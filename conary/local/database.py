@@ -1125,7 +1125,17 @@ class Database(SqlDbRepository):
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
             if not os.path.exists(self.rollbackCache):
-                util.mkdirChain(self.rollbackCache)
+                try:
+                    util.mkdirChain(self.rollbackCache)
+                except OSError, e:
+                    if e.errno == errno.ENOTDIR:
+                        # when making a directory, the partent
+                        # wat not a directory
+                        d = os.path.dirname(e.filename)
+                        raise OpenError(top, '%s is not a directory' %d)
+                    else:
+                        raise
+
             if not os.path.exists(self.rollbackStatus):
                 self.firstRollback = 0
                 self.lastRollback = -1

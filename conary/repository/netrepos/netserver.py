@@ -788,7 +788,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 coreQdict["domain"] = """
                 JOIN Instances AS Domain ON
                     Items.itemId = Domain.itemId AND
-                    Domain.troveType %s """ % s
+                    Domain.troveType %s AND
+                    Domain.isPresent=1""" % s
             coreQdict["domain"] += """
             JOIN Nodes ON
                 Domain.itemId = Nodes.itemId AND

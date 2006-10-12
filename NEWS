@@ -1,47 +1,70 @@
 Changes in @NEW@:
   o Client Changes:
-    * Erases of critical troves is no longer considered a reason to restart
-      conary.
-    * You can now delete troves, update from changesets, and update with a
-      full version specified without an installLabelPath set. (CNY-281)
-    * The "conary rm" command has been added as an alias for the
-      "conary remove" command. (CNY-952)
+    * You can now delete troves, update from changeset files, and
+      update with a full version specified without an installLabelPath
+      set. (CNY-281)
+    * "conary rm" has been added as an alias for the "conary remove"
+      command. (CNY-952)
     * Conary now produces an error message when an invalid context is
       specified. (CNY-890)
+    * User settings in a context will override but not remove user
+      settings from the main conary configuration file. (CNY-972)
 
   o Build (cvc) Changes:
-    * When building a group, if you turn the last byDefault True component
-      to byDefault False, for a package, that will turn the package itself
-      byDefault False.  This avoids installing empty shells of packages
-      on the system. (CNY-774)
-    * Java files in which cvc fails to discover any provided or required
-      interfaces (for example, due to EAR dependencies) previously caused
-      a traceback, but no longer does. (CNY-964)
+    * "cvc cook --prep" now warns about missing dependencies instead
+      of raising an error.  "cvc cook --download" does not warn or
+      error. (CNY-787)
+    * In a group recipe, if you use r.remove() to remove a component
+      from a package in a group (which marks the component
+      byDefault=False), and the package no longer contains any
+      byDefault=True components, the package itself will also be made
+      byDefault=False. This avoids installing packages with no
+      components on the system. (CNY-774)
+    * Previously, Java files that have no discoverable provided or
+      required interfaces (for example, due to EAR dependencies)
+      caused a traceback.  Conary now handles this case correctly and
+      does not traceback.
+    * Merging when the current version is already based on the parent
+      version now gives an error message instead of writing out an
+      incorrect CONARY file (CNY-968)
 
   o Bug Fixes:
-    * Fixed a bug triggered when a critical update of a trove depended on 
-      an erase.
+    * Erases of critical troves is no longer considered a reason to
+      restart Conary.
+    * A bug triggered when a critical update of a trove depended on an
+      erase has been fixed.
     * A bug that caused changesets to be invalidated from the
       changeset cache when signatures were not modified by
       setTroveSigs() has been fixed.
     * A bug that caused an Internal Server Error (ISE) when attempting
       to browse the files in a shadowed component via the Conary
       repository browser has been fixed. (CNY-926)
-    * A bug introduced 1.0.32 that affected the ability to update two troves
-      due to the same broken dependency with resolveLevel 2 has been fixed.
-      This bug affected the ability to simply run "conary update conary" when 
-      conary-build and conary-repository will both installed. (CNY-949)
-    * Conary will now display config lines that are equivalent to the default
-      configuration value but are set explicitly by the user. (CNY-959)
-    * includeConfigFile within a context will now include the file also
-      within that context. (CNY-622)
+    * A bug introduced 1.0.32 that affected the ability to update two
+      troves due to the same broken dependency when using
+      "resolveLevel 2" has been fixed.  This bug affected the ability
+      to simply run "conary update conary" when conary-build and
+      conary-repository will both installed. (CNY-949)
+    * Conary will now display config lines that are equivalent to the
+      default configuration value but are set explicitly by the
+      user. (CNY-959)
+    * Specifying "includeConfigFile" within a context will now include
+      the file also within that context. (CNY-622)
     * A memory leak in conary.lib.misc.depSplit() has been fixed.
-    * The client no longer loops forever trying to create cross-repository
-      relative changesets when the trove is missing from one of the
-      repositories. (CNY-948)
-    * Repositories no longer return empty troves when createChangeSet() is
-      called on troves which are referenced within the repository but present
-      on a remote repository (CNY-948)
+    * The client no longer loops forever trying to create
+      cross-repository relative changesets when the trove is missing
+      from one of the repositories. (CNY-948)
+    * Repositories no longer return empty troves when
+      createChangeSet() is called on troves which are referenced
+      within the repository but present on a remote repository.
+      (CNY-948)
+    * Repository queries no longer return matches for troves which are
+      referenced by groups but are not present in the
+      repository. (CNY-947)
+    * Specifying a root (through conaryrc configuration or the
+      "--root" command line parameter) that is not a directory no
+      longer results in an unhandled exception. (CNY-814)
+    * Renaming and changing a source file no longer results in
+      tracebacks on "cvc update" and "cvc merge" (CNY-944, CNY-967)
 
 Changes in 1.1.6:
   o Client Changes:

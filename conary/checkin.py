@@ -1098,6 +1098,11 @@ def merge(repos, versionSpec=None, callback=None):
         log.error("Cannot merge: version specified is before the last "
                   "merge point, would be merging backwards")
         return
+    elif parentHeadVersion == parentRootVersion:
+        # merging to the version we're based on doesn't make much sense
+        log.error("No changes have been made on the parent branch; nothing "
+                  "to merge.")
+        return
 
     changeSet = repos.createChangeSet([(troveName,
                             (parentRootVersion, deps.deps.Flavor()), 

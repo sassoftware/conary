@@ -805,8 +805,10 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                                       sourceVersion.branch().label(),
                                       use.usedFlagsToFlavor(recipeClass.name)))
 
-    recipeObj.checkBuildRequirements(cfg, sourceVersion, 
-                                     ignoreDeps=ignoreDeps)
+    if not downloadOnly:
+        # no point in checking/recording buildreqs when we're not building.
+        recipeObj.checkBuildRequirements(cfg, sourceVersion,
+                                         raiseError=not (ignoreDeps or prep))
 
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
