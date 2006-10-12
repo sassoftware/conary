@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.7:
   o Client Changes:
     * You can now delete troves, update from changeset files, and
       update with a full version specified without an installLabelPath
