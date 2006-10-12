@@ -14,7 +14,6 @@
 
 import os
 import re
-import time
 
 from conary import sqlite3
 
@@ -31,7 +30,7 @@ def _regexp(pattern, item):
     return regexp.match(item) is not None
 # a timestamp function compatible with other backends
 def _timestamp():
-    return long(time.strftime("%Y%m%d%H%M%S", time.gmtime(time.time())))
+    return sqllib.toDatabaseTimestamp()
 
 class Cursor(BaseCursor):
     driver = "sqlite"
