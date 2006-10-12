@@ -8,6 +8,10 @@ Changes in @NEW@:
       "conary remove" command. (CNY-952)
     * Conary now produces an error message when an invalid context is
       specified. (CNY-890)
+    * --prep now warns about missing dependencies instead of raising an error.
+      --download does not warn or error. (CNY-787)
+    * User settings in a context will override but not remove user settings
+      from the main conary configuration file. (CNY-972) 
 
   o Build (cvc) Changes:
     * When building a group, if you turn the last byDefault True component
@@ -19,8 +23,8 @@ Changes in @NEW@:
       a traceback, but no longer does. (CNY-964)
 
   o Bug Fixes:
-    * Fixed a bug triggered when a critical update of a trove depended on 
-      an erase.
+    * A bug triggered when a critical update of a trove depended on an
+      erase has been fixed.
     * A bug that caused changesets to be invalidated from the
       changeset cache when signatures were not modified by
       setTroveSigs() has been fixed.
@@ -29,7 +33,7 @@ Changes in @NEW@:
       repository browser has been fixed. (CNY-926)
     * A bug introduced 1.0.32 that affected the ability to update two troves
       due to the same broken dependency with resolveLevel 2 has been fixed.
-      This bug affected the ability to simply run "conary update conary" when 
+      This bug affected the ability to simply run "conary update conary" when
       conary-build and conary-repository will both installed. (CNY-949)
     * Conary will now display config lines that are equivalent to the default
       configuration value but are set explicitly by the user. (CNY-959)
@@ -44,6 +48,14 @@ Changes in @NEW@:
       on a remote repository (CNY-948)
     * Repository queries no longer return matches for troves which are
       referenced by groups but are not present in the repository. (CNY-947)
+    * Specifying a root (through conaryrc configuration or the
+      "--root" command line parameter) that is not a directory no
+      longer results in an unhandled exception. (CNY-814)
+    * Renaming and changing a source file no longer results in tracebacks
+      on cvc update and cvc merge (CNY-944, CNY-967)
+    * Merging when the current version is already based on the parent version
+      now gives an error message instead of writing out an incorrect
+      CONARY file (CNY-968)
 
 Changes in 1.0.33:
   o Client Changes:

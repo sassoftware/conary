@@ -1028,7 +1028,7 @@ class FilesystemJob:
             # to see if we need to go into the if statement which follows
             # this rather then having to look up the file from the old
             # trove for every file which has changed
-            fsFile = files.FileFromFilesystem(realPath, pathId)
+            fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
 
             # link groups come from the database; they aren't inferred from
             # the filesystem
