@@ -1233,6 +1233,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 args = (target, cs, server, job, recurse, withFiles,
                         withFileContents, excludeAutoSource,
                         filesNeeded, chgSetList, removedList)
+
                 try:
                     if server.__class__ == ServerProxy:
                         # this is a XML-RPC proxy for a remote repository
