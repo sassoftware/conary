@@ -12,7 +12,9 @@
 # full details.
 #
 
-python_files = schema.py  sqlite2mysql.py  sqlite2pgsql.py sqlite2sqlite.py
+python_files = schema.py  \
+               sqlite2mysql.py  sqlite2pgsql.py sqlite2sqlite.py \
+	       mysql2pgsql.py
 
 extra_dist = Makefile
 
