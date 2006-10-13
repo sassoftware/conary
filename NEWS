@@ -1,3 +1,7 @@
+Changes in @NEW@:
+  o PostgreSQL support has been finalized and some SQL queries have
+    been updated in the repository code for PostgreSQL compatibility
+
 Changes in 1.0.34:
   o Client Changes:
     * You can now delete troves, update from changeset files, and
