@@ -1081,10 +1081,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         def _getCsFromShim(target, cs, server, job, recurse, withFiles,
                            withFileContents, excludeAutoSource,
                            filesNeeded, chgSetList):
-            (cs, extraTroveList, extraFileList) = \
+            (newCs, extraTroveList, extraFileList) = \
                   server.getChangeSetObj(job, recurse,
                                          withFiles, withFileContents,
                                          excludeAutoSource)
+            if not cs:
+                cs = newCs
+            else:
+                cs.merge(newCs)
             return cs, extraTroveList, extraFileList
 
         if not chgSetList:
