@@ -1,4 +1,4 @@
-Changes in @NEW@
+Changes in 1.0.35:
   o Bug Fixes:
     * The fix for CNY-926, which allows a ShimNetClient to create
       changes directly from an in-process Conary Repository, did not
