@@ -1,3 +1,7 @@
+Changes in @NEW@:
+  o PostgreSQL support has been finalized and some SQL queries have
+    been updated in the repository code for PostgreSQL compatibility
+
 Changes in 1.0.35:
   o Bug Fixes:
     * The fix for CNY-926, which allows a ShimNetClient to create
