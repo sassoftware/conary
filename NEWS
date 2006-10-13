@@ -3,6 +3,8 @@ Changes in @NEW@
     * The fix for CNY-926, which allows a ShimNetClient to create
       changes directly from an in-process Conary Repository, did not
       properly merge changesets when multiple servers were involved.
+    * The r.setByDefault() method in group recipes was broken in
+      1.0.34.  It would cause a traceback.  This has been fixed.
 
 Changes in 1.0.34:
   o Client Changes:
