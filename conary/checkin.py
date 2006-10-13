@@ -376,7 +376,12 @@ def commit(repos, cfg, message, callback=None, test=False):
             if not f.flags.isAutoSource(): continue
             path = srcPkg.getFile(f.pathId())[0]
 
-            if path not in srcMap:
+            # XXX this check is a hack -- it assumes if a path isn't
+            # in the srcMap for autosource files and it's not in the
+            # current directory, it is supposed to be removed. The
+            # current directory check lets us convert autosources files
+            # to non-autosources ones.
+            if path not in srcMap and not util.exists(path):
                 # the file doesn't exist anymore
                 state.removeFilePath(path)
 

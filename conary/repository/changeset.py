@@ -1242,7 +1242,11 @@ def fileChangeSet(pathId, old, new):
     return (diff, contentsHash)
 
 def fileContentsUseDiff(oldFile, newFile):
-    return oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig()
+    # Don't use diff's for config files when the autosource flag changes
+    # because the client may not have anything around it can apply the diff 
+    # to.
+    return oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig() \
+           and (oldFile.flags.isAutoSource() == newFile.flags.isAutoSource())
 
 def fileContentsDiff(oldFile, oldCont, newFile, newCont):
     if fileContentsUseDiff(oldFile, newFile):

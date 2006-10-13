@@ -15,6 +15,10 @@ Changes in 1.0.35:
     * The r.setByDefault() method in group recipes was broken in
       1.0.34.  It would cause a traceback.  This has been fixed.
 
+  o Bug Fixes:
+    * cvc now allows files to be switched from autosource to normal
+      and from normal to autosourced (CNY-946)
+
 Changes in 1.0.34:
   o Client Changes:
     * You can now delete troves, update from changeset files, and
