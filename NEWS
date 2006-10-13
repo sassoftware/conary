@@ -1,3 +1,9 @@
+Changes in @NEW@
+  o Bug Fixes:
+    * The fix for CNY-926, which allows a ShimNetClient to create
+      changes directly from an in-process Conary Repository, did not
+      properly merge changesets when multiple servers were involved.
+
 Changes in 1.0.34:
   o Client Changes:
     * You can now delete troves, update from changeset files, and
