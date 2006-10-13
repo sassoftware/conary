@@ -1128,7 +1128,7 @@ class SingleGroup(object):
         else:
             self.troves[name, version, flavor] = (False, False, comps,
                                                   childByDefaults)
-    def setByDefault(self, name, version, flavor, byDefault):
+    def setTroveByDefault(self, name, version, flavor, byDefault):
         (explicit, oldByDefault, comps, childByDefaults) \
                                         = self.troves[name, version, flavor]
         self.troves[name, version, flavor] = (explicit, byDefault, comps,
@@ -1777,7 +1777,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
             continue
         log.debug("Setting byDefault False for %s=%s[%s] because it doesn't"
                   " contain any byDefault True components" % (pkgTup))
-        group.setByDefault(byDefault=False, *pkgTup)
+        group.setTroveByDefault(byDefault=False, *pkgTup)
 
     if unmatchedRemoveSpecs:
         log.warning(GroupUnmatchedRemoves(unmatchedRemoveSpecs, group))
