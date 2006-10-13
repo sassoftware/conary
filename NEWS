@@ -1,6 +1,11 @@
 Changes in @NEW@:
   o PostgreSQL support has been finalized and some SQL queries have
     been updated in the repository code for PostgreSQL compatibility
+  
+  o Bug Fixes:
+    * A bug has been fixed that caused group cook with a replace or remove 
+      with a flavor and no matching trove to emit a traceback instead of a
+      warning. (CNY-977)
 
 Changes in 1.0.35:
   o Bug Fixes:

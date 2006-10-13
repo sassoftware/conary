@@ -101,7 +101,7 @@ class _UnmatchedSpecs(CookError):
             ver = flavor = ''
             if troveSpec[1]:
                 ver = '=%s' % troveSpec[1]
-            if troveSpec[2]:
+            if troveSpec[2] is not None:
                 flavor = '[%s]' % troveSpec[2]
             lns.append('    %s%s%s\n' % (troveSpec[0], ver, flavor))
         self.args = (''.join(lns),)
