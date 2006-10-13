@@ -358,8 +358,7 @@ class NetworkAuthorization:
             if itemId:
                 itemId = itemId[0]
             else:
-                cu.execute("INSERT INTO Items (itemId, item) VALUES(NULL, ?)",
-                           trovePattern)
+                cu.execute("INSERT INTO Items (item) VALUES(?)", trovePattern)
                 itemId = cu.lastrowid
         else:
             itemId = 0
@@ -370,7 +369,7 @@ class NetworkAuthorization:
             if labelId:
                 labelId = labelId[0]
             else:
-                cu.execute("INSERT INTO Labels (labelId, label) VALUES(NULL, ?)", label)
+                cu.execute("INSERT INTO Labels (label) VALUES(?)", label)
                 labelId = cu.lastrowid
         else:
             labelId = 0
@@ -777,6 +776,7 @@ class NetworkAuthorization:
             raise errors.GroupNotFound
         assert(len(l) == 1)
         userGroupId = l[0][0]
+
         cu.execute("INSERT INTO EntitlementGroups (entGroup) "
                    "VALUES (?)", entGroup)
         entGroupId = cu.lastrowid

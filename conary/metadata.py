@@ -93,12 +93,11 @@ class MetadataTable:
             return None
 
         # URL, LICENSE, and CATEGORY are not translated
-        cu.execute("""SELECT class, data FROM MetadataItems
-                      WHERE metadataId=? and (language=?
-                            OR class IN (?, ?, ?))""",
-                   metadataId, language, MDClass.URL,
-                                         MDClass.LICENSE,
-                                         MDClass.CATEGORY)
+        cu.execute("""
+        SELECT class, data FROM MetadataItems
+        WHERE metadataId=? and (language=? OR class IN (?, ?, ?))
+        """, (metadataId, language,
+              MDClass.URL, MDClass.LICENSE, MDClass.CATEGORY))
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
@@ -123,6 +122,9 @@ class MetadataTable:
             elif classType == MDClass.LIST:
                 items[className].append(data)
 
+        for key, value in items.iteritems():
+            if isinstance(value, list):
+                items[key] = sorted(value)
         return items
 
     def getLatestVersion(self, itemId, branchId):
