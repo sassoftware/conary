@@ -1147,30 +1147,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 copyCallback = None
                 abortCheck = None
 
-            try:
-                # seek to the end of the file
-                outFile.seek(0, 2)
-                start = outFile.tell()
-                totalSize = util.copyfileobj(inF, outFile,
-                                             callback = copyCallback,
-                                             abortCheck = abortCheck,
-                                             rateLimit = self.downloadRateLimit)
+            # seek to the end of the file
+            outFile.seek(0, 2)
+            start = outFile.tell()
+            totalSize = util.copyfileobj(inF, outFile,
+                                         callback = copyCallback,
+                                         abortCheck = abortCheck,
+                                         rateLimit = self.downloadRateLimit)
 
-                # attempt to remove temporary local files
-                # possibly created by a shim client
-                if os.path.exists(url) and os.access(url, os.W_OK):
-                    os.unlink(url)
+            # attempt to remove temporary local files
+            # possibly created by a shim client
+            if os.path.exists(url) and os.access(url, os.W_OK):
+                os.unlink(url)
 
-                if totalSize == None:
-                    sys.exit(0)
-                #assert(totalSize == sum(sizes))
-                inF.close()
-            except:
-                if target and os.path.exists(target):
-                    os.unlink(target)
-                elif os.path.exists(tmpName):
-                    os.unlink(tmpName)
-                raise
+            if totalSize == None:
+                sys.exit(0)
+            #assert(totalSize == sum(sizes))
+            inF.close()
 
             for size in sizes:
                 f = util.SeekableNestedFile(outFile, size, start)
@@ -1191,10 +1184,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         def _getCsFromShim(target, cs, server, job, recurse, withFiles,
                            withFileContents, excludeAutoSource,
                            filesNeeded, chgSetList, removedList):
-            (cs, extraTroveList, extraFileList, removedList) = \
+            (newCs, extraTroveList, extraFileList, removedList) = \
                   server.getChangeSetObj(job, recurse,
                                          withFiles, withFileContents,
                                          excludeAutoSource)
+            if not cs:
+                cs = newCs
+            else:
+                cs.merge(newCs)
             return cs, extraTroveList, extraFileList
 
         if not chgSetList:
@@ -1236,12 +1233,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 args = (target, cs, server, job, recurse, withFiles,
                         withFileContents, excludeAutoSource,
                         filesNeeded, chgSetList, removedList)
-                if server.__class__ == ServerProxy:
-                    # this is a XML-RPC proxy for a remote repository
-                    cs, extraTroveList, extraFileList = _getCsFromRepos(*args)
-                else:
-                    # assume we are a shim repository
-                    cs, extraTroveList, extraFileList = _getCsFromShim(*args)
+                try:
+                    if server.__class__ == ServerProxy:
+                        # this is a XML-RPC proxy for a remote repository
+                        rc = _getCsFromRepos(*args)
+                    else:
+                        # assume we are a shim repository
+                        rc = _getCsFromShim(*args)
+                    cs, extraTroveList, extraFileList = rc
+                except Exception:
+                    if target and os.path.exists(target):
+                        os.unlink(target)
+                    elif os.path.exists(tmpName):
+                        os.unlink(tmpName)
+                    raise
 
                 chgSetList += extraTroveList
                 filesNeeded += extraFileList
