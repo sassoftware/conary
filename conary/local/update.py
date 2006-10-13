@@ -1014,9 +1014,24 @@ class FilesystemJob:
             # the headFileId, not the fsFileId
 
             # autosource files don't get merged
-            if baseFile.flags.isAutoSource():
+            if headFile.flags.isAutoSource():
                 fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId,
                                 isConfig = headFile.flags.isConfig())
+                if not baseFile.flags.isAutoSource():
+                    # we need to remove this file because it's now autosourced
+                    self._remove(baseFile, realPath,
+                                 "removing %s (it is now autosourced)")
+                continue
+            elif baseFile.flags.isAutoSource():
+                # This file used to be autosourced but it isn't anymore.
+                # Just go ahead and create it.
+                fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
+                                isConfig = headFile.flags.isConfig())
+                self._restore(headFile, realPath, newTroveInfo,
+                              filePriorityPath,
+                              "creating %s with contents "
+                              "from repository",
+                              replaceFiles = replaceFiles)
                 continue
             elif isSrcTrove:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
@@ -1570,7 +1585,6 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 	if isSrcTrove:
 	    f.flags.isSource(set = True)
             f.flags.isAutoSource(set = isAutoSource)
-            assert(srcFile.flags.isAutoSource() == f.flags.isAutoSource())
 
         # the link group doesn't change due to local mods
         if srcFile.hasContents and f.hasContents:

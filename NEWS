@@ -2,6 +2,10 @@ Changes in @NEW@:
   o PostgreSQL support has been finalized and some SQL queries have
     been updated in the repository code for PostgreSQL compatibility
 
+  o Bug Fixes:
+    * cvc now allows files to be switched from autosource to normal
+      and from normal to autosourced (CNY-946)
+
 Changes in 1.0.34:
   o Client Changes:
     * You can now delete troves, update from changeset files, and
