@@ -118,7 +118,7 @@ def timings(current, total, tstart):
 def getfunc(field):
     binaryCols = [
         "salt", "password", "data", "entitlement", "pgpkey",
-        "stream", "fileid", "pathid" ]
+        "stream", "fileid", "pathid", "sha1" ]
     if field.lower() in binaryCols:
         return dst.binary
     return lambda a: a
@@ -140,6 +140,39 @@ for t in tList:
         Table: %s
         src: %s
         dst: %s""" % (t, f1, f2))
+
+# update the primary key sequence
+def fix_pk(table):
+    # get the name of the primary key
+    dst.execute("""
+    select
+        t.relname as table_name,
+        ind.relname as pk_name,
+        col.attname as column_name
+    from pg_class t
+    join pg_index i on t.oid = i.indrelid and i.indisprimary = true
+    join pg_class ind on i.indexrelid = ind.oid
+    join pg_attribute col on col.attrelid = t.oid and col.attnum = i.indkey[0]
+    where
+        t.relname = ?
+    and i.indnatts = 1
+    and pg_catalog.pg_table_is_visible(t.oid)
+    """, table.lower())
+    ret = dst.fetchall()
+    if not len(ret):
+        return
+    pkname = ret[0][2]
+    # get the max seq value
+    dst.execute("select max(%s) from %s" % (pkname, table))
+    pkval = dst.fetchall()[0][0]
+    if not pkval:
+        pkval = 1
+    # now reset the sequence for the primary key
+    dst.execute("select pg_catalog.setval(pg_catalog.pg_get_serial_sequence(?, ?), ?, false)",
+                table.lower(), pkname.lower(), pkval)
+    ret = dst.fetchall()[0][0]
+    assert (ret == pkval)
+    print "    SETVAL %s(%s) = %d" % (table, pkname, ret)
 
 for t in tList:
     count = src.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
@@ -182,6 +215,7 @@ for t in tList:
             if i % 10000 == 0:
                 pgsql.commit()
     print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
+    fix_pk(t)
     pgsql.commit()
 
 # and now create the indexes
