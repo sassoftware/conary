@@ -11,6 +11,8 @@ Changes in @NEW@:
       takes paths into account, if there's a choice to make between matching
       up two old troves that are otherwise equivalent with a new trove, conary
       will choose the one that shares paths with the new trove. (CNY-819)
+    * Conary will now allow "conary migrate --info" and "conary migrate
+      --interactive" without displaying usage information. (CNY-985)
 
   o Build Changes:
     * cvc now allows files to be switched from autosource to normal
