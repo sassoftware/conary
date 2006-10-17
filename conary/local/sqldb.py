@@ -1752,7 +1752,7 @@ order by
                 versionId = self.versionTable.get(version, None)
                 if versionId is None:
                     continue
-                r.append([])
+                r.append(None)
                 yield (i, name, versionId, flavorId)
 
         cu.executemany("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",

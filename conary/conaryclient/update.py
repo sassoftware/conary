@@ -244,6 +244,24 @@ class ClientUpdate:
                            alwaysFollowLocalChanges=False,
                            removeNotByDefault = False):
 
+        def lookupPathHashes(infoList, old = False):
+            result = []
+            if old:
+                for s in self.db.getPathHashesForTroveList(infoList):
+                    if s is None:
+                        result.append(set())
+                    else:
+                        result.append(s)
+
+                return result
+            else:
+                troveSource = uJob.getTroveSource()
+                for info in infoList:
+                    ph = troveSource.getTrove(withFiles = False, *info).\
+                                    getPathHashes()
+                    result.append(ph)
+
+            return result
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse,
                           ineligible):
@@ -600,7 +618,8 @@ class ClientUpdate:
         [ existsTrv.addTrove(*x) for x in installedTroves ]
         [ existsTrv.addTrove(*x) for x in referencedNotInstalled ]
 
-        jobList = availableTrove.diff(existsTrv)[2]
+        jobList = availableTrove.diff(existsTrv,
+                                      getPathHashes=lookupPathHashes)[2]
 
         # alreadyReferenced troves are in both the update set 
         # and the installed set.  They are a good match for themselves.

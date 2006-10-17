@@ -47,27 +47,46 @@ def post(port, isSecure, repos, req):
         protocol = "http"
 
     if req.headers_in['Content-Type'] == "text/xml":
+        # handle XML-RPC requests
         encoding = req.headers_in.get('Content-Encoding', None)
-        data = req.read()
-        if encoding == 'deflate':
-            data = zlib.decompress(data)
-
-        startTime = time.time()
-        (params, method) = xmlrpclib.loads(data)
-        repos.log(3, "decoding=%s" % method, authToken[0],
-                  "%.3f" % (time.time()-startTime))
         try:
-            result = repos.callWrapper(protocol, port, method, authToken,
-                                       params,
-                                       remoteIp = req.connection.remote_ip)
-        except errors.InsufficientPermission:
-            return apache.HTTP_FORBIDDEN
+            data = req.read()
+        except IOError, e:
+            # if we got a read timeout, marshal an exception back
+            # to the client
+            print >> sys.stderr, 'error reading from client: %s' %e
+            result = (False, True, ('ClientTimeout',
+                                    'The server was not able to read the '
+                                    'XML-RPC request sent by this client. '
+                                    'This is sometimes caused by MTU problems '
+                                    'on your network connection.  Using a '
+                                    'smaller MTU may work around this '
+                                    'problem.'))
+            resp = xmlrpclib.dumps((result,), methodresponse=1)
+        else:
+            # otherwise, we've read the data, let's process it
+            if encoding == 'deflate':
+                data = zlib.decompress(data)
+
+            startTime = time.time()
+            (params, method) = xmlrpclib.loads(data)
+            repos.log(3, "decoding=%s" % method, authToken[0],
+                      "%.3f" % (time.time()-startTime))
+            try:
+                result = repos.callWrapper(protocol, port, method, authToken,
+                                           params,
+                                           remoteIp = req.connection.remote_ip)
+            except errors.InsufficientPermission:
+                return apache.HTTP_FORBIDDEN
+            resp = xmlrpclib.dumps((result,), methodresponse=1)
+            repos.log(1, method, "time=%.3f size=%d" % (time.time()-startTime,
+                                                        len(resp)))
+
         usedAnonymous = result[0]
         result = result[1:]
 
-        resp = xmlrpclib.dumps((result,), methodresponse=1)
-        repos.log(1, method, "time=%.3f size=%d" % (time.time()-startTime, len(resp)))
         req.content_type = "text/xml"
+        # check to see if the client will accept a compressed response
         encoding = req.headers_in.get('Accept-encoding', '')
         if len(resp) > 200 and 'deflate' in encoding:
             req.headers_out['Content-encoding'] = 'deflate'
@@ -78,6 +97,7 @@ def post(port, isSecure, repos, req):
         req.write(resp)
         return apache.OK
     else:
+        # Handle HTTP (web browser) requests
         from conary.server.http import HttpHandler
         httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port)
         return httpHandler._methodHandler()

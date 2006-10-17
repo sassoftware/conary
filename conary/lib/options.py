@@ -63,12 +63,18 @@ class OptionParser(optparse.OptionParser):
                                                              values)
 
     def _process_long_opt(self, rargs, values):
+        opt = self._match_long_opt(rargs[0].split('=')[0])
+
+        option = self._long_opt[opt]
+
         if '=' in rargs[0]:
             had_explicit_value = True
+            if option.callback in (strictOptParamCallback, optParamCallback):
+                rargs[:] = rargs[0].split('=', 1) + rargs[1:]
+                self.rargs = rargs
         else:
             had_explicit_value = False
-        opt = self._match_long_opt(rargs[0].split('=')[0])
-        option = self._long_opt[opt]
+
         option.had_explicit_value = had_explicit_value
         return optparse.OptionParser._process_long_opt(self, rargs, values)
 

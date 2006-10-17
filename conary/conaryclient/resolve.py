@@ -417,7 +417,8 @@ class DependencySolver(object):
             # first: attempt to update packages that dependended on the missing
             # package.
             log.debug('Update breaks dependencies!')
-            for reqInfo, depSet, provInfo in sorted(cannotResolve):
+            for reqInfo, depSet, provInfo in sorted(cannotResolve,
+                                                    key=lambda x:x[0][0]):
                 depSet = '\n     '.join(str(depSet).split('\n'))
                 msg = (
                     'Broken dependency: (dep needed by the system but being removed):\n'
@@ -562,7 +563,7 @@ class DependencySolver(object):
 
         if newJobSet:
             log.debug('updated %s troves:\n   %s', len(newJobSet), 
-                       '\n   '.join('%s=%s/%s[%s]' % (x[0], x[2][0].branch().label(), x[2][0].trailingRevision(), x[2][1]) for x in sorted(newJobSet) if x[2][0]))
+                       '\n   '.join(sorted('%s=%s/%s[%s]' % (x[0], x[2][0].branch().label(), x[2][0].trailingRevision(), x[2][1]) for x in newJobSet if x[2][0])))
 
         return cannotResolve, newJobSet
 

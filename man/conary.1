@@ -108,7 +108,7 @@ that is; if you run \fBconary remove /foo/bar\fP and \fI/foo/bar\fP
 is later renamed \fI/foo/blah\fP, when you update to a version of
 the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
-as a new file.)
+as a new file.) The \fBremove\fP command can also be invoked as \fBrm\fP.
 
 .TP
 .B rollback \fI<identifier>\fP
@@ -463,6 +463,7 @@ Displays information about the troves that provide dep <dep>, if any.
 The \fBshowcs\fP command lists the contents of the provided 
 \fBchangeset\fP.  If a trove is specified, and that trove is within the 
 changeset, only that trove is displayed.  If no trove is specified, the \fBprimary troves\fP in changeset are displayed.  Primary troves are defined in the jargon section below.
+The \fBshowcs\fP command can also be invoked as \fBscs\fP.
 .RS 4
 .TP 4
 .B \-\-show-changes
