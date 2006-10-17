@@ -12,14 +12,17 @@ Changes in @NEW@:
       up two old troves that are otherwise equivalent with a new trove, conary
       will choose the one that shares paths with the new trove. (CNY-819)
 
-  o Bug Fixes:
-    * A bug has been fixed that caused group cook with a replace or
-      remove with a flavor and no matching trove to emit a traceback
-      instead of a warning. (CNY-977)
+  o Build Changes:
     * cvc now allows files to be switched from autosource to normal
-      and from normal to autosourced (CNY-946)
-    * Fixed a bug that tracebacked when two packages with the same
-      name require a package that was being erased.
+      and from normal to autosourced. (CNY-946)
+
+  o Bug Fixes:
+    * A bug that caused group cook with a replace or remove with a
+      flavor and no matching trove to emit a traceback instead of a
+      warning has been fixed. (CNY-977)
+    * A bug that caused an unhandled exception when two packages with
+      the same name require a trove that was being erased has been
+      fixed.
 
 Changes in 1.0.35:
   o Bug Fixes:
