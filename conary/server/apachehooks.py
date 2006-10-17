@@ -62,6 +62,7 @@ def post(port, isSecure, repos, req):
                                     'on your network connection.  Using a '
                                     'smaller MTU may work around this '
                                     'problem.'))
+            resp = xmlrpclib.dumps((result,), methodresponse=1)
         else:
             # otherwise, we've read the data, let's process it
             if encoding == 'deflate':
@@ -77,13 +78,13 @@ def post(port, isSecure, repos, req):
                                            remoteIp = req.connection.remote_ip)
             except errors.InsufficientPermission:
                 return apache.HTTP_FORBIDDEN
+            resp = xmlrpclib.dumps((result,), methodresponse=1)
             repos.log(1, method, "time=%.3f size=%d" % (time.time()-startTime,
                                                         len(resp)))
 
         usedAnonymous = result[0]
         result = result[1:]
 
-        resp = xmlrpclib.dumps((result,), methodresponse=1)
         req.content_type = "text/xml"
         # check to see if the client will accept a compressed response
         encoding = req.headers_in.get('Accept-encoding', '')
