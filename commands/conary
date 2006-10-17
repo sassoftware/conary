@@ -52,13 +52,7 @@ from conary.conaryclient import cmdline
 sys.excepthook = util.genExcepthook(debug=True)
 
 def usage(rc = 1):
-    print 'Conary Software Configuration Management System'
-    print
-    print 'basic commands (use "conary help" for the full list)'
-    for command in _commands:
-        print command.commands[0], command.paramHelp
-
-def help():
+    print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>"
     print "       conary commit       <changeset>"
     print "       conary config"
     print "       conary emerge       <troveName>+"
@@ -328,20 +322,15 @@ class LocalCommitCommand(ConaryCommand):
 _register(LocalCommitCommand)
 
 
-class PinUnpinCommand(ConaryCommand):
+class PinCommand(ConaryCommand):
+    commands = ['pin', 'unpin']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
 
     def runCommand(self, cfg, argSet, otherArgs):
         if argSet: return self.usage()
         updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
-
-class PinCommand(PinUnpinCommand):
-    commands = ['pin']
 _register(PinCommand)
 
-class PinCommand(PinUnpinCommand):
-    commands = ['unpin']
-_register(PinCommand)
 
 class RemoveCommand(ConaryCommand):
     commands = ['remove', 'rm']
