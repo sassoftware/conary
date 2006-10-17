@@ -57,8 +57,11 @@ def post(port, isSecure, repos, req):
             print >> sys.stderr, 'error reading from client: %s' %e
             result = (False, True, ('ClientTimeout',
                                     'The server was not able to read the '
-                                    'XML-RPC request sent by this client'))
-
+                                    'XML-RPC request sent by this client. '
+                                    'This is sometimes caused by MTU problems '
+                                    'on your network connection.  Using a '
+                                    'smaller MTU may work around this '
+                                    'problem.'))
         else:
             # otherwise, we've read the data, let's process it
             if encoding == 'deflate':
