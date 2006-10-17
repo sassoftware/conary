@@ -1054,7 +1054,7 @@ class Trove(streams.StreamSet):
     def __ne__(self, them):
 	return not self == them
 
-    def diff(self, them, absolute = 0):
+    def diff(self, them, absolute = 0, getPathHashes = None):
 	"""
 	Generates a change set between them (considered the old
 	version) and this instance. We return the change set, a list
@@ -1089,88 +1089,6 @@ class Trove(streams.StreamSet):
                 d.setdefault(info[2], []).append(info[1])
 
             return byBr
-
-        def _versionMatch(oldInfoSet, newInfoSet):
-            # Match by version; use the closeness measure for items on
-            # different branches and the timestamps for the same branch. If the
-            # same version exists twice here, it means the flavors are
-            # incompatible or tied; in either case the flavor won't help us
-            # much.
-            matches = []
-            byBranch = {}
-            # we need copies we can update
-            oldInfoSet = set(oldInfoSet)
-            newInfoSet = set(newInfoSet)
-
-            for newInfo in newInfoSet:
-                for oldInfo in oldInfoSet:
-                    if newInfo[1].branch() == oldInfo[1].branch():
-                        l = byBranch.setdefault(newInfo, [])
-                        l.append(((oldInfo[1].trailingRevision(), oldInfo)))
-
-            # pass 1, find things on the same branch
-            for newInfo, oldInfoList in sorted(byBranch.items()):
-                # take the newest (by timestamp) item from oldInfoList which
-                # hasn't been matched to anything else 
-                oldInfoList.sort()
-                oldInfoList.reverse()
-                name = newInfo[0]
-
-                for revision, oldInfo in oldInfoList:
-                    if oldInfo not in oldInfoSet: continue
-                    matches.append((oldInfo, newInfo))
-                    oldInfoSet.remove(oldInfo)
-                    newInfoSet.remove(newInfo)
-                    break
-
-            del byBranch
-
-            # pass 2, match across branches -- we know there is nothing left
-            # on the same branch anymore
-            scored = []
-            for newInfo in newInfoSet:
-                for oldInfo in oldInfoSet:
-                    score = newInfo[1].closeness(oldInfo[1])
-                    # score 0 are have nothing in common
-                    if not score: continue
-                    scored.append((score, oldInfo, newInfo))
-
-            # high scores are better
-            scored.sort()
-            scored.reverse()
-            for score, oldInfo, newInfo in scored:
-                if oldInfo not in oldInfoSet: continue
-                if newInfo not in newInfoSet: continue
-
-                matches.append((oldInfo, newInfo))
-                oldInfoSet.remove(oldInfo)
-                newInfoSet.remove(newInfo)
-
-            # the dregs are left. we do straight matching by timestamp here;
-            # newest goes with newest, etc
-            newList = []
-            oldList = []
-            for newInfo in newInfoSet:
-                newList.append((newInfo[1].trailingRevision(), newInfo))
-            newList.sort()
-            newList.reverse()
-                                
-            for oldInfo in oldInfoSet:
-                oldList.append((oldInfo[1].trailingRevision(), oldInfo))
-            oldList.sort()
-            oldList.reverse()
-
-            for ((oldTs, oldInfo), (newTs, newInfo)) in \
-                                            itertools.izip(oldList, newList):
-                matches.append((oldInfo, newInfo))
-
-            for oldTs, oldInfo in oldList[len(newList):]:
-                matches.append((oldInfo, (None, None, None)))
-                
-            for newTs, newInfo in newList[len(oldList):]:
-                matches.append(((None, None, None), newInfo))
-
-            return matches
 
         def troveSetDiff(ourDict, theirDict, weakRefs):
             ourSet = set(ourDict)
@@ -1294,6 +1212,7 @@ class Trove(streams.StreamSet):
 
 	added = {}
 	removed = {}
+        oldTroves = []
 
         for name, chgList in \
                 chgSet.iterChangedTroves(strongRefs = True):
@@ -1302,182 +1221,605 @@ class Trove(streams.StreamSet):
                     whichD = added
                 elif how == '-':
                     whichD = removed
+                    oldTroves.append((name, version, flavor))
                 else:
                     continue
 
-                d = whichD.setdefault(name, {})
-                l = d.setdefault(flavor, [])
-                l.append(version)
+                d = whichD.setdefault(name, set())
+                d.add((version, flavor))
 
-	trvList = []
 
-	if absolute:
-	    for name in added.keys():
-		for flavor in added[name]:
-		    for version in added[name][flavor]:
-			trvList.append((name, None, version, None, flavor))
+        trvList = []
+        if added or removed:
+            if absolute:
+                for name in added.keys():
+                    for version, flavor in added[name]:
+                        trvList.append((name, (None, None), (version, flavor),
+                                        True))
 
-            trvList = [ (x[0], (x[1], x[3]), (x[2], x[4]), absolute)
-                                for x in trvList ]
+            else:
+                trvList = self._diffPackages(added, removed, getPathHashes)
+        return (chgSet, filesNeeded, trvList)
 
-	    return (chgSet, filesNeeded, trvList)
+    def _diffPackages(self, addedDict, removedDict, getPathHashes):
+        """
+            Matches up the list of troves that have been added to those
+            that were removed.  Matches are done by name first,
+            then by heuristics based on branches, flavors, and path hashes.
+        """
+        # NOTE: the matches are actually created by _makeMatch.
+        # Most functions deal with lists that are (version, flavor)
+        # lists, and have the name passed in as a separate argument.
 
-	# use added and removed to assemble a list of trove diffs which need
-	# to go along with this change set
+        def _makeMatch(name, oldInfo, newInfo, trvList,
+                       addedList, removedList):
+            """ 
+                NOTE: this function has side effects!
+                Removes items from global addedDict and removedDict as
+                necessary to avoid the info from being used in another
+                match, also removes them from the local addedList and
+                removedList for the same reason.
 
-	for name in added.keys(): 
-	    if not removed.has_key(name):
-		# there isn't anything which disappeared that has the same
-		# name; this must be a new addition
-		for newFlavor in added[name]:
-		    for version in added[name][newFlavor]:
-			trvList.append((name, None, version, None, newFlavor))
-		del added[name]
+                Finally appends the match to trvList, the result that will
+                be returned from _diffPackages
+            """
+            trvList.append((name, oldInfo, newInfo, False))
+            if newInfo and newInfo[0]:
+                if not addedList is addedDict[name]:
+                    addedList.remove(newInfo)
+                addedDict[name].remove(newInfo)
+            if oldInfo and oldInfo[0]:
+                if not removedList is removedDict[name]:
+                    removedList.remove(oldInfo)
+                removedDict[name].remove(oldInfo)
 
-	# for things that are left, see if we can match flavors 
-	for name in added.keys():
-            changePair = []
-            newInfoSet = set(_iterInfo(added, name))
+        def _getCompsByPackage(addedList, removedList):
+            """
+                Sorts components into addedByPackage, removedByPackage
+                packageTup -> [packageTup, compTup, ...] lists.
+            """
+            # Collates the lists into dicts by package.
+            # Returns dict of addedByPackage, removedByPackage.
+            addedByPackage = {}
+            removedByPackage = {}
+            for troveD, packageD in ((addedList, addedByPackage),
+                                     (removedList, removedByPackage)):
+                for name in troveD:
+                    if troveIsCollection(name):
+                        packageName = name
+                    else:
+                        packageName = name.split(':')[0]
 
-            if name not in removed:
-                # this don't have removals to go with them
-                for oldInfo in newInfoSet:
-                    trvList.append((name, None, newInfo[1], 
-                                          None, newInfo[2]))
-                continue
+                    for version, flavor in troveD[name]:
+                        l = packageD.setdefault((packageName, version, flavor),
+                                                [])
+                        l.append((name, version, flavor))
+            return addedByPackage, removedByPackage
 
-            oldInfoSet = set(_iterInfo(removed, name))
+        def _getPathHashOverlaps(name, allAdded, allRemoved,
+                                 addedByPackage, removedByPackage,
+                                 getPathHashesFn):
+            """
+                Gets overlaps for path hashes for a particular name.
+                allAdded, allRemoved are lists of (version, flavor) tuples
+                for this name.
+                If the name is for a collection, then the path hashes
+                for that collection are based on all the components
+                for that collection (that are in this update).
+            """ 
+            if troveIsCollection(name):
+                newTroves = (addedByPackage[name, x[0], x[1]] for x in allAdded)
+                newTroves = list(itertools.chain(*newTroves))
+                oldTroves = (removedByPackage[name, x[0], x[1]]
+                             for x in allRemoved)
+                oldTroves = list(itertools.chain(*oldTroves))
+            else:
+                newTroves = [ (name, x[0], x[1]) for x in allAdded ]
+                oldTroves = [ (name, x[0], x[1]) for x in allRemoved ]
 
-            # try to match flavors by branch first - take bad matches
-            # that are on the same branch over perfect matches that are
-            # not.
+            oldHashes = getPathHashesFn(oldTroves, old = True)
+            oldHashes = dict(itertools.izip(oldTroves, oldHashes))
+            newHashes = getPathHashesFn(newTroves)
+            newHashes = dict(itertools.izip(newTroves, newHashes))
 
-            # To that end, sort flavors by branch.  Search over
-            # the flavors on a particular branch first.  If those flavors
-            # match, remove from the main added/removed list
-            addedByBranch = _infoByBranch(newInfoSet)
-            removedByBranch = _infoByBranch(oldInfoSet)
+            overlaps = {}
+            if troveIsCollection(name):
+                for version, flavor in allAdded:
+                    for component in addedByPackage[name, version, flavor]:
+                        newPathHash = newHashes[component]
+                        if newPathHash:
+                            newHashes[name, version, flavor] |= newPathHash
 
-            # Search matching branches (order is irrelevant), then all
-            # of the troves regardless of branch
-            searchOrder = []
-            for branch, addedFlavors in addedByBranch.iteritems():
-                removedFlavors = removedByBranch.get(branch, False)
-                if removedFlavors:
-                    searchOrder.append((addedFlavors, removedFlavors))
+                for version, flavor in allRemoved:
+                    for component in removedByPackage[name, version, flavor]:
+                        oldPathHash = oldHashes[component]
+                        if oldPathHash:
+                            oldHashes[name, version, flavor] |= oldPathHash
 
-            searchOrder.append((added[name], removed[name]))
+            for newInfo in newTroves:
+                if newInfo[0] != name:
+                    continue
+                newHash = newHashes[newInfo]
 
-            scoreCache = {}
-            usedFlavors = set()
-            NEG_INF = -99999
-
-            for addedFlavors, removedFlavors in searchOrder:
-                found = True
-
-                while found:
-                    found = False
-                    maxScore = None
-                    # score every new flavor against every old flavor 
-                    # to find the best match.  Doing anything less
-                    # may result in incorrect flavor lineups
-                    for newFlavor in addedFlavors:
-                        if newFlavor in usedFlavors:
-                            continue
-
-                        # empty flavors don't score properly; handle them
-                        # here
-                        if newFlavor.isEmpty():
-                            if newFlavor in removedFlavors:
-                                maxScore = (9999, newFlavor, newFlavor)
-                                break
-                            else:
-                                continue
-
-                        for oldFlavor in removedFlavors:
-                            if oldFlavor.isEmpty() or oldFlavor in usedFlavors:
-                                # again, empty flavors don't score properly
-                                continue
-
-                            myMax = scoreCache.get((newFlavor, oldFlavor), None)
-                            if myMax is None:
-                                # check for superset matching and subset
-                                # matching.  Currently we don't consider 
-                                # a superset flavor match "better" than 
-                                # a subset - if we want to change that, 
-                                # a initial parameter for maxScore that 
-                                # ordered scores by type would work.
-                                # If we do that, we should consider adding
-                                # heuristic to prefer strongly satisfied
-                                # flavors most of all. 
-                                scores = (NEG_INF, newFlavor.score(oldFlavor),
-                                          oldFlavor.score(newFlavor))
-                                myMax = max(x for x in scores if x is not False)
-
-                                # scoring (thanks to the transformations above)
-                                # is symmetric
-                                scoreCache[newFlavor, oldFlavor] = myMax
-                                scoreCache[oldFlavor, newFlavor] = myMax
-
-                            if not maxScore or myMax > maxScore[0]:
-                                maxScore = (myMax, newFlavor, oldFlavor)
-
-                    if maxScore and maxScore[0] > NEG_INF:
+                # we store overlaps by version, flavor not by  name, version, 
+                # flavor
+                newInfo = (newInfo[1], newInfo[2])
+                for oldInfo in oldTroves:
+                    if oldInfo[0] != name:
+                        continue
+                    oldHash = oldHashes[oldInfo]
+                    oldInfo = (oldInfo[1], oldInfo[2])
+                    if newHash & oldHash:
                         found = True
-                        newFlavor, oldFlavor = maxScore[1:]
-                        usedFlavors.update((newFlavor, oldFlavor))
+                        # just mark by version, flavor
+                        overlaps.setdefault(newInfo, [])
+                        overlaps[newInfo].append(oldInfo)
+                        overlaps.setdefault(oldInfo, [])
+                        overlaps[oldInfo].append(newInfo)
+            return overlaps
 
-                    if found:
-                        changePair.append((addedFlavors[newFlavor][:], 
-                                           newFlavor, 
-                                           removedFlavors[oldFlavor][:],
-                                           oldFlavor))
-            
+        def _checkPathHashMatch(name, addedList, removedList, trvList,
+                                pathHashMatches, flavorCache,
+                                requireCompatible=False):
+            """
+                NOTE: This function may update addedList, removedList, and
+                the global addedDict and removedDict.
+
+                Finds matches for troves based on path hashes.  Also finds
+                troves that match paths with other packages _outside_ of the
+                given lists, and returns those lists as "delayed" troves - 
+                troves that if possible should not be matched up within the
+                given list.
+            """
+            delayedAdds = []
+            delayedRemoves = []
+
+            for added in list(addedList):
+                removedPathMatches = pathHashMatches.get(added, None)
+                if not removedPathMatches:
+                    continue
+
+                # filter by the list we were passed in - other matches
+                # are not allowed at this time.
+                inMatches = [ x for x in removedPathMatches if x in removedList]
+
+                if requireCompatible:
+                    # filter by flavor - only allow matches when the flavor
+                    # is compatible
+                    inMatches = [ x for x in inMatches
+                                 if flavorCache.matches(x[1], added[1])]
+
+
+                # matches that are _outside_ of this compatibility
+                # check are a good reason to not pick a package if 
+                # otherwise the selection would be arbitrary
+                outMatches = [ x for x in removedPathMatches
+                               if x not in inMatches ]
+                assert(len(inMatches) + len(outMatches) \
+                        == len(removedPathMatches))
+
+                # find matches from the removed trove to other added troves.
+                # Any such matches means we can't use the pathhash info 
+                # reliably.
+                reverseMatches = []
+                for inMatch in inMatches:
+                    addedPathMatches = pathHashMatches[inMatch]
+                    reverseMatches = [ x for x in addedPathMatches
+                                        if x in addedList ]
+                    if requireCompatible:
+                        reverseMatches = [ x for x in reverseMatches
+                                     if flavorCache.matches(x[1], added[1]) ]
+
+                if len(reverseMatches) > 1 or len(inMatches) > 1:
+                    # we've got conflicting information about how
+                    # to match up these troves.  Therefore, just don't
+                    # use path hashes to match up.
+                    continue
+                elif len(inMatches) == 1:
+                    removed = inMatches[0]
+                    _makeMatch(name, removed, added, trvList,
+                               addedList, removedList)
+                    continue
+                else:
+                    # No in matches, but there is a match with a different
+                    # flavor.  Delay this trove's match as long as possible.
+                    delayedAdds.append(added)
+            for removed in removedList:
+                addedPathMatches = pathHashMatches.get(removed, None)
+                if not addedPathMatches:
+                    continue
+
+                # filter by the list we were passed in - other matches
+                # are not allowed at this time.
+                inMatches = [ x for x in addedPathMatches if x in addedList]
+
+                if requireCompatible:
+                    # filter by flavor - only allow matches when the flavor
+                    # is compatible
+                    inMatches = [ x for x in inMatches
+                                 if flavorCache.matches(x[1], removed[1])]
+                if inMatches:
+                    continue
+                else:
+                    delayedRemoves.append(removed)
+
+            return delayedAdds, delayedRemoves
+
+        def _matchByFlavorAndVersion(name, addedList, removedList, trvList,
+                                     flavorCache, requireCompatible=False):
+            """
+                NOTE: This function has no side effects.
+                Matches up addedList and removedList, first by flavor scoring,
+                then by version scoring within that branch.
+
+                If requireCompatible is True, then we don't perform any
+                matches where the flavors have a NEG_INF value.
+
+                returns matches in order of "goodness" - the first match
+                is best, second match is second best, etc.
+            """
+            if not addedList or not removedList:
+                return []
+            addedByFlavor = {}
+            removedByFlavor = {}
+            for (version, flavor) in addedList:
+                addedByFlavor.setdefault(flavor, []).append(version)
+            for (version, flavor) in removedList:
+                removedByFlavor.setdefault(flavor, []).append(version)
+
+            changePair = []
+
+            # score every new flavor against every old flavor 
+            # to find the best match.  Doing anything less
+            # may result in incorrect flavor lineups
+            scoredValues = []
+            for newFlavor in addedByFlavor:
+                for oldFlavor in removedByFlavor:
+                    score = scoreCache[oldFlavor, newFlavor]
+                    if not requireCompatible or score > scoreCache.NEG_INF:
+                        scoredValues.append((score, oldFlavor, newFlavor))
+            scoredValues.sort(key = lambda x: x[0], reverse=True)
+
+            # go through scored values in order, from highest to lowest,
+            # picking off 
+            for (score, oldFlavor, newFlavor) in scoredValues:
+                if (newFlavor not in addedByFlavor 
+                    or oldFlavor not in removedByFlavor):
+                    continue
+                newVersions = addedByFlavor.pop(newFlavor)
+                oldVersions = removedByFlavor.pop(oldFlavor)
+                changePair.append((newVersions,
+                                   newFlavor, oldVersions, oldFlavor))
+
+            matches = []
             # go through changePair and try and match things up by versions
             for (newVersionList, newFlavor, oldVersionList, oldFlavor) \
-                        in changePair:
+                                                            in changePair:
                 oldInfoList = []
                 for version in oldVersionList:
-                    info = (name, version, oldFlavor)
-                    if info in oldInfoSet:
+                    info = (version, oldFlavor)
+                    if info in removedList:
                         oldInfoList.append(info)
 
                 newInfoList = []
                 for version in newVersionList:
-                    info = (name, version, newFlavor)
-                    if info in newInfoSet:
+                    info = (version, newFlavor)
+                    if info in addedList:
                         newInfoList.append(info)
 
                 versionMatches = _versionMatch(oldInfoList, newInfoList)
 
                 for oldInfo, newInfo in versionMatches:
-                    if not oldInfo[1] or not newInfo[1]:
+                    if not oldInfo[0] or not newInfo[0]:
                         # doesn't match anything in this flavor grouping
                         continue
+                    matches.append((oldInfo, newInfo))
 
-                    trvList.append((name, oldInfo[1], newInfo[1],
-                                          oldInfo[2], newInfo[2]))
-                    newInfoSet.remove(newInfo)
+            return matches
+
+        def _versionMatch(oldInfoSet, newInfoSet):
+            # Match by version; use the closeness measure for items on
+            # different branches and the timestamps for the same branch. If the
+            # same version exists twice here, it means the flavors are
+            # incompatible or tied; in either case the flavor won't help us
+            # much.
+            matches = []
+            byBranch = {}
+            # we need copies we can update
+            oldInfoSet = set(oldInfoSet)
+            newInfoSet = set(newInfoSet)
+
+            for newInfo in newInfoSet:
+                for oldInfo in oldInfoSet:
+                    if newInfo[0].branch() == oldInfo[0].branch():
+                        l = byBranch.setdefault(newInfo, [])
+                        l.append(((oldInfo[0].trailingRevision(), oldInfo)))
+
+            # pass 1, find things on the same branch
+            for newInfo, oldInfoList in sorted(byBranch.items(), reverse=True):
+                # take the newest (by timestamp) item from oldInfoList which
+                # hasn't been matched to anything else 
+                oldInfoList.sort(reverse=True)
+
+                for revision, oldInfo in oldInfoList:
+                    if oldInfo not in oldInfoSet: continue
+                    matches.append((oldInfo, newInfo))
                     oldInfoSet.remove(oldInfo)
+                    newInfoSet.remove(newInfo)
+                    break
 
-            # so much for flavor influenced matching. now try to match up 
-            # everything that's left based on versions
-            versionMatches = _versionMatch(oldInfoSet, newInfoSet)
-            for oldInfo, newInfo in versionMatches:
-                trvList.append((name, oldInfo[1], newInfo[1],
-                                      oldInfo[2], newInfo[2]))
+            del byBranch
 
-            del removed[name]
+            # pass 2, match across branches -- we know there is nothing left
+            # on the same branch anymore
+            scored = []
+            for newInfo in newInfoSet:
+                for oldInfo in oldInfoSet:
+                    score = newInfo[0].closeness(oldInfo[0])
+                    # score 0 are have nothing in common
+                    if not score: continue
+                    scored.append((score, oldInfo, newInfo))
 
-        for name in removed:
-            # this don't have additions to go with them
-            for oldInfo in set(_iterInfo(removed, name)):
-                trvList.append((name, oldInfo[1], None, oldInfo[2], None))
+            # high scores are better
+            scored.sort()
+            scored.reverse()
+            for score, oldInfo, newInfo in scored:
+                if oldInfo not in oldInfoSet: continue
+                if newInfo not in newInfoSet: continue
 
-        trvList = [ (x[0], (x[1], x[3]), (x[2], x[4]), absolute)
-                            for x in trvList ]
+                matches.append((oldInfo, newInfo))
+                oldInfoSet.remove(oldInfo)
+                newInfoSet.remove(newInfo)
 
-	return (chgSet, filesNeeded, trvList)
+            # the dregs are left. we do straight matching by timestamp here;
+            # newest goes with newest, etc
+            newList = []
+            oldList = []
+            for newInfo in newInfoSet:
+                newList.append((newInfo[0].trailingRevision(), newInfo))
+            newList.sort(reverse=True)
+
+            for oldInfo in oldInfoSet:
+                oldList.append((oldInfo[0].trailingRevision(), oldInfo))
+            oldList.sort(reverse=True)
+
+            for ((oldTs, oldInfo), (newTs, newInfo)) in \
+                                            itertools.izip(oldList, newList):
+                matches.append((oldInfo, newInfo))
+
+            return matches
+
+        def _matchList(name, addedList, removedList, trvList, pathHashOverlap,
+                       scoreCache, requireCompatible=False):
+            """
+                NOTE: this function may remove items from addedList or
+                removedList, and addedDict and removedDict, as matches are
+                made.
+
+                Called repeatedly with different pairs of addedLists
+                and removedLists.  Checks for a good path hash match, or
+                and then matches by flavor and version, prefering paths without
+                other potential overlaps with other troves outside of this
+                addedList and removedList.
+            """
+            if not addedList or not removedList:
+                return []
+            addDelays, removeDelays = _checkPathHashMatch(name, addedList, 
+                                          removedList, 
+                                          trvList,
+                                          pathHashOverlap,
+                                          scoreCache,
+                                          requireCompatible=requireCompatible)
+            # Now we go through a whole bunch of work to deal with this 
+            # case:  two foo:runtimes, 1 and 2,  exist on branch a, but only
+            # one new foo:runtime is being updated on branch a.  However,
+            # a second foo:runtime on branch b that shares paths with a/1 
+            # is also being added.
+            # We match by branch first, so what we need to do is _delay_ 
+            # matching a/1 if possible, that is prefer to match a/2 to match
+            # with the new update on a.
+            # In this case, a/1 will be in the removeDelays lists.
+            # The algorithm could get even more complicated in this case:
+            # We have 2 potential overlaps between a and b, but only
+            # one slot for delays.  In that case, we just drop the delays
+            # - better than trying to make the algorithm more complicated
+            # by matching between all the troves, and then remove the worst 
+            # matches that are also delayed troves and delay them, allowing 
+            # them to match up with the trove we want (commented out code
+            # to do that is below, just in case).
+
+            newAddedList = addedList
+            newRemovedList = removedList
+
+            possibleDelays = abs(len(addedList) - len(removedList))
+            if len(addedList) > len(removedList):
+                # we have more new troves than old troves - we'll
+                # be able to delay matching a new trove, but there's
+                # no way to delay matching a remove trove - they all have
+                # matches.
+                removeDelays = []
+                rematchesNeeded = max(len(addDelays) - possibleDelays, 0)
+                if not rematchesNeeded:
+                    newAddedList = [ x for x in addedList if x not in addDelays]
+                # else bail - we don't have enough slots to delay
+                # all the troves we want to delay.
+            elif len(addedList) < len(removedList):
+                addDelays = []
+                rematchesNeeded = max(len(removeDelays) - possibleDelays, 0)
+                if not rematchesNeeded:
+                    newRemovedList = [ x for x in removedList 
+                                       if x not in removeDelays]
+                # else bail - we don't have enough slots to delay
+                # all the troves we want to delay.
+
+            # NOTE: turn off the algorithm below, which tries to handle 
+            # dealing with only have one slot available for delays and
+            # two troves to delay.  It's unlikely to occur and not worth
+            # dealing with afaict.
+            addDelays = removeDelays = []
+            rematchesNeeded = 0
+
+            matches = _matchByFlavorAndVersion(name, newAddedList,
+                                           newRemovedList, trvList,
+                                           scoreCache,
+                                           requireCompatible=requireCompatible)
+            assert(not rematchesNeeded)
+            for oldInfo, newInfo in matches:
+                _makeMatch(name, oldInfo, newInfo, trvList,
+                           addedList, removedList)
+            return
+            # we've got a worst-case scenario here - too many troves match
+            # troves on other labels.
+
+            # sort from worst to best
+            #badAdds = []
+            #badRemoves = []
+            #notFound = addDelays + removeDelays
+            #for oldInfo, newInfo in reversed(matches):
+            #    if oldInfo in removeDelays:
+            #        notFound.remove(oldInfo)
+            #        if rematchesNeeded > 0:
+            #            badRemoves.append(oldInfo)
+            #            rematchesNeeded -= 1
+            #    elif newInfo in addDelays:
+            #        notFound.remove(newInfo)
+            #        if rematchesNeeded > 0:
+            #            badAdds.append(newInfo)
+            #            rematchesNeeded -= 1
+
+            #if badAdds or badRemoves or notFound:
+            #    changed = False
+            #    if notFound:
+            #        if addDelays:
+            #            newAddedList = [ x for x in newAddedList
+            #                             if x not in notFound ]
+            #            badAdds = badAdds[:-(len(notFound))]
+            #        else:
+            #            newRemovedList = [ x for x in newRemovedList
+            #                               if x not in notFound ]
+            #            badRemoves = badRemoves[:-(len(notFound))]
+
+            #    if badAdds:
+            #        newAddedList = [ x for x in newAddedList
+            #                         if x not in badAdds]
+            #        changed = True
+            #    else:
+            #        newRemovedList = [ x for x in newRemovedList
+            #                           if x not in badRemoves ]
+            #        changed = True
+            #    if changed:
+            #        matches = _matchByFlavorAndVersion(name, newAddedList,
+            #                             newRemovedList, trvList,
+            #                             scoreCache,
+            #                             requireCompatible=requireCompatible)
+            #for oldInfo, newInfo in matches:
+            #    _makeMatch(name, oldInfo, newInfo, trvList,
+            #               addedList, removedList)
+
+        ### def _diffPackages starts here.
+
+        # use added and removed to assemble a list of trove diffs which need
+        # to go along with this change set
+
+        trvList = []
+
+        for name in addedDict.keys():
+            if not name in removedDict:
+                # there isn't anything which disappeared that has the same
+                # name; this must be a new addition
+                for version, newFlavor in addedDict[name]:
+                    trvList.append((name, (None, None), (version, newFlavor),
+                                    False))
+                del addedDict[name]
+        for name in removedDict.keys():
+            if not name in addedDict:
+                # there isn't anything which disappeared that has the same
+                # name; this must be a new addition
+                for version, oldFlavor in removedDict[name]:
+                    trvList.append((name, (version, oldFlavor), (None, None),
+                                    False))
+                del removedDict[name]
+        if not addedDict and not removedDict:
+            return trvList
+
+        (addedByPackage,
+         removedByPackage) = _getCompsByPackage(addedDict, removedDict)
+
+        scoreCache = FlavorScoreCache()
+
+        # match packages/groups first, then components that are not
+        # matched as part of that.
+        for name in addedDict:
+            if name not in addedDict or name not in removedDict:
+                continue
+
+            if not addedDict[name] or not removedDict[name]:
+                continue
+
+            if getPathHashes:
+                overlaps = _getPathHashOverlaps(name, 
+                                                addedDict[name],
+                                                removedDict[name],
+                                                addedByPackage,
+                                                removedByPackage,
+                                                getPathHashes)
+            else:
+                overlaps = {}
+
+
+            addedByBranch = {}
+            removedByBranch = {}
+            for version, flavor in addedDict[name]:
+                addedByBranch.setdefault(version.branch(), []).append(
+                                                            (version, flavor))
+            for version, flavor in removedDict[name]:
+                removedByBranch.setdefault(version.branch(), []).append(
+                                                            (version, flavor))
+            for branch, branchAdded in addedByBranch.iteritems():
+                branchRemoved = removedByBranch.get(branch, [])
+                if not branchRemoved:
+                    continue
+                # 1. match troves on the same branch with compatible flavors.
+                _matchList(name, branchAdded, branchRemoved, trvList,
+                           overlaps, scoreCache, requireCompatible=True)
+
+            # 2. match troves with compatible flavors on different
+            #    branches
+            _matchList(name, addedDict[name], removedDict[name], trvList,
+                       overlaps, scoreCache, requireCompatible=True)
+
+            addedByBranch = {}
+            removedByBranch = {}
+            for version, flavor in addedDict[name]:
+                addedByBranch.setdefault(version.branch(), []).append(
+                                                            (version, flavor))
+            for version, flavor in removedDict[name]:
+                removedByBranch.setdefault(version.branch(), []).append(
+                                               (version, flavor))
+
+            for branch, branchAdded in addedByBranch.iteritems():
+                branchRemoved = removedByBranch.get(branch, [])
+                if not branchRemoved:
+                    continue
+                # 3. match troves on the same branch without compatible flavors.
+                _matchList(name, branchAdded, branchRemoved, trvList,
+                           overlaps, scoreCache, requireCompatible=False)
+
+            # 4. match remaining troves.
+            _matchList(name, addedDict[name], removedDict[name], trvList,
+                       overlaps, scoreCache, requireCompatible=False)
+
+        for name in removedDict:
+            # these don't have additions to go with them
+            for oldInfo in removedDict[name]:
+                trvList.append((name, oldInfo, (None, None), False))
+
+        for name in addedDict:
+            # these don't have removals to go with them
+            for newInfo in addedDict[name]:
+                trvList.append((name, (None, None), newInfo, False))
+
+        return trvList
 
     def setProvides(self, provides):
         self.provides.set(provides)
@@ -2074,6 +2416,39 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)
+
+
+class FlavorScoreCache(object):
+    def __init__(self):
+        self.cache = {}
+        self.NEG_INF = -9999
+        self.POS_INF = 9999
+
+    def matches(self, oldFlavor, newFlavor):
+        return (self[oldFlavor, newFlavor] > self.NEG_INF)
+
+    def __getitem__(self, (oldFlavor, newFlavor)):
+        # check for superset matching and subset
+        # matching.  Currently we don't consider 
+        # a superset flavor match "better" than 
+        # a subset - if we want to change that, 
+        # a initial parameter for maxScore that 
+        # ordered scores by type would work.
+        # If we do that, we should consider adding
+        # heuristic to prefer strongly satisfied
+        # flavors most of all. 
+        if not (oldFlavor, newFlavor) in self.cache:
+            if oldFlavor.isEmpty() and newFlavor.isEmpty():
+                myMax = self.POS_INF
+            else:
+                scores = (self.NEG_INF, newFlavor.score(oldFlavor),
+                          oldFlavor.score(newFlavor))
+                myMax = max(x for x in scores if x is not False)
+            self.cache[oldFlavor, newFlavor] = myMax
+            self.cache[newFlavor, oldFlavor] = myMax
+            return myMax
+        else:
+            return self.cache[oldFlavor, newFlavor]
 
 class TroveError(errors.ConaryError):
 
