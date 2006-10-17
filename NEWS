@@ -1,7 +1,11 @@
 Changes in @NEW@:
-  o PostgreSQL support has been finalized and some SQL queries have
-    been updated in the repository code for PostgreSQL compatibility
-  
+  o Server Changes:
+    * PostgreSQL support has been finalized and some SQL queries have
+      been updated in the repository code for PostgreSQL compatibility
+    * Timeouts that occur when attempting to read the XML-RPC request
+      from a client are now logged and return an exception (instead of
+      causing a unhandled exception in the server).
+
   o Bug Fixes:
     * A bug has been fixed that caused group cook with a replace or remove 
       with a flavor and no matching trove to emit a traceback instead of a
