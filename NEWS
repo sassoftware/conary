@@ -1,7 +1,13 @@
 Changes in @NEW@:
   o PostgreSQL support has been finalized and some SQL queries have
     been updated in the repository code for PostgreSQL compatibility
-  
+
+  o Client Changes:
+    * When choosing how to match up troves with the same name, conary now
+      takes paths into account, if there's a choice to make between matching
+      up two old troves that are otherwise equivalent with a new trove, conary
+      will choose the one that shares paths with the new trove. (CNY-819)
+
   o Bug Fixes:
     * A bug has been fixed that caused group cook with a replace or remove 
       with a flavor and no matching trove to emit a traceback instead of a
