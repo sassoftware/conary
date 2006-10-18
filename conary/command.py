@@ -23,7 +23,7 @@ class ConaryCommand(options.AbstractCommand):
     docs = {'build-label'        : ('Use build label LABEL as default search'
                                     ' loc', 'LABEL'),
             'components'         : ('Do not hide components'),
-            'config'             : ('Set config KEY to VALUE', ''KEY VALUE''),
+            'config'             : ('Set config KEY to VALUE', '"KEY VALUE"'),
             'config-file'        : ('Read PATH config file', 'PATH'),
             'context'            : 'Set the current context',
             'install-label'      : ('Set the install label', 'LABEL'),
@@ -35,7 +35,7 @@ class ConaryCommand(options.AbstractCommand):
             'profile'            : optparse.SUPPRESS_HELP,
             'lsprof'             : optparse.SUPPRESS_HELP,
             'pubring'            : '',
-            'skip-default-config': 'Don't read default configs',
+            'skip-default-config': "Don't read default configs",
             'quiet'              : ('do not display extra information when '
                                     'running'),
             'root'               : 'use conary database at location ROOT',
