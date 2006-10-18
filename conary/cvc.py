@@ -58,9 +58,8 @@ STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
 
 class CvcCommand(command.ConaryCommand):
 
-    docs = {'signature-key'      : ("Use signature key to sign results", 'KEY'),
-            }
-
+    docs = { 'signature-key' : ("Use signature key to sign results", 'KEY'), }
+    commandGroup = 'Information Display'
     def addConfigOptions(self, cfgMap, argDef):
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
         command.ConaryCommand.addConfigOptions(self, cfgMap, argDef)
@@ -68,6 +67,8 @@ class CvcCommand(command.ConaryCommand):
 class AddCommand(CvcCommand):
     commands = ['add']
     paramHelp = '<file> [<file2> <file3> ...]'
+    help = 'Add a file to be controlled by Conary'
+    commandGroup = 'File Operations'
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -86,6 +87,7 @@ _register(AddCommand)
 class AnnotateCommand(CvcCommand):
     commands = ['annotate']
     paramHelp = '<file>'
+    help = 'Show version information for each line in a file'
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if argSet or len(args) != 2: return self.usage()
@@ -99,7 +101,8 @@ class BranchShadowCommand(CvcCommand):
 
     commands = ['shadow']
     paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
-
+    help = 'Create a shadow in a repository'
+    commandGroup = 'Repository Access'
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
             'source-only': ('For any binary components listed, shadow/branch'
                             ' their sources instead'),
@@ -132,6 +135,8 @@ _register(BranchShadowCommand)
 class CheckoutCommand(CvcCommand):
     commands = ['checkout', 'co']
     paramHelp = '<trove>[=<version>]+'
+    help = 'Check out a source component'
+    commandGroup = 'Repository Access'
 
     docs = {'dir': 'Check out single trove in directory DIR'}
 
@@ -158,7 +163,8 @@ class CloneCommand(CvcCommand):
 
     commands = ['clone']
     paramHelp = '<target-branch> <trove>[=<version>][[flavor]]+'
-
+    help = 'Copy troves from one branch to another in a repository'
+    commandGroup = 'Repository Access'
     docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
                                   'information about how this trove was built'),
              'info'            : 'Do not perform clone',
@@ -204,7 +210,8 @@ _register(CloneCommand)
 class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
-
+    help = 'Commit changes to a source component'
+    commandGroup = 'Repository Access'
     docs = {'message':'Use MESSAGE to describe why the commit was performed',
             'test':   ('Runs through all the steps of committing but does not '
                        'modify the repository')}
@@ -230,7 +237,7 @@ _register(CommitCommand)
 
 class ConfigCommand(CvcCommand):
     commands = ['config']
-
+    help = 'Display the current configuration'
     docs = {'show-contexts'  : 'display contexts as well as current config',
             'show-passwords' : 'do not mask passwords'}
 
@@ -261,6 +268,8 @@ _register(ConfigCommand)
 class ContextCommand(CvcCommand):
     commands = ['context']
     paramHelp = '[CONTEXT]'
+    help = 'Set up a context in the current directory'
+    commandGroup = 'Setup Commands'
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -295,6 +304,8 @@ _register(ContextCommand)
 class CookCommand(CvcCommand):
     commands = ['cook']
     paramHelp = '<file.recipe|troveName=<version>>[[flavor]]+'
+    help = 'Build binary package and groups from a recipe'
+    commandGroup = 'Recipe Building'
 
     docs = {'cross'   : ('set macros for cross-compiling', 
                          '[(local|HOST)--]TARGET'),
@@ -425,7 +436,8 @@ _register(CookCommand)
 class DescribeCommand(CvcCommand):
     commands = ['describe']
     paramHelp = '<xml file>'
-
+    help = 'Add metadata to a repository from an XML file'
+    commandGroup = 'Repository Access'
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         level = log.getVerbosity()
@@ -449,6 +461,7 @@ _register(DescribeCommand)
 
 class DiffCommand(CvcCommand):
     commands = ['diff']
+    help = 'Show uncommitted changes'
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if argSet or not args or len(args) > 2: return self.usage()
@@ -459,6 +472,7 @@ _register(DiffCommand)
 
 class LogCommand(CvcCommand):
     commands = ['log']
+    help = 'Show changelog entries for this source component'
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -471,7 +485,7 @@ _register(LogCommand)
 class RdiffCommand(CvcCommand):
     commands = ['rdiff']
     paramHelp = "<name> [<oldver>|-<num>] <newver>"
-
+    help = 'Show changes between two versions of a trove in a repository'
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if argSet or len(args) != 4: return self.usage()
@@ -481,6 +495,8 @@ _register(RdiffCommand)
 class RefreshCommand(CvcCommand):
     commands = ['refresh']
     paramHelp = '<fileGlob> [<fileGlob2> <fileGlob3> ...]'
+    help = 'Refresh files that are automatically downloaded'
+    commandGroup = 'File Operations'
 
     def runCommand(self, repos, cfg, argSet, args, profile = False,
                    callback = None):
@@ -491,6 +507,8 @@ _register(RefreshCommand)
 class RemoveCommand(CvcCommand):
     commands = ['remove', 'rm']
     paramHelp = "<file> [<file2> <file3> ...]"
+    help = 'Remove a file from Conary control'
+    commandGroup = 'File Operations'
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -502,6 +520,8 @@ _register(RemoveCommand)
 class RenameCommand(CvcCommand):
     commands = ['rename']
     paramHelp = "<oldfile> <newfile>"
+    help = 'Rename a file that is under Conary control'
+    commandGroup = 'File Operations'
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -512,8 +532,9 @@ _register(RenameCommand)
 class SignCommand(CvcCommand):
     commands = ['sign']
     paramHelp = "<newshadow> <trove>[=<version>][[flavor]]"
-
+    help = 'Add a digital signature to troves in a repository'
     docs = {'recurse' : 'recursively sign child troves'}
+    commandGroup = 'Repository Access'
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -532,7 +553,8 @@ _register(SignCommand)
 class NewPkgCommand(CvcCommand):
     commands = ['newpkg']
     paramHelp = '<name>'
-
+    help = 'Set up the directory for creating a new package'
+    commandGroup = 'Setup Commands'
     docs = {'dir' : 'create new package in DIR',
             'template' : 'set recipe template to use'}
 
@@ -553,7 +575,8 @@ _register(NewPkgCommand)
 
 class MergeCommand(CvcCommand):
     commands = ['merge']
-
+    help = 'Merge changes made in a parent branch into the current directory'
+    commandGroup = 'File Operations'
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if argSet or not args or len(args) > 2: return self.usage()
@@ -568,7 +591,8 @@ class SetCommand(CvcCommand):
 
     commands = ['set']
     paramHelp = "<path>+"
-
+    help = 'Set the properties of a file under Conary control'
+    commandGroup = 'File Operations'
     docs = {'text'       : ('Mark the given files as text files'),
             'binary'     : ('Mark the given files as binary files') }
 
@@ -596,6 +620,8 @@ _register(SetCommand)
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
     paramHelp = "[<version>]"
+    help = 'Update files in current directory to a different version'
+    commandGroup = 'File Operations'
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -615,6 +641,12 @@ class CvcMain(options.MainHandler):
     version = constants.version
     commandList = _commands
     hobbleShortOpts = True
+
+    def usage(self, rc=1):
+        print 'Conary Version Control (cvc)'
+        print
+        print 'Common Commands (use "cvc help" for the full list)'
+        return options.MainHandler.usage(self, rc)
 
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         client = conaryclient.ConaryClient(cfg)
