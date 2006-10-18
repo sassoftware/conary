@@ -168,7 +168,7 @@ def addOptions(parser, argDef, skip=None):
             parser.add_option(action='callback',
                               callback=optParamCallback, dest=name,
                               type='string', nargs=0, help=help,
-                              help_level=help_leve,
+                              help_level=help_level,
                               metavar=meta, *flagNames)
         elif paramType == MULT_PARAM:
             parser.add_option(action='append', dest=name, help=help,
