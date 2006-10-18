@@ -31,11 +31,28 @@ import sys
  STRICT_OPT_PARAM, # arg may occur once, optional parameter, stricter parsing
  ) = range(0,6)
 
+(NORMAL_HELP,
+ VERBOSE_HELP,  # only display in usage messages if -v is used
+) = range(0,2)
+
 class OptionError(Exception):
     val = 1
     def __init__(self, msg, parser):
         Exception.__init__(self, msg)
         self.parser = parser
+
+class HelpFormatter(optparse.IndentedHelpFormatter):
+    def format_option(self, option):
+        if option.help_level == VERBOSE_HELP:
+            return ''
+        return optparse.IndentedHelpFormatter.format_option(self, option)
+
+class Option(optparse.Option):
+    ATTRS = optparse.Option.ATTRS[:]
+    ATTRS.append('help_level')
+
+    def _set_attrs(self, attrs):
+        return optparse.Option._set_attrs(self, attrs)
 
 class OptionParser(optparse.OptionParser):
     forbiddenOpts = set(str(x) for x in range(0,9))
@@ -110,6 +127,7 @@ def addOptions(parser, argDef, skip=None):
             parser.add_option_group(group)
             continue
         help = ''
+        help_level = NORMAL_HELP
         shortOpt = None
         meta = None
         if isinstance(data, (list, tuple)):
@@ -119,7 +137,13 @@ def addOptions(parser, argDef, skip=None):
             if len(data) >= 2:
                 help = data[1]
                 if isinstance(help, (list, tuple)):
-                    help, meta = help
+                    if isinstance(help[0], int):
+                        help_level = help[0]
+                        help = help[1:]
+                    if len(help) == 2:
+                        help, meta = help
+                    else:
+                        help = help[0]
             paramType = data[0]
         else:
             paramType = data
@@ -128,27 +152,32 @@ def addOptions(parser, argDef, skip=None):
             flagNames.append(shortOpt)
 
         if paramType == NO_PARAM:
-            parser.add_option(action='store_true', dest=name, help=help, 
+            parser.add_option(action='store_true', dest=name, help=help,
+                              help_level=help_level,
                               metavar=meta, *flagNames)
         elif paramType == ONE_PARAM:
-            parser.add_option(dest=name, help=help, metavar=meta, *flagNames)
+            parser.add_option(dest=name, help=help, metavar=meta,
+                              help_level=help_level, *flagNames)
         elif paramType == STRICT_OPT_PARAM:
             parser.add_option(action='callback',
                               callback=strictOptParamCallback, dest=name,
                               type='string', nargs=0, help=help,
-                               metavar=meta, *flagNames)
+                              help_level=help_level,
+                              metavar=meta, *flagNames)
         elif paramType == OPT_PARAM:
             parser.add_option(action='callback',
-                               callback=optParamCallback, dest=name,
-                               type='string', nargs=0, help=help, 
-                               metavar=meta, *flagNames)
-
+                              callback=optParamCallback, dest=name,
+                              type='string', nargs=0, help=help,
+                              help_level=help_leve,
+                              metavar=meta, *flagNames)
         elif paramType == MULT_PARAM:
-            parser.add_option(action='append', dest=name, help=help, 
+            parser.add_option(action='append', dest=name, help=help,
+                              help_level=help_level,
                               metavar=meta, *flagNames)
         elif paramType == COUNT_PARAM:
             parser.add_option(action='count',
                               dest=name, help=help, metavar=meta,
+                              help_level=help_level,
                               *flagNames)
 
 
@@ -236,8 +265,11 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
 def getOptionParser(params, cfgMap, cfg, usage, version=None, useHelp=False,
                     defaultGroup=None, interspersedArgs=True, 
                     hobbleShortOpts=False):
-    parser = OptionParser(usage=usage, add_help_option=useHelp, version=version,
-                          hobbleShortOpts=hobbleShortOpts)
+    parser = OptionParser(usage=usage, add_help_option=useHelp,
+                          version=version,
+                          hobbleShortOpts=hobbleShortOpts,
+                          option_class=Option,
+                          formatter=HelpFormatter())
     if not interspersedArgs:
         parser.disable_interspersed_args()
 
@@ -294,11 +326,13 @@ class AbstractCommand(object):
     commands = []
     paramHelp = '' # for each command will display <command> + paramHelp
                    # as part of usage.
+    help = '' # short help
     defaultGroup = 'Common Options' # The heading for options that aren't
                                     # put in any other group.
-
+    commandGroup = 'Common Commands'
     docs = {} # add docs in the form 'long-option' : 'description'
               # or 'long-option' : ('description', 'KEYWORD').
+    hidden = False # hide from the default usage message?
     hobbleShortOpts = None
     def __init__(self):
         self.parser = None
@@ -396,7 +430,6 @@ class AbstractCommand(object):
     def runCommand(self, *args, **kw):
         raise NotImplementedError
 
-
 class MainHandler(object):
     """
         Class to handle parsing and executing commands set up to use
@@ -445,6 +478,39 @@ class MainHandler(object):
                                     hobbleShortOpts=self.hobbleShortOpts)
         return argSet, [argv[0]] + otherArgs
 
+    def usage(self, rc = 1):
+        # get the longest command to set the width of the command
+        # column
+        width = 0
+        for command in self.commandList:
+            if command.hidden:
+                continue
+            width = max(width, len('/'.join(command.commands)))
+        # group the commands together
+        groups = dict.fromkeys(x.commandGroup for x in self.commandList)
+        for group in groups.iterkeys():
+            groups[group] = [ x for x in self.commandList if
+                              x.commandGroup == group ]
+        # Sort the groups
+        groupNames = groups.keys()
+        groupNames.sort()
+        for group in groupNames:
+            if group == 'Hidden Commands':
+                continue
+            commands = groups[group]
+            # filter out hidden commands
+            filtered = [ x for x in commands if not x.hidden ]
+            if not filtered:
+                continue
+            # print the header for the command group
+            print
+            print group
+            # sort the commands by the first command name
+            for command in sorted(filtered, key=lambda x: x.commands[0]):
+                print '  %-*s  %s' %(width, '/'.join(command.commands),
+                                     command.help)
+        return rc
+
     def getConfigFile(self, argv):
         """
             Find the appropriate config file
@@ -471,7 +537,7 @@ class MainHandler(object):
         if cfg is None:
             cfg = self.getConfigFile(argv)
 
-        if '--version' in argv or '-v' in argv:
+        if '--version' in argv:
             print self.version
             return
 

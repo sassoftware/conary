@@ -48,31 +48,6 @@ class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
         updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
 
-def usage(rc = 1):
-    print "usage: cvc add <file> [<file2> <file3> ...]"
-    print "       cvc annotate <file>"
-    print "       cvc checkout <trove>[=<version>]"
-    print "       cvc clone <target-branch> <trove>[=<version>][[flavor]]+ "
-    print "       cvc commit"
-    print "       cvc config"
-    print "       cvc context"
-    print '       cvc cook <file.recipe|troveName=<version>>[[flavor]]+'
-    print '       cvc describe <xml file>'
-    print "       cvc diff"
-    print "       cvc log"
-    print "       cvc newpkg <name>"
-    print "       cvc merge [<revision>]"
-    print "       cvc rdiff <name> <oldver> <newver>"
-    print "       cvc remove <file> [<file2> <file3> ...]"
-    print "       cvc rename <oldfile> <newfile>"
-    print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
-    print "       cvc set <path>+"
-    print '       cvc sign <trove>[=version][[flavor]]+'
-    print "       cvc update [<version>]"
-    print ""
-    print "type 'cvc <command> --help' for command-specific usage"
-    return rc
-
 _commands = []
 def _register(cmd):
     _commands.append(cmd)
@@ -213,7 +188,7 @@ _register(CheckoutCommand)
 
 class CloneCommand(CvcCommand):
 
-    commands = 'clone'
+    commands = ['clone']
     paramHelp = '<target-branch> <trove>[=<version>][[flavor]]+'
 
     docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
@@ -505,7 +480,7 @@ _register(DescribeCommand)
 
 
 class DiffCommand(CvcCommand):
-    commands = 'diff'
+    commands = ['diff']
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
         if argSet or not args or len(args) > 2: return self.usage()
@@ -515,7 +490,7 @@ class DiffCommand(CvcCommand):
 _register(DiffCommand)
 
 class LogCommand(CvcCommand):
-    commands = 'log'
+    commands = ['log']
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
@@ -672,9 +647,6 @@ class CvcMain(options.MainHandler):
     version = constants.version
     commandList = _commands
     hobbleShortOpts = True
-
-    def usage(self, rc = 1):
-        return usage(rc)
 
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         client = conaryclient.ConaryClient(cfg)

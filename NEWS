@@ -13,6 +13,8 @@ Changes in @NEW@:
       will choose the one that shares paths with the new trove. (CNY-819)
     * Conary will now allow "conary migrate --info" and "conary migrate
       --interactive" without displaying usage information. (CNY-985)
+    * The usage message displayed when running "conary" or "cvc" has
+      been simplified and improved. (CNY-560)
 
   o Build Changes:
     * cvc now allows files to be switched from autosource to normal
