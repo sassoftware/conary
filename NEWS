@@ -27,6 +27,8 @@ Changes in @NEW@:
   o Code Cleanups
     * The command line options common between cvc and conary are now
       defined in one place.
+    * The code to add options to the command line parser for an option
+      has been refactored to remove duplication.
 
   o Bug Fixes:
     * A bug that caused group cook with a replace or remove with a

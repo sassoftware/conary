@@ -151,34 +151,29 @@ def addOptions(parser, argDef, skip=None):
         if shortOpt:
             flagNames.append(shortOpt)
 
+        attrs = {
+            'dest': name,
+            'help': help,
+            'help_level': help_level,
+            'metavar': meta,
+            }
         if paramType == NO_PARAM:
-            parser.add_option(action='store_true', dest=name, help=help,
-                              help_level=help_level,
-                              metavar=meta, *flagNames)
+            attrs['action'] = 'store_true'
         elif paramType == ONE_PARAM:
-            parser.add_option(dest=name, help=help, metavar=meta,
-                              help_level=help_level, *flagNames)
-        elif paramType == STRICT_OPT_PARAM:
-            parser.add_option(action='callback',
-                              callback=strictOptParamCallback, dest=name,
-                              type='string', nargs=0, help=help,
-                              help_level=help_level,
-                              metavar=meta, *flagNames)
-        elif paramType == OPT_PARAM:
-            parser.add_option(action='callback',
-                              callback=optParamCallback, dest=name,
-                              type='string', nargs=0, help=help,
-                              help_level=help_level,
-                              metavar=meta, *flagNames)
+            pass
+        elif paramType in (OPT_PARAM, STRICT_OPT_PARAM):
+            attrs['action'] = 'callback'
+            if paramType == OPT_PARAM:
+                attrs['callback'] = optParamCallback
+            else:
+                attrs['callback'] = strictOptParamCallback
+            attrs['nargs'] = 0
+            attrs['type'] = 'string'
         elif paramType == MULT_PARAM:
-            parser.add_option(action='append', dest=name, help=help,
-                              help_level=help_level,
-                              metavar=meta, *flagNames)
+            attrs['action'] = 'append'
         elif paramType == COUNT_PARAM:
-            parser.add_option(action='count',
-                              dest=name, help=help, metavar=meta,
-                              help_level=help_level,
-                              *flagNames)
+            attrs['action'] = 'count'
+        parser.add_option(*flagNames, **attrs)
 
 
 def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
