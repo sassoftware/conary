@@ -24,6 +24,8 @@ Changes in @NEW@:
 
 
   o Bug Fixes:
+    * A bug that caused an Internal Server Error when marking a group
+      :source component as removed in a repository has been fixed.
     * A bug that caused group cook with a replace or remove with a
       flavor and no matching trove to emit a traceback instead of a
       warning has been fixed. (CNY-977)
