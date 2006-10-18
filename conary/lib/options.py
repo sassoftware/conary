@@ -197,18 +197,22 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
         stderr = StringIO.StringIO()
         oldStdOut = sys.stdout
         oldStdErr = sys.stderr
-        sys.stdout = stdout
-        sys.stderr = stderr
+        # set a default message
+        rc = 'An error occurred while generating the usage message'
         try:
-            usage()
-        except SystemExit:
-            # some of these old usage functions even exit after 
-            # printing the usage message!
-            pass
-        sys.stdout = oldStdOut
-        sys.stderr = oldStdErr
-        usage = stdout.getvalue() + stderr.getvalue()
-
+            sys.stdout = stdout
+            sys.stderr = stderr
+            try:
+                usage()
+            except SystemExit:
+                # some of these old usage functions even exit after 
+                # printing the usage message!
+                pass
+            rc = stdout.getvalue() + stderr.getvalue()
+        finally:
+            sys.stdout = oldStdOut
+            sys.stderr = oldStdErr
+        usage = rc
 
     if defaultGroup:
         d = params[defaultGroup]
@@ -443,8 +447,11 @@ class MainHandler(object):
 
     def __init__(self):
         self._supportedCommands = {}
-        for command in self.commandList:
-            self._registerCommand(command)
+        for class_ in reversed(inspect.getmro(self.__class__)):
+            if not hasattr(class_, 'commandList'):
+                continue
+            for command in class_.commandList:
+                self._registerCommand(command)
 
     def _registerCommand(self, commandClass):
         supportedCommands = self._supportedCommands
@@ -477,14 +484,15 @@ class MainHandler(object):
         # get the longest command to set the width of the command
         # column
         width = 0
-        for command in self.commandList:
+        commandList = set(self._supportedCommands.itervalues())
+        for command in commandList:
             if command.hidden:
                 continue
             width = max(width, len('/'.join(command.commands)))
         # group the commands together
-        groups = dict.fromkeys(x.commandGroup for x in self.commandList)
+        groups = dict.fromkeys(x.commandGroup for x in commandList)
         for group in groups.iterkeys():
-            groups[group] = [ x for x in self.commandList if
+            groups[group] = [ x for x in commandList if
                               x.commandGroup == group ]
         # Sort the groups
         groupNames = groups.keys()

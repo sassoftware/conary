@@ -101,3 +101,34 @@ class ConaryCommand(options.AbstractCommand):
                 os.environ.pop(k, None)
                 continue
             os.environ[k] = v
+
+class ConfigCommand(ConaryCommand):
+    commands = ['config']
+    help = 'Display the current configuration'
+    docs = {'show-contexts'  : 'display contexts as well as current config',
+            'show-passwords' : 'do not mask passwords'}
+    commandGroup = 'Information Display'
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        argDef["show-contexts"] = NO_PARAM
+        argDef["show-passwords"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, args, **kwargs):
+        showPasswords = argSet.pop('show-passwords', False)
+        showContexts = argSet.pop('show-contexts', False)
+        try:
+            prettyPrint = sys.stdout.isatty()
+        except AttributeError:
+            prettyPrint = False
+        cfg.setDisplayOptions(hidePasswords=not showPasswords,
+                              showContexts=showContexts,
+                              prettyPrint=prettyPrint)
+        if argSet: return self.usage()
+        if (len(args) > 2):
+            return self.usage()
+        else:
+            cfg.display()
+
+class MainHandler(options.MainHandler):
+    commandList = [ ConfigCommand ]

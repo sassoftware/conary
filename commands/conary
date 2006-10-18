@@ -118,37 +118,6 @@ Creates a changeset with the specified troves and stores it in <outfile>'''
         cscmd.ChangeSetCommand(cfg, otherArgs[2:], outFile, **kwargs)
 _register(ChangeSetCommand)
 
-class ConfigCommand(ConaryCommand):
-    commands = ['config']
-    docs = {'show-contexts'  : 'display contexts as well as current config',
-            'show-passwords' : 'do not mask passwords'}
-    help = 'Display the current configuration'
-    commandGroup = 'Information Display'
-
-
-    def addParameters(self, argDef):
-        ConaryCommand.addParameters(self, argDef)
-        argDef["show-contexts"] = NO_PARAM
-        argDef["show-passwords"] = NO_PARAM
-
-    def runCommand(self, cfg, argSet, otherArgs):
-        showPasswords = argSet.pop('show-passwords', False)
-        showContexts = argSet.pop('show-contexts', False)
-        try:
-            prettyPrint = sys.stdout.isatty()
-        except AttributeError:
-            prettyPrint = False
-        cfg.setDisplayOptions(hidePasswords=not showPasswords,
-                              showContexts=showContexts,
-                              prettyPrint=prettyPrint)
-        if argSet: return self.usage()
-        if (len(otherArgs) > 2):
-            return self.usage()
-        else:
-            cfg.display()
-_register(ConfigCommand)
-
-
 class CommitCommand(ConaryCommand):
     commands = ['commit']
     paramHelp = "<changeset>"
@@ -927,7 +896,7 @@ class VerifyCommand(ConaryCommand):
 _register(VerifyCommand)
 
 
-class ConaryMain(options.MainHandler):
+class ConaryMain(command.MainHandler):
     name = 'conary'
     abstractCommand = ConaryCommand
     configClass = conarycfg.ConaryConfiguration
