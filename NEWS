@@ -23,6 +23,9 @@ Changes in @NEW@:
       defined to be the first two decimal-seperated parts of the upstream
       version, combined with a decimal. For example, a version string of
       2.16.1.3 would have a major_version of 2.16. (CNY-629)
+    * A list of KDE mirrors has been added to the default mirror
+      configuration. (CNY-895)
+
 
   o Code Cleanups
     * The command line options common between cvc and conary are now
