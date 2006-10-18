@@ -233,7 +233,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
             cfg.read(path, exception = True)
         except IOError, msg:
             raise OptionError(msg, parser)
-	
+
     for (arg, name) in cfgMap.items():
 	if argSet.has_key(arg):
 	    cfg.configLine("%s %s" % (name, argSet[arg]))
@@ -545,14 +545,15 @@ class MainHandler(object):
             print >>sys.stderr, e
             sys.exit(e.val)
 
-        if len(argv) < 2:
+        if len(argv) == 1:
             # no command specified
             return self.usage()
 
-
         commandName = argv[1]
         if commandName not in self._supportedCommands:
-            return self.usage()
+            rc = self.usage()
+            print "%s: unknown command: '%s'" % (self.name, commandName)
+            return rc
 
         thisCommand = self._supportedCommands[commandName]
         if thisCommand.hobbleShortOpts is not None:
