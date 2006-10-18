@@ -93,56 +93,19 @@ class ConaryCommand(command.ConaryCommand):
     paramHelp = ''
     defaultGroup = 'Common Options'
 
-    docs = {'build-label'        : ('Use build label LABEL as default search'
-                                    ' loc', 'LABEL'),
-            'components'         : ("Do not hide components"),
-            'config'             : ("Set config KEY to VALUE", "'KEY VALUE'"),
-            'config-file'        : ("Read PATH config file", "PATH"),
-            'context'            : "Set the current context",
+    docs = {'components'         : ('Do not hide components'),
             'exclude-troves'     : ('Do not install troves matching REGEXP', 
                                     'REGEXP'),
-            'install-label'      : ("Set the install label", "LABEL"),
-            'interactive'        : ('ask questions before performing actions '
-                                    'that change system or repository state'),
-            'flavors'            : 'Display complete flavors where applicable',
-            'full-versions'      : ('Always display complete version strings'),
             'labels'             : 'Always display labels for versions',
-            'profile'            : optparse.SUPPRESS_HELP,
-            'lsprof'             : optparse.SUPPRESS_HELP,
-            "pubring"            : '',
-            'skip-default-config': "Don't read default configs",
-            'quiet'              : ('do not display extra information when '
-                                    'running'),
-            'root'               : 'use conary database at location ROOT',
             'trust-threshold'    : ('Set trust threshold', 'INT')
             }
 
-
-    def addParameters(self, argDef):
-        d = {}
-        d["config"] = '-c', MULT_PARAM
-        d["config-file"] = MULT_PARAM
-        d["context"] = ONE_PARAM
-        d["install-label"] = MULT_PARAM
-        d["profile"] = NO_PARAM
-        d["lsprof"] = NO_PARAM
-        d["skip-default-config"] = NO_PARAM
-        argDef[self.defaultGroup] = d
-
     def addConfigOptions(self, cfgMap, argDef):
-        cfgMap["build-label"] = "buildLabel", ONE_PARAM
-        cfgMap["exclude-troves"] = "excludeTroves", ONE_PARAM
-        cfgMap["trust-threshold"] = "trustThreshold", ONE_PARAM
-        cfgMap["pubring"] = "pubRing", ONE_PARAM
-        cfgMap["root"] = "root", ONE_PARAM, '-r'
-        cfgMap["quiet"] = "quiet", NO_PARAM
-
-        cfgMap['interactive'] = 'interactive', NO_PARAM,
-        cfgMap['full-versions'] = 'fullVersions', NO_PARAM
-        cfgMap['labels'] = 'showLabels', NO_PARAM,
-        cfgMap['flavors'] = 'fullFlavors', NO_PARAM,
         cfgMap['components'] = 'showComponents', NO_PARAM
-        options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
+        cfgMap['exclude-troves'] = 'excludeTroves', ONE_PARAM
+        cfgMap['labels'] = 'showLabels', NO_PARAM,
+        cfgMap['trust-threshold'] = 'trustThreshold', ONE_PARAM
+        command.ConaryCommand.addConfigOptions(self, cfgMap, argDef)
 
 class ChangeSetCommand(ConaryCommand):
     commands = ['changeset', 'cs' ]

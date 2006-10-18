@@ -22,6 +22,9 @@ Changes in @NEW@:
       version, combined with a decimal. For example, a version string of
       2.16.1.3 would have a major_version of 2.16. (CNY-629)
 
+  o Code Cleanups
+    * The command line options common between cvc and conary are now
+      defined in one place.
 
   o Bug Fixes:
     * A bug that caused group cook with a replace or remove with a
