@@ -58,44 +58,12 @@ STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
 
 class CvcCommand(command.ConaryCommand):
 
-    docs = {'build-label'        : ('Use build label LABEL as default search'
-                                    ' loc', 'LABEL'),
-            'config'             : ("Set config KEY to VALUE", "'KEY VALUE'"),
-            'config-file'        : ("Read PATH config file", "PATH"),
-            'context'            : "Set the current context",
-            'install-label'      : ("Set the install label", "LABEL"),
-            'interactive'        : ('ask questions before performing actions '
-                                    'that change system or repository state'),
-            'flavors'            : 'Display complete flavors where applicable',
-            'full-versions'      : ('Always display complete version strings'),
-            'profile'            : optparse.SUPPRESS_HELP,
-            'skip-default-config': "Don't read default configs",
-            'signature-key'      : ("Use signature key to sign results", 'KEY'),
-            'quiet'              : ('do not display extra information when '
-                                    'running'),
-            'root'               : 'use conary database at location ROOT'
+    docs = {'signature-key'      : ("Use signature key to sign results", 'KEY'),
             }
 
-    def addParameters(self, argDef):
-        d = {}
-        d["config"] = '-c', MULT_PARAM
-        d["config-file"] = MULT_PARAM
-        d["context"] = ONE_PARAM
-        d["install-label"] = MULT_PARAM
-        d["profile"] = NO_PARAM
-        d["skip-default-config"] = NO_PARAM
-        argDef[self.defaultGroup] = d
-
     def addConfigOptions(self, cfgMap, argDef):
-        cfgMap["build-label"]   = "buildLabel", ONE_PARAM,
-        cfgMap['interactive']   = 'interactive', NO_PARAM,
-        cfgMap['full-versions'] = 'fullVersions', NO_PARAM
-        cfgMap['flavors']       = 'fullFlavors', NO_PARAM
-        cfgMap["pubring"]       = "pubRing", ONE_PARAM
-        cfgMap["quiet"]         = "quiet", NO_PARAM,
-        cfgMap["root"]          = "root", ONE_PARAM, '-r'
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
-        options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
+        command.ConaryCommand.addConfigOptions(self, cfgMap, argDef)
 
 class AddCommand(CvcCommand):
     commands = ['add']

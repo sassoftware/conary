@@ -12,11 +12,56 @@
 # full details.
 #
 
-import os, sys
+import os, sys, optparse
 from conary.lib import options, log
 from conary import state, versions
 
+(NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
+(OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+
 class ConaryCommand(options.AbstractCommand):
+    docs = {'build-label'        : ('Use build label LABEL as default search'
+                                    ' loc', 'LABEL'),
+            'components'         : ('Do not hide components'),
+            'config'             : ('Set config KEY to VALUE', '"KEY VALUE"'),
+            'config-file'        : ('Read PATH config file', 'PATH'),
+            'context'            : 'Set the current context',
+            'install-label'      : ('Set the install label', 'LABEL'),
+            'interactive'        : ('ask questions before performing actions '
+                                    'that change system or repository state'),
+            'flavors'            : 'Display complete flavors where applicable',
+            'full-versions'      : ('Always display complete version strings'),
+            'labels'             : 'Always display labels for versions',
+            'profile'            : optparse.SUPPRESS_HELP,
+            'lsprof'             : optparse.SUPPRESS_HELP,
+            'pubring'            : '',
+            'skip-default-config': "Don't read default configs",
+            'quiet'              : ('do not display extra information when '
+                                    'running'),
+            'root'               : 'use conary database at location ROOT',
+            }
+
+    def addParameters(self, argDef):
+        d = {}
+        d['config'] = '-c', MULT_PARAM
+        d['config-file'] = MULT_PARAM
+        d['context'] = ONE_PARAM
+        d['install-label'] = MULT_PARAM
+        d['profile'] = NO_PARAM
+        d['lsprof'] = NO_PARAM
+        d['skip-default-config'] = NO_PARAM
+        argDef[self.defaultGroup] = d
+
+    def addConfigOptions(self, cfgMap, argDef):
+        cfgMap['build-label']   = 'buildLabel', ONE_PARAM,
+        cfgMap['pubring']       = 'pubRing', ONE_PARAM
+        cfgMap['quiet']         = 'quiet', NO_PARAM,
+        cfgMap['root']          = 'root', ONE_PARAM, '-r'
+        cfgMap['flavors']       = 'fullFlavors', NO_PARAM
+        cfgMap['full-versions'] = 'fullVersions', NO_PARAM
+        cfgMap['interactive']   = 'interactive', NO_PARAM,
+        options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
+
     def setContext(self, cfg, argSet):
         context = cfg.context
         where = 'specified as the default context in the conary configuration'
