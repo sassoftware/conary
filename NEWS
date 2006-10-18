@@ -5,6 +5,7 @@ Changes in @NEW@:
     * Timeouts that occur when attempting to read the XML-RPC request
       from a client are now logged and return an exception (instead of
       causing a unhandled exception in the server).
+    * The repository browser is now viewable by Internet Explorer.
 
   o Client Changes:
     * When choosing how to match up troves with the same name, conary now
@@ -25,7 +26,6 @@ Changes in @NEW@:
       2.16.1.3 would have a major_version of 2.16. (CNY-629)
     * A list of KDE mirrors has been added to the default mirror
       configuration. (CNY-895)
-
 
   o Code Cleanups
     * The command line options common between cvc and conary are now
