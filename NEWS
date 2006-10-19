@@ -26,6 +26,9 @@ Changes in @NEW@:
       2.16.1.3 would have a major_version of 2.16. (CNY-629)
     * A list of KDE mirrors has been added to the default mirror
       configuration. (CNY-895)
+    * If a group is cooked twice at the same command line, say
+      cvc cook group-dist[ssl] group-dist[!ssl], then conary will cache
+      the trove used for the first group cook for the second. (CNY-818)
 
   o Code Cleanups
     * The command line options common between cvc and conary are now

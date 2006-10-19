@@ -226,7 +226,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                targetLabel = None, resume = None, alwaysBumpCount = False,
                allowUnknownFlags = False, allowMissingSource = False,
                ignoreDeps = False, logBuild = False,
-               crossCompile = None, callback = None, 
+               crossCompile = None, callback = None,
                requireCleanSources = False, downloadOnly = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
@@ -280,6 +280,14 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     sources all be from the repository.
     @rtype: list of strings
     """
+    if not isinstance(recipeClass, (list, tuple)):
+        recipeClasses = [recipeClass]
+    else:
+        recipeClasses = recipeClass
+        recipeClass = recipeClass[0]
+        # every recipe passed into build at once must have the same
+        # name and version.
+        assert(len(set((x.name, x.version) for x in recipeClasses)) == 1)
 
     if not callback:
         callback = callbacks.CookCallback()
@@ -291,16 +299,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
             "Version string %s has illegal '-' character" %recipeClass.version)
 
     if not use.Arch.keys():
-	log.error('No architectures have been defined in %s -- '
-		  'cooking is not possible' % ' '.join(cfg.archDirs)) 
-	sys.exit(1)
-    try:
-	use.setBuildFlagsFromFlavor(recipeClass.name, cfg.buildFlavor)
-    except AttributeError, msg:
-	log.error('Error setting build flags from flavor %s: %s' % (
-							    cfg.buildFlavor, 
-							    msg))
-	sys.exit(1)
+        log.error('No architectures have been defined in %s -- '
+                  'cooking is not possible' % ' '.join(cfg.archDirs)) 
+        sys.exit(1)
 
     # check to make sure that policy exists
     policyFound = False
@@ -347,37 +348,54 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     macros['buildlabel'] = buildBranch.label().asString()
 
     db = database.Database(cfg.root, cfg.dbPath)
-    if recipeClass.getType() in (recipe.RECIPE_TYPE_PACKAGE, 
-                                 recipe.RECIPE_TYPE_INFO):
-	ret = cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, 
+    type = recipeClass.getType()
+    if recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
+        ret = cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion,
+                               macros = macros, targetLabel = targetLabel,
+                               alwaysBumpCount = alwaysBumpCount,
+                               callback = callback)
+    else:
+        assert(len(recipeClasses) == 1) 
+        buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
+        try:
+            use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
+        except AttributeError, msg:
+            log.error('Error setting build flags from flavor %s: %s' % (
+                                            buildFlavor, msg))
+            sys.exit(1)
+
+        if type in (recipe.RECIPE_TYPE_INFO,
+                      recipe.RECIPE_TYPE_PACKAGE):
+            ret = cookPackageObject(repos, db, cfg, recipeClass, 
+                                sourceVersion, 
                                 prep = prep, macros = macros,
-				targetLabel = targetLabel,
-				resume = resume, 
+                                targetLabel = targetLabel,
+                                resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount, 
-                                ignoreDeps = ignoreDeps, logBuild = logBuild,
+                                ignoreDeps = ignoreDeps, 
+                                logBuild = logBuild,
                                 crossCompile = crossCompile,
                                 requireCleanSources = requireCleanSources,
                                 downloadOnly = downloadOnly)
-    elif recipeClass.getType() == recipe.RECIPE_TYPE_REDIRECT:
-	ret = cookRedirectObject(repos, db, cfg, recipeClass,  sourceVersion,
-			      macros = macros, targetLabel = targetLabel,
-                              alwaysBumpCount = alwaysBumpCount)
-    elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
-	ret = cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, 
-			      macros = macros, targetLabel = targetLabel,
-                              alwaysBumpCount = alwaysBumpCount,
-                              callback = callback)
-    elif recipeClass.getType() == recipe.RECIPE_TYPE_FILESET:
-	ret = cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, 
-				macros = macros, targetLabel = targetLabel,
-                                alwaysBumpCount = alwaysBumpCount)
-    else:
-        raise AssertionError
+        elif type == recipe.RECIPE_TYPE_REDIRECT:
+            ret = cookRedirectObject(repos, db, cfg, recipeClass,
+                                  sourceVersion,
+                                  macros = macros, 
+                                  targetLabel = targetLabel,
+                                  alwaysBumpCount = alwaysBumpCount)
+        elif type == recipe.RECIPE_TYPE_FILESET:
+            ret = cookFilesetObject(repos, db, cfg, recipeClasses, 
+                                    sourceVersion, 
+                                    macros = macros, 
+                                    targetLabel = targetLabel,
+                                    alwaysBumpCount = alwaysBumpCount)
+        else:
+            raise AssertionError
 
     # cook*Object returns None if using prep or downloadOnly
     if ret is None:
         return []
-    
+
     (cs, built, cleanup) = ret
 
     # sign the changeset
@@ -389,13 +407,13 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:
-	cs.writeToFile(changeSetFile)
+        cs.writeToFile(changeSetFile)
     else:
-	repos.commitChangeSet(cs, callback = callback)
+        repos.commitChangeSet(cs, callback = callback)
 
     if cleanup:
-	(fn, args) = cleanup
-	fn(*args)
+        (fn, args) = cleanup
+        fn(*args)
 
     return built
 
@@ -485,9 +503,9 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
     return (changeSet, built, None)
 
-def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
-		    targetLabel = None, alwaysBumpCount=False, 
-                    callback = callbacks.CookCallback()):
+def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
+                     targetLabel = None, alwaysBumpCount=False, 
+                     callback = callbacks.CookCallback()):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -513,76 +531,84 @@ def cookGroupObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     @param redirect: if True, a redirect trove is built instead of a
     normal trove.
     """
+    troveCache = grouprecipe.TroveCache(repos, callback)
 
-    fullName = recipeClass.name
     changeSet = changeset.ChangeSet()
 
-    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
-                            cfg.buildFlavor, macros)
-
-    use.track(True)
-    _callSetup(cfg, recipeObj)
-    use.track(False)
-
-    log.info('Building %s=%s[%s]' % ( recipeClass.name,
+    builtGroups = []
+    groupNames = []
+    groupFlavors = []
+    for recipeClass in recipeClasses:
+        fullName = recipeClass.name
+        buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
+        use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
+        recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
+                                buildFlavor, macros)
+        use.track(True)
+        _callSetup(cfg, recipeObj)
+        use.track(False)
+        log.info('Building %s=%s[%s]' % ( recipeClass.name,
                                       sourceVersion.branch().label(),
                                       use.usedFlagsToFlavor(recipeClass.name)))
 
-    flavors = [buildpackage._getUseFlavor(recipeObj)]
+        flavors = [buildpackage._getUseFlavor(recipeObj)]
 
-    grouprecipe.buildGroups(recipeObj, cfg, repos, callback)
+        grouprecipe.buildGroups(recipeObj, cfg, repos, callback, 
+                                troveCache=troveCache)
 
-    callback.buildingChangeset()
+        callback.buildingChangeset()
 
-    for group in recipeObj.iterGroupList():
-        flavors.extend(x[2] for x in group.iterTroveList())
-    grpFlavor = deps.mergeFlavorList(flavors,
-                                     deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
+        for group in recipeObj.iterGroupList():
+            flavors.extend(x[2] for x in group.iterTroveList())
+        grpFlavor = deps.mergeFlavorList(flavors,
+                                         deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
+        builtGroups.append((recipeObj, grpFlavor))
+        groupNames.extend(recipeObj.getGroupNames())
+        groupFlavors.append(grpFlavor)
 
-    groupNames = recipeObj.getGroupNames()
     targetVersion = nextVersion(repos, db, groupNames, sourceVersion, 
-                                grpFlavor, targetLabel,
+                                groupFlavors, targetLabel,
                                 alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
     built = []
-    for group in recipeObj.iterGroupList():
-        groupName = group.name
-        grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None,
-                             isRedirect = False)
-        grpTrv.setRequires(group.getRequires())
+    for recipeObj, grpFlavor in builtGroups:
+        for group in recipeObj.iterGroupList():
+            groupName = group.name
+            grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None,
+                                 isRedirect = False)
+            grpTrv.setRequires(group.getRequires())
 
-	provides = deps.DependencySet()
-	provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
-	grpTrv.setProvides(provides)
-
-
-        grpTrv.setBuildTime(buildTime)
-        grpTrv.setSourceName(fullName + ':source')
-        grpTrv.setSize(group.getSize())
-        grpTrv.setConaryVersion(constants.version)
-        grpTrv.setIsCollection(True)
-        grpTrv.setLabelPath(recipeObj.getLabelPath())
-
-        for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
-            grpTrv.addTrove(byDefault = byDefault,
-                            weakRef=not explicit, *troveTup)
-
-	# add groups which were newly created by this group. 
-	for name, byDefault, explicit in group.iterNewGroupList():
-	    grpTrv.addTrove(name, targetVersion, grpFlavor, 
-                            byDefault = byDefault, 
-                            weakRef = not explicit)
-
-        grpDiff = grpTrv.diff(None, absolute = 1)[0]
-        changeSet.newTrove(grpDiff)
-
-        built.append((grpTrv.getName(), str(grpTrv.getVersion()),
-                                        grpTrv.getFlavor()))
+            provides = deps.DependencySet()
+            provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
+            grpTrv.setProvides(provides)
 
 
-    for primaryName in recipeObj.getPrimaryGroupNames():
-        changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
+            grpTrv.setBuildTime(buildTime)
+            grpTrv.setSourceName(fullName + ':source')
+            grpTrv.setSize(group.getSize())
+            grpTrv.setConaryVersion(constants.version)
+            grpTrv.setIsCollection(True)
+            grpTrv.setLabelPath(recipeObj.getLabelPath())
+
+            for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+                grpTrv.addTrove(byDefault = byDefault,
+                                weakRef=not explicit, *troveTup)
+
+            # add groups which were newly created by this group. 
+            for name, byDefault, explicit in group.iterNewGroupList():
+                grpTrv.addTrove(name, targetVersion, grpFlavor, 
+                                byDefault = byDefault, 
+                                weakRef = not explicit)
+
+            grpDiff = grpTrv.diff(None, absolute = 1)[0]
+            changeSet.newTrove(grpDiff)
+
+            built.append((grpTrv.getName(), str(grpTrv.getVersion()),
+                                            grpTrv.getFlavor()))
+
+        for primaryName in recipeObj.getPrimaryGroupNames():
+            changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
 
     return (changeSet, built, None)
 
@@ -1192,7 +1218,9 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                             versions.Revision('%s-1' % (versionStr)))
     return None
 
-def getRecipeInfoFromPath(repos, cfg, recipeFile):
+def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
+    if buildFlavor is None:
+        buildFlavor = cfg.buildFlavor
 
     if recipeFile[0] != '/':
         recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
@@ -1201,7 +1229,7 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile):
 
 
     try:
-        use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
+        use.setBuildFlagsFromFlavor(pkgname, buildFlavor)
     except AttributeError, msg:
         log.error('Error setting build flag values: %s' % msg)
         sys.exit(1)
@@ -1216,7 +1244,7 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile):
             branch = None
 
         loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
-                                         branch=branch)
+                                         branch=branch, buildFlavor=buildFlavor)
         version = None
     except builderrors.RecipeFileError, msg:
         raise CookError(str(msg))
@@ -1278,56 +1306,73 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.track(True)
 
-    (name, versionStr, flavor) = parseTroveSpec(item)
-    if flavor is not None:
-        cfg.buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
-    if name.endswith('.recipe') and os.path.isfile(name):
-        if versionStr:
-            raise CookError, \
-                ("Must not specify version string when cooking recipe file")
-
-        loader, recipeClass, sourceVersion = getRecipeInfoFromPath(repos, cfg,
-                                                                   name)
-
-        targetLabel = versions.CookLabel()
-        if requireCleanSources is None:
-            requireCleanSources = False
-
-        changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
+    if isinstance(item, tuple):
+        (name, versionStr, flavorList) = item
     else:
-	if resume:
-	    raise CookError('Cannot use --resume argument when cooking in repository')
-        if requireCleanSources is None:
-            requireCleanSources = True
+        (name, versionStr, flavor) = parseTroveSpec(item)
+        flavorList = [flavor]
 
-        if emerge:
-            labelPath = cfg.installLabelPath
+    recipeClassDict = {}
+    loaders = []
+    for flavor in flavorList:
+        if flavor is not None:
+            buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
         else:
-            labelPath = None
+            buildFlavor = cfg.buildFlavor
 
-        try:
-	    use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
-	except AttributeError, msg:
-	    log.error('Error setting build flag values: %s' % msg)
-	    sys.exit(1)
+        if name.endswith('.recipe') and os.path.isfile(name):
+            if versionStr:
+                raise CookError, \
+                    ("Must not specify version string when cooking recipe file")
 
-        try:
-            (loader, sourceVersion) = \
-                            loadrecipe.recipeLoaderFromSourceComponent(
-                                        name, cfg, repos,
-                                        versionStr=versionStr,
-                                        labelPath = labelPath)[0:2]
-        except builderrors.RecipeFileError, msg:
-            raise CookError(str(msg))
+            loader, recipeClass, sourceVersion = \
+                              getRecipeInfoFromPath(repos, cfg, name,
+                                                    buildFlavor=buildFlavor)
 
-        recipeClass = loader.getRecipe()
+            targetLabel = versions.CookLabel()
+            if requireCleanSources is None:
+                requireCleanSources = False
 
+            changeSetFile = "%s-%s.ccs" % (recipeClass.name,
+                                           recipeClass.version)
+        else:
+            if resume:
+                raise CookError('Cannot use --resume argument when cooking in repository')
+            if requireCleanSources is None:
+                requireCleanSources = True
+
+            if emerge:
+                labelPath = cfg.installLabelPath
+            else:
+                labelPath = None
+
+            try:
+                use.setBuildFlagsFromFlavor(name, buildFlavor)
+            except AttributeError, msg:
+                log.error('Error setting build flag values: %s' % msg)
+                sys.exit(1)
+
+            try:
+                (loader, sourceVersion) = \
+                                loadrecipe.recipeLoaderFromSourceComponent(
+                                            name, cfg, repos,
+                                            versionStr=versionStr,
+                                            labelPath = labelPath,
+                                            buildFlavor=buildFlavor)[0:2]
+            except builderrors.RecipeFileError, msg:
+                raise CookError(str(msg))
+
+            recipeClass = loader.getRecipe()
+        loaders.append(loader)
+        recipeClassDict.setdefault(sourceVersion, []).append(recipeClass)
+
+        if showBuildReqs:
+            if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+                raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
+            recipeObj = recipeClass(cfg, None, [], lightInstance=True)
+            sys.stdout.write('\n'.join(sorted(recipeObj.buildRequires)))
+            sys.stdout.flush()
     if showBuildReqs:
-        if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-            raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
-        recipeObj = recipeClass(cfg, None, [], lightInstance=True)
-        sys.stdout.write('\n'.join(sorted(recipeObj.buildRequires)))
-        sys.stdout.flush()
         return None
 
     if emerge:
@@ -1336,28 +1381,35 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         targetLabel = versions.EmergeLabel()
 
     built = None
-    try:
-        troves = cookObject(repos, cfg, recipeClass, 
-                            changeSetFile = changeSetFile,
-                            prep = prep, macros = macros,
-			    targetLabel = targetLabel,
-                            sourceVersion = sourceVersion,
-			    resume = resume,
-                            allowUnknownFlags = allowUnknownFlags,
-                            allowMissingSource=False, ignoreDeps=ignoreDeps,
-                            logBuild=logBuild,
-                            crossCompile=crossCompile,
-                            callback=callback,
-                            requireCleanSources=requireCleanSources,
-                            downloadOnly = downloadOnly)
-        if troves:
-            built = (tuple(troves), changeSetFile)
-    except errors.RepositoryError, e:
-	if emerge:
-	    os.unlink(changeSetFile)
-        raise CookError(str(e))
 
-    return built
+    built = []
+    if len(recipeClassDict) > 1 and changeSetFile:
+        # this would involve reading the changeset from disk and merging 
+        # or writing an interface for this very, very, unlikely case where the
+        # version is based off of a use flavor.
+        raise CookError("Cannot cook multiple versions of %s to change set" % name)
+    for sourceVersion, recipeClasses in recipeClassDict.items():
+        try:
+            troves = cookObject(repos, cfg, recipeClasses, 
+                                changeSetFile = changeSetFile,
+                                prep = prep, macros = macros,
+                                targetLabel = targetLabel,
+                                sourceVersion = sourceVersion,
+                                resume = resume,
+                                allowUnknownFlags = allowUnknownFlags,
+                                allowMissingSource=False, ignoreDeps=ignoreDeps,
+                                logBuild=logBuild,
+                                crossCompile=crossCompile,
+                                callback=callback,
+                                requireCleanSources=requireCleanSources,
+                                downloadOnly = downloadOnly)
+            if troves:
+                built.extend(tuple(troves))
+        except errors.RepositoryError, e:
+            if emerge:
+                os.unlink(changeSetFile)
+            raise CookError(str(e))
+    return tuple(built), changeSetFile
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
@@ -1377,7 +1429,29 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         if not cookUid or not cookGid:
             raise CookError('Do not cook as root')
 
-    for item in args:
+    items = {}
+    for idx, item in enumerate(args):
+        (name, version, flavor) = parseTroveSpec(item)
+        l = items.setdefault((name, version), (idx, set()))
+        l[1].add(flavor)
+    finalItems = []
+    items = sorted(items.iteritems(), key=lambda x: x[1][0])
+
+    for (name, version), (idx, flavorList) in items:
+        # NOTE: most of the cook code is set up to allow
+        # cooks to be shared when building multiple flavors
+        # of the same trove.  However, troves with files in
+        # them cannot handle creating one changeset w/ 
+        # shared pathIds in them.  If this limitation of the 
+        # changeset format ever gets fixed, we can remove this
+        # check.
+        if name.startswith('group-'):
+            finalItems.append((name, version, flavorList))
+        else:
+            for flavor in flavorList:
+                finalItems.append((name, version, [flavor]))
+
+    for item in finalItems:
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
         # first, we need to ignore the tty output in the child process

@@ -1324,7 +1324,7 @@ class TroveCache(dict):
         return self[troveTup].includeTroveByDefault(*childTrove)
 
 
-def buildGroups(recipeObj, cfg, repos, callback):
+def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     """ 
         Main function for finding, adding, and checking the troves requested
         for the the groupRecipe.
@@ -1358,7 +1358,10 @@ def buildGroups(recipeObj, cfg, repos, callback):
     if callback is None:
         callback = callbacks.CookCallback()
 
-    cache = TroveCache(repos, callback)
+    if troveCache is None:
+        cache = TroveCache(repos, callback)
+    else:
+        cache = troveCache
 
     labelPath = recipeObj.getLabelPath()
     flavor = recipeObj.getSearchFlavor()
