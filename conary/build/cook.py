@@ -384,7 +384,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                   targetLabel = targetLabel,
                                   alwaysBumpCount = alwaysBumpCount)
         elif type == recipe.RECIPE_TYPE_FILESET:
-            ret = cookFilesetObject(repos, db, cfg, recipeClasses, 
+            ret = cookFilesetObject(repos, db, cfg, recipeClass, 
                                     sourceVersion, 
                                     macros = macros, 
                                     targetLabel = targetLabel,
