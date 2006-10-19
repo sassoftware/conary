@@ -89,6 +89,7 @@ class AnnotateCommand(CvcCommand):
     commands = ['annotate']
     paramHelp = '<file>'
     help = 'Show version information for each line in a file'
+    hidden = True
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
         args = args[1:]
@@ -169,6 +170,7 @@ class CloneCommand(CvcCommand):
     paramHelp = '<target-branch> <trove>[=<version>][[flavor]]+'
     help = 'Copy troves from one branch to another in a repository'
     commandGroup = 'Repository Access'
+    hidden = True
     docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
                                   'information about how this trove was built'),
              'info'            : 'Do not perform clone',
@@ -416,6 +418,7 @@ class DescribeCommand(CvcCommand):
     paramHelp = '<xml file>'
     help = 'Add metadata to a repository from an XML file'
     commandGroup = 'Repository Access'
+    hidden = True
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
         args = args[1:]
@@ -453,6 +456,7 @@ _register(DiffCommand)
 class LogCommand(CvcCommand):
     commands = ['log']
     help = 'Show changelog entries for this source component'
+    hidden = True
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -467,6 +471,7 @@ class RdiffCommand(CvcCommand):
     commands = ['rdiff']
     paramHelp = "<name> [<oldver>|-<num>] <newver>"
     help = 'Show changes between two versions of a trove in a repository'
+    hidden = True
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
         args = args[1:]
@@ -479,6 +484,7 @@ class RefreshCommand(CvcCommand):
     paramHelp = '<fileGlob> [<fileGlob2> <fileGlob3> ...]'
     help = 'Refresh files that are automatically downloaded'
     commandGroup = 'File Operations'
+    hidden=True
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
@@ -506,6 +512,7 @@ class RenameCommand(CvcCommand):
     paramHelp = "<oldfile> <newfile>"
     help = 'Rename a file that is under Conary control'
     commandGroup = 'File Operations'
+    hidden = True
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -520,6 +527,7 @@ class SignCommand(CvcCommand):
     help = 'Add a digital signature to troves in a repository'
     docs = {'recurse' : 'recursively sign child troves'}
     commandGroup = 'Repository Access'
+    hidden = True
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -564,6 +572,7 @@ class MergeCommand(CvcCommand):
     commands = ['merge']
     help = 'Merge changes made in a parent branch into the current directory'
     commandGroup = 'File Operations'
+    hidden = True
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
@@ -581,6 +590,7 @@ class SetCommand(CvcCommand):
     paramHelp = "<path>+"
     help = 'Set the properties of a file under Conary control'
     commandGroup = 'File Operations'
+    hidden=True
     docs = {'text'       : ('Mark the given files as text files'),
             'binary'     : ('Mark the given files as binary files') }
 
