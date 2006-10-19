@@ -77,6 +77,7 @@ class AddCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos=None):
+        args = args[1:]
         text = argSet.pop('text', False)
         binary = argSet.pop('binary', False)
         if len(args) < 2: return self.usage()
@@ -90,6 +91,7 @@ class AnnotateCommand(CvcCommand):
     help = 'Show version information for each line in a file'
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if argSet or len(args) != 2: return self.usage()
         args[0] = repos
         checkin.annotate(*args)
@@ -116,6 +118,7 @@ class BranchShadowCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         makeShadow =  (args[0] == "shadow")
         sourceOnly = argSet.pop('source-only', False)
         binaryOnly = argSet.pop('binary-only', False)
@@ -146,6 +149,7 @@ class CheckoutCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if argSet.has_key("dir"):
             dir = argSet['dir']
             del argSet['dir']
@@ -189,6 +193,7 @@ class CloneCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if len(args) < 3:
             return self.usage()
 
@@ -224,6 +229,7 @@ class CommitCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         level = log.getVerbosity()
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
@@ -251,6 +257,7 @@ class ContextCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if len(args) > 2:
             return self.usage()
 
@@ -312,6 +319,7 @@ class CookCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         level = log.getVerbosity()
         macros = {}
         prep = 0
@@ -410,6 +418,7 @@ class DescribeCommand(CvcCommand):
     commandGroup = 'Repository Access'
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         level = log.getVerbosity()
         if level > log.INFO:
             log.setVerbosity(log.INFO)
@@ -434,6 +443,7 @@ class DiffCommand(CvcCommand):
     help = 'Show uncommitted changes'
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
 
         args[0] = repos
@@ -446,6 +456,7 @@ class LogCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if argSet or len(args) > 2: return self.usage()
 
         args[0] = repos
@@ -458,6 +469,7 @@ class RdiffCommand(CvcCommand):
     help = 'Show changes between two versions of a trove in a repository'
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if argSet or len(args) != 4: return self.usage()
         checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
 _register(RdiffCommand)
@@ -470,6 +482,7 @@ class RefreshCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
+        args = args[1:]
         #if len(args) < 2: return self.usage()
         checkin.refresh(repos, cfg, args[1:])
 _register(RefreshCommand)
@@ -482,6 +495,7 @@ class RemoveCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if len(args) < 2: return self.usage()
         for f in args[1:]:
             checkin.removeFile(f, repos=repos)
@@ -495,6 +509,7 @@ class RenameCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if len(args) != 3: return self.usage()
         checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
@@ -512,6 +527,7 @@ class SignCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
+        args = args[1:]
         if len(args) <2: return self.usage()
         if argSet.has_key('quiet'):
             cfg.quiet = True
@@ -535,6 +551,7 @@ class NewPkgCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
+        args = args[1:]
         dir = argSet.pop('dir', None)
         template = argSet.pop('template', None)
 
@@ -549,6 +566,7 @@ class MergeCommand(CvcCommand):
     commandGroup = 'File Operations'
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
+        args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
         if len(args) == 2:
             kw = dict(versionSpec=args[1])
@@ -573,6 +591,7 @@ class SetCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         binary = argSet.pop('binary', False)
         text = argSet.pop('text', False)
 
@@ -595,6 +614,7 @@ class UpdateCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
+        args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
 
         args[0] = repos
@@ -653,7 +673,7 @@ class CvcMain(command.MainHandler):
         keyCache.setCallback(keyCacheCallback)
 
         rv = options.MainHandler.runCommand(self, thisCommand,
-                                            cfg, argSet, args[1:],
+                                            cfg, argSet, args,
                                             callback=callback,
                                             repos=client.getRepos())
 
@@ -673,7 +693,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
-    return thisCommand.runCommand(cfg, argSet, args,
+    return thisCommand.runCommand(cfg, argSet, [ 'cvc' ] + list(args),
                                   profile=profile,
                                   callback=callback,
                                   repos=repos)
