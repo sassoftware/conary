@@ -58,7 +58,8 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
                           {sourceVersion.getBinaryVersion().branch() : None })
     
     if repos and not sourceVersion.isOnLocalHost():
-        d = repos.getTroveVersionsByBranch(query)
+        d = repos.getTroveVersionsByBranch(query,
+                                           troveTypes = repos.TROVE_QUERY_ALL)
     else:
         d = {}
 
