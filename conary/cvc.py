@@ -586,9 +586,12 @@ _register(MergeCommand)
 
 class MarkRemovedCommand(CvcCommand):
     commands = [ 'markremoved' ]
+    commandGroup = 'Hidden Commands'
+    hidden = True
 
     def runCommand(self, repos, cfg, argSet, args, profile = False, 
                    callback = None):
+        args = args[1:]
         if argSet or not args or len(args) != 2: return self.usage()
         checkin.markRemoved(cfg, repos, args[1])
 _register(MarkRemovedCommand)
