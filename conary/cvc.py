@@ -589,8 +589,8 @@ class MarkRemovedCommand(CvcCommand):
     commandGroup = 'Hidden Commands'
     hidden = True
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
         args = args[1:]
         if argSet or not args or len(args) != 2: return self.usage()
         checkin.markRemoved(cfg, repos, args[1])
