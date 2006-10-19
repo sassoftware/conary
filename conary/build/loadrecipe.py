@@ -129,18 +129,24 @@ def _copyReusedRecipes(moduleDict):
 class RecipeLoader:
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
-                 branch=None, ignoreInstalled=False, directory=None):
+                 branch=None, ignoreInstalled=False, directory=None,
+                 buildFlavor=None):
         try:
             self._load(filename, cfg, repos, component,
-                       branch, ignoreInstalled, directory)
+                       branch, ignoreInstalled, directory, 
+                       buildFlavor=buildFlavor)
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
     def _load(self, filename, cfg=None, repos=None, component=None,
-              branch=None, ignoreInstalled=False, directory=None):
+              branch=None, ignoreInstalled=False, directory=None,
+              buildFlavor=None):
         self.recipes = {}
-        
+
+        if buildFlavor is None and cfg is not None:
+            buildFlavor = cfg.buildFlavor
+
         if filename[0] != "/":
             raise builderrors.LoadRecipeError("recipe file names must be absolute paths")
 
@@ -167,6 +173,7 @@ class RecipeLoader:
         self.module.__dict__['ignoreInstalled'] = ignoreInstalled
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
+        self.module.__dict__['buildFlavor'] = buildFlavor
 
 
         # create the recipe class by executing the code in the recipe
@@ -219,6 +226,7 @@ class RecipeLoader:
         del self.module.__dict__['branch']
         del self.module.__dict__['name']
         del self.module.__dict__['ignoreInstalled']
+        del self.module.__dict__['buildFlavor']
 
         found = False
         for (name, obj) in self.module.__dict__.items():
@@ -260,6 +268,7 @@ class RecipeLoader:
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)
             self.recipe._trackedFlags = use.getUsed()
+            self.recipe._buildFlavor = buildFlavor
         else:
             # we'll get this if the recipe file is empty 
             raise builderrors.RecipeFileError(
@@ -332,7 +341,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     ignoreInstalled=False, 
                                     filterVersions=False, 
                                     parentDir=None, 
-                                    defaultToLatest = False):
+                                    defaultToLatest = False,
+                                    buildFlavor = None):
     # FIXME parentDir specifies the directory to look for 
     # local copies of recipes called with loadRecipe.  If 
     # empty, we'll look in the tmp directory where we create the recipe
@@ -341,6 +351,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     name = name.split(':')[0]
     component = name + ":source"
     filename = name + '.recipe'
+    if buildFlavor is None:
+        buildFlavor = cfg.buildFlavor
     if not labelPath:
         if not cfg.buildLabel:
              raise builderrors.LoadRecipeError(
@@ -405,7 +417,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
         loader = RecipeLoader(recipeFile, cfg, repos, component, 
                               sourceComponent.getVersion().branch(),
                               ignoreInstalled=ignoreInstalled,
-                              directory=parentDir)
+                              directory=parentDir, buildFlavor=buildFlavor)
     finally:
         os.unlink(recipeFile)
     recipe = loader.getRecipe()
@@ -514,6 +526,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     branch = callerGlobals['branch']
     parentPackageName = callerGlobals['name']
     parentDir = callerGlobals['directory']
+    buildFlavor = callerGlobals.get('buildFlavor', cfg.buildFlavor)
+
     if 'ignoreInstalled' in callerGlobals:
         alwaysIgnoreInstalled = callerGlobals['ignoreInstalled']
     else:
@@ -541,11 +555,12 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if os.path.exists(localfile):
             # XXX: FIXME: this next test is unreachable
             if flavor is not None and not flavor.isEmpty():
-                oldBuildFlavor = cfg.buildFlavor
-                cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+                oldBuildFlavor = buildFlavor
+                buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor)
             loader = RecipeLoader(localfile, cfg, repos=repos,
-                                  ignoreInstalled=alwaysIgnoreInstalled)
+                                  ignoreInstalled=alwaysIgnoreInstalled,
+                                  buildFlavor=buildFlavor)
 
     if not loader:
         if label:
@@ -573,9 +588,9 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
             # trove was found.  
-            oldBuildFlavor = cfg.buildFlavor
-            cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-            use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+            oldBuildFlavor = buildFlavor
+            buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+            use.setBuildFlagsFromFlavor(name, buildFlavor)
         loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
@@ -612,9 +627,9 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             callerGlobals['loadedTroves'].append(troveTuple)
             callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)
     if flavor is not None:
-        cfg.buildFlavor = oldBuildFlavor
+        buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
-        use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)
+        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor)
 
     # stash a reference to the module in the namespace
     # of the recipe that loaded it, or else it will be destroyed
