@@ -335,6 +335,7 @@ class AbstractCommand(object):
     hobbleShortOpts = None
     def __init__(self):
         self.parser = None
+        self.mainHandler = None
 
     def usage(self, errNo=1):
         if self.parser:
@@ -343,6 +344,9 @@ class AbstractCommand(object):
 
     def setParser(self, parser):
         self.parser = parser
+
+    def setMainHandler(self, mainHandler):
+        self.mainHandler = mainHandler
 
     def addParameters(self, argDef):
         pass
@@ -480,7 +484,7 @@ class MainHandler(object):
                                     hobbleShortOpts=self.hobbleShortOpts)
         return argSet, [argv[0]] + otherArgs
 
-    def usage(self, rc = 1):
+    def usage(self, rc = 1, showAll = False):
         # get the longest command to set the width of the command
         # column
         width = 0
@@ -502,7 +506,10 @@ class MainHandler(object):
                 continue
             commands = groups[group]
             # filter out hidden commands
-            filtered = [ x for x in commands if not x.hidden ]
+            if showAll:
+                filtered = commands
+            else:
+                filtered = [ x for x in commands if not x.hidden ]
             if not filtered:
                 continue
             # print the header for the command group
@@ -596,6 +603,7 @@ class MainHandler(object):
             sys.exit(1)
 
         thisCommand.setParser(parser)
+        thisCommand.setMainHandler(self)
         argSet.update(newArgSet)
         thisCommand.processConfigOptions(cfg, cfgMap, argSet)
         self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)

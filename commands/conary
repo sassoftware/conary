@@ -905,11 +905,12 @@ class ConaryMain(command.MainHandler):
     commandList = _commands
     hobbleShortOpts = True
 
-    def usage(self, rc = 1):
+    def usage(self, rc = 1, showAll=False):
         print 'Conary Software Configuration Management System'
-        print
-        print 'Common Commands (use "conary help" for the full list)'
-        return options.MainHandler.usage(self, rc)
+        if not showAll:
+            print
+            print 'Common Commands (use "conary help" for the full list)'
+        return options.MainHandler.usage(self, rc, showAll=showAll)
 
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,

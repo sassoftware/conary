@@ -632,11 +632,12 @@ class CvcMain(command.MainHandler):
     commandList = _commands
     hobbleShortOpts = True
 
-    def usage(self, rc=1):
+    def usage(self, rc=1, showAll=False):
         print 'Conary Version Control (cvc)'
-        print
-        print 'Common Commands (use "cvc help" for the full list)'
-        return options.MainHandler.usage(self, rc)
+        if not showAll:
+            print
+            print 'Common Commands (use "cvc help" for the full list)'
+        return options.MainHandler.usage(self, rc, showAll=showAll)
 
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         client = conaryclient.ConaryClient(cfg)

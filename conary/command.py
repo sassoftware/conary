@@ -130,5 +130,21 @@ class ConfigCommand(ConaryCommand):
         else:
             cfg.display()
 
+class HelpCommand(ConaryCommand):
+    commands = ['help']
+    help = 'Display help information'
+    commandGroup = 'Information Display'
+
+    def runCommand(self, cfg, argSet, args, **kwargs):
+        if len(args) == 3:
+            pass
+        elif len(args) == 2:
+            self.mainHandler.usage(showAll=True)
+            return 0
+        else:
+            print "%s: too many arguments: '%s'" % (self.mainHandler.name,
+                                                    ' '.join(args[2:]))
+            return self.usage()
+
 class MainHandler(options.MainHandler):
-    commandList = [ ConfigCommand ]
+    commandList = [ ConfigCommand, HelpCommand ]
