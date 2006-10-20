@@ -176,7 +176,7 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
     def setKeyTable(self, keyTable):
         self.keyTable = keyTable
 
-    def getPublicKey(self, keyId, serverName = None):
+    def getPublicKey(self, keyId, serverName = None, warn=False):
         if keyId in self.publicDict:
             return self.publicDict[keyId]
 
