@@ -31,6 +31,9 @@ Changes in @NEW@:
     * If a group is cooked twice at the same command line, say
       cvc cook group-dist[ssl] group-dist[!ssl], then conary will cache
       the trove used for the first group cook for the second. (CNY-818)
+    * Unpacking a tarball now preserved permissions only when unpacking
+      into the root proxy, not unpacking sources into the build
+      directory. (CNY-998)
 
   o Code Cleanups
     * The command line options common between cvc and conary are now
