@@ -1502,12 +1502,12 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                              crossCompile = crossCompile,
                              callback = CookCallback(),
                              downloadOnly = downloadOnly)
-            if built is None:
+            components, csFile = built
+            if not components:
                 # --prep or --download or perhaps an error was logged
                 if log.errorOccurred():
                     sys.exit(1)
                 sys.exit(0)
-            components, csFile = built
             for component, version, flavor in sorted(components):
                 print "Created component:", component, version,
                 if flavor is not None:
