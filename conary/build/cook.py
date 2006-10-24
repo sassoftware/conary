@@ -572,38 +572,39 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     buildTime = time.time()
 
     built = []
-    for group in recipeObj.iterGroupList():
-        groupName = group.name
-        grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
-        grpTrv.setRequires(group.getRequires())
+    for recipeObj, grpFlavor in builtGroups:
+        for group in recipeObj.iterGroupList():
+            groupName = group.name
+            grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
+            grpTrv.setRequires(group.getRequires())
 
-	provides = deps.DependencySet()
-	provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
-	grpTrv.setProvides(provides)
+            provides = deps.DependencySet()
+            provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
+            grpTrv.setProvides(provides)
 
 
-        grpTrv.setBuildTime(buildTime)
-        grpTrv.setSourceName(fullName + ':source')
-        grpTrv.setSize(group.getSize())
-        grpTrv.setConaryVersion(constants.version)
-        grpTrv.setIsCollection(True)
-        grpTrv.setLabelPath(recipeObj.getLabelPath())
+            grpTrv.setBuildTime(buildTime)
+            grpTrv.setSourceName(fullName + ':source')
+            grpTrv.setSize(group.getSize())
+            grpTrv.setConaryVersion(constants.version)
+            grpTrv.setIsCollection(True)
+            grpTrv.setLabelPath(recipeObj.getLabelPath())
 
-        for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
-            grpTrv.addTrove(byDefault = byDefault,
-                            weakRef=not explicit, *troveTup)
+            for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+                grpTrv.addTrove(byDefault = byDefault,
+                                weakRef=not explicit, *troveTup)
 
-	# add groups which were newly created by this group. 
-	for name, byDefault, explicit in group.iterNewGroupList():
-	    grpTrv.addTrove(name, targetVersion, grpFlavor, 
-                            byDefault = byDefault, 
-                            weakRef = not explicit)
+            # add groups which were newly created by this group. 
+            for name, byDefault, explicit in group.iterNewGroupList():
+                grpTrv.addTrove(name, targetVersion, grpFlavor, 
+                                byDefault = byDefault, 
+                                weakRef = not explicit)
 
-        grpDiff = grpTrv.diff(None, absolute = 1)[0]
-        changeSet.newTrove(grpDiff)
+            grpDiff = grpTrv.diff(None, absolute = 1)[0]
+            changeSet.newTrove(grpDiff)
 
-        built.append((grpTrv.getName(), str(grpTrv.getVersion()),
-                                        grpTrv.getFlavor()))
+            built.append((grpTrv.getName(), str(grpTrv.getVersion()),
+                                            grpTrv.getFlavor()))
 
         for primaryName in recipeObj.getPrimaryGroupNames():
             changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
