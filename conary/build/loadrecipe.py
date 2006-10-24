@@ -144,9 +144,6 @@ class RecipeLoader:
               buildFlavor=None):
         self.recipes = {}
 
-        if buildFlavor is None and cfg is not None:
-            buildFlavor = cfg.buildFlavor
-
         if filename[0] != "/":
             raise builderrors.LoadRecipeError("recipe file names must be absolute paths")
 
@@ -268,7 +265,8 @@ class RecipeLoader:
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)
             self.recipe._trackedFlags = use.getUsed()
-            self.recipe._buildFlavor = buildFlavor
+            if buildFlavor is not None:
+                self.recipe._buildFlavor = buildFlavor
         else:
             # we'll get this if the recipe file is empty 
             raise builderrors.RecipeFileError(
@@ -351,8 +349,6 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     name = name.split(':')[0]
     component = name + ":source"
     filename = name + '.recipe'
-    if buildFlavor is None:
-        buildFlavor = cfg.buildFlavor
     if not labelPath:
         if not cfg.buildLabel:
              raise builderrors.LoadRecipeError(
@@ -526,7 +522,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     branch = callerGlobals['branch']
     parentPackageName = callerGlobals['name']
     parentDir = callerGlobals['directory']
-    buildFlavor = callerGlobals.get('buildFlavor', cfg.buildFlavor)
+    buildFlavor = callerGlobals.get('buildFlavor', None)
 
     if 'ignoreInstalled' in callerGlobals:
         alwaysIgnoreInstalled = callerGlobals['ignoreInstalled']
@@ -555,8 +551,12 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if os.path.exists(localfile):
             # XXX: FIXME: this next test is unreachable
             if flavor is not None and not flavor.isEmpty():
-                oldBuildFlavor = buildFlavor
-                buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                if buildFlavor is None:
+                    oldBuildFlavor = cfg.buildFlavor
+                    use.setBuildFlagsFromFlavor()
+                else:
+                    oldBuildFlavor = buildFlavor
+                    buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor)
             loader = RecipeLoader(localfile, cfg, repos=repos,
                                   ignoreInstalled=alwaysIgnoreInstalled,
@@ -587,10 +587,15 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if flavor is not None:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
-            # trove was found.  
-            oldBuildFlavor = buildFlavor
-            buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-            use.setBuildFlagsFromFlavor(name, buildFlavor)
+            # trove was found.
+            if buildFlavor is None:
+                oldBuildFlavor = cfg.buildFlavor
+                cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+            else:
+                oldBuildFlavor = buildFlavor
+                buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor)
         loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
@@ -627,7 +632,10 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             callerGlobals['loadedTroves'].append(troveTuple)
             callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)
     if flavor is not None:
-        buildFlavor = oldBuildFlavor
+        if buildFlavor is None:
+            buildFlavor = cfg.buildFlavor = oldBuildFlavor
+        else:
+            buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
         use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor)
 
