@@ -541,9 +541,17 @@ class NetworkAuthorization:
 
     def getPermsByGroup(self, userGroupName):
         cu = self._queryPermsByGroup(userGroupName)
-
-        return cu.fetchall_dict()
-        
+        results = cu.fetchall_dict()
+        # reconstruct the dictionary of values (because some
+        # database engines like PostgreSQL lowercase all column names)
+        l = []
+        for result in results:
+            d = {}
+            for key in ('label', 'item', 'canWrite', 'capId', 'admin',
+                        'canRemove'):
+                d[key] = result[key]
+            l.append(d)
+        return l
 
     def _getGroupIdByName(self, userGroupName):
         cu = self.db.cursor()
