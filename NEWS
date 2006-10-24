@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.36:
   o Client Changes:
     * The usage message displayed when running "conary" or "cvc" has
       been simplified and improved. (CNY-560)
