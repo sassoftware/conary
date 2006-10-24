@@ -1,39 +1,40 @@
 Changes in @NEW@:
-  o Server Changes:
-    * PostgreSQL support has been finalized and some SQL queries have
-      been updated in the repository code for PostgreSQL compatibility
-    * Timeouts that occur when attempting to read the XML-RPC request
-      from a client are now logged and return an exception (instead of
-      causing a unhandled exception in the server).
-    * The repository browser is now viewable by Internet Explorer.
-
   o Client Changes:
+    * The usage message displayed when running "conary" or "cvc" has
+      been simplified and improved. (CNY-560)
     * When choosing how to match up troves with the same name, conary now
       takes paths into account, if there's a choice to make between matching
       up two old troves that are otherwise equivalent with a new trove, conary
       will choose the one that shares paths with the new trove. (CNY-819)
     * Conary will now allow "conary migrate --info" and "conary migrate
       --interactive" without displaying usage information. (CNY-985)
-    * The usage message displayed when running "conary" or "cvc" has
-      been simplified and improved. (CNY-560)
     * Conary now only warns about being able to execute gpg if a
       signature trust threshold has been set. (CNY-589)
+
+  o Server Changes:
+    * PostgreSQL support has been finalized and some SQL queries have
+      been updated in the repository code for PostgreSQL
+      compatibility.  PostgreSQL will be officially supported in a
+      future release of Conary.
+    * The repository browser is now viewable by Internet Explorer.
 
   o Build Changes:
     * cvc now allows files to be switched from autosource to normal
       and from normal to autosourced. (CNY-946)
-    * Recipes will now automatically inherit the major_version macro, which is
-      defined to be the first two decimal-seperated parts of the upstream
-      version, combined with a decimal. For example, a version string of
-      2.16.1.3 would have a major_version of 2.16. (CNY-629)
+    * Recipes will now automatically inherit a major_version macro,
+      which is defined to be the first two decimal-seperated parts of
+      the upstream version, combined with a decimal. For example, a
+      version string of 2.16.1.3 would have a major_version of
+      2.16. (CNY-629)
     * A list of KDE mirrors has been added to the default mirror
       configuration. (CNY-895)
-    * If a group is cooked twice at the same command line, say
-      cvc cook group-dist[ssl] group-dist[!ssl], then conary will cache
-      the trove used for the first group cook for the second. (CNY-818)
-    * Unpacking a tarball now preserved permissions only when unpacking
-      into the root proxy, not unpacking sources into the build
-      directory. (CNY-998)
+    * If a group is cooked twice at the same command line, for example
+      "cvc cook group-dist[ssl] group-dist[!ssl]", then conary will
+      cache the trove found during the first group cook and use it for
+      subsequent group cooks. (CNY-818)
+    * Unpacking a tarball now preserved permissions only when
+      unpacking into the root proxy, not unpacking sources into the
+      build directory. (CNY-998)
 
   o Code Cleanups
     * The command line options common between cvc and conary are now
@@ -50,6 +51,9 @@ Changes in @NEW@:
     * A bug that caused an unhandled exception when two packages with
       the same name require a trove that was being erased has been
       fixed.
+    * Timeouts that occur when attempting to read the XML-RPC request
+      from a client are now logged and return an exception (instead of
+      causing a unhandled exception in the server).
 
 Changes in 1.1.8:
   o Bug Fixes:
