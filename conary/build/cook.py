@@ -599,11 +599,11 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                             byDefault = byDefault, 
                             weakRef = not explicit)
 
-            grpDiff = grpTrv.diff(None, absolute = 1)[0]
-            changeSet.newTrove(grpDiff)
+        grpDiff = grpTrv.diff(None, absolute = 1)[0]
+        changeSet.newTrove(grpDiff)
 
-            built.append((grpTrv.getName(), str(grpTrv.getVersion()),
-                                            grpTrv.getFlavor()))
+        built.append((grpTrv.getName(), str(grpTrv.getVersion()),
+                                        grpTrv.getFlavor()))
 
         for primaryName in recipeObj.getPrimaryGroupNames():
             changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
