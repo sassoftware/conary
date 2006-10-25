@@ -783,6 +783,8 @@ class TroveFormatter(TroveTupFormatter):
                 tags.extend(fileObj.tags)
             if fileObj.flags.isInitialContents():
                 tags.append('initialContents')
+            if fileObj.flags.isAutoSource():
+                tags.append('autosource')
             if fileObj.flags.isConfig():
                 tags.append('config')
             if tags:
