@@ -130,7 +130,7 @@ class ConfigCommand(ConaryCommand):
         else:
             cfg.display()
 
-class HelpCommand(ConaryCommand):
+class HelpCommand(options.AbstractCommand):
     commands = ['help']
     help = 'Display help information'
     commandGroup = 'Information Display'
