@@ -13,6 +13,9 @@ Changes in @NEW@:
       files
     * Removing files doesn't readd them any longer simply because they were in
       the previous version and are present in the lookaside anymore (CNY-601)
+    * Conary now warns in the presence of unknown use flags in the buildFlavor
+      instead of erroring.  (It will still error if the unknown use flag
+      is accessed in the recipe).
 
 Changes in 1.0.36:
   o Client Changes:
