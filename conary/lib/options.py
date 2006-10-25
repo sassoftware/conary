@@ -349,7 +349,8 @@ class AbstractCommand(object):
         self.mainHandler = mainHandler
 
     def addParameters(self, argDef):
-        pass
+        if self.defaultGroup not in argDef:
+            argDef[self.defaultGroup] = {}
 
     def addConfigOptions(self, cfgMap, argDef):
         for name, data in cfgMap.items():

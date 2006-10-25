@@ -182,7 +182,7 @@ class FetchCallback(Callback):
 
 class KeyCacheCallback(Callback):
 
-    def getPublicKey(self, keyId, serverName):
+    def getPublicKey(self, keyId, serverName, warn=False):
         return False
 
     def __init__(self, repositoryMap = None, pubRing = ''):

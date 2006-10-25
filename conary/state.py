@@ -26,18 +26,49 @@ from conary import versions
 
 class FileInfo(object):
 
-    __slots__ = ( 'isConfig', 'refresh' )
+    __slots__ = ( 'isConfig', 'refresh', 'isAutoSource' )
 
     # container for the extra information we keep on files for SourceStates
     # this has no access methods; it is meant to be accessed directly
 
-    def __init__(self, isConfig = 0, refresh = 0):
+    def __str__(self):
+        def one(name, val):
+            if val:
+                return name
+
+            return None
+
+        l = [ x for x in [ one('config', self.isConfig),
+                            one('refresh', self.refresh),
+                            one('autosource', self.isAutoSource) ]
+              if x is not None ]
+
+        if l:
+            return '/'.join(l)
+        else:
+            return '_'
+
+    def __init__(self, isConfig = False, isAutoSource = False,
+                 refresh = False, str = ""):
         self.isConfig = isConfig
+        self.isAutoSource = isAutoSource
         self.refresh = refresh
+
+        if not str or str == '_':
+            return
+
+        l = str.split("/")
+        for item in l:
+            if item == 'config':
+                self.isConfig = True
+            elif item == 'refresh':
+                self.refresh = True
+            elif item == 'autosource':
+                self.isAutoSource = True
 
 class ConaryState:
 
-    stateVersion = 1
+    stateVersion = 2
 
     def __init__(self, context=None, source=None):
         self.context = context
@@ -92,9 +123,11 @@ class SourceState(trove.Trove):
         trove.Trove.removeFile(self, pathId)
         del self.fileInfo[pathId]
 
-    def addFile(self, pathId, path, version, fileId, isConfig):
+    def addFile(self, pathId, path, version, fileId, isConfig,
+                isAutoSource):
         trove.Trove.addFile(self, pathId, path, version, fileId)
-        self.fileInfo[pathId] = FileInfo(isConfig = isConfig)
+        self.fileInfo[pathId] = FileInfo(isConfig = isConfig,
+                                         isAutoSource = isAutoSource)
 
     def removeFilePath(self, file):
 	for (pathId, path, fileId, version) in self.iterFileList():
@@ -136,10 +169,10 @@ class SourceState(trove.Trove):
         rc = []
         rc.append("%d\n" % (len(self.idMap)))
 
-        rc += [ "%s %s %s %d %d %s\n" % (sha1helper.md5ToString(x[0]), x[1][0],
+        rc += [ "%s %s %s %s %s\n" % (sha1helper.md5ToString(x[0]),
+                                x[1][0],
                                 sha1helper.sha1ToString(x[1][1]),
-                                self.fileInfo[x[0]].isConfig,
-                                self.fileInfo[x[0]].refresh,
+                                self.fileInfo[x[0]],
                                 x[1][2].asString())
                 for x in self.idMap.iteritems() ]
 
@@ -192,6 +225,12 @@ class SourceState(trove.Trove):
             return self.fileInfo[pathId].isConfig
         self.fileInfo[pathId].isConfig = set
 
+    def fileIsAutoSource(self, pathId, set = None):
+        if set is None:
+            return self.fileInfo[pathId].isAutoSource
+        # not not here makes this a boolean
+        self.fileInfo[pathId].isAutoSource = not not set
+
     def fileNeedsRefresh(self, pathId, set = None):
         if set is None:
             return self.fileInfo[pathId].refresh
@@ -226,6 +265,11 @@ class ConaryStateFromFile(ConaryState):
         if lines[0].startswith('stateversion '):
             stateVersion = int(lines[0].split(None, 1)[1].strip())
             lines.pop(0)
+
+        if stateVersion > self.stateVersion:
+            raise ConaryStateError(
+                "Cannot read version %d of CONARY state file. Please "
+                 "upgrade your conary." % stateVersion)
 
         contextList = [ x for x in lines if x.startswith('context ') ]
         if contextList:
@@ -268,6 +312,7 @@ class SourceStateFromLines(SourceState):
     def _readFileList(self, lines, stateVersion, repos):
 	fileCount = int(lines[0][:-1])
         configFlagNeeded = []
+        autoSourceFlagNeeded = []
 
         for line in lines[1:]:
             # chop
@@ -276,23 +321,35 @@ class SourceStateFromLines(SourceState):
 	    pathId = sha1helper.md5FromString(fields.pop(0))
             version = versions.VersionFromString(fields.pop(-1))
 
-            if stateVersion >= 1:
+            isConfig = False
+            refresh = False
+            isAutoSource = False
+
+            if stateVersion >= 2:
+                info = FileInfo(str = fields.pop())
+            elif stateVersion == 1:
                 refresh = int(fields.pop(-1))
                 isConfig = int(fields.pop(-1))
-            else:
-                isConfig = 0
-                refresh = 0
+                info = FileInfo(refresh = refresh, isConfig = isConfig)
+            elif stateVersion == 0:
+                info = FileInfo()
 
 	    fileId = sha1helper.sha1FromString(fields.pop(-1))
 
             if stateVersion == 0:
                 if not isinstance(version, versions.NewVersion):
                     configFlagNeeded.append((pathId, fileId, version))
+                    autoSourceFlagNeeded.append((pathId, fileId, version))
+            elif stateVersion == 1:
+                if not isinstance(version, versions.NewVersion):
+                    autoSourceFlagNeeded.append((pathId, fileId, version))
 
 	    path = " ".join(fields)
 
-	    self.addFile(pathId, path, version, fileId, isConfig = isConfig)
-            self.fileNeedsRefresh(pathId, set = refresh)
+            self.addFile(pathId, path, version, fileId,
+                         isConfig = info.isConfig,
+                         isAutoSource = info.isAutoSource)
+            self.fileNeedsRefresh(pathId, set = info.refresh)
 
         if configFlagNeeded:
             if not repos:
@@ -302,6 +359,16 @@ class SourceStateFromLines(SourceState):
             for (pathId, fileId, version), fileObj in \
                             itertools.izip(configFlagNeeded, fileObjs):
                 self.fileIsConfig(pathId, set = fileObj.flags.isConfig())
+
+        if autoSourceFlagNeeded:
+            if not repos:
+                raise ConaryStateError('CONARY file has version %s, but this application cannot convert - please run a cvc command, e.g. cvc diff, to convert.' % stateVersion)
+            assert(stateVersion < 2)
+            fileObjs = repos.getFileVersions(autoSourceFlagNeeded)
+            for (pathId, fileId, version), fileObj in \
+                            itertools.izip(autoSourceFlagNeeded, fileObjs):
+                self.fileIsAutoSource(pathId,
+                                      set = fileObj.flags.isAutoSource())
 
     def parseLines(self, lines, stateVersion, repos):
         kwargs = {}
