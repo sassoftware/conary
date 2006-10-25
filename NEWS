@@ -17,6 +17,11 @@ Changes in @NEW@:
       instead of erroring.  (It will still error if the unknown use flag
       is accessed in the recipe).
 
+Changes in 1.0.37:
+  o Bugfixes:
+    * A warning message produced when attempting to retrieve a OpenPGP
+      key has been fixed.  The warning was introduced in CNY-589.
+
 Changes in 1.0.36:
   o Client Changes:
     * The usage message displayed when running "conary" or "cvc" has
