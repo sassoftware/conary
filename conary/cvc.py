@@ -627,6 +627,19 @@ class SetCommand(CvcCommand):
         checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
 _register(SetCommand)
 
+class StatCommand(CvcCommand):
+    
+    commands = ['stat', 'st']
+    help = 'Show changed files in the working directory'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or not args or len(args) > 2: return self.usage()
+
+        args[0] = repos
+        checkin.stat_(*args)
+_register(StatCommand)
+
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
     paramHelp = "[<version>]"
