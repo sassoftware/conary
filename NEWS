@@ -1,6 +1,4 @@
 Changes in @NEW@:
-  o PostgreSQL support has been finalized and some SQL queries have
-    been updated in the repository code for PostgreSQL compatibility
   o Build Changes:
     * Files now have their refresh state reset after a commit
     * Committing trove on longer downloads autosourced files which haven't 
