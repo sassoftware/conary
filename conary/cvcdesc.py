@@ -21,13 +21,10 @@ import sys
 from conary import conarycfg
 from conary import constants
 from conary import metadata
+from conary import versions
 from conary.lib import log
 from conary.lib import options
 from conary.lib import util
-from conary import versions
-
-argDef = {}
-argDef['dir'] = 1
 
 sys.excepthook = util.genExcepthook()
 def usage(rc = 1):
@@ -101,10 +98,11 @@ def realMain(cfg, argv=sys.argv):
                 md = metadata.fetchFreshmeat(fmName)
             except metadata.NoFreshmeatRecord:
                 log.error("no freshmeat record found for %s", fmName)
-                return
+                return 1
             log.info("found record: '%s'", md.getShortDesc())
         else:
             log.error("unsupported metadata source: %s", argSet["source"])
+            return 1
 
         shortDesc = md.getShortDesc()
         longDesc = md.getLongDesc()
@@ -135,8 +133,8 @@ def realMain(cfg, argv=sys.argv):
 
     for url in urls:
         xml += "    <url>%s</url>\n" % url
-    for license in licenses:
-        xml += "    <license>%s</license>\n" % license
+    for license_ in licenses:
+        xml += "    <license>%s</license>\n" % license_
     for category in categories:
         xml += "    <category>%s</category>\n" % category
 
@@ -157,9 +155,9 @@ def main(argv=sys.argv):
         else:
             cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
         # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
-	realMain(cfg, argv)
-    except conarycfg.ConaryCfgError, e:
+        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions)
+	return realMain(cfg, argv)
+    except conarycfg.CfgError, e:
         log.error(str(e))
         sys.exit(1)
 

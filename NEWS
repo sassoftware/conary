@@ -10,6 +10,7 @@ Changes in 1.1.9:
       --interactive" without displaying usage information. (CNY-985)
     * Conary now only warns about being able to execute gpg if a
       signature trust threshold has been set. (CNY-589)
+    * Fixed cvcdesc after the refactoring of configuration options. (CNY-984)
 
   o Server Changes:
     * PostgreSQL support has been finalized and some SQL queries have

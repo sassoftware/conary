@@ -220,11 +220,16 @@ class Metadata:
 class NoFreshmeatRecord(xml.parsers.expat.ExpatError):
     pass
 
-def fetchFreshmeat(troveName):
-    url = urlopen('http://freshmeat.net/projects-xml/%s/%s.xml' % (troveName, troveName))
+def fetchFreshmeat(troveName, xmlDocStream=None):
+    if xmlDocStream:
+        # Most likely part of a test suite, although one may want a different
+        # plugin for xml metadata - a stream will work just fine
+        source = xmlDocStream
+    else:
+        source = urlopen('http://freshmeat.net/projects-xml/%s/%s.xml' % (troveName, troveName))
 
     try:
-        doc = xml.dom.minidom.parse(url)
+        doc = xml.dom.minidom.parse(source)
         metadata = {}
 
         shortDesc = doc.getElementsByTagName("desc_short")[0]
