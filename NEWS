@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Client Changes:
+    * "conary help update" now works.
+
   o Build Changes:
     * Files now have their refresh state reset after a commit
     * Committing trove on longer downloads autosourced files which haven't 
