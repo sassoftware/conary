@@ -156,10 +156,7 @@ class _Source(action.RecipeAction):
 	if 'sourcename' not in self.__dict__:
 	    return None
 
-        if self.rpm:
-            toFetch = self.rpm
-        else:
-            toFetch = self.sourcename
+        toFetch = self.getPath()
 
         f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             toFetch, self.recipe.name, self.recipe.srcdirs,
@@ -179,6 +176,11 @@ class _Source(action.RecipeAction):
                                 allowNone=True)
         return f
 
+    def getPath(self):
+        if self.rpm:
+            return self.rpm
+        else:
+            return self.sourcename
 
     def do(self):
 	raise NotImplementedError
