@@ -358,6 +358,9 @@ class RepositoryCache:
         self.cacheMap[basename] = cachedname
 	return cachedname
 
+    def setRefreshFilter(self, refreshFilter):
+        self.refreshFilter = refreshFilter
+
     def __init__(self, repos, refreshFilter=None):
 	self.repos = repos
         self.refreshFilter = refreshFilter

@@ -41,6 +41,8 @@ import itertools
 
 #conary
 from conary.deps import deps
+from conary.lib import log
+from conary.errors import CvcError
 
 class Flag(dict):
 
@@ -299,24 +301,22 @@ class CollectionWithFlag(Flag, Collection):
         return "%s: %s {%s}" % (self._name, self._value, 
                                 ', '.join((repr(x) for x in self.values())))
 
-class NoSuchUseFlagError(AttributeError):
+class NoSuchUseFlagError(CvcError):
 
     def __init__(self, key):
         self.key = key
 
     def __str__(self):
         return """
-
-An unknown use flag, Use.%s, was accessed.  The default behavior 
-of conary is to complain about the missing flag, since it may be 
-a typo.  You can add the flag /etc/conary/use/%s, or 
+An unknown use flag, Use.%s, was accessed.  The default behavior
+of conary is to complain about the missing flag, since it may be
+a typo.  You can add the flag /etc/conary/use/%s, or
 ${HOME}/.conary/use/%s, or use the --unknown-flags option on
 the command line to make conary assume that all unknown flags are
-not relevant to your system.  
-
+not relevant to your system.
 """ % (self.key, self.key, self.key)
              
-class NoSuchArchFlagError(AttributeError):
+class NoSuchArchFlagError(CvcError):
 
     def __init__(self, key):
         self.key = key
@@ -335,7 +335,7 @@ your system.
 
 """ % (self.key, self.key, self.key)
  
-class NoSuchSubArchFlagError(AttributeError):
+class NoSuchSubArchFlagError(CvcError):
 
     def __init__(self, majArch, key):
         self.majArch = majArch
@@ -732,7 +732,7 @@ def createFlavor(recipeName, *flagIterables):
             set.union(flag._toDependency(recipeName))
     return set
 
-def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
+def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
     """ Sets the truth of the build Flags based on the build flavor.
         All the set build flags must already exist.  Flags not mentioned
         in this flavor will be untouched.
@@ -759,7 +759,9 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
                             if error:
                                 raise AttributeError(
                                             "No Such Use Flag %s" % flag)
-                            else:
+                            elif warn:
+                                log.warning(
+                                        'ignoring unknown Use flag %s' % flag)
                                 continue
                     elif recipeName:
                         packageName, flag = parts
@@ -772,6 +774,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
                         raise RuntimeError, ('Trying to set a flavor with '
                                              'localflag %s when no trove '
                                              ' name was given' % flag)
+
         elif isinstance(depGroup, deps.InstructionSetDependency):
             if len([ x for x in depGroup.getDeps()]) > 1:
                 setOnlyIfMajArchSet = True
