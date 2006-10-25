@@ -1,6 +1,8 @@
 Changes in @NEW@:
   o Client Changes:
     * "conary help update" now works.
+    * Added getUpdateItemList() method to allow retrieval of top level troves 
+      on the local system. (CNY-1025)
 
   o Build Changes:
     * Files now have their refresh state reset after a commit
