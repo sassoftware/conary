@@ -247,7 +247,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
 	del argSet['debugger']
 	from conary.lib import debugger
 	debugger.set_trace()
-        sys.excepthook = util.genExcepthook(cfg.dumpStackOnError,
+        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
                                             debugCtrlC=True)
 
     if 'debug' in argSet:
