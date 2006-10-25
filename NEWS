@@ -3,6 +3,7 @@ Changes in @NEW@:
     * "conary help update" now works.
     * Added getUpdateItemList() method to allow retrieval of top level troves 
       on the local system. (CNY-1025)
+    * --tags will now display whether source files are autosource or not.
 
   o Build Changes:
     * Files now have their refresh state reset after a commit
