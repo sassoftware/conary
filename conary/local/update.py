@@ -820,7 +820,8 @@ class FilesystemJob:
             # from that and want to note these new files.
             if headFile.flags.isAutoSource():
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId,
-                                isConfig = headFile.flags.isConfig())
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = True)
                 continue
 
             restoreFile = True
@@ -922,8 +923,9 @@ class FilesystemJob:
                               "creating %s", replaceFiles = replaceFiles)
                 if isSrcTrove:
                     fsTrove.addFile(pathId, headPath, headFileVersion,
-                                    headFileId,
-                                    isConfig = headFile.flags.isConfig())
+                                headFileId,
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = headFile.flags.isAutoSource())
                 else:
                     fsTrove.addFile(pathId, headPath, headFileVersion,
                                     headFileId)
@@ -987,7 +989,8 @@ class FilesystemJob:
             if not headFileVersion:
                 if isSrcTrove:
                     fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
-                                    isConfig = fsTrove.fileIsConfig(pathId))
+                            isConfig = fsTrove.fileIsConfig(pathId),
+                            isAutoSource = fsTrove.fileIsAutoSource(pathId))
                 else:
                     # this can't happen right now -- we only support renames
                     # for source troves
@@ -1016,7 +1019,8 @@ class FilesystemJob:
             # autosource files don't get merged
             if headFile.flags.isAutoSource():
                 fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId,
-                                isConfig = headFile.flags.isConfig())
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = True)
                 if not baseFile.flags.isAutoSource():
                     # we need to remove this file because it's now autosourced
                     self._remove(baseFile, realPath,
@@ -1026,7 +1030,8 @@ class FilesystemJob:
                 # This file used to be autosourced but it isn't anymore.
                 # Just go ahead and create it.
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
-                                isConfig = headFile.flags.isConfig())
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = True)
                 self._restore(headFile, realPath, newTroveInfo,
                               filePriorityPath,
                               "creating %s with contents "
@@ -1035,7 +1040,8 @@ class FilesystemJob:
                 continue
             elif isSrcTrove:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
-                                isConfig = headFile.flags.isConfig())
+                            isConfig = headFile.flags.isConfig(),
+                            isAutoSource = headFile.flags.isAutoSource())
             else:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
 
@@ -1282,8 +1288,9 @@ class FilesystemJob:
 		# break things
                 if isSrcTrove:
                     fsTrove.addFile(pathId, finalPath, headFileVersion,
-                                    headFileId,
-                                    isConfig = headFile.flags.isConfig())
+                                headFileId,
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = headFile.flags.isAutoSource())
                 else:
                     fsTrove.addFile(pathId, finalPath, headFileVersion,
                                     headFileId)
@@ -1544,15 +1551,33 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
         # transient files never show up in in local changesets...
         if ignoreTransient and srcFile.flags.isTransient():
             continue
-        elif ignoreAutoSource and srcFile.flags.isAutoSource():
-            continue
+
+        if ignoreAutoSource:
+            if srcFile.flags.isAutoSource() and \
+                                curTrove.fileIsAutoSource(pathId):
+                # file was autosourced and still is; ignore it
+                continue
+            elif srcFile.flags.isAutoSource():
+                # file was autosourced but was now added. keep going so
+                # it shows up in the diff
+                pass
+            elif curTrove.fileIsAutoSource(pathId):
+                # file was removed (which gets marked as autosourced). remove
+                # it from the newTrove to get the diff right
+                newTrove.removeFile(pathId)
+                continue
 
 	(path, fileId, version) = newTrove.getFile(pathId)
 
         if isSrcTrove:
             if path in curTrove.pathMap:
-                realPath = curTrove.pathMap[path]
-                isAutoSource = True
+                info = curTrove.pathMap[path]
+                if type(info) == tuple:
+                    # this file hasn't changed -- just keep going
+                    continue
+                else:
+                    realPath = info
+                    isAutoSource = True
             else:
                 realPath = os.getcwd() + "/" + path
                 isAutoSource = False
@@ -1606,7 +1631,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             newFileId = f.fileId()
             if isSrcTrove:
                 newTrove.addFile(pathId, path, newVersion, newFileId,
-                                 isConfig = f.flags.isConfig())
+                                 isConfig = f.flags.isConfig(),
+                                 isAutoSource = f.flags.isAutoSource())
             else:
                 newTrove.addFile(pathId, path, newVersion, newFileId)
 
@@ -1659,7 +1685,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     # line, it's version would be NewVersion)
                     changeSet.addFile(None, srcFile.fileId(), srcFile.freeze())
                     newTrove.addFile(pathId, path, version, srcFile.fileId(),
-                                     isConfig=srcFile.flags.isConfig())
+                                     isConfig=srcFile.flags.isConfig(),
+                                     isAutoSource=True)
                     continue
         else:
 	    realPath = root + path
@@ -1676,7 +1703,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             f.flags.isAutoSource(set = isAutoSource)
             f.flags.isConfig(set= curTrove.fileIsConfig(pathId))
             newTrove.addFile(pathId, path, newVersion, f.fileId(),
-                             isConfig = f.flags.isConfig())
+                             isConfig = f.flags.isConfig(),
+                             isAutoSource = f.flags.isAutoSource())
         else:
             # this can't happen since we don't allow files to be added to
             # troves for installed systems
