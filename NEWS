@@ -18,6 +18,7 @@ Changes in @NEW@:
       been simplified and improved. (CNY-560)
     * Conary now only warns about being able to execute gpg if a
       signature trust threshold has been set. (CNY-589)
+    * Fixed cvcdesc after the refactoring of configuration options. (CNY-984)
 
   o Build Changes:
     * cvc now allows files to be switched from autosource to normal
