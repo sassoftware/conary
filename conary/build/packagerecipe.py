@@ -188,7 +188,7 @@ class _AbstractPackageRecipe(Recipe):
                                   " locations):\n   " + '\n   '.join(errlist))
 	self.prepSources()
 	files = []
-	for src in self._sources:
+	for src in self.getSourcePathList():
             if skipFilter and skipFilter(os.path.basename(src.getPath())):
                 continue
 
@@ -212,7 +212,7 @@ class _AbstractPackageRecipe(Recipe):
         return files
 
     def getSourcePathList(self):
-        return self._sources
+        return [ x for x in self._sources if isinstance(x, source._Source) ]
 
     def checkBuildRequirements(self, cfg, sourceVersion, raiseError=True):
         """ Checks to see if the build requirements for the recipe
