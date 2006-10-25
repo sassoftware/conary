@@ -20,6 +20,7 @@ and committing changes back to the repository.
 import difflib
 import errno
 import fnmatch
+import itertools
 import os
 import re
 import stat
@@ -108,6 +109,8 @@ def _verifyAtHead(repos, headPkg, state):
     return True
 
 def _makeFilter(patterns):
+    if not patterns:
+        return None
 
     # convert globs to regexps, but chop off the final '$'
     patterns = [ fnmatch.translate(x)[:-1] for x in patterns ]
@@ -227,7 +230,8 @@ use cvc co %s=<branch> for the following branches:
 
 	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
         sourceState.addFile(pathId, path, version, fileId,
-                            isConfig = fileObj.flags.isConfig())
+                            isConfig = fileObj.flags.isConfig(),
+                            isAutoSource = fileObj.flags.isAutoSource())
 
         if fileObj.flags.isAutoSource():
             continue
@@ -262,11 +266,6 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     conaryState = ConaryStateFromFile("CONARY", repos)
     state = conaryState.getSourceState()
-
-    refreshFilter = None
-    refreshPatterns = state.getFileRefreshList()
-    if len(refreshPatterns):
-        refreshFilter = _makeFilter(refreshPatterns)
 
     troveName = state.getName()
     conflicts = []
@@ -312,7 +311,7 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     # don't download sources for groups or filesets
     if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-        lcache = lookaside.RepositoryCache(repos, refreshFilter)
+        lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
@@ -333,8 +332,60 @@ def commit(repos, cfg, message, callback=None, test=False):
             else:
                 log.error('you need a setup method for your recipe')
 
+        # os.path.basenames stripts the protocol off a url as well
+        sourceFiles = [ os.path.basename(x.getPath()) for x in 
+                                recipeObj.getSourcePathList() ]
+
+        # sourceFiles is a list of everything which ought to be autosourced.
+        # those are either the same as in the previous trove, new (in which
+        # case they are missing from the previous trove), or nonexistant. So
+        # simple look for files which were autosourced in the previous
+        # trove and haven't been marked as refreshed. such files don't need
+        # to be downloaded again.
+
+        # this is a set of items not to download again
+        skipPatterns = set()
+
+        # (pathId, fileId, version)
+        if srcPkg:
+            # this avoids downloding files which are autosourced by reusing
+            # the fileId/version from the previous version of the trove
+            srcFiles = repos.getFileVersions(
+                        [ (x[0], x[2], x[3]) for x in srcPkg.iterFileList() ] )
+            for srcFileObj, (pathId, path, fileId, version) in \
+                            itertools.izip(srcFiles, srcPkg.iterFileList() ):
+                if path not in sourceFiles:
+                    # the file no longer exists
+                    continue
+                elif not state.fileIsAutoSource(pathId):
+                    # the file is no longer autosourced, so we need to
+                    # take the file from the current directoy
+                    continue
+                elif state.fileNeedsRefresh(pathId):
+                    # the file has been refreshed; we need to make sure
+                    # we get the refreshed version of the file
+                    continue
+                elif srcFileObj.flags.isAutoSource():
+                    # as long as the previous version of the file with the
+                    # same name wasn't autosourced, reuse that version
+                    srcMap[path] = (pathId, fileId)
+
+        # there is no reason to download anything which is already in the
+        # current directory and not autosourced
+        skipPatterns.update([ x[1] for x in state.iterFileList() 
+                                if not state.fileIsAutoSource(x[0]) ])
+        skipFilter = _makeFilter(skipPatterns)
+
+        refreshFilter = _makeFilter(state.getFileRefreshList())
+        lcache.setRefreshFilter(refreshFilter)
+
+        # files have now been refreshed; reset the refresh bit
+        for pathId in (x[0] for x in state.iterFileList()):
+            state.fileNeedsRefresh(pathId, set = False)
+
         try:
-            srcFiles = recipeObj.fetchAllSources()
+            srcFiles = recipeObj.fetchAllSources(refreshFilter = refreshFilter,
+                                                 skipFilter = skipFilter)
         except OSError, e:
             if e.errno == errno.ENOENT:
                 raise errors.CvcError('Source file %s does not exist' % 
@@ -362,7 +413,17 @@ def commit(repos, cfg, message, callback=None, test=False):
 
                 pathId = makePathId()
                 state.addFile(pathId, base, versions.NewVersion(), "0" * 20,
-                              isConfig = False)
+                              isConfig = False, isAutoSource = True)
+
+            if not state.fileIsAutoSource(pathId):
+                # we don't do anything else for files unless they are
+                # autosourced
+                continue
+
+            if base in srcMap:
+                # this file was in the previous version of the trove; no
+                # need to add it again
+                continue
 
             if os.path.dirname(fullPath) != cwd:
                 srcMap[base] = fullPath
@@ -370,18 +431,9 @@ def commit(repos, cfg, message, callback=None, test=False):
     # now remove old files. this is done separately in case the recipe type
     # changed (a package changing to a redirect, for example)
     if srcPkg:
-        existingFiles = repos.getFileVersions( 
-                [ (x[0], x[2], x[3]) for x in srcPkg.iterFileList() ] )
-        for f in existingFiles:
-            if not f.flags.isAutoSource(): continue
-            path = srcPkg.getFile(f.pathId())[0]
-
-            # XXX this check is a hack -- it assumes if a path isn't
-            # in the srcMap for autosource files and it's not in the
-            # current directory, it is supposed to be removed. The
-            # current directory check lets us convert autosources files
-            # to non-autosources ones.
-            if path not in srcMap and not util.exists(path):
+        for (pathId, path, fileId, version) in list(state.iterFileList()):
+            if not state.fileIsAutoSource(pathId): continue
+            if path not in srcMap:
                 # the file doesn't exist anymore
                 state.removeFilePath(path)
 
@@ -1209,7 +1261,12 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 	found = False
 	for (pathId, path, fileId, version) in state.iterFileList():
 	    if path == filename:
-                if not ignoreExisting:
+                if state.fileIsAutoSource(pathId):
+                    state.addFile(pathId, path, version,
+                                  fileId,
+                                  isConfig = state.fileIsConfig(pathId),
+                                  isAutoSource = False)
+                elif not ignoreExisting:
                     log.error("file %s is already part of this source component" % path)
 		found = True
 
@@ -1259,25 +1316,37 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
                     return
 
 	state.addFile(pathId, filename, versions.NewVersion(), "0" * 20,
-                      isConfig = isConfig)
+                      isConfig = isConfig, isAutoSource = False)
 
     conaryState.write("CONARY")
 
-def removeFile(file, repos=None):
+def removeFile(cfg, filename, repos=None):
     conaryState = ConaryStateFromFile("CONARY", repos)
-    if not conaryState.getSourceState().removeFilePath(file):
-	log.error("file %s is not under management" % file)
+    state = conaryState.getSourceState()
+
+    path = None
+    for (pathId, path, fileId, version) in state.iterFileList():
+        if path == filename:
+            break
+
+    if path != filename:
+        log.error("file %s is not under management" % filename)
         return 1
 
-    if util.exists(file):
-        sb = os.lstat(file)
+    # we don't remove the file here; we mark it as autosource instead. the
+    # commit will remove it if need be or commit it as autosource if that's
+    # what's needed
+    state.fileIsAutoSource(pathId, set = True)
+
+    if util.exists(filename):
+        sb = os.lstat(filename)
         try:
             if sb.st_mode & stat.S_IFDIR:
-                os.rmdir(file)
+                os.rmdir(filename)
             else:
-                os.unlink(file)
+                os.unlink(filename)
         except OSError, e:
-            log.error("cannot remove %s: %s" % (file, e.strerror))
+            log.error("cannot remove %s: %s" % (filename, e.strerror))
             return 1
 
     conaryState.write("CONARY")
@@ -1357,7 +1426,7 @@ def newTrove(repos, cfg, name, dir = None, template = None):
         try:
             os.chdir(dir)
             pathId = makePathId()
-            sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20, isConfig = True)
+            sourceState.addFile(pathId, recipeFile, versions.NewVersion(), "0" * 20, isConfig = True, isAutoSource = False)
         finally:
             os.chdir(cwd)
 
@@ -1383,7 +1452,8 @@ def renameFile(oldName, newName, repos=None):
 	if path == oldName:
 	    os.rename(oldName, newName)
 	    sourceState.addFile(pathId, newName, version, fileId,
-                                isConfig = sourceState.fileIsConfig(pathId))
+                        isConfig = sourceState.fileIsConfig(pathId),
+                        isAutoSource = sourceState.fileIsAutoSource(pathId))
 	    conaryState.write("CONARY")
 	    return
     
@@ -1496,7 +1566,7 @@ def setContext(cfg, contextName=None, ask=False, repos=None):
             defaultText = default = args[0]
         else:
             defaultText, default = args[0:2]
-            
+
         while True:
             if defaultText:
                 msg = "%s [%s]: " % (txt, defaultText)
@@ -1587,9 +1657,8 @@ def setFileFlags(repos, paths, text = False, binary = False):
                     sourceState.fileIsConfig(pathId, set = isConfig)
 
     state.write('CONARY')
-    
-def refresh(repos, cfg, refreshPatterns=[], callback=None):
 
+def refresh(repos, cfg, refreshPatterns=[], callback=None):
     if not callback:
         callback = CheckinCallback()
 
@@ -1604,6 +1673,14 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         refreshPatterns.extend(state.getFileRefreshList())
 
     refreshFilter = _makeFilter(refreshPatterns)
+
+    # if it's not being refreshed, don't download it
+    skipPatterns = []
+    for path in (x[1] for x in state.iterFileList()):
+        if not refreshFilter(path):
+            skipPatterns.append(path)
+
+    skipFilter = _makeFilter(skipPatterns)
 
     troveName = state.getName()
 
@@ -1649,7 +1726,8 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
             raise errors.CvcError('Recipe requires setup() method')
 
     try:
-        srcFiles = recipeObj.fetchAllSources(refreshFilter)
+        srcFiles = recipeObj.fetchAllSources(refreshFilter = refreshFilter,
+                                             skipFilter = skipFilter)
     except OSError, e:
         if e.errno == errno.ENOENT:
             raise errors.CvcError('Source file %s does not exist' % 
@@ -1665,7 +1743,10 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         if recipeFileName.endswith(path):
             continue
         if refreshFilter(path):
-            state.fileNeedsRefresh(pathId, 1)
+            if not state.fileIsAutoSource(pathId):
+                raise errors.CvcError('%s is not autosourced and cannot be '
+                                      'refreshed' % path)
+            state.fileNeedsRefresh(pathId, True)
 
     conaryState.setSourceState(state)
     conaryState.write('CONARY')
