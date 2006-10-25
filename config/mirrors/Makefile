@@ -17,6 +17,7 @@ mirror_files =	\
                 debian \
                 fedora \
                 gentoo \
+                kde \
                 sourceforge \
                 gnu \
                 cpan

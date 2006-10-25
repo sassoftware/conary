@@ -160,6 +160,7 @@ class HttpHandler(WebHandler):
         path = os.path.join(self.templatePath, templateName + ".kid")
         t = kid.load_template(path)
         return t.serialize(encoding = "utf-8",
+                           output = 'xhtml-strict',
                            cfg = self.cfg,
                            req = self.req,
                            hasWrite = self.hasWrite,

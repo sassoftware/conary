@@ -750,6 +750,10 @@ class _AbstractPackageRecipe(Recipe):
 
 	self.macros.name = self.name
 	self.macros.version = self.version
+        if '.' in self.version:
+            self.macros.major_version = '.'.join(self.version.split('.')[0:2])
+        else:
+            self.macros.major_version = self.version
         self.packages = { self.name : True }
         self.manifests = set()
 	if extraMacros:

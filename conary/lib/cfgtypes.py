@@ -19,7 +19,7 @@ import shlex
 import sre_constants
 import os
 
-class CfgType:
+class CfgType(object):
 
     """ A config value type wrapper -- gives a config value a conversion
         to and from a string, a way to copy values, and a way to print
@@ -32,12 +32,8 @@ class CfgType:
         CfgDict should mean that parseString is still all that needs
         to be overridden.
     """
-
     # if a default isn't specified for a subclass CfgType, it defaults to None
     default = None
-
-    def __init__(self):
-        pass
 
     def copy(self, val):
         """ Create a new copy of the given value """
@@ -98,6 +94,7 @@ class CfgType:
         """
         return str(val)
 
+
     def toStrings(self, val, displayOptions=None):
         return [self.format(val, displayOptions)]
 
@@ -105,19 +102,44 @@ class CfgType:
 # A configuration type converts from string -> ConfigValue and from
 # ConfigValue -> string, and may store information about how to make that
 # change, but does NOT contain actual configuration values.
+
 CfgString = CfgType
 
+_pathCache = {}
+def Path(str):
+    if str not in _pathCache:
+        if '~' not in str:
+            p = _Path(str)
+        else:
+            p = _ExpandedPath(str)
+        _pathCache[str] = p
+        return p
+    else:
+        return _pathCache[str]
 
-class Path(str):
+class _Path(str):
+    __slots__ = []
+
+    def __init__(self, s):
+        str.__init__(self, s)
+
+    def _getUnexpanded(self):
+        return self
+
+    def __repr__(self):
+        return "<Path '%s'>" % self
+
+class _ExpandedPath(_Path):
+
     def __new__(cls, origString):
         string = os.path.expanduser(os.path.expandvars(origString))
         return str.__new__(cls, string)
 
     def __init__(self, origString):
-        self.__origString = origString
+        self._origString = origString
 
     def _getUnexpanded(self):
-        return self.__origString
+        return self._origString
 
     def __repr__(self):
         return "<Path '%s'>" % self
@@ -164,7 +186,6 @@ class CfgBool(CfgType):
         else:
             raise ParseError, "expected True or False"
 
-
 class CfgRegExp(CfgType):
     """ RegularExpression type.
         Stores the value as (origVal, compiledVal)
@@ -181,7 +202,6 @@ class CfgRegExp(CfgType):
 
     def format(self, val, displayOptions=None):
         return val[0]
-
 
 class CfgSignedRegExp(CfgRegExp):
     """SignedRegularExpression type.
@@ -233,6 +253,7 @@ class CfgEnum(CfgType):
         return self.origName[val]
 
     def __init__(self):
+        CfgType.__init__(self)
         if isinstance(self.validValues, list):
             self.origName = dict([(x, x) for x in self.validValues])
             self.validValues = dict([(x.lower(), x) for x in self.validValues])
@@ -440,8 +461,7 @@ class RegularExpressionList(list):
     """ This is the actual configuration value -- NOT a config type.
         The CfgRegExpList returns values of this class.
     """
-    def __init__(self, *args, **kw):
-        list.__init__(self, *args, **kw)
+
     def __repr__(self):
         return 'RegularExpressionList(%s)' % list.__repr__(self)
     def addExp(self, val):
@@ -460,8 +480,7 @@ class SignedRegularExpressionList(list):
     are -1, 0 or 1 for a negative, unknown or positive match, respectively
     First match wins.
     """
-    def __init__(self, *args):
-        list.__init__(self, *args)
+
     def __repr__(self):
         return "SignedRegularExpressionList(%s)" % list.__repr__(self)
     def addExp(self, val):
@@ -492,7 +511,6 @@ class CfgRegExpList(CfgList):
 class CfgSignedRegExpList(CfgRegExpList):
     listType = SignedRegularExpressionList
     valueType = CfgSignedRegExp
-    pass
 
 CfgPathList  = CfgLineList(CfgPath, ':')
 

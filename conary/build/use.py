@@ -756,7 +756,11 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
                         try:
                             Use[flag]._set(value)
                         except KeyError:
-                            raise AttributeError, "No Such Use Flag %s" % flag
+                            if error:
+                                raise AttributeError(
+                                            "No Such Use Flag %s" % flag)
+                            else:
+                                continue
                     elif recipeName:
                         packageName, flag = parts
                         if packageName == recipeName:
@@ -787,7 +791,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
                                  deps.FLAG_SENSE_PREFERRED):
                         subarches.append(flag)
                 Arch._setArch(majarch, subarches)
-            
+
             if setOnlyIfMajArchSet and not found:
                 if error:
                     raise RuntimeError, ('Cannot set arctitecture build flags'

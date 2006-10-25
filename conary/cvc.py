@@ -48,31 +48,6 @@ class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
         updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
 
-def usage(rc = 1):
-    print "usage: cvc add <file> [<file2> <file3> ...]"
-    print "       cvc annotate <file>"
-    print "       cvc checkout <trove>[=<version>]"
-    print "       cvc clone <target-branch> <trove>[=<version>][[flavor]]+ "
-    print "       cvc commit"
-    print "       cvc config"
-    print "       cvc context"
-    print '       cvc cook <file.recipe|troveName=<version>>[[flavor]]+'
-    print '       cvc describe <xml file>'
-    print "       cvc diff"
-    print "       cvc log"
-    print "       cvc newpkg <name>"
-    print "       cvc merge [<revision>]"
-    print "       cvc rdiff <name> <oldver> <newver>"
-    print "       cvc remove <file> [<file2> <file3> ...]"
-    print "       cvc rename <oldfile> <newfile>"
-    print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
-    print "       cvc set <path>+"
-    print '       cvc sign <trove>[=version][[flavor]]+'
-    print "       cvc update [<version>]"
-    print ""
-    print "type 'cvc <command> --help' for command-specific usage"
-    return rc
-
 _commands = []
 def _register(cmd):
     _commands.append(cmd)
@@ -83,56 +58,26 @@ STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
 
 class CvcCommand(command.ConaryCommand):
 
-    docs = {'build-label'        : ('Use build label LABEL as default search'
-                                    ' loc', 'LABEL'),
-            'config'             : ("Set config KEY to VALUE", "'KEY VALUE'"),
-            'config-file'        : ("Read PATH config file", "PATH"),
-            'context'            : "Set the current context",
-            'install-label'      : ("Set the install label", "LABEL"),
-            'interactive'        : ('ask questions before performing actions '
-                                    'that change system or repository state'),
-            'flavors'            : 'Display complete flavors where applicable',
-            'full-versions'      : ('Always display complete version strings'),
-            'profile'            : optparse.SUPPRESS_HELP,
-            'skip-default-config': "Don't read default configs",
-            'signature-key'      : ("Use signature key to sign results", 'KEY'),
-            'quiet'              : ('do not display extra information when '
-                                    'running'),
-            'root'               : 'use conary database at location ROOT'
-            }
-
-    def addParameters(self, argDef):
-        d = {}
-        d["config"] = '-c', MULT_PARAM
-        d["config-file"] = MULT_PARAM
-        d["context"] = ONE_PARAM
-        d["install-label"] = MULT_PARAM
-        d["profile"] = NO_PARAM
-        d["skip-default-config"] = NO_PARAM
-        argDef[self.defaultGroup] = d
-
+    docs = { 'signature-key' : ("Use signature key to sign results", 'KEY'), }
+    commandGroup = 'Information Display'
     def addConfigOptions(self, cfgMap, argDef):
-        cfgMap["build-label"]   = "buildLabel", ONE_PARAM,
-        cfgMap['interactive']   = 'interactive', NO_PARAM,
-        cfgMap['full-versions'] = 'fullVersions', NO_PARAM
-        cfgMap['flavors']       = 'fullFlavors', NO_PARAM
-        cfgMap["pubring"]       = "pubRing", ONE_PARAM
-        cfgMap["quiet"]         = "quiet", NO_PARAM,
-        cfgMap["root"]          = "root", ONE_PARAM, '-r'
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
-        options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
+        command.ConaryCommand.addConfigOptions(self, cfgMap, argDef)
 
 class AddCommand(CvcCommand):
     commands = ['add']
     paramHelp = '<file> [<file2> <file3> ...]'
+    help = 'Add a file to be controlled by Conary'
+    commandGroup = 'File Operations'
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["binary"] = NO_PARAM
         argDef["text"] = NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos=None):
+        args = args[1:]
         text = argSet.pop('text', False)
         binary = argSet.pop('binary', False)
         if len(args) < 2: return self.usage()
@@ -143,8 +88,11 @@ _register(AddCommand)
 class AnnotateCommand(CvcCommand):
     commands = ['annotate']
     paramHelp = '<file>'
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    help = 'Show version information for each line in a file'
+    hidden = True
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet or len(args) != 2: return self.usage()
         args[0] = repos
         checkin.annotate(*args)
@@ -156,7 +104,8 @@ class BranchShadowCommand(CvcCommand):
 
     commands = ['shadow']
     paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
-
+    help = 'Create a shadow in a repository'
+    commandGroup = 'Repository Access'
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
             'source-only': ('For any binary components listed, shadow/branch'
                             ' their sources instead'),
@@ -168,8 +117,9 @@ class BranchShadowCommand(CvcCommand):
         argDef["source-only"] = NO_PARAM
         argDef["info"] = '-i', NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         makeShadow =  (args[0] == "shadow")
         sourceOnly = argSet.pop('source-only', False)
         binaryOnly = argSet.pop('binary-only', False)
@@ -189,6 +139,8 @@ _register(BranchShadowCommand)
 class CheckoutCommand(CvcCommand):
     commands = ['checkout', 'co']
     paramHelp = '<trove>[=<version>]+'
+    help = 'Check out a source component'
+    commandGroup = 'Repository Access'
 
     docs = {'dir': 'Check out single trove in directory DIR'}
 
@@ -196,8 +148,9 @@ class CheckoutCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef["dir"] = ONE_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet.has_key("dir"):
             dir = argSet['dir']
             del argSet['dir']
@@ -213,9 +166,11 @@ _register(CheckoutCommand)
 
 class CloneCommand(CvcCommand):
 
-    commands = 'clone'
+    commands = ['clone']
     paramHelp = '<target-branch> <trove>[=<version>][[flavor]]+'
-
+    help = 'Copy troves from one branch to another in a repository'
+    commandGroup = 'Repository Access'
+    hidden = True
     docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
                                   'information about how this trove was built'),
              'info'            : 'Do not perform clone',
@@ -238,8 +193,9 @@ class CloneCommand(CvcCommand):
         argDef["full-recurse"] = NO_PARAM
         argDef["test"] = NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if len(args) < 3:
             return self.usage()
 
@@ -261,7 +217,8 @@ _register(CloneCommand)
 class CommitCommand(CvcCommand):
 
     commands = ['commit', 'ci']
-
+    help = 'Commit changes to a source component'
+    commandGroup = 'Repository Access'
     docs = {'message':'Use MESSAGE to describe why the commit was performed',
             'test':   ('Runs through all the steps of committing but does not '
                        'modify the repository')}
@@ -272,8 +229,9 @@ class CommitCommand(CvcCommand):
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         level = log.getVerbosity()
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
@@ -285,39 +243,11 @@ class CommitCommand(CvcCommand):
         log.setVerbosity(level)
 _register(CommitCommand)
 
-class ConfigCommand(CvcCommand):
-    commands = ['config']
-
-    docs = {'show-contexts'  : 'display contexts as well as current config',
-            'show-passwords' : 'do not mask passwords'}
-
-    def addParameters(self, argDef):
-        CvcCommand.addParameters(self, argDef)
-        argDef["show-contexts"] = NO_PARAM
-        argDef["show-passwords"] = NO_PARAM
-
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
-        showPasswords = argSet.pop('show-passwords', False)
-        showContexts = argSet.pop('show-contexts', False)
-        try:
-            prettyPrint = sys.stdout.isatty()
-        except AttributeError:
-            prettyPrint = False
-        cfg.setDisplayOptions(hidePasswords=not showPasswords,
-                              showContexts=showContexts,
-                              prettyPrint=prettyPrint)
-        if argSet: return self.usage()
-        if (len(args) > 2):
-            return self.usage()
-        else:
-            cfg.display()
-_register(ConfigCommand)
-
-
 class ContextCommand(CvcCommand):
     commands = ['context']
     paramHelp = '[CONTEXT]'
+    help = 'Set up a context in the current directory'
+    commandGroup = 'Setup Commands'
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -327,8 +257,9 @@ class ContextCommand(CvcCommand):
     docs = {'ask' : 'If not defined, create CONTEXT by answering questions',
             'show-passwords' : 'do not mask passwords'}
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if len(args) > 2:
             return self.usage()
 
@@ -352,6 +283,8 @@ _register(ContextCommand)
 class CookCommand(CvcCommand):
     commands = ['cook']
     paramHelp = '<file.recipe|troveName=<version>>[[flavor]]+'
+    help = 'Build binary package and groups from a recipe'
+    commandGroup = 'Recipe Building'
 
     docs = {'cross'   : ('set macros for cross-compiling', 
                          '[(local|HOST)--]TARGET'),
@@ -386,8 +319,9 @@ class CookCommand(CvcCommand):
         argDef['resume'] = STRICT_OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         level = log.getVerbosity()
         macros = {}
         prep = 0
@@ -482,9 +416,12 @@ _register(CookCommand)
 class DescribeCommand(CvcCommand):
     commands = ['describe']
     paramHelp = '<xml file>'
-
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    help = 'Add metadata to a repository from an XML file'
+    commandGroup = 'Repository Access'
+    hidden = True
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         level = log.getVerbosity()
         if level > log.INFO:
             log.setVerbosity(log.INFO)
@@ -505,9 +442,11 @@ _register(DescribeCommand)
 
 
 class DiffCommand(CvcCommand):
-    commands = 'diff'
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    commands = ['diff']
+    help = 'Show uncommitted changes'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
 
         args[0] = repos
@@ -515,10 +454,13 @@ class DiffCommand(CvcCommand):
 _register(DiffCommand)
 
 class LogCommand(CvcCommand):
-    commands = 'log'
+    commands = ['log']
+    help = 'Show changelog entries for this source component'
+    hidden = True
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet or len(args) > 2: return self.usage()
 
         args[0] = repos
@@ -528,9 +470,11 @@ _register(LogCommand)
 class RdiffCommand(CvcCommand):
     commands = ['rdiff']
     paramHelp = "<name> [<oldver>|-<num>] <newver>"
-
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    help = 'Show changes between two versions of a trove in a repository'
+    hidden = True
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet or len(args) != 4: return self.usage()
         checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
 _register(RdiffCommand)
@@ -538,9 +482,13 @@ _register(RdiffCommand)
 class RefreshCommand(CvcCommand):
     commands = ['refresh']
     paramHelp = '<fileGlob> [<fileGlob2> <fileGlob3> ...]'
+    help = 'Refresh files that are automatically downloaded'
+    commandGroup = 'File Operations'
+    hidden=True
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False,
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
         #if len(args) < 2: return self.usage()
         checkin.refresh(repos, cfg, args[1:])
 _register(RefreshCommand)
@@ -548,9 +496,12 @@ _register(RefreshCommand)
 class RemoveCommand(CvcCommand):
     commands = ['remove', 'rm']
     paramHelp = "<file> [<file2> <file3> ...]"
+    help = 'Remove a file from Conary control'
+    commandGroup = 'File Operations'
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if len(args) < 2: return self.usage()
         for f in args[1:]:
             checkin.removeFile(cfg, f, repos=repos)
@@ -559,9 +510,13 @@ _register(RemoveCommand)
 class RenameCommand(CvcCommand):
     commands = ['rename']
     paramHelp = "<oldfile> <newfile>"
+    help = 'Rename a file that is under Conary control'
+    commandGroup = 'File Operations'
+    hidden = True
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if len(args) != 3: return self.usage()
         checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
@@ -569,15 +524,18 @@ _register(RenameCommand)
 class SignCommand(CvcCommand):
     commands = ['sign']
     paramHelp = "<newshadow> <trove>[=<version>][[flavor]]"
-
+    help = 'Add a digital signature to troves in a repository'
     docs = {'recurse' : 'recursively sign child troves'}
+    commandGroup = 'Repository Access'
+    hidden = True
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef['recurse'] = NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
         if len(args) <2: return self.usage()
         if argSet.has_key('quiet'):
             cfg.quiet = True
@@ -589,7 +547,8 @@ _register(SignCommand)
 class NewPkgCommand(CvcCommand):
     commands = ['newpkg']
     paramHelp = '<name>'
-
+    help = 'Set up the directory for creating a new package'
+    commandGroup = 'Setup Commands'
     docs = {'dir' : 'create new package in DIR',
             'template' : 'set recipe template to use'}
 
@@ -598,8 +557,9 @@ class NewPkgCommand(CvcCommand):
         argDef['dir'] = ONE_PARAM
         argDef['template'] = ONE_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
         dir = argSet.pop('dir', None)
         template = argSet.pop('template', None)
 
@@ -610,9 +570,12 @@ _register(NewPkgCommand)
 
 class MergeCommand(CvcCommand):
     commands = ['merge']
-
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    help = 'Merge changes made in a parent branch into the current directory'
+    commandGroup = 'File Operations'
+    hidden = True
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
         if len(args) == 2:
             kw = dict(versionSpec=args[1])
@@ -625,7 +588,9 @@ class SetCommand(CvcCommand):
 
     commands = ['set']
     paramHelp = "<path>+"
-
+    help = 'Set the properties of a file under Conary control'
+    commandGroup = 'File Operations'
+    hidden=True
     docs = {'text'       : ('Mark the given files as text files'),
             'binary'     : ('Mark the given files as binary files') }
 
@@ -634,8 +599,9 @@ class SetCommand(CvcCommand):
         argDef["binary"] = NO_PARAM
         argDef["text"] = NO_PARAM
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         binary = argSet.pop('binary', False)
         text = argSet.pop('text', False)
 
@@ -653,9 +619,12 @@ _register(SetCommand)
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
     paramHelp = "[<version>]"
+    help = 'Update files in current directory to a different version'
+    commandGroup = 'File Operations'
 
-    def runCommand(self, repos, cfg, argSet, args, profile = False, 
-                   callback = None):
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
 
         args[0] = repos
@@ -664,7 +633,7 @@ class UpdateCommand(CvcCommand):
 _register(UpdateCommand)
 
 
-class CvcMain(options.MainHandler):
+class CvcMain(command.MainHandler):
     name = 'cvc'
     abstractCommand = CvcCommand
     configClass = conarycfg.ConaryConfiguration
@@ -673,16 +642,17 @@ class CvcMain(options.MainHandler):
     commandList = _commands
     hobbleShortOpts = True
 
-    def usage(self, rc = 1):
-        return usage(rc)
+    def usage(self, rc=1, showAll=False):
+        print 'Conary Version Control (cvc)'
+        if not showAll:
+            print
+            print 'Common Commands (use "cvc help" for the full list)'
+        return options.MainHandler.usage(self, rc, showAll=showAll)
 
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         client = conaryclient.ConaryClient(cfg)
         repos = client.getRepos()
         callback = CheckinCallback(cfg)
-
-        if isinstance(thisCommand, CommitCommand):
-            self.hobbleShortOpts = False
 
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]
@@ -714,9 +684,9 @@ class CvcMain(options.MainHandler):
         keyCache.setCallback(keyCacheCallback)
 
         rv = options.MainHandler.runCommand(self, thisCommand,
-                                            client.getRepos(),
-                                            cfg, argSet, args[1:],
-                                            callback=callback)
+                                            cfg, argSet, args,
+                                            callback=callback,
+                                            repos=client.getRepos())
 
         if profile:
             prof.stop()
@@ -734,7 +704,10 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
-    return thisCommand.runCommand(repos, cfg, argSet, args, profile, callback)
+    return thisCommand.runCommand(cfg, argSet, [ 'cvc' ] + list(args),
+                                  profile=profile,
+                                  callback=callback,
+                                  repos=repos)
 
 def main(argv=sys.argv):
     try:

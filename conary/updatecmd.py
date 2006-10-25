@@ -358,13 +358,12 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     if not info:
         client.checkWriteableRoot()
 
-    if migrate:
+    if migrate and not info and not cfg.interactive:
         print ('As of conary 1.0.21, the migrate command has changed.'
                '  Migrate must be run with --interactive '
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
-        if not cfg.interactive:
-            return
+        return
 
     criticalUpdateInfo = CriticalUpdateInfo(applyCriticalOnly)
     if restartChangeSets:

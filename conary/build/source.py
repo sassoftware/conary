@@ -376,7 +376,10 @@ class Archive(_Source):
             _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
 
             if True in [f.endswith(x) for x in _tarSuffix]:
-                _unpack = "tar -C %s -xSpf -" % (destDir,)
+                preserve = ''
+                if self.dir.startswith('/'):
+                    preserve = 'p'
+                _unpack = "tar -C %s -xS%sf -" % (destDir, preserve)
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
             elif _uncompress != 'cat':

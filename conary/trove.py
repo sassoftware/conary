@@ -628,11 +628,13 @@ class Trove(streams.StreamSet):
 
         if keyCache is None:
             keyCache = openpgpkey.getKeyCache()
-
         for signature in self.troveInfo.sigs.digitalSigs.iter():
             try:
                 key = keyCache.getPublicKey(signature[0],
-                                            serverName = serverName)
+                                            serverName=serverName,
+                                            # don't warn about missing gpg
+                                            # if the threshold is <= 0
+                                            warn=(threshold > 0))
             except KeyNotFound:
                 missingKeys.append(signature[0])
                 continue
@@ -641,6 +643,11 @@ class Trove(streams.StreamSet):
                 badFingerprints.append(key.getFingerprint())
             maxTrust = max(lev,maxTrust)
 
+        if missingKeys and threshold > 0:
+            from conary.lib import log
+            log.warning('Unable to import or load the public keys needed '
+                        'to verify digital signatures.  A public key '
+                        'is needed for: %s', ', '.join(missingKeys))
         if len(badFingerprints):
             raise DigitalSignatureVerificationError(
                     "Trove signatures made by the following keys are bad: %s" 

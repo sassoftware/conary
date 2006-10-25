@@ -1406,7 +1406,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
 
     def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
-	assert(url.startswith(self.urlBase()))
+        base = self.urlBase()
+        if not url.startswith(base):
+            raise errors.RepositoryError(
+                'The changeset that is being committed was not '
+                'uploaded a URL on this server.  The url is "%s", this '
+                'server is "%s".'
+                %(url, base))
 	# +1 strips off the ? from the query url
 	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)

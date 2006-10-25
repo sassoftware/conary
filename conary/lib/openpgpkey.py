@@ -195,7 +195,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             trustDbPath = '/'.join(pubRing.split('/')[:-1]) + '/trustdb.gpg'
             self.trustDbPaths.append(trustDbPath)
 
-    def getPublicKey(self, keyId, serverName = None):
+    def getPublicKey(self, keyId, serverName = None, warn=True):
         # if we have this key cached, return it immediately
         if keyId in self.publicDict:
             return self.publicDict[keyId]
@@ -220,8 +220,9 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             except (KeyNotFound, IOError):
                 pass
         # callback should only return True if it found the key.
-        if serverName and self.callback.getPublicKey(keyId, serverName):
-            return self.getPublicKey(keyId)
+        if serverName and self.callback.getPublicKey(keyId, serverName,
+                                                     warn=warn):
+            return self.getPublicKey(keyId, warn=warn)
         raise KeyNotFound(keyId)
 
     def getPrivateKey(self, keyId, passphrase=None):
@@ -270,7 +271,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 #OpenPGPKeyFinder: download missing keys from conary servers.
 #-----#
 class KeyCacheCallback(callbacks.KeyCacheCallback):
-    def findOpenPGPKey(self, server, keyId):
+    def findOpenPGPKey(self, server, keyId, warn=True):
         # if we can't exec gpg, go ahead and bail
         if not self.hasGPG:
             return
@@ -322,16 +323,19 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         pid, status = os.waitpid(pid, 0)
         if os.WEXITSTATUS(status) == 255:
             self.hasGPG = False
-            log.warning('gpg does not appear to be installed.  gpg is required'
-                        ' to import keys into the conary public keyring.  Use'
-                        ' "conary update gnupg" to install gpg.')
+            if warn:
+                log.warning('gpg does not appear to be installed.  gpg '
+                            'is required to import keys into the '
+                            'conary public keyring.  Use "conary '
+                            'update gnupg" to install gpg.')
+
         if not secringExists:
             try:
                 os.remove(pubRingPath + '/secring.gpg')
             except:
                 pass
 
-    def getPublicKey(self, keyId, serverName):
+    def getPublicKey(self, keyId, serverName, warn=True):
         server = None
         if self.repositoryMap and serverName not in self.repositoryMap:
             server = "http://%s/conary/" % serverName
@@ -344,7 +348,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
                 server = self.repositoryMap.getNoPass(serverName)
         if server == None:
             return False
-        self.findOpenPGPKey(server, keyId)
+        self.findOpenPGPKey(server, keyId, warn=warn)
         # decide if we found the key or not.
         try:
             keyRing = open(self.pubRing)

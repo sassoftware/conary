@@ -71,6 +71,8 @@ monodis             = '%(bindir)s/monodis' # tool to determine mono dependencies
 # reference macros filled in from the recipe
 archive_name       = '%(name)s'
 archive_version    = '%(version)s'
+# overridden in conary
+major_version      = '%(version)s'
 
 # filled in at cook time
 buildbranch         = ''
