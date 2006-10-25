@@ -358,7 +358,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         assert(len(recipeClasses) == 1) 
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         try:
-            use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
+            use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor,
+                                        error=False, warn=True)
         except AttributeError, msg:
             log.error('Error setting build flags from flavor %s: %s' % (
                                             buildFlavor, msg))
@@ -1229,7 +1230,7 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
 
 
     try:
-        use.setBuildFlagsFromFlavor(pkgname, buildFlavor)
+        use.setBuildFlagsFromFlavor(pkgname, buildFlavor, error=False)
     except AttributeError, msg:
         log.error('Error setting build flag values: %s' % msg)
         sys.exit(1)
@@ -1312,6 +1313,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         (name, versionStr, flavor) = parseTroveSpec(item)
         flavorList = [flavor]
 
+    use.allowUnknownFlags(allowUnknownFlags)
     recipeClassDict = {}
     loaders = []
     for flavor in flavorList:
@@ -1347,7 +1349,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 labelPath = None
 
             try:
-                use.setBuildFlagsFromFlavor(name, buildFlavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
             except AttributeError, msg:
                 log.error('Error setting build flag values: %s' % msg)
                 sys.exit(1)

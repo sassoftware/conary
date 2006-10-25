@@ -34,6 +34,9 @@ Changes in @NEW@:
     * Unpacking a tarball now preserved permissions only when unpacking
       into the root proxy, not unpacking sources into the build
       directory. (CNY-998)
+    * Conary now warns in the presence of unknown use flags in the buildFlavor
+      instead of erroring.  (It will still error if the unknown use flag
+      is accessed in the recipe).
 
   o Code Cleanups
     * The command line options common between cvc and conary are now
