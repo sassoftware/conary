@@ -384,8 +384,7 @@ def commit(repos, cfg, message, callback=None, test=False):
             state.fileNeedsRefresh(pathId, set = False)
 
         try:
-            srcFiles = recipeObj.fetchAllSources(refreshFilter = refreshFilter,
-                                                 skipFilter = skipFilter)
+            srcFiles = recipeObj.fetchAllSources(skipFilter = skipFilter)
         except OSError, e:
             if e.errno == errno.ENOENT:
                 raise errors.CvcError('Source file %s does not exist' % 
