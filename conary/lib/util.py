@@ -103,6 +103,27 @@ def searchFile(file, searchdirs, error=None):
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
+def recurseDirectoryList(topdir, withDirs=False):
+    """Recursively list all files in the directory"""
+    items = [topdir]
+    while items:
+        item = items.pop()
+        if os.path.islink(item) or os.path.isfile(item):
+            yield item
+            continue
+        # Directory
+        listdir = os.listdir(item)
+        # Add the contents of the directory in reverse order (we use pop(), so
+        # last element in the list is the one popped out)
+        listdir.sort()
+        listdir.reverse()
+        listdir = [ os.path.join(item, x) for x in listdir ]
+        items.extend(listdir)
+
+        if withDirs:
+            # This is useful if one wants to catch empty directories
+            yield item
+
 errorMessage = '''
 *******************************************************************
 *** An error has occurred in conary:
