@@ -504,7 +504,7 @@ class RemoveCommand(CvcCommand):
         args = args[1:]
         if len(args) < 2: return self.usage()
         for f in args[1:]:
-            checkin.removeFile(cfg, f, repos=repos)
+            checkin.removeFile(f, repos=repos)
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):

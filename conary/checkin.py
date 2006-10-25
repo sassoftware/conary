@@ -1275,7 +1275,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
     conaryState.write("CONARY")
 
-def removeFile(cfg, filename, repos=None):
+def removeFile(filename, repos=None):
     conaryState = ConaryStateFromFile("CONARY", repos)
     state = conaryState.getSourceState()
 
