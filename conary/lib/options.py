@@ -182,13 +182,7 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     """
     return _processArgs(argDef, cfgMap, cfg, usage, argv)[:2]
 
-def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
-                commonParams=None, useHelp=False, defaultGroup=None,
-                interspersedArgs=True, hobbleShortOpts=False):
-    argSet = {}
-    # don't mangle the command line
-    argv = argv[:]
-
+def _getUsageStr(usage):
     # historically, usage was generally a function to print out the usage 
     # message.  We want it to be a string.  For now, we
     # convert here to allow backwards compatibility.
@@ -213,55 +207,82 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
             sys.stdout = oldStdOut
             sys.stderr = oldStdErr
         usage = rc
+    return usage
+
+def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
+               interspersedArgs=True, hobbleShortOpts=False,
+               addDebugOptions=True, addConfigOptions=True):
+    usage = _getUsageStr(usage)
 
     if defaultGroup:
         d = params[defaultGroup]
     else:
         d = params
-    d['debug'] = STRICT_OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
-    d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
 
-    for (arg, name) in cfgMap.items():
-        d[arg] = ONE_PARAM
+    if addDebugOptions:
+        d['debug'] = STRICT_OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
+        d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
 
-    parser = getOptionParser(params, cfgMap, cfg, usage, version, useHelp,
-                             defaultGroup, interspersedArgs,
-                             hobbleShortOpts=hobbleShortOpts)
+    if addConfigOptions:
+        for (arg, name) in cfgMap.items():
+            d[arg] = ONE_PARAM
+
+
+    return getOptionParser(params, usage, version, useHelp,
+                           defaultGroup, interspersedArgs,
+                           hobbleShortOpts=hobbleShortOpts)
+
+
+
+def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
+                commonParams=None, useHelp=False, defaultGroup=None,
+                interspersedArgs=True, hobbleShortOpts=False,
+                addDebugOptions=True, addConfigOptions=True):
+    argSet = {}
+    # don't mangle the command line
+    argv = argv[:]
+
+    parser = _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
+                        interspersedArgs, hobbleShortOpts,
+                        addDebugOptions=addDebugOptions, 
+                        addConfigOptions=addConfigOptions)
     argSet, otherArgs, options = getArgSet(params, parser, argv)
 
-    configFileList = argSet.pop('config-file', [])
-    if not isinstance(configFileList, list):
-        configFileList = [configFileList]
-    for path in configFileList:
-        try:
-            cfg.read(path, exception = True)
-        except IOError, msg:
-            raise OptionError(msg, parser)
+    if addConfigOptions:
+        configFileList = argSet.pop('config-file', [])
+        if not isinstance(configFileList, list):
+            configFileList = [configFileList]
+        for path in configFileList:
+            try:
+                cfg.read(path, exception = True)
+            except IOError, msg:
+                raise OptionError(msg, parser)
 
-    for (arg, name) in cfgMap.items():
-	if argSet.has_key(arg):
-	    cfg.configLine("%s %s" % (name, argSet[arg]))
-	    del argSet[arg]
+        for (arg, name) in cfgMap.items():
+            if argSet.has_key(arg):
+                cfg.configLine("%s %s" % (name, argSet[arg]))
+                del argSet[arg]
 
-    if argSet.has_key('debugger'):
-	del argSet['debugger']
-	from conary.lib import debugger
-	debugger.set_trace()
-        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
-                                            debugCtrlC=True)
+    if addDebugOptions:
+        if argSet.has_key('debugger'):
+            del argSet['debugger']
+            from conary.lib import debugger
+            debugger.set_trace()
+            sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                                debugCtrlC=True)
 
-    if 'debug' in argSet:
-        if argSet['debug'] is True:
-            log.setVerbosity(log.DEBUG)
+        if 'debug' in argSet:
+            if argSet['debug'] is True:
+                log.setVerbosity(log.DEBUG)
+            else:
+                log.setVerbosity(log.LOWLEVEL)
+            del argSet['debug']
         else:
-            log.setVerbosity(log.LOWLEVEL)
-	del argSet['debug']
-    else:
-	log.setVerbosity(log.WARNING)
+            log.setVerbosity(log.WARNING)
 
     return argSet, otherArgs, parser, options
 
-def getOptionParser(params, cfgMap, cfg, usage, version=None, useHelp=False,
+def getOptionParser(params, usage, version=None, useHelp=False,
                     defaultGroup=None, interspersedArgs=True, 
                     hobbleShortOpts=False):
     parser = OptionParser(usage=usage, add_help_option=useHelp,
@@ -338,7 +359,8 @@ class AbstractCommand(object):
         self.mainHandler = None
 
     def usage(self, errNo=1):
-        if self.parser:
+        if not self.parser:
+            self.setParser(self.mainHandler.getParser(self.commands[0]))
             self.parser.print_help()
         return errNo
 
@@ -442,6 +464,8 @@ class MainHandler(object):
     hobbleShortOpts = False # whether or not to allow -mn to be used, or to
                             # require -m -n.
     configClass = None
+    useConaryOptions = True # whether to add --config, --debug, --debugger
+                            # and use cfgMap.
 
     def __init__(self):
         self._supportedCommands = {}
@@ -454,6 +478,7 @@ class MainHandler(object):
     def _registerCommand(self, commandClass):
         supportedCommands = self._supportedCommands
         inst = commandClass()
+        inst.setMainHandler(self)
         if isinstance(commandClass.commands, str):
             supportedCommands[commandClass.commands] = inst
         else:
@@ -529,6 +554,31 @@ class MainHandler(object):
             ccfg = self.configClass(readConfigFiles=True)
         return ccfg
 
+    def getParser(self, command):
+        thisCommand = self._supportedCommands[command]
+        defaultGroup = thisCommand.defaultGroup
+        if self.name:
+            progName = self.name
+        else:
+            progName = argv[0]
+        commandUsage = '%s %s %s' % (progName, command,
+                                     thisCommand.paramHelp)
+
+        params, cfgMap = thisCommand.prepare()
+
+        if thisCommand.hobbleShortOpts is not None:
+            hobbleShortOpts = thisCommand.hobbleShortOpts
+        else:
+            hobbleShortOpts = self.hobbleShortOpts
+
+        return _getParser(params, {}, commandUsage, version=self.version,
+                          useHelp=True,
+                          defaultGroup=defaultGroup,
+                          hobbleShortOpts=hobbleShortOpts,
+                          addDebugOptions=self.useConaryOptions,
+                          addConfigOptions=self.useConaryOptions)
+
+
     def main(self, argv=sys.argv, debuggerException=Exception,
              cfg=None, **kw):
         """
@@ -597,7 +647,6 @@ class MainHandler(object):
             sys.exit(1)
 
         thisCommand.setParser(parser)
-        thisCommand.setMainHandler(self)
         argSet.update(newArgSet)
         thisCommand.processConfigOptions(cfg, cfgMap, argSet)
         self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)
