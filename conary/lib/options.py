@@ -411,13 +411,6 @@ class AbstractCommand(object):
             Manage any config maps we've set up, converting 
             assigning them to the config object.
         """ 
-        configFileList = argSet.pop('config-file', [])
-        if not isinstance(configFileList, list):
-            configFileList = list(configFileList)
-
-        for line in configFileList:
-            cfg.read(path, exception=True)
-
         for (arg, data) in cfgMap.items():
             cfgName, paramType = data[0:2]
             value = argSet.pop(arg, None)
