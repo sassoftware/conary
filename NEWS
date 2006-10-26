@@ -28,9 +28,10 @@ Changes in @NEW@:
       to happen when the file was in the previous version of the
       source component and also present in the lookaside
       cache. (CNY-601)
-    * Conary now warns in the presence of unknown use flags in the
-      buildFlavor instead of erroring.  (It will still error if the
-      unknown use flag is accessed in the recipe).
+    * Conary now produces a warning when an unknown use flag is
+      specified in the buildFlavor configuration variable instead of
+      producing an error.  It will still produce an error if the
+      unknown use flag is accessed in the recipe.
 
 Changes in 1.0.37:
   o Bugfixes:
