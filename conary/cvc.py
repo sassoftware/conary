@@ -106,12 +106,6 @@ _register(AnnotateCommand)
 
 
 class BranchShadowCommand(CvcCommand):
-    '''\
-    Create a shadow in a repository.
-
-    Blah blah blah.
-'''
-
     commands = ['shadow']
     paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
     help = 'Create a shadow in a repository'
@@ -297,7 +291,7 @@ class CookCommand(CvcCommand):
     help = 'Build binary package and groups from a recipe'
     commandGroup = 'Recipe Building'
 
-    docs = {'cross'   : ('set macros for cross-compiling', 
+    docs = {'cross'   : (VERBOSE_HELP, 'set macros for cross-compiling', 
                          '[(local|HOST)--]TARGET'),
             'debug-exceptions' : 'Enter debugger if a recipe fails in conary',
             'flavor'  : 'build the trove with flavor FLAVOR',
@@ -305,13 +299,15 @@ class CookCommand(CvcCommand):
             'macros'  : optparse.SUPPRESS_HELP, # can we get rid of this?
             'no-clean': 'do not remove build directory even if build is'
                         ' successful',
+            'no-deps': optparse.SUPPRESS_HELP,
             'ignore-buildreqs' : 'do not check build requirements',
-            'show-buildreqs': 'show build requirements for recipe',
+            'show-buildreqs': (VERBOSE_HELP,'show build requirements for recipe'),
             'prep'    : 'unpack, but do not build',
             'download': 'download, but do not unpack or build',
             'resume'  : ('resume building at given loc (default at failure)', 
                          '[LINENO|policy]'),
-            'unknown-flags' : optparse.SUPPRESS_HELP,
+            'unknown-flags' : (VERBOSE_HELP, 
+                    'Set all unknown flags that are used in the recipe to False')
            }
 
     def addParameters(self, argDef):
