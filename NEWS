@@ -21,8 +21,8 @@ Changes in @NEW@:
     * The autosource state is stored explicitly in CONARY files.
     * CONARY files now use textual identifiers for flags instead of
       digits.
-    * cvc refresh only downloads refreshed files now instead of all
-      autosource files.
+    * "cvc refresh" no longer downloads all autosource files.  Only
+      the file(s) specified are downloaded.
     * Removing files doesn't readd them any longer simply because they
       were in the previous version and are present in the lookaside
       anymore. (CNY-601)
