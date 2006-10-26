@@ -20,7 +20,7 @@ Changes in @NEW@:
       directory and the file is still specified in the recipe file as
       being automatically downloaded, the file will now be switched to
       an autosource file (preserving the pathId).
-    * The autosource state is stored explicitly in CONARY files.
+    * The autosource state is now stored explicitly in CONARY files.
     * CONARY files now use textual identifiers for flags instead of
       digits.
     * "cvc refresh" no longer downloads all autosource files.  Only
