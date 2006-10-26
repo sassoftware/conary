@@ -20,25 +20,43 @@ from conary import state, versions
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
 class ConaryCommand(options.AbstractCommand):
-    docs = {'build-label'        : ('Use build label LABEL as default search'
+    docs = {'build-label'        : (options.VERBOSE_HELP,
+                                    'Use build label LABEL as default search'
                                     ' loc', 'LABEL'),
-            'components'         : ('Do not hide components'),
-            'config'             : ('Set config KEY to VALUE', '"KEY VALUE"'),
-            'config-file'        : ('Read PATH config file', 'PATH'),
-            'context'            : 'Set the current context',
-            'install-label'      : ('Set the install label', 'LABEL'),
-            'interactive'        : ('ask questions before performing actions '
+            'components'         : (options.VERBOSE_HELP,
+                                    'Do not hide components'),
+            'config'             : (options.VERBOSE_HELP, 
+                                    'Set config KEY to VALUE', '"KEY VALUE"'),
+            'config-file'        : (options.VERBOSE_HELP, 
+                                    'Read PATH config file', 'PATH'),
+            'context'            : (options.VERBOSE_HELP,
+                                    'Set the current context'),
+            'exclude-troves'     : (options.VERBOSE_HELP,
+                                    'Do not install troves matching REGEXP', 
+                                    'REGEXP'),
+            'install-label'      : (options.VERBOSE_HELP, 
+                                    'Set the install label', 'LABEL'),
+            'interactive'        : (options.VERBOSE_HELP, 
+                                    'ask questions before performing actions '
                                     'that change system or repository state'),
-            'flavors'            : 'Display complete flavors where applicable',
-            'full-versions'      : ('Always display complete version strings'),
-            'labels'             : 'Always display labels for versions',
+            'flavors'            : (options.VERBOSE_HELP, 
+                                    'Display complete flavors where applicable'),
+            'full-versions'      : (options.VERBOSE_HELP,
+                                    'Always display complete version strings'),
+            'labels'             : (options.VERBOSE_HELP,
+                                    'Always display labels for versions'),
             'profile'            : optparse.SUPPRESS_HELP,
             'lsprof'             : optparse.SUPPRESS_HELP,
-            'pubring'            : '',
-            'skip-default-config': "Don't read default configs",
-            'quiet'              : ('do not display extra information when '
+            'pubring'            : (options.VERBOSE_HELP, ''),
+            'skip-default-config': (options.VERBOSE_HELP, 
+                                    "Don't read default configs"),
+            'quiet'              : (options.VERBOSE_HELP,
+                                    'do not display extra information when '
                                     'running'),
-            'root'               : 'use conary database at location ROOT',
+            'root'               : (options.VERBOSE_HELP,
+                                   'use conary database at location ROOT'),
+            'trust-threshold'    : (options.VERBOSE_HELP,
+                                    'Set trust threshold', 'INT')
             }
 
     def addParameters(self, argDef):

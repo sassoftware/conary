@@ -55,10 +55,12 @@ def _register(cmd):
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
+(NORMAL_HELP, VERBOSE_HELP)  = (options.NORMAL_HELP, options.VERBOSE_HELP)
 
 class CvcCommand(command.ConaryCommand):
 
-    docs = { 'signature-key' : ("Use signature key to sign results", 'KEY'), }
+    docs = { 'signature-key' : (VERBOSE_HELP,
+                                "Use signature key to sign results", 'KEY'), }
     commandGroup = 'Information Display'
     def addConfigOptions(self, cfgMap, argDef):
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
@@ -69,6 +71,9 @@ class AddCommand(CvcCommand):
     paramHelp = '<file> [<file2> <file3> ...]'
     help = 'Add a file to be controlled by Conary'
     commandGroup = 'File Operations'
+
+    docs = {'binary' : "Add files as binary - updates will not be merged on cvc up",
+            'text' : "Add files as text - updates will be merged"}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -101,10 +106,10 @@ _register(AnnotateCommand)
 
 
 class BranchShadowCommand(CvcCommand):
-
     commands = ['shadow']
     paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
     help = 'Create a shadow in a repository'
+
     commandGroup = 'Repository Access'
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
             'source-only': ('For any binary components listed, shadow/branch'
@@ -286,7 +291,7 @@ class CookCommand(CvcCommand):
     help = 'Build binary package and groups from a recipe'
     commandGroup = 'Recipe Building'
 
-    docs = {'cross'   : ('set macros for cross-compiling', 
+    docs = {'cross'   : (VERBOSE_HELP, 'set macros for cross-compiling', 
                          '[(local|HOST)--]TARGET'),
             'debug-exceptions' : 'Enter debugger if a recipe fails in conary',
             'flavor'  : 'build the trove with flavor FLAVOR',
@@ -294,13 +299,15 @@ class CookCommand(CvcCommand):
             'macros'  : optparse.SUPPRESS_HELP, # can we get rid of this?
             'no-clean': 'do not remove build directory even if build is'
                         ' successful',
+            'no-deps': optparse.SUPPRESS_HELP,
             'ignore-buildreqs' : 'do not check build requirements',
-            'show-buildreqs': 'show build requirements for recipe',
+            'show-buildreqs': (VERBOSE_HELP,'show build requirements for recipe'),
             'prep'    : 'unpack, but do not build',
             'download': 'download, but do not unpack or build',
             'resume'  : ('resume building at given loc (default at failure)', 
                          '[LINENO|policy]'),
-            'unknown-flags' : optparse.SUPPRESS_HELP,
+            'unknown-flags' : (VERBOSE_HELP, 
+                    'Set all unknown flags that are used in the recipe to False')
            }
 
     def addParameters(self, argDef):
@@ -504,7 +511,7 @@ class RemoveCommand(CvcCommand):
         args = args[1:]
         if len(args) < 2: return self.usage()
         for f in args[1:]:
-            checkin.removeFile(cfg, f, repos=repos)
+            checkin.removeFile(f, repos=repos)
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):
@@ -615,6 +622,19 @@ class SetCommand(CvcCommand):
         checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
 
 _register(SetCommand)
+
+class StatCommand(CvcCommand):
+    
+    commands = ['stat', 'st']
+    help = 'Show changed files in the working directory'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or not args or len(args) > 2: return self.usage()
+
+        args[0] = repos
+        checkin.stat_(*args)
+_register(StatCommand)
 
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']

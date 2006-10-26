@@ -1884,9 +1884,9 @@ conary erase '%s=%s[%s]'
         uJob.getTroveSource().addChangeSet(cs)
         return finalJobs
 
-    def fullUpdateItemList(self):
-        # ignore updates that just switch version, not flavor or 
-        # branch
+    def getUpdateItemList(self):
+        # Returns top-level items, things that need to be updated
+        # in order to update entire system.
         items = ( x for x in self.getPrimaryLocalUpdates() 
                   if (x[1][0] is None
                       or not deps.compatibleFlavors(x[1][1], x[2][1])
@@ -1896,7 +1896,12 @@ conary erase '%s=%s[%s]'
         items = [ x[0] for x in itertools.izip(items,
                                                self.db.trovesArePinned(items))
                                                                   if not x[1] ]
+        return items
 
+    def fullUpdateItemList(self):
+        # ignore updates that just switch version, not flavor or 
+        # branch
+        items = self.getUpdateItemList()
 
         installed = self.db.findByNames(x[0] for x in items)
 

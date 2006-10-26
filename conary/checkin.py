@@ -1274,7 +1274,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
     conaryState.write("CONARY")
 
-def removeFile(cfg, filename, repos=None):
+def removeFile(filename, repos=None):
     conaryState = ConaryStateFromFile("CONARY", repos)
     state = conaryState.getSourceState()
 
@@ -1708,3 +1708,79 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
 
     conaryState.setSourceState(state)
     conaryState.write('CONARY')
+
+def stat_(repos):
+    # List all files in the current directory
+    filtered = [ 'CONARY' ]
+
+    dirfiles = util.recurseDirectoryList('.', withDirs=False)
+    dirfilesHash = {}
+    for f in dirfiles:
+        # Remove ./ prefix
+        f = os.path.normpath(f)
+        if f in filtered:
+            # Special file
+            continue
+        dirfilesHash[f] = None
+
+    state = ConaryStateFromFile("CONARY", repos).getSourceState()
+
+    if state.getVersion() == versions.NewVersion():
+	log.error("no versions have been committed")
+	return
+
+    oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
+
+    result = update.buildLocalChanges(repos, 
+	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
+            forceSha1=True, ignoreAutoSource = True)
+
+    (changeSet, ((isDifferent, newState),)) = result
+
+    troveChanges = changeSet.iterNewTroveList()
+    troveCs = troveChanges.next()
+    assert(util.assertIteratorAtEnd(troveChanges))
+
+    fileList = [ (x[0], x[1], True, x[2], x[3]) for x in
+troveCs.getNewFileList() ]
+    fileList += [ (x[0], x[1], False, x[2], x[3]) for x in
+                            troveCs.getChangedFileList() ]
+
+    # List of tuples (state, path)
+    # state can be ?, A, M, R
+    results = []
+
+    for (pathId, path, isNew, fileId, newVersion) in fileList:
+	if isNew:
+            results.append(('A', path))
+            del dirfilesHash[path]
+            continue
+
+	# changed file
+        if not path:
+            path = oldTrove.getFile(pathId)[0]
+        del dirfilesHash[path]
+        results.append(('M', path))
+        continue
+
+    for pathId in troveCs.getOldFileList():
+	path = oldTrove.getFile(pathId)[0]
+        results.append(('R', path))
+
+    # All other files in the directory are unknown
+    unknown = dirfilesHash.keys()
+
+    unknown = [ ('?', path) for path in unknown ]
+    results[0:0] = unknown
+
+    # Sort by file path
+    results.sort(lambda x, y: cmp(x[1], y[1]))
+	
+    return _showStat(results)
+
+def _showStat(results):
+    # print results
+    for fstat, path in results:
+        print "%s  %s" % (fstat, path)
+
+    return results
