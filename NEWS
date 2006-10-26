@@ -14,8 +14,8 @@ Changes in @NEW@:
       file would continue to be refreshed on subsequent commits.
     * When using "cvc commit", cvc no longer downloads autosourced
       files which haven't changed (CNY-611, CNY-463)
-    * Files can now be moved from autosource to standard inclusion
-      using cvc add.
+    * Files that were previously marked as autosource files can now be
+      made a regular file by calling "cvc add".
     * When using "cvc remove" to remove a file from the local checkout
       directory and the file is still specified in the recipe file as
       being automatically downloaded, the file will now be switched to
