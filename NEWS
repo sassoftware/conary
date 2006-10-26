@@ -23,9 +23,11 @@ Changes in @NEW@:
       digits.
     * "cvc refresh" no longer downloads all autosource files.  Only
       the file(s) specified are downloaded.
-    * Removing files doesn't readd them any longer simply because they
-      were in the previous version and are present in the lookaside
-      anymore. (CNY-601)
+    * Files removed with "cvc remove" are no longer erroneously
+      re-added when committing changes to the repository.  This used
+      to happen when the file was in the previous version of the
+      source component and also present in the lookaside
+      cache. (CNY-601)
     * Conary now warns in the presence of unknown use flags in the
       buildFlavor instead of erroring.  (It will still error if the
       unknown use flag is accessed in the recipe).
