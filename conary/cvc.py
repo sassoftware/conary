@@ -55,10 +55,12 @@ def _register(cmd):
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 STRICT_OPT_PARAM        = options.STRICT_OPT_PARAM
+(NORMAL_HELP, VERBOSE_HELP)  = (options.NORMAL_HELP, options.VERBOSE_HELP)
 
 class CvcCommand(command.ConaryCommand):
 
-    docs = { 'signature-key' : ("Use signature key to sign results", 'KEY'), }
+    docs = { 'signature-key' : (VERBOSE_HELP,
+                                "Use signature key to sign results", 'KEY'), }
     commandGroup = 'Information Display'
     def addConfigOptions(self, cfgMap, argDef):
         cfgMap['signature-key'] = 'signatureKey', ONE_PARAM
@@ -69,6 +71,9 @@ class AddCommand(CvcCommand):
     paramHelp = '<file> [<file2> <file3> ...]'
     help = 'Add a file to be controlled by Conary'
     commandGroup = 'File Operations'
+
+    docs = {'binary' : "Add files as binary - updates will not be merged on cvc up",
+            'text' : "Add files as text - updates will be merged"}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -101,10 +106,16 @@ _register(AnnotateCommand)
 
 
 class BranchShadowCommand(CvcCommand):
+    '''\
+    Create a shadow in a repository.
+
+    Blah blah blah.
+'''
 
     commands = ['shadow']
     paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
     help = 'Create a shadow in a repository'
+
     commandGroup = 'Repository Access'
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
             'source-only': ('For any binary components listed, shadow/branch'

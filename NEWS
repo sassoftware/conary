@@ -4,6 +4,8 @@ Changes in @NEW@:
     * Added getUpdateItemList() method to allow retrieval of top level troves 
       on the local system. (CNY-1025)
     * --tags will now display whether source files are autosource or not.
+    * --help options will now display a smaller number of flags by default,
+      and more when the --debug flag is added.
 
   o Build Changes:
     * Files now have their refresh state reset after a commit
