@@ -7,9 +7,9 @@ Changes in @NEW@:
 
   o Build Changes:
     * Files now have their refresh state reset after a commit
-    * Committing trove on longer downloads autosourced files which haven't 
+    * Committing trove no longer downloads autosourced files which haven't 
       changed (CNY-611, CNY-463)
-    * Files can now be moved form autosource to standard inclusion using
+    * Files can now be moved from autosource to standard inclusion using
       cvc add
     * Files which are cvc removed will now be switched to autosourced if
       appropriate (preserving the pathId)
