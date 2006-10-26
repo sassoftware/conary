@@ -20,6 +20,10 @@ Changes in @NEW@:
       instead of erroring.  (It will still error if the unknown use flag
       is accessed in the recipe).
 
+  o Bugfixes:
+    * Files added in both the repository and locally with cvc now give an
+      error message on update rather than corrupting the CONARY file (CNY-1024)
+
 Changes in 1.0.37:
   o Bugfixes:
     * A warning message produced when attempting to retrieve a OpenPGP

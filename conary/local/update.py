@@ -805,6 +805,15 @@ class FilesystemJob:
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
                 continue
 
+            if isSrcTrove:
+                # in source operations we could have a file which was added
+                # manually also be added in the repository. the pathId's
+                # would be different, but paths conflicting is a bad idea
+                if [ x for x in fsTrove.iterFileList() if x[1] == headPath ]:
+                    self.errors.append(
+                        DuplicatePath(headPath))
+                    continue
+
             if headPath in pathsMoved:
                 # this file looks new, but it's actually moved over from
                 # another trove. treat it as an update later on.

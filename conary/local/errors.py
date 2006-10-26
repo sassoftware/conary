@@ -114,3 +114,11 @@ class FileContentsConflictError(UpdateError):
     def __init__(self, path):
         self.path = path
 
+class DuplicatePath(UpdateError):
+
+    def __str__(self):
+        return "path %s added both locally and in repository" % self.path
+
+    def __init__(self, path):
+        self.path = path
+
