@@ -56,6 +56,7 @@ def openDatabase(root, path):
 
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+(NORMAL_HELP, VERBOSE_HELP)  = (options.NORMAL_HELP, options.VERBOSE_HELP)
 
 _commands = []
 def _register(cmd):
@@ -65,13 +66,6 @@ class ConaryCommand(command.ConaryCommand):
     paramHelp = ''
     defaultGroup = 'Common Options'
     commandGroup = 'Miscellaneous Commands'
-
-    docs = {'components'         : ('Do not hide components'),
-            'exclude-troves'     : ('Do not install troves matching REGEXP', 
-                                    'REGEXP'),
-            'labels'             : 'Always display labels for versions',
-            'trust-threshold'    : ('Set trust threshold', 'INT')
-            }
 
     def addConfigOptions(self, cfgMap, argDef):
         cfgMap['components'] = 'showComponents', NO_PARAM
@@ -88,7 +82,8 @@ class ChangeSetCommand(ConaryCommand):
 Creates a changeset with the specified troves and stores it in <outfile>'''
     help = 'Request a changeset from one or more Conary repositories'
     commandGroup = 'Repository Access'
-    docs = {'no-recurse' : "Don't include child troves in changeset"}
+    docs = {'no-recurse' : (VERBOSE_HELP, 
+                            "Don't include child troves in changeset")}
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -368,29 +363,37 @@ _register(RollbackCommand)
 class _AbstractQueryCommand(ConaryCommand):
 
     docs = {'all-troves'    : '', # Meaning changes based on command
-            'buildreqs'     : ('Display troves used to satisfy buildreqs'
+            'buildreqs'     : (VERBOSE_HELP,
+                               'Display troves used to satisfy buildreqs'
                                ' of this trove'),
             'deps'          : 'Display trove dependencies',
             'file-deps'     : 'Display dependencies for individual files',
-            'file-versions' : 'Display file versions',
-            'ids'           : 'Display path and file ids for files',
+            'file-versions' : (VERBOSE_HELP, 'Display file versions'),
+            'ids'           : (VERBOSE_HELP,
+                               'Display path and file ids for files'),
             'info'          : 'Display detailed trove info',
             'ls'            : 'List files',
             'lsl'           : 'List file details like ls -l',
             'no-pristine'   : optparse.SUPPRESS_HELP,
-            'no-recurse'    : 'Force no recursive display of child troves',
-            'path'          : 'Display trove that owns PATH',
-            'recurse'       : 'Force recursive display of child troves',
-            'sha1s'         : 'Display checksums for original file contents',
-            'signatures'    : 'Display any signatures on this trove',
-            'tags'          : 'Display tags for files',
-            'troves'        : 'Display one level of child troves',
-            'trove-flags'   : 'Display trove flags (see man page)',
-            'trove-headers' : 'Display current trove name when listing info'
-                              ' from multiple troves',
+            'no-recurse'    : (VERBOSE_HELP, 
+                               'Force no recursive display of child troves'),
+            'path'          : (VERBOSE_HELP, 'Display trove that owns PATH'),
+            'recurse'       : (VERBOSE_HELP,
+                              'Force recursive display of child troves'),
+            'sha1s'         : (VERBOSE_HELP,
+                              'Display checksums for original file contents'),
+            'signatures'    : (VERBOSE_HELP,
+                               'Display any signatures on this trove'),
+            'tags'          : (VERBOSE_HELP, 'Display tags for files'),
+            'troves'        : (VERBOSE_HELP, 
+                               'Display one level of child troves'),
+            'trove-flags'   : (VERBOSE_HELP, 'Display trove flags (see man page)'),
+            'trove-headers' : (VERBOSE_HELP,
+                               'Display current trove name when listing info'
+                              ' from multiple troves'),
             'weak-refs'     : optparse.SUPPRESS_HELP,
-            'what-provides' : ('Return information about what troves provide a dependency', 'DEP'),
-            'what-requires' : ('Return information about what troves require a dependency', 'DEP')
+            'what-provides' : (VERBOSE_HELP, 'Return information about what troves provide a dependency', 'DEP'),
+            'what-requires' : (VERBOSE_HELP, 'Return information about what troves require a dependency', 'DEP')
             }
 
 
@@ -583,7 +586,8 @@ class ShowChangesetCommand(_AbstractQueryCommand):
             'all-troves'         : 'display not-by-default troves', 
             'show-changes'       : ('(for relative changeset) display changes'
                                     'that the relative changeset contains'),
-            'recurse-repository' : ('search the repository for troves not '
+            'recurse-repository' : (VERBOSE_HELP,
+                                    'search the repository for troves not '
                                     'contained in the changeset when recursing')
            }
 
@@ -639,25 +643,31 @@ class _UpdateCommand(ConaryCommand):
     commandGroup = 'System Modification'
 
     docs = {
-        'apply-critical'  : 'apply any critical conary updates and then stop',
+        'apply-critical'  : (VERBOSE_HELP, 
+                             'apply any critical conary updates and then stop'),
         'from-file'     : 'search changeset(s) for given troves',
-        'just-db'       : 'Update db only - Do not modify rest of file system',
+        'just-db'       : (VERBOSE_HELP,
+                          'Update db only - Do not modify rest of file system'),
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
         'keep-required' : 'Do not erase troves which are needed by troves '
                           'which will remain installed',
         'info'          : 'Display what update would have done',
         'no-deps'       : 'Do not raise errors due to dependency failures',
-        'no-recurse'    : 'Do not install/erase children of specified trove',
-        'no-resolve'    : 'Do not attempt to solve dependency problems',
-        'no-conflict-check' : 'Ignore potential path conflicts',
+        'no-recurse'    : (VERBOSE_HELP, 
+                           'Do not install/erase children of specified trove'),
+        'no-resolve'    : (VERBOSE_HELP,
+                           'Do not attempt to solve dependency problems'),
+        'no-conflict-check' : (VERBOSE_HELP,
+                               'Ignore potential path conflicts'),
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found',
         'resolve'       : 'Add troves to update to solve dependency problems',
         'restart-info'  : optparse.SUPPRESS_HELP,
-        'sync-to-parents' : 'Install already referenced versions of troves',
+        'sync-to-parents' : (VERBOSE_HELP,
+                            'Install already referenced versions of troves'),
         'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
         'test'      : 'Run through whole update but do not modify system',
-        'update-only' : 'Do not install any new troves',
+        'update-only' :(VERBOSE_HELP, 'Do not install any new troves'),
     }
 
     def addParameters(self, argDef):

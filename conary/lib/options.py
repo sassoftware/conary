@@ -43,16 +43,16 @@ class OptionError(Exception):
 
 class HelpFormatter(optparse.IndentedHelpFormatter):
     def format_option(self, option):
-        if option.help_level == VERBOSE_HELP:
+        if option.help_level == VERBOSE_HELP and log.getVerbosity() > log.DEBUG:
             return ''
         return optparse.IndentedHelpFormatter.format_option(self, option)
+
+    def format_description(self, description):
+        return description + '\n'
 
 class Option(optparse.Option):
     ATTRS = optparse.Option.ATTRS[:]
     ATTRS.append('help_level')
-
-    def _set_attrs(self, attrs):
-        return optparse.Option._set_attrs(self, attrs)
 
 class OptionParser(optparse.OptionParser):
     forbiddenOpts = set(str(x) for x in range(0,9))
@@ -95,6 +95,19 @@ class OptionParser(optparse.OptionParser):
         option.had_explicit_value = had_explicit_value
         return optparse.OptionParser._process_long_opt(self, rargs, values)
 
+class OptionGroup(optparse.OptionGroup):
+     def format_help(self, formatter):
+        if log.getVerbosity() > log.DEBUG:
+            found = False
+            for option in self.option_list:
+                if (option.help_level == NORMAL_HELP 
+                    and option.help != optparse.SUPPRESS_HELP):
+                    found = True
+                    break
+            if not found:
+                return ''
+        return optparse.OptionGroup.format_help(self, formatter)
+
 def optParamCallback(option, opt_str, value, parser, *args, **kw):
     strict = kw.pop('strictOpt', False)
 
@@ -122,7 +135,7 @@ def addOptions(parser, argDef, skip=None):
         if name == skip:
             continue
         if isinstance(data, dict):
-            group = optparse.OptionGroup(parser, name)
+            group = OptionGroup(parser, name)
             addOptions(group, data)
             parser.add_option_group(group)
             continue
@@ -131,11 +144,12 @@ def addOptions(parser, argDef, skip=None):
         shortOpt = None
         meta = None
         if isinstance(data, (list, tuple)):
-            if len(data) == 3:
+            if isinstance(data[0], str) and data[0].startswith('-'):
                 shortOpt = data[0]
                 data = data[1:]
             if len(data) >= 2:
-                help = data[1]
+                help = data[-1]
+                data = data[:-1]
                 if isinstance(help, (list, tuple)):
                     if isinstance(help[0], int):
                         help_level = help[0]
@@ -144,6 +158,10 @@ def addOptions(parser, argDef, skip=None):
                         help, meta = help
                     else:
                         help = help[0]
+                elif isinstance(help, int):
+                    help = ''
+                    help_level = help
+            assert(len(data) == 1)
             paramType = data[0]
         else:
             paramType = data
@@ -211,7 +229,8 @@ def _getUsageStr(usage):
 
 def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
                interspersedArgs=True, hobbleShortOpts=False,
-               addDebugOptions=True, addConfigOptions=True):
+               addDebugOptions=True, addConfigOptions=True,
+               description=None):
     usage = _getUsageStr(usage)
 
     if defaultGroup:
@@ -220,8 +239,10 @@ def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
         d = params
 
     if addDebugOptions:
-        d['debug'] = STRICT_OPT_PARAM, 'Print helpful debugging output (use --debug=all for internal debug info)'
+        d['debug'] = STRICT_OPT_PARAM, (VERBOSE_HELP, 'Print helpful debugging output (use --debug=all for internal debug info)')
         d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
+
+    d['help'] = NO_PARAM, optparse.SUPPRESS_HELP
 
     if addConfigOptions:
         for (arg, name) in cfgMap.items():
@@ -230,14 +251,16 @@ def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
 
     return getOptionParser(params, usage, version, useHelp,
                            defaultGroup, interspersedArgs,
-                           hobbleShortOpts=hobbleShortOpts)
+                           hobbleShortOpts=hobbleShortOpts,
+                           description=description)
 
 
 
 def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                 commonParams=None, useHelp=False, defaultGroup=None,
                 interspersedArgs=True, hobbleShortOpts=False,
-                addDebugOptions=True, addConfigOptions=True):
+                addDebugOptions=True, addConfigOptions=True,
+                description=None):
     argSet = {}
     # don't mangle the command line
     argv = argv[:]
@@ -245,7 +268,8 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
     parser = _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
                         interspersedArgs, hobbleShortOpts,
                         addDebugOptions=addDebugOptions, 
-                        addConfigOptions=addConfigOptions)
+                        addConfigOptions=addConfigOptions,
+                        description=description)
     argSet, otherArgs, options = getArgSet(params, parser, argv)
 
     if addConfigOptions:
@@ -284,17 +308,18 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
 
 def getOptionParser(params, usage, version=None, useHelp=False,
                     defaultGroup=None, interspersedArgs=True, 
-                    hobbleShortOpts=False):
+                    hobbleShortOpts=False, description=None):
     parser = OptionParser(usage=usage, add_help_option=useHelp,
                           version=version,
                           hobbleShortOpts=hobbleShortOpts,
                           option_class=Option,
-                          formatter=HelpFormatter())
+                          formatter=HelpFormatter(),
+                          description=description)
     if not interspersedArgs:
         parser.disable_interspersed_args()
 
     if defaultGroup in params:
-        group = optparse.OptionGroup(parser, defaultGroup)
+        group = OptionGroup(parser, defaultGroup)
         addOptions(group, params[defaultGroup])
         parser.add_option_group(group)
 
@@ -309,7 +334,7 @@ def getOptionParser(params, usage, version=None, useHelp=False,
             found = False
 
     if found is False:
-        group = optparse.OptionGroup(parser, 'Command Options')
+        group = OptionGroup(parser, 'Command Options')
         addOptions(group, params, skip=defaultGroup)
         parser.add_option_group(group)
     else:
@@ -346,7 +371,8 @@ class AbstractCommand(object):
     commands = []
     paramHelp = '' # for each command will display <command> + paramHelp
                    # as part of usage.
-    help = '' # short help
+    help = ''      # short help
+    description = None # longer help (defaults to __doc__)
     defaultGroup = 'Common Options' # The heading for options that aren't
                                     # put in any other group.
     commandGroup = 'Common Commands'
@@ -361,7 +387,10 @@ class AbstractCommand(object):
     def usage(self, errNo=1):
         if not self.parser:
             self.setParser(self.mainHandler.getParser(self.commands[0]))
-            self.parser.print_help()
+        self.parser.print_help()
+        if log.getVerbosity() > log.DEBUG:
+            print
+            print '(Use --debug to get a full option listing)'
         return errNo
 
     def setParser(self, parser):
@@ -496,8 +525,8 @@ class MainHandler(object):
                                                     params, {}, cfg,
                                                     self.usage,
                                                     argv=argv[1:],
-                                                    version=self.version,
-                                                    useHelp=True,
+                                                    version=None,
+                                                    useHelp=False,
                                                     defaultGroup=defaultGroup,
                                                     interspersedArgs=False,
                                     hobbleShortOpts=self.hobbleShortOpts)
@@ -556,28 +585,35 @@ class MainHandler(object):
 
     def getParser(self, command):
         thisCommand = self._supportedCommands[command]
+        params, cfgMap = thisCommand.prepare()
+        kwargs = self._getParserFlags(command)
+        return _getParser(params, {}, **kwargs)
+
+    def _getParserFlags(self, commandName):
+        thisCommand = self._supportedCommands[commandName]
+        if thisCommand.hobbleShortOpts is not None:
+            hobbleShortOpts = thisCommand.hobbleShortOpts
+        else:
+            hobbleShortOpts = self.hobbleShortOpts
         defaultGroup = thisCommand.defaultGroup
         if self.name:
             progName = self.name
         else:
             progName = argv[0]
-        commandUsage = '%s %s %s' % (progName, command,
+        commandUsage = '%s %s %s' % (progName, commandName,
                                      thisCommand.paramHelp)
-
-        params, cfgMap = thisCommand.prepare()
-
-        if thisCommand.hobbleShortOpts is not None:
-            hobbleShortOpts = thisCommand.hobbleShortOpts
-        else:
-            hobbleShortOpts = self.hobbleShortOpts
-
-        return _getParser(params, {}, commandUsage, version=self.version,
-                          useHelp=True,
-                          defaultGroup=defaultGroup,
-                          hobbleShortOpts=hobbleShortOpts,
-                          addDebugOptions=self.useConaryOptions,
-                          addConfigOptions=self.useConaryOptions)
-
+        description = thisCommand.description
+        if not description:
+            description = thisCommand.__doc__
+        if description is None:
+            description = thisCommand.help
+        return dict(usage=commandUsage, version=None,
+                    useHelp=False,
+                    defaultGroup=defaultGroup,
+                    hobbleShortOpts=hobbleShortOpts,
+                    addDebugOptions=self.useConaryOptions,
+                    addConfigOptions=self.useConaryOptions,
+                    description=description)
 
     def main(self, argv=sys.argv, debuggerException=Exception,
              cfg=None, **kw):
@@ -615,27 +651,13 @@ class MainHandler(object):
             return rc
 
         thisCommand = self._supportedCommands[commandName]
-        if thisCommand.hobbleShortOpts is not None:
-            hobbleShortOpts = thisCommand.hobbleShortOpts
-        else:
-            hobbleShortOpts = self.hobbleShortOpts
         params, cfgMap = thisCommand.prepare()
-        defaultGroup = thisCommand.defaultGroup
-        if self.name:
-            progName = self.name
-        else:
-            progName = argv[0]
-        commandUsage = '%s %s %s' % (progName, commandName,
-                                     thisCommand.paramHelp)
+        kwargs = self._getParserFlags(commandName)
+
         try:
             newArgSet, otherArgs, parser, optionSet = _processArgs(
                                         params, {}, cfg,
-                                        commandUsage,
-                                        argv=argv,
-                                        version=self.version,
-                                        useHelp=True,
-                                        defaultGroup=defaultGroup,
-                                        hobbleShortOpts=hobbleShortOpts)
+                                        argv=argv, **kwargs)
         except debuggerException, e:
             raise
         except OptionError, e:
@@ -645,6 +667,11 @@ class MainHandler(object):
         except versions.ParseError, e:
             print >> sys.stderr, e
             sys.exit(1)
+
+        if argSet.pop('help', False):
+            thisCommand.usage()
+            sys.exit(1)
+
 
         thisCommand.setParser(parser)
         argSet.update(newArgSet)
