@@ -30,6 +30,8 @@ Changes in @NEW@:
       error message on update rather than corrupting the CONARY file (CNY-1024)
     * Adding a file locally and then merging that file from upstream now
       causes an error as expected (it would traceback before). (CNY-1021)
+    * Empty groups will not traceback if resolveDependencies is True --
+      they will display an error message as expected. (CNY-1030)
 
 Changes in 1.0.37:
   o Bugfixes:

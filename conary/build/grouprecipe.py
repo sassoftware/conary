@@ -1424,6 +1424,9 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
                 extra += '[Weak]'
             log.debug(' %s=%s[%s] %s' % (troveTup + (extra,)))
 
+        if group.isEmpty():
+            raise CookError('%s has no troves in it' % group.name)
+
         if group.autoResolve:
             callback.done()
             log.info('Resolving dependencies...')
@@ -1446,9 +1449,6 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
         if conflicts:
             groupsWithConflicts[group.name] = conflicts
-
-        if group.isEmpty():
-            raise CookError('%s has no troves in it' % group.name)
 
         callback.groupBuilt()
         log.info('%s built.\n' % group.name)
