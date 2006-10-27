@@ -1747,7 +1747,6 @@ def stat_(repos):
 troveCs.getNewFileList() ]
     fileList += [ (x[0], x[1], False, x[2], x[3]) for x in
                             troveCs.getChangedFileList() ]
-
     # List of tuples (state, path)
     # state can be ?, A, M, R
     results = []
@@ -1769,7 +1768,17 @@ troveCs.getNewFileList() ]
 	path = oldTrove.getFile(pathId)[0]
         results.append(('R', path))
 
-    # All other files in the directory are unknown
+    trackedFiles = {}
+    # Add all the tracked files to a hash
+    for iterr in state.iterFileList():
+        trackedFiles[iterr[1]] = None
+
+    # Eliminate the files that have not changed (the ones we track but are
+    # still present in dirfilesHash)
+    for k in dirfilesHash.keys():
+        if k in trackedFiles:
+            del dirfilesHash[k]
+
     unknown = dirfilesHash.keys()
 
     unknown = [ ('?', path) for path in unknown ]
