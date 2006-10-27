@@ -53,6 +53,9 @@ Changes in @NEW@:
       before). (CNY-1021)
     * Empty groups will not traceback if resolveDependencies is True --
       they will display an error message as expected. (CNY-1030)
+    * Re-execing after critical update switches from migrate mode to regular
+      update mode. (CNY-980)
+
 
 Changes in 1.0.37:
   o Bugfixes:
