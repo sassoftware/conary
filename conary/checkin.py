@@ -573,7 +573,8 @@ def commit(repos, cfg, message, callback=None, test=False):
 
             fileMap[pathId] = (fileObj, fullPath, path)
 
-        changeSet = changeset.CreateFromFilesystem([ (newState, fileMap) ])
+        changeSet = changeset.CreateFromFilesystem([ (None, newState,
+                                                      fileMap) ])
         troveCs = changeSet.iterNewTroveList().next()
 
     # this replaces the TroveChangeSet update.buildLocalChanges put in

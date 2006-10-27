@@ -1282,8 +1282,9 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 def CreateFromFilesystem(troveList):
     cs = ChangeSet()
 
-    for (trv, fileMap) in troveList:
-	(troveChgSet, filesNeeded, trovesNeeded) = trv.diff(None, absolute = 1)
+    for (oldTrv, trv, fileMap) in troveList:
+	(troveChgSet, filesNeeded, trovesNeeded) = trv.diff(oldTrv,
+                                                            absolute = 1)
 	cs.newTrove(troveChgSet)
 
 	for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:

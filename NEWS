@@ -24,6 +24,9 @@ Changes in @NEW@:
     * Conary now warns in the presence of unknown use flags in the buildFlavor
       instead of erroring.  (It will still error if the unknown use flag
       is accessed in the recipe).
+    * Package builds now create relative changesets for components instead
+      of absolute changesets, reducing the size of the upload to the
+      repository (CNY-912)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an

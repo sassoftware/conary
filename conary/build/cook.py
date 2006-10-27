@@ -165,6 +165,12 @@ class CookCallback(lookaside.ChangesetCallback, callbacks.CookCallback):
         lookaside.ChangesetCallback.__init__(self, *args, **kw)
 
 
+def _signTrove(trv, fingerprint):
+    if fingerprint is not None:
+        trv.addDigitalSignature(fingerprint)
+    else:
+        # if no fingerprint, just add sha1s
+        trv.computeSignatures()
 
 def signAbsoluteChangeset(cs, fingerprint=None):
     # adds signatures or at least sha1s (if fingerprint is None)
@@ -177,11 +183,7 @@ def signAbsoluteChangeset(cs, fingerprint=None):
         # instantiate each trove from the troveCs so we can generate
         # the signature
         t = trove.Trove(troveCs)
-        if fingerprint is not None:
-            t.addDigitalSignature(fingerprint)
-        else:
-            # if no fingerprint, just add sha1s
-            t.computeSignatures()
+        _signTrove(t, fingerprint)
         # create a new troveCs that has the new signature included in it
         newTroveCs = t.diff(None, absolute = 1)[0]
         # replace the old troveCs with the new one in the changeset
@@ -347,6 +349,12 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     macros['buildbranch'] = buildBranch.asString()
     macros['buildlabel'] = buildBranch.label().asString()
 
+    if targetLabel:
+        signatureLabel = targetLabel
+        signatureKey = selectSignatureKey(cfg, targetLabel)
+    else:
+        signatureKey = selectSignatureKey(cfg, sourceVersion.trailingLabel())
+
     db = database.Database(cfg.root, cfg.dbPath)
     type = recipeClass.getType()
     if recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
@@ -354,6 +362,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                macros = macros, targetLabel = targetLabel,
                                alwaysBumpCount = alwaysBumpCount,
                                callback = callback)
+        needsSigning = True
     else:
         assert(len(recipeClasses) == 1) 
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
@@ -377,19 +386,23 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                 logBuild = logBuild,
                                 crossCompile = crossCompile,
                                 requireCleanSources = requireCleanSources,
-                                downloadOnly = downloadOnly)
+                                downloadOnly = downloadOnly,
+                                signatureKey = signatureKey)
+            needsSigning = False
         elif type == recipe.RECIPE_TYPE_REDIRECT:
             ret = cookRedirectObject(repos, db, cfg, recipeClass,
                                   sourceVersion,
                                   macros = macros, 
                                   targetLabel = targetLabel,
                                   alwaysBumpCount = alwaysBumpCount)
+            needsSigning = True
         elif type == recipe.RECIPE_TYPE_FILESET:
             ret = cookFilesetObject(repos, db, cfg, recipeClass, 
                                     sourceVersion, 
                                     macros = macros, 
                                     targetLabel = targetLabel,
                                     alwaysBumpCount = alwaysBumpCount)
+            needsSigning = True
         else:
             raise AssertionError
 
@@ -399,13 +412,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     (cs, built, cleanup) = ret
 
-    # sign the changeset
-    if targetLabel:
-        signatureLabel = targetLabel
-    else:
-        signatureLabel = sourceVersion.branch().label()
-    signatureKey = selectSignatureKey(cfg, signatureLabel)
-    signAbsoluteChangeset(cs, signatureKey)
+    if needsSigning:
+        # sign the changeset
+        signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:
         cs.writeToFile(changeSetFile)
@@ -713,11 +722,11 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     return (changeSet, built, None)
 
 def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True, 
-		      macros={}, targetLabel = None, 
+                      macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False, 
                       ignoreDeps=False, logBuild=False, crossCompile = None,
-                      requireCleanSources = False,
-                      downloadOnly = False):
+                      requireCleanSources = False, downloadOnly = False,
+                      signatureKey = None):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -746,6 +755,9 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
+    @param signatureKey: GPG fingerprint for trove signing. If None, only
+    sha1 signatures are generated.
+    @type signatureKey: string
     @rtype: tuple
     """
     # 1. create the desired files in destdir and package info
@@ -772,7 +784,8 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                            recipeObj, sourceVersion,
                            targetLabel=targetLabel,
                            alwaysBumpCount=alwaysBumpCount,
-                           policyTroves=policyTroves)
+                           policyTroves=policyTroves,
+                           signatureKey = signatureKey)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
@@ -975,7 +988,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
 def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                             targetLabel=None, alwaysBumpCount=False,
-                            policyTroves=None):
+                            policyTroves=None, signatureKey = None):
     """ Helper function for cookPackage object.  See there for most
         parameter definitions. BldList is the list of
         components created by cooking a package recipe.  RecipeObj is
@@ -1049,6 +1062,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
     built = []
     packageList = []
+    perviousQuery = {}
     for buildPkg in bldList:
         # bldList only contains components
         compName = buildPkg.getName()
@@ -1059,23 +1073,53 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	(p, fileMap) = _createComponent(repos, buildPkg, targetVersion, ident)
 
 	built.append((compName, p.getVersion().asString(), p.getFlavor()))
-	packageList.append((p, fileMap))
+
+	packageList.append((None, p, fileMap))
         p.setSourceName(sourceName)
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
-	
+
+        _signTrove(p, signatureKey)
+
 	byDefault = recipeObj.byDefault(compName)
         grp.addTrove(compName, p.getVersion(), p.getFlavor(),
                      byDefault = byDefault)
         if byDefault:
             grp.setSize(grp.getSize() + p.getSize())
 
+    if not targetVersion.isOnLocalHost():
+        # this keeps cook and emerge branchs from showing up
+        searchBranch = targetVersion.branch()
+        previousVersions = repos.getTroveLeavesByBranch(
+                dict(
+                    ( x[1].getName(), { targetVersion.branch() : [ flavor ] } )
+                        for x in packageList ) )
+
+        needTroves = []
+        for name in previousVersions:
+            prevVersion = previousVersions[name].keys()[0]
+            prevFlavor = previousVersions[name][prevVersion][0]
+            needTroves.append((name, prevVersion, prevFlavor))
+
+        previousTroves = repos.getTroves(needTroves)
+        previousTroveDict = dict( (x[0][0], x[1]) for x in
+                                    itertools.izip(needTroves, previousTroves))
+
+        relativePackageList = []
+        needTroves = {}
+        for empty, p, fileMap in packageList:
+            oldTrove = previousTroveDict.get(p.getName(), None)
+            relativePackageList.append((oldTrove, p, fileMap))
+
+        packageList = relativePackageList
+
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:
         changeSet.addPrimaryTrove(packageName, targetVersion, flavor)
 
     for grp in grpMap.values():
+        _signTrove(grp, signatureKey)
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
 
