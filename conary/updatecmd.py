@@ -485,6 +485,13 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         # do depresolution on that job set to compare contents and warn
         # if contents have changed.
         params = sys.argv
+
+        # CNY-980: we should have the whole script of changes to perform in
+        # the restart directory (in the job list); if in migrate mode, re-exec
+        # as regular update
+        if migrate and 'migrate' in params:
+            params[params.index('migrate')] = 'update'
+
         params.extend(['--restart-info=%s' % restartDir])
         raise errors.ReexecRequired(
                 'Critical update completed, rerunning command...', params,
