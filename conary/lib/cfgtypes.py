@@ -108,14 +108,17 @@ CfgString = CfgType
 _pathCache = {}
 def Path(str):
     if str not in _pathCache:
-        if '~' not in str:
+        if '~' not in str and '$' not in str:
             p = _Path(str)
         else:
             p = _ExpandedPath(str)
         _pathCache[str] = p
         return p
-    else:
-        return _pathCache[str]
+    elif '~' in str or '$' in str:
+        p = _ExpandedPath(str)
+        if p != _pathCache[str]:
+            _pathCache[str] = p
+    return _pathCache[str]
 
 class _Path(str):
     __slots__ = []
