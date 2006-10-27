@@ -1179,6 +1179,7 @@ def merge(repos, versionSpec=None, callback=None):
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)
+        return 1
     fsJob.apply()
 
     newPkgs = fsJob.iterNewTroveList()

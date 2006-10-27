@@ -1,29 +1,41 @@
 Changes in @NEW@:
   o Client Changes:
-    * "conary help update" now works.
-    * Added getUpdateItemList() method to allow retrieval of top level troves 
-      on the local system. (CNY-1025)
-    * --tags will now display whether source files are autosource or not.
-    * --help options will now display a smaller number of flags by default,
-      and more when the --debug flag is added.
+    * "conary help [command]" now works displays the usage message for
+      the command.
+    * --help options will now display a smaller number of flags by
+      default, and more when the --debug flag is added.
+    * A getUpdateItemList() method has been added to the ConaryClient
+      class.  It returns a list of top level troves on the local
+      system. (CNY-1025)
+    * "conary rq package:source --tags" will now show an "autosource"
+      tag on autosourced files.
 
   o Build Changes:
-    * Files now have their refresh state reset after a commit
-    * Committing trove on longer downloads autosourced files which haven't 
-      changed (CNY-611, CNY-463)
-    * Files can now be moved form autosource to standard inclusion using
-      cvc add
-    * Files which are cvc removed will now be switched to autosourced if
-      appropriate (preserving the pathId)
-    * The autosource state is stored explicitly in CONARY files
-    * CONARY files now use textual identifiers for flags instead of digits
-    * cvc refresh only downloads refreshed files now instead of all autosource
-      files
-    * Removing files doesn't readd them any longer simply because they were in
-      the previous version and are present in the lookaside anymore (CNY-601)
-    * Conary now warns in the presence of unknown use flags in the buildFlavor
-      instead of erroring.  (It will still error if the unknown use flag
-      is accessed in the recipe).
+    * When using "cvc refresh" to refresh autosourced files, the
+      refresh flag is now reset after the commit.  Previously, the
+      file would continue to be refreshed on subsequent commits.
+    * When using "cvc commit", cvc no longer downloads autosourced
+      files which haven't changed (CNY-611, CNY-463)
+    * Files that were previously marked as autosource files can now be
+      made a regular file by calling "cvc add".
+    * When using "cvc remove" to remove a file from the local checkout
+      directory and the file is still specified in the recipe file as
+      being automatically downloaded, the file will now be switched to
+      an autosource file (preserving the pathId).
+    * The autosource state is now stored explicitly in CONARY files.
+    * CONARY files now use textual identifiers for flags instead of
+      digits.
+    * "cvc refresh" no longer downloads all autosource files.  Only
+      the file(s) specified are downloaded.
+    * Files removed with "cvc remove" are no longer erroneously
+      re-added when committing changes to the repository.  This used
+      to happen when the file was in the previous version of the
+      source component and also present in the lookaside
+      cache. (CNY-601)
+    * Conary now produces a warning when an unknown use flag is
+      specified in the buildFlavor configuration variable instead of
+      producing an error.  It will still produce an error if the
+      unknown use flag is accessed in the recipe.
     * Package builds now create relative changesets for components instead
       of absolute changesets, reducing the size of the upload to the
       repository (CNY-912)
@@ -31,6 +43,16 @@ Changes in @NEW@:
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an
       error message on update rather than corrupting the CONARY file (CNY-1024)
+    * Adding a file locally and then merging that file from upstream now
+      causes an error as expected (it would traceback before). (CNY-1021)
+    * Files added in both the repository and locally with cvc now give
+      an error message on update rather than corrupting the CONARY
+      file (CNY-1024)
+    * Adding a file locally and then merging that file from upstream
+      now causes an error as expected (it would traceback
+      before). (CNY-1021)
+    * Empty groups will not traceback if resolveDependencies is True --
+      they will display an error message as expected. (CNY-1030)
 
 Changes in 1.0.37:
   o Bugfixes:
