@@ -1745,7 +1745,7 @@ conary erase '%s=%s[%s]'
             (troveName, (oldVersionStr, oldFlavorStr),
                         (newVersionStr, newFlavorStr), isAbsolute) = item
             if not isAbsolute or troveName[0] == '-':
-                raise UpdateError('Cannot perform relative updates'
+                raise UpdateError('Cannot perform relative updates '
                                   'or erases as part of full migration')
             toFind.append((troveName, newVersionStr, newFlavorStr))
 
