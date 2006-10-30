@@ -55,6 +55,12 @@ CLIENT_VERSIONS = [ 36, 37 ]
 # including / (which is normally considered "safe" by urllib.quote)
 quote = lambda s: urllib.quote(s, safe='')
 
+# mask out the username and password for error messages
+def _cleanseUrl(protocol, url):
+    if url.find('@') != -1:
+        return protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
+    return url
+
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
@@ -233,7 +239,12 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__transport.setAbortCheck(check)
 
     def __init__(self, url, serverName, transporter, pwCallback, usedMap):
-        xmlrpclib.ServerProxy.__init__(self, url, transporter)
+        try:
+            xmlrpclib.ServerProxy.__init__(self, url, transporter)
+        except IOError, e:
+            proto, url = urllib.splittype(url)
+            raise errors.OpenError('Error occurred opening repository '
+                                   '%s: %s' % (_cleanseUrl(proto, url), e))
         self.__pwCallback = pwCallback
         self.__altHost = None
         self.__serverName = serverName
@@ -280,10 +291,6 @@ class ServerCache:
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)
-        def _cleanseUrl(protocol, url):
-            if url.find('@') != -1:
-                return protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
-            return url
 
 	server = self.cache.get(serverName, None)
         if server is not None:
