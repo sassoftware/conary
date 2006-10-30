@@ -585,7 +585,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
     docs = {'all'                : 'combine many common scs flags',
             'all-troves'         : 'display not-by-default troves', 
             'show-changes'       : ('(for relative changeset) display changes'
-                                    'that the relative changeset contains'),
+                                    ' that the relative changeset contains'),
             'recurse-repository' : (VERBOSE_HELP,
                                     'search the repository for troves not '
                                     'contained in the changeset when recursing')
