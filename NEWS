@@ -39,6 +39,8 @@ Changes in @NEW@:
     * Package builds now create relative changesets for components instead
       of absolute changesets, reducing the size of the upload to the
       repository (CNY-912)
+    * The download code in cvc now accepts cookies.  This is required
+      to download files from Colabnet sites. (CNY-321)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an

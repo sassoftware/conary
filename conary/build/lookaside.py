@@ -29,6 +29,7 @@ import os
 import socket
 import time
 import urllib2
+import cookielib
 
 # location is normally the package name
 networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://')
@@ -156,8 +157,12 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     log.info('Trying %s...', name)
     while retries < 5:
         try:
+            # set up a urlopener that tracks cookies to handle
+            # sites like Colabnet that want to set a session cookie
+            cj = cookielib.LWPCookieJar()
+            opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
             req = urllib2.Request(name, headers=httpHeaders)
-            url = urllib2.urlopen(req)
+            url = opener.open(req)
             if not name.startswith('ftp://'):
                 content_type = url.info()['content-type']
                 if (guessName or mirror) and 'text/html' in content_type:
