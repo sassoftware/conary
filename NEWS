@@ -41,6 +41,8 @@ Changes in @NEW@:
       repository (CNY-912)
     * The download code in cvc now accepts cookies.  This is required
       to download files from Colabnet sites. (CNY-321)
+    * The download code in cvc can now handle basic HTTP
+      authentication. (CNY-981)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an
