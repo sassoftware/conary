@@ -334,6 +334,10 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   installMissing = installMissing,
                   migrate = migrate, restartChangeSets = restartChangeSets, 
                   applyCriticalOnly = applyCriticalOnly)
+    # Clean up after ourselves
+    if restartInfo:
+        util.rmtree(restartInfo, ignore_errors=True)
+
 
 def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
@@ -542,8 +546,6 @@ def _loadRestartInfo(restartDir):
             newVersion = None
         finalJobSet.append((job[0], (oldVersion, job[1][1]), 
                             (newVersion, job[2][1]), job[3]))
-    # Clean up after ourselves
-    util.rmtree(restartDir, ignore_errors=True)
     return finalJobSet, changeSetList
 
 # we grab a url from the repo based on our version and flavor,
@@ -655,6 +657,9 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
                   keepRequired = keepRequired, 
                   applyCriticalOnly=applyCriticalOnly,
                   restartChangeSets=restartChangeSets, recurse=recurse)
+    # Clean up after ourselves
+    if restartInfo:
+        util.rmtree(restartInfo, ignore_errors=True)
 
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)
