@@ -286,6 +286,9 @@ class ConfigFile(_Config):
         except EnvironmentError, err:
             raise CfgEnvironmentError(err.filename, err.strerror)
 
+        # We're done with this config file, remove it from the include stack
+        self._configFileStack.remove(path)
+
     def _openPath(self, path, exception=True):
         if os.path.exists(path):
             try:
