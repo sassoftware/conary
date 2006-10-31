@@ -542,6 +542,8 @@ def _loadRestartInfo(restartDir):
             newVersion = None
         finalJobSet.append((job[0], (oldVersion, job[1][1]), 
                             (newVersion, job[2][1]), job[3]))
+    # Clean up after ourselves
+    util.rmtree(restartDir, ignore_errors=True)
     return finalJobSet, changeSetList
 
 # we grab a url from the repo based on our version and flavor,
