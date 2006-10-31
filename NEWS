@@ -64,6 +64,7 @@ Changes in @NEW@:
       explicitly specified when re-execing after critical updates.
       Previously, the migration failed if a critical update was
       applied. (CNY-980)
+    * Avoid infinite loops when including configuration files. (CNY-914)
 
 
 Changes in 1.0.37:
