@@ -408,15 +408,23 @@ class ChangeSetJob:
 		else:
 		    diff = cs.getFileChange(oldFileId, fileId)
                     if diff is None:
-                        # XXX we really should check to make sure this file
-                        # is already present rather then just blindly
-                        # skipping over it. we do make sure fileHostFilter
-                        # is empty though, keeping this skip from occuring
-                        # on databases
+                        if not fileHostFilter:
+                            # We are trying to commit to a database, but the
+                            # diff returned nothing
+                            raise KeyError
+
+                        # Make sure the file is present in the repository
+                        if newVersion.getHost() in fileHostFilter:
+                            # Is the file in this repository?
+                            try:
+                                fileObj = repos.getFileVersion(pathId,
+                                    fileId, newVersion, withContents=False)
+                            except errors.FileStreamMissing:
+                                # Missing from the repo; raise exception
+                                raise errors.IntegrityError(
+                                    "Incomplete changeset specified")
                         fileObj = None
                         fileStream = None
-                        if not fileHostFilter:
-                            raise KeyError
                     else:
                         restoreContents = 1
                         if oldVersion:
