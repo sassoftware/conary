@@ -66,6 +66,8 @@ Changes in @NEW@:
       applied. (CNY-980)
     * Avoid infinite loops when including configuration files. (CNY-914)
     * Clean up after a critical update has been performed. (CNY-1012)
+    * Do not allow for incomplete changesets to be checked in. (CNY-749)
+
 
 
 Changes in 1.0.37:
