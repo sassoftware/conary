@@ -182,7 +182,9 @@ class Config(policy.Policy):
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
-        # for :config component
+        # for :config component, ComponentSpec must run after Config
+        # Otherwise, this policy would follow PackageSpec and just set isConfig
+        # on each config file
         ('ComponentSpec', policy.REQUIRED_SUBSEQUENT),
     )
     invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
@@ -407,10 +409,16 @@ class PackageSpec(_filterSpec):
             self.recipe.packages[newTrove] = True
         _filterSpec.updateArgs(self, *args, **keywords)
 
-    def doProcess(self, recipe):
-	pkgFilters = []
-	self.macros = recipe.macros
-	self.rootdir = self.rootdir % self.macros
+    def preProcess(self):
+        self.pkgFilters = []
+        recipe = self.recipe
+        self.destdir = recipe.macros.destdir
+        if self.exceptions:
+            self.warn('PackageSpec does not honor exceptions')
+            self.exceptions = None
+        if self.inclusions:
+            # would have an effect only with exceptions listed, so no warning...
+            self.inclusions = None
 
 	for (filteritem) in self.extraFilters:
 	    name = filteritem[0] % self.macros
@@ -418,20 +426,23 @@ class PackageSpec(_filterSpec):
                 self.error('%s is not a valid package name', name)
 
 	    filterargs = self.filterExpression(filteritem[1:], name=name)
-	    pkgFilters.append(filter.Filter(*filterargs))
+	    self.pkgFilters.append(filter.Filter(*filterargs))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
-	pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
+	self.pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
 
 	# OK, all the filters exist, build an autopackage object that
 	# knows about them
 	recipe.autopkg = buildpackage.AutoBuildPackage(
-	    pkgFilters, self.compFilters, recipe)
+	    self.pkgFilters, self.compFilters, recipe)
+        self.autopkg = recipe.autopkg
 
+    def doFile(self, path):
 	# now walk the tree -- all policy classes after this require
 	# that the initial tree is built
-        recipe.autopkg.walk(self.macros['destdir'])
+        self.autopkg.addFile(path, self.destdir + path)
 
+    def postProcess(self):
         # flag all config files
         for confname in self.configFiles:
             self.recipe.autopkg.pathMap[confname].flags.isConfig(True)

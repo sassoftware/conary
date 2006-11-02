@@ -304,29 +304,3 @@ class AutoBuildPackage:
             if self.components[componentName].keys(): # if has files
                 l.append(self.components[componentName])
         return l
-            
-    def walk(self, root):
-        """
-        Traverse the directory tree specified by @C{root}, adding file
-        entries to the BuildComponent
-
-        @param root: root of path to walk
-        @type root: str
-        @rtype: None
-        """
-        os.path.walk(root, self._autoVisit, root)
-
-    def _autoVisit(self, root, dir, files):
-        """
-        Helper function called by os.path.walk() when AutoBuildPackage.walk()
-        is called
-        """
-        dir = dir[len(root):]
-
-        for file in files:
-            if dir:
-                path = dir + '/' + file
-            else:
-                path = '/' + file
-
-            self.addFile(path, root + path)
