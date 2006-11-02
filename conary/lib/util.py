@@ -583,6 +583,18 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
         dir = _tempdir
     return tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=dir, text=text)
 
+def verFormat(cfg, version):
+    """Format the version according to the options in the cfg object"""
+    if cfg.fullVersions:
+        return str(version)
+    if cfg.showLabels:
+        ret = "%s/%s" % (version.branch().label(), version.trailingRevision())
+        return ret
+    # If the branch is matching the install label, don't bother to show it
+    if version.branch().label() == cfg.installLabel:
+        return version.trailingRevision().asString()
+    return version.asString()
+
 class NestedFile:
 
     def close(self):
