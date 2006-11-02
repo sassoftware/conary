@@ -9,6 +9,8 @@ Changes in @NEW@:
       system. (CNY-1025)
     * "conary rq package:source --tags" will now show an "autosource"
       tag on autosourced files.
+    * Conary now correctly uses "KB/s" instead of "Kb/s" when
+      displaying transfer rates. (CNY-330)
 
   o Build Changes:
     * When using "cvc refresh" to refresh autosourced files, the
