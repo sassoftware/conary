@@ -25,32 +25,42 @@ def listRollbacks(db, cfg):
 	    return version.trailingRevision().asString()
 	return version.asString()
 
-    for rollbackName in reversed(db.getRollbackList()):
-	print "%s:" % rollbackName
+    # Display template
+    templ = "\t%9s: %s %s"
 
-	rb = db.getRollback(rollbackName)
-	for cs in rb.iterChangeSets():
+    for rollbackName in reversed(db.getRollbackList()):
+        print "%s:" % rollbackName
+
+        rb = db.getRollback(rollbackName)
+        for cs in rb.iterChangeSets():
             newList = []
             for pkg in cs.iterNewTroveList():
                 newList.append((pkg.getName(), pkg.getOldVersion(),
                                 pkg.getNewVersion()))
             oldList = [ x[0:2] for x in cs.getOldTroveList() ]
 
-	    newList.sort()
-	    oldList.sort()
-	    for (name, oldVersion, newVersion) in newList:
-		if not oldVersion:
-		    print "\t%s %s removed" % (name, 
-					       verStr(cfg, newVersion))
-		else:
-		    print "\t%s %s -> %s" % \
-			(name, verStr(cfg, oldVersion),
-			       verStr(cfg, newVersion))
+            newList.sort()
+            oldList.sort()
+            for (name, oldVersion, newVersion) in newList:
+                if newVersion.onLocalLabel():
+                    # Don't display changes to local branch
+                    continue
+                if not oldVersion:
+                    print templ % ('erased', name, verStr(cfg, newVersion))
+                else:
+                    ov = oldVersion.trailingRevision()
+                    nv = newVersion.trailingRevision()
+                    if newVersion.onRollbackLabel() and ov == nv:
+                        # Avoid displaying changes to rollback branch
+                        continue
+                    pn = "%s -> %s" % (verStr(cfg, newVersion),
+                                       verStr(cfg, oldVersion))
+                    print templ % ('updated', name, pn)
 
-	    for (name, version) in oldList:
-		print "\t%s %s added" %  (name, verStr(cfg, version))
+            for (name, version) in oldList:
+                print templ % ('installed', name, verStr(cfg, version))
 
-	print
+        print
 
 def apply(db, cfg, rollbackSpec, **kwargs):
     client = conaryclient.ConaryClient(cfg)
