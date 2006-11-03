@@ -2089,7 +2089,7 @@ class Provides(_dependency):
             # can't actually specify what to provide, just that it provides...
             f.flags.isPathDependencyTarget(True)
 
-        if provision.startswith("abi:"):
+        elif provision.startswith("abi:"):
             abistring = provision[4:].strip()
             op = abistring.index('(')
             abi = abistring[:op]
@@ -2098,7 +2098,7 @@ class Provides(_dependency):
             self._addDepToMap(path, pkg.providesMap, deps.AbiDependency,
                 deps.Dependency(abi, flags))
 
-        if provision.startswith("soname:"):
+        elif provision.startswith("soname:"):
             sm, finalpath = self._symlinkMagic(path, fullpath, macros, m)
             if self._isELF(sm):
                 # Only ELF files can provide sonames.
@@ -2115,6 +2115,10 @@ class Provides(_dependency):
                 if '/' in soname:
                     basedir, soname = soname.rsplit('/', 1)
                 self._ELFAddProvide(path, sm, pkg, soname=soname, soflags=soflags)
+        else:
+            self.error('Provides %s for file %s does not start with one of'
+                       ' "file", "abi:", or "soname"',
+                       provision, path)
 
 
 class Requires(_addInfo, _dependency):
@@ -2770,7 +2774,8 @@ class Requires(_addInfo, _dependency):
         if depClass == deps.FileDependencies:
             pathMap = self.recipe.autopkg.pathMap
             componentMap = self.recipe.autopkg.componentMap
-            if info in pathMap and info not in componentMap[info].providesMap:
+            if (info in pathMap and not
+                componentMap[info][info][1].flags.isPathDependencyTarget()):
                 # if a package requires a file, includes that file,
                 # and does not provide that file, it should error out
                 self.error('%s requires %s, which is included but not'
