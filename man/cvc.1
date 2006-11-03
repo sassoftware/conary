@@ -274,6 +274,18 @@ signatureKeyMap settings specified in config files. The repositories affected
 must recognize the OpenPGP key(s) that made the trove signature(s) or the 
 respective signatures will be rejected.
 .TP
+.B status
+This command displays the status of changed files in the working directory.
+Synonyms:  \fBstat\fP, \fBst\fP
+
+.nf
+The following are possible file status codes returned by \fBstatus\fP:
+A = added
+M = modified
+R = removed
+? = not tracked
+.fi
+.TP
 .B update [\fI<version>\fP]
 Updates the current source directory to the latest version, or to
 \fI<version>\fP if specified.  Merges changes when possible.
