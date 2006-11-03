@@ -893,6 +893,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def createChangeSetFile(self, jobList, fName, recurse = True,
                             primaryTroveList = None, callback = None):
+        """
+        @raise FilesystemError: if the destination file is not writable
+        """
         return self._getChangeSet(jobList, target = fName,
                                   recurse = recurse,
                                   primaryTroveList = primaryTroveList,
@@ -1105,7 +1108,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         filesNeeded = []
 
         if target:
-            outFile = open(target, "w+")
+            try:
+                outFile = open(target, "w+")
+            except IOError, e:
+                raise errors.FilesystemError(e.errno, e.filename, e.strerror)
         else:
             (outFd, tmpName) = util.mkstemp()
             outFile = os.fdopen(outFd, "w+")

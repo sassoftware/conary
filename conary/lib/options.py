@@ -676,9 +676,9 @@ class MainHandler(object):
         thisCommand.setParser(parser)
         argSet.update(newArgSet)
         thisCommand.processConfigOptions(cfg, cfgMap, argSet)
-        self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)
+        return self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)
 
     def runCommand(self, thisCommand, *args, **kw):
-        thisCommand.runCommand(*args, **kw)
+        return thisCommand.runCommand(*args, **kw)
 
 

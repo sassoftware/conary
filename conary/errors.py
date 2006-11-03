@@ -68,6 +68,9 @@ class WebError(ConaryError):
     """ Base class for errors with the web client """
     pass
 
+class FilesystemError(ConaryError):
+    """Base class for errors that are filesystem-specific"""
+
 class TroveNotFound(ConaryError):
     """Returned from findTrove when no trove is matched"""
 
