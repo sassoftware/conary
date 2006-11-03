@@ -70,6 +70,11 @@ class WebError(ConaryError):
 
 class FilesystemError(ConaryError):
     """Base class for errors that are filesystem-specific"""
+    def __init__(self, errorCode, path, errorString, *args, **kwargs):
+        self.errorCode = errorCode
+        self.path = path
+        self.errorString = errorString
+        ConaryError.__init__(self, *args, **kwargs)
 
 class TroveNotFound(ConaryError):
     """Returned from findTrove when no trove is matched"""

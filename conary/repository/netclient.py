@@ -1111,7 +1111,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             try:
                 outFile = open(target, "w+")
             except IOError, e:
-                raise errors.FilesystemError(e.errno, e.filename, e.strerror)
+                strerr = "Error writing to file %s: %s" % (e.filename,
+                    e.strerror)
+                raise errors.FilesystemError(e.errno, e.filename, e.strerror,
+                    strerr)
         else:
             (outFd, tmpName) = util.mkstemp()
             outFile = os.fdopen(outFd, "w+")
