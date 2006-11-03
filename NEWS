@@ -76,6 +76,8 @@ Changes in @NEW@:
     * Avoid infinite loops when including configuration files. (CNY-914)
     * Clean up after a critical update has been performed. (CNY-1012)
     * Do not allow for incomplete changesets to be checked in. (CNY-749)
+    * Raise an exception if trying to write a changeset file to something
+      that cannot be written (directory, read-only file etc). (CNY-903)
 
 
 
