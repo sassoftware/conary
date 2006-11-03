@@ -625,7 +625,7 @@ _register(SetCommand)
 
 class StatCommand(CvcCommand):
     
-    commands = ['stat', 'st']
+    commands = ['status', 'stat', 'st']
     help = 'Show changed files in the working directory'
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
