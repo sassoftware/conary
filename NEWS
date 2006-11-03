@@ -47,6 +47,9 @@ Changes in @NEW@:
       to download files from Colabnet sites. (CNY-321)
     * The download code in cvc can now handle basic HTTP
       authentication. (CNY-981)
+    * Shared libraries and symlinks to shared libraries provide their
+      filenames as soname dependency provisions, as well as DT_SONAME
+      records listed within the shared library, if any. (CNY-699)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an
