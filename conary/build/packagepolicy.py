@@ -19,6 +19,7 @@ import itertools
 import os
 import re
 import site
+import sre_constants
 import stat
 import sys
 
@@ -2278,10 +2279,15 @@ class Requires(_addInfo, _dependency):
                                    for x in file('/etc/ld.so.conf').readlines())
         self.rpathFixup = [(filter.Filter(x, macros), y % macros)
                            for x, y in self.rpathFixup]
-        self.exceptDeps = [(filter.Filter(x, macros), re.compile(y % macros))
-                          for x, y in self.exceptDeps]
         self.PkgConfigRe = re.compile(
             r'(%(libdir)s|%(datadir)s)/pkgconfig/.*\.pc$' %macros)
+        exceptDeps = []
+        for fE, rE in self.exceptDeps:
+            try:
+                exceptDeps.append((filter.Filter(fE, macros), re.compile(rE % macros)))
+            except sre_constants.error, e:
+                self.error('Bad regular expression %s for file spec %s: %s', rE, fE, e)
+        self.exceptDeps= exceptDeps
         _dependency.preProcess(self)
 
     def doFile(self, path):

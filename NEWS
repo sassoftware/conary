@@ -50,6 +50,8 @@ Changes in @NEW@:
     * Shared libraries and symlinks to shared libraries provide their
       filenames as soname dependency provisions, as well as DT_SONAME
       records listed within the shared library, if any. (CNY-699)
+    * Malformed regular expressions passed as exceptDeps arguments to
+      the r.Requires policy are now reported gracefully. (CNY-942)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an
