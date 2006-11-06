@@ -22,10 +22,10 @@ from conary import changelog
 class FetchCallback(callbacks.LineOutput, callbacks.FetchCallback):
     def fetch(self, got, need):
         if need == 0:
-            self._message("Downloading source (%dKb at %dKb/sec)..." \
+            self._message("Downloading source (%dKB at %dKB/sec)..." \
                           % (got/1024, self.rate/1024))
         else:
-            self._message("Downloading source (%dKb (%d%%) of %dKb at %dKb/sec)..." \
+            self._message("Downloading source (%dKB (%d%%) of %dKB at %dKB/sec)..." \
                           % (got/1024, (got*100)/need , need/1024, self.rate/1024))
 
     def __init__(self, *args, **kw):
@@ -42,10 +42,10 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
 
     def downloadingFileContents(self, got, need):
         if need == 0:
-            self._message("Downloading file (%dKb at %dKb/sec)..." \
+            self._message("Downloading file (%dKB at %dKB/sec)..." \
                           % (got/1024, self.rate/1024))
         else:
-            self._message("Downloading file (%dKb (%d%%) of %dKb at %dKb/sec)..." \
+            self._message("Downloading file (%dKB (%d%%) of %dKB at %dKB/sec)..." \
                           % (got/1024, (got*100)/need , need/1024, self.rate/1024))
     def downloadingChangeSet(self, got, need):
         self._downloading('Downloading', got, self.rate, need)
@@ -55,14 +55,14 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
             self.csText = None
         elif need != 0:
             if self.csHunk[1] < 2 or not self.updateText:
-                self.csMsg("%s %dKb (%d%%) of %dKb at %dKb/sec"
+                self.csMsg("%s %dKB (%d%%) of %dKB at %dKB/sec"
                            % (msg, got/1024, (got*100)/need, need/1024, rate/1024))
             else:
-                self.csMsg("%s %d of %d: %dKb (%d%%) of %dKb at %dKb/sec"
+                self.csMsg("%s %d of %d: %dKB (%d%%) of %dKB at %dKB/sec"
                            % ((msg,) + self.csHunk + \
                               (got/1024, (got*100)/need, need/1024, rate/1024)))
         else: # no idea how much we need, just keep on counting...
-            self.csMsg("%s (got %dKb at %dKb/s so far)" % (msg, got/1024, rate/1024))
+            self.csMsg("%s (got %dKB at %dKB/s so far)" % (msg, got/1024, rate/1024))
 
         self.update()
 
@@ -73,11 +73,11 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
     def sendingChangeset(self, got, need):
         if need != 0:
             self._message("Committing changeset "
-                          "(%dKb (%d%%) of %dKb at %dKb/sec)..."
+                          "(%dKB (%d%%) of %dKB at %dKB/sec)..."
                           % (got/1024, (got*100)/need, need/1024, self.rate/1024))
         else:
             self._message("Committing changeset "
-                          "(%dKb at %dKb/sec)..." % (got/1024, self.rate/1024))
+                          "(%dKB at %dKB/sec)..." % (got/1024, self.rate/1024))
 
 
     def update(self):

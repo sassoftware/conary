@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -20,7 +20,8 @@ mirror_files =	\
                 kde \
                 sourceforge \
                 gnu \
-                cpan
+                cpan \
+                gnome
 
 
 dist_files = Makefile $(mirror_files)

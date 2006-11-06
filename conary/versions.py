@@ -561,6 +561,7 @@ class CookLabel(StaticLabel):
 staticLabelTable[LocalLabel.name] = LocalLabel
 staticLabelTable[EmergeLabel.name] = EmergeLabel
 staticLabelTable[CookLabel.name] = CookLabel
+staticLabelTable[RollbackLabel.name] = RollbackLabel
 
 class AbstractVersion(object):
 

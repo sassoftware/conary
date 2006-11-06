@@ -74,20 +74,6 @@ class BuildComponent(dict):
             # permissions have been recorded
             os.chmod(realPath, f.inode.perms() | 0400)
 
-        if f.hasContents and isinstance(f, files.RegularFile):
-            results = elf.inspect(realPath)
-            if results != None:
-                requires, provides = results
-                abi = None
-                for depClass, main, flags in requires:
-                    if depClass == 'abi':
-                        abi = (main, flags)
-                        self.isnsetMap[path] = flags[1]
-                        break
-
-                self.requiresMap[path] = self.getDepsFromElf(requires, abi)
-                self.providesMap[path] = self.getDepsFromElf(provides, abi)
-
         if linkCount > 1:
             if f.hasContents:
                 l = self.linkGroups.get(inode, [])
@@ -100,32 +86,6 @@ class BuildComponent(dict):
                     # no hardlinks allowed for special files other than dirs
                     self.badhardlinks.append(path)
         return f
-
-    def getDepsFromElf(self, elfinfo, abi):
-        """
-        Add dependencies from ELF information.
-
-        @param elfinfo: List provided by C{lib.elf.inspect()}
-        @param abi: tuple of abi information to blend into soname dependencies
-        """
-	depSet = deps.DependencySet()
-	for (depClass, main, flags) in elfinfo:
-            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
-	    if depClass == 'soname':
-                if '/' in main:
-                    main = os.path.basename(main)
-                assert(abi)
-                curClass = deps.SonameDependencies
-                flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
-                dep = deps.Dependency(abi[0] + "/" + main, flags)
-	    elif depClass == 'abi':
-		curClass = deps.AbiDependency
-                dep = deps.Dependency(main, flags)
-	    else:
-		assert(0)
-
-	    depSet.addDep(curClass, dep)
-        return depSet
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -188,7 +148,6 @@ class BuildComponent(dict):
         self.linkGroups = {}
         self.requiresMap = {}
         self.providesMap = {}
-        self.isnsetMap = {}
         self.hardlinks = []
         self.badhardlinks = []
         self.recipe = recipe
@@ -304,29 +263,3 @@ class AutoBuildPackage:
             if self.components[componentName].keys(): # if has files
                 l.append(self.components[componentName])
         return l
-            
-    def walk(self, root):
-        """
-        Traverse the directory tree specified by @C{root}, adding file
-        entries to the BuildComponent
-
-        @param root: root of path to walk
-        @type root: str
-        @rtype: None
-        """
-        os.path.walk(root, self._autoVisit, root)
-
-    def _autoVisit(self, root, dir, files):
-        """
-        Helper function called by os.path.walk() when AutoBuildPackage.walk()
-        is called
-        """
-        dir = dir[len(root):]
-
-        for file in files:
-            if dir:
-                path = dir + '/' + file
-            else:
-                path = '/' + file
-
-            self.addFile(path, root + path)

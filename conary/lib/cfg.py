@@ -250,8 +250,14 @@ class ConfigFile(_Config):
     def __init__(self):
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
+        self._configFileStack = set()
 
     def readObject(self, path, f):
+        if path in self._configFileStack:
+            # File was already processed, most likely an include loop
+            # This should also handle loops in URLs
+            return
+        self._configFileStack.add(path)
         # path is used for generating error messages
         try:
             lineno = 1
@@ -279,6 +285,9 @@ class ConfigFile(_Config):
             raise CfgEnvironmentError(path, err.reason.args[1])
         except EnvironmentError, err:
             raise CfgEnvironmentError(err.filename, err.strerror)
+
+        # We're done with this config file, remove it from the include stack
+        self._configFileStack.remove(path)
 
     def _openPath(self, path, exception=True):
         if os.path.exists(path):

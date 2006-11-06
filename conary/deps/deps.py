@@ -744,6 +744,15 @@ class UseDependency(DependencyClass):
     depNameSignificant = False
 _registerDepClass(UseDependency)
 
+def UnknownDependencyFactory(intTag):
+    # Factory for unknown classes
+    class _UnknownDependency(DependencyClass):
+        tag = intTag
+        tagName = "unknown-%s" % intTag
+        depClass = Dependency
+        justOne = False
+    return _UnknownDependency
+
 class DependencySet(object):
 
     __slots__ = ( 'members', 'hash' )
@@ -999,7 +1008,10 @@ def _Thaw(depSet, frz):
     depSetSplit = misc.depSetSplit
     while i < len(frz):
         (i, tag, frozen) = depSetSplit(i, frz)
-        depClass = dependencyClasses[tag]
+        if tag in dependencyClasses:
+            depClass = dependencyClasses[tag]
+        else:
+            depClass = UnknownDependencyFactory(tag)
         a(depClass, depClass.thawDependency(frozen))
     return depSet
 

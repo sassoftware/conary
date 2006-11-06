@@ -12,45 +12,68 @@
 # full details.
 #
 
+import sys
+
 from conary import conaryclient
-from conary.lib import log
+from conary.lib import log, util
 from conary.local import database
 
 def listRollbacks(db, cfg):
-    def verStr(cfg, version):
-	if version.onLocalLabel():
-	    return "local"
+    # Generator for the rollback data
+    def _generator():
+        for rollbackName in reversed(db.getRollbackList()):
+            rb = db.getRollback(rollbackName)
+            yield (rollbackName, rb)
 
-	if version.branch().label() == cfg.installLabel:
-	    return version.trailingRevision().asString()
-	return version.asString()
+    return formatRollbacks(cfg, _generator(), stream=sys.stdout)
 
-    for rollbackName in reversed(db.getRollbackList()):
-	print "%s:" % rollbackName
 
-	rb = db.getRollback(rollbackName)
-	for cs in rb.iterChangeSets():
+def formatRollbacks(cfg, rollbacks, stream=None):
+    # Formatter function
+
+    if stream is None:
+        stream = sys.stdout
+
+    verStr = util.verFormat
+
+    # Display template
+    templ = "\t%9s: %s %s\n"
+
+    # Shortcut
+    w_ = stream.write
+
+    for (rollbackName, rb) in rollbacks:
+        w_("%s:\n" % rollbackName)
+
+        for cs in rb.iterChangeSets():
             newList = []
             for pkg in cs.iterNewTroveList():
                 newList.append((pkg.getName(), pkg.getOldVersion(),
                                 pkg.getNewVersion()))
             oldList = [ x[0:2] for x in cs.getOldTroveList() ]
 
-	    newList.sort()
-	    oldList.sort()
-	    for (name, oldVersion, newVersion) in newList:
-		if not oldVersion:
-		    print "\t%s %s removed" % (name, 
-					       verStr(cfg, newVersion))
-		else:
-		    print "\t%s %s -> %s" % \
-			(name, verStr(cfg, oldVersion),
-			       verStr(cfg, newVersion))
+            newList.sort()
+            oldList.sort()
+            for (name, oldVersion, newVersion) in newList:
+                if newVersion.onLocalLabel():
+                    # Don't display changes to local branch
+                    continue
+                if not oldVersion:
+                    w_(templ % ('erased', name, verStr(cfg, newVersion)))
+                else:
+                    ov = oldVersion.trailingRevision()
+                    nv = newVersion.trailingRevision()
+                    if newVersion.onRollbackLabel() and ov == nv:
+                        # Avoid displaying changes to rollback branch
+                        continue
+                    pn = "%s -> %s" % (verStr(cfg, newVersion),
+                                       verStr(cfg, oldVersion))
+                    w_(templ % ('updated', name, pn))
 
-	    for (name, version) in oldList:
-		print "\t%s %s added" %  (name, verStr(cfg, version))
+            for (name, version) in oldList:
+                w_(templ % ('installed', name, verStr(cfg, version)))
 
-	print
+        w_('\n')
 
 def apply(db, cfg, rollbackSpec, **kwargs):
     client = conaryclient.ConaryClient(cfg)

@@ -11,7 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.errors import ConaryError, InternalConaryError
+from conary.errors import ConaryError, FilesystemError, InternalConaryError
 from conary.errors import RepositoryError, TroveNotFound, InvalidRegex
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.trove import TroveError

@@ -46,6 +46,7 @@ class ELF(Magic):
         for req in requires:
             if req[0] == 'abi':
                 self.contents['abi'] = req[1:]
+                self.contents['isnset'] = req[2][1]
         for prov in provides:
             if prov[0] == 'soname':
                 self.contents['soname'] = prov[1]
@@ -157,7 +158,7 @@ def magic(path, basedir=''):
 	basedir += '/'
 
     n = basedir+path
-    if not util.isregular(n):
+    if not util.exists(n) or not util.isregular(n):
 	return None
 
     oldmode = None
