@@ -71,7 +71,7 @@ elif otherArgs[1] == 'create-class':
     repos.addEntitlementGroup(otherArgs[2], otherArgs[3], otherArgs[4])
 elif otherArgs[1] == 'delete-entitlement':
     if len(otherArgs) != 5: usage()
-    repos.deleteEntitlement(otherArgs[2], otherArgs[3], [ otherArgs[4] ])
+    repos.deleteEntitlements(otherArgs[2], otherArgs[3], [ otherArgs[4] ])
 elif otherArgs[1] == 'list-entitlements':
     if len(otherArgs) != 4: usage()
     print "\n".join(repos.listEntitlements(otherArgs[2], otherArgs[3]))
