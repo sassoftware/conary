@@ -928,11 +928,7 @@ class TroveSourceStack(SearchableTroveSource):
     def __init__(self, *sources):
         self.sources = []
         for source in sources:
-            if isinstance(source, TroveSourceStack):
-                for subSource in source.iterSources():
-                    self.addSource(source)
-            else:
-                self.addSource(source)
+            self.addSource(source)
 
     def requiresLabelPath(self):
         for source in self.iterSources():
@@ -941,7 +937,15 @@ class TroveSourceStack(SearchableTroveSource):
         return False
 
     def addSource(self, source):
-        if source is not None and source not in self:
+        if source is None:
+            return
+
+        if isinstance(source, TroveSourceStack):
+            for subSource in source.iterSources():
+                self.addSource(subSource)
+            return
+
+        if source not in self:
             self.sources.append(source)
 
     def insertSource(self, source, idx=0):
@@ -1157,7 +1161,7 @@ def stack(*sources):
     if len(sources) > 2:
         return stack(sources[0], stack(*sources[1:]))
     elif len(sources) == 1:
-        return sources[1]
+        return sources[0]
     elif not sources:
         return None
     else:
@@ -1178,11 +1182,11 @@ def stack(*sources):
         source1.addSource(source2)
         return source1
     elif isinstance(source2, TroveSourceStack):
-        if source2.hasSource(source1):
-            return source2
-        source2 = source2.copy()
-        source2.insertSource(source1)
-        return source2
+        # addSource will do the proper thing to add source2's sources to
+        # the stack
+        s = TroveSourceStack(source1)
+        s.addSource(source2)
+        return s
     return TroveSourceStack(*sources)
 
 class AbstractJobSource(AbstractTroveSource):
