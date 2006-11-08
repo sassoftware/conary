@@ -227,7 +227,7 @@ class CommitCommand(CvcCommand):
     docs = {'message':'Use MESSAGE to describe why the commit was performed',
             'test':   ('Runs through all the steps of committing but does not '
                        'modify the repository'),
-            'logfile': 'Read the commit message from file LOGFILE (use - for '
+            'log-file':'Read the commit message from file LOGFILE (use - for '
                        'standard input)',
     }
     # allow "cvc commit -m'foo bar'" to work
@@ -236,7 +236,7 @@ class CommitCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
-        argDef["logfile"] = '-l', ONE_PARAM
+        argDef["log-file"] = '-l', ONE_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -244,13 +244,13 @@ class CommitCommand(CvcCommand):
         level = log.getVerbosity()
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        logfile = argSet.pop("logfile", None)
+        logfile = argSet.pop("log-file", None)
         sourceCheck = True
 
         if argSet or len(args) != 1: return self.usage()
 
         if message and logfile:
-            raise errors.ConaryError("options --message and --logfile are "
+            raise errors.ConaryError("options --message and --log-file are "
                 "mutually exclusive")
         if logfile:
             # Read the checkin message from the file

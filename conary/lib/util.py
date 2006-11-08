@@ -517,10 +517,20 @@ class ObjectCache(dict):
         return dict.setdefault(self, ref(key, self._remove), ref(value))()
 
 def memsize():
-    pfn = "/proc/%d/status" % os.getpid()
-    lines = open(pfn).readlines()
-    f = lines[10].split()
-    return int(f[1])
+    return memusage()[0]
+
+def memusage():
+    pfn = "/proc/self/statm"
+    line = open(pfn).readline()
+    # Assume page size is 4k (true for i386). This can be adjusted by reading
+    # resource.getpagesize() 
+    arr = [ 4 * int(x) for x in line.split()[:6] ]
+    vmsize, vmrss, vmshared, text, lib, data = arr
+
+    # The RHS in the following description is the fields in /proc/self/status
+    # text is VmExe
+    # data is VmData + VmStk
+    return vmsize, vmrss, vmshared, text, lib, data
 
 def createLink(src, to):
     name = os.path.basename(to)

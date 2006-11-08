@@ -15,6 +15,7 @@
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
 """
+import imp
 import itertools
 import os
 import re
@@ -27,7 +28,7 @@ from conary import files, trove
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.deps import deps
-from conary.lib import elf, util, log, pydeps
+from conary.lib import elf, util, log, pydeps, graph
 from conary.local import database
 
 from elementtree import ElementTree
@@ -268,46 +269,6 @@ class ComponentSpec(_filterSpec):
         ('Config', policy.REQUIRED_PRIOR),
         ('PackageSpec', policy.REQUIRED_SUBSEQUENT),
     )
-    invariantFilters = (
-        # These must never be overridden; keeping this separate allows for
-        # r.ComponentSpec('runtime', '.*')
-	('test',      ('%(testdir)s/')),
-	('debuginfo', ('%(debugsrcdir)s/',
-		       '%(debuglibdir)s/')),
-    )
-    # FIXME: baseFilters should be initialized like macros at some point
-    baseFilters = (
-        # development docs go in :devel
-        ('devel',     ('%(mandir)s/man(2|3)/')),
-	# note that gtk-doc is not well-named; it is a shared system, like info,
-	# and is used by unassociated tools (devhelp).  This line needs to
-        # come first because "lib" in these paths should not mean :lib
-	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info|ri|javadoc)/')),
-	# automatic subpackage names and sets of regexps that define them
-	# cannot be a dictionary because it is ordered; first match wins
-	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
-        # python is potentially architecture-specific because of %(lib)
-	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),
-        # perl is potentially architecture-specific because of %(lib)
-	('perl',      ('/usr/(%(lib)s|lib)/perl.*/(vendor|site)_perl/')),
-        # devellib is architecture-specific
-        ('devellib',  (r'\.so',), stat.S_IFLNK),
-	('devellib',  (r'\.a',
-                       '(%(libdir)s|%(datadir)s)/pkgconfig/')),
-        # devel is architecture-generic -- no %(lib)s/%(libdir)s
-        ('devel',     (r'.*/include/.*\.h',
-		       '%(includedir)s/',
-		       '%(datadir)s/aclocal/',
-		       '%(bindir)s/..*-config')),
-	('locale',    ('%(datadir)s/locale/',
-		       '%(datadir)s/gnome/help/.*/')),
-	('emacs',     ('%(datadir)s/emacs/site-lisp/',)),
-        # Anything else in /usr/share should be architecture-independent
-        # data files (thus the "datadir" name)
-        ('data',      ('%(datadir)s/',)),
-        # Anything in {,/usr}/lib{,64} is architecture-specific
-        ('lib',       (r'.*/(%(lib)s|lib)/')),
-    )
     keywords = { 'catchall': 'runtime' }
 
     def __init__(self, *args, **keywords):
@@ -316,24 +277,24 @@ class ComponentSpec(_filterSpec):
         unassigned files.  Default: C{runtime}
         """
         _filterSpec.__init__(self, *args, **keywords)
+        self.configFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
             config=keywords.pop('_config')
             self.recipe.PackageSpec(_config=config)
-            # disable creating the automatic :config component
-            # until/unless we handle files moving between
-            # components
-            #self.extraFilters.append(('config', re.escape(config)))
+            if self.recipe.cfg.configComponent:
+                self.configFilters.append(('config', re.escape(config)))
 
         if args:
             name = args[0]
             if ':' in name:
                 package, name = name.split(':')
-                args = (name, ) + args[1:]
+                args = list(itertools.chain([name], args[1:]))
                 if package:
                     # we've got a package as well as a component, pass it on
-                    self.recipe.PackageSpec(package, args[1:])
+                    pkgargs = list(itertools.chain((package,), args[1:]))
+                    self.recipe.PackageSpec(*pkgargs)
 
 	_filterSpec.updateArgs(self, *args, **keywords)
 
@@ -342,22 +303,120 @@ class ComponentSpec(_filterSpec):
 	self.macros = recipe.macros
 	self.rootdir = self.rootdir % recipe.macros
 
+        self.loadFilterDirs()
+
         # The extras need to come before base in order to override decisions
         # in the base subfilters; invariants come first for those very few
         # specs that absolutely should not be overridden in recipes.
         for filteritem in itertools.chain(self.invariantFilters,
+                                          self.configFilters,
                                           self.extraFilters,
                                           self.baseFilters):
 	    name = filteritem[0] % self.macros
 	    assert(name != 'source')
-	    filterargs = self.filterExpression(filteritem[1:], name=name)
-	    compFilters.append(filter.Filter(*filterargs))
+            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+            compFilters.append(filter.Filter(*args, **kwargs))
+
 	# by default, everything that hasn't matched a filter pattern yet
 	# goes in the catchall component ('runtime' by default)
 	compFilters.append(filter.Filter('.*', self.macros, name=self.catchall))
 
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
+
+
+    def loadFilterDirs(self):
+        invariantFilterMap = {}
+        baseFilterMap = {}
+        self.invariantFilters = []
+        self.baseFilters = []
+
+        # Load all component python files
+        for componentDir in self.recipe.cfg.componentDirs:
+            for filterType, map in (('invariant', invariantFilterMap),
+                                    ('base', baseFilterMap)):
+                oneDir = os.sep.join((componentDir, filterType))
+                if not os.path.isdir(oneDir):
+                    continue
+                for filename in os.listdir(oneDir):
+                    fullpath = os.sep.join((oneDir, filename))
+                    if (not filename.endswith('.py') or
+                        not util.isregular(fullpath)):
+                        continue
+                    self.loadFilter(filterType, map, filename, fullpath)
+
+        # populate the lists with dependency-sorted information
+        for filterType, map, filterList in (
+            ('invariant', invariantFilterMap, self.invariantFilters),
+            ('base', baseFilterMap, self.baseFilters)):
+            dg = graph.DirectedGraph()
+            for filterName in map.keys():
+                dg.addNode(filterName)
+                filter, follows, precedes  = map[filterName]
+
+                def warnMissing(missing):
+                    self.error('%s depends on missing %s', filterName, missing)
+
+                for prior in follows:
+                    if not prior in map:
+                        warnMissing(prior)
+                    dg.addEdge(prior, filterName)
+                for subsequent in precedes:
+                    if not subsequent in map:
+                        warnMissing(subsequent)
+                    dg.addEdge(filterName, subsequent)
+
+            # test for dependency loops
+            depLoops = [x for x in dg.getStronglyConnectedComponents()
+                        if len(x) > 1]
+            if depLoops:
+                self.error('dependency loop(s) in %s component filters: %s',
+                           sorted(':'.join(x) for x in sorted(list(depLoops))))
+
+            # Create a stably-sorted list of config filters where
+            # the filter is not empty.  (An empty filter with both
+            # follows and precedes specified can be used to induce
+            # ordering between otherwise unrelated components.)
+            #for name in dg.getTotalOrdering(nodeSort=lambda a, b: cmp(a,b)):
+            for name in dg.getTotalOrdering():
+                filters = map[name][0]
+                if not filters:
+                    continue
+
+                componentName = filters[0]
+                for filterExp in filters[1]:
+                    filterList.append((componentName, filterExp))
+
+
+    def loadFilter(self, filterType, map, filename, fullpath):
+        # do not load shared libraries
+        desc = [x for x in imp.get_suffixes() if x[0] == '.py'][0]
+        f = file(fullpath)
+        modname = filename[:-3]
+        m = imp.load_module(modname, f, fullpath, desc)
+        f.close()
+
+        if not 'filters' in m.__dict__:
+            self.warn('%s missing "filters"; not a valid component'
+                      ' specification file', fullname)
+            return
+        filters = m.__dict__['filters']
+        
+        if filters and len(filters) > 1 and type(filters[1]) not in (list,
+                                                                     tuple):
+            self.error('invalid expression in %s: filters specification'
+                       " must be ('name', ('expression', ...))", fullpath)
+
+        follows = ()
+        if 'follows' in m.__dict__:
+            follows = m.__dict__['follows']
+
+        precedes = ()
+        if 'precedes' in m.__dict__:
+            precedes = m.__dict__['precedes']
+
+        map[modname] = (filters, follows, precedes)
+
 
 
 class PackageSpec(_filterSpec):
@@ -426,8 +485,8 @@ class PackageSpec(_filterSpec):
             if not trove.troveNameIsValid(name):
                 self.error('%s is not a valid package name', name)
 
-	    filterargs = self.filterExpression(filteritem[1:], name=name)
-	    self.pkgFilters.append(filter.Filter(*filterargs))
+            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+            self.pkgFilters.append(filter.Filter(*args, **kwargs))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	self.pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
@@ -1011,14 +1070,26 @@ class ExcludeDirectories(policy.Policy):
     package installed on a system at any one time can own the same
     directory.
 
-    There are only two reasons to explicitly package a directory: the
-    directory needs permissions other than 0755, or it must exist even
-    if it is empty.
+    There are only three reasons to explicitly package a directory: the
+    directory needs permissions other than 0755, it needs non-root owner
+    or group, or it must exist even if it is empty.
 
     Therefore, it should generally not be necessary to invoke this policy
     directly.  If your directory requires permissions other than 0755, simply
     use C{r.SetMode} to specify the permissions, and the directory will be
-    automatically included.
+    automatically included.  Similarly, if you wish to include an empty
+    directory with owner or group information, call C{r.Ownership} on that
+    empty directory,
+
+    Because C{r.Ownership} can reasonably be called on an entire
+    subdirectory tree and indiscriminately applied to files and
+    directories alike, non-empty directories with owner or group
+    set will be excluded from packaging unless an exception is
+    explicitly provided.
+
+    If you call C{r.Ownership} with a filter that applies to an
+    empty directory, but you do not want to package that directory,
+    you will have to remove the directory with C{r.Remove}.
 
     Packages do not need to explicitly include directories to ensure
     existence of a target to place a file in. Conary will appropriately
@@ -1036,6 +1107,7 @@ class ExcludeDirectories(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Ownership', policy.REQUIRED_PRIOR),
         ('MakeDevices', policy.CONDITIONAL_PRIOR),
     )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
@@ -1044,9 +1116,19 @@ class ExcludeDirectories(policy.Policy):
 	fullpath = self.recipe.macros.destdir + os.sep + path
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
+
 	if mode & 0777 != 0755:
             self.info('excluding directory %s with mode %o', path, mode&0777)
 	elif not os.listdir(fullpath):
+            d = self.recipe.autopkg.pathMap[path]
+            if d.inode.owner.freeze() != 'root':
+                self.info('not excluding empty directory %s'
+                          ' because of non-root owner', path)
+                return
+            elif d.inode.group.freeze() != 'root':
+                self.info('not excluding empty directory %s'
+                          ' because of non-root group', path)
+                return
             self.info('excluding empty directory %s', path)
 	self.recipe.autopkg.delFile(path)
 
