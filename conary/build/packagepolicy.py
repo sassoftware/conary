@@ -1070,14 +1070,26 @@ class ExcludeDirectories(policy.Policy):
     package installed on a system at any one time can own the same
     directory.
 
-    There are only two reasons to explicitly package a directory: the
-    directory needs permissions other than 0755, or it must exist even
-    if it is empty.
+    There are only three reasons to explicitly package a directory: the
+    directory needs permissions other than 0755, it needs non-root owner
+    or group, or it must exist even if it is empty.
 
     Therefore, it should generally not be necessary to invoke this policy
     directly.  If your directory requires permissions other than 0755, simply
     use C{r.SetMode} to specify the permissions, and the directory will be
-    automatically included.
+    automatically included.  Similarly, if you wish to include an empty
+    directory with owner or group information, call C{r.Ownership} on that
+    empty directory,
+
+    Because C{r.Ownership} can reasonably be called on an entire
+    subdirectory tree and indiscriminately applied to files and
+    directories alike, non-empty directories with owner or group
+    set will be excluded from packaging unless an exception is
+    explicitly provided.
+
+    If you call C{r.Ownership} with a filter that applies to an
+    empty directory, but you do not want to package that directory,
+    you will have to remove the directory with C{r.Remove}.
 
     Packages do not need to explicitly include directories to ensure
     existence of a target to place a file in. Conary will appropriately
@@ -1095,6 +1107,7 @@ class ExcludeDirectories(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Ownership', policy.REQUIRED_PRIOR),
         ('MakeDevices', policy.CONDITIONAL_PRIOR),
     )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
@@ -1103,9 +1116,19 @@ class ExcludeDirectories(policy.Policy):
 	fullpath = self.recipe.macros.destdir + os.sep + path
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
+
 	if mode & 0777 != 0755:
             self.info('excluding directory %s with mode %o', path, mode&0777)
 	elif not os.listdir(fullpath):
+            d = self.recipe.autopkg.pathMap[path]
+            if d.inode.owner.freeze() != 'root':
+                self.info('not excluding empty directory %s'
+                          ' because of non-root owner', path)
+                return
+            elif d.inode.group.freeze() != 'root':
+                self.info('not excluding empty directory %s'
+                          ' because of non-root group', path)
+                return
             self.info('excluding empty directory %s', path)
 	self.recipe.autopkg.delFile(path)
 

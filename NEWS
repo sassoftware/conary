@@ -65,6 +65,8 @@ Changes in @NEW@:
       make it easier to override them.  This configuration can be
       disabled by setting the configComponent configuration item
       to False. (CNY-172)
+    * Empty directories that have owner or group information explicitly
+      set are now included in packages by default. (CNY-724)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an
