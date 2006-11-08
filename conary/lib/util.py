@@ -523,13 +523,13 @@ def memusage():
     pfn = "/proc/self/statm"
     line = open(pfn).readline()
     # Assume page size is 4k (true for i386). This can be adjusted by reading
+    # resource.getpagesize() 
     arr = [ 4 * int(x) for x in line.split()[:6] ]
     vmsize, vmrss, vmshared, text, lib, data = arr
 
     # The RHS in the following description is the fields in /proc/self/status
     # text is VmExe
     # data is VmData + VmStk
-    # resource.getpagesize() 
     return vmsize, vmrss, vmshared, text, lib, data
 
 def createLink(src, to):
