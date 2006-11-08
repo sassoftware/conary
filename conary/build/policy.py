@@ -188,25 +188,48 @@ class Policy(action.RecipeAction):
 	self.addArgs(**keywords)
 
     def filterExpression(self, expression, name=None):
+        """
+        backwards compatibility
+        """
+        args, kwargs = self.filterExpArgs(expression, name)
+        return (args[0],
+                args[1],
+                kwargs['setmode'],
+                kwargs['unsetmode'],
+                kwargs['name'],
+                kwargs['rootdir'])
+
+    def filterExpArgs(self, expression, name=None):
 	"""
 	@param expression: regular expression or tuple of
 	(regex, [setmode, [unsetmode]])
-	Create tuple that represents arguments to filter.Filter.__init__
-	"""
+        Creates arguments to filter.Filter.__init__
+        """
+        kwargs = {
+            'name': name,
+            'setmode': None,
+            'unsetmode': None,
+            'rootdir': self.rootdir,
+        }
+        macros = self.macros
 	if type(expression) in (str, types.FunctionType):
-	    return (expression, self.macros)
+            return (expression, macros), kwargs
+
 	if type(expression) is not list:
 	    expression = list(expression)
-	expression[1:1] = [self.macros]
-	if name:
-	    while len(expression) < 4:
-		expression.append(None)
-	    expression.append(name)
-	else:
-	    while len(expression) < 5:
-		expression.append(None)
-	expression.append(self.rootdir)
-	return expression
+
+        # this normally happens when code at a higher level
+        # has a filterExp tuple in a list of items and does
+        # not need to know how to handle it separately.
+        if len(expression) == 1 and type(expression[0]) in (list, tuple):
+            expression = list(expression[0])
+
+        regex = expression.pop(0)
+        if expression:
+            kwargs['setmode'] = expression.pop(0)
+        if expression:
+            kwargs['unsetmode'] = expression.pop(0)
+        return (regex, macros), kwargs
 
     def compileFilters(self, expressionList, filterList):
         seen = []
@@ -215,8 +238,8 @@ class Policy(action.RecipeAction):
                 # only put each expression on the list once
                 continue
             seen.append(expression)
-	    expression = self.filterExpression(expression)
-	    filterList.append(filter.Filter(*expression))
+            args, kwargs = self.filterExpArgs(expression)
+            filterList.append(filter.Filter(*args, **kwargs))
 
     def doProcess(self, recipe):
 	"""

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,18 +12,8 @@
 # full details.
 #
 
-SUBDIRS=arch recipeTemplates use site mirrors components
+# Note that python components have %(lib)s in them; we depend on the
+# NonMultilibComponent policy to ensure that python is multilib-safe.
 
-dist_files = Makefile pubring.gpg trustdb.gpg macros
-
-all: default-subdirs
-
-install: install-subdirs
-	install --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
-
-dist: default-dist
-
-clean: default-clean
-
-include ../Make.rules
-
+filters = ('python', ('/usr/(%(lib)s|lib)/python.*/site-packages/',))
+precedes = ('devellib', 'lib', 'devel')

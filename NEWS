@@ -54,6 +54,17 @@ Changes in @NEW@:
       the r.Requires policy are now reported gracefully. (CNY-942)
     * A list of GNOME mirrors has been added to the default mirrors. 
     * Implemented cvc --log-file with support for stdin. (CNY-937)
+    * The default ComponentSpec information is now loaded from
+      files in the /etc/conary/components/ directory tree, and the
+      defaults can now be overridden on a per-distribution basis in
+      the /etc/conary/distro/components/ directory tree. (CNY-317)
+    * Freeform documentation from /usr/share/doc is now included
+      in the new ":supdoc" component instead of the ":doc" component
+      by default. (CNY-883)
+    * Configuration files are now put into a ":config" component to
+      make it easier to override them.  This configuration can be
+      disabled by setting the configComponent configuration item
+      to False. (CNY-172)
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an
