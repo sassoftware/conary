@@ -246,6 +246,10 @@ class ConaryContext(ConfigSection):
     buildLabel            =  CfgLabel
     buildPath             =  (CfgPath, '~/conary/builds')
     cleanAfterCook        =  (CfgBool, True)
+    componentDirs         =  (CfgPathList, ('/etc/conary/components',
+                                            '/etc/conary/distro/components',
+                                            '~/.conary/components'))
+    configComponent       =  (CfgBool, True)
     contact               =  None
     context		  =  None
     dbPath                =  '/var/lib/conarydb'
