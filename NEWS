@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.11:
   o Client Changes:
     * "conary help [command]" now displays the usage message for
       the command.
