@@ -370,7 +370,7 @@ class ComponentSpec(_filterSpec):
             depLoops = [x for x in dg.getStronglyConnectedComponents()
                         if len(x) > 1]
             if depLoops:
-                self.error('dependency loop(s) in %s component filters: %s',
+                self.error('dependency loop(s) in component filters: %s',
                            sorted(':'.join(x) for x in sorted(list(depLoops))))
 
             # Create a stably-sorted list of config filters where
