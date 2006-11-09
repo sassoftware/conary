@@ -159,9 +159,23 @@ class UpdateCallback(ChangesetCallback):
     def setAbortEvent(self, event = None):
         self.abortEvent = event
 
-    def __init__(self):
+    def verifyTroveSignatures(self, trv):
+        # @rtype: (int, list)
+        # @raise DigitalSignatureVerificationError: 
+
+        # Default implementation - you can override it if you want to handle
+        # the exception yourself
+        return trv.verifyDigitalSignatures(threshold=self.trustThreshold,
+                                           keyCache=self.keyCache)
+
+    def setTrustThreshold(self, trustThreshold):
+        self.trustThreshold = trustThreshold
+
+    def __init__(self, trustThreshold=0, keyCache=None):
         ChangesetCallback.__init__(self)
         self.abortEvent = None
+        self.trustThreshold = trustThreshold
+        self.keyCache = keyCache
 
 class SignatureCallback(Callback):
 
