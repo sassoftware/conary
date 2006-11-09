@@ -1,8 +1,8 @@
 Changes in @NEW@:
   o Client Changes:
-    * "conary help [command]" now works displays the usage message for
+    * "conary help [command]" now displays the usage message for
       the command.
-    * --help options will now display a smaller number of flags by
+    * The --help options will now display a smaller number of flags by
       default, and more when the --verbose flag is added.
     * A getUpdateItemList() method has been added to the ConaryClient
       class.  It returns a list of top level troves on the local
@@ -36,10 +36,10 @@ Changes in @NEW@:
       to happen when the file was in the previous version of the
       source component and also present in the lookaside
       cache. (CNY-601)
-    * Conary now produces a warning when an unknown use flag is
-      specified in the buildFlavor configuration variable instead of
-      producing an error.  It will still produce an error if the
-      unknown use flag is accessed in the recipe.
+    * Conary now produces a warning instead of an error when an
+      unknown use flag is specified in the buildFlavor configuration
+      variable.  It will still produce an error if the unknown use
+      flag is accessed in the recipe.
     * Package builds now create relative changesets for components instead
       of absolute changesets, reducing the size of the upload to the
       repository (CNY-912)
@@ -53,7 +53,9 @@ Changes in @NEW@:
     * Malformed regular expressions passed as exceptDeps arguments to
       the r.Requires policy are now reported gracefully. (CNY-942)
     * A list of GNOME mirrors has been added to the default mirrors. 
-    * Implemented cvc --log-file with support for stdin. (CNY-937)
+    * Commit log messages may now be provided with the "cvc --log-file"
+      command, with support for standard input using the filename "-".
+      (CNY-937)
     * The default ComponentSpec information is now loaded from
       files in the /etc/conary/components/ directory tree, and the
       defaults can now be overridden on a per-distribution basis in
@@ -75,11 +77,8 @@ Changes in @NEW@:
     * Adding a file locally and then merging that file from upstream
       now causes an error as expected (it would traceback
       before). (CNY-1021)
-    * Adding a file locally and then merging that file from upstream
-      now causes an error as expected (it would traceback
-      before). (CNY-1021)
     * Cooking a group recipe that defines an empty groups with
-      resolveDependencies set no longer results in a traceback..
+      resolveDependencies set no longer results in a traceback.
       Conary will display an error message as expected. (CNY-1030)
     * Specifying a bad protocol in a repositoryMap entry (a protocol
       other than http or https) no longer causes an unhandled

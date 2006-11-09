@@ -20,4 +20,6 @@ include ../../Make.rules
 
 dist: default-dist
 
-clean: default-clean
+clean: clean-subdirs
+
+install: install-subdirs
