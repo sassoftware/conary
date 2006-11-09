@@ -18,7 +18,7 @@ dist_files = Makefile
 
 include ../../Make.rules
 
-dist: dist-subdirs
+dist: default-dist
 
 clean: clean-subdirs
 
