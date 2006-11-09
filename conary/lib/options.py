@@ -43,7 +43,7 @@ class OptionError(Exception):
 
 class HelpFormatter(optparse.IndentedHelpFormatter):
     def format_option(self, option):
-        if option.help_level == VERBOSE_HELP and log.getVerbosity() > log.DEBUG:
+        if option.help_level == VERBOSE_HELP and log.getVerbosity() > log.INFO:
             return ''
         return optparse.IndentedHelpFormatter.format_option(self, option)
 
@@ -230,6 +230,7 @@ def _getUsageStr(usage):
 def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
                interspersedArgs=True, hobbleShortOpts=False,
                addDebugOptions=True, addConfigOptions=True,
+               addVerboseOptions=True,
                description=None):
     usage = _getUsageStr(usage)
 
@@ -241,6 +242,9 @@ def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
     if addDebugOptions:
         d['debug'] = STRICT_OPT_PARAM, (VERBOSE_HELP, 'Print helpful debugging output (use --debug=all for internal debug info)')
         d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
+
+    if addVerboseOptions:
+        d['verbose'] = STRICT_OPT_PARAM, (VERBOSE_HELP, 'Display more verbose output')
 
     d['help'] = NO_PARAM, optparse.SUPPRESS_HELP
 
@@ -257,10 +261,10 @@ def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
 
 
 def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
-                commonParams=None, useHelp=False, defaultGroup=None,
-                interspersedArgs=True, hobbleShortOpts=False,
-                addDebugOptions=True, addConfigOptions=True,
-                description=None):
+                 commonParams=None, useHelp=False, defaultGroup=None,
+                 interspersedArgs=True, hobbleShortOpts=False,
+                 addDebugOptions=True, addConfigOptions=True,
+                 addVerboseOptions=True, description=None):
     argSet = {}
     # don't mangle the command line
     argv = argv[:]
@@ -269,6 +273,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                         interspersedArgs, hobbleShortOpts,
                         addDebugOptions=addDebugOptions, 
                         addConfigOptions=addConfigOptions,
+                        addVerboseOptions=addVerboseOptions,
                         description=description)
     argSet, otherArgs, options = getArgSet(params, parser, argv)
 
@@ -287,6 +292,12 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                 cfg.configLine("%s %s" % (name, argSet[arg]))
                 del argSet[arg]
 
+    if addVerboseOptions:
+        if 'verbose' in argSet:
+            if argSet['verbose'] is True:
+                log.setVerbosity(log.INFO)
+            del argSet['verbose']
+
     if addDebugOptions:
         if argSet.has_key('debugger'):
             del argSet['debugger']
@@ -302,7 +313,9 @@ def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
                 log.setVerbosity(log.LOWLEVEL)
             del argSet['debug']
         else:
-            log.setVerbosity(log.WARNING)
+            if log.getVerbosity() > log.WARNING:
+                log.setVerbosity(log.WARNING)
+
 
     return argSet, otherArgs, parser, options
 
@@ -388,9 +401,9 @@ class AbstractCommand(object):
         if not self.parser:
             self.setParser(self.mainHandler.getParser(self.commands[0]))
         self.parser.print_help()
-        if log.getVerbosity() > log.DEBUG:
+        if log.getVerbosity() > log.INFO:
             print
-            print '(Use --debug to get a full option listing)'
+            print '(Use --verbose to get a full option listing)'
         return errNo
 
     def setParser(self, parser):
