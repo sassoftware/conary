@@ -19,4 +19,4 @@
 
 filters = ('supdoc', ('%(datadir)s/doc/',))
 follows = ('develdocs',)
-precedes = ('supdoc', 'data')
+precedes = ('doc', 'data')
