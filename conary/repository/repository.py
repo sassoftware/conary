@@ -290,26 +290,12 @@ class ChangeSetJob:
     def checkTroveCompleteness(self, trv):
         pass
     
-    def checkTroveSignatures(self, trv, threshold, keyCache = None):
-        if keyCache is None:
-            keyCache = openpgpkey.getKeyCache()
-        for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
-            pubKey = keyCache.getPublicKey(fingerprint)
-            if pubKey.isRevoked():
-                raise openpgpfile.IncompatibleKey('Key %s is revoked'
-                                                  %pubKey.getFingerprint())
-            expirationTime = pubKey.getTimestamp()
-            if expirationTime and expirationTime < timestamp:
-                raise openpgpfile.IncompatibleKey('Key %s is expired'
-                                                  %pubKey.getFingerprint())
-        res = trv.verifyDigitalSignatures(threshold, keyCache)
-        if len(res[1]):
-            raise openpgpfile.KeyNotFound('Repository does not recognize '
-                                          'key: %s'% res[1][0])
+    def checkTroveSignatures(self, trv, callback):
+        assert(hasattr(callback, 'verifyTroveSignatures'))
+        return callback.verifyTroveSignatures(trv)
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
-                 resetTimestamps = False, keyCache = None, threshold = 0,
-                 allowIncomplete = False):
+                 resetTimestamps = False, allowIncomplete = False):
 	self.repos = repos
 	self.cs = cs
 
@@ -382,7 +368,7 @@ class ChangeSetJob:
 
             self.checkTroveCompleteness(newTrove)
 
-            self.checkTroveSignatures(newTrove, threshold, keyCache=keyCache)
+            self.checkTroveSignatures(newTrove, callback=callback)
 
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove)

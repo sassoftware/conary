@@ -106,15 +106,12 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         self.oldFile(pathId, fileId, sha1)
 
-    def checkTroveSignatures(self, trv, threshold, keyCache=None):
-        trust, missingKeys = trv.verifyDigitalSignatures(threshold, keyCache)
-
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs, callback, autoPinList, 
-                 filePriorityPath, threshold = 0,
+                 filePriorityPath,
                  allowIncomplete = False, pathRemovedCheck = None,
                  replaceFiles = False):
 	assert(not cs.isAbsolute())
@@ -128,7 +125,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         self.pathRemovedCheck = pathRemovedCheck
 
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
-                                         threshold = threshold, 
                                          allowIncomplete=allowIncomplete)
 
         for name, version, flavor in self.oldTroveList():

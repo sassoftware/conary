@@ -527,7 +527,7 @@ class Database(SqlDbRepository):
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
                         removeHints = {}, filePriorityPath = None,
-                        autoPinList = RegularExpressionList(), threshold = 0):
+                        autoPinList = RegularExpressionList()):
 	assert(not cs.isAbsolute())
 
         if filePriorityPath is None:
@@ -709,7 +709,6 @@ class Database(SqlDbRepository):
                 localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
                     filePriorityPath,
-                    threshold = threshold,
                     allowIncomplete = isRollback, 
                     pathRemovedCheck = fsJob.pathRemoved,
                     replaceFiles = replaceFiles)
