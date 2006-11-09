@@ -21,3 +21,5 @@ include ../../Make.rules
 dist: default-dist
 
 clean: default-clean
+
+install: default-install
