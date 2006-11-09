@@ -34,6 +34,9 @@ from conary.streams import SMALL, LARGE
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
+# the difference between 10 and 11 is that the REMOVED type appeared, 
+# and we allow group redirects; 11 is used *only* for those situations
+TROVE_VERSION_1_1=11
 
 def troveIsCollection(troveName):
     return not(":" in troveName or troveName.startswith("fileset-"))
@@ -489,10 +492,14 @@ _STREAM_TRV_PROVIDES        = 5
 _STREAM_TRV_REQUIRES        = 6
 _STREAM_TRV_STRONG_TROVES   = 7
 _STREAM_TRV_FILES           = 8
-_STREAM_TRV_FLAGS           = 9
+_STREAM_TRV_TYPE            = 9
 _STREAM_TRV_SIGS            = 10
 _STREAM_TRV_WEAK_TROVES     = 11
 _STREAM_TRV_REDIRECTS       = 12
+
+TROVE_TYPE_NORMAL          = 0
+TROVE_TYPE_REDIRECT        = 1
+TROVE_TYPE_REMOVED         = 2
 
 class Trove(streams.StreamSet):
     """
@@ -529,8 +536,8 @@ class Trove(streams.StreamSet):
                     (LARGE, TroveRefsTrovesStream,       "weakTroves"   ), 
         _STREAM_TRV_FILES         : 
                     (LARGE, TroveRefsFilesStream,        "idMap"        ), 
-        _STREAM_TRV_FLAGS         :
-                    (SMALL, ByteStream,                  "redirect"     ),
+        _STREAM_TRV_TYPE          :
+                    (SMALL, ByteStream,                  "type"         ),
         _STREAM_TRV_REDIRECTS     :
                     (SMALL, TroveRedirectList,           "redirects"    ),
     }
@@ -541,7 +548,7 @@ class Trove(streams.StreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "strongTroves", "weakTroves",
-                  "idMap", "redirect", "redirects" ]
+                  "idMap", "type", "redirects" ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -698,7 +705,7 @@ class Trove(streams.StreamSet):
                             self.version().copy(),
                             self.flavor().copy(),
                             None,
-                            isRedirect = self.isRedirect(), 
+                            type = self.type(),
                             setVersion = False)
         new.idMap = self.idMap.copy()
         new.strongTroves = self.strongTroves.copy()
@@ -731,12 +738,18 @@ class Trove(streams.StreamSet):
         return self.troveInfo.sigs
 
     def isRedirect(self):
-        return self.redirect()
+        return self.type() == TROVE_TYPE_REDIRECT
+
+    def isRemoved(self):
+        return self.type() == TROVE_TYPE_REMOVED
+
+    def getType(self):
+        return self.type()
 
     def addFile(self, pathId, path, version, fileId):
 	assert(len(pathId) == 16)
 	assert(fileId is None or len(fileId) == 20)
-        assert(not self.redirect())
+        assert(not self.type())
 	self.idMap[pathId] = (path, fileId, version)
 
     def computePathHashes(self):
@@ -877,7 +890,7 @@ class Trove(streams.StreamSet):
         return rc
 
     def addRedirect(self, toName, toBranch, toFlavor):
-        assert(self.isRedirect())
+        assert(self.type() == TROVE_TYPE_REDIRECT)
         assert(isinstance(toBranch, versions.Branch))
         self.redirects.add(toName, toBranch, toFlavor)
 
@@ -914,9 +927,9 @@ class Trove(streams.StreamSet):
         # If we skipFiles, we have to also skipIntegrityChecks
         assert(not skipFiles or skipIntegrityChecks)
 
-	self.redirect.set(trvCs.getIsRedirect())
-        if self.redirect():
-            # we don't explicitly remove files for redirects
+	self.type.set(trvCs.getType())
+        if self.type():
+            # we don't explicitly remove files for non-normal troves
             self.idMap = TroveRefsFilesStream()
 
 	fileMap = {}
@@ -965,7 +978,8 @@ class Trove(streams.StreamSet):
         if not allowIncomplete and not self.getVersion().isOnLocalHost():
             assert(not self.troveInfo.incomplete())
 
-        if TROVE_VERSION < self.troveInfo.troveVersion():
+        if TROVE_VERSION < self.troveInfo.troveVersion() and \
+           TROVE_VERSION_1_1 < self.troveInfo.troveVersion():
             self.troveInfo.incomplete.set(1)
         elif self.troveInfo.incomplete() is None:
             # old troves don't have an incomplete flag - we want it to 
@@ -1046,7 +1060,7 @@ class Trove(streams.StreamSet):
 	    return False
 	if self.getFlavor() != them.getFlavor():
 	    return False
-	if self.isRedirect() != them.isRedirect():
+	if self.type() != them.type():
 	    return False
 
 	(csg, pcl, fcl) = self.diff(them)
@@ -1145,7 +1159,7 @@ class Trove(streams.StreamSet):
                                     them.getFlavor(), self.getFlavor(),
                                     them.getSigs(), self.getSigs(),
                                     absolute = False,
-                                    isRedirect = self.redirect(),
+                                    type = self.type(),
                                     troveInfoDiff = troveInfoDiff)
 	else:
 	    themMap = {}
@@ -1154,7 +1168,7 @@ class Trove(streams.StreamSet):
 				      None, self.getFlavor(),
                                       None, self.getSigs(),
 				      absolute = absolute,
-                                      isRedirect = self.redirect(),
+                                      type = self.type(),
                                       troveInfoDiff = self.troveInfo.freeze())
 
 	# dependency and flavor information is always included in total;
@@ -1169,8 +1183,8 @@ class Trove(streams.StreamSet):
 	sameIds = {}
 	filesNeeded = []
 
-        if not self.redirect():
-            # we just ignore file information for redirects
+        if not self.type():
+            # we just ignore file information for nonnormal troves
             allIds = self.idMap.keys() + themMap.keys()
             for pathId in allIds:
                 inSelf = self.idMap.has_key(pathId)
@@ -1918,7 +1932,7 @@ class Trove(streams.StreamSet):
         return self.troveInfo.pathHashes
 
     def __init__(self, name, version = None, flavor = None, changeLog = None, 
-                 isRedirect = False, skipIntegrityChecks = False,
+                 type = TROVE_TYPE_NORMAL, skipIntegrityChecks = False,
                  setVersion = True):
         streams.StreamSet.__init__(self)
 
@@ -1937,11 +1951,17 @@ class Trove(streams.StreamSet):
             self.version.set(version)
             self.flavor.set(flavor)
             if setVersion:
-                self.troveInfo.troveVersion.set(TROVE_VERSION)
+                if type == TROVE_TYPE_REMOVED:
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
+                elif type == TROVE_TYPE_REDIRECT and name.startswith('group-'):
+                    self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
+                else:
+                    self.troveInfo.troveVersion.set(TROVE_VERSION)
             self.troveInfo.incomplete.set(0)
             if changeLog:
                 self.changeLog.thaw(changeLog.freeze())
-            self.redirect.set(isRedirect)
+
+            self.type.set(type)
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
@@ -2100,7 +2120,7 @@ _STREAM_TCS_NEW_FILES               =  9
 _STREAM_TCS_CHG_FILES               = 10
 _STREAM_TCS_OLD_FLAVOR              = 11
 _STREAM_TCS_NEW_FLAVOR              = 12
-_STREAM_TCS_IS_REDIRECT             = 13
+_STREAM_TCS_TROVE_TYPE              = 13
 _STREAM_TCS_TROVEINFO               = 14
 _STREAM_TCS_OLD_SIGS                = 15
 _STREAM_TCS_NEW_SIGS                = 16
@@ -2129,7 +2149,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_CHG_FILES   : (LARGE, ReferencedFileList,   "changedFiles"),
         _STREAM_TCS_OLD_FLAVOR  : (SMALL, FlavorsStream,        "oldFlavor"  ),
         _STREAM_TCS_NEW_FLAVOR  : (SMALL, FlavorsStream,        "newFlavor"  ),
-        _STREAM_TCS_IS_REDIRECT : (SMALL, ByteStream,           "isRedirect" ),
+        _STREAM_TCS_TROVE_TYPE  : (SMALL, ByteStream,           "troveType" ),
         _STREAM_TCS_TROVEINFO   : (LARGE, streams.StringStream, "troveInfoDiff"),
         _STREAM_TCS_OLD_SIGS    : (LARGE, TroveSignatures,      "oldSigs"    ),
         _STREAM_TCS_NEW_SIGS    : (LARGE, TroveSignatures,      "newSigs"    ),
@@ -2358,12 +2378,8 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def setProvides(self, provides):
 	self.provides.set(provides)
 
-    def setIsRedirect(self, val):
-        assert(type(val) == bool)
-        self.isRedirect.set(val)
-
-    def getIsRedirect(self):
-        return self.isRedirect()
+    def getType(self):
+        return self.troveType()
 
     def setRedirects(self, redirs):
         self.redirects = redirs.copy()
@@ -2394,7 +2410,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, name, changeLog, oldVersion, newVersion, 
 		 oldFlavor, newFlavor, oldSigs, newSigs,
-                 absolute = 0, isRedirect = False,
+                 absolute = 0, type = TROVE_TYPE_NORMAL,
                  troveInfoDiff = None):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.AbstractVersion))
@@ -2412,7 +2428,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
         if oldVersion is not None:
             self.oldFlavor.set(oldFlavor)
 	self.newFlavor.set(newFlavor)
-        self.isRedirect.set(isRedirect)
+        self.troveType.set(type)
         assert(troveInfoDiff is not None)
         self.troveInfoDiff.set(troveInfoDiff)
         if oldSigs:
