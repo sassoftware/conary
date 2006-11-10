@@ -1,3 +1,13 @@
+Changes in @NEW@:
+  o Client Changes:
+    * A signature callback has been added, which allows one to catch the
+      troves with bad signatures and react appropriately (display an error
+      message, lower trust level) (CNY-1008)
+
+  o Build Changes:
+
+  o Bugfixes:
+
 Changes in 1.0.38:
   o Client Changes:
     * "conary help [command]" now displays the usage message for
