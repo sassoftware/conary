@@ -4,6 +4,7 @@ Changes in @NEW@:
       to control whether Conary creates relative or absolute changesets
       when cooking.  It defaults to True, but can be changed to False
       to cause Conary to cook and commit absolute changesets. (CNY-912)
+    * A list of X.org mirrors has been added to the default mirrors.
 
 Changes in 1.0.38:
   o Client Changes:
