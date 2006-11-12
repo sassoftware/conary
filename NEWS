@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes
+    * The build time is now displayed properly as "(unknown)" if a
+      trove has no build time set. (CNY-990)
+
 Changes in 1.0.38:
   o Client Changes:
     * "conary help [command]" now displays the usage message for

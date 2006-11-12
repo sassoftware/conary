@@ -41,7 +41,14 @@ import time
         <tr class="odd"><td>Version:</td><td>${trove.getVersion().asString()}</td></tr>
         <tr class="even"><td>Flavor:</td><td>${trove.getFlavor()}</td></tr>
         <tr class="odd"><td>Built from trove:</td><td><a href="${sourceLink}">${trove.getSourceName()}</a></td></tr>
-        <tr class="even"><td>Build time:</td><td>${time.ctime(trove.getBuildTime())} using Conary ${trove.getConaryVersion()}</td></tr>
+        <?python
+           buildTime = trove.getBuildTime()
+           if not buildTime:
+               buildTime = '(unknown)'
+           else:
+               buildTime = time.ctime(buildTime)
+        ?>
+        <tr class="even"><td>Build time:</td><td>${buildTime} using Conary ${trove.getConaryVersion()}</td></tr>
         <tr class="odd"><td>Provides:</td>
             <td class="top">
                 <div py:for="dep in str(trove.provides.deps).split('\n')">${dep}</div>
