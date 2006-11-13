@@ -274,7 +274,9 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                removeNotByDefault = False, restartInfo = None,
                                applyCriticalOnly = False):
     if not callback:
-        callback = callbacks.UpdateCallback()
+        callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
+    else:
+        callback.setTrustThreshold(cfg.trustThreshold)
 
     if syncChildren or syncUpdate:
         installMissing = True
@@ -475,8 +477,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoPinList = cfg.pinTroves, 
-                       threshold = cfg.trustThreshold)
+                       callback = callback, autoPinList = cfg.pinTroves)
 
     log.syslog.commandComplete()
 

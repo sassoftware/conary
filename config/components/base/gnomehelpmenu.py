@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,18 +12,12 @@
 # full details.
 #
 
-SUBDIRS=arch recipeTemplates use site mirrors components
+# GNOME programs tend to need their menu help to function without apparant
+# error, so it needs to be either in 'runtime' or 'data'.  It would otherwise
+# show up in locale.  Most other systems include the default locale within
+# the application, and need locale data only for translations.  This is
+# therefore encoded as an exception to the general rule.
 
-dist_files = Makefile pubring.gpg trustdb.gpg macros
-
-all: default-subdirs
-
-install: install-subdirs
-	install --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
-
-dist: default-dist
-
-clean: default-clean
-
-include ../Make.rules
-
+filters = ('runtime', ('%(datadir)s/gnome/help/.*/C/',))
+follows = ('doc', 'supdoc')
+precedes = ('locale', 'data')

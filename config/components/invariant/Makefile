@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,18 +12,23 @@
 # full details.
 #
 
-SUBDIRS=arch recipeTemplates use site mirrors components
+filter_files =	\
+	test.py \
+	debuginfo.py \
 
-dist_files = Makefile pubring.gpg trustdb.gpg macros
 
-all: default-subdirs
+dist_files = Makefile $(filter_files)
 
-install: install-subdirs
-	install --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
+all: default-all
+
+install:
+	mkdir -p $(DESTDIR)/etc/conary/components/invariant/; \
+	for f in $(filter_files); do \
+		cp -a $$f $(DESTDIR)/etc/conary/components/invariant/$$f; \
+	done
 
 dist: default-dist
 
 clean: default-clean
 
-include ../Make.rules
-
+include ../../../Make.rules

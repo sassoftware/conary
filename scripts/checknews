@@ -1,0 +1,79 @@
+#!/usr/bin/python
+#
+# Copyright (c) 2006 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+import sys
+import re
+# use jiranemo to crib off the configuration files, etc.
+from jiranemo import main
+from conary.lib import options
+
+class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
+    commands = ['check']
+
+    def runCommand(self, client, cfg, argSet, args):
+        keyre = re.compile('[A-Z]+-[0-9]+')
+        if len(args) != 3:
+            sys.exit(1)
+        news = args[2]
+        f = open(news)
+        started = False
+        fixVer = None
+        for line in f:
+            if line.startswith('Changes in'):
+                if started:
+                    break
+                else:
+                    started = True
+                    # cut off "Changes in " and the trailing ":"
+                    line = line.strip()
+                    version = line[11:-1]
+                if version == '@NEW@':
+                    print 'change @NEW@ first'
+                    sys.exit(1)
+            if not fixVer:
+                versions = client.getVersions('CNY')
+                v = [ x for x in versions if x.name == version ]
+                if not v:
+                    print 'no such version', version, 'in CNY project'
+                fixVer = v[0]
+                versionToId = dict((x.name, x.id) for x in versions)
+            match = keyre.search(line)
+            if match:
+                key = match.group()
+                if not key.startswith('CNY'):
+                    print 'not checking', key
+                print 'getting', key
+                issue = client.getIssue(key)
+                fixVers = [ x for x in issue.fixVersions if x.name == version ]
+                if not fixVers:
+                    print key, 'does not have fix version set to', version
+                    fixVersions = issue.fixVersions[:]
+                    fixVersions.append(fixVer)
+                    newVersions = [ versionToId[x.name] for x in fixVersions ]
+                    d = { 'id': 'fixVersions',
+                          'values': newVersions }
+                    client.client.updateIssue(key, [ d ])
+
+class CheckerMain(main.JiraNemoMain, options.MainHandler):
+    commandList = [ CheckNewsCommand ]
+
+    def usage(self, rc=1):
+        return options.MainHandler.usage(self, rc)
+
+if __name__ == '__main__':
+    Main = CheckerMain()
+    argv = sys.argv[:]
+    argv.insert(1, 'check')
+    sys.exit(Main.main(argv))

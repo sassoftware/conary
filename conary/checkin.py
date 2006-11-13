@@ -76,8 +76,9 @@ cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
-    def __init__(self):
-        callbacks.UpdateCallback.__init__(self)
+    def __init__(self, trustThreshold=0, keyCache=None):
+        callbacks.UpdateCallback.__init__(self, trustThreshold=trustThreshold,
+                                                keyCache=keyCache)
         callbacks.CookCallback.__init__(self)
 
 # makePathId() returns 16 random bytes, for use as a pathId
@@ -128,19 +129,20 @@ def _makeFilter(patterns):
 
     return patternsFilter
 
-def verifyAbsoluteChangeset(cs, trustThreshold = 0):
+def verifyAbsoluteChangeset(cs, callback):
     # go through all the trove change sets we have in this changeset.
     # verify the digital signatures on each piece
     # return code should be the minimum trust on the entire set
-    #verifyDigitalSignatures can raise a
-    #DigitalSignatureVerificationError
+    # Calling the callback's verifyTroveSignatures can raise a
+    # DigitalSignatureVerificationError
+    assert(hasattr(callback, 'verifyTroveSignatures'))
     r = 256
     missingKeys = []
     for troveCs in [ x for x in cs.iterNewTroveList() ]:
         # instantiate each trove from the troveCs so we can verify
         # the signature
         t = trove.Trove(troveCs)
-        verTuple = t.verifyDigitalSignatures(trustThreshold)
+        verTuple = callback.verifyTroveSignatures(t)
         missingKeys.extend(verTuple[1])
         r = min(verTuple[0], r)
     return r
@@ -151,7 +153,7 @@ def checkout(repos, cfg, workDir, nameList, callback=None):
 
 def _checkout(repos, cfg, workDir, name, callback):
     if not callback:
-        callback = CheckinCallback()
+        callback = CheckinCallback(trustThreshold=cfg.trustThreshold)
 
     # We have to be careful with labels
     name, versionStr, flavor = cmdline.parseTroveSpec(name)
@@ -218,7 +220,7 @@ use cvc co %s=<branch> for the following branches:
                                excludeAutoSource = True,
                                callback=callback)
 
-    verifyAbsoluteChangeset(cs, cfg.trustThreshold)
+    verifyAbsoluteChangeset(cs, callback)
 
     troveCs = cs.iterNewTroveList().next()
 
