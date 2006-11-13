@@ -210,7 +210,10 @@ based on the contents of \fI<xml file>\fP.
 Show (in a slightly extended unified diff format) the changes that
 have been made in the current source directory since the last
 \fBcvc commit\fP
-(or, if no commit, since the source component was checked out).
+(or, if no commit, since the source component was checked out). If an
+error occurs, diff returns a value of 2. If there are differences
+in the local directory, 1 is returned. If no differences are found, 0
+is returned (this convention is consistent with \fBdiff\fR(1).
 .TP
 .B log [\fI<branch>\fP]
 Prints the log messages for the branch specified by \fBbuildLabel\fP,
@@ -350,8 +353,13 @@ More examples coming soon to a man page near you!
 .\"
 .\"
 .SH BUGS
-There are no bugs, only undocumented features.  You can report
-undocumented features at http://bugs.rpath.com/
+The return codes from cvc are inconsistent at best. It tries hard to return
+success even if there is failure, though it occasionally returns error codes.
+Do not depend on the return codes from cvc unless the cvc command you are
+using has its return values documented in this man page.
+
+This behavior is not a bug. There are no bugs, only undocumented features.  You
+can report undocumented features at http://bugs.rpath.com/
 .\"
 .\"
 .\"

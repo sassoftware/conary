@@ -52,7 +52,9 @@ Changes in @NEW@:
       records listed within the shared library, if any. (CNY-699)
     * Malformed regular expressions passed as exceptDeps arguments to
       the r.Requires policy are now reported gracefully. (CNY-942)
-    * A list of GNOME mirrors has been added to the default mirrors. 
+    * A list of GNOME mirrors has been added to the default mirrors.
+    * "cvc diff" now returns 2 on error, 1 if there are differences, and
+      0 if there are no differences (CNY-938).
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give an

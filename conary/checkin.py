@@ -888,11 +888,12 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
+    # return 0 if no differences, 1 if differences, 2 on error
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
-	return
+	return 2
 
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
@@ -902,11 +903,11 @@ def diff(repos, versionStr = None):
         except errors.TroveNotFound, e:
             log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
-            return
+            return 2
         
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
-	    return
+	    return 2
 
 	oldTrove = repos.getTrove(*pkgList[0])
     else:
@@ -915,12 +916,13 @@ def diff(repos, versionStr = None):
     result = update.buildLocalChanges(repos, 
 	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
             forceSha1=True, ignoreAutoSource = True)
-    if not result: return
+    if not result: return 2
 
     (changeSet, ((isDifferent, newState),)) = result
-    if not isDifferent: return
+    if not isDifferent: return 0
     _showChangeSet(repos, changeSet, oldTrove, state,
                    displayAutoSourceFiles = False)
+    return 1
 
 def _showChangeSet(repos, changeSet, oldTrove, newTrove,
                    displayAutoSourceFiles = True):
