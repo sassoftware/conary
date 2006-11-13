@@ -246,6 +246,7 @@ class ConaryContext(ConfigSection):
     buildLabel            =  CfgLabel
     buildPath             =  (CfgPath, '~/conary/builds')
     cleanAfterCook        =  (CfgBool, True)
+    commitRelativeChangeset = (CfgBool, True)
     componentDirs         =  (CfgPathList, ('/etc/conary/components',
                                             '/etc/conary/distro/components',
                                             '~/.conary/components'))

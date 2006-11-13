@@ -125,4 +125,8 @@ class ReexecRequired(ConaryError):
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 
 def exceptionIsUncatchable(e):
-    return isinstance(e, UncatchableExceptionClasses)
+    if isinstance(e, UncatchableExceptionClasses):
+        return True
+    if hasattr(e, "errorIsUncatchable") and e.errorIsUncatchable:
+        return True
+    return False
