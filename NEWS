@@ -11,6 +11,10 @@ Changes in @NEW@:
       to cause Conary to cook and commit absolute changesets. (CNY-912)
     * A list of X.org mirrors has been added to the default mirrors.
 
+  o Bug Fixes
+    * The build time is now displayed properly as "(unknown)" if a
+      trove has no build time set. (CNY-990)
+
 Changes in 1.0.38:
   o Client Changes:
     * "conary help [command]" now displays the usage message for
