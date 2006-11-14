@@ -620,6 +620,8 @@ class Trove(streams.StreamSet):
         @param keyCache: cache of keys to verify against
         @type keyCache: openpgpkey.OpenPGPKeyFileCache
         @rtype: (int, list)
+        @raise DigitalSignatureVerificationError: if an invalid signature is
+        found, or the keys are not trusted
         """
         version = self.getVersion()
         serverName = None
@@ -2501,6 +2503,9 @@ class DigitalSignatureVerificationError(TroveError):
     """
     Indicates that a digital signature did not verify.
     """
+    # Mark the error as uncatchable, we want the callback wrapper to re-raise
+    # it instead of burying it
+    errorIsUncatchable = True
     def __str__(self):
         return self.message
 

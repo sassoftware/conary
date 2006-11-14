@@ -1108,7 +1108,10 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         relativePackageList = []
         needTroves = {}
         for empty, p, fileMap in packageList:
-            oldTrove = previousTroveDict.get(p.getName(), None)
+            if cfg.commitRelativeChangeset:
+                oldTrove = previousTroveDict.get(p.getName(), None)
+            else:
+                oldTrove = None
             relativePackageList.append((oldTrove, p, fileMap))
 
         packageList = relativePackageList
