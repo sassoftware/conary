@@ -10,6 +10,8 @@ Changes in @NEW@:
       when cooking.  It defaults to True, but can be changed to False
       to cause Conary to cook and commit absolute changesets. (CNY-912)
     * A list of X.org mirrors has been added to the default mirrors.
+    * "cvc diff" now returns 2 on error, 1 if there are differences, and
+      0 if there are no differences (CNY-938).
 
   o Bug Fixes
     * The build time is now displayed properly as "(unknown)" if a
@@ -86,8 +88,6 @@ Changes in 1.0.38:
       to False. (CNY-172)
     * Empty directories that have owner or group information explicitly
       set are now included in packages by default. (CNY-724)
-    * "cvc diff" now returns 2 on error, 1 if there are differences, and
-      0 if there are no differences (CNY-938).
 
   o Bugfixes:
     * Files added in both the repository and locally with cvc now give
