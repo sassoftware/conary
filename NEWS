@@ -12,6 +12,8 @@ Changes in @NEW@:
     * A list of X.org mirrors has been added to the default mirrors.
     * "cvc diff" now returns 2 on error, 1 if there are differences, and
       0 if there are no differences (CNY-938).
+    * "cvc cook" is now more efficient in looking up files that are part of
+      the built troves (CNY-1008).
 
   o Bug Fixes
     * The build time is now displayed properly as "(unknown)" if a
