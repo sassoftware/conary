@@ -42,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39 ]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -1761,7 +1761,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return l[0]
 
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName,
-                                branch):
+                                branch, filePrefixes=None):
+        # filePrefixes should be a list of prefixes to look for
+        # It tries to limit the number of results for things that generate
+        # unique paths with each build (e.g. the kernel).
+        # Added as part of protocol version 39
 	if not self.auth.check(authToken, write = False,
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
@@ -1787,16 +1791,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             TroveFiles.streamId = FileStreams.streamId
         WHERE
             Items.item = ? AND
-            Branches.branch = ?
+            Branches.branch = ?%s
         ORDER BY
             Nodes.finalTimestamp DESC
         """
-        args = [sourceName, branch]
-        cu.execute(query, args)
-        self.log(4, "execute query", query, args)
 
+        if filePrefixes is None:
+            query = query % ''
+        else:
+            # Add the filtering by path prefix
+            query = query % " AND\n            TroveFiles.path LIKE ?"
+
+        def executeIterArgs(cursor, query, argsList):
+            # Execute query by iterating over the list of arguments
+            # Result set is the union of the result sets on each argument list
+            for args in argsList:
+                cursor.execute(query, args)
+                self.log(4, "execute query", query, args)
+                for tup in cursor:
+                    yield tup
+
+        def genArgsList():
+            if filePrefixes is None:
+                yield (sourceName, branch)
+            else:
+                for f in filePrefixes:
+                    yield (sourceName, branch, f + '%')
+
+        rsIter = executeIterArgs(cu, query, genArgsList())
         ids = {}
-        for (pathId, path, version, fileId, timeStamp) in cu:
+        for (pathId, path, version, fileId, timeStamp) in rsIter:
             encodedPath = self.fromPath(path)
             if not encodedPath in ids:
                 ids[encodedPath] = (self.fromPathId(pathId),

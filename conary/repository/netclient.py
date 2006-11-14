@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1660,7 +1660,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return contents
 
-    def getPackageBranchPathIds(self, sourceName, branch):
+    def getPackageBranchPathIds(self, sourceName, branch, filePrefixes=None):
         """
         Searches all of the troves generated from sourceName on the
         given branch, and returns the latest pathId for each path
@@ -1671,8 +1671,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @param branch: branch to restrict the source to
         @type branch: versions.Branch
         """
-        ids = self.c[branch].getPackageBranchPathIds(sourceName,
-                                                     self.fromVersion(branch))
+        if filePrefixes is None or self.c[branch]._protocolVersion < 39:
+            args = (sourceName, self.fromVersion(branch))
+        else:
+            args = (sourceName, self.fromVersion(branch), filePrefixes)
+        ids = self.c[branch].getPackageBranchPathIds(*args)
         return dict((self.toPath(x[0]), (self.toPathId(x[1][0]),
                                          self.toVersion(x[1][1]),
                                          self.toFileId(x[1][2])))
