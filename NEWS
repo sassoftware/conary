@@ -16,6 +16,8 @@ Changes in @NEW@:
   o Bug Fixes
     * The build time is now displayed properly as "(unknown)" if a
       trove has no build time set. (CNY-990)
+    * dbsh now properly loads the schema when one of the .show commands is
+      executed. (CNY-1064)
 
 Changes in 1.0.38:
   o Client Changes:
