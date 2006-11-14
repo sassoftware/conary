@@ -18,7 +18,7 @@ import errno
 import traceback
 import sys
 
-from conary import files, trove
+from conary import files, trove, callbacks
 from conary.deps import deps
 from conary.lib import util, openpgpfile, sha1helper
 from conary.repository import changeset, errors, filecontents
@@ -51,6 +51,24 @@ class FilesystemChangeSetJob(ChangeSetJob):
                 nvf = trv.getName(), trv.getVersion(), trv.getFlavor(), 
                 err =  'Attempted to commit incomplete trove %s=%s[%s]' % nvf
                 raise errors.TroveIntegrityError(error=err, *nvf)
+
+    def checkTroveSignatures(self, trv, callback):
+        assert(hasattr(callback, 'verifyTroveSignatures'))
+        if callback.keyCache is None:
+            callback.keyCache = openpgpkey.getKeyCache()
+        for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
+            pubKey = callback.keyCache.getPublicKey(fingerprint)
+            if pubKey.isRevoked():
+                raise openpgpfile.IncompatibleKey('Key %s is revoked'
+                                                  %pubKey.getFingerprint())
+            expirationTime = pubKey.getTimestamp()
+            if expirationTime and expirationTime < timestamp:
+                raise openpgpfile.IncompatibleKey('Key %s is expired'
+                                                  %pubKey.getFingerprint())
+        res = ChangeSetJob.checkTroveSignatures(self, trv, callback)
+        if len(res[1]):
+            raise openpgpfile.KeyNotFound('Repository does not recognize '
+                                          'key: %s'% res[1][0])
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -153,12 +171,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             threshold = TRUST_FULL
         else:
             threshold = TRUST_UNTRUSTED
+        # Callback for signature verification
+        callback = callbacks.UpdateCallback(trustThreshold=threshold,
+                            keyCache=self.troveStore.keyTable.keyCache)
         try:
             # reset time stamps only if we're not mirroring.
             FilesystemChangeSetJob(self, cs, self.serverNameList,
                                    resetTimestamps = not mirror,
-                                   keyCache = self.troveStore.keyTable.keyCache,
-                                   threshold = threshold,
+                                   callback=callback,
                                    mirror = mirror)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error

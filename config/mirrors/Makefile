@@ -21,7 +21,8 @@ mirror_files =	\
                 sourceforge \
                 gnu \
                 cpan \
-                gnome
+                gnome \
+                xorg
 
 
 dist_files = Makefile $(mirror_files)

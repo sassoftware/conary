@@ -76,8 +76,9 @@ cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
-    def __init__(self):
-        callbacks.UpdateCallback.__init__(self)
+    def __init__(self, trustThreshold=0, keyCache=None):
+        callbacks.UpdateCallback.__init__(self, trustThreshold=trustThreshold,
+                                                keyCache=keyCache)
         callbacks.CookCallback.__init__(self)
 
 # makePathId() returns 16 random bytes, for use as a pathId
@@ -128,19 +129,20 @@ def _makeFilter(patterns):
 
     return patternsFilter
 
-def verifyAbsoluteChangeset(cs, trustThreshold = 0):
+def verifyAbsoluteChangeset(cs, callback):
     # go through all the trove change sets we have in this changeset.
     # verify the digital signatures on each piece
     # return code should be the minimum trust on the entire set
-    #verifyDigitalSignatures can raise a
-    #DigitalSignatureVerificationError
+    # Calling the callback's verifyTroveSignatures can raise a
+    # DigitalSignatureVerificationError
+    assert(hasattr(callback, 'verifyTroveSignatures'))
     r = 256
     missingKeys = []
     for troveCs in [ x for x in cs.iterNewTroveList() ]:
         # instantiate each trove from the troveCs so we can verify
         # the signature
         t = trove.Trove(troveCs)
-        verTuple = t.verifyDigitalSignatures(trustThreshold)
+        verTuple = callback.verifyTroveSignatures(t)
         missingKeys.extend(verTuple[1])
         r = min(verTuple[0], r)
     return r
@@ -151,7 +153,7 @@ def checkout(repos, cfg, workDir, nameList, callback=None):
 
 def _checkout(repos, cfg, workDir, name, callback):
     if not callback:
-        callback = CheckinCallback()
+        callback = CheckinCallback(trustThreshold=cfg.trustThreshold)
 
     # We have to be careful with labels
     name, versionStr, flavor = cmdline.parseTroveSpec(name)
@@ -218,7 +220,7 @@ use cvc co %s=<branch> for the following branches:
                                excludeAutoSource = True,
                                callback=callback)
 
-    verifyAbsoluteChangeset(cs, cfg.trustThreshold)
+    verifyAbsoluteChangeset(cs, callback)
 
     troveCs = cs.iterNewTroveList().next()
 
@@ -888,11 +890,12 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
+    # return 0 if no differences, 1 if differences, 2 on error
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
-	return
+	return 2
 
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
@@ -902,11 +905,11 @@ def diff(repos, versionStr = None):
         except errors.TroveNotFound, e:
             log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
-            return
+            return 2
         
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
-	    return
+	    return 2
 
 	oldTrove = repos.getTrove(*pkgList[0])
     else:
@@ -915,12 +918,13 @@ def diff(repos, versionStr = None):
     result = update.buildLocalChanges(repos, 
 	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
             forceSha1=True, ignoreAutoSource = True)
-    if not result: return
+    if not result: return 2
 
     (changeSet, ((isDifferent, newState),)) = result
-    if not isDifferent: return
+    if not isDifferent: return 0
     _showChangeSet(repos, changeSet, oldTrove, state,
                    displayAutoSourceFiles = False)
+    return 1
 
 def _showChangeSet(repos, changeSet, oldTrove, newTrove,
                    displayAutoSourceFiles = True):
