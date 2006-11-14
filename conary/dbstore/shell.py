@@ -338,6 +338,7 @@ type ".quit" to exit, ".help" for help"""
     schemaBits = ('tables', 'triggers', 'functions', 'sequences',
                   'triggers')
     def do__show(self, arg):
+        self.db.loadSchema()
         if arg in self.schemaBits:
             d = getattr(self.db, arg)
             print '\n'.join(sorted(d.keys()))
