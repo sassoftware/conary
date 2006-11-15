@@ -28,6 +28,10 @@ Changes in @NEW@:
       that follows the application of a critical update. (CNY-1034)
     * A condition that was causing sys.exit to not terminate the server
       process when running in coverage mode has been fixed. (CNY-1038)
+    * If a configuration value is a list and has a non-empty default,
+      appending values to that default does not reset that list to empty
+      (Conary itself never triggers this case, but rMake does with
+      defaultBuildReqs). (CNY-1078)
 
 Changes in 1.0.38:
   o Client Changes:
