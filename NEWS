@@ -16,6 +16,10 @@ Changes in @NEW@:
       0 if there are no differences (CNY-938).
     * "cvc cook" is now more efficient in looking up files that are part of
       the built troves (CNY-1008).
+    * added addResolveSource method will will change how dependeny resolution
+      is done when building a group - instead of searching the label path
+      defined in the group for solutions, the resolve source will be searched
+      instead. (CNY-1061)
 
   o Bug Fixes
     * The build time is now displayed properly as "(unknown)" if a

@@ -130,7 +130,10 @@ def normurl(url):
     if surl[2] == '':
         surl[2] = '/'
     else:
-        surl[2] = normpath(surl[2])
+        tail = ''
+        if surl[2].endswith('/'):
+            tail = '/'
+        surl[2] = normpath(surl[2]) + tail
     return urlparse.urlunsplit(surl)
 
 errorMessage = '''

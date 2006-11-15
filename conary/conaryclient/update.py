@@ -2196,7 +2196,7 @@ conary erase '%s=%s[%s]'
                         updateOnly = False, resolveGroupList=None,
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
-                        criticalUpdateInfo=None):
+                        criticalUpdateInfo=None, resolveSource = None):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -2258,6 +2258,11 @@ conary erase '%s=%s[%s]'
         @param criticalUpdateInfo: Settings and data needed for critical
         updates
         @type: CriticalUpdateInfo instance
+        @param resolveSource: Instance of 
+        conaryclient.resolve.DepResolutionMethod to be used for dep resolution.
+        If left blank will be created based on installLabelPath or 
+        resolveGroups.
+        @type: conaryclient.resolv.eDepResolutionMethod instance
         @rtype: tuple
         """
         # FIXME: this API has gotten far out of hand.  Refactor when 
@@ -2278,7 +2283,6 @@ conary erase '%s=%s[%s]'
             uJob.getTroveSource().addChangeSet(changeSet)
 
         forceJobClosure = False
-        resolveSource = None
 
         useAffinity = False
         if fromChangesets:
@@ -2313,7 +2317,6 @@ conary erase '%s=%s[%s]'
             useAffinity = True
 
         if resolveGroupList:
-            resolveRepos = False
             if useAffinity:
                 affinityDb = self.db
             else:
@@ -2327,6 +2330,8 @@ conary erase '%s=%s[%s]'
             groupTroves = self.repos.getTroves(groupTups, withFiles=False)
             resolveSource = resolve.DepResolutionByTroveList(self.cfg, self.db,
                                                              groupTroves)
+        if resolveSource:
+            resolveRepos = False
 
         if migrate:
             jobSet = self._fullMigrate(itemList, uJob, callback)
