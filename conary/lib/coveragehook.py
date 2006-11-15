@@ -67,7 +67,7 @@ def _install():
 
 def _saveState(signal, f):
     save()
-    sys.exit(1)
+    os._exit(1)
 
 def _run(coverage):
     signal.signal(signal.SIGUSR2, _saveState)
