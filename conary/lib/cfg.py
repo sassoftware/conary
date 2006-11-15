@@ -346,7 +346,7 @@ class ConfigFile(_Config):
             self[key] = self._options[key].parseString(self[key], val)
         except KeyError, msg:
             raise ParseError, "%s:%s: unknown config item '%s'" % (fileName,
-                                                                  lineno, key)
+                                                                   lineno, key)
         except ParseError, msg:
             raise ParseError, "%s:%s: %s for configuration item '%s'" \
                                                             % (fileName,
@@ -533,7 +533,7 @@ class ConfigOption:
         """
         self._callListeners()
 
-        if curVal == self.default:
+        if curVal == self.default and self._isDefault:
             return self.valueType.setFromString(curVal, str)
         else:
             return self.valueType.updateFromString(curVal, str)
@@ -575,7 +575,7 @@ class ConfigOption:
     def _callListeners(self):
         for listenFn in self.listeners:
             listenFn(self.name)
-    
+
     def write(self, out, value, displayOptions=None):
         """ Writes a config option name and value.
         """
