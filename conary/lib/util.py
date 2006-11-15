@@ -127,7 +127,10 @@ def recurseDirectoryList(topdir, withDirs=False):
 
 def normurl(url):
     surl = list(urlparse.urlsplit(url))
-    surl[2] = normpath(surl[2])
+    if surl[2] == '':
+        surl[2] = '/'
+    else:
+        surl[2] = normpath(surl[2])
     return urlparse.urlunsplit(surl)
 
 errorMessage = '''
