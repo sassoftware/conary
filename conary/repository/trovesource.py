@@ -994,7 +994,13 @@ class TroveSourceStack(SearchableTroveSource):
 
     def trovesByName(self, name):
         return list(itertools.chain(*(x.trovesByName(name) for x in self.sources)))
-        
+
+    def getTrove(self, name, version, flavor, withFiles = True):
+        trv = self.getTroves([(name, version, flavor)], withFiles=withFiles)[0]
+        if trv is None:
+            raise errors.TroveMissing(name, version)
+        return trv
+
     def getTroves(self, troveList, withFiles = True):
         troveList = list(enumerate(troveList)) # make a copy and add indexes
         numTroves = len(troveList)
@@ -1003,8 +1009,11 @@ class TroveSourceStack(SearchableTroveSource):
         for source in self.sources:
             newTroveList = []
             newIndexes = []
-            troves = source.getTroves([x[1] for x in troveList], 
-                                      withFiles=withFiles)
+            try:
+                troves = source.getTroves([x[1] for x in troveList], 
+                                          withFiles=withFiles)
+            except NotImplementedError:
+                continue
             for ((index, troveTup), trove) in itertools.izip(troveList, troves):
                 if trove is None:
                     newTroveList.append((index, troveTup))
