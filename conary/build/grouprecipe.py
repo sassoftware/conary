@@ -213,6 +213,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self.macros.update(extraMacros)
 
         self.replaceSpecs = []
+        self.resolveTroveSpecs = []
 
         _BaseGroupRecipe.__init__(self)
         group = self.createGroup(self.name, depCheck = self.depCheck,
@@ -726,6 +727,24 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         self._setDefaultGroup(self._getGroup(groupName))
 
+    def addResolveSource(self, name, versionStr = None, flavor = None,
+                         ref = None, use = True):
+        """
+        FIXME: create docs this.
+
+        Adds a resolution source for resolving dependencies.  When you specify
+        a resolve source, that source will be searched for dependencies,
+        and your labelPath will not be searched.  If you do not use any
+        resolveSource lines, then your labelPath will be searched for solutions
+        for dependencies.
+
+        NOTE: This does not imply autoResolve, since autoResolve is a per-group
+        option and addResolveSource is globally defined.
+        """
+        if use:
+            flavor = self._parseFlavor(flavor)
+            self.resolveTroveSpecs.append(((name, versionStr, flavor), ref))
+
     def addReference(self, name, versionStr = None, flavor = None, ref = None):
         """
         NAME
@@ -878,6 +897,9 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def getLabelPath(self):
         return self.labelPath
+
+    def getResolveTroveSpecs(self):
+        return self.resolveTroveSpecs
 
     def getSearchFlavor(self):
         return self.flavor
@@ -1371,12 +1393,18 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     replaceSpecs = dict(recipeObj.iterReplaceSpecs())
     log.info('Getting initial set of troves for'
              ' building all %s groups' % (len(recipeObj.iterGroupList())))
+    resolveSpecs = recipeObj.getResolveTroveSpecs()
     troveMap = findTrovesForGroups(repos, recipeObj.iterGroupList(),
-                                   replaceSpecs,
+                                   replaceSpecs, resolveSpecs,
                                    labelPath, flavor, callback)
     troveTupList = list(chain(*chain(*(x.values() for x in troveMap.itervalues()))))
     cache.cacheTroves(troveTupList)
     log.info('Troves cached.')
+
+    # get resolve source to be used for dependency resolution.
+    resolveSource = getResolveSource(recipeObj.getResolveTroveSpecs(),
+                                     troveMap, cache, cfg)
+
 
     groupsWithConflicts = {}
 
@@ -1430,8 +1458,9 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         if group.autoResolve:
             callback.done()
             log.info('Resolving dependencies...')
-            resolveGroupDependencies(group, cache, cfg, 
-                                     repos, labelPath, flavor, callback)
+            resolveGroupDependencies(group, cache, cfg,
+                                     repos, labelPath, flavor, callback,
+                                     resolveSource)
 
         if group.depCheck:
             callback.done()
@@ -1460,12 +1489,15 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
 
 
-def findTrovesForGroups(repos, groupList, replaceSpecs, labelPath, 
-                        searchFlavor, callback):
+def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
+                        labelPath, searchFlavor, callback):
     toFind = {}
     troveMap = {}
 
     for troveSpec, refSource in replaceSpecs:
+        toFind.setdefault(refSource, set()).add(troveSpec)
+
+    for troveSpec, refSource in resolveSpecs:
         toFind.setdefault(refSource, set()).add(troveSpec)
 
     for group in groupList:
@@ -1931,10 +1963,24 @@ def addPackagesForComponents(group, repos, troveCache):
             group.addTrove(comp, False, byDefault, [],
                            reason=(ADD_REASON_ADDED,))
 
+def getResolveSource(troveSpecList, troveMap, cache, cfg):
+    """
+        Returns the resolveSource object to be used for dep resolution.
+        If no resolveTroves have been added, then will return None.
+    """
+    if troveSpecList:
+        resolveTups = []
+        for troveSpec, ref in troveSpecList:
+            resolveTups.extend(troveMap[ref][troveSpec])
+        resolveTroves = [ cache[x] for x in resolveTups ]
+        resolveSource = conaryclient.resolve.DepResolutionByTroveList(cfg,
+                                                None, resolveTroves)
+    else:
+        resolveSource = None
+    return resolveSource
 
-
-def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor, 
-                             callback):
+def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
+                             callback, resolveSource):
     """ 
         Add in any missing dependencies to group
     """
@@ -1970,7 +2016,9 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     updJob, suggMap = client.updateChangeSet(troves, recurse = False,
                                              resolveDeps = True,
                                              test = True,
-                                             checkPathConflicts=False)
+                                             checkPathConflicts=False,
+                                             resolveSource=resolveSource)
+
     if resetVerbosity:
         log.setVerbosity(log.LOWLEVEL)
 
