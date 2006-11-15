@@ -3,6 +3,8 @@ Changes in @NEW@:
     * A signature callback has been added, which allows one to catch the
       troves with bad signatures and react appropriately (display an error
       message, lower trust level) (CNY-1008)
+    * The conary.lib.conarylogparse module has been added to provide
+      parsed access to conary log files. (CNY-1075)
 
   o Build Changes:
     * The commitRelativeChangeset configuration item has been added
@@ -18,6 +20,8 @@ Changes in @NEW@:
       trove has no build time set. (CNY-990)
     * dbsh now properly loads the schema when one of the .show commands is
       executed. (CNY-1064)
+    * The Conary client version is saved before the re-execution of conary
+      that follows the application of a critical update. (CNY-1034)
 
 Changes in 1.0.38:
   o Client Changes:
