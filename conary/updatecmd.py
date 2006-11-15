@@ -553,12 +553,11 @@ def _storeJobInfo(remainingJobs, changeSetSource):
 
 def _loadRestartInfo(restartDir):
     changeSetList = []
-    # Files starting with underscore are not changesets, skip them
+    # Skip files that are not changesets (.ccs).
     # This was the first attempt to fix CNY-1034, but it would break
     # old clients.
-    # Nevertheless the code now ignores files that start with underscore.
-    filelist = [ x for x in os.listdir(restartDir)
-                   if not x.startswith('_') and x != 'joblist' ]
+    # Nevertheless the code now ignores files everything but .ccs files
+    filelist = [ x for x in os.listdir(restartDir) if x.endswith('.ccs') ]
     for path in filelist:
         cs = changeset.ChangeSetFromFile(os.path.join(restartDir, path))
         changeSetList.append(cs)
