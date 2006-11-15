@@ -20,6 +20,7 @@ import urllib2
 
 from conary import callbacks
 from conary import conaryclient
+from conary import constants
 from conary import display
 from conary import errors
 from conary import versions
@@ -526,11 +527,39 @@ def _storeJobInfo(remainingJobs, changeSetSource):
         jobStrs.append(''.join(jobStr))
     jobFile.write('\n'.join(jobStrs))
     jobFile.close()
+    # Write the version of the conary client
+    # CNY-1034: we need to save more information about the currently running
+    # client; upon restart, the new client may later check the old client's
+    # version and recompute the update set if the old client was buggy.
+
+    # Unfortunately, _loadRestartInfo will only ignore joblist, so we can't
+    # drop a state file in the same restartDir. We'll create a new directory
+    # and save the version file there.
+    extraDir = restartDir + "misc"
+    try:
+        os.mkdir(extraDir)
+    except OSError, e:
+        # restartDir was a temporary directory, the likelyhood of extraDir
+        # existing is close to zero
+        # Just in case, remove the existing directory and re-create it
+        util.rmtree(extraDir, ignore_errors=True)
+        os.mkdir(extraDir)
+
+    versionFilePath = os.path.join(extraDir, "__version__")
+    versionFile = open(versionFilePath, "w+")
+    versionFile.write("version %s\n" % constants.version)
+    versionFile.close()
     return restartDir
 
 def _loadRestartInfo(restartDir):
     changeSetList = []
-    for path in [ x for x in os.listdir(restartDir) if x != 'joblist']:
+    # Files starting with underscore are not changesets, skip them
+    # This was the first attempt to fix CNY-1034, but it would break
+    # old clients.
+    # Nevertheless the code now ignores files that start with underscore.
+    filelist = [ x for x in os.listdir(restartDir)
+                   if not x.startswith('_') and x != 'joblist' ]
+    for path in filelist:
         cs = changeset.ChangeSetFromFile(os.path.join(restartDir, path))
         changeSetList.append(cs)
     jobSetPath = os.path.join(restartDir, 'joblist')
@@ -547,6 +576,9 @@ def _loadRestartInfo(restartDir):
             newVersion = None
         finalJobSet.append((job[0], (oldVersion, job[1][1]), 
                             (newVersion, job[2][1]), job[3]))
+    # If there was something to be done with the version information, it would
+    # be performed by now. Clean up the misc directory
+    util.rmtree(restartDir + "misc", ignore_errors=True)
     return finalJobSet, changeSetList
 
 # we grab a url from the repo based on our version and flavor,
