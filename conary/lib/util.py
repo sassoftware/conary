@@ -129,7 +129,7 @@ def normurl(url):
     surl = list(urlparse.urlsplit(url))
     if surl[2] == '':
         surl[2] = '/'
-    else:
+    elif surl[2] != '/':
         tail = ''
         if surl[2].endswith('/'):
             tail = '/'
