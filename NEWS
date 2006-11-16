@@ -14,6 +14,10 @@ Changes in @NEW@:
     * A list of X.org mirrors has been added to the default mirrors.
     * "cvc diff" now returns 2 on error, 1 if there are differences, and
       0 if there are no differences (CNY-938).
+    * added addResolveSource method will will change how dependeny resolution
+      is done when building a group - instead of searching the label path
+      defined in the group for solutions, the resolve source will be searched
+      instead. (CNY-1061)
 
   o Bug Fixes
     * The build time is now displayed properly as "(unknown)" if a
@@ -24,6 +28,10 @@ Changes in @NEW@:
       that follows the application of a critical update. (CNY-1034)
     * A condition that was causing sys.exit to not terminate the server
       process when running in coverage mode has been fixed. (CNY-1038)
+    * If a configuration value is a list and has a non-empty default,
+      appending values to that default does not reset that list to empty
+      (Conary itself never triggers this case, but rMake does with
+      defaultBuildReqs). (CNY-1078)
 
 Changes in 1.0.38:
   o Client Changes:

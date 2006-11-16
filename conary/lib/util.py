@@ -29,6 +29,7 @@ import sys
 import tempfile
 import time
 import traceback
+import urlparse
 import weakref
 
 from conary.lib import fixedglob, log
@@ -123,6 +124,17 @@ def recurseDirectoryList(topdir, withDirs=False):
         if withDirs:
             # This is useful if one wants to catch empty directories
             yield item
+
+def normurl(url):
+    surl = list(urlparse.urlsplit(url))
+    if surl[2] == '':
+        surl[2] = '/'
+    elif surl[2] != '/':
+        tail = ''
+        if surl[2].endswith('/'):
+            tail = '/'
+        surl[2] = normpath(surl[2]) + tail
+    return urlparse.urlunsplit(surl)
 
 errorMessage = '''
 *******************************************************************

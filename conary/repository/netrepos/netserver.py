@@ -1407,6 +1407,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
         base = self.urlBase()
+        url = util.normurl(url)
         if not url.startswith(base):
             raise errors.RepositoryError(
                 'The changeset that is being committed was not '
