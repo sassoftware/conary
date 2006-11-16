@@ -1720,7 +1720,9 @@ class _dependency(policy.Policy):
         return m and (m.name == 'java' or m.name == 'jar') and self._hasContents(m, contents)
 
     def _isPerlModule(self, path):
-        return path.endswith('.pm') or path.endswith('.pl')
+        return (path.endswith('.pm') or
+                path.endswith('.pl') or
+                path.endswith('.ph'))
 
     def _isPerl(self, path, m, f):
         return self._isPerlModule(path) or (
