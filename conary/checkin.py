@@ -1198,6 +1198,51 @@ def merge(repos, versionSpec=None, callback=None):
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
 
+def markRemoved(cfg, repos, troveSpec):
+    troveSpec = cmdline.parseTroveSpec(troveSpec)
+    trvList = repos.findTrove(cfg.buildLabel, troveSpec,
+                              defaultFlavor = cfg.flavor)
+    if len(trvList) > 1:
+        log.error("multiple troves found " + 
+            " ".join([ "%s=%s[%s]" % x for x in trvList ] ))
+        return 1
+
+    # XXX should this do a full recursive descent? seems scary.
+    existingTrove = repos.getTrove(withFiles = False, *trvList[0])
+    if not existingTrove.getName().startswith('group'):
+        trvList += [ x for x in
+                     existingTrove.iterTroveList(strongRefs = True) ]
+
+    cs = changeset.ChangeSet()
+
+    for (name, version, flavor) in trvList:
+        trv = trove.Trove(name, version, flavor,
+                          type = trove.TROVE_TYPE_REMOVED)
+        trv.computeSignatures()
+        signatureKey = selectSignatureKey(cfg,
+                                          version.trailingLabel().asString())
+        if signatureKey is not None:
+            # skip integrity checks since we just want to compute the
+            # new sha1 with all our changes accounted for
+            trv.addDigitalSignature(signatureKey, skipIntegrityChecks=True)
+
+        cs.newTrove(trv.diff(None, absolute = True)[0])
+
+    # XXX This forces interactive mode for removing troves. Seems like a good
+    # idea.
+    if True or cfg.interactive:
+        print 'The contents of the following troves will be removed:'
+        print
+        for (name, version, flavor) in trvList:
+            print '\t%s=%s[%s]' % (name, version.asString(), str(flavor))
+        print
+        okay = cmdline.askYn('continue with commit? [Y/n]', default=True)
+
+        if not okay:
+            return
+
+    repos.commitChangeSet(cs)
+
 def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
              repos=None, defaultToText=True):
     assert(not text or not binary)

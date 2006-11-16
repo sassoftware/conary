@@ -30,6 +30,8 @@ from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
+from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
+                                        TROVE_QUERY_NORMAL
 from conary.repository.netrepos import cacheset, calllog
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
@@ -40,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39 ]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -77,18 +79,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'listAccessGroups',
                         'updateAccessGroupMembers',
                         'setUserGroupCanMirror',
+                        'listAcls',
                         'addAcl',
                         'editAcl',
+                        'deleteAcl',
                         'changePassword',
                         'getUserGroups',
                         'addEntitlement',
+                        'addEntitlements',
                         'addEntitlementGroup',
                         'deleteEntitlementGroup',
                         'addEntitlementOwnerAcl',
                         'deleteEntitlementOwnerAcl',
                         'deleteEntitlement',
+                        'deleteEntitlements',
                         'listEntitlements',
                         'listEntitlementGroups',
+                        'getEntitlementClassAccessGroup',
+                        'setEntitlementClassAccessGroup',
                         'updateMetadata',
                         'getMetadata',
                         'troveNames',
@@ -99,6 +107,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getTroveLeavesByBranch',
                         'getTroveLeavesByLabel',
                         'getTroveVersionsByLabel',
+                        'getTrovesByPaths',
                         'getFileContents',
                         'getTroveLatestVersion',
                         'getChangeSet',
@@ -414,8 +423,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.auth.setMirror(userGroup, canMirror)
         return True
 
+    def listAcls(self, authToken, clientVersion, userGroup):
+        if not self.auth.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], userGroup)
+
+        returner = list()
+        for acl in self.auth.getPermsByGroup(userGroup):
+            if acl['label'] is None:
+                acl['label'] = ""
+            if acl['item'] is None:
+                acl['item'] = ""
+            returner.append(acl)
+        return returner
+
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, admin):
+               label, write, capped, admin, remove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
@@ -432,12 +455,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             label = None
 
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         admin)
+                         admin, remove = remove)
+
+        return True
+
+    def deleteAcl(self, authToken, clientVersion, userGroup, trovePattern,
+               label):
+        if not self.auth.check(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], userGroup, trovePattern, label)
+        if trovePattern == "":
+            trovePattern = None
+
+        if label == "":
+            label = None
+
+        self.auth.deleteAcl(userGroup, label, trovePattern)
 
         return True
 
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write, capped, admin):
+                oldLabel, trovePattern, label, write, capped, admin,
+                canRemove = False):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
@@ -463,7 +502,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin)
+            write, capped, admin, canRemove = canRemove)
 
         return True
 
@@ -483,17 +522,32 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         r = self.auth.getUserGroups(authToken[0])
         return r
 
-    def addEntitlement(self, authToken, clientVersion, entGroup, entitlement):
+    def addEntitlement(self, authToken, clientVersion, *args):
+        raise errors.InvalidClientVersion(
+            'conary 1.1.x is required to manipulate entitlements in '
+            'this repository server')
+
+    def addEntitlements(self, authToken, clientVersion, entGroup, 
+                        entitlements):
         # self.auth does its own authentication check
-        entitlement = self.toEntitlement(entitlement)
-        self.auth.addEntitlement(authToken, entGroup, entitlement)
+        for entitlement in entitlements:
+            entitlement = self.toEntitlement(entitlement)
+            self.auth.addEntitlement(authToken, entGroup, entitlement)
+
         return True
 
-    def deleteEntitlement(self, authToken, clientVersion, entGroup, 
-                          entitlement):
+    def deleteEntitlement(self, authToken, clientVersion, *args):
+        raise errors.InvalidClientVersion(
+            'conary 1.1.x is required to manipulate entitlements in '
+            'this repository server')
+
+    def deleteEntitlements(self, authToken, clientVersion, entGroup, 
+                           entitlements):
         # self.auth does its own authentication check
-        entitlement = self.toEntitlement(entitlement)
-        self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+        for entitlement in entitlements:
+            entitlement = self.toEntitlement(entitlement)
+            self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+
         return True
 
     def addEntitlementGroup(self, authToken, clientVersion, entGroup,
@@ -529,6 +583,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # list of entitlements being displayed to those the user has
         # permissions to manage
         return self.auth.listEntitlementGroups(authToken)
+
+    def getEntitlementClassAccessGroup(self, authToken, clientVersion,
+                                         classList):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to the admin user
+        return self.auth.getEntitlementClassAccessGroup(authToken, classList)
+
+    def setEntitlementClassAccessGroup(self, authToken, clientVersion,
+                                         classInfo):
+        # self.auth does its own authentication check and restricts the
+        # list of entitlements being displayed to the admin user
+        self.auth.setEntitlementClassAccessGroup(authToken, classInfo)
+        return ""
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
@@ -607,6 +674,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         entries = cu.next()[0]
         self.log(4, "created temporary table gtvlTbl", entries)
 
+    def _latestType(self, queryType):
+        return queryType
+
     _GTL_VERSION_TYPE_NONE = 0
     _GTL_VERSION_TYPE_LABEL = 1
     _GTL_VERSION_TYPE_VERSION = 2
@@ -616,7 +686,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                       versionType = _GTL_VERSION_TYPE_NONE,
                       latestFilter = _GET_TROVE_ALL_VERSIONS,
                       flavorFilter = _GET_TROVE_ALL_FLAVORS,
-                      withFlavors = False):
+                      withFlavors = False,
+                      troveTypes = TROVE_QUERY_PRESENT):
         self.log(3, versionType, latestFilter, flavorFilter)
         cu = self.db.cursor()
         singleVersionSpec = None
@@ -693,16 +764,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we establish the execution domain out into the Nodes table
         # keep in mind: "leaves" == Latest ; "all" == Instances
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            coreQdict["domain"] = """\
-            JOIN Latest AS Domain USING (itemId)
-            JOIN Nodes USING (itemId, branchId, versionId) """
-        else:
-            # We're not using USING() here because of a MySQL bug
-            # http://bugs.mysql.com/bug.php?id=23223
-            coreQdict["domain"] = """\
-            JOIN Instances AS Domain ON
+            coreQdict["domain"] = """
+            JOIN Latest AS Domain ON
                 Items.itemId = Domain.itemId AND
-                Domain.isPresent = 1
+                Domain.latestType = :ltype
+            JOIN Nodes ON
+                Domain.itemId = Nodes.itemId AND
+                Domain.branchId = Nodes.branchId AND
+                Domain.versionId = Nodes.versionId """
+            argDict["ltype"] = self._latestType(troveTypes)
+        else:
+            if troveTypes == TROVE_QUERY_ALL:
+                coreQdict["domain"] = """
+                JOIN Instances AS Domain USING (itemId)"""
+            else:
+                if troveTypes == TROVE_QUERY_PRESENT:
+                    s = "!= :ttype"
+                    argDict["ttype"] = trove.TROVE_TYPE_REMOVED
+                else:
+                    assert(troveTypes == TROVE_QUERY_NORMAL)
+                    s = "= :ttype"
+                    argDict["ttype"] = trove.TROVE_TYPE_NORMAL
+                coreQdict["domain"] = """
+                JOIN Instances AS Domain ON
+                    Items.itemId = Domain.itemId AND
+                    Domain.troveType %s AND
+                    Domain.isPresent=1""" % s
+            coreQdict["domain"] += """
             JOIN Nodes ON
                 Domain.itemId = Nodes.itemId AND
                 Domain.versionId = Nodes.versionId """
@@ -724,8 +812,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                    PerItems.item as acl,
                    Permissions.permissionId as aclId
                FROM
-                   Permissions
-                   JOIN Items as PerItems USING (itemId)
+                   Permissions JOIN Items as PerItems ON
+                       Permissions.itemId = PerItems.itemId
                WHERE
                    Permissions.userGroupId IN (%(ugid)s)
             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
@@ -980,7 +1068,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             names.add(trove)
         return list(names)
 
-    def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
+    def getTroveVersionList(self, authToken, clientVersion, troveSpecs,
+                            troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         troveFilter = {}
         for name, flavors in troveSpecs.iteritems():
@@ -992,17 +1081,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             else:
                 troveFilter[name] = { None : None }
         return self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withFlavors = True)
+                                  withFlavors = True,
+                                  troveTypes = troveTypes)
 
     def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
-                               bestFlavor):
+                               bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion, troveSpecs,
                               bestFlavor, self._GTL_VERSION_TYPE_VERSION,
-                              latestFilter = self._GET_TROVE_ALL_VERSIONS)
+                              latestFilter = self._GET_TROVE_ALL_VERSIONS,
+                              troveTypes = troveTypes)
 
     def getAllTroveLeaves(self, authToken, clientVersion, troveSpecs,
-                          flavorFilter = 0):
+                          troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         troveFilter = {}
         for name, flavors in troveSpecs.iteritems():
@@ -1015,8 +1106,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # dispatch the more complex version to the old getTroveList
         if not troveSpecs == { '' : True }:
             return self._getTroveList(authToken, clientVersion, troveFilter,
-                                      latestFilter = self._GET_TROVE_VERY_LATEST,
-                                      withFlavors = True)
+                                  latestFilter = self._GET_TROVE_VERY_LATEST,
+                                  withFlavors = True, troveTypes = troveTypes)
 
         cu = self.db.cursor()
 
@@ -1025,6 +1116,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         groupIds = self.auth.getAuthGroups(cu, authToken)
         if not groupIds:
             return {}
+
+        latestType = self._latestType(troveTypes)
 
         query = """
         select
@@ -1048,7 +1141,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Items on Latest.itemId = Items.itemId
         join Flavors on Latest.flavorId = Flavors.flavorId
         join Versions on Latest.versionId = Versions.versionId
-        """ % ",".join("%d" % x for x in groupIds)
+        where
+            Latest.latestType = %d
+        """ % (",".join("%d" % x for x in groupIds), latestType)
         self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
@@ -1070,7 +1165,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ret
 
     def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs,
-                              bestFlavor, versionType, latestFilter):
+                              bestFlavor, versionType, latestFilter,
+                              troveTypes = TROVE_QUERY_PRESENT):
         self.log(3, troveSpecs)
         hasFlavors = False
         d = {}
@@ -1101,43 +1197,44 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   flavorFilter = flavorFilter,
                                   versionType = versionType,
                                   latestFilter = latestFilter,
-                                  withFlavors = True)
+                                  withFlavors = True, troveTypes = troveTypes)
 
     def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
-                                 bestFlavor):
+                                 bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH,
-                                          self._GET_TROVE_ALL_VERSIONS)
+                                          self._GET_TROVE_ALL_VERSIONS,
+                                          troveTypes = troveTypes)
 
     def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
-                               bestFlavor):
+                               bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_BRANCH,
-                                          self._GET_TROVE_VERY_LATEST)
+                                          self._GET_TROVE_VERY_LATEST,
+                                          troveTypes = troveTypes)
 
-    def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList,
-                              labelStr, flavorFilter = None):
-        troveSpecs = troveNameList
+    def getTroveLeavesByLabel(self, authToken, clientVersion, troveSpecs,
+                              bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, troveSpecs)
-        bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_LABEL,
-                                          self._GET_TROVE_VERY_LATEST)
+                                          self._GET_TROVE_VERY_LATEST,
+                                          troveTypes = troveTypes)
 
     def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList,
-                              labelStr, flavorFilter = None):
+                                bestFlavor, troveTypes = TROVE_QUERY_PRESENT):
         troveSpecs = troveNameList
         self.log(2, troveSpecs)
-        bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
                                           troveSpecs, bestFlavor,
                                           self._GTL_VERSION_TYPE_LABEL,
-                                          self._GET_TROVE_ALL_VERSIONS)
+                                          self._GET_TROVE_ALL_VERSIONS,
+                                          troveTypes = troveTypes)
 
     def getFileContents(self, authToken, clientVersion, fileList):
         self.log(2, "fileList", fileList)
@@ -1184,11 +1281,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             os.close(fd)
 
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName,
-                              branchStr):
+                              branchStr, troveTypes = TROVE_QUERY_PRESENT):
         self.log(2, pkgName, branchStr)
         r = self.getTroveLeavesByBranch(authToken, clientVersion,
                                 { pkgName : { branchStr : None } },
-                                True)
+                                True, troveTypes = troveTypes)
         if pkgName not in r:
             return 0
         elif len(r[pkgName]) != 1:
@@ -1227,10 +1324,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                          withFiles = withFiles,
                                          withFileContents = withFileContents,
                                          excludeAutoSource = excludeAutoSource)
-        (newCs, trovesNeeded, filesNeeded) = ret
+        (newCs, trovesNeeded, filesNeeded, removedTroves) = ret
         cs.merge(newCs)
 
-        return (cs, trovesNeeded, filesNeeded)
+        return (cs, trovesNeeded, filesNeeded, removedTroves)
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
@@ -1289,6 +1386,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pathList = []
         newChgSetList = []
         allFilesNeeded = []
+        allRemovedTroves = []
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -1308,13 +1406,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                         withFileContents = withFileContents,
                                         excludeAutoSource = excludeAutoSource)
 
-                (cs, trovesNeeded, filesNeeded) = ret
+                (cs, trovesNeeded, filesNeeded, removedTroves) = ret
 
                 # look up the version w/ timestamps
                 primary = (l[0], l[2][0], l[2][1])
-                trvCs = cs.getNewTroveVersion(*primary)
-                primary = (l[0], trvCs.getNewVersion(), l[2][1])
-                cs.addPrimaryTrove(*primary)
+                try:
+                    trvCs = cs.getNewTroveVersion(*primary)
+                    primary = (l[0], trvCs.getNewVersion(), l[2][1])
+                    cs.addPrimaryTrove(*primary)
+                except KeyError:
+                    # primary troves could be in the externalTroveList, in
+                    # which case they aren't primries
+                    pass
 
                 (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                                  suffix = '.tmp')
@@ -1326,15 +1429,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 						  withFileContents,
 						  excludeAutoSource,
 						  (trovesNeeded,
-						   filesNeeded),
+						   filesNeeded,
+                                                   removedTroves),
                                                   size = size)
 
                 os.rename(tmpPath, path)
             else:
-                path, (trovesNeeded, filesNeeded), size = cacheEntry
+                path, otherDetails, size = cacheEntry
+                if len(otherDetails) == 2:
+                    # conary 1.0 caches
+                   (trovesNeeded, filesNeeded) = otherDetails
+                   removedTroves = []
+                else:
+                   (trovesNeeded, filesNeeded, removedTroves) = otherDetails
 
             newChgSetList += _cvtTroveList(trovesNeeded)
             allFilesNeeded += _cvtFileList(filesNeeded)
+            allRemovedTroves += removedTroves
 
             pathList.append((path, size))
 
@@ -1348,7 +1459,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             f.write("%s %d\n" % (path, size))
         f.close()
 
-        return url, sizes, newChgSetList, allFilesNeeded
+        if clientVersion < 38:
+            if allRemovedTroves:
+                raise errors.TroveMissing(allRemovedTroves[0][0],
+                                          version = allRemovedTroves[0][1][0])
+            else:
+                return url, sizes, newChgSetList, allFilesNeeded
+
+        return url, sizes, newChgSetList, allFilesNeeded, \
+               _cvtTroveList(allRemovedTroves)
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
 	if not self.auth.check(authToken, write = False,
@@ -1391,19 +1510,44 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return result
 
+    def _checkCommitPermissions(self, authToken, verList, mirror):
+        for name, oldVer, newVer in verList:
+            assert(newVer)
+            newLabel = newVer.branch().label()
+            if not self.auth.check(authToken, write = True, mirror = mirror,
+                                   label = newLabel,
+                                   trove = name):
+                raise errors.InsufficientPermission
+            if oldVer:
+                oldLabel = oldVer.branch().label()
+                if not self.auth.check(authToken, write = True,
+                                       mirror = mirror, label = oldLabel,
+                                       trove = name):
+                    raise errors.InsufficientPermission
 
+    def prepareChangeSet(self, authToken, clientVersion, jobList=None,
+                         mirror=False):
+        def _convertJobList(jobList):
+            for name, oldInfo, newInfo, absolute in jobList:
+                oldVer = oldInfo[0]
+                newVer = newInfo[0]
+                if oldVer:
+                    oldVer = self.toVersion(oldVer)
+                if newVer:
+                    newVer = self.toVersion(newVer)
+                yield name, oldVer, newVer
 
-    def prepareChangeSet(self, authToken, clientVersion):
-	# make sure they have a valid account and permission to commit to
-	# *something*
-	if not self.auth.check(authToken, write = True):
-	    raise errors.InsufficientPermission
+        if jobList:
+            self._checkCommitPermissions(authToken, _convertJobList(jobList),
+                                         mirror)
+
         self.log(2, authToken[0])
-	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
-	os.close(fd)
+  	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
+  	os.close(fd)
 	fileName = os.path.basename(path)
 
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
+
 
     def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
         base = self.urlBase()
@@ -1455,27 +1599,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def _commitChangeSet(self, authToken, cs, mirror = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
+
+        verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
+                    for x in cs.iterNewTroveList())
+        self._checkCommitPermissions(authToken, verList, mirror)
+
         items = {}
+        removedList = []
+        # check removed permissions; _checkCommitPermissions can't do
+        # this for us since it's based on the trove type
         for troveCs in cs.iterNewTroveList():
-            name = troveCs.getName()
-            version = troveCs.getNewVersion()
-            flavor = troveCs.getNewFlavor()
-            if not self.auth.check(authToken, write = True, mirror = mirror,
+            if troveCs.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
+
+            removedList.append(troveCs.getNewNameVersionFlavor())
+            (name, version, flavor) = troveCs.getNewNameVersionFlavor()
+
+            if not self.auth.check(authToken, mirror = mirror, remove = True,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
 
-            oldVersion = troveCs.getOldVersion()
-            if oldVersion is not None and \
-               not self.auth.check(authToken, mirror = mirror,
-                                   label = oldVersion.branch().label(),
-                                   trove = name):
-                raise errors.InsufficientPermission
-
             items.setdefault((version, flavor), []).append(name)
+
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, mirror = mirror)
+
+        for info in removedList:
+            self.cache.invalidateEntry(self.repos, *info)
+
 	if not self.commitAction:
 	    return True
 
@@ -1609,7 +1762,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return l[0]
 
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName,
-                                branch):
+                                branch, filePrefixes=None):
+        # filePrefixes should be a list of prefixes to look for
+        # It tries to limit the number of results for things that generate
+        # unique paths with each build (e.g. the kernel).
+        # Added as part of protocol version 39
 	if not self.auth.check(authToken, write = False,
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
@@ -1635,16 +1792,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             TroveFiles.streamId = FileStreams.streamId
         WHERE
             Items.item = ? AND
-            Branches.branch = ?
+            Branches.branch = ?%s
         ORDER BY
             Nodes.finalTimestamp DESC
         """
-        args = [sourceName, branch]
-        cu.execute(query, args)
-        self.log(4, "execute query", query, args)
 
+        if filePrefixes is None:
+            query = query % ''
+        else:
+            # Add the filtering by path prefix
+            query = query % " AND\n            TroveFiles.path LIKE ?"
+
+        def executeIterArgs(cursor, query, argsList):
+            # Execute query by iterating over the list of arguments
+            # Result set is the union of the result sets on each argument list
+            for args in argsList:
+                cursor.execute(query, args)
+                self.log(4, "execute query", query, args)
+                for tup in cursor:
+                    yield tup
+
+        def genArgsList():
+            if filePrefixes is None:
+                yield (sourceName, branch)
+            else:
+                for f in filePrefixes:
+                    yield (sourceName, branch, f + '%')
+
+        rsIter = executeIterArgs(cu, query, genArgsList())
         ids = {}
-        for (pathId, path, version, fileId, timeStamp) in cu:
+        for (pathId, path, version, fileId, timeStamp) in rsIter:
             encodedPath = self.fromPath(path)
             if not encodedPath in ids:
                 ids[encodedPath] = (self.fromPathId(pathId),
@@ -1706,6 +1883,84 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             results[row]= self.auth.checkTrove(pattern, name)
 
         return results
+
+    def getTrovesByPaths(self, authToken, clientVersion, pathList, label,
+                         all=False):
+        self.log(2, pathList, label, all)
+        cu = self.db.cursor()
+        schema.resetTable(cu, 'trovesByPathTmp')
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return {}
+
+        for row, path in enumerate(pathList):
+            cu.execute("INSERT INTO trovesByPathTmp (row, path) "
+                       "VALUES (?, ?)", row, path)
+
+
+        # FIXME: MySQL 5.0.18 does not like "SELECT row, ..." so we are
+        # explicit
+        query = """SELECT trovesByPathTmp.row, item, version, flavor,
+                          timeStamps, UP.permittedTrove 
+                        FROM trovesByPathTmp 
+                        JOIN TroveFiles USING(path)
+                        JOIN Instances USING(instanceId)
+                        JOIN Nodes ON
+                            Nodes.itemId = Instances.itemId AND
+                            Nodes.versionId = Instances.versionId
+                        JOIN LabelMap ON
+                            Nodes.itemId = LabelMap.itemId AND
+                            Nodes.branchId = LabelMap.branchId
+                        JOIN Labels USING(labelId)
+                        JOIN (SELECT
+                               Permissions.labelId as labelId,
+                               PerItems.item as permittedTrove,
+                               Permissions.permissionId as aclId
+                           FROM
+                               Permissions
+                               join Items as PerItems using (itemId)
+                           WHERE
+                               Permissions.userGroupId in (%s)
+                           ) as UP ON
+                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+                        JOIN Items ON 
+                            (Instances.itemId = Items.itemId)
+                        JOIN Versions ON 
+                            (Instances.versionId = Versions.versionId)
+                        JOIN Flavors ON
+                            (Instances.flavorId = Flavors.flavorId)
+                        WHERE
+                            Instances.isPresent = 1 
+                            AND Labels.label = ?
+                        ORDER BY
+                            Nodes.finalTimestamp DESC
+                    """ % ",".join("%d" % x for x in userGroupIds)
+        cu.execute(query, label)
+
+        if all:
+            results = [[] for x in pathList]
+            for idx, name, versionStr, flavor, timeStamps, pattern in cu:
+                if not self.auth.checkTrove(pattern, name):
+                    continue
+                version = versions.VersionFromString(versionStr, 
+                        timeStamps=[float(x) for x in timeStamps.split(':')])
+                branch = version.branch()
+                results[idx].append((name, self.freezeVersion(version), flavor))
+            return results
+
+        results = [ {} for x in pathList ]
+        for idx, name, versionStr, flavor, timeStamps, pattern in cu:
+            if not self.auth.checkTrove(pattern, name):
+                continue
+
+            version = versions.VersionFromString(versionStr, 
+                        timeStamps=[float(x) for x in timeStamps.split(':')])
+            branch = version.branch()
+            results[idx].setdefault((name, branch, flavor), 
+                                    self.freezeVersion(version))
+        return [ [ (y[0][0], y[1], y[0][2]) for y in x.iteritems()] 
+                                                            for x in results ]
 
     def getCollectionMembers(self, authToken, clientVersion, troveName,
                              branch):
@@ -1848,7 +2103,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             VALUES (?, ?, ?)
             """, (instanceId, trove._TROVEINFO_TAG_SIGS,
                   cu.binary(trv.troveInfo.sigs.freeze())))
-        self.cache.invalidateEntry(trv.getName(), trv.getVersion(),
+        self.cache.invalidateEntry(self.repos, trv.getName(), trv.getVersion(),
                                    trv.getFlavor())
         return True
 
@@ -2108,7 +2363,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 updateCount += 1
                 invalidate = True
             if invalidate:
-                self.cache.invalidateEntry(name, self.toVersion(version),
+                self.cache.invalidateEntry(self.repos, name,
+                                           self.toVersion(version),
                                            self.toFlavor(flavor))
 
         return updateCount
