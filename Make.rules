@@ -37,7 +37,7 @@ default-all:
 	echo "nothing to build"
 
 default-clean: clean-subdirs
-	rm -f *~ .??*~ .#* *.pyo *.pyc $(generated_files)
+	rm -f *~ .??*~ .#* *.pyo *.pyc *,cover $(generated_files)
 
 default-test:
 	$(TESTSUITE) *.py

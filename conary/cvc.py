@@ -177,7 +177,7 @@ class CloneCommand(CvcCommand):
     commandGroup = 'Repository Access'
     hidden = True
     docs = { 'skip-build-info' : ('Do not attempt to rewrite version'
-                                  'information about how this trove was built'),
+                                  ' information about how this trove was built'),
              'info'            : 'Do not perform clone',
              'with-sources'    : ('Ensure that any binaries that are being'
                                  ' cloned also have a matching source component'),

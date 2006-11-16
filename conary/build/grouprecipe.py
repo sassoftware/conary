@@ -730,16 +730,55 @@ class GroupRecipe(_BaseGroupRecipe):
     def addResolveSource(self, name, versionStr = None, flavor = None,
                          ref = None, use = True):
         """
-        FIXME: create docs this.
+        NAME
+        ====
 
-        Adds a resolution source for resolving dependencies.  When you specify
-        a resolve source, that source will be searched for dependencies,
-        and your labelPath will not be searched.  If you do not use any
-        resolveSource lines, then your labelPath will be searched for solutions
-        for dependencies.
+        B{C{r.addResolveSource()}} - Specify alternate source for dependency
+        resolution
 
-        NOTE: This does not imply autoResolve, since autoResolve is a per-group
-        option and addResolveSource is globally defined.
+        SYNOPSIS
+        ========
+
+        C{r.addResolveSource(I{name}, [I{versionStr}], [I{flavor}], [I{ref}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.addResolveSource} command adds a resolution source for
+        resolving dependencies.  When you specify a resolve source, that
+        source will be searched for dependencies, and your labelPath will
+        not be searched.  If you do not specify C{r.addResolveSource} lines,
+        then your labelPath will be searched dependency resolution.
+
+        NOTE: Using C{r.addResolveSource} does not imply C{autoResolve}, since
+        C{autoResolve} is a per-group option and C{addResolveSource} is
+        globally defined
+
+        PARAMETERS
+        ==========
+
+        The C{r.addResolveSource()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{name} : (None) The name of the reference to add
+
+        B{versionStr} : (None) A version specifier like that passed to
+
+        B{flavor} : (None) A flavor limiter such as that passed to
+        B{repquery} which determines the trove returned.
+
+        B{ref} : (None) Trove reference to search for this trove in. See
+        C{r.addReference} for more information.
+
+
+        EXAMPLES
+        ========
+
+        C{r.addResolveSource('foo.example.com@foo:devel')
+
+        Uses C{r.addResolveSource} to specify dependency resolution should
+        be performed against the labelPath I{foo.example.com@foo:devel}
+
         """
         if use:
             flavor = self._parseFlavor(flavor)
