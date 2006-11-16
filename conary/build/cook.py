@@ -870,7 +870,12 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         except:
             pass
 
-    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
+    bldDir = os.path.join(builddir, recipeObj.mainDir())
+    try:
+        util.mkdirChain(bldDir)
+    except OSError, e:
+        raise errors.ConaryError("Error creating %s: %s" % 
+                                 (e.filename, e.strerror))
     if not destdir:
         destdir = builddir + '/_ROOT_'
     util.mkdirChain(destdir)
