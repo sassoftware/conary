@@ -22,6 +22,12 @@ Changes in @NEW@:
       instead. (CNY-1061)
     * Cloning multiple flavors of the same package in a single step is
       now possible. (CNY-1080)
+    * Perl dependencies now include provides for .ph files, as well as
+      .pl and .pm files, found in the perl @INC path. (CNY-1083)
+    * The previous fix for CNY-699 introduced two errors in handling
+      shared library dependencies that were not in shared library
+      paths and thus need to have their paths encoded.  These bugs
+      have been resolved. (CNY-1088)
 
   o Bug Fixes
     * The build time is now displayed properly as "(unknown)" if a
