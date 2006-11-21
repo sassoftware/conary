@@ -15,7 +15,7 @@
 python_files=	    __init__.py		\
 		    cfg.py		\
 		    cfgtypes.py		\
-		    conarylogparse.py   \
+		    logparse.py		\
 		    coveragehook.py	\
 		    enum.py		\
 		    debugger.py		\
