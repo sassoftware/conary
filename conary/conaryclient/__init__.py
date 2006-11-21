@@ -374,8 +374,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         for (n,v,f) in itertools.chain(*toCreate):
             troveSpec =  (n, str(v.trailingLabel()), None)
             if troveSpec in branchesByLabel:
-                conflicts.append(((n,v,f), branchesByLabel[troveSpec][1]))
-            branchesByLabel[troveSpec] = (v.branch(), (n, v,f))
+                # We've seen this trove before; was it on a different branch?
+                oEnt = branchesByLabel[troveSpec]
+                if oEnt[0] != v.branch():
+                    conflicts.append(((n,v,f), oEnt[1]))
+            else:
+                branchesByLabel[troveSpec] = (v.branch(), (n,v,f))
 
         results = self.repos.findTroves(None, branchesByLabel, None,
                                        bestFlavor = False, getLeaves = True,

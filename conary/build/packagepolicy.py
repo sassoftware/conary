@@ -1720,7 +1720,9 @@ class _dependency(policy.Policy):
         return m and (m.name == 'java' or m.name == 'jar') and self._hasContents(m, contents)
 
     def _isPerlModule(self, path):
-        return path.endswith('.pm') or path.endswith('.pl')
+        return (path.endswith('.pm') or
+                path.endswith('.pl') or
+                path.endswith('.ph'))
 
     def _isPerl(self, path, m, f):
         return self._isPerlModule(path) or (
@@ -1743,6 +1745,8 @@ class _dependency(policy.Policy):
         """
         abi = m.contents['abi']
         elfClass = abi[0]
+        nameMap = {}
+
         depSet = deps.DependencySet()
         for depClass, main, flags in elfinfo:
             if soflags:
@@ -1766,24 +1770,26 @@ class _dependency(policy.Policy):
 
                 main = os.path.normpath('/'.join((elfClass, main)))
 
+                if basedir:
+                    nameMap[main] = oldname
+
                 if libPathMap and main in libPathMap:
                     # if we have a mapping to a provided library that would be
                     # satisfied, then we modify the requirement to match the
                     # provision
                     provided = libPathMap[main]
-                    if set(flags).issubset(set(provided.flags.keys())):
+                    requiredSet = set(x[0] for x in flags)
+                    providedSet = set(provided.flags.keys())
+                    if requiredSet.issubset(providedSet):
                         main = provided.getName()[0]
                     else:
                         self.warn('Not replacing %s with %s because of missing %s',
                                   main, provided.getName()[0],
-                                  sorted(list(set(flags)-set(provided.flags.keys()))))
+                                  sorted(list(requiredSet-providedSet)))
                     
                 curClass = deps.SonameDependencies
                 flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
                 dep = deps.Dependency(main, flags)
-
-                if basedir:
-                    recipe.Requires(_privateDepMap=(oldname, dep))
 
             elif depClass == 'abi':
                 curClass = deps.AbiDependency
@@ -1792,6 +1798,16 @@ class _dependency(policy.Policy):
                 assert(0)
 
             depSet.addDep(curClass, dep)
+
+            # This loops has to happen later so that the soname
+            # flag merging from multiple flag instances has happened
+            if nameMap:
+                for soDep in depSet.iterDepsByClass(deps.SonameDependencies):
+                    newName = soDep.getName()[0]
+                    if newName in nameMap:
+                        oldName = nameMap[newName]
+                        recipe.Requires(_privateDepMap=(oldname, soDep))
+
         return depSet
 
     def _addDepToMap(self, path, depMap, depType, dep):
