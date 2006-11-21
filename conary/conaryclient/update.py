@@ -1648,7 +1648,7 @@ conary erase '%s=%s[%s]'
 
         return newJob
 
-    def _fullMigrate(self, itemList, uJob, callback):
+    def _fullMigrate(self, itemList, uJob, callback, recurse=True):
         def _convertRedirects(searchSource, newTroves):
             troveNames = set(x.getName() for x in newTroves)
             redirects = [ x for x in newTroves if x.isRedirect() ]
@@ -1744,7 +1744,7 @@ conary erase '%s=%s[%s]'
         for item in itemList:
             (troveName, (oldVersionStr, oldFlavorStr),
                         (newVersionStr, newFlavorStr), isAbsolute) = item
-            if not isAbsolute or troveName[0] == '-':
+            if (not isAbsolute and oldVersionStr) or troveName[0] == '-':
                 raise UpdateError('Cannot perform relative updates '
                                   'or erases as part of full migration')
             toFind.append((troveName, newVersionStr, newFlavorStr))
@@ -1770,6 +1770,8 @@ conary erase '%s=%s[%s]'
         for trv in newTroves:
             updateSet.append(trv.getNameVersionFlavor())
             availByDefaultInfo[trv.getNameVersionFlavor()] = True
+            if not recurse:
+                continue
             for (troveNVF, byDefault, isWeak) in trv.iterTroveListInfo():
                 updateSet.append(troveNVF)
                 if byDefault:
@@ -1790,6 +1792,8 @@ conary erase '%s=%s[%s]'
         count = 0
         notByDefault = []
         for trv in toBeMigrated:
+            if not recurse:
+                continue
             troveList = list(trv.iterTroveListInfo())
 
             troveTups = [x[0] for x in troveList]
@@ -1875,7 +1879,15 @@ conary erase '%s=%s[%s]'
                     finalJobs.remove(job)
                     updateJobs.remove(job)
 
-        cs, notFound = csSource.createChangeSet(list(updateJobs),
+        updateJobs = list(updateJobs)
+        hasTroves = uJob.getTroveSource().hasTroves(
+            [ (x[0], x[2][0], x[2][1]) for x in updateJobs ] )
+
+        reposChangeSetList = set([ x[1] for x in
+                          itertools.izip(hasTroves, updateJobs)
+                           if x[0] is not True ])
+
+        cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                 withFiles = False,
                                                 recurse = False,
                                                 callback = callback)
@@ -2330,7 +2342,8 @@ conary erase '%s=%s[%s]'
             resolveRepos = False
 
         if migrate:
-            jobSet = self._fullMigrate(itemList, uJob, callback)
+            jobSet = self._fullMigrate(itemList, uJob, callback,
+                                       recurse=recurse)
         else:
             jobSet = self._updateChangeSet(itemList, uJob,
                                        keepExisting = keepExisting,
