@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.12:
   o Client Changes:
     * A signature callback has been added, which allows one to catch
       the troves with bad signatures and react appropriately (display
