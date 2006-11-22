@@ -46,6 +46,15 @@ Changes in 1.0.39:
       appending values to that default does not reset that list to
       empty (Conary itself never triggers this case, but rMake does
       with defaultBuildReqs). (CNY-1078)
+    * FileContainers don't store the path of the filecontainer in the
+      gzip header for contents which are being transparently compressed
+      by the object
+    * Creating referential changesets obtained the path of files in the
+      data store multiple times. When one content store in a round-robin
+      content store configuration is corrupt, that would lead to inconsistent
+      changesets. Instead, we will include those corrupt contents in
+      a valid changeset and let the install content validation catch the
+      problem.
 
 Changes in 1.0.38:
   o Client Changes:
