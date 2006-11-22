@@ -106,7 +106,7 @@ class FileContainer:
             size = util.copyfileobj(fileObj, self.file)
         else:
             start = self.file.tell()
-            gzFile = gzip.GzipFile(None, "wb", 6, self.file)
+            gzFile = gzip.GzipFile('', "wb", 6, self.file)
             util.copyfileobj(fileObj, gzFile)
             gzFile.close()
             size = self.file.tell() - start
