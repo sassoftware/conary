@@ -295,8 +295,7 @@ class ChangeSet(streams.StreamSet):
 	    (contType, f, compressed) = contents[hash]
             if contType != ChangedFileTypes.diff:
                 if withReferences and \
-                       (isinstance(f, filecontents.FromDataStore) or \
-                        isinstance(f, filecontents.CompressedFromDataStore)):
+                        isinstance(f, filecontents.CompressedFromDataStore):
                     path = f.path()
                     realSize = os.stat(path).st_size
                     sizeCorrection += (realSize - len(path))
