@@ -300,7 +300,7 @@ class ChangeSet(streams.StreamSet):
                     realSize = os.stat(path).st_size
                     sizeCorrection += (realSize - len(path))
                     csf.addFile(hash, 
-                                filecontents.FromString(f.path()),
+                                filecontents.FromString(path),
                                 tag + ChangedFileTypes.refr[4:],
                                 precompressed = True)
                 else:
