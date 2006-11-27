@@ -141,46 +141,26 @@ class FileContainer:
 	tag = self.file.read(tagLen)
 	return (name, tag, size)
 
-    def dumpToFile(self, outF):
-        def _writeNestedFile(outF, name, tag, size, f, sizeCb):
-            if 'refr' == tag[2:]:
-                path = f.read()
-                f = open(path)
-                tag = tag[0:2] + 'file'
-
-            headerLen = sizeCb(size, tag)
-            bytes = util.copyfileobj(f, outF)
-            return headerLen + bytes
-
-        self.dump(outF.write,
-                    lambda name, tag, size, f, sizeCb:
-                        _writeNestedFile(outF, name, tag, size, f,
-                                         sizeCb))
-
     def dump(self, dumpString, dumpFile):
         def sizeCallback(dumpString, name, tag, size):
             hdr = struct.pack("!HHIH%ds%ds" % (len(name), len(tag)),
                         SUBFILE_MAGIC, len(name), size, len(tag), name, tag)
             dumpString(hdr)
-            return len(hdr)
 
 	assert(not self.mutable)
         pos = self.file.seek(SEEK_SET, 0)
 
         fileHeader = self.file.read(8)
         dumpString(fileHeader)
-        s = len(fileHeader)
 
         next = self.getNextFile()
         while next is not None:
             (name, tag, fcf) = next
             size = fcf.size
-            s += dumpFile(name, tag, size, fcf,
+            dumpFile(name, tag, size, fcf,
                      lambda size, newTag: 
                         sizeCallback(dumpString, name, newTag, size))
             next = self.getNextFile()
-
-        return s
 
     def reset(self):
         """
