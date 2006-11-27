@@ -1928,6 +1928,11 @@ class Provides(_dependency):
     def preProcess(self):
 	self.rootdir = self.rootdir % self.macros
 	self.fileFilters = []
+        self.binDirs = frozenset(
+            x % self.macros for x in [
+            '%(bindir)s', '%(sbindir)s', 
+            '%(essentialbindir)s', '%(essentialsbindir)s',
+            '%(libexecdir)s', ])
 	for filespec, provision in self.provisions:
 	    self.fileFilters.append(
 		(filter.Filter(filespec, self.macros), provision % self.macros))
@@ -1955,6 +1960,7 @@ class Provides(_dependency):
                 self._markProvides(path, fullpath, provision, pkg, macros, m, f)
 
         if os.path.exists(fullpath):
+            dirpath = os.path.dirname(path)
             if self._isELF(m) and m.contents['Type'] != elf.ET_EXEC:
                 # we do not add elf provides for programs that won't be linked to
                 self._ELFAddProvide(path, m, pkg)
@@ -1979,6 +1985,10 @@ class Provides(_dependency):
 
             elif self._isPerlModule(path):
                 self._addPerlProvides(path, m, pkg)
+
+            if dirpath in self.binDirs:
+                # CNY-930: automatically export paths in bindirs
+                f.flags.isPathDependencyTarget(True)
 
         # Because paths can change, individual files do not provide their
         # paths.  However, within a trove, a file does provide its name.
