@@ -1705,6 +1705,10 @@ class _dependency(policy.Policy):
         return True
 
     def _isELF(self, m, contents=None):
+        "Test whether is ELF file and optionally has certain contents"
+        # Note: for provides, check for 'abi' not 'provides' because we
+        # can provide the filename even if there is no provides list
+        # as long as a DT_NEEDED entry has been present to set the abi
         return m and m.name == 'ELF' and self._hasContents(m, contents)
 
     def _isPython(self, path):
@@ -1928,6 +1932,11 @@ class Provides(_dependency):
     def preProcess(self):
 	self.rootdir = self.rootdir % self.macros
 	self.fileFilters = []
+        self.binDirs = frozenset(
+            x % self.macros for x in [
+            '%(bindir)s', '%(sbindir)s', 
+            '%(essentialbindir)s', '%(essentialsbindir)s',
+            '%(libexecdir)s', ])
 	for filespec, provision in self.provisions:
 	    self.fileFilters.append(
 		(filter.Filter(filespec, self.macros), provision % self.macros))
@@ -1955,12 +1964,13 @@ class Provides(_dependency):
                 self._markProvides(path, fullpath, provision, pkg, macros, m, f)
 
         if os.path.exists(fullpath):
-            if self._isELF(m) and m.contents['Type'] != elf.ET_EXEC:
+            dirpath = os.path.dirname(path)
+            if self._isELF(m, 'abi') and m.contents['Type'] != elf.ET_EXEC:
                 # we do not add elf provides for programs that won't be linked to
                 self._ELFAddProvide(path, m, pkg)
             if not m:
                 sm, finalpath = self._symlinkMagic(path, fullpath, macros)
-                if sm and self._isELF(sm) and sm.contents['Type'] != elf.ET_EXEC:
+                if sm and self._isELF(sm, 'abi') and sm.contents['Type'] != elf.ET_EXEC:
                     # add the filename as a soname provision (CNY-699)
                     # note: no provides necessary
                     self._ELFAddProvide(path, sm, pkg)
@@ -1979,6 +1989,10 @@ class Provides(_dependency):
 
             elif self._isPerlModule(path):
                 self._addPerlProvides(path, m, pkg)
+
+            if dirpath in self.binDirs:
+                # CNY-930: automatically export paths in bindirs
+                f.flags.isPathDependencyTarget(True)
 
         # Because paths can change, individual files do not provide their
         # paths.  However, within a trove, a file does provide its name.
@@ -2199,7 +2213,7 @@ class Provides(_dependency):
 
         elif provision.startswith("soname:"):
             sm, finalpath = self._symlinkMagic(path, fullpath, macros, m)
-            if self._isELF(sm):
+            if self._isELF(sm, 'abi'):
                 # Only ELF files can provide sonames.
                 # This is for libraries that don't really include a soname,
                 # but programs linked against them require a soname.
@@ -2403,7 +2417,7 @@ class Requires(_addInfo, _dependency):
         fullpath = macros.destdir + path
         m = self.recipe.magic[path]
 
-        if self._isELF(m):
+        if self._isELF(m, 'requires'):
             self._addELFRequirements(path, m, pkg)
 
         # now go through explicit requirements

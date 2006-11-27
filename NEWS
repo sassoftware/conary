@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Build Changes:
+    * All files in "binary directories" now provide their path. (CNY-930)
+    * ELF files that have no DT_NEEDED or DT_SONAME entries no
+      longer cause Conary to trace back attempting to discover
+      the ELF ABI. (CNY-1072)
+
 Changes in 1.0.39:
   o Client Changes:
     * A signature callback has been added, which allows one to catch
