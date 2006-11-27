@@ -4,6 +4,9 @@ Changes in @NEW@:
     * ELF files that have no DT_NEEDED or DT_SONAME entries no
       longer cause Conary to trace back attempting to discover
       the ELF ABI. (CNY-1072)
+    * Config files, though added to the :config component by
+      default (CNY-172), can now be appropriately overridden
+      by ComponentSpec. (CNY-1107)
 
 Changes in 1.0.39:
   o Client Changes:

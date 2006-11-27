@@ -309,8 +309,8 @@ class ComponentSpec(_filterSpec):
         # in the base subfilters; invariants come first for those very few
         # specs that absolutely should not be overridden in recipes.
         for filteritem in itertools.chain(self.invariantFilters,
-                                          self.configFilters,
                                           self.extraFilters,
+                                          self.configFilters,
                                           self.baseFilters):
 	    name = filteritem[0] % self.macros
 	    assert(name != 'source')
