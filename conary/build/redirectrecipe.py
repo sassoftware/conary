@@ -149,7 +149,7 @@ class RedirectRecipe(Recipe):
                             raise builderrors.RecipeFileError, \
                                 "Label %s matched multiple branches." % str(label)
 
-                # use an empty list to indicate notexistance
+                targetFlavors = set()
                 if destName not in matches:
                     # We're redirecting to something which doesn't
                     # exist. This is an error if it's the top of a
@@ -158,14 +158,10 @@ class RedirectRecipe(Recipe):
                     if name in names:
                         raise builderrors.RecipeFileError, \
                             "Trove %s does not exist" % (destName)
-
-                    redirMap[(name, sourceFlavor)] = (None, None, None, [])
-                    continue
-
-                # Get the flavors and branch available on the target
-                targetFlavors = set()
-                for version, flavorList in matches[destName].iteritems():
-                    targetFlavors.update((version, x) for x in flavorList)
+                else:
+                    # Get the flavors and branch available on the target
+                    for version, flavorList in matches[destName].iteritems():
+                        targetFlavors.update((version, x) for x in flavorList)
                 del matches
 
                 foundMatch = False
@@ -212,10 +208,16 @@ class RedirectRecipe(Recipe):
                                  targetFlavorRestriction,
                                  [ x[0] for x in 
                                     trv.iterTroveList(strongRefs = True) ] )
+                        elif not targetFlavors:
+                            # redirect to nothing
+                            foundMatch = True
+                            redirMap[(name, sourceFlavor)] = \
+                                                (None, None, None, [])
                         elif targetFlavorRestriction is not None:
                             raise builderrors.RecipeFileError, \
                                 "Trove %s does not exist for flavor %s" \
                                 % (name, targetFlavor)
+
                 if not foundMatch:
                     raise builderrors.CookError(
                     "Could not find target with satisfying flavor"
