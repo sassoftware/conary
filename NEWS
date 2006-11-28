@@ -15,6 +15,9 @@ Changes in 1.0.39:
       an error message, lower trust level, etc). (CNY-1008)
     * The conary.lib.logparse module has been added to provide
       parsed access to conary log files. (CNY-1075)
+    * Added addRemoveRedirect() to allow redirecting packages to nothing
+      (which causes them to be erased on update). Updated the client
+      code to remove package components properly for this case (CNY-764)
 
   o Build Changes:
     * A "commitRelativeChangeset" configuration variable has been

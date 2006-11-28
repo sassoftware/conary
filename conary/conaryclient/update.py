@@ -128,6 +128,9 @@ class ClientUpdate:
         # The outer loop is to allow redirects to point to redirects. The
         # inner loop handles one set of troves.
 
+        import epdb
+        epdb.st('f')
+
         initialSet = itertools.izip(itertools.repeat(True), jobSet)
         while initialSet:
             alreadyHandled = set()
@@ -178,6 +181,7 @@ class ClientUpdate:
                 matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
                                                 affinityDatabase = self.db)
                 if not matches:
+                    # this is a remove redirect
                     assert(not allTargets)
                     l = redirectHack.setdefault(None, redirectSourceList)
                     l.append(item)
@@ -199,9 +203,9 @@ class ClientUpdate:
                             if isPrimary:
                                 jobsToAdd.append(redirectJob)
 
-                    for info in trv.iterTroveList(strongRefs = True):
-                        toDoSet.add((False, 
-                                     (info[0], (None, None), info[1:], True)))
+                for info in trv.iterTroveList(strongRefs = True):
+                    toDoSet.add((False, 
+                                 (info[0], (None, None), info[1:], True)))
 
             # The targets of redirects need to be loaded - but only
             # if they're not already in the job.
