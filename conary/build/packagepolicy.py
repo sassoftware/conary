@@ -1954,6 +1954,7 @@ class Provides(_dependency):
         m = self.recipe.magic[path]
 
         fullpath = macros.destdir + path
+        basepath = os.path.basename(path)
 
         if os.path.exists(fullpath):
             mode = os.lstat(fullpath)[stat.ST_MODE]
@@ -1967,13 +1968,14 @@ class Provides(_dependency):
             dirpath = os.path.dirname(path)
             if self._isELF(m, 'abi') and m.contents['Type'] != elf.ET_EXEC:
                 # we do not add elf provides for programs that won't be linked to
-                self._ELFAddProvide(path, m, pkg)
-            if not m:
-                sm, finalpath = self._symlinkMagic(path, fullpath, macros)
+                self._ELFAddProvide(path, m, pkg, basedir=dirpath)
+            if dirpath in self.sonameSubtrees:
+                # only export filename as soname if is shlib
+                sm, finalpath = self._symlinkMagic(path, fullpath, macros, m)
                 if sm and self._isELF(sm, 'abi') and sm.contents['Type'] != elf.ET_EXEC:
                     # add the filename as a soname provision (CNY-699)
                     # note: no provides necessary
-                    self._ELFAddProvide(path, sm, pkg)
+                    self._ELFAddProvide(path, sm, pkg, soname=basepath, basedir=dirpath)
 
             if self._isPythonModuleCandidate(path):
                 self._addPythonProvides(path, m, pkg, macros)
@@ -2015,8 +2017,9 @@ class Provides(_dependency):
             # we need to synthesize some provides information
             return [('soname', soname, ())]
 
-    def _ELFAddProvide(self, path, m, pkg, soname=None, soflags=None):
-        basedir = os.path.dirname(path)
+    def _ELFAddProvide(self, path, m, pkg, soname=None, soflags=None, basedir=None):
+        if basedir is None:
+            basedir = os.path.dirname(path)
         if basedir in self.sonameSubtrees:
             # do not record the basedir
             basedir = None
@@ -2227,7 +2230,8 @@ class Provides(_dependency):
                 basedir = None
                 if '/' in soname:
                     basedir, soname = soname.rsplit('/', 1)
-                self._ELFAddProvide(path, sm, pkg, soname=soname, soflags=soflags)
+                self._ELFAddProvide(path, sm, pkg, soname=soname, soflags=soflags,
+                                    basedir=basedir)
         else:
             self.error('Provides %s for file %s does not start with one of'
                        ' "file", "abi:", or "soname"',

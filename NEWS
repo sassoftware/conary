@@ -7,6 +7,14 @@ Changes in @NEW@:
     * Config files, though added to the :config component by
       default (CNY-172), can now be appropriately overridden
       by ComponentSpec. (CNY-1107)
+    * The previous fix for CNY-699 wrongly encoded the soname rather
+      than the filename in provisions for symbolic links to shared
+      libraries when the shared library had a soname.  Additionally,
+      symlinks from directories not in the system shared library
+      path to ELF shared libraries in directories in the shared
+      library path wrongly caused internal dependencies to have the
+      full path to the symlink encoded in the shared library
+      requirement.  These bugs have been resolved. (CNY-1088)
 
 Changes in 1.0.39:
   o Client Changes:
