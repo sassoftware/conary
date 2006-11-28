@@ -128,9 +128,6 @@ class ClientUpdate:
         # The outer loop is to allow redirects to point to redirects. The
         # inner loop handles one set of troves.
 
-        import epdb
-        epdb.st('f')
-
         initialSet = itertools.izip(itertools.repeat(True), jobSet)
         while initialSet:
             alreadyHandled = set()
