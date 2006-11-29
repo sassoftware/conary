@@ -1115,6 +1115,12 @@ class Version(VersionSequence):
 	return (self.onLocalCookLabel() or self.onEmergeLabel()
                 or self.onLocalLabel() or self.onRollbackLabel())
 
+    def isInLocalNamespace(self):
+        if self.trailingLabel().getNamespace() == 'local':
+            return True
+        else:
+            return False
+
     def branch(self):
 	"""
 	Returns the branch this version is part of.

@@ -1905,7 +1905,8 @@ conary erase '%s=%s[%s]'
                       or not deps.compatibleFlavors(x[1][1], x[2][1])
                       or x[1][0].branch() != x[2][0].branch()))
         items = [ (x[0], x[2][0], x[2][1]) for x in items
-                   if not x[2][0].isOnLocalHost() ]
+                   if not x[2][0].isOnLocalHost() and 
+                   not x[2][0].isInLocalNamespace() ]
         items = [ x[0] for x in itertools.izip(items,
                                                self.db.trovesArePinned(items))
                                                                   if not x[1] ]
