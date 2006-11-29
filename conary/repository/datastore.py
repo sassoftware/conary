@@ -150,6 +150,10 @@ class DataStore(AbstractDataStore):
 	f = open(path, "r")
 	return f
 
+    def removeFile(self, hash):
+        path = self.hashToPath(hash)
+        os.unlink(path)
+
     def __init__(self, topPath):
 	self.top = topPath
 
