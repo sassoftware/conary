@@ -200,6 +200,11 @@ class RedirectRecipe(Recipe):
                                 break
 
                         if match is not None:
+                            if (name, sourceFlavor) in redirMap:
+                                raise builderrors.RecipeFileError, \
+                                    "Multiple redirect targets specified " \
+                                    "from trove %s[%s]" % (name, sourceFlavor)
+
                             assert((name, sourceFlavor) not in redirMap)
                             redirInfo = (destName, match.branch(),
                                          targetFlavorRestriction)
