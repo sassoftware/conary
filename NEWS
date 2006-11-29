@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Config files, though added to the :config component by
       default (CNY-172), can now be appropriately overridden
       by ComponentSpec. (CNY-1107)
+    * Conary will no longer attempt to update troves in the namespace "local"
+      when using updateall.
 
 Changes in 1.0.39:
   o Client Changes:
