@@ -17,6 +17,8 @@ Changes in @NEW@:
       requirement.  These bugs have been resolved. (CNY-1088)
     * Conary will no longer attempt to update troves in the namespace "local"
       when using updateall.
+    * Redirect recipes which contain conflicting redirects now give an
+      error message instead of a traceback (CNY-449)
 
 Changes in 1.0.39:
   o Client Changes:
