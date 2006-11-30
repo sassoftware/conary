@@ -19,6 +19,11 @@ Changes in @NEW@:
       when using updateall.
     * Redirect recipes which contain conflicting redirects now give an
       error message instead of a traceback (CNY-449)
+    * A addRemoveRedirect() method has been added to the
+      RedirectRecipe class to allow redirecting packages to nothing
+      (which causes them to be erased on update). The client code has
+      been updated to remove package components properly for this
+      case.  (CNY-764)
 
 Changes in 1.0.39:
   o Client Changes:
@@ -27,9 +32,6 @@ Changes in 1.0.39:
       an error message, lower trust level, etc). (CNY-1008)
     * The conary.lib.logparse module has been added to provide
       parsed access to conary log files. (CNY-1075)
-    * Added addRemoveRedirect() to allow redirecting packages to nothing
-      (which causes them to be erased on update). Updated the client
-      code to remove package components properly for this case (CNY-764)
 
   o Build Changes:
     * A "commitRelativeChangeset" configuration variable has been
