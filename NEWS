@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.40:
   o Build Changes:
     * All files in "binary directories" now provide their path as a
       file: dependency. This allows more flexibility for files that
