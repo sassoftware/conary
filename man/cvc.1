@@ -166,8 +166,8 @@ trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
 name. See the \fBExamples\fP section for more information.
 .RS 4
 .TP
-.B \-\-clone-sources
-Automatically clone the source for every package your are cloning.  So, for example, if you are cloning package foo from /localhost@rpl:1 to /localhost@rpl:conary, foo:source would be cloned as well if necessary.
+.B \-\-with-sources
+Automatically clone the source for every package you are cloning.  So, for example, if you are cloning package foo from /localhost@rpl:1 to /localhost@rpl:conary, foo:source would be cloned as well if necessary.
 .TP
 .B \-\-full-recurse
 For any group included in the clone operation, clone every package and subgroup included in that group.  (Note: cvc automatically clones any subgroups that were created from the same source component - there is no way to disable this.  Similarly, cvc automatically clones all components in a package when the package is selected for cloning.  This is why this option is called full-recurse instead of just recurse.
