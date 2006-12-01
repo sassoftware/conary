@@ -2686,7 +2686,8 @@ class Requires(_addInfo, _dependency):
             # .../conary/Scandeps and .../conary/scripts/perlreqs.pl live
             basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-3])
             scandeps = '/'.join((basedir, 'conary/ScanDeps'))
-            if os.path.exists(scandeps):
+            if (os.path.exists(scandeps) and
+                os.path.exists('%s/scripts/perlreqs.pl' % basedir)):
                 perlreqs = '%s/scripts/perlreqs.pl' % basedir
             else:
                 # we assume that conary is installed in
