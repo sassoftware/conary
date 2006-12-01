@@ -361,4 +361,8 @@ class Database(BaseDatabase):
             if str(e) == 'attempt to write a readonly database':
                 raise sqlerrors.ReadOnlyDatabase(str(e))
             raise
+        except sqlite3.DatabaseError, e:
+            if e.args[0].startswith('database is locked'):
+                raise sqlerrors.DatabaseLocked(str(e))
+            raise
         return cu

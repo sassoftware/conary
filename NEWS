@@ -3,6 +3,37 @@ Changes in @NEW@:
     in different locations would fail to commit if the files differed
     only by mtime. (CNY-1114)
 
+Changes in 1.0.40:
+  o Build Changes:
+    * All files in "binary directories" now provide their path as a
+      file: dependency. This allows more flexibility for files that
+      have requirements such as "file: /usr/bin/cp". (CNY-930)
+    * A addRemoveRedirect() method has been added to the
+      RedirectRecipe class to allow redirecting packages to nothing
+      (which causes them to be erased on update). The client code has
+      been updated to remove package components properly for this
+      case.  (CNY-764)
+
+  o Bug Fixes:
+    * Config files, though added to the :config component by default
+      (CNY-172), can now be appropriately overridden by
+      ComponentSpec. (CNY-1107)
+    * ELF files that have no DT_NEEDED or DT_SONAME entries no longer
+      cause Conary to trace back attempting to discover the ELF
+      ABI. (CNY-1072)
+    * Conary will no longer attempt to update troves in the namespace
+      "local" when using updateall.
+    * Redirect recipes which contain conflicting redirects now give an
+      error message instead of a traceback. (CNY-449)
+    * The previous fix for CNY-699 wrongly encoded the soname rather
+      than the filename in provisions for symbolic links to shared
+      libraries when the shared library had a soname.  Additionally,
+      symlinks from directories not in the system shared library path
+      to ELF shared libraries in directories in the shared library
+      path wrongly caused internal dependencies to have the full path
+      to the symlink encoded in the shared library requirement.  These
+      bugs have been resolved. (CNY-1088)
+
 Changes in 1.0.39:
   o Client Changes:
     * A signature callback has been added, which allows one to catch
@@ -51,6 +82,15 @@ Changes in 1.0.39:
       appending values to that default does not reset that list to
       empty (Conary itself never triggers this case, but rMake does
       with defaultBuildReqs). (CNY-1078)
+    * FileContainers don't store the path of the filecontainer in the
+      gzip header for contents which are being transparently compressed
+      by the object
+    * Creating referential changesets obtained the path of files in the
+      data store multiple times. When one content store in a round-robin
+      content store configuration is corrupt, that would lead to inconsistent
+      changesets. Instead, we will include those corrupt contents in
+      a valid changeset and let the install content validation catch the
+      problem.
 
 Changes in 1.0.38:
   o Client Changes:

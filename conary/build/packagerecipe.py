@@ -300,6 +300,23 @@ class _AbstractPackageRecipe(Recipe):
         self.buildReqMap = reqMap
         self.ignoreDeps = not raiseError
 
+    def _getTransitiveBuildRequiresNames(self):
+        if self.transitiveBuildRequiresNames is not None:
+            return self.transitiveBuildRequiresNames
+
+	db = database.Database(self.cfg.root, self.cfg.dbPath)
+        self.transitiveBuildRequiresNames = set(
+            req.getName() for req in self.buildReqMap.itervalues())
+        depSetList = [ req.getRequires()
+                       for req in self.buildReqMap.itervalues() ]
+        d = db.getTransitiveProvidesClosure(depSetList)
+        for depSet in d:
+            self.transitiveBuildRequires.update(
+                set(troveTup[0] for troveTup in d[depSet]))
+
+        return self.transitiveBuildRequiresNames
+
+
     def extraSource(self, action):
 	"""
 	extraSource allows you to append a source list item that is
@@ -742,6 +759,7 @@ class _AbstractPackageRecipe(Recipe):
 	self.macros = macros.Macros()
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
+        self.transitiveBuildRequiresNames = None
 
         # allow for architecture not to be set -- this could happen
         # when storing the recipe e.g.

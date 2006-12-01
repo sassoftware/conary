@@ -16,6 +16,8 @@ SUBDIRS = base invariant
 
 dist_files = Makefile
 
+all: default-all
+
 include ../../Make.rules
 
 dist: default-dist

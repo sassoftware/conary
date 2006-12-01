@@ -58,6 +58,16 @@ class RedirectRecipe(Recipe):
         self.addTroveList.append((name, branchStr, sourceFlavor, 
                                   targetFlavor, fromTrove, skipTargetMatching))
 
+    def addRemoveRedirect(self, fromTrove = None):
+        if fromTrove is None:
+            fromTrove = self.name
+        elif fromTrove.find(":") != -1:
+            raise ValueError, 'components cannot be individually redirected'
+
+        # the None for branchStr (the second item in this tuple) indicates
+        # this is a redirect to nothing
+        self.addTroveList.append((self.name, None, None, None, fromTrove, None))
+
     def findTroves(self):
         self.size = 0
 
@@ -79,7 +89,7 @@ class RedirectRecipe(Recipe):
                 l.insert(0, (name, branchStr, sourceFlavor, targetFlavor,
                              skipTargetMatching))
 
-            d = sourceSearch.setdefault(fromTrove, { self.branch : None })
+            sourceSearch.setdefault(fromTrove, { self.branch : None })
 
         sourceTroveMatches = self.repos.getTroveLeavesByBranch(sourceSearch)
 
@@ -128,7 +138,11 @@ class RedirectRecipe(Recipe):
             additionalNames = set()
             for (destName, branchStr, sourceFlavorRestriction,
                 targetFlavorRestriction, skipTargetMatching) in destSet:
-                if branchStr[0] == '/':
+
+                if branchStr is None:
+                    # redirect to nothing
+                    matches = None
+                elif branchStr[0] == '/':
                     branch = versions.VersionFromString(branchStr)
                     if not isinstance(branch, versions.Branch):
                         raise builderrors.RecipeFileError, \
@@ -148,9 +162,11 @@ class RedirectRecipe(Recipe):
                         if len(branches) > 1:
                             raise builderrors.RecipeFileError, \
                                 "Label %s matched multiple branches." % str(label)
-
-                # use an empty list to indicate notexistance
-                if destName not in matches:
+                targetFlavors = set()
+                if matches is None:
+                    # Intentional redirect to nothing
+                    pass
+                elif destName not in matches:
                     # We're redirecting to something which doesn't
                     # exist. This is an error if it's the top of a
                     # redirect (a package), but generates an erase
@@ -158,14 +174,10 @@ class RedirectRecipe(Recipe):
                     if name in names:
                         raise builderrors.RecipeFileError, \
                             "Trove %s does not exist" % (destName)
-
-                    redirMap[(name, sourceFlavor)] = (None, None, None, [])
-                    continue
-
-                # Get the flavors and branch available on the target
-                targetFlavors = set()
-                for version, flavorList in matches[destName].iteritems():
-                    targetFlavors.update((version, x) for x in flavorList)
+                else:
+                    # Get the flavors and branch available on the target
+                    for version, flavorList in matches[destName].iteritems():
+                        targetFlavors.update((version, x) for x in flavorList)
                 del matches
 
                 foundMatch = False
@@ -188,34 +200,47 @@ class RedirectRecipe(Recipe):
                                 break
 
                         if match is not None:
-                            foundMatch = True
-                            # we can redirect this trove. go ahead and
-                            # setup the redirect for it, and add any troves
-                            # it references to the todo list
-                            trvCs = trvCsDict[(name, version, sourceFlavor)]
-
-                            # we can't integrity check here because we got
-                            # the trove w/o files
-                            trv = trove.Trove(trvCs, skipIntegrityChecks = True)
-
-                            for info in trv.iterTroveList(strongRefs = True):
-                                assert(info[1] == version)
-                                assert(info[2] == sourceFlavor)
-                                additionalNames.add(info[0])
-                                d = sourceTroveMatches.setdefault(info[0], {})
-                                flavorList = d.setdefault(info[1], [])
-                                flavorList.append(info[2])
+                            if (name, sourceFlavor) in redirMap:
+                                raise builderrors.RecipeFileError, \
+                                    "Multiple redirect targets specified " \
+                                    "from trove %s[%s]" % (name, sourceFlavor)
 
                             assert((name, sourceFlavor) not in redirMap)
-                            redirMap[(name, sourceFlavor)] = \
-                                (destName, match.branch(),
-                                 targetFlavorRestriction,
-                                 [ x[0] for x in 
-                                    trv.iterTroveList(strongRefs = True) ] )
+                            redirInfo = (destName, match.branch(),
+                                         targetFlavorRestriction)
+                        elif not targetFlavors:
+                            # redirect to nothing
+                            redirInfo = (None, None, None)
                         elif targetFlavorRestriction is not None:
                             raise builderrors.RecipeFileError, \
                                 "Trove %s does not exist for flavor %s" \
                                 % (name, targetFlavor)
+                        else:
+                            continue
+
+                        # we created a redirect!
+                        foundMatch = True
+
+                        # add any troves the redirected trove referenced
+                        # to the todo list
+                        trvCs = trvCsDict[(name, version, sourceFlavor)]
+
+                        # we can't integrity check here because we got
+                        # the trove w/o files
+                        trv = trove.Trove(trvCs, skipIntegrityChecks = True)
+
+                        redirMap[(name, sourceFlavor)] = redirInfo + \
+                                 ([ x[0] for x in
+                                    trv.iterTroveList(strongRefs = True) ], )
+
+                        for info in trv.iterTroveList(strongRefs = True):
+                            assert(info[1] == version)
+                            assert(info[2] == sourceFlavor)
+                            additionalNames.add(info[0])
+                            d = sourceTroveMatches.setdefault(info[0], {})
+                            flavorList = d.setdefault(info[1], [])
+                            flavorList.append(info[2])
+
                 if not foundMatch:
                     raise builderrors.CookError(
                     "Could not find target with satisfying flavor"
