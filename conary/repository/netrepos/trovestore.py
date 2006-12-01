@@ -73,9 +73,11 @@ class TroveStore:
         self.metadataTable = metadata.MetadataTable(self.db, create = False)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        self.streamIdCache = {}
 	self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
+
+        self.fileVersionCache = {}
+        self.seenFileId = set()
 
     def __del__(self):
         self.db = self.log = None
@@ -109,7 +111,6 @@ class TroveStore:
 	    theId = self.versionTable.addId(version)
 
 	cache[version] = theId
-
 	return theId
 
     def getFullVersion(self, item, version):
@@ -215,11 +216,9 @@ class TroveStore:
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
 
-	self.fileVersionCache = {}
 	return (cu, trv)
 
     def addTroveDone(self, troveInfo):
-	versionCache = {}
 	(cu, trv) = troveInfo
 
         self.log(3, trv)
@@ -511,8 +510,6 @@ class TroveStore:
                         LEFT OUTER JOIN Flavors ON
                             NewRedirects.flavor = Flavors.flavor
         """ % troveInstanceId)
-
-	del self.fileVersionCache
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
                     urls, licenses, categories, source, language):
@@ -840,7 +837,6 @@ class TroveStore:
 	troveFlavorId = self.flavors[troveFlavor]
 	troveInstanceId = self.instances[(troveItemId, troveVersionId,
 					  troveFlavorId)]
-	versionCache = {}
 
 	cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
 		   "TroveFiles JOIN FileStreams USING (streamId)"
@@ -869,10 +865,13 @@ class TroveStore:
                 fileStream = None):
 	cu = troveInfo[0]
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
-
+        # if we have seen this fileId before, ignore the new stream data
+        if fileId in self.seenFileId:
+            fileObj = fileStream = None
         if fileObj or fileStream:
             if fileStream is None:
                 fileStream = fileObj.freeze()
+            self.seenFileId.add(fileId)
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)",
 		       (cu.binary(pathId), versionId, cu.binary(fileId), 
                         cu.binary(fileStream), path))
@@ -906,10 +905,16 @@ class TroveStore:
     def resolveRequirements(self, label, depSetList, troveList=[]):
         return self.depTables.resolve(label, depSetList, troveList=troveList)
 
+    def _cleanCache(self):
+        self.fileVersionCache = {}
+        self.seenFileId = set()
+
     def begin(self):
+        self._cleanCache()
         return self.db.transaction()
 
     def rollback(self):
+        self._cleanCache()
         return self.db.rollback()
 
     def commit(self):
@@ -928,6 +933,7 @@ class TroveStore:
 	    self.versionOps.needsCleanup = False
 
 	self.db.commit()
+        self._cleanCache()
 
 class FileRetriever:
 
