@@ -76,8 +76,9 @@ class TroveStore:
 	self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
 
-        self.fileVersionCache = {}
+        self.versionIdCache = {}
         self.seenFileId = set()
+        self.itemIdCache = {}
 
     def __del__(self):
         self.db = self.log = None
@@ -86,7 +87,12 @@ class TroveStore:
         self.versionOps.labels.getOrAddId(label)
 
     def getItemId(self, item):
-        return self.items.getOrAddId(item)
+        itemId = self.itemIdCache.get(item, None)
+        if itemId is not None:
+            return itemId
+        itemId = self.items.getOrAddId(item)
+        self.itemIdCache[item] = itemId
+        return itemId
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
                       isRedirect, isPresent = True):
@@ -101,8 +107,8 @@ class TroveStore:
             self.items.setTroveFlag(itemId, 1)
  	return theId
 
-    def getVersionId(self, version, cache):
-	theId = cache.get(version, None)
+    def getVersionId(self, version):
+	theId = self.versionIdCache.get(version, None)
 	if theId:
 	    return theId
 
@@ -110,7 +116,7 @@ class TroveStore:
 	if theId == None:
 	    theId = self.versionTable.addId(version)
 
-	cache[version] = theId
+	self.versionIdCache[version] = theId
 	return theId
 
     def getFullVersion(self, item, version):
@@ -280,7 +286,7 @@ class TroveStore:
 			    NeededFlavors.flavor = Flavors.Flavor
 			WHERE Flavors.flavorId is NULL""")
         # make a list of the flavors we're going to create.  Add them
-        # after we have retreived all of the rows from this select
+        # after we have retrieved all of the rows from this select
         l = []
 	for (flavorStr,) in cu:
             l.append(flavorIndex[flavorStr])
@@ -422,7 +428,7 @@ class TroveStore:
 
 	    # make sure the versionId and nodeId exists for this (we need
 	    # a nodeId, or the version doesn't get timestamps)
-	    versionId = self.versionTable.get(version, None)
+	    versionId = self.getVersionId(version)
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
@@ -460,10 +466,8 @@ class TroveStore:
             else:
                 byDefault = 0
 
-            cu.execute("INSERT INTO TroveTroves "
-                       "(instanceId, includedId, flags) "
-                       "VALUES (?, ?, ?)", (
-                troveInstanceId, instanceId, flags))
+            cu.execute("INSERT INTO TroveTroves (instanceId, includedId, flags) "
+                       "VALUES (?, ?, ?)", (troveInstanceId, instanceId, flags))
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
@@ -864,7 +868,7 @@ class TroveStore:
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None):
 	cu = troveInfo[0]
-	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
+	versionId = self.getVersionId(fileVersion)
         # if we have seen this fileId before, ignore the new stream data
         if fileId in self.seenFileId:
             fileObj = fileStream = None
@@ -906,7 +910,8 @@ class TroveStore:
         return self.depTables.resolve(label, depSetList, troveList=troveList)
 
     def _cleanCache(self):
-        self.fileVersionCache = {}
+        self.versionIdCache = {}
+        self.itemIdCache = {}
         self.seenFileId = set()
 
     def begin(self):
