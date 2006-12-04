@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Build Changes:
+    * cvc will no longer fail if the EDITOR variable points to an invalid
+      editor. (CNY-688)
+
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
       in different locations would fail to commit if the files differed
