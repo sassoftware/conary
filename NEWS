@@ -1,7 +1,13 @@
 Changes in @NEW@:
-  o Bugfix: builds that resulted in changesets containg the same file
-    in different locations would fail to commit if the files differed
-    only by mtime. (CNY-1114)
+  o Bug Fixes:
+    * Builds that resulted in changesets containg the same file
+      in different locations would fail to commit if the files differed
+      only by mtime. (CNY-1114)
+
+  o Internal changes: 
+    * Conary now supports being built against an internal copy of the
+      sqlite3 library for cases when the system sqlite3 is not the
+      optimal version for Conary.
 
 Changes in 1.0.40:
   o Build Changes:
