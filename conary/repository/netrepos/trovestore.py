@@ -865,13 +865,12 @@ class TroveStore:
             elif files.frozenFileHasContents(fileStream):
                 cont = files.frozenFileContentInfo(fileStream)
                 sha1 = cont.sha1()
-
+            self.seenFileId.add(fileId)
             cu.execute("""INSERT INTO NewFiles
                           (pathId, versionId, fileId, stream, path, sha1)
                           VALUES(?, ?, ?, ?, ?, ?)""",
                        (cu.binary(pathId), versionId, cu.binary(fileId), 
                         cu.binary(fileStream), path, cu.binary(sha1)))
-            self.seenFileId.add(fileId)
 	else:
             cu.execute("""INSERT INTO NewFiles
                           (pathId, versionId, fileId, stream, path, sha1)

@@ -215,9 +215,9 @@ class SearchableTroveSource(AbstractTroveSource):
         implement.
     """
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args, **kwargs):
         self.searchAsDatabase()
-        AbstractTroveSource.__init__(self, *args, **kw)
+        AbstractTroveSource.__init__(self, *args, **kwargs)
 
     def trovesByName(self, name):
         raise NotImplementedError
