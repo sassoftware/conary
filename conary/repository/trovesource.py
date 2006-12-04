@@ -215,6 +215,10 @@ class SearchableTroveSource(AbstractTroveSource):
         implement.
     """
 
+    def __init__(self, *args, **kw):
+        self.searchAsDatabase()
+        AbstractTroveSource.__init__(self, *args, **kw)
+
     def trovesByName(self, name):
         raise NotImplementedError
 
@@ -229,10 +233,6 @@ class SearchableTroveSource(AbstractTroveSource):
         # return changeset, and unhandled jobs
         cs = changeset.ReadOnlyChangeSet()
         return cs, jobList
-    
-    def __init__(self, *args, **kw):
-        self.searchAsDatabase()
-        AbstractTroveSource.__init__(self, *args, **kw)
 
     def searchAsRepository(self):
         self._allowNoLabel = False

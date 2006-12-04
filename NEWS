@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bugfix: builds that resulted in changesets containg the same file
+    in different locations would fail to commit if the files differed
+    only by mtime. (CNY-1114)
+
 Changes in 1.1.13:
   o Build Changes:
     * All files in "binary directories" now provide their path as a

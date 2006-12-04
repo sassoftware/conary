@@ -73,13 +73,15 @@ class TroveStore:
         self.metadataTable = metadata.MetadataTable(self.db, create = False)
         self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        self.streamIdCache = {}
-	self.needsCleanup = False
+        self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
-
         self.LATEST_TYPE_ANY = versionops.LATEST_TYPE_ANY
         self.LATEST_TYPE_NORMAL = versionops.LATEST_TYPE_NORMAL
         self.LATEST_TYPE_PRESENT = versionops.LATEST_TYPE_PRESENT
+
+        self.versionIdCache = {}
+        self.seenFileId = set()
+        self.itemIdCache = {}
 
     def __del__(self):
         self.db = self.log = None
@@ -88,7 +90,12 @@ class TroveStore:
         self.versionOps.labels.getOrAddId(label)
 
     def getItemId(self, item):
-        return self.items.getOrAddId(item)
+        itemId = self.itemIdCache.get(item, None)
+        if itemId is not None:
+            return itemId
+        itemId = self.items.getOrAddId(item)
+        self.itemIdCache[item] = itemId
+        return itemId
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
                       troveType, isPresent = True):
@@ -103,8 +110,8 @@ class TroveStore:
             self.items.setTroveFlag(itemId, 1)
  	return theId
 
-    def getVersionId(self, version, cache):
-	theId = cache.get(version, None)
+    def getVersionId(self, version):
+	theId = self.versionIdCache.get(version, None)
 	if theId:
 	    return theId
 
@@ -112,8 +119,7 @@ class TroveStore:
 	if theId == None:
 	    theId = self.versionTable.addId(version)
 
-	cache[version] = theId
-
+	self.versionIdCache[version] = theId
 	return theId
 
     def getFullVersion(self, item, version):
@@ -219,11 +225,9 @@ class TroveStore:
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
 
-	self.fileVersionCache = {}
 	return (cu, trv)
 
     def addTroveDone(self, troveInfo):
-	versionCache = {}
 	(cu, trv) = troveInfo
 
         self.log(3, trv)
@@ -285,7 +289,7 @@ class TroveStore:
 			    NeededFlavors.flavor = Flavors.Flavor
 			WHERE Flavors.flavorId is NULL""")
         # make a list of the flavors we're going to create.  Add them
-        # after we have retreived all of the rows from this select
+        # after we have retrieved all of the rows from this select
         l = []
 	for (flavorStr,) in cu:
             l.append(flavorIndex[flavorStr])
@@ -406,7 +410,7 @@ class TroveStore:
 
 	    # make sure the versionId and nodeId exists for this (we need
 	    # a nodeId, or the version doesn't get timestamps)
-	    versionId = self.versionTable.get(version, None)
+	    versionId = self.getVersionId(version)
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
@@ -444,10 +448,8 @@ class TroveStore:
             else:
                 byDefault = 0
 
-            cu.execute("INSERT INTO TroveTroves "
-                       "(instanceId, includedId, flags) "
-                       "VALUES (?, ?, ?)", (
-                troveInstanceId, instanceId, flags))
+            cu.execute("INSERT INTO TroveTroves (instanceId, includedId, flags) "
+                       "VALUES (?, ?, ?)", (troveInstanceId, instanceId, flags))
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
@@ -494,8 +496,6 @@ class TroveStore:
                         LEFT OUTER JOIN Flavors ON
                             NewRedirects.flavor = Flavors.flavor
         """ % troveInstanceId)
-
-	del self.fileVersionCache
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
                     urls, licenses, categories, source, language):
@@ -823,7 +823,6 @@ class TroveStore:
 	troveFlavorId = self.flavors[troveFlavor]
 	troveInstanceId = self.instances[(troveItemId, troveVersionId,
 					  troveFlavorId)]
-	versionCache = {}
 
 	cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
 		   "TroveFiles JOIN FileStreams USING (streamId)"
@@ -851,14 +850,15 @@ class TroveStore:
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None):
 	cu = troveInfo[0]
-	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
-
+	versionId = self.getVersionId(fileVersion)
+        # if we have seen this fileId before, ignore the new stream data
+        if fileId in self.seenFileId:
+            fileObj = fileStream = None
         if fileObj or fileStream:
             sha1 = None
 
             if fileStream is None:
                 fileStream = fileObj.freeze()
-
             if fileObj is not None:
                 if fileObj.hasContents:
                     sha1 = fileObj.contents.sha1()
@@ -871,6 +871,7 @@ class TroveStore:
                           VALUES(?, ?, ?, ?, ?, ?)""",
                        (cu.binary(pathId), versionId, cu.binary(fileId), 
                         cu.binary(fileStream), path, cu.binary(sha1)))
+            self.seenFileId.add(fileId)
 	else:
             cu.execute("""INSERT INTO NewFiles
                           (pathId, versionId, fileId, stream, path, sha1)
@@ -903,10 +904,17 @@ class TroveStore:
     def resolveRequirements(self, label, depSetList, troveList=[]):
         return self.depTables.resolve(label, depSetList, troveList=troveList)
 
+    def _cleanCache(self):
+        self.versionIdCache = {}
+        self.itemIdCache = {}
+        self.seenFileId = set()
+
     def begin(self):
+        self._cleanCache()
         return self.db.transaction()
 
     def rollback(self):
+        self._cleanCache()
         return self.db.rollback()
 
     def _removeTrove(self, name, version, flavor, markOnly = False):
@@ -1150,6 +1158,7 @@ class TroveStore:
 	    self.versionOps.needsCleanup = False
 
 	self.db.commit()
+        self._cleanCache()
 
 class FileRetriever:
 
