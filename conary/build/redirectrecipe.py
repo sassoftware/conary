@@ -51,10 +51,6 @@ class RedirectRecipe(Recipe):
         elif fromTrove.find(":") != -1:
             raise ValueError, 'components cannot be individually redirected'
 
-        if fromTrove.startswith("group-"):
-            # how sad
-            raise ValueError, "groups cannot be redirected"
-
         self.addTroveList.append((name, branchStr, sourceFlavor, 
                                   targetFlavor, fromTrove, skipTargetMatching))
 
@@ -229,17 +225,22 @@ class RedirectRecipe(Recipe):
                         # the trove w/o files
                         trv = trove.Trove(trvCs, skipIntegrityChecks = True)
 
-                        redirMap[(name, sourceFlavor)] = redirInfo + \
-                                 ([ x[0] for x in
-                                    trv.iterTroveList(strongRefs = True) ], )
 
-                        for info in trv.iterTroveList(strongRefs = True):
-                            assert(info[1] == version)
-                            assert(info[2] == sourceFlavor)
-                            additionalNames.add(info[0])
-                            d = sourceTroveMatches.setdefault(info[0], {})
-                            flavorList = d.setdefault(info[1], [])
-                            flavorList.append(info[2])
+                        if not name.startswith('group-'):
+                            for info in trv.iterTroveList(strongRefs = True):
+                                assert(info[1] == version)
+                                assert(info[2] == sourceFlavor)
+                                additionalNames.add(info[0])
+                                d = sourceTroveMatches.setdefault(info[0], {})
+                                flavorList = d.setdefault(info[1], [])
+                                flavorList.append(info[2])
+                            troveList = [ x[0] for x in
+                                trv.iterTroveList(strongRefs = True) ]
+                        else:
+                            troveList = []
+
+                        redirMap[(name, sourceFlavor)] = redirInfo + \
+                                 (troveList, )
 
                 if not foundMatch:
                     raise builderrors.CookError(
