@@ -76,17 +76,14 @@ class TroveStore:
 	self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
 
-<<<<<<< /home/devel/msw/hg/conary-1.1/conary/repository/netrepos/trovestore.py
         self.LATEST_TYPE_ANY = versionops.LATEST_TYPE_ANY
         self.LATEST_TYPE_NORMAL = versionops.LATEST_TYPE_NORMAL
         self.LATEST_TYPE_PRESENT = versionops.LATEST_TYPE_PRESENT
 
-=======
         self.versionIdCache = {}
         self.seenFileId = set()
         self.itemIdCache = {}
 
->>>>>>> /tmp/trovestore.py~other.eq99C7
     def __del__(self):
         self.db = self.log = None
 
