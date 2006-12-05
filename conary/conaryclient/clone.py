@@ -130,7 +130,7 @@ class ClientClone:
 
                 leafMap[(name, infoVersionMap[name, singleFlavor], 
                          singleFlavor)] = (name, lastVersion, singleFlavor)
-                if lastVersion.getSourceVersion() == srcVersion:
+                if lastVersion.getSourceVersion(False) == srcVersion:
                     dupCheck[name] = lastVersion
 
             trvs = repos.getTroves([ (name, version, singleFlavor) for
@@ -304,7 +304,7 @@ class ClientClone:
                     sourceName = trv.getSourceName()
                     if not sourceName:
                         sourceName = trv.getName().split(':')[0] + ':source'
-                    if not fullRecurse:
+                    if ':' not in trv.getName() and not fullRecurse:
                         sourcePackage = sourceName.split(':')[0]
                         parentPackage = (sourcePackage, trv.getVersion(),
                                          trv.getFlavor())
@@ -317,15 +317,14 @@ class ClientClone:
 
                     if cloneSources:
                         sourceTup = (sourceName,
-                                     trv.getVersion().getSourceVersion(),
+                                     trv.getVersion().getSourceVersion(False),
                                      deps.Flavor())
                         newToClone.append(sourceTup)
 
                 allTroves[info] = trv
                 allTroveInfo.add(info)
 
-                newToClone.extend(trv.iterTroveList(weakRefs=True,
-                                                    strongRefs=True))
+                newToClone.extend(trv.iterTroveList(strongRefs=True))
 
             toClone = newToClone
 
@@ -387,8 +386,8 @@ class ClientClone:
             assert(source is not None)
 
             l = trovesBySource.setdefault(trv.getSourceName(), 
-                                   (trv.getVersion().getSourceVersion(), []))
-            if l[0] != trv.getVersion().getSourceVersion():
+                                   (trv.getVersion().getSourceVersion(False), []))
+            if l[0] != trv.getVersion().getSourceVersion(False):
                 log.error("Clone operation needs multiple versions of %s"
                             % trv.getSourceName())
             l[1].append(info)
@@ -404,10 +403,9 @@ class ClientClone:
                 if targetBranch == sourceVersion.branch():
                     newSourceVersion = sourceVersion
                 elif (sourceVersion.isShadow()
-                      and not sourceVersion.isModifiedShadow()):
-                    sourceVersion = sourceVersion.parentVersion()
-                    if targetBranch == sourceVersion.branch():
-                        newSourceVersion = sourceVersion
+                  and not sourceVersion.isModifiedShadow()
+                  and sourceVersion.parentVersion().branch() == targetBranch):
+                    newSourceVersion = sourceVersion.parentVersion()
                 else:
                     try:
                         currentVersionList = \

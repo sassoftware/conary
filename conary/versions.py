@@ -1199,7 +1199,7 @@ class Version(VersionSequence):
         buildCount = self.parentVersion().trailingRevision().buildCount
         return buildCount is None or str(buildCount) != '0'
 
-    def getSourceVersion(self):
+    def getSourceVersion(self, removeShadows=True):
         """
         Takes a binary version and returns its associated source
         version (any trailing version info is left untouched).  If
@@ -1211,8 +1211,9 @@ class Version(VersionSequence):
         """
         v = self.copy()
         # if a binary was branched/shadowed onto this label
-        while v.isBranchedBinary():
-            v = v.parentVersion()
+        if removeShadows:
+            while v.isBranchedBinary():
+                v = v.parentVersion()
         for item in v.versions:
             if isinstance(item, Revision):
                 item.buildCount = None
