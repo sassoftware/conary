@@ -948,32 +948,26 @@ class TroveStore:
 
         # remove all dependencies which are used only by this instanceId
         cu.execute("""
-            SELECT AllDepsUsed.depId AS depId FROM
-                (SELECT depId FROM Provides WHERE instanceId = ?
-                 UNION
-                 SELECT depId FROM Requires WHERE instanceId = ?
-                ) AS AllDepsUsed
-                LEFT OUTER JOIN (
-                    SELECT AllDepsUsed.depId AS depId FROM
-                        (SELECT depId FROM Provides WHERE instanceId = ?
-                         UNION
-                         SELECT depId FROM Requires WHERE instanceId = ?
-                        ) AS AllDepsUsed
-                        LEFT OUTER JOIN Provides ON
-                            AllDepsUsed.depId = Provides.depId AND
-                            Provides.instanceId != ?
-                        LEFT OUTER JOIN Requires ON
-                            AllDepsUsed.depId = Requires.depId AND
-                            Requires.instanceId != ?
-                        WHERE
-                            Provides.instanceId IS NOT NULL OR
-                            Requires.instanceId IS NOT NULL
-                ) AS DepsStillNeeded ON
-                    AllDepsUsed.depId = DepsStillNeeded.depId
-                WHERE
-                    DepsStillNeeded.depId IS NULL
-        """, instanceId, instanceId, instanceId, instanceId, instanceId, 
-             instanceId)
+        select prov.depId as depId from
+        ( select a.depId as depId from
+          ( select depId, instanceId from Provides where instanceId = :instanceId
+            union
+            select depId, instanceId  from Requires where instanceId = :instanceId
+          ) as a
+          left outer join Provides as p on a.depId = p.depId and p.instanceId != a.instanceId
+          where p.depId is NULL
+        ) as prov
+        join
+        ( select a.depId as depId from
+          ( select depId, instanceId from Provides where instanceId = :instanceId
+            union
+            select depId, instanceId  from Requires where instanceId = :instanceId
+          ) as a
+          left outer join Requires as r on a.depId = r.depId and r.instanceId != a.instanceId
+          where r.depId is NULL
+        ) as reqs
+        where prov.depId = reqs.depId
+        """, instanceId = instanceId )
         depsToRemove = [ x[0] for x in cu ]
 
         cu.execute("DELETE FROM Provides WHERE instanceId = ?", instanceId)
@@ -1036,7 +1030,7 @@ class TroveStore:
         # Was this the only Instance for the node?
         cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
                    "AND versionId = ? AND instanceId != ?", 
-                   itemId, versionId, instanceId)
+                   (itemId, versionId, instanceId))
         lastInstanceOfNode = (cu.next()[0] == 0)
 
         if lastInstanceOfNode:
@@ -1107,6 +1101,9 @@ class TroveStore:
         cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
                    "LIMIT 1", itemId)
         count = cu.next()[0]
+        cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? "
+                   "LIMIT 1", itemId)
+        count += cu.next()[0]
         cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE itemId = ? "
                    "LIMIT 1", itemId)
         count += cu.next()[0]
