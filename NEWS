@@ -1,3 +1,6 @@
+* Redirects now build erase redirects for package components which existed
+  in the past but have disappeared on head
+
 Changes in @NEW@:
   o Build Changes:
     * All files in "binary directories" now provide their path. (CNY-930)
