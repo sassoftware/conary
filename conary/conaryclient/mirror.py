@@ -19,7 +19,7 @@ import os
 
 from conary import conarycfg, callbacks
 from conary.lib import cfg, util, log
-from conary.repository import errors
+from conary.repository import errors, changeset
 
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
@@ -199,7 +199,10 @@ def displayBundle(bundle):
     oldVF = list(oldVF)[0]
     newVF = list(newVF)[0]
     ret = []
-    markLine = "mark: %.0f " % (minMark,)
+    if minMark > 0:
+        markLine = "mark: %.0f " % (minMark,)
+    else:
+        markLine = ""
     if oldVF == (None, None):
         markLine += "absolute changeset"
         ret.append(markLine)
@@ -235,6 +238,31 @@ def mirrorGPGKeys(sourceRepos, targetRepos, cfg, host, test = False):
     else:
         keyList = [ False ]
     addedKeys[host] = set(keyList)
+
+# mirroring stuff when we are running into PathIdConflict errors
+def splitJobList(jobList, sourceRepos, targetRepos, callback = None):
+    log.debug("PathIdConflict detected; splitting job further...")
+    jobs = {}
+    for job in jobList:
+        name = job[0]
+        if ':' in name:
+            name = name.split(':')[0]
+        l = jobs.setdefault(name, [])
+        l.append(job)
+    i = 0
+    for smallJobList in jobs.itervalues():
+        (outFd, tmpName) = util.mkstemp()
+        os.close(outFd)
+        log.debug("jobsplit %d of %d %s" % (
+            i + 1, len(jobs), displayBundle([(0,x) for x in smallJobList])))
+        cs = sourceRepos.createChangeSetFile(smallJobList, tmpName, recurse = False,
+                                             callback = callback)
+        log.debug("committing")
+        targetRepos.commitChangeSetFile(tmpName, mirror = True, callback = callback)
+        os.unlink(tmpName)
+        callback.done()
+        i += 1
+    return
 
 def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
                      test = False, syncSigs = False):
@@ -415,11 +443,18 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             (outFd, tmpName) = util.mkstemp()
             os.close(outFd)
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
-            cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
-                                                 callback = callback)
-            log.debug("committing")
-            targetRepos.commitChangeSetFile(tmpName, mirror = True, callback = callback)
-            os.unlink(tmpName)
+            try:
+                cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
+                                                     callback = callback)
+            except changeset.PathIdsConflictError, e:
+                splitJobList(jobList, sourceRepos, targetRepos, callback = callback)
+            else:
+                log.debug("committing")
+                targetRepos.commitChangeSetFile(tmpName, mirror = True, callback = callback)
+            try:
+                os.unlink(tmpName)
+            except OSError:
+                pass
             callback.done()
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
