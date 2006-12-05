@@ -486,7 +486,7 @@ def findEndOfLife(keyId, keyRing):
     while (keyRing.tell() < limit):
         while (keyRing.tell() < limit) and (intKeyId != getSigId(keyRing)):
             seekNextSignature(keyRing)
-        if keyRing.tell() == limit:
+        if keyRing.tell() >= limit:
             break
         sigPoint = keyRing.tell()
         #we found a self signature, parse it for the info we want

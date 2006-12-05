@@ -16,7 +16,9 @@ Implements changelog entries for repository commits.
 """
 
 import os
+import sys
 import string
+import subprocess
 import tempfile
 
 from conary import streams
@@ -66,7 +68,43 @@ class ChangeLog(streams.StreamSet):
 	os.write(fd, msg)
 	os.close(fd)
 
-	os.system("%s %s" % (editor, name))
+        def _getMessageNoEditor():
+            sys.stderr.write("Error executing %s. Please set the EDITOR\n"
+              "environment variable to a valid editor, or enter log message,\n"
+              "terminated with single '.' (or CTRL+D to cancel)\n" % editor)
+            rows = []
+            while 1:
+                try:
+                    row = raw_input('>> ')
+                except EOFError:
+                    return None
+                if row == '.':
+                    # We need a trailing newline
+                    rows.append('')
+                    break
+                rows.append(row)
+            return '\n'.join(rows)
+
+        class EditorError(Exception):
+            pass
+
+        cmdargs = [editor, name]
+        try:
+            try:
+                # Capture stderr and discard it
+                retcode = subprocess.call(" ".join(cmdargs), shell=True,
+                    stderr=subprocess.PIPE)
+            except OSError, e:
+                raise EditorError
+            if retcode != 0:
+                raise EditorError
+        except EditorError:
+            # Error running the editor
+            msg = _getMessageNoEditor()
+            if msg is None:
+                return False
+            self.message.set(msg)
+            return True
 
 	newMsg = open(name).read()
 	os.unlink(name)

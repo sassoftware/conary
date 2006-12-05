@@ -1984,7 +1984,7 @@ class Remove(BuildAction):
     NAME
     ====
 
-    B{C{r.Remove()}} - Removes files
+    B{C{r.Remove()}} - Removes files and directories
 
     SYNOPSIS
     ========
@@ -1995,7 +1995,17 @@ class Remove(BuildAction):
     ===========
 
     The C{r.Remove()} class is called from within a Conary recipe to remove
-    one or more files.
+    one or more files or directories. 
+
+    KEYWORDS
+    ========
+
+    The C{r.Remove()} class accepts the following keywords, with default
+    values shown in parentheses when applicable:
+
+    B{recursive} : (False) Specifying this keyword as True when using
+    C{r.Remove()} on a directory will remove both the contents of the
+    directory I{and} the directory.
 
     EXAMPLES
     ========
@@ -2003,8 +2013,12 @@ class Remove(BuildAction):
     C{r.Remove('/lib/modules/%(kver)s/modules.*')}
 
     Calls C{r.Remove()} to remove the C{modules.*} files from the
-    C{/lib/modules/%(kver)s/} subdirectory.
+    C{/lib/modules/%(kver)s/} directory.
+    
+    C{r.Remove('/etc/widget', recursive=True)}
 
+    Calls C{r.Remove()} to remove both the content in the C{/etc/widget}
+    directory, and the C{/etc/widget} directory.
     """
     keywords = { 'recursive': False }
 

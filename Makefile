@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 1.0.39
+export VERSION = 1.0.40
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -55,8 +55,7 @@ dist:
 	fi
 	$(MAKE) forcedist
 
-
-forcedist: $(dist_files)
+archive:
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
 	for d in $(SUBDIRS); do make -C $$d DIR=$$d dist || exit 1; done
@@ -64,13 +63,19 @@ forcedist: $(dist_files)
 		mkdir -p $(DISTDIR)/`dirname $$f`; \
 		cp -a $$f $(DISTDIR)/$$f; \
 	done; \
-	tar cjf $(DISTDIR).tar.bz2 `basename $(DISTDIR)`
+	tar cjf $(DISTDIR).tar.bz2 `basename $(DISTDIR)` ; \
+	rm -rf $(DISTDIR)
+
+smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
+	tar jxf $(DISTDIR).tar.bz2 ; \
 	cd $(DISTDIR); \
 	make > /dev/null; \
 	./bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
 	cd -; \
 	rm -rf $(DISTDIR)
+
+forcedist: $(dist_files) smoketest
 
 tag:
 	hg tag conary-$(VERSION)
