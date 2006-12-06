@@ -258,8 +258,9 @@ class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False, remove = False):
         self.log(3, authToken[0],
-                 "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s" %(
-            authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror))))
+                 "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
+            authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror)),
+            int(bool(remove))))
 
         if label and label.getHost() not in self.serverNameList:
             raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
@@ -391,6 +392,8 @@ class NetworkAuthorization:
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
             write, capped, admin, canRemove = False):
 
+        self.log(3, userGroup,  (oldTroveId, oldLabelId), (troveId, labelId),
+                 write, admin, canRemove)
         cu = self.db.cursor()
 
         userGroupId = self._getGroupIdByName(userGroup)
@@ -419,6 +422,8 @@ class NetworkAuthorization:
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
+        self.log(3, userGroup, label, item)
+
         # check the validity of the userGroupId
         userGroupId = self._getGroupIdByName(userGroup)
 
