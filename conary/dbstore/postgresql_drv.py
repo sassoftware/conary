@@ -27,6 +27,7 @@ class KeywordDict(BaseKeywordDict):
         'BLOB'       : 'BYTEA',
         'MEDIUMBLOB' : 'BYTEA',
         'PATHTYPE'   : 'BYTEA',
+        'STRING'     : 'VARCHAR'
         } )
 
     def binaryVal(self, len):

@@ -603,8 +603,8 @@ order by
 	    cu.execute("""
             CREATE TEMPORARY TABLE flavorsNeeded(
                 empty INTEGER,
-                flavor VARCHAR(767)
-            )""")
+                flavor %(STRING)s
+            )""" % self.db.keywords)
 	    for flavor in self.flavorsNeeded.keys():
 		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
 			   None, flavor.freeze())
@@ -730,14 +730,14 @@ order by
         cu.execute("""CREATE TEMPORARY TABLE NewFiles (
                         pathId BLOB,
                         versionId INTEGER,
-                        path VARCHAR(768),
+                        path %(PATHTYPE)s,
                         fileId BLOB,
                         stream BLOB,
-                        isPresent INTEGER)""")
+                        isPresent INTEGER)""" % self.db.keywords)
 
         cu.execute("""CREATE TEMPORARY TABLE NewFileTags (
                         pathId BLOB,
-                        tag VARCHAR(767))""")
+                        tag %(STRING)s)""" % self.db.keywords)
 
         stmt = cu.compile("""
                 INSERT INTO NewFiles (pathId, versionId, path, fileId, 

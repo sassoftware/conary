@@ -34,7 +34,8 @@ class BaseKeywordDict(dict):
              'MEDIUMBLOB'    : 'BLOB',
              'STRAIGHTJOIN'  : '',
              'TABLEOPTS'     : '',
-             'PATHTYPE'      : 'VARCHAR(767)',
+             'PATHTYPE'      : 'STRING',
+             'STRING'        : 'STRING',
              }
     def __init__(self):
         dict.__init__(self, self.keys)
