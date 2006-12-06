@@ -34,6 +34,8 @@ class KeywordDict(BaseKeywordDict):
     keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
     keys['TABLEOPTS'] = 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin'
     keys['STRAIGHTJOIN'] = 'STRAIGHT_JOIN'
+    keys['PATHTYPE'] = 'VARBINARY(767)'
+    keys['STRING'] = 'VARCHAR(767)'
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 

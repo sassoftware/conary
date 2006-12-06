@@ -68,10 +68,7 @@ class ChangeLog(streams.StreamSet):
 	os.write(fd, msg)
 	os.close(fd)
 
-        cmdargs = [editor, name]
-        try:
-            retcode = subprocess.call(cmdargs)
-        except OSError, e:
+        def _getMessageNoEditor():
             sys.stderr.write("Error executing %s. Please set the EDITOR\n"
               "environment variable to a valid editor, or enter log message,\n"
               "terminated with single '.' (or CTRL+D to cancel)\n" % editor)
@@ -80,16 +77,34 @@ class ChangeLog(streams.StreamSet):
                 try:
                     row = raw_input('>> ')
                 except EOFError:
-                    return False
+                    return None
                 if row == '.':
                     # We need a trailing newline
                     rows.append('')
                     break
                 rows.append(row)
-            self.message.set('\n'.join(rows))
+            return '\n'.join(rows)
+
+        class EditorError(Exception):
+            pass
+
+        cmdargs = [editor, name]
+        try:
+            try:
+                # Capture stderr and discard it
+                retcode = subprocess.call(" ".join(cmdargs), shell=True,
+                    stderr=subprocess.PIPE)
+            except OSError, e:
+                raise EditorError
+            if retcode != 0:
+                raise EditorError
+        except EditorError:
+            # Error running the editor
+            msg = _getMessageNoEditor()
+            if msg is None:
+                return False
+            self.message.set(msg)
             return True
-        if retcode != 0:
-            return False
 
 	newMsg = open(name).read()
 	os.unlink(name)

@@ -473,7 +473,7 @@ def loadInstalled(troveSpec, label=None):
     C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
     """
 
-    callerGlobals = inspect.stack()[1][0].f_globals
+    callerGlobals = sys._getframe(1).f_globals
     _loadRecipe(troveSpec, label, callerGlobals, True)
 
 

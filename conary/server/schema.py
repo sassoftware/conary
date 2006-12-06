@@ -78,7 +78,7 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE Flavors(
             flavorId        %(PRIMARYKEY)s,
-            flavor          VARCHAR(767)
+            flavor          %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, '')")
         db.tables["Flavors"] = []
@@ -131,7 +131,7 @@ def createNodes(db):
             branchId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             sourceItemId    INTEGER,
-            timeStamps      VARCHAR(1000),
+            timeStamps      %(STRING)s,
             finalTimeStamp  NUMERIC(13,3) NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Nodes_itemId_fk
@@ -726,15 +726,15 @@ def setupTempTables(db):
     if "NewRedirects" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NewRedirects(
-            item        VARCHAR(767),
-            branch      VARCHAR(767),
-            flavor      VARCHAR(767)
+            item        %(STRING)s,
+            branch      %(STRING)s,
+            flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NewRedirects"] = True
     if "NeededFlavors" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NeededFlavors(
-            flavor      VARCHAR(767)
+            flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["NeededFlavors"] = True
     if "gtl" not in db.tempTables:
@@ -742,8 +742,8 @@ def setupTempTables(db):
         CREATE TEMPORARY TABLE gtl(
             idx         %(PRIMARYKEY)s,
             name        VARCHAR(254),
-            version     VARCHAR(767),
-            flavor      VARCHAR(767)
+            version     %(STRING)s,
+            flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtl"] = True
     if "gtlInst" not in db.tempTables:
@@ -766,15 +766,15 @@ def setupTempTables(db):
         cu.execute("""
         CREATE TEMPORARY TABLE itf(
             item        VARCHAR(254),
-            version     VARCHAR(767),
-            fullVersion VARCHAR(767)
+            version     %(STRING)s,
+            fullVersion %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["itf"] = True
     if "gtvlTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE gtvlTbl(
-            item        VARCHAR(767),
-            versionSpec VARCHAR(767),
+            item        %(STRING)s,
+            versionSpec %(STRING)s,
             flavorId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtvlTbl"] = True
@@ -785,8 +785,8 @@ def setupTempTables(db):
         hasTrovesTmp(
             row         INTEGER,
             item        VARCHAR(254),
-            version     VARCHAR(767),
-            flavor      VARCHAR(767)
+            version     %(STRING)s,
+            flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["hasTrovesTmp"] = True
         db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
@@ -797,8 +797,8 @@ def setupTempTables(db):
              CREATE TEMPORARY TABLE
              trovesByPathTmp(
                  row                 INTEGER,
-                 path                VARCHAR(767)
-             )""")
+                 path                %(PATHTYPE)s
+             )""" % db.keywords)
         db.tempTables["trovesByPathTmp"] = True
 
     if "tmpInstances" not in db.tempTables:

@@ -67,7 +67,7 @@ modify, and cook source components:
 .B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>[=<version>]...
 .PD
 
-Build a package.  If \fB\-\-prep\fP is specified, the souce code is
+Build a package.  If \fB\-\-prep\fP is specified, the source code is
 unpacked, but is not built. If \fB\-\-download\fP is specified, the source code
 is downloaded into your lookaside, but is not unpacked or built. If
 \fB\-\-macros\fP is specified, it names a file containing macro definitions to
@@ -100,7 +100,7 @@ be used only with local recipe files, not source components being
 built directly from a repository.
 .IP 
 The \-\-flavor option can be used to override the default Use flags, 
-package-specific flags, and arch Flags  for this instantiaton.   
+package-specific flags, and arch Flags  for this instantiation.   
 The format is exactly as it is shown in conary config flavors.  The 
 flavor specified here overrides flavors specified in the buildFlavor
 config option.
@@ -193,6 +193,14 @@ command line with \fB\-\-message\fP. Specify a changelog message file with
 \fB\-\-log\-file\fP \fI<file>\fP or use \fB\-\-log\-file -\fP to read the
 changelog message from standard input.  The \fB\-\-log\-file\fP and
 \fB\-\-message\fP arguments are mutually exclusive.
+
+When \fBcvc\fP requests changelog message input, it invokes the editor specified
+by the EDITOR environment variable or \fB/bin/vi\fP if EDITOR is unset. If the
+editor cannot be executed, you will be prompted to enter the changelog message 
+into the command line directly.  Enter the message lines into the command line, 
+and terminate the message with a single period character on a line to finish.
+Pressing CTRL-D (EOF) will cancel both the message input and commit.
+
 Synonyms: \fBci\fP
 .TP
 .B context [name] [\-\-show-passwords]\fP
@@ -310,7 +318,7 @@ the fingerprint of an OpenPGP key from the local keyring. (generally ~/.gnupg).
 When a signature is generated and submitted to a repository, the repository 
 verifies the signature. If the signature is bad, or the repository doesn't know 
 about the OpenPGP Key that made that signature, the repository will remain 
-unachaged. Aka, a signature failure on cook will result in the trove not being 
+unchanged. Aka, a signature failure on cook will result in the trove not being 
 uploaded to the repository, whereas a failure on sign will not affect the trove 
 on the repository, whether or not that trove already had signatures associated 
 with it. The OpenPGP key that will be used can be specified on the command line 
@@ -338,7 +346,7 @@ All refer to the exact same OpenPGP Key
 cvc shadow conary.example.com@rpl:example-foo foo:source=conary.rpath.com@rpl:devel
 .br
 This creates a shadow in the conary.example.com repository of the
-foo:source trove, based on the version of foo in the main rpath repository.
+foo:source trove, based on the version of foo in the main rPath repository.
 You can now check out this shadow and work on it:
 .br
 cvc checkout --build-label conary.example.com@rpl:example-foo foo
@@ -363,7 +371,7 @@ Do not depend on the return codes from cvc unless the cvc command you are
 using has its return values documented in this man page.
 
 This behavior is not a bug. There are no bugs, only undocumented features.  You
-can report undocumented features at http://bugs.rpath.com/
+can report undocumented features at http://issues.rpath.com/
 .\"
 .\"
 .\"

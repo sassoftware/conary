@@ -103,7 +103,7 @@ class RedirectRecipe(Recipe):
         trvCsDict = {}
         # We don't need to recurse here since we only support package
         # redirects
-        cs = self.repos.createChangeSet(l, recurse = True, withFiles = False)
+        cs = self.repos.createChangeSet(l, recurse = False, withFiles = False)
         for trvCs in cs.iterNewTroveList():
             info = (trvCs.getName(), trvCs.getNewVersion(),
                     trvCs.getNewFlavor())
@@ -201,7 +201,6 @@ class RedirectRecipe(Recipe):
                                     "Multiple redirect targets specified " \
                                     "from trove %s[%s]" % (name, sourceFlavor)
 
-                            assert((name, sourceFlavor) not in redirMap)
                             redirInfo = (destName, match.branch(),
                                          targetFlavorRestriction)
                         elif not targetFlavors:
@@ -217,6 +216,11 @@ class RedirectRecipe(Recipe):
                         # we created a redirect!
                         foundMatch = True
 
+                        redirMap[(name, sourceFlavor)] = redirInfo + ([], )
+
+                        if not trove.troveIsCollection(name):
+                            continue
+
                         # add any troves the redirected trove referenced
                         # to the todo list
                         trvCs = trvCsDict[(name, version, sourceFlavor)]
@@ -225,22 +229,41 @@ class RedirectRecipe(Recipe):
                         # the trove w/o files
                         trv = trove.Trove(trvCs, skipIntegrityChecks = True)
 
+                        subNames = set()
+                        for info in trv.iterTroveList(strongRefs = True):
+                            assert(info[1] == version)
+                            assert(info[2] == sourceFlavor)
+                            subNames.add(info[0])
+                            d = sourceTroveMatches.setdefault(info[0], {})
+                            d.setdefault(info[1], []).append(info[2])
 
-                        if not name.startswith('group-'):
-                            for info in trv.iterTroveList(strongRefs = True):
-                                assert(info[1] == version)
-                                assert(info[2] == sourceFlavor)
-                                additionalNames.add(info[0])
-                                d = sourceTroveMatches.setdefault(info[0], {})
-                                flavorList = d.setdefault(info[1], [])
-                                flavorList.append(info[2])
-                            troveList = [ x[0] for x in
-                                trv.iterTroveList(strongRefs = True) ]
-                        else:
-                            troveList = []
+                        allOldVersions = self.repos.getTroveVersionsByBranch(
+                            { trv.getName() :
+                                { trv.getVersion().branch() : None } } )
+                        l = []
+                        for subVersion, subFlavorList in \
+                                allOldVersions[trv.getName()].iteritems():
+                            l += [ ( trv.getName(), subVersion, flavor)
+                                     for flavor in subFlavorList ]
 
-                        redirMap[(name, sourceFlavor)] = redirInfo + \
-                                 (troveList, )
+                        allTroves = self.repos.getTroves(l, withFiles = False)
+                        neededNames = set()
+                        for otherTrv in allTroves:
+                            neededNames.update(
+                               [ x[0] for x in
+                                 otherTrv.iterTroveList(strongRefs = True) ] )
+
+                        # subNames is all of the included troves we've built
+                        # redirects for, and neededNames is everything we
+                        # should have built them for; the difference is troves
+                        # that disappeared
+                        for subName in neededNames - subNames:
+                            d = sourceTroveMatches.setdefault(subName, {})
+                            d.setdefault(None, []).append(sourceFlavor)
+
+                        redirMap[(name, sourceFlavor)][-1].extend(neededNames)
+
+                        additionalNames.update(neededNames)
 
                 if not foundMatch:
                     raise builderrors.CookError(
