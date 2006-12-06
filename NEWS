@@ -4,6 +4,10 @@ Changes in @NEW@:
       editor. (CNY-688)
     * Redirects now build erase redirects for package components which existed
       in the past but have disappeared on head (CNY-453)
+    * The TagSpec policy now checks the transitive closure of build
+      requirements when determining whether the build requirements
+      are sufficient to ensure that a needed tag description will
+      be installed. (CNY-1109)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
