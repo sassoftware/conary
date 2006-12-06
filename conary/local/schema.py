@@ -337,10 +337,10 @@ def setupTempDepTables(db, cu = None):
         cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroves(
                 name        VARCHAR(254),
-                version     VARCHAR(767),
-                flavor      VARCHAR(767),
+                version     %(STRING)s,
+                flavor      %(STRING)s,
                 nodeId      INTEGER
-            )""", start_transaction = False)
+            )""" % db.keywords, start_transaction = False)
         db.tempTables["RemovedTroves"] = True
 
     db.commit()

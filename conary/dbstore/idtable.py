@@ -22,7 +22,7 @@ def createIdTable(db, tableName, keyName, strName):
         cu.execute("""
         CREATE TABLE %s (
             %s %%(PRIMARYKEY)s,
-            %s VARCHAR(767)
+            %s %%(STRING)s
         )  %%(TABLEOPTS)s""" %(tableName, keyName, strName) % db.keywords)
         db.tables[tableName] = []
         commit = True
@@ -79,26 +79,6 @@ class IdTable:
         cu.execute("INSERT INTO %s (%s) VALUES (?)" %(
             self.tableName, self.strName), (item,))
         return cu.lastrowid
-
-    def getOrAddIds(self, items):
-        # FIXME: unused method
-        cu = self.db.cursor()
-        cu.execute('CREATE TEMPORARY TABLE neededIds (num INTEGER, %s VARCHAR(767))' % self.strName)
-        for num, item in enumerate(items):
-            cu.execute('INSERT INTO neededIds VALUES (?, ?)', num, item)
-
-        cu.execute('''INSERT INTO %(tableName)s (%(keyName)s, %(strName)s)
-                      SELECT DISTINCT
-                         NULL, neededIds.%(strName)s FROM neededIds
-                         LEFT JOIN %(tableName)s AS existing USING(%(strName)s)
-                         WHERE existing.%(keyName)s IS NULL
-                   ''' % self.__dict__)
-        ids = [ x[0] for x in
-                cu.execute("""SELECT %s FROM neededIds JOIN %s USING(%s)
-                              ORDER BY NUM"""
-                           %(self.keyName, self.tableName, self.strName))]
-        cu.execute('DROP TABLE neededIds')
-        return ids
 
     def delId(self, theId):
         assert(isinstance(theId, (int, long)))

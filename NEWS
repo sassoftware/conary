@@ -16,10 +16,13 @@ Changes in @NEW@:
       the PathIdConflict erros are raised by certain source repositories
       during mirroring (CNY-426)
 
-  o Internal changes: 
+  o Internal changes:
     * Conary now supports being built against an internal copy of the
       sqlite3 library for cases when the system sqlite3 is not the
       optimal version for Conary.
+    * The repository schema's string types are no longer restricted to
+      arbitrary sizes for backends that support indexing larger strings
+      than MySQL's InnoDB storage engine. (CNY-1054)
 
 Changes in 1.0.40:
   o Build Changes:
