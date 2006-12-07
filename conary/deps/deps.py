@@ -691,6 +691,7 @@ class PerlDependencies(DependencyClass):
     tagName = "perl"
     justOne = False
     depClass = Dependency
+    depFormat = 'IDENT(?:::IDENT)*' # foo[::bar]* including foo::bar::baz
     flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(PerlDependencies)
 
