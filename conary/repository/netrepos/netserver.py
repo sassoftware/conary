@@ -42,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40 ]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -442,7 +442,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.check(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
-                 "write=%s admin=%s" % (write, admin))
+                 "write=%s admin=%s remove=%s" % (write, admin, remove))
         if trovePattern == "":
             trovePattern = None
         if trovePattern:
@@ -2438,7 +2438,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # back to the client
         query = """
         SELECT DISTINCT UP.permittedTrove, item, version, flavor,
-            timeStamps, Instances.changed
+            timeStamps, Instances.changed, Instances.troveType
         FROM Instances
         JOIN Nodes USING (itemId, versionId)
         JOIN LabelMap USING (itemId, branchId)
@@ -2465,15 +2465,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(4, "executing query", query, mark)
         l = set()
 
-        for pattern, name, version, flavor, timeStamps, mark in cu:
+        for pattern, name, version, flavor, timeStamps, mark, troveType in cu:
             if self.auth.checkTrove(pattern, name):
                 version = versions.strToFrozen(version,
                     [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
-                l.add((mark, (name, version, flavor)))
+                l.add((mark, (name, version, flavor), troveType))
             if len(l) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
                 junk = cu.fetchall()
                 break
+        # older mirror clients do not support getting the troveType values
+        if clientVersion < 40:
+            return [ (x[0], x[1]) for x in list(l) ]
         return list(l)
 
     def checkVersion(self, authToken, clientVersion):

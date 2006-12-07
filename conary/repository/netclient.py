@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -572,19 +572,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        kwargs = {}
-
         if remove and self.c[reposLabel]._protocolVersion < 38:
             raise InvalidServerVersion, "Setting canRemove for an acl " \
                     "requires a repository running Conary 1.1 or later."
         elif remove:
-            kwargs['remove'] = True
-
-        self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                  capped, admin, **kwargs)
+            self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
+                                      capped, admin, remove)
+        else:
+            self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
+                                      capped, admin)
+        return True
 
     def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
-                trovePattern, label, write = False, capped = False, 
+                trovePattern, label, write = False, capped = False,
                 admin = False, canRemove = False):
         if not label:
             label = "ALL"
@@ -606,18 +606,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
-        kwargs = {}
-
         if canRemove and self.c[reposLabel]._protocolVersion < 38:
             raise InvalidServerVersion, "Setting canRemove for an acl " \
                     "requires a repository running Conary 1.1 or later."
         elif canRemove:
-            kwargs['canRemove'] = True
-
-
-        self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                   trovePattern, label, write, capped, admin,
-                                   **kwargs)
+            self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
+                                       trovePattern, label, write, capped, admin,
+                                       canRemove)
+        else:
+            self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
+                                       trovePattern, label, write, capped, admin)
 
         return True
 
@@ -732,7 +730,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 yield (pathId, path, fileId, version, fileStream)
             else:
                 yield (pathId, path, fileId, version)
-    
+
     def _mergeTroveQuery(self, resultD, response):
         for troveName, troveVersions in response.iteritems():
             if not resultD.has_key(troveName):
@@ -1761,13 +1759,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     x in self.c[host].getNewSigList(mark) ]
 
     def getNewTroveList(self, host, mark):
-        return [ (x[0], (x[1][0], self.thawVersion(x[1][1]), 
-                                  self.toFlavor(x[1][2]))) for
-                    x in self.c[host].getNewTroveList(mark) ]
+        server = self.c[host]
+        # from server protocol 40 onward we get returned the real troveTypes
+        if server._protocolVersion < 40:
+            return [ ( x[0],
+                       (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
+                       trove.TROVE_TYPE_NORMAL
+                     ) for x in server.getNewTroveList(mark) ]
+        return [ ( x[0],
+                   (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
+                   x[2]
+                 ) for x in server.getNewTroveList(mark) ]
 
     def addPGPKeyList(self, host, keyList):
         self.c[host].addPGPKeyList([ base64.encodestring(x) for x in keyList ])
-        
+
     def getNewPGPKeys(self, host, mark):
         return [ base64.decodestring(x) for x in 
                     self.c[host].getNewPGPKeys(mark) ]
