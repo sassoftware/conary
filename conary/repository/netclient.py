@@ -1334,6 +1334,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 new = troves[i]
                 i += 1
 
+                # if the old version is marked removed, pretend as though
+                # it doesn't exist.
+                if old.isRemoved():
+                    old = None
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute)
                 # newFilesNeeded = [ (pathId, oldFileVersion, newFileVersion) ]
