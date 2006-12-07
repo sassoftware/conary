@@ -1967,7 +1967,9 @@ class Provides(_dependency):
 
         if os.path.exists(fullpath):
             dirpath = os.path.dirname(path)
-            if self._isELF(m, 'abi') and m.contents['Type'] != elf.ET_EXEC:
+            if (self._isELF(m, 'abi')
+                and m.contents['Type'] != elf.ET_EXEC
+                and dirpath not in self.binDirs):
                 # we do not add elf provides for programs that won't be linked to
                 self._ELFAddProvide(path, m, pkg, basedir=dirpath)
             if dirpath in self.sonameSubtrees:

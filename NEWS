@@ -10,6 +10,8 @@ Changes in @NEW@:
       be installed. (CNY-1109)
     * Repositories can now be made read only to allow for maintenance.
       (CNY-659)
+    * PIE executables, which appear to be shared libraries in binary
+      directories, will no longer export soname dependencies. (CNY-1128)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
