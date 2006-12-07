@@ -20,7 +20,9 @@ Changes in @NEW@:
       only by mtime. (CNY-1114)
     * The mirror script now correctly handles the cases where
       the PathIdConflict erros are raised by certain source repositories
-      during mirroring (CNY-426)
+      during mirroring. (CNY-426)
+    * Perl dependency strings containing double colons are now properly
+      accepted on the command line. (CNY-1132)
 
   o Internal changes:
     * Conary now supports being built against an internal copy of the
