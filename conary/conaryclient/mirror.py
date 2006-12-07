@@ -328,7 +328,7 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
 def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = None):
     if not troveSet:
         return 0
-    log.debug("mirroring %d removed troves", len(troveSet))
+    log.debug("checking on %d removed troves", len(troveSet))
     # these removed troves better exist on the target
     present = targetRepos.hasTroves(list(troveSet))
     missing = [ x for x in troveSet if not present[x] ]
@@ -337,7 +337,6 @@ def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = N
         log.warning("Mirroring removed trove: valid trove not found on target: %s", t)
         troveSet.remove(t)
     # for the remaining removed troves, are any of them already mirrored?
-    log.debug("checking which removed troves need to be mirrored...")
     jobList = [ (name, (None, None), (version, flavor), True) for
                 (name, version, flavor) in troveSet ]
     cs = targetRepos.createChangeSet(jobList, recurse=False, withFiles=False,
@@ -345,8 +344,10 @@ def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = N
     for trvCs in cs.iterNewTroveList():
         if trvCs.getType() == trove.TROVE_TYPE_REMOVED:
             troveSet.remove(trvCs.getNewNameVersionFlavor())
+    log.debug("mirroring %d removed troves", len(troveSet))
     if not troveSet:
         return 0
+
     jobList = [ (name, (None, None), (version, flavor), True) for
                 (name, version, flavor) in troveSet ]
     log.debug("mirroring removed troves %s" % (displayJobList(jobList),))
@@ -492,7 +493,6 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("test mode: skipping commit")
         else:
             (outFd, tmpName) = util.mkstemp()
-            log.debug("changeset is in %s", tmpName)
             os.close(outFd)
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
             try:
