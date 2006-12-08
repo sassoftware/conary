@@ -761,6 +761,7 @@ class TagSpec(_addInfo):
 		    path = util.joinPaths(directory, filename)
 		    self.tagList.append(tags.TagFile(path, recipe.macros, True))
         self.db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
+        self.fullReqs = self.recipe._getTransitiveBuildRequiresNames()
         _addInfo.doProcess(self, recipe)
 
     def markTag(self, name, tag, path, tagFile=None):
@@ -780,7 +781,7 @@ class TagSpec(_addInfo):
             if tagFile:
                 for trove in self.db.iterTrovesByPath(tagFile.tagFile):
                     troveName = trove.getName()
-                    if troveName not in self.recipe.buildRequires:
+                    if troveName not in self.fullReqs:
                         # XXX should be error, change after bootstrap
                         self.warn("%s assigned by %s to file %s, so add '%s'"
                                    ' to buildRequires or call r.TagSpec()'
@@ -1966,7 +1967,9 @@ class Provides(_dependency):
 
         if os.path.exists(fullpath):
             dirpath = os.path.dirname(path)
-            if self._isELF(m, 'abi') and m.contents['Type'] != elf.ET_EXEC:
+            if (self._isELF(m, 'abi')
+                and m.contents['Type'] != elf.ET_EXEC
+                and dirpath not in self.binDirs):
                 # we do not add elf provides for programs that won't be linked to
                 self._ELFAddProvide(path, m, pkg, basedir=dirpath)
             if dirpath in self.sonameSubtrees:

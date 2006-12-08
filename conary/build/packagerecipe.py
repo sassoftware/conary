@@ -311,7 +311,7 @@ class _AbstractPackageRecipe(Recipe):
                        for req in self.buildReqMap.itervalues() ]
         d = db.getTransitiveProvidesClosure(depSetList)
         for depSet in d:
-            self.transitiveBuildRequires.update(
+            self.transitiveBuildRequiresNames.update(
                 set(troveTup[0] for troveTup in d[depSet]))
 
         return self.transitiveBuildRequiresNames

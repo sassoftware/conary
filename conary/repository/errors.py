@@ -233,6 +233,8 @@ configured incorrectly or the request you sent to the server was invalid.
 %s
 ''' % (err,))
 
+class ReadOnlyRepositoryError(RepositoryError):
+    pass
 
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that
@@ -256,4 +258,5 @@ simpleExceptions = (
     (InvalidEntitlement,         'InvalidEntitlement'),
     (CannotChangePassword,       'CannotChangePassword'),
     (InvalidRegex,               'InvalidRegex'),
+    (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
     )
