@@ -17,6 +17,7 @@ import tempfile
 import cPickle
 
 from conary import dbstore
+from conary.lib import util
 from conary.local import schema, sqldb, versiontable
 from conary.dbstore import idtable
 
@@ -37,7 +38,7 @@ class NullCacheSet:
         os.close(fd)
         return None, path
 
-    def invalidateEntry(self, name, version, flavor):
+    def invalidateEntry(self, repos, name, version, flavor):
         pass
 
 
@@ -192,35 +193,37 @@ class CacheSet:
 
         return (row, path)
 
-    def invalidateEntry(self, name, version, flavor):
+    def invalidateEntry(self, repos, name, version, flavor):
         """
         invalidates (and deletes) any cached changeset that matches
         the given name, version, flavor.
         """
-        flavorId = self.flavors.get(flavor, None)
-        versionId = self.versions.get(version, None)
-
-        if flavorId is None or versionId is None:
-            # this should not happen, but we'll handle it anyway
-            return
+        invList = [ (name, version, flavor) ]
+        invList.extend(repos.getParentTroves(name, version, flavor))
 
         # start a transaction to retain a consistent state
         cu = self.db.transaction()
-        cu.execute("""
-        SELECT row, returnValue, size
-        FROM CacheContents
-        WHERE troveName=? AND newFlavorId=? AND newVersionId=?
-        """, (name, flavorId, versionId))
 
-        # delete all matching entries from the db and the file system
-        for (row, returnVal, size) in cu.fetchall():
-            cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-            path = self.filePattern % (self.tmpDir, row)
-            if os.path.exists(path):
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
+        for name, version, flavor in invList:
+            flavorId = self.flavors.get(flavor, None)
+            versionId = self.versions.get(version, None)
+
+            if flavorId is None or versionId is None:
+                # this should not happen, but we'll handle it anyway
+                return
+
+            cu.execute("""
+            SELECT row, returnValue, size
+            FROM CacheContents
+            WHERE troveName=? AND newFlavorId=? AND newVersionId=?
+            """, (name, flavorId, versionId))
+
+            # delete all matching entries from the db and the file system
+            for (row, returnVal, size) in cu.fetchall():
+                cu.execute("DELETE FROM CacheContents WHERE row=?", row)
+                path = self.filePattern % (self.tmpDir, row)
+                util.removeIfExists(path)
+
         self.db.commit()
 
     def __cleanCache(self, cu = None):
@@ -229,11 +232,7 @@ class CacheSet:
         cu.execute("SELECT row from CacheContents")
         for (row,) in cu:
             fn = self.filePattern % (self.tmpDir, row)
-            if os.path.exists(fn):
-                try:
-                    os.unlink(fn)
-                except OSError:
-                    pass
+            util.removeIfExists(fn)
 
     def __cleanDatabase(self, cu = None):
         global CACHE_SCHEMA_VERSION

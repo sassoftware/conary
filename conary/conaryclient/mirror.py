@@ -17,7 +17,7 @@
 import itertools
 import os
 
-from conary import conarycfg, callbacks
+from conary import conarycfg, callbacks, trove
 from conary.lib import cfg, util, log
 from conary.repository import errors, changeset
 
@@ -168,7 +168,7 @@ def recurseTrove(sourceRepos, name, version, flavor,
         return []
     # we need to grab the trove list recursively for
     # mirroring. Unfortunately the netclient does not wire the
-    # repsoitory's getChangeSet parameters, so we need to cheat a
+    # repository's getChangeSet parameters, so we need to cheat a
     # little to keep the roundtrips to a minimum
     log.debug("recursing group trove: %s=%s[%s]" % (name, version, flavor))
     groupCs = sourceRepos.createChangeSet(
@@ -177,13 +177,17 @@ def recurseTrove(sourceRepos, name, version, flavor,
         callback = callback)
     recursedGroups.add((name, version, flavor))
     ret = []
+    removedList = []
     for troveCs in groupCs.iterNewTroveList():
         (trvName, trvVersion, trvFlavor) = troveCs.getNewNameVersionFlavor()
         # keep track of groups we have already recursed through
         if trvName.startswith("group-"):
             recursedGroups.add((trvName, trvVersion, trvFlavor))
-        ret.append((trvName, trvVersion, trvFlavor))
-    return ret
+        if troveCs.getType() == trove.TROVE_TYPE_REMOVED:
+            removedList.append((trvName, trvVersion, trvFlavor))
+        else:
+            ret.append((trvName, trvVersion, trvFlavor))
+    return ret, removedList
 
 # format a bundle for display
 def displayBundle(bundle):
@@ -214,6 +218,10 @@ def displayBundle(bundle):
         ret.append("oldVF: %s" % (oldVF,))
     ret.append("newVF: %s" % (newVF,))
     return "\n  ".join(ret)
+
+# wrapper for displaying a simple jobList
+def displayJobList(jobList):
+    return displayBundle([(0, x) for x in jobList])
 
 # this is to keep track of GPG keys we already added to avoid repeated
 # add operation into the target
@@ -316,6 +324,42 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
 
     return updateCount
 
+# this mirrors all the troves marked as removed from the sourceRepos into the targetRepos
+def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = None):
+    if not troveSet:
+        return 0
+    log.debug("checking on %d removed troves", len(troveSet))
+    # these removed troves better exist on the target
+    present = targetRepos.hasTroves(list(troveSet))
+    missing = [ x for x in troveSet if not present[x] ]
+    # we can not have any "missing" troves while we mirror removals
+    for t in missing:
+        log.warning("Mirroring removed trove: valid trove not found on target: %s", t)
+        troveSet.remove(t)
+    # for the remaining removed troves, are any of them already mirrored?
+    jobList = [ (name, (None, None), (version, flavor), True) for
+                (name, version, flavor) in troveSet ]
+    cs = targetRepos.createChangeSet(jobList, recurse=False, withFiles=False,
+                                     withFileContents=False, callback=callback)
+    for trvCs in cs.iterNewTroveList():
+        if trvCs.getType() == trove.TROVE_TYPE_REMOVED:
+            troveSet.remove(trvCs.getNewNameVersionFlavor())
+    log.debug("mirroring %d removed troves", len(troveSet))
+    if not troveSet:
+        return 0
+
+    jobList = [ (name, (None, None), (version, flavor), True) for
+                (name, version, flavor) in troveSet ]
+    log.debug("mirroring removed troves %s" % (displayJobList(jobList),))
+    # grab the removed troves changeset
+    cs = sourceRepos.createChangeSet(jobList, recurse = False,
+                                     withFiles = False, withFileContents = False,
+                                     callback = callback)
+    log.debug("committing")
+    targetRepos.commitChangeSet(cs, mirror = True, callback = callback)
+    callback.done()
+    return len(jobList)
+
 # While running under --test, we should not touch the mirror mark of the target repository
 CurrentTestMark = None
 LastBundleSet = None
@@ -379,22 +423,28 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                       if cfg.matchTroves.match(x[1][0]) > 0 ]
         log.debug("after matchTroves %d troves are needed", len(troveList))
 
+    # removed troves are a special blend - we keep them separate
+    removedSet  = set([ x[1] for x in troveList if x[2] == trove.TROVE_TYPE_REMOVED ])
+    troveList = [ (x[0], x[1]) for x in troveList if x[2] != trove.TROVE_TYPE_REMOVED ]
+
     # figure out if we need to recurse the group-troves
     if cfg.recurseGroups:
         # avoid adding duplicates
         troveSetList = set([x[1] for x in troveList])
-        for (mark, (name, version, flavor)) in troveList:
+        for (mark, (name, version, flavor), troveType) in troveList:
             if name.startswith("group-"):
-                recTroves = recurseTrove(sourceRepos, name, version, flavor,
+                recTroves, rmTroves = recurseTrove(sourceRepos, name, version, flavor,
                                          callback = callback)
                 # add the results at the end with the current mark
                 for (n,v,f) in recTroves:
                     if (n,v,f) not in troveSetList:
                         troveList.append((mark, (n,v,f)))
                         troveSetList.add((n,v,f))
+                for x in rmTroves:
+                    removedSet.add(x)
         log.debug("after group recursion %d troves are needed", len(troveList))
         # we need to make sure we mirror the GPG keys of any newly added troves
-        for host in set([x[1].getHost() for x in troveSetList]) - set([cfg.host]):
+        for host in set([x[1].getHost() for x in troveSetList + removedSet]) - set([cfg.host]):
             mirrorGPGKeys(sourceRepos, targetRepos, cfg, host, test)
 
     if len(troveList):
@@ -404,7 +454,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
 
     # if we were returned troves, but we filtered them all out, advance the
     # mark and signal "try again"
-    if len(troveList) == 0 and crtTroveLen:
+    if len(troveList) == 0 and len(removedSet) == 0 and crtTroveLen:
         # we had troves and now we don't
         log.debug("no troves found for our label %s" % cfg.labels)
         log.debug("advancing newMark to %d" % int(crtMaxMark))
@@ -415,22 +465,24 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # try again
         return -1
 
-    log.debug("grouping %d troves based on version and flavor", len(troveList))
-    groupList = groupTroves(troveList)
-    log.debug("building grouped job list")
-    bundles = buildJobList(targetRepos, groupList)
+    bundles = []
+    if troveList:
+        log.debug("grouping %d troves based on version and flavor", len(troveList))
+        groupList = groupTroves(troveList)
+        log.debug("building grouped job list")
+        bundles = buildJobList(targetRepos, groupList)
 
-    if len(bundles) > 1:
-        # We cut off the last bundle if there is more than one and let the
-        # next pass through this function handle it. That makes sure that
-        # we don't half-commit a package when the server limits the number
-        # of responses getNewTroveList() will return
-        bundles = bundles[:-1]
+        if len(bundles) > 1:
+            # We cut off the last bundle if there is more than one and let the
+            # next pass through this function handle it. That makes sure that
+            # we don't half-commit a package when the server limits the number
+            # of responses getNewTroveList() will return
+            bundles = bundles[:-1]
 
-    if test and LastBundleSet == bundles:
-        log.debug("test mode detected a loop, ending...")
-        return 0
-    LastBundleSet = bundles
+        if test and LastBundleSet == bundles:
+            log.debug("test mode detected a loop, ending...")
+            return 0
+        LastBundleSet = bundles
 
     for i, bundle in enumerate(bundles):
         jobList = [ x[1] for x in bundle ]
@@ -458,11 +510,14 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             callback.done()
         updateCount += len(bundle)
     else: # only when we're all done looping advance mark to the new max
-        # compute the max mark of the bundles we comitted
-        crtMaxMark = max([min([x[0] for x in bundle]) for bundle in bundles])
+        if len(bundles):
+            # compute the max mark of the bundles we comitted
+            crtMaxMark = max([min([x[0] for x in bundle]) for bundle in bundles])
         log.debug("setting the mirror mark to %d", int(crtMaxMark))
         if test:
             CurrentTestMark = crtMaxMark
         else:
             targetRepos.setMirrorMark(cfg.host, crtMaxMark)
+    updateCount += mirrorRemoved(sourceRepos, targetRepos, removedSet,
+                                 test = test, callback = callback)
     return updateCount
