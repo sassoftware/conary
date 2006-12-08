@@ -218,6 +218,10 @@ class RedirectRecipe(Recipe):
 
                         redirMap[(name, sourceFlavor)] = redirInfo + ([], )
 
+                        # groups don't include any additional redirections
+                        if name.startswith('group-'):
+                            continue
+
                         if not trove.troveIsCollection(name):
                             continue
 
