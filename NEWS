@@ -25,6 +25,8 @@ Changes in @NEW@:
       during mirroring. (CNY-426)
     * Perl dependency strings containing double colons are now properly
       accepted on the command line. (CNY-1132)
+    * cvc stat now correctly displays the usage information when extra
+      arguments are specified. (CNY-1126)
 
   o Internal changes:
     * Conary now supports being built against an internal copy of the
