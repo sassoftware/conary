@@ -824,7 +824,7 @@ class DependencyChecker:
         # Remove nodes which cancel each other
         self._collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
-        linkedNodeLists = [self._getNodeListFromJobSet(x)
+        linkedNodeLists = [self._getNodeListFromJobSet(x, ignoreUnknown=True)
                            for x in linkedJobSets]
         if finalJobs:
             finalNodes  = self._getNodeListFromJobSet(finalJobs)
@@ -872,10 +872,12 @@ class DependencyChecker:
             changeSetList.append(list(componentList))
         return changeSetList, criticalUpdates
 
-    def _getNodeListFromJobSet(self, jobSet):
+    def _getNodeListFromJobSet(self, jobSet, ignoreUnknown=False):
         # convert from jobSet -> list of nodes
         nodeList = []
         for job in jobSet:
+            if job not in self.jobSet and ignoreUnknown:
+                continue
             if job[1][0]:
                 nodeId = self.oldInfoToNodeId[job[0], job[1][0], job[1][1]]
             else:
