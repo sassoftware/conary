@@ -574,6 +574,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             'conary 1.1.x is required to manipulate entitlements in '
             'this repository server')
 
+    @accessReadWrite
     def deleteEntitlements(self, authToken, clientVersion, entGroup, 
                            entitlements):
         # self.auth does its own authentication check
