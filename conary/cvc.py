@@ -652,7 +652,7 @@ class StatCommand(CvcCommand):
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
         args = args[1:]
-        if argSet or not args or len(args) > 2: return self.usage()
+        if argSet or not args or len(args) > 1: return self.usage()
 
         args[0] = repos
         checkin.stat_(*args)
