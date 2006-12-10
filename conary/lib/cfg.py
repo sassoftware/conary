@@ -244,13 +244,16 @@ class _Config:
 
 
 class ConfigFile(_Config):
-    
     """ _Config class + ability to read in files """
 
     def __init__(self):
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
         self._configFileStack = set()
+        self._ignoreErrors = False
+
+    def setIgnoreErrors(self, val=True):
+        self._ignoreErrors = val
 
     def readObject(self, path, f):
         if path in self._configFileStack:
@@ -345,10 +348,14 @@ class ConfigFile(_Config):
             key = self._lowerCaseMap[key.lower()]
             self[key] = self._options[key].parseString(self[key], val)
         except KeyError, msg:
-            raise ParseError, "%s:%s: unknown config item '%s'" % (fileName,
+            if self._ignoreErrors:
+                pass
+            else:
+                raise ParseError, "%s:%s: unknown config item '%s'" % (fileName,
                                                                    lineno, key)
         except ParseError, msg:
-            raise ParseError, "%s:%s: %s for configuration item '%s'" \
+            if not self._ignoreErrors:
+                raise ParseError, "%s:%s: %s for configuration item '%s'" \
                                                             % (fileName,
                                                                lineno, msg, key)
 
