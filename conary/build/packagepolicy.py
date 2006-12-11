@@ -1938,6 +1938,10 @@ class Provides(_dependency):
             '%(bindir)s', '%(sbindir)s', 
             '%(essentialbindir)s', '%(essentialsbindir)s',
             '%(libexecdir)s', ])
+        self.noProvDirs = frozenset(
+            x % self.macros for x in [
+            '%(testdir)s',
+            ]).union(self.binDirs)
 	for filespec, provision in self.provisions:
 	    self.fileFilters.append(
 		(filter.Filter(filespec, self.macros), provision % self.macros))
@@ -1969,7 +1973,7 @@ class Provides(_dependency):
             dirpath = os.path.dirname(path)
             if (self._isELF(m, 'abi')
                 and m.contents['Type'] != elf.ET_EXEC
-                and dirpath not in self.binDirs):
+                and not [ x for x in self.noProvDirs if path.startswith(x) ]):
                 # we do not add elf provides for programs that won't be linked to
                 self._ELFAddProvide(path, m, pkg, basedir=dirpath)
             if dirpath in self.sonameSubtrees:
