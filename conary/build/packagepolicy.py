@@ -1941,6 +1941,7 @@ class Provides(_dependency):
         self.noProvDirs = frozenset(
             x % self.macros for x in [
             '%(testdir)s',
+            '%(debuglibdir)s',
             ]).union(self.binDirs)
 	for filespec, provision in self.provisions:
 	    self.fileFilters.append(
