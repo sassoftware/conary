@@ -171,6 +171,14 @@ class UpdateCallback(ChangesetCallback):
     def setTrustThreshold(self, trustThreshold):
         self.trustThreshold = trustThreshold
 
+    def missingFiles(self, missingFiles):
+        """This callback gets called if missing files were detected in the
+        upstream server
+        @param missingFiles: a list of tuples:
+          (troveName, troveVersion, troveFlavor, pathId, path, fileId, version)
+        """
+        return False
+
     def __init__(self, trustThreshold=0, keyCache=None):
         ChangesetCallback.__init__(self)
         self.abortEvent = None

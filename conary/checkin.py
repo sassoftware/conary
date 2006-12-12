@@ -230,7 +230,12 @@ use cvc co %s=<branch> for the following branches:
     for (pathId, path, fileId, version) in troveCs.getNewFileList():
 	fullPath = workDir + "/" + path
 
-	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
+        fileStream = cs.getFileChange(None, fileId)
+        if fileStream is None:
+            # File is missing
+            continue
+
+        fileObj = files.ThawFile(fileStream, pathId)
         sourceState.addFile(pathId, path, version, fileId,
                             isConfig = fileObj.flags.isConfig(),
                             isAutoSource = fileObj.flags.isAutoSource())
