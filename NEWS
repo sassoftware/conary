@@ -12,6 +12,8 @@ Changes in @NEW@:
       (CNY-659)
     * PIE executables, which appear to be shared libraries in binary
       directories, will no longer export soname dependencies. (CNY-1128)
+    * ELF files in %(testdir)s and %(debuglibdir)s will no longer export
+      soname provides.  (CNY-1138, CNY-1139)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
