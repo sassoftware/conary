@@ -33,6 +33,10 @@ Changes in @NEW@:
       job contains (besides the conary package which is the source of critical
       updates) linked troves. Linked troves are troves with overlapping paths.
       (CNY-1115)
+    * A GET request to the "changeset" URL of a repository server that
+      does not supply any arguments no longer results in an Internal
+      Server Error.  The repository can be configured to send email to
+      an email address with debugging information. (CNY-1142)
 
   o Internal changes:
     * Conary now supports being built against an internal copy of the
