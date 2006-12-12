@@ -48,6 +48,12 @@ class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
         updatecmd.UpdateCallback.__init__(self, cfg)
         cook.CookCallback.__init__(self)
 
+    def missingFiles(self, missingFiles):
+        print "Warning: The following files are missing:"
+        for mp in missingFiles:
+            print mp[4]
+        return True
+
 _commands = []
 def _register(cmd):
     _commands.append(cmd)
@@ -707,6 +713,7 @@ class CvcMain(command.MainHandler):
 
         cfg.initializeFlavors()
         log.setMinVerbosity(log.INFO)
+        log.resetErrorOccurred()
 
         # set the build flavor here, just to set architecture information 
         # which is used when initializing a recipe class

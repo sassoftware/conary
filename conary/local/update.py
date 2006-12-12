@@ -1487,7 +1487,7 @@ class FilesystemJob:
 def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False,
                   ignoreTransient=False, ignoreAutoSource=False,
-                  crossRepositoryDeltas = True):
+                  crossRepositoryDeltas = True, allowMissingFiles = False):
     """
     Populates a change set against the files in the filesystem and builds
     a trove object which describes the files installed.  The return
@@ -1550,7 +1550,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     isSrcTrove = curTrove.getName().endswith(':source')
 
     srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
-                                                    fileList ] )
+                                                    fileList ],
+                                        allowMissingFiles=allowMissingFiles)
     for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
                     itertools.izip(fileList, srcFileObjs):
 	# files which disappear don't need to make it into newTrove
@@ -1749,7 +1750,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
                       ignoreAutoSource = False, updateContainers = False,
-                      crossRepositoryDeltas = True):
+                      crossRepositoryDeltas = True, allowMissingFiles = False):
     """
     Builds a change set against a set of files currently installed and
     builds a trove object which describes the files installed.  The
@@ -1788,7 +1789,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                                forceSha1 = forceSha1, 
                                ignoreTransient = ignoreTransient,
                                ignoreAutoSource = ignoreAutoSource,
-                               crossRepositoryDeltas = crossRepositoryDeltas)
+                               crossRepositoryDeltas = crossRepositoryDeltas,
+                               allowMissingFiles = allowMissingFiles)
         if result is None:
             # an error occurred
             return None

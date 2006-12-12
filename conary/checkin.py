@@ -230,7 +230,12 @@ use cvc co %s=<branch> for the following branches:
     for (pathId, path, fileId, version) in troveCs.getNewFileList():
 	fullPath = workDir + "/" + path
 
-	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
+        fileStream = cs.getFileChange(None, fileId)
+        if fileStream is None:
+            # File is missing
+            continue
+
+        fileObj = files.ThawFile(fileStream, pathId)
         sourceState.addFile(pathId, path, version, fileId,
                             isConfig = fileObj.flags.isConfig(),
                             isAutoSource = fileObj.flags.isAutoSource())
@@ -290,7 +295,8 @@ def commit(repos, cfg, message, callback=None, test=False):
                     conflicts.append(version)
         srcPkg = None
     else:
-        srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
+        srcPkg = repos.getTrove(troveName, state.getVersion(), 
+                                deps.deps.Flavor(), callback=callback)
         if not _verifyAtHead(repos, srcPkg, state):
             log.error("contents of working directory are not all "
                       "from the head of the branch; use update")
@@ -353,7 +359,8 @@ def commit(repos, cfg, message, callback=None, test=False):
             # this avoids downloding files which are autosourced by reusing
             # the fileId/version from the previous version of the trove
             srcFiles = repos.getFileVersions(
-                        [ (x[0], x[2], x[3]) for x in srcPkg.iterFileList() ] )
+                        [ (x[0], x[2], x[3]) for x in srcPkg.iterFileList() ],
+                        allowMissingFiles = bool(callback))
             for srcFileObj, (pathId, path, fileId, version) in \
                             itertools.izip(srcFiles, srcPkg.iterFileList() ):
                 if path not in sourceFiles:
@@ -490,7 +497,8 @@ def commit(repos, cfg, message, callback=None, test=False):
         result = update.buildLocalChanges(repos, 
                         [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
                         forceSha1=True,
-                        crossRepositoryDeltas = False)
+                        crossRepositoryDeltas = False,
+                        allowMissingFiles = bool(callback))
     except OSError, e:
         if e.errno == errno.ENOENT:
             raise errors.CvcError('File %s does not exist' % e.filename)
