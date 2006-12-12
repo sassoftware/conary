@@ -1459,12 +1459,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
-        base = self.urlBase()
+        base = util.normurl(self.urlBase())
         url = util.normurl(url)
         if not url.startswith(base):
             raise errors.RepositoryError(
                 'The changeset that is being committed was not '
-                'uploaded a URL on this server.  The url is "%s", this '
+                'uploaded to a URL on this server.  The url is "%s", this '
                 'server is "%s".'
                 %(url, base))
 	# +1 strips off the ? from the query url

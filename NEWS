@@ -37,6 +37,9 @@ Changes in @NEW@:
       does not supply any arguments no longer results in an Internal
       Server Error.  The repository can be configured to send email to
       an email address with debugging information. (CNY-1142)
+    * When checking to make sure that the URL used to upload a
+      changeset matches the repository base URL, both URLs are now
+      normalized before the comparison is made. (CNY-1140)
 
   o Internal changes:
     * Conary now supports being built against an internal copy of the
