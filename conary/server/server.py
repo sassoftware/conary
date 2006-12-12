@@ -101,8 +101,12 @@ class HttpRequests(SimpleHTTPRequestHandler):
             queryString = ""
 
         if base == 'changeset':
+            if not queryString:
+                # handle CNY-1142
+                self.send_error(400, "Bad Request")
+                return None
             urlPath = posixpath.normpath(urllib.unquote(self.path))
-            localName = self.tmpDir + "/" + urlPath.split('?', 1)[1] + "-out"
+            localName = self.tmpDir + "/" + queryString + "-out"
             if os.path.realpath(localName) != localName:
                 self.send_error(404, "File not found")
                 return None
