@@ -1524,6 +1524,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # Remove this file from the big dictionary and try again
                     del sentFiles[missingFileId]
                     continue
+                except errors.OpenError, e:
+                    if not allowMissingFiles:
+                        # Re-raise the exception
+                        raise
+                    # No sense in trying the rest of the files, the server is
+                    # dead. It's a stiff. Bereft of life.
+                    return result
 
                 # Call succeded
                 for (fileStream, idx) in zip(fileStreams, idxL):
