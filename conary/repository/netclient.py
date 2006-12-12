@@ -802,9 +802,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return d
 
-    def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
+    def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True,
+                 callback = None):
 	rc = self.getTroves([(troveName, troveVersion, troveFlavor)],
-                            withFiles = withFiles)
+                            withFiles = withFiles, callback = callback)
 	if rc[0] is None:
 	    raise errors.TroveMissing(troveName, version = troveVersion)
 
@@ -1255,7 +1256,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     need.append((pathId, oldFileId, oldFileVersion))
                 need.append((pathId, newFileId, newFileVersion))
 
-            fileObjs = self.getFileVersions(need, lookInLocal = True)
+            # If a callback was passed in, then allow for missing files
+            fileObjs = self.getFileVersions(need, lookInLocal = True,
+                                            allowMissingFiles = bool(callback))
             fileDict = {}
             for ((pathId, fileId, fileVersion), fileObj) in zip(need, fileObjs):
                 fileDict[(pathId, fileId)] = fileObj
@@ -1358,8 +1361,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         elif target:
             os.unlink(target)
 
-        if callback and missingFiles:
-            assert(hasattr(callback, 'missingFiles'))
+        if missingFiles:
             mfs = []
             for mf in missingFiles:
                 trvName, trvVersion, trvFlavor = mf[:3]
@@ -1374,7 +1376,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 mfs.append((trvName, trvVersion, trvFlavor, 
                             pathId, path, fileId, version))
 
-            if not callback.missingFiles(mfs):
+            # The test for the presence of the callback is redundant, if we
+            # have missing files we should have a callback, otherwise
+            # getFileVersions would have raised an exception because of the
+            # allowMissingFiles flag.
+            ret = False
+            if callback:
+                assert(hasattr(callback, 'missingFiles'))
+                ret = callback.missingFiles(mfs)
+
+            # If the callback returns False, or no callback is present, 
+            # keep the old behavior of raising the exception
+            # Note that the callback can choose to raise an exception itself,
+            # in which case this code will not get executed.
+            if not ret:
                 # Grab just the first file
                 mf = mfs[0]
                 raise errors.FileStreamMissing(mf[5])
@@ -1468,7 +1483,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return r
 
 
-    def getFileVersions(self, fullList, lookInLocal = False):
+    def getFileVersions(self, fullList, lookInLocal = False,
+                        allowMissingFiles = False):
+        # if allowMissingFiles is False, a FileStreamMissing error is passed
+        # straight down to the client. Otherwise, missing files will have None
+        # as their file objects, and callbacks can react to that.
         def getFromServer(server, items, result):
             sentFiles = {}
             for ent in items:
@@ -1493,6 +1512,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 try:
                     fileStreams = self.c[server].getFileVersions(sendL)
                 except errors.FileStreamMissing, e:
+                    if not allowMissingFiles:
+                        # Re-raise the exception
+                        raise
                     missingFileId = self.fromFileId(e.fileId)
                     if missingFileId not in sentFiles:
                         # This shouldn't happen - the server sent us a file id

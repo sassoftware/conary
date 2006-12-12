@@ -305,7 +305,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def findFileVersion(self, fileId):
         return self.db.findFileVersion(fileId)
 
-    def getFileVersions(self, l):
+    def getFileVersions(self, l, allowMissingFiles=False):
 	return self.db.iterFiles(l)
 
     def findUnreferencedTroves(self):
