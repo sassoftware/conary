@@ -74,6 +74,7 @@ def formatRequestInfo(req):
 def logAndEmail(req, cfg, header, msg):
     timeStamp = time.ctime(time.time())
 
+    log.error(header)
     if not cfg.bugsFromEmail or not cfg.bugsToEmail:
         return
     log.error('sending mail to %s' % cfg.bugsToEmail)
@@ -103,14 +104,11 @@ def logAndEmail(req, cfg, header, msg):
 def logErrorAndEmail(req, cfg, exception, e, bt):
     timeStamp = time.ctime(time.time())
 
-    # log error
-    log.error('[%s] Unhandled exception from conary repository: %s: %s', 
-              timeStamp, exception.__name__, e)
-    log.error(''.join(traceback.format_exception(*sys.exc_info())))
-
     header = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
     msg = ''.join(traceback.format_tb(bt))
     logAndEmail(req, cfg, header, msg)
+    # log error
+    log.error(''.join(traceback.format_exception(*sys.exc_info())))
 
 def handler(req):
     coveragehook.install()
