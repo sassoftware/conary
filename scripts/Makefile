@@ -33,7 +33,7 @@ install:
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(datadir)/conary
 	install -m 755 dumpcontainer $(DESTDIR)$(datadir)/conary
-	install -m 755 localupdateinfo $(DESTDIR)$(datadir)
+	install -m 755 localupdateinfo $(DESTDIR)$(datadir)/conary
 	install -m 755 mirror $(DESTDIR)$(datadir)/conary
 	install -m 755 md5pw $(DESTDIR)$(datadir)/conary
 	install -m 755 ccs2tar $(DESTDIR)$(bindir)

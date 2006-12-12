@@ -126,6 +126,15 @@ def get(port, isSecure, repos, req):
         return apache.HTTP_FORBIDDEN
 
     if cmd == "changeset":
+        if not req.args:
+            # the client asked for a changeset, but there is no
+            # ?tmpXXXXXX.cf after /conary/changeset (CNY-1142)
+            import sys
+            print >> sys.stderr, "sys.modules", str(sys.modules)
+            sys.stderr.flush()
+            from conary.server.apachehooks import logAndEmail
+            logAndEmail(req, repos.cfg, 'Bad GET request to /changeset', '')
+            return apache.HTTP_BAD_REQUEST
         if '/' in req.args:
             return apache.HTTP_FORBIDDEN
 

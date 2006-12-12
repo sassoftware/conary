@@ -527,6 +527,13 @@ class MainHandler(object):
             for cmdName in commandClass.commands:
                 supportedCommands[cmdName] = inst
 
+    def _unregisterCommand(self, commandClass):
+        if isinstance(commandClass.commands, str):
+            del self._supportedCommands[commandClass.commands]
+        else:
+            for cmdName in commandClass.commands:
+                del self._supportedCommands[cmdName]
+
     def _getPreCommandOptions(self, argv, cfg):
         """Allow the user to specify generic flags before they specify the
            command to run.

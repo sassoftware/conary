@@ -25,12 +25,11 @@ from conary.lib import log
 from conary.repository.netrepos import netserver
 from conary.server.apachemethods import get, post, putFile
 
-
 def writeTraceback(wfile, cfg):
     kid_error.write(wfile, cfg = cfg, pageTitle = "Error",
                            error = traceback.format_exc())
 
-def logErrorAndEmail(req, cfg, exception, e, bt):
+def formatRequestInfo(req):
     c = req.connection
     req.add_common_vars()
     info_dict = {
@@ -66,27 +65,27 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
         'subprocess_env' : req.subprocess_env,
         'referer'        : req.headers_in.get('referer', 'N/A')
     }
-    info_dict_small = {
-        'local_addr'     : c.local_ip + ':' + str(c.local_addr[1]),
-        'uri'            : req.uri,
-        'request_time'   : time.ctime(req.request_time),
-    }
+    l = []
+    for key, val in sorted(info_dict.items()):
+        l.append('%s: %s' %(key, val))
+    info = '\n'.join(l)
+    return info
 
+def logAndEmail(req, cfg, header, msg):
     timeStamp = time.ctime(time.time())
 
-    # log error
-    log.error('[%s] Unhandled exception from conary repository: %s: %s', 
-              timeStamp, exception.__name__, e)
+    log.error(header)
+    if not cfg.bugsFromEmail or not cfg.bugsToEmail:
+        return
     log.error('sending mail to %s' % cfg.bugsToEmail)
 
     # send email
-    body = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
+    body = header + '\n'
     body += 'Time of occurrence: %s\n' % timeStamp
-    body += 'Conary repository server: %s\n\n' % info_dict['hostname']
-    body += ''.join(traceback.format_tb(bt))
+    body += 'Conary repository server: %s\n\n' % req.hostname
+    body += msg + '\n'
     body += '\nConnection Information:\n'
-    for key, val in sorted(info_dict.items()):
-        body += '\n' + key + ': ' + str(val)
+    body += formatRequestInfo(req)
 
     def sendMail(fromEmail, fromEmailName, toEmail, subject, body):
         msg = MIMEText.MIMEText(body)
@@ -101,6 +100,15 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
 
     sendMail(cfg.bugsFromEmail, cfg.bugsEmailName, cfg.bugsToEmail, 
              cfg.bugsEmailSubject, body)
+
+def logErrorAndEmail(req, cfg, exception, e, bt):
+    timeStamp = time.ctime(time.time())
+
+    header = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
+    msg = ''.join(traceback.format_tb(bt))
+    logAndEmail(req, cfg, header, msg)
+    # log error
+    log.error(''.join(traceback.format_exception(*sys.exc_info())))
 
 def handler(req):
     coveragehook.install()
@@ -168,13 +176,8 @@ def _handler(req):
             raise
     except:
         cfg = repos.cfg
-        if cfg.bugsFromEmail and cfg.bugsToEmail:
-            exception, e, bt = sys.exc_info()
-            logErrorAndEmail(req, cfg, exception, e, bt)
-        timeStamp = time.ctime(time.time())
-        log.error('[%s] Unhandled exception from conary repository', timeStamp)
-        log.error(''.join(traceback.format_exception(*sys.exc_info())))
-
+        exception, e, bt = sys.exc_info()
+        logErrorAndEmail(req, cfg, exception, e, bt)
         return apache.HTTP_INTERNAL_SERVER_ERROR
 
 

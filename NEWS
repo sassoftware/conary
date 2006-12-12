@@ -12,6 +12,8 @@ Changes in @NEW@:
       (CNY-659)
     * PIE executables, which appear to be shared libraries in binary
       directories, will no longer export soname dependencies. (CNY-1128)
+    * ELF files in %(testdir)s and %(debuglibdir)s will no longer export
+      soname provides.  (CNY-1138, CNY-1139)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
@@ -33,6 +35,13 @@ Changes in @NEW@:
       job contains (besides the conary package which is the source of critical
       updates) linked troves. Linked troves are troves with overlapping paths.
       (CNY-1115)
+    * A GET request to the "changeset" URL of a repository server that
+      does not supply any arguments no longer results in an Internal
+      Server Error.  The repository can be configured to send email to
+      an email address with debugging information. (CNY-1142)
+    * When checking to make sure that the URL used to upload a
+      changeset matches the repository base URL, both URLs are now
+      normalized before the comparison is made. (CNY-1140)
 
   o Internal changes:
     * Conary now supports being built against an internal copy of the
