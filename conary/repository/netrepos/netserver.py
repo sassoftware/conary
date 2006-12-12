@@ -2326,7 +2326,7 @@ class ServerConfig(ConfigFile):
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository Bugs')
     bugsEmailSubject        = (CfgString,
-                               'Conary Repository Unhandled Exception Report')
+                               'Conary Repository Error Message')
     cacheDB                 = dbstore.CfgDriver
     closed                  = CfgString
     commitAction            = CfgString
