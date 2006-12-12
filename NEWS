@@ -14,6 +14,8 @@ Changes in @NEW@:
       directories, will no longer export soname dependencies. (CNY-1128)
     * ELF files in %(testdir)s and %(debuglibdir)s will no longer export
       soname provides.  (CNY-1138, CNY-1139)
+    * cvc is now able to check out source troves that have been shadowed from
+      a branch that no longer contains the files. (CNY-462)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
