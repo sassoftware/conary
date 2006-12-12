@@ -80,7 +80,7 @@ def logAndEmail(req, cfg, header, msg):
     log.error('sending mail to %s' % cfg.bugsToEmail)
 
     # send email
-    body = header
+    body = header + '\n'
     body += 'Time of occurrence: %s\n' % timeStamp
     body += 'Conary repository server: %s\n\n' % req.hostname
     body += msg + '\n'
