@@ -16,6 +16,8 @@ Changes in @NEW@:
       soname provides.  (CNY-1138, CNY-1139)
     * cvc is now able to check out source troves that have been shadowed from
       a branch that no longer contains the files. (CNY-462)
+    * the Install recipe class now has the ability to copy symbolic links.
+      (CNY-288)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
