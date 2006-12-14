@@ -44,7 +44,7 @@ class SysLog:
             self.open()
 
         msg = str % args
-        self.f.write(time.strftime("[%b %d %H:%M:%S] ") + self.indent)
+        self.f.write(time.strftime("[%Y %b %d %H:%M:%S] ") + self.indent)
         self.f.write(msg)
         self.f.write("\n")
         self.f.flush()
