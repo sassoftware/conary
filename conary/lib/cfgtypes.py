@@ -175,7 +175,7 @@ class CfgInt(CfgType):
         try:
             return int(val)
         except ValueError, msg:
-            raise ParseError, 'expected integeter'
+            raise ParseError, 'expected integer'
 
 class CfgBool(CfgType):
 
