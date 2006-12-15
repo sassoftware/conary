@@ -144,6 +144,9 @@ class UpdateCallback(ChangesetCallback):
     def updateDone(self):
         pass
 
+    def tagHandlerOutput(self, tag, msg, stderr = False):
+        print "[%s] %s" % (tag, msg),
+
     def setUpdateHunk(self, hunk, hunkCount):
         pass
 
