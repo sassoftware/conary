@@ -686,7 +686,7 @@ class Database(SqlDbRepository):
             # this makes --test a little inaccurate, but life goes on
             if not test:
                 callback.runningPreTagHandlers()
-                fsJob.preapply(tagSet, tagScript)
+                fsJob.preapply(tagSet, tagScript, callback = callback)
 
         for (troveName, troveVersion, troveFlavor, fileDict) in fsJob.iterUserRemovals():
             if sum(fileDict.itervalues()) == 0:

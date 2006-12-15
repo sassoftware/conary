@@ -48,6 +48,11 @@ Changes in @NEW@:
       changeset matches the repository base URL, both URLs are now
       normalized before the comparison is made. (CNY-1140)
 
+  o Client changes;
+    * Tag handler output is now redirected to a callback. The command line
+      callback places "[ tag ]" in front of the output from each tag handler
+      to help with debugging (CNY-906).
+
   o Internal changes:
     * Conary now supports being built against an internal copy of the
       sqlite3 library for cases when the system sqlite3 is not the
