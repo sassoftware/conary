@@ -773,6 +773,11 @@ class LineReader:
     def readlines(self):
         s = os.read(self.fd, 4096)
         if not s:
+            if self.buf:
+                s = self.buf
+                self.buf = ''
+                return [ s ]
+
             return None
 
         self.buf += s
