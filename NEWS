@@ -18,6 +18,9 @@ Changes in @NEW@:
       a branch that no longer contains the files. (CNY-462)
     * the Install recipe class now has the ability to copy symbolic links.
       (CNY-288)
+    * The output produced by cvc when attempting to find the
+      appropriate patch level when applying a patch has been
+      improved. (CNY-588)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
