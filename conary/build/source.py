@@ -579,6 +579,9 @@ class Patch(_Source):
 	self.applymacros = self.macros
 
     def patchme(self, patch, f, destDir, patchlevels):
+        logFiles = []
+        log.info('attempting to apply %s with to %s with patch level(s) %s'
+                 %(f, destDir, ', '.join(str(x) for x in patchlevels)))
         for patchlevel in patchlevels:
             patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
             if self.backup:
@@ -586,7 +589,6 @@ class Patch(_Source):
             if self.extraArgs:
                 patchArgs.extend(self.extraArgs)
 
-            log.info('attempting to apply %s with patchlevel %s' % (f,patchlevel))
             fd, path = tempfile.mkstemp()
             os.unlink(path)
             logFile = os.fdopen(fd, 'w+')
@@ -603,19 +605,41 @@ class Patch(_Source):
                             # answer y/n questions.
 
             failed = p2.wait()
-            try:
-                logFile.flush()
-                logFile.seek(0,0)
-                print logFile.read().strip()
-            except IOError:
-                pass
-            logFile.close()
 
+            logFile.flush()
+            logFile.seek(0,0)
             if failed:
-                log.info('patch %s did not apply with level %s' % (f,patchlevel))
-            else:
-                log.info('patch applied successfully')
-                return
+                # patch failed - keep patchlevel and logfile for display
+                # later
+                logFiles.append((patchlevel, logFile))
+                continue
+            # patch was successful
+            log.info(logFile.read().strip())
+            logFile.close()
+            log.info('applied successfully with patch level %s'
+                     %patchlevel)
+            # close any saved log files before we return
+            for f in logFiles:
+                f.close()
+            return
+        # all attemps were unsuccessful.  display relevant logs
+        rightLevels = []
+        # do two passes over all the log files.  Once to find
+        # which log files are probably interesting ones
+        # and one to actually print them.
+        for idx, (patchlevel, logFile) in enumerate(logFiles):
+            s = logFile.read().strip()
+            if "can't find file to patch" not in s:
+                rightLevels.append(idx)
+            logFiles[idx] = (patchlevel, s)
+        for idx, (patchlevel, s) in enumerate(logFiles):
+            if rightLevels and idx not in rightLevels:
+                log.info('patch level %s failed - probably wrong level'
+                         %(patchlevel))
+                continue
+            log.info('patch level %s FAILED' % patchlevel)
+            log.info(s)
+            logFile.close()
         log.error('could not apply patch %s in directory %s', f, destDir)
         raise SourceError, 'could not apply patch %s' % f
 
@@ -639,7 +663,7 @@ class Patch(_Source):
         if self.level != None:
             leveltuple = (self.level,)
         else:
-            leveltuple = (1,0,2,3,)
+            leveltuple = (1, 0, 2, 3,)
         util.mkdirChain(destDir)
 
         pin = util.popen("%s '%s'" %(provides, f))
