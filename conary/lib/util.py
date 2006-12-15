@@ -16,6 +16,7 @@ import bdb
 import bz2
 import debugger
 import errno
+import fcntl
 import log
 import misc
 import os
@@ -766,6 +767,33 @@ def lstat(path):
         return None
 
     return sb
+
+class NonblockingLineReader:
+
+    def readlines(self):
+        try:
+            s = os.read(self.fd, 4096)
+        except:
+            s = ''
+
+        while s:
+            self.buf += s
+            try:
+                s = os.read(self.fd, 4096)
+            except:
+                s = ''
+
+        lines = self.buf.split('\n')
+        self.buf = lines[-1]
+        del lines[-1]
+
+        return [ x + "\n" for x in lines ]
+
+    def __init__(self, fd):
+        fcntl.fcntl(fd, fcntl.F_SETFL,
+                    fcntl.fcntl(fd, fcntl.F_GETFL, 0) | os.O_NONBLOCK)
+        self.fd = fd
+        self.buf = ''
 
 exists = misc.exists
 removeIfExists = misc.removeIfExists
