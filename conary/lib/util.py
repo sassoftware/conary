@@ -768,20 +768,14 @@ def lstat(path):
 
     return sb
 
-class NonblockingLineReader:
+class LineReader:
 
     def readlines(self):
-        try:
-            s = os.read(self.fd, 4096)
-        except:
-            s = ''
+        s = os.read(self.fd, 4096)
+        if not s:
+            return None
 
-        while s:
-            self.buf += s
-            try:
-                s = os.read(self.fd, 4096)
-            except:
-                s = ''
+        self.buf += s
 
         lines = self.buf.split('\n')
         self.buf = lines[-1]
@@ -790,8 +784,6 @@ class NonblockingLineReader:
         return [ x + "\n" for x in lines ]
 
     def __init__(self, fd):
-        fcntl.fcntl(fd, fcntl.F_SETFL,
-                    fcntl.fcntl(fd, fcntl.F_GETFL, 0) | os.O_NONBLOCK)
         self.fd = fd
         self.buf = ''
 
