@@ -2201,9 +2201,6 @@ class TagCommand:
                     log.error('unknown datasource %s' %datasource)
                     break
 
-                #import epdb
-                #epdb.st()
-
                 log.debug("running %s", " ".join(command))
                 if root != '/' and uid:
                     continue
