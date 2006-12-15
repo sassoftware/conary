@@ -1188,16 +1188,30 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
 
 
 def guessUpstreamSourceTrove(repos, srcName, state):
+    # Grab the latest upstream source, if one exists, and keep only the files
+    # that did not change in it
+
+    # We do all the hard work here so that in packagepolicy.py :
+    # populateLcache we know which files to grab from the lookaside cache and
+    # which ones to get from the repository.
+    # Note that, as of CNY-31, we never fetch the sources from upstream
+    # directly, cvc refresh is supposed to do that if they've changed.
     if not repos:
-        return []
+        return None
 
     # Compute hash of autosourced files
     autosourced = {}
     for srcFile in state.iterFileList():
         pathId = srcFile[0]
-        if state.fileIsAutoSource(pathId):
-            fileId = srcFile[2]
-            autosourced[fileId] = srcFile
+        if not state.fileIsAutoSource(pathId):
+            continue
+        # File is autosourced. Does it need to be refreshed?
+        if state.fileNeedsRefresh(pathId):
+            # CNY-31
+            # if an autosource file is marked as needing to be refreshed
+            # in the Conary state file, the lookaside cache has to win
+            continue
+        autosourced[pathId] = srcFile
 
     # Fetch the latest trove from upstream
     try:
@@ -1211,14 +1225,21 @@ def guessUpstreamSourceTrove(repos, srcName, state):
     flavor = deps.Flavor()
 
     trove = repos.getTrove(srcName, headVersion, flavor, withFiles=True)
-    return trove
-    ret = []
-    for srcFile in trove.iterFileList():
-        fileId = srcFile[2]
-        if fileId in autosourced:
-            ret.append(srcFile)
 
-    return ret
+    # Iterate over the files in the upstream trove, and keep only the ones
+    # that are in the autosourced hash (non-refreshed, autosourced files)
+
+    filesToRemove = []
+    for srcFile in trove.iterFileList():
+        pathId = srcFile[0]
+        if pathId not in autosourced:
+            filesToRemove.append(pathId)
+
+    # Remove the files we don't care about from the upstream trove
+    for pathId in filesToRemove:
+        trove.removeFile(pathId)
+
+    return trove
 
 def guessSourceVersion(repos, name, versionStr, buildLabel, 
                                                 searchBuiltTroves=False):
