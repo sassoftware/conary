@@ -21,6 +21,11 @@ Changes in @NEW@:
     * The output produced by cvc when attempting to find the
       appropriate patch level when applying a patch has been
       improved. (CNY-588)
+    * When cooking (either from a recipe or from the repository), cvc will
+      always use the (auto)source files from the repository, instead of
+      re-downloading them. This allows for rebuilds of sources even if the
+      upstream source is no longer available. (Auto)sources can still be
+      re-downloaded using cvc refresh. (CNY-31)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
