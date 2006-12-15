@@ -487,15 +487,18 @@ class _AbstractPackageRecipe(Recipe):
                 continue
             srcName = rclass._trove.getName()
             srcVersion = rclass._trove.getVersion()
-            for f in repos.iterFilesInTrove(srcName, srcVersion,
-                                            deps.Flavor(),
-                                            withFiles=True):
-                pathId, path, fileId, version, fileObj = f
+            # CNY-31: walk over the files in the trove we found upstream
+            # (which we may have modified to remove the non-autosourced files
+            # Also, if an autosource file is marked as needing to be refreshed
+            # in the Conary state file, the lookaside cache has to win, so
+            # don't populate it with the repository file)
+            for pathId, path, fileId, version in rclass._trove.iterFileList():
                 assert(path[0] != "/")
                 # we might need to retrieve this source file
                 # to enable a build, so we need to find the
                 # sha1 hash of it since that's how it's indexed
                 # in the file store
+                fileObj = repos.getFileVersion(pathId, fileId, version)
                 if isinstance(fileObj, files.RegularFile):
                     # it only makes sense to fetch regular files, skip
                     # anything that isn't
