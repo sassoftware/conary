@@ -55,6 +55,8 @@ Changes in @NEW@:
     * When checking to make sure that the URL used to upload a
       changeset matches the repository base URL, both URLs are now
       normalized before the comparison is made. (CNY-1140)
+    * The conary.lib.logparse module now provides the correct date
+      strings for each logged event.
 
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line
