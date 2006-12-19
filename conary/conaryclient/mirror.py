@@ -85,11 +85,16 @@ def buildJobList(repos, groupList):
     q = {}
     for group in groupList:
         for mark, (name, version, flavor) in group:
+            # force groups to always be transferred using absolute changesets
+            if name.startswith("group-"):
+                continue
             d = q.setdefault(name, {})
             l = d.setdefault(version.branch(), [])
             l.append(flavor)
 
-    latestAvailable = repos.getTroveLeavesByBranch(q)
+    latestAvailable = {}
+    if len(q):
+        latestAvailable = repos.getTroveLeavesByBranch(q)
 
     # we'll keep latestAvailable in sync with what the target will look like
     # as the mirror progresses
@@ -136,6 +141,8 @@ def buildJobList(repos, groupList):
         # reflect the state of the mirror after this job completes
         for mark, job in groupJobList:
             name = job[0]
+            if name.startswith("group-"):
+                continue
             oldVersion, oldFlavor = job[1]
             newVersion, newFlavor = job[2]
 
