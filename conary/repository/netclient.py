@@ -1106,7 +1106,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         cs = None
         scheduledSet = {}
         internalCs = None
-        filesNeeded = []
+        filesNeeded = set()
 
         if target:
             try:
@@ -1155,7 +1155,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     raise
 
                 chgSetList += extraTroveList
-                filesNeeded += extraFileList
+                filesNeeded.update(extraFileList)
 
             if (ourJobList or filesNeeded) and not internalCs:
                 internalCs = changeset.ChangeSet()
@@ -1228,9 +1228,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute)
                 # newFilesNeeded = [ (pathId, oldFileVersion, newFileVersion) ]
-                filesNeeded += [ (x[0], troveName, 
+                filesNeeded.update( ( (x[0], troveName, 
                         (oldVersion, oldFlavor, x[1], x[2]),
-                        (newVersion, newFlavor, x[3], x[4])) for x in newFilesNeeded ]
+                        (newVersion, newFlavor, x[3], x[4]))
+                            for x in newFilesNeeded ) )
 
                 if recurse:
                     for (otherTroveName, (otherOldVersion, otherOldFlavor),
