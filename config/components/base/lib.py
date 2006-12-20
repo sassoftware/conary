@@ -19,5 +19,6 @@
 filters = ('lib', (r'.*/(%(lib)s|lib)/',))
 follows = ('python',
            'perl',
+           'data',
            'devellib',
            'devel',)

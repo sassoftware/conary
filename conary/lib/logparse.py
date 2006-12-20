@@ -50,11 +50,11 @@ def getConaryLogEventList(lines=None):
 
     events = []
     for start, end in slices:
-        first = lines[n]
+        first = lines[start]
         date = ''
         dateend = first.find(']')
         if dateend > 0:
-            date = first[1:dateend-1]
+            date = first[1:dateend]
         events.append((date, [_stripdate(x) for x in lines[start:end]]))
 
     return events

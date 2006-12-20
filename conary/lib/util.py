@@ -16,6 +16,7 @@ import bdb
 import bz2
 import debugger
 import errno
+import fcntl
 import log
 import misc
 import os
@@ -766,6 +767,30 @@ def lstat(path):
         return None
 
     return sb
+
+class LineReader:
+
+    def readlines(self):
+        s = os.read(self.fd, 4096)
+        if not s:
+            if self.buf:
+                s = self.buf
+                self.buf = ''
+                return [ s ]
+
+            return None
+
+        self.buf += s
+
+        lines = self.buf.split('\n')
+        self.buf = lines[-1]
+        del lines[-1]
+
+        return [ x + "\n" for x in lines ]
+
+    def __init__(self, fd):
+        self.fd = fd
+        self.buf = ''
 
 exists = misc.exists
 removeIfExists = misc.removeIfExists

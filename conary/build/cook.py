@@ -905,10 +905,6 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             else:
                 raise
         if logBuild:
-            if recipeObj.isatty():
-                out = logFile
-            else:
-                out = sys.stdout
             logBuildEnvironment(logFile, sourceVersion, policyTroves,
                                 recipeObj.macros, cfg)
     try:
@@ -1207,6 +1203,59 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write('START OF BUILD:\n\n')
 
 
+def guessUpstreamSourceTrove(repos, srcName, state):
+    # Grab the latest upstream source, if one exists, and keep only the files
+    # that did not change in it
+
+    # We do all the hard work here so that in packagepolicy.py :
+    # populateLcache we know which files to grab from the lookaside cache and
+    # which ones to get from the repository.
+    # Note that, as of CNY-31, we never fetch the sources from upstream
+    # directly, cvc refresh is supposed to do that if they've changed.
+    if not repos:
+        return None
+
+    # Compute hash of autosourced files
+    autosourced = {}
+    for srcFile in state.iterFileList():
+        pathId = srcFile[0]
+        if not state.fileIsAutoSource(pathId):
+            continue
+        # File is autosourced. Does it need to be refreshed?
+        if state.fileNeedsRefresh(pathId):
+            # CNY-31
+            # if an autosource file is marked as needing to be refreshed
+            # in the Conary state file, the lookaside cache has to win
+            continue
+        autosourced[pathId] = srcFile
+
+    # Fetch the latest trove from upstream
+    try:
+        headVersion = repos.getTroveLatestVersion(srcName,
+                                                  state.getVersion().branch())
+    except errors.TroveMissing:
+        # XXX we shouldn't get here unless the user messed up the CONARY file
+        return None
+
+    # Sources don't have flavors
+    flavor = deps.Flavor()
+
+    trove = repos.getTrove(srcName, headVersion, flavor, withFiles=True)
+
+    # Iterate over the files in the upstream trove, and keep only the ones
+    # that are in the autosourced hash (non-refreshed, autosourced files)
+
+    filesToRemove = []
+    for srcFile in trove.iterFileList():
+        pathId = srcFile[0]
+        if pathId not in autosourced:
+            filesToRemove.append(pathId)
+
+    # Remove the files we don't care about from the upstream trove
+    for pathId in filesToRemove:
+        trove.removeFile(pathId)
+
+    return trove
 
 def guessSourceVersion(repos, name, versionStr, buildLabel, 
                                                 searchBuiltTroves=False):
@@ -1226,6 +1275,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         @param searchBuiltTroves: if True, search for binary troves  
         that match the desired trove's name, versionStr and label. 
         @type searchBuiltTroves: bool
+        @return (version, upstreamTrove): upstreamTrove is an instance of the
+        trove if it was previously built on the same branch.
     """
     srcName = name + ':source'
     sourceVerison = None
@@ -1236,10 +1287,11 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
             if state.getName() == srcName and \
                             state.getVersion() != versions.NewVersion():
                 stateVer = state.getVersion().trailingRevision().version
+                trv = guessUpstreamSourceTrove(repos, srcName, state)
                 if versionStr and stateVer != versionStr:
                     return state.getVersion().branch().createVersion(
-                                versions.Revision('%s-1' % (versionStr)))
-                return state.getVersion()
+                                versions.Revision('%s-1' % (versionStr))), trv
+                return state.getVersion(), trv
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
@@ -1255,13 +1307,13 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 if x.trailingRevision().version == versionStr ] 
         if relVersionList:
             relVersionList.sort()
-            return relVersionList[-1]
+            return relVersionList[-1], None
         else:
             # we've got a reasonable branch to build on, but not
             # a sourceCount.  Reset the sourceCount to 1.
             versionList.sort()
             return versionList[-1].branch().createVersion(
-                        versions.Revision('%s-1' % (versionStr)))
+                        versions.Revision('%s-1' % (versionStr))), None
     if searchBuiltTroves:
         # XXX this is generally a bad idea -- search for a matching
         # built trove on the branch that our source version is to be
@@ -1278,14 +1330,14 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 relVersionList.sort()
                 sourceVersion = relVersionList[-1].copy()
                 sourceVersion.trailingRevision().buildCount = None
-                return sourceVersion
+                return sourceVersion, None
             else:
                 # we've got a reasonable branch to build on, but not
                 # a sourceCount.  Reset the sourceCount to 1.
                 versionList.sort()
                 return versionList[-1].branch().createVersion(
-                            versions.Revision('%s-1' % (versionStr)))
-    return None
+                            versions.Revision('%s-1' % (versionStr))), None
+    return None, None
 
 def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     if buildFlavor is None:
@@ -1305,8 +1357,8 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     try:
         # make a guess on the branch to use since it can be important
         # for loading superclasses.
-        sourceVersion = guessSourceVersion(repos, pkgname,
-                                           None, cfg.buildLabel)
+        sourceVersion, upstrTrove = guessSourceVersion(repos, pkgname,
+                                                       None, cfg.buildLabel)
         if sourceVersion:
             branch = sourceVersion.branch()
         else:
@@ -1321,9 +1373,9 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     recipeClass = loader.getRecipe()
 
     try:
-        sourceVersion = guessSourceVersion(repos, recipeClass.name,
-                                           recipeClass.version,
-                                           cfg.buildLabel)
+        sourceVersion, upstrTrove = guessSourceVersion(repos, recipeClass.name,
+                                                       recipeClass.version,
+                                                       cfg.buildLabel)
     except errors.OpenError:
         # pass this error here, we'll warn about the unopenable repository
         # later.
@@ -1339,6 +1391,7 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
                                                recipeClass.version))
         # the source version must have a time stamp
         sourceVersion.trailingRevision().resetTimeStamp()
+    recipeClass._trove = upstrTrove
     return loader, recipeClass, sourceVersion
 
 

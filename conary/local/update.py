@@ -28,6 +28,7 @@ flag for files is ignored.
 import errno
 import itertools
 import os
+import select
 import sha
 import stat
 import sys
@@ -220,10 +221,11 @@ class FilesystemJob:
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
 
-    def preapply(self, tagSet = {}, tagScript = None):
+    def preapply(self, tagSet = {}, tagScript = None,
+                 callback = UpdateCallback()):
 	# this is run before the change make it to the database
 	rootLen = len(self.root)
-	tagCommands = TagCommand()
+	tagCommands = TagCommand(callback = callback.tagHandlerOutput)
 
         # processing these before the tagRemoves taghandler files ensures
         # we run them even if the taghandler will be removed in the same
@@ -320,7 +322,7 @@ class FilesystemJob:
 
 	# this is run after the changes are in the database (but before
 	# they are committed
-	tagCommands = TagCommand()
+	tagCommands = TagCommand(callback = callback.tagHandlerOutput)
 	runLdconfig = False
 	rootLen = len(self.root)
 
@@ -1487,7 +1489,7 @@ class FilesystemJob:
 def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False,
                   ignoreTransient=False, ignoreAutoSource=False,
-                  crossRepositoryDeltas = True):
+                  crossRepositoryDeltas = True, allowMissingFiles = False):
     """
     Populates a change set against the files in the filesystem and builds
     a trove object which describes the files installed.  The return
@@ -1550,7 +1552,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     isSrcTrove = curTrove.getName().endswith(':source')
 
     srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
-                                                    fileList ] )
+                                                    fileList ],
+                                        allowMissingFiles=allowMissingFiles)
     for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
                     itertools.izip(fileList, srcFileObjs):
 	# files which disappear don't need to make it into newTrove
@@ -1749,7 +1752,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
                       ignoreAutoSource = False, updateContainers = False,
-                      crossRepositoryDeltas = True):
+                      crossRepositoryDeltas = True, allowMissingFiles = False):
     """
     Builds a change set against a set of files currently installed and
     builds a trove object which describes the files installed.  The
@@ -1788,7 +1791,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                                forceSha1 = forceSha1, 
                                ignoreTransient = ignoreTransient,
                                ignoreAutoSource = ignoreAutoSource,
-                               crossRepositoryDeltas = crossRepositoryDeltas)
+                               crossRepositoryDeltas = crossRepositoryDeltas,
+                               allowMissingFiles = allowMissingFiles)
         if result is None:
             # an error occurred
             return None
@@ -2076,7 +2080,7 @@ class HandlerInfo:
             l.append(tagInfo)
 
 class TagCommand:
-    def __init__(self):
+    def __init__(self, callback):
         self.commandOrder = (
             ('handler', 'preremove'),
             ('files',   'preupdate'),
@@ -2097,6 +2101,8 @@ class TagCommand:
                 'remove':    {},
             },
         }
+
+        self.outputCallback = callback
 
     def addCommand(self, tagInfo, updateType, updateClass, fileList):
         h = self.commands[updateType][updateClass].setdefault(
@@ -2199,18 +2205,63 @@ class TagCommand:
                 if root != '/' and uid:
                     continue
 
-                p = os.pipe()
+                inputPipe = os.pipe()
+                inputPid = None
+
+                if datasource != 'args':
+                    # fork a separate process to feed stdin
+                    inputPid = os.fork()
+                    if inputPid == 0:
+                        os.close(inputPipe[0])
+                        if datasource == 'stdin':
+                            for filename in sorted(hi.tagToFile[tagInfo]):
+                                try:
+                                    os.write(inputPipe[1], filename + "\n")
+                                except OSError, e:
+                                    if e.errno != errno.EPIPE:
+                                        raise
+                                    log.error(str(e))
+                                    break
+                        elif datasource == 'multitag':
+                            for fileName in sorted(hi.fileToTag):
+                                try:
+                                    os.write(inputPipe[1], 
+                                        "%s\n%s\n" %(" ".join(
+                                        sorted([x.tag for x in
+                                                hi.fileToTag[fileName]])),
+                                        fileName))
+                                except OSError, e:
+                                    if e.errno != errno.EPIPE:
+                                        raise
+                                    log.error(str(e))
+                                    break
+                        os._exit(0)
+
+                os.close(inputPipe[1])
+
+                stdoutPipe = os.pipe()
+                stderrPipe = os.pipe()
+
                 pid = os.fork()
+
                 if not pid:
                     try:
-                        os.close(p[1])
-                        os.dup2(p[0], 0)
-                        os.close(p[0])
+                        os.dup2(inputPipe[0], 0)
+                        os.dup2(stdoutPipe[1], 1)
+                        os.dup2(stderrPipe[1], 2)
+
+                        os.close(inputPipe[0])
+                        os.close(stdoutPipe[0])
+                        os.close(stdoutPipe[1])
+                        os.close(stderrPipe[0])
+                        os.close(stderrPipe[1])
+
                         os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
                         os.chdir(root)
                         if root != '/':
                             assert(root[0] == '/')
                             os.chroot(root)
+                        import time
                         os.execv(command[0], command)
                     except Exception, e:
                         try:
@@ -2218,30 +2269,34 @@ class TagCommand:
                         finally:
                             os._exit(1)
 
-                os.close(p[0])
-                if datasource == 'stdin':
-                    for filename in sorted(hi.tagToFile[tagInfo]):
-                        try:
-                            os.write(p[1], filename + "\n")
-                        except OSError, e:
-                            if e.errno != errno.EPIPE:
-                                raise
-                            log.error(str(e))
-                            break
-                elif datasource == 'multitag':
-                    for fileName in sorted(hi.fileToTag):
-                        try:
-                            os.write(p[1], "%s\n%s\n" %(" ".join(
-                                sorted([x.tag for x in
-                                        hi.fileToTag[fileName]])),
-                                fileName))
-                        except OSError, e:
-                            if e.errno != errno.EPIPE:
-                                raise
-                            log.error(str(e))
-                            break
-                os.close(p[1])
+                os.close(inputPipe[0])
+                os.close(stdoutPipe[1])
+                os.close(stderrPipe[1])
 
+                stdoutReader = util.LineReader(stdoutPipe[0])
+                stderrReader = util.LineReader(stderrPipe[0])
+                poller = select.poll()
+                poller.register(stdoutPipe[0], select.POLLIN)
+                poller.register(stderrPipe[0], select.POLLIN)
+
+                count = 2
+                while count:
+                    fds = [ x[0] for x in poller.poll() ]
+                    for (fd, reader, isError) in (
+                                (stdoutPipe[0], stdoutReader, False),
+                                (stderrPipe[0], stderrReader, True) ):
+                        if fd not in fds: continue
+                        lines = reader.readlines()
+
+                        if lines == None:
+                            poller.unregister(fd)
+                            count -= 1
+                        else:
+                            for line in lines:
+                                self.outputCallback(tagInfo.tag, line,
+                                                    stderr = isError)
+
+                if inputPid is not None: os.waitpid(inputPid, 0)
                 (id, status) = os.waitpid(pid, 0)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
                     log.error("%s failed", command[0])
