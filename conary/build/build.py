@@ -1561,7 +1561,7 @@ class SetModes(_FileAction):
 	    self.setComponents(macros.destdir, f)
 
 class _PutFiles(_FileAction):
-    keywords = { 'mode': -1 }
+    keywords = { 'mode': -1, 'preserveSymlinks' : False }
 
     def do(self, macros):
         dest = action._expandOnePath(self.toFile, macros)
@@ -1600,10 +1600,20 @@ class _PutFiles(_FileAction):
             log.info('renaming %s to %s', source, dest)
             os.rename(source, dest)
 	else:
+            if os.path.islink(source) and self.preserveSymlinks:
+                # We have to copy the symlink
+                linksrc = os.readlink(source)
+                log.info('creating symlink %s -> %s' % (dest, linksrc))
+                os.symlink(linksrc, dest)
+                self.setComponents(destdir, dest)
+                # No sense in chmod'ing a symlink
+                return
+
             log.info('copying %s to %s', source, dest)
             shutil.copy2(source, dest)
-	self.setComponents(destdir, dest)
-	self.chmod(destdir, dest, mode=mode)
+
+        self.setComponents(destdir, dest)
+        self.chmod(destdir, dest, mode=mode)
 
 
     def __init__(self, recipe, *args, **keywords):
@@ -1659,6 +1669,13 @@ class Install(_PutFiles):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe.
+
+    B{mode} : The mode of the file. If one of the executable bits is set, the
+    mode is 0755, otherwise it is 0644.
+
+    B{preserveSymlinks} : (False) If set to True, symbolic links are copied.
+    The default behavior is to de-reference symbolic links when copying the
+    files.
 
     EXAMPLES
     ========

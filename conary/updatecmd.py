@@ -182,6 +182,12 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
         self.lock.release()
 
+    def tagHandlerOutput(self, tag, msg, stderr = False):
+        self.lock.acquire()
+        self._message('')
+        self.out.write('[%s] %s\n' % (tag, msg))
+        self.lock.release()
+
     def __init__(self, cfg=None):
         callbacks.UpdateCallback.__init__(self)
         callbacks.LineOutput.__init__(self)
