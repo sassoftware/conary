@@ -60,6 +60,9 @@ Changes in @NEW@:
       normalized before the comparison is made. (CNY-1140)
     * The conary.lib.logparse module now provides the correct date
       strings for each logged event.
+    * The Conary command line argument parser checks for the --help
+      option earlier.  This corrects some instances where commands
+      like "conary rq --help" would not display help. (CNY-1153)
 
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line
