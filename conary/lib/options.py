@@ -688,13 +688,12 @@ class MainHandler(object):
             print >> sys.stderr, e
             sys.exit(1)
 
+        argSet.update(newArgSet)
         if argSet.pop('help', False):
             thisCommand.usage()
             sys.exit(1)
 
-
         thisCommand.setParser(parser)
-        argSet.update(newArgSet)
         thisCommand.processConfigOptions(cfg, cfgMap, argSet)
         return self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)
 
