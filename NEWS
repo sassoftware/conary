@@ -29,6 +29,9 @@ Changes in @NEW@:
     * The ordering for the rules used to determine which component a
       file should be in was reversed when a file was under /usr/share
       but had /lib/ somewhere in the path name. (CNY-1155)
+    * cvc add will now refuse to add symbolic links that are absolute,
+      dangling, pointing to files outside of the current directory or pointing
+      to files that are not tracked by Conary. (CNY-468)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
