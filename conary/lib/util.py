@@ -488,6 +488,27 @@ def checkPath(binary, root=None):
 def joinPaths(*args):
     return normpath(os.sep.join(args))
 
+def splitPathReverse(path):
+    """Split the path at the operating system's separators.
+    Returns a list with the path components in reverse order.
+    Empty path components are stripped out.
+    Example: 'a//b//c/d' -> ['d', 'c', 'b', 'a']
+    """
+    while 1:
+        path, tail = os.path.split(path)
+        if not tail:
+            break
+        yield tail
+
+def splitPath(path):
+    """Split the path at the operating system's separators
+    Empty path components are stripped out
+    Example: 'a//b//c/d' -> ['a', 'b', 'c', 'd']
+    """
+    ret = list(splitPathReverse(path))
+    ret.reverse()
+    return ret
+
 def assertIteratorAtEnd(iter):
     try:
 	iter.next()

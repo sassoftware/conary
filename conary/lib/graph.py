@@ -15,6 +15,12 @@
 import copy
 import itertools
 
+class BackEdgeError(Exception):
+    def __init__(self, src, dst, *args, **kwargs):
+        self.src = src
+        self.dst = dst
+        Exception.__init__(self, *args, **kwargs)
+
 class NodeData(object):
     """Stores data associated with nodes.  Subclasses can determine
        faster ways to retrieve the index from a data object
@@ -188,7 +194,7 @@ class DirectedGraph:
         g.edges = self.getReversedEdges()
         return g
 
-    def doDFS(self, start=None, nodeSort=None):
+    def doDFS(self, start=None, nodeSort=None, finishCallback=None):
         nodeData = self.data
 
         nodeIds = [ x[0] for x in nodeData.sort(nodeSort) ]
@@ -218,6 +224,8 @@ class DirectedGraph:
                 nodeId, finish = nodeStack.pop()
                 if finish:
                     finishes[nodeId] = timeCount
+                    if finishCallback:
+                        finishCallback(nodeId, starts, finishes)
                     timeCount += 1
                     continue
                 elif nodeId in starts:
@@ -251,12 +259,29 @@ class DirectedGraph:
         else:
             reversedSort = None
 
-        starts, finishes, trees = self.doDFS(nodeSort=reversedSort)
+        # Accumulate elements in finishList as they are finished.
+        finishList = []
+        def finishCallback(nodeId, starts, finishes):
+            finishList.append(nodeId)
 
-        def nodeSelect(a, b):
-            return cmp(finishes[b[0]], finishes[a[0]])
+        starts, finishes, trees = self.doDFS(nodeSort=reversedSort,
+                                             finishCallback=finishCallback)
 
-        return [ x[1] for x in self.data.sort(nodeSelect)]
+        # finishList is sorted by finish times, for a total ordering we need
+        # it reversed
+        finishList.reverse()
+
+        # Find back edges (two adjacent nodes u, v have a back edge iff
+        # starts[u] > starts[v] and finishes[u] < finishes[v]
+        for fromIdx, toIdxList in self.edges.iteritems():
+            for toIdx in toIdxList:
+                if starts[fromIdx] > starts[toIdx] and \
+                   finishes[fromIdx] < finishes[toIdx]:
+                   # Back edge
+                   src, dst = self.data.getItemsByIndex([fromIdx, toIdx])
+                   raise BackEdgeError(src, dst)
+
+        return self.data.getItemsByIndex(finishList)
 
     def getStronglyConnectedComponents(self):
         if self.isEmpty():
