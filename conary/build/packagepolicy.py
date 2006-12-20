@@ -373,6 +373,7 @@ class ComponentSpec(_filterSpec):
                 self.error('dependency loop(s) in component filters: %s',
                            ' '.join(sorted(':'.join(x)
                                            for x in sorted(list(depLoops)))))
+                return
 
             # Create a stably-sorted list of config filters where
             # the filter is not empty.  (An empty filter with both
