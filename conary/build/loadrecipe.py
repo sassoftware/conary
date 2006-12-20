@@ -81,6 +81,7 @@ def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.build.grouprecipe', 'GroupRecipe')
     localImport(d, 'conary.build.filesetrecipe', 'FilesetRecipe')
     localImport(d, 'conary.build.redirectrecipe', 'RedirectRecipe')
+    localImport(d, 'conary.build.derivedrecipe', 'DerivedPackageRecipe')
     localImport(d, 'conary.build.packagerecipe', 
                                   ('clearBuildReqs',
                                    'PackageRecipe', 
