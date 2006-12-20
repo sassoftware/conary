@@ -51,10 +51,6 @@ class RedirectRecipe(Recipe):
         elif fromTrove.find(":") != -1:
             raise ValueError, 'components cannot be individually redirected'
 
-        if fromTrove.startswith("group-"):
-            # how sad
-            raise ValueError, "groups cannot be redirected"
-
         self.addTroveList.append((name, branchStr, sourceFlavor, 
                                   targetFlavor, fromTrove, skipTargetMatching))
 
@@ -221,6 +217,10 @@ class RedirectRecipe(Recipe):
                         foundMatch = True
 
                         redirMap[(name, sourceFlavor)] = redirInfo + ([], )
+
+                        # groups don't include any additional redirections
+                        if name.startswith('group-'):
+                            continue
 
                         if not trove.troveIsCollection(name):
                             continue

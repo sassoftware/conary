@@ -19,7 +19,8 @@ python_files = __init__.py    \
 	       apachemethods.py \
 	       server.py      \
                http.py        \
-	       schema.py
+	       schema.py      \
+	       migrate.py
 
 extra_dist = Makefile
 
