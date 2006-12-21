@@ -41,6 +41,7 @@ from conary.deps import deps
 from conary.lib import log, patch, sha1helper, util
 from conary.local.errors import *
 from conary.repository import changeset, filecontents
+from conary.local.journal import JobJournal
 
 MERGE = 1 << 0
 REPLACEFILES = 1 << 1
@@ -275,7 +276,7 @@ class FilesystemJob:
 
         tagCommands.run(tagScript, self.root, preScript=True)
 
-    def _createLink(self, linkGroup, target):
+    def _createLink(self, linkGroup, target, opJournal):
         # this is part of a hard link group, attempt making a
         # hardlink.
         linkPath = self.linkGroups[linkGroup]
@@ -303,10 +304,11 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
-    def apply(self, tagSet = {}, tagScript = None, journal = None,
-              callback = UpdateCallback()):
+    def _applyFileChanges(self, opJournal, callback, journal):
 
-	def restoreFile(fileObj, contents, root, target, journal):
+	def restoreFile(fileObj, contents, root, target, journal, opJournal):
+            opJournal.backup(target)
+
 	    if fileObj.hasContents and contents and not \
 				       fileObj.flags.isConfig():
 		# config file sha1's are verified when they get inserted
@@ -318,16 +320,14 @@ class FilesystemJob:
 	    else:
 		fileObj.restore(contents, root, target, journal=journal)
 
-        assert(not self.errors)
-
-	# this is run after the changes are in the database (but before
-	# they are committed
-	tagCommands = TagCommand(callback = callback.tagHandlerOutput)
-	runLdconfig = False
-	rootLen = len(self.root)
+            if isinstance(fileObj, files.Directory):
+                opJournal.mkdir(target)
+            else:
+                opJournal.create(target)
 
 	for (oldPath, newPath, msg) in self.renames:
 	    os.rename(oldPath, newPath)
+            opJournal.rename(oldPath, newPath)
 	    log.debug(msg)
 
 	contents = None
@@ -367,8 +367,11 @@ class FilesystemJob:
                     log.warning('%s was changed into a directory'
                                 ' - not removing', target[len(self.root):])
                     continue
+
+                opJournal.backup(target)
                 try:
                     fileObj.remove(target)
+                    opJournal.remove(target)
                 except OSError, e:
                     log.error("%s could not be removed: %s",
                               target[len(self.root):], e.strerror)
@@ -398,7 +401,8 @@ class FilesystemJob:
                 
                 contType, contents = self.changeSet.getFileContents(pathId)
                 assert(contType == changeset.ChangedFileTypes.file)
-		restoreFile(fileObj, contents, self.root, target, journal)
+		restoreFile(fileObj, contents, self.root, target, journal,
+                            opJournal)
                 del delayedRestores[match[0]]
 
                 if fileObj.hasContents and fileObj.linkGroup():
@@ -453,7 +457,8 @@ class FilesystemJob:
                         open(target, "w")
                         continue
 
-	    restoreFile(fileObj, contents, self.root, target, journal)
+	    restoreFile(fileObj, contents, self.root, target, journal,
+                        opJournal)
             if ptrTargets.has_key(pathId):
                 ptrTargets[pathId] = target
 	    log.debug(msg, target)
@@ -473,28 +478,65 @@ class FilesystemJob:
             if fileObj.linkGroup():
                 linkGroup = fileObj.linkGroup()
                 if self.linkGroups.has_key(linkGroup):
+                    # this could create spurious backups, but they won't
+                    # hurt anything
+                    opJournal.backup(target)
                     if self._createLink(fileObj.linkGroup(), target):
+                        opJournal.create(target)
                         continue
                 else:
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
 
 	    restoreFile(fileObj, filecontents.FromFilesystem(ptrTargets[ptrId]),
-			self.root, target, journal=journal)
+			self.root, target, journal=journal,
+                        opJournal = opJournal)
             log.debug(msg, target)
 
         del delayedRestores
 
 	for (target, str, msg) in self.newFiles:
+            opJournal.backup(target)
             try:
                 os.unlink(target)
             except OSError, e:
                 if e.errno != errno.ENOENT:
                     raise
 	    f = open(target, "w")
+            opJournal.create(target)
 	    f.write(str)
 	    f.close()
 	    log.warning(msg)
+
+    def apply(self, tagSet = {}, tagScript = None, journal = None,
+              callback = UpdateCallback(), opJournalPath = None,
+              keepOpJournal = False):
+
+        assert(not self.errors)
+
+	# this is run after the changes are in the database (but before
+	# they are committed
+	tagCommands = TagCommand(callback = callback.tagHandlerOutput)
+	runLdconfig = False
+	rootLen = len(self.root)
+
+        opJournal = JobJournal('/tmp/journal', self.root, create = True)
+
+        try:
+            self._applyFileChanges(opJournal, callback, journal)
+        except:
+            log.error("a critical error occured -- reverting filesystem "
+                      "changes")
+            opJournal.revert()
+            if not keepOpJournal:
+                os.unlink('/tmp/journal')
+            raise
+
+        log.debug("committing journal")
+        opJournal.commit()
+        if not keepOpJournal:
+            os.unlink('/tmp/journal')
+        del opJournal
 
         # FIXME: the next two operations need to be combined into one;
         # groups can depend on users, and vice-versa.  This ordering
