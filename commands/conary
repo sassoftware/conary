@@ -677,6 +677,7 @@ class _UpdateCommand(ConaryCommand):
         d["from-file"] = MULT_PARAM
         d["just-db"] = NO_PARAM
         d["keep-existing"] = NO_PARAM
+        d["keep-journal"] = NO_PARAM            # don't document this
         d["keep-required"] = NO_PARAM
         d["info"] = '-i', NO_PARAM
         d["no-deps"] = NO_PARAM
@@ -723,6 +724,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
+        kwargs['keepJournal'] = argSet.pop('keep-journal', False)
         kwargs['keepRequired'] = argSet.pop('keep-required', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)

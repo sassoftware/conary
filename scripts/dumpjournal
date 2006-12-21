@@ -44,4 +44,9 @@ for kind, entry in j:
     else:
         assert(0)
 
-    print entry.old(), "->", entry.new()
+    print entry.old(), "->", entry.new(),
+
+    if kind == journal.JOURNAL_ENTRY_BACKUP:
+        print "perms=0%o" % entry.inode.perms()
+
+    print

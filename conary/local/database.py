@@ -527,7 +527,8 @@ class Database(SqlDbRepository):
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
                         removeHints = {}, filePriorityPath = None,
-                        autoPinList = RegularExpressionList()):
+                        autoPinList = RegularExpressionList(),
+                        keepJournal = False):
 	assert(not cs.isAbsolute())
 
         if filePriorityPath is None:
@@ -756,7 +757,8 @@ class Database(SqlDbRepository):
             return
 
         if not justDatabase:
-            fsJob.apply(tagSet, tagScript, journal, callback)
+            fsJob.apply(tagSet, tagScript, journal, callback,
+                        keepJournal = keepJournal)
 
         if updateDatabase:
             for (name, version, flavor) in fsJob.getOldTroveList():

@@ -510,7 +510,7 @@ class FilesystemJob:
 
     def apply(self, tagSet = {}, tagScript = None, journal = None,
               callback = UpdateCallback(), opJournalPath = None,
-              keepOpJournal = False):
+              keepJournal = False):
 
         assert(not self.errors)
 
@@ -524,17 +524,17 @@ class FilesystemJob:
 
         try:
             self._applyFileChanges(opJournal, callback, journal)
-        except:
+        except Exception, e:
             log.error("a critical error occured -- reverting filesystem "
                       "changes")
             opJournal.revert()
-            if not keepOpJournal:
+            if keepJournal:
                 os.unlink('/tmp/journal')
             raise
 
         log.debug("committing journal")
         opJournal.commit()
-        if not keepOpJournal:
+        if not keepJournal:
             os.unlink('/tmp/journal')
         del opJournal
 

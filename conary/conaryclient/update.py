@@ -2523,7 +2523,8 @@ conary erase '%s=%s[%s]'
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback(),
-                    autoPinList = conarycfg.RegularExpressionList()):
+                    autoPinList = conarycfg.RegularExpressionList(),
+                    keepJournal = False):
 
         def _createCs(repos, db, jobSet, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
@@ -2553,7 +2554,8 @@ conary erase '%s=%s[%s]'
                         test = test, justDatabase = justDatabase,
                         journal = journal, callback = callback,
                         localRollbacks = localRollbacks,
-                        removeHints = removeHints, autoPinList = autoPinList)
+                        removeHints = removeHints, autoPinList = autoPinList,
+                        keepJournal = keepJournal)
             except Exception, e:
                 # an exception happened, clean up
                 rb = uJob.getRollback()

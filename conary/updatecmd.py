@@ -279,7 +279,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                syncUpdate = False, updateOnly = False,
                                migrate = False, keepRequired = False,
                                removeNotByDefault = False, restartInfo = None,
-                               applyCriticalOnly = False):
+                               applyCriticalOnly = False, keepJournal = False):
     if not callback:
         callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
     else:
@@ -341,8 +341,9 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   updateOnly = updateOnly,
                   removeNotByDefault = removeNotByDefault,
                   installMissing = installMissing,
-                  migrate = migrate, restartChangeSets = restartChangeSets, 
-                  applyCriticalOnly = applyCriticalOnly)
+                  migrate = migrate, restartChangeSets = restartChangeSets,
+                  applyCriticalOnly = applyCriticalOnly,
+                  keepJournal = keepJournal)
     # Clean up after ourselves
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
@@ -363,7 +364,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   removeNotByDefault = False,
                                   installMissing = False, migrate = False,
                                   restartChangeSets = None,
-                                  applyCriticalOnly = False):
+                                  applyCriticalOnly = False,
+                                  keepJournal = False):
 
     client = conaryclient.ConaryClient(cfg)
 
@@ -484,7 +486,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoPinList = cfg.pinTroves)
+                       callback = callback, autoPinList = cfg.pinTroves,
+                       keepJournal = keepJournal)
 
     log.syslog.commandComplete()
 

@@ -17,13 +17,20 @@ import stat
 import struct
 import tempfile
 
+from conary.files import InodeStream
 from conary.lib import log
 from conary.streams import *
 
 JOURNAL_VERSION = 1
 
-_JOURNAL_ENTRY_OLD_NAME = 1
-_JOURNAL_ENTRY_NEW_NAME = 2
+_JOURNAL_ENTRY_OLD_NAME  = 1
+_JOURNAL_ENTRY_NEW_NAME  = 2
+_JOURNAL_ENTRY_NEW_INODE = 3
+
+_INFO_STREAM_PERMS = 1
+_INFO_STREAM_MTIME = 2
+_INFO_STREAM_OWNER = 3
+_INFO_STREAM_GROUP = 4
 
 JOURNAL_ENTRY_RENAME = 0
 JOURNAL_ENTRY_BACKUP = 1
@@ -31,11 +38,24 @@ JOURNAL_ENTRY_CREATE = 2
 JOURNAL_ENTRY_REMOVE = 3
 JOURNAL_ENTRY_MKDIR  = 4
 
+class InodeInfo(StreamSet):
+
+    streamDict = {
+          _INFO_STREAM_PERMS : (SMALL, ShortStream,  "perms"),
+          _INFO_STREAM_MTIME : (SMALL, MtimeStream,  "mtime"),
+          _INFO_STREAM_OWNER : (SMALL, IntStream,    "uid"  ),
+          _INFO_STREAM_GROUP : (SMALL, IntStream,    "gid"  )
+        }
+    __slots__ = [ "perms", "mtime", "uid", "gid" ]
+
 class JournalEntry(StreamSet):
 
-    streamDict = { _JOURNAL_ENTRY_OLD_NAME : (DYNAMIC, StringStream, "old" ),
-                   _JOURNAL_ENTRY_NEW_NAME : (DYNAMIC, StringStream, "new" ) }
-    __slots__ = [ "old", "new" ]
+    streamDict = { 
+          _JOURNAL_ENTRY_OLD_NAME  : (DYNAMIC, StringStream, "old" ),
+          _JOURNAL_ENTRY_NEW_NAME  : (DYNAMIC, StringStream, "new" ),
+          _JOURNAL_ENTRY_NEW_INODE : (SMALL,   InodeInfo,    "inode" )
+        }
+    __slots__ = [ "old", "new", "inode" ]
 
 class JobJournal:
 
@@ -76,10 +96,23 @@ class JobJournal:
         os.write(self.fd, frz)
         os.write(self.fd, struct.pack("!BH", kind, len(frz)))
 
-    def _backup(self, origName, newName):
+    def _backup(self, origName, newName, statBuf):
         name = self._normpath(origName)
         name = self._normpath(newName)
-        self._record(JOURNAL_ENTRY_BACKUP, origName, newName)
+
+        assert(not self.immutable)
+        s = JournalEntry()
+        s.old.set(origName[self.rootLen:])
+        s.new.set(newName[self.rootLen:])
+
+        s.inode.mtime.set(statBuf.st_mtime)
+        s.inode.uid.set(statBuf.st_uid)
+        s.inode.gid.set(statBuf.st_gid)
+        s.inode.perms.set(statBuf.st_mode & 07777)
+
+        frz = s.freeze()
+        os.write(self.fd, frz)
+        os.write(self.fd, struct.pack("!BH", JOURNAL_ENTRY_BACKUP, len(frz)))
 
     def rename(self, origName, newName):
         origName = self._normpath(origName)
@@ -89,11 +122,11 @@ class JobJournal:
     def create(self, name):
         name = self._normpath(name)
         self._record(JOURNAL_ENTRY_CREATE, '', name)
-    
+
     def mkdir(self, name):
         name = self._normpath(name)
         self._record(JOURNAL_ENTRY_MKDIR, '', name)
-    
+
     def remove(self, name):
         name = self._normpath(name)
         self._record(JOURNAL_ENTRY_REMOVE, '', name)
@@ -112,10 +145,10 @@ class JobJournal:
             os.close(tmpfd)
             os.unlink(tmpname)
             if not stat.S_ISDIR(sb.st_mode):
-                self._backup(target, tmpname)
+                self._backup(target, tmpname, sb)
                 os.link(target, tmpname)
             elif not skipDirs:
-                self._rename(target, tmpname)
+                self.rename(target, tmpname)
                 os.rename(target, tmpname)
 
     def commit(self):
@@ -124,11 +157,17 @@ class JobJournal:
                 os.unlink(self.root + entry.new())
 
     def revert(self):
+        import epdb
+        epdb.st()
         for kind, entry in self:
             try:
                 if kind == JOURNAL_ENTRY_BACKUP:
                     what = "restore"
-                    os.rename(self.root + entry.new(), self.root + entry.old())
+                    path = self.root + entry.old()
+                    os.rename(self.root + entry.new(), path)
+                    os.chown(path, entry.inode.uid(), entry.inode.gid())
+                    os.chmod(path, entry.inode.perms())
+                    os.utime(path, (entry.inode.mtime(), entry.inode.mtime()))
                 elif kind == JOURNAL_ENTRY_RENAME:
                     what = "restore"
                     os.rename(self.root + entry.new(), self.root + entry.old())
