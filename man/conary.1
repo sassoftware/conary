@@ -111,6 +111,13 @@ the component that now contains \fI/foo/blah\fP instead of
 as a new file.) The \fBremove\fP command can also be invoked as \fBrm\fP.
 
 .TP
+.B revert
+Conary uses a journal file when writing files to the filesystem to allow
+it to recover from failures. In the case of a catastrophic failure, this
+journal file will remain on the system and Conary will not allow access
+to the system until the journal has been reverted using this command.
+
+.TP
 .B rollback \fI<identifier>\fP
 Applies rollback \fI<identifier>\fP.  The \fI<identifier>\fP can be either
 an r.<sequence> rollback name as displayed by \fBrblist\fR, or a number.

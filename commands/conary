@@ -317,6 +317,14 @@ class RemoveCommand(ConaryCommand):
         log.syslog.commandComplete()
 _register(RemoveCommand)
 
+class RevertCommand(ConaryCommand):
+    commands = ['revert']
+    commandGroup = 'System Modification'
+    help = 'Revert the journal from a failed operation.'
+    def runCommand(self, cfg, argSet, otherArgs):
+        if argSet or len(otherArgs) > 2: return self.usage()
+        updatecmd.revert(cfg)
+_register(RevertCommand)
 
 class ListRollbackCommand(ConaryCommand):
     commands = ['rblist']

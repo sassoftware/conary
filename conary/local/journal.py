@@ -78,7 +78,7 @@ class JobJournal:
 
         if create:
             self.immutable = False
-            self.fd = os.open("/tmp/journal",
+            self.fd = os.open(path,
                               os.O_RDWR | os.O_CREAT | os.O_TRUNC, 0600)
             os.write(self.fd, struct.pack("!H", JOURNAL_VERSION))
         else:
@@ -157,8 +157,6 @@ class JobJournal:
                 os.unlink(self.root + entry.new())
 
     def revert(self):
-        import epdb
-        epdb.st()
         for kind, entry in self:
             try:
                 if kind == JOURNAL_ENTRY_BACKUP:

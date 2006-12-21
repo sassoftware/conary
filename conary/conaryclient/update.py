@@ -90,6 +90,13 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 
 class ClientUpdate:
 
+    @staticmethod
+    def revertJournal(cfg):
+        try:
+            database.Database.revertJournal(cfg.root, cfg.dbPath)
+        except database.OpenError, e:
+            log.error(str(e))
+
     def _resolveDependencies(self, uJob, jobSet, split = False,
                              resolveDeps = True, useRepos = True,
                              resolveSource = None, keepRequired = True,

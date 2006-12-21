@@ -520,7 +520,7 @@ class FilesystemJob:
 	runLdconfig = False
 	rootLen = len(self.root)
 
-        opJournal = JobJournal('/tmp/journal', self.root, create = True)
+        opJournal = JobJournal(self.db.opJournalPath, self.root, create = True)
 
         try:
             self._applyFileChanges(opJournal, callback, journal)
@@ -529,13 +529,13 @@ class FilesystemJob:
                       "changes")
             opJournal.revert()
             if keepJournal:
-                os.unlink('/tmp/journal')
+                os.unlink(self.db.opJournalPath)
             raise
 
         log.debug("committing journal")
         opJournal.commit()
         if not keepJournal:
-            os.unlink('/tmp/journal')
+            os.unlink(self.db.opJournalPath)
         del opJournal
 
         # FIXME: the next two operations need to be combined into one;

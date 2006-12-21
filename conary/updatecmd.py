@@ -712,3 +712,6 @@ def changePins(cfg, troveStrList, pin = True):
         troveList += troves
 
     client.pinTroves(troveList, pin = pin)
+
+def revert(cfg):
+    conaryclient.ConaryClient.revertJournal(cfg)
