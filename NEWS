@@ -63,6 +63,8 @@ Changes in @NEW@:
     * The Conary command line argument parser checks for the --help
       option earlier.  This corrects some instances where commands
       like "conary rq --help" would not display help. (CNY-1153)
+    * "conary [command] --help --verbose" now correctly displays
+      verbose option help.
 
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line

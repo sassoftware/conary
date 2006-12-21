@@ -97,7 +97,7 @@ class OptionParser(optparse.OptionParser):
 
 class OptionGroup(optparse.OptionGroup):
      def format_help(self, formatter):
-        if log.getVerbosity() > log.DEBUG:
+        if log.getVerbosity() > log.INFO:
             found = False
             for option in self.option_list:
                 if (option.help_level == NORMAL_HELP 
