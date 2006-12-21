@@ -429,7 +429,7 @@ class FilesystemJob:
                         self.linkGroups.has_key(fileObj.linkGroup()):
                     # this creates links whose target we already know
                     # (because it was already present or already restored)
-                    if self._createLink(fileObj.linkGroup(), target):
+                    if self._createLink(fileObj.linkGroup(), target, opJournal):
                         continue
                 else:
                     contType, contents = self.changeSet.getFileContents(pathId)
@@ -481,7 +481,7 @@ class FilesystemJob:
                     # this could create spurious backups, but they won't
                     # hurt anything
                     opJournal.backup(target)
-                    if self._createLink(fileObj.linkGroup(), target):
+                    if self._createLink(fileObj.linkGroup(), target, opJournal):
                         opJournal.create(target)
                         continue
                 else:
