@@ -758,7 +758,8 @@ class Database(SqlDbRepository):
 
         if not justDatabase:
             fsJob.apply(tagSet, tagScript, journal, callback,
-                        keepJournal = keepJournal)
+                        keepJournal = keepJournal,
+                        opJournalPath = self.opJournalPath)
 
         if updateDatabase:
             for (name, version, flavor) in fsJob.getOldTroveList():

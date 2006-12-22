@@ -58,7 +58,33 @@ class JournalEntry(StreamSet):
         }
     __slots__ = [ "old", "new", "inode" ]
 
-class JobJournal:
+class NoopJobJournal:
+
+    def __init__(self):
+        pass
+
+    def rename(self, origName, newName):
+        pass
+
+    def create(self, name):
+        pass
+
+    def mkdir(self, name):
+        pass
+
+    def remove(self, name):
+        pass
+
+    def backup(self, target, skipDirs = False):
+        pass
+
+    def commit(self):
+        pass
+
+    def revert(self):
+        pass
+
+class JobJournal(NoopJobJournal):
 
     # this is designed to be readable back to front, not front to back
 

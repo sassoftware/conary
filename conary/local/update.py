@@ -41,7 +41,7 @@ from conary.deps import deps
 from conary.lib import log, patch, sha1helper, util
 from conary.local.errors import *
 from conary.repository import changeset, filecontents
-from conary.local.journal import JobJournal
+from conary.local.journal import JobJournal, NoopJobJournal
 
 MERGE = 1 << 0
 REPLACEFILES = 1 << 1
@@ -520,7 +520,10 @@ class FilesystemJob:
 	runLdconfig = False
 	rootLen = len(self.root)
 
-        opJournal = JobJournal(self.db.opJournalPath, self.root, create = True)
+        if opJournalPath:
+            opJournal = JobJournal(opJournalPath, self.root, create = True)
+        else:
+            opJournal = NoopJobJournal()
 
         try:
             self._applyFileChanges(opJournal, callback, journal)
@@ -528,14 +531,14 @@ class FilesystemJob:
             log.error("a critical error occured -- reverting filesystem "
                       "changes")
             opJournal.revert()
-            if not keepJournal:
-                os.unlink(self.db.opJournalPath)
+            if not keepJournal and opJournalPath:
+                os.unlink(opJournalPath)
             raise
 
         log.debug("committing journal")
         opJournal.commit()
-        if not keepJournal:
-            os.unlink(self.db.opJournalPath)
+        if not keepJournal and opJournalPath:
+            os.unlink(opJournalPath)
         del opJournal
 
         # FIXME: the next two operations need to be combined into one;
