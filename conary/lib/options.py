@@ -97,7 +97,7 @@ class OptionParser(optparse.OptionParser):
 
 class OptionGroup(optparse.OptionGroup):
      def format_help(self, formatter):
-        if log.getVerbosity() > log.DEBUG:
+        if log.getVerbosity() > log.INFO:
             found = False
             for option in self.option_list:
                 if (option.help_level == NORMAL_HELP 
@@ -688,13 +688,12 @@ class MainHandler(object):
             print >> sys.stderr, e
             sys.exit(1)
 
+        argSet.update(newArgSet)
         if argSet.pop('help', False):
             thisCommand.usage()
             sys.exit(1)
 
-
         thisCommand.setParser(parser)
-        argSet.update(newArgSet)
         thisCommand.processConfigOptions(cfg, cfgMap, argSet)
         return self.runCommand(thisCommand, cfg, argSet, otherArgs, **kw)
 

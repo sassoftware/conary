@@ -619,7 +619,7 @@ class Patch(_Source):
             log.info('applied successfully with patch level %s'
                      %patchlevel)
             # close any saved log files before we return
-            for f in logFiles:
+            for patchlevel, f in logFiles:
                 f.close()
             return
         # all attemps were unsuccessful.  display relevant logs

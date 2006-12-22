@@ -21,6 +21,17 @@ Changes in @NEW@:
     * The output produced by cvc when attempting to find the
       appropriate patch level when applying a patch has been
       improved. (CNY-588)
+    * When cooking (either from a recipe or from the repository), cvc will
+      always use the (auto)source files from the repository, instead of
+      re-downloading them. This allows for rebuilds of sources even if the
+      upstream source is no longer available. (Auto)sources can still be
+      re-downloaded using cvc refresh. (CNY-31)
+    * The ordering for the rules used to determine which component a
+      file should be in was reversed when a file was under /usr/share
+      but had /lib/ somewhere in the path name. (CNY-1155)
+    * cvc add will now refuse to add symbolic links that are absolute,
+      dangling, pointing to files outside of the current directory or pointing
+      to files that are not tracked by Conary. (CNY-468)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
@@ -47,6 +58,13 @@ Changes in @NEW@:
     * When checking to make sure that the URL used to upload a
       changeset matches the repository base URL, both URLs are now
       normalized before the comparison is made. (CNY-1140)
+    * The conary.lib.logparse module now provides the correct date
+      strings for each logged event.
+    * The Conary command line argument parser checks for the --help
+      option earlier.  This corrects some instances where commands
+      like "conary rq --help" would not display help. (CNY-1153)
+    * "conary [command] --help --verbose" now correctly displays
+      verbose option help.
 
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line
