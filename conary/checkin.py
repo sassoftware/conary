@@ -48,6 +48,7 @@ from conary.conaryclient import cmdline
 from conary.lib import log
 from conary.lib import magic
 from conary.lib import util
+from conary.lib import graph
 from conary.local import update
 from conary.repository import changeset
 from conary.state import ConaryState, ConaryStateFromFile, SourceState
@@ -1208,48 +1209,42 @@ def merge(repos, versionSpec=None, callback=None):
 
 def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
              repos=None, defaultToText=True):
-    assert(not text or not binary)
-    try:
-        conaryState = ConaryStateFromFile("CONARY", repos=repos)
-        state = conaryState.getSourceState()
-    except OSError:
-        return
 
-    for filename in fileList:
+    def _addFile(filename, state, stateHash):
         if filename == "." or filename == "..":
             log.error("cannot add special directory %s to trove" % filename)
-            continue
+            return
 
 	try:
 	    os.lstat(filename)
 	except OSError:
 	    log.error("file %s does not exist", filename)
-	    continue
+            return
 
-	found = False
-	for (pathId, path, fileId, version) in state.iterFileList():
-	    if path == filename:
-                if state.fileIsAutoSource(pathId):
-                    state.addFile(pathId, path, version,
-                                  fileId,
-                                  isConfig = state.fileIsConfig(pathId),
-                                  isAutoSource = False)
-                elif not ignoreExisting:
-                    log.error("file %s is already part of this source component" % path)
-		found = True
+        # Normalize the file path. This will remove things like 
+        # ./CONARY, ././CONARY etc.
+        filename = os.path.normpath(filename)
 
-	if found: 
-	    continue
+        if filename in stateHash:
+            (pathId, path, fileId, version) = stateHash[filename]
+            if state.fileIsAutoSource(pathId):
+                state.addFile(pathId, path, version,
+                              fileId,
+                              isConfig = state.fileIsConfig(pathId),
+                              isAutoSource = False)
+            elif not ignoreExisting:
+                log.error("file %s is already part of this source component" % path)
+            return
 
-	fileMagic = magic.magic(filename)
-	if fileMagic and fileMagic.name == "changeset":
-	    log.error("do not add changesets to source components")
-	    continue
-	elif filename == "CONARY":
-	    log.error("refusing to add CONARY to the list of managed sources")
-	    continue
+        if filename == "CONARY":
+            log.error("refusing to add CONARY to the list of managed sources")
+            return
+        fileMagic = magic.magic(filename)
+        if fileMagic and fileMagic.name == "changeset":
+            log.error("do not add changesets to source components")
+            return
 
-	pathId = makePathId()
+        pathId = makePathId()
 
         sb = os.lstat(filename)
 
@@ -1268,23 +1263,101 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
             log.error("cannot determine if %s is binary or text. please add "
                       "--binary or --text and rerun cvc add for %s",
                       filename, filename)
-            continue
+            return
 
         if isConfig:
             sb = os.stat(filename)
             if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
-                fd = os.open(filename, os.O_RDONLY)
-                os.lseek(fd, -1, 2)
-                term = os.read(fd, 1)
+                fobj = file(filename, "r")
+                fobj.seek(-1, 2)
+                term = fobj.read(1)
+                fobj.close()
                 if term != '\n':
                     log.error("%s does not end with a trailing new line", 
                                 filename)
 
-                    os.close(fd)
+                    # XXX Should this terminate the import of the whole set,
+                    # or just of this file?
                     return
 
-	state.addFile(pathId, filename, versions.NewVersion(), "0" * 20,
+        version = versions.NewVersion()
+        fileId = "0" * 20
+        state.addFile(pathId, filename, version, fileId,
                       isConfig = isConfig, isAutoSource = False)
+        # Remove silly ./././ if present.
+        filename = os.path.normpath(filename)
+        stateHash[filename] = (pathId, filename, fileId, version)
+
+
+    assert(not text or not binary)
+    try:
+        conaryState = ConaryStateFromFile("CONARY", repos=repos)
+        state = conaryState.getSourceState()
+    except OSError:
+        return
+
+    # Iterate over the state, and hash the files (by path)
+    stateHash = {}
+    for ent in state.iterFileList():
+        # ent is (pathId, path, fileId, version)
+        path = ent[1]
+        stateHash[path] = ent
+
+    grph = graph.DirectedGraph()
+    tlinks = {}
+    for filename in fileList:
+        # Defer the addition of symlinks since we want to make sure the
+        # de-referenced value is tracked
+        if not os.path.islink(filename):
+            _addFile(filename, state, stateHash)
+            continue
+
+        filename = os.path.normpath(filename)
+
+        # dereference the symlink
+        deref = os.readlink(filename)
+        if deref[0] == '/':
+            # Absolute paths not allowed
+            log.error("not adding absolute symlink %s -> %s" 
+                      % (filename, deref))
+            continue
+
+        # Don't allow .. in paths, we don't want to let the symlink escape
+        # the current directory
+        if '..' in util.splitPathReverse(deref):
+            log.error("not adding symlink with bad destination %s -> %s"
+                % (filename, deref))
+            continue
+
+        deref = os.path.normpath(deref)
+
+        # No dangling symlinks
+        if not os.path.exists(deref):
+            log.error("not adding broken symlink %s -> %s" % (filename, deref))
+            continue
+
+        grph.addNode(filename)
+        grph.addNode(deref)
+        grph.addEdge(filename, deref)
+        # Add transposed link
+        tlinks.setdefault(deref, set()).add(filename)
+
+    # t-sort the graph
+    # We cannot have symlink loops at this point, it turns out that, for the
+    # case l1 -> l2 -> l3 -> l1, os.path.exists(l1) will return False
+    nodeList = reversed(grph.getTotalOrdering())
+    for deref in reversed(grph.getTotalOrdering()):
+        if deref not in tlinks:
+            # This is a source with nothing referencing it
+            continue
+        if deref not in stateHash:
+            # Grab one link
+            linkname = tlinks[deref].pop()
+            log.error("not adding link with dereferenced file not tracked "
+                      "%s -> %s" % (linkname, deref))
+            continue
+        for linkname in tlinks[deref]:
+            _addFile(linkname, state, stateHash)
 
     conaryState.write("CONARY")
 
