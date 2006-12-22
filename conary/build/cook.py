@@ -31,6 +31,7 @@ import traceback
 
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
+from conary import errors as conaryerrors
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
 from conary.build import recipe, grouprecipe, loadrecipe
 from conary.build import errors as builderrors
@@ -403,6 +404,13 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                     targetLabel = targetLabel,
                                     alwaysBumpCount = alwaysBumpCount)
             needsSigning = True
+        elif type == recipe.RECIPE_TYPE_DERIVEDPKG:
+            ret = cookDerivedPackageObject(repos, db, cfg, recipeClass,
+                                           sourceVersion,
+                                           macros = macros, 
+                                           targetLabel = targetLabel,
+                                           alwaysBumpCount = alwaysBumpCount)
+            needsSigning = True
         else:
             raise AssertionError
 
@@ -414,6 +422,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     if needsSigning:
         # sign the changeset
+        import epdb
+        epdb.st()
         signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:
@@ -619,6 +629,131 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         for primaryName in recipeObj.getPrimaryGroupNames():
             changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
+
+    return (changeSet, built, None)
+
+def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
+                             macros={}, targetLabel = None,
+                             alwaysBumpCount=False):
+    """
+    Turns a derived package recipe object into a change set. Returns the
+    absolute changeset created, a list of the names of the packages built, and
+    and None (for compatibility with cookPackageObject).
+
+    @param repos: Repository to both look for source files and file id's in.
+    @type repos: repository.Repository
+    @param cfg: conary configuration
+    @type cfg: conarycfg.ConaryConfiguration
+    @param recipeClass: class which will be instantiated into a recipe
+    @type recipeClass: class descended from recipe.Recipe
+    @param macros: set of macros for the build
+    @type macros: dict
+    @param targetLabel: label to use for the cooked troves; it is used
+    as a new branch from whatever version was previously built
+    default), the sourceVersion's branch is used
+    @type targetLabel: versions.Label
+    @param alwaysBumpCount: if True, the cooked troves will not share a 
+    full version with any other existing troves with the same name, 
+    even if their flavors would differentiate them.  
+    @type alwaysBumpCount: bool
+    @rtype: tuple
+    """
+
+    fullName = recipeClass.name
+
+    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
+                            cfg.flavor, macros)
+
+    try:
+        parentRevision = versions.Revision(recipeObj.parentVersion)
+    except conaryerrors.ParseError, e:
+        raise builderrors.RecipeFileError('Cannot parse parentVersion %s: %s',
+                            recipeObj.parentRevision, str(e))
+
+    if not sourceVersion.hasParentVersion():
+        raise builderrors.RecipeFileError(
+                "only shadowed sources can be derived packages")
+    elif sourceVersion.trailingRevision().getVersion() != \
+                                                parentRevision.getVersion():
+        raise builderrors.RecipeFileError(
+                "parentRevision must have the same upstream version as the "
+                "derived package recipe")
+
+    _callSetup(cfg, recipeObj)
+
+    log.info('Building %s=%s[%s]' % ( recipeClass.name,
+                                      sourceVersion.branch().label(),
+                                      use.usedFlagsToFlavor(recipeClass.name)))
+
+    # find all the flavors of the parent
+    parentBranch = sourceVersion.branch().parentBranch()
+    parentVersion = parentBranch.createVersion(parentRevision)
+    d = repos.getTroveVersionFlavors({ recipeClass.name :
+                        { parentVersion : [ None ] } } )
+    if recipeClass.name not in d:
+        raise builderrors.RecipeFileError(
+                'Version %s of %s not found'
+                            % (parentVersion, recipeClass.name) )
+    parentFlavors = d[recipeClass.name][parentVersion]
+
+    cs = repos.createChangeSet(
+            [ (recipeClass.name, (None, None), (parentVersion, flavor), True)
+                for flavor in parentFlavors ], withFileContents = False,
+            recurse = True )
+
+    trovesByFlavor = {}
+    for trvCs in cs.iterNewTroveList():
+        trv = trove.Trove(trvCs)
+        l = trovesByFlavor.setdefault(trv.getFlavor(), [])
+        l.append(trv)
+
+    import epdb
+    epdb.st()
+
+    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
+                                trovesByFlavor.keys(),
+                                targetLabel, alwaysBumpCount=alwaysBumpCount)
+    changeSet = changeset.ChangeSet()
+
+    for trvList in trovesByFlavor.itervalues():
+        for trv in trvList:
+            trv.changeVersion(targetVersion)
+            if trv.isCollection():
+                # it has to be a package to get here
+                includes = [ x for x in trv.iterTroveListInfo() ]
+                for (troveInfo), byDefault, isStrong in includes:
+                    trv.delTrove(missingOkay = False, *troveInfo)
+                    trv.addTrove(troveInfo[0], targetVersion, troveInfo[2],
+                                 byDefault = byDefault, weakRef = not isStrong)
+
+            trv.setBuildTime(time.time())
+            trv.setConaryVersion(constants.version)
+
+        recipeObj.updateTroves(trvList)
+
+        for trv in trvList:
+            trv.computePathHashes()
+            #trv.setSize(size)
+
+            trv.invalidateSignatures()
+
+            trvCs = trv.diff(None, absolute = 1)[0]
+            changeSet.newTrove(trvCs)
+
+    changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
+
+    #if targetVersion.isOnLocalHost():
+        # We need the file contents. Go get 'em
+
+        # pass (fileId, fileVersion)
+        #contentList = repos.getFileContents([ (x[3], x[2]) for x in l ])
+        #for (pathId, path, version, fileId, isConfig), contents in \
+                                                #itertools.izip(l, contentList):
+            #changeSet.addFileContents(pathId, changeset.ChangedFileTypes.file, 
+                                      #contents, isConfig)
+
+    built = [ (fullName, targetVersion.asString(), x) for x in
+                    trovesByFlavor.keys() ]
 
     return (changeSet, built, None)
 
