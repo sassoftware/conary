@@ -32,11 +32,12 @@ _INFO_STREAM_MTIME = 2
 _INFO_STREAM_OWNER = 3
 _INFO_STREAM_GROUP = 4
 
-JOURNAL_ENTRY_RENAME = 0
-JOURNAL_ENTRY_BACKUP = 1
-JOURNAL_ENTRY_CREATE = 2
-JOURNAL_ENTRY_REMOVE = 3
-JOURNAL_ENTRY_MKDIR  = 4
+JOURNAL_ENTRY_RENAME  = 0
+JOURNAL_ENTRY_BACKUP  = 1
+JOURNAL_ENTRY_CREATE  = 2
+JOURNAL_ENTRY_REMOVE  = 3
+JOURNAL_ENTRY_MKDIR   = 4
+JOURNAL_ENTRY_BACKDIR = 5
 
 class InodeInfo(StreamSet):
 
@@ -96,7 +97,7 @@ class JobJournal:
         os.write(self.fd, frz)
         os.write(self.fd, struct.pack("!BH", kind, len(frz)))
 
-    def _backup(self, origName, newName, statBuf):
+    def _backup(self, origName, newName, statBuf, kind = JOURNAL_ENTRY_BACKUP):
         name = self._normpath(origName)
         name = self._normpath(newName)
 
@@ -112,7 +113,10 @@ class JobJournal:
 
         frz = s.freeze()
         os.write(self.fd, frz)
-        os.write(self.fd, struct.pack("!BH", JOURNAL_ENTRY_BACKUP, len(frz)))
+        os.write(self.fd, struct.pack("!BH", kind, len(frz)))
+
+    def _backdir(self, name, statBuf):
+        self._backup("", name, statBuf, kind = JOURNAL_ENTRY_BACKDIR)
 
     def rename(self, origName, newName):
         origName = self._normpath(origName)
@@ -148,8 +152,7 @@ class JobJournal:
                 self._backup(target, tmpname, sb)
                 os.link(target, tmpname)
             elif not skipDirs:
-                self.rename(target, tmpname)
-                os.rename(target, tmpname)
+                self._backdir(target, sb)
 
     def commit(self):
         for kind, entry in self:
@@ -176,6 +179,8 @@ class JobJournal:
                     what = "remove"
                     os.rmdir(self.root + entry.new())
                 elif kind == JOURNAL_ENTRY_REMOVE:
+                    pass
+                elif kind == JOURNAL_ENTRY_BACKDIR:
                     pass
                 else:
                     log.warning('unknown journal entry %d', kind)

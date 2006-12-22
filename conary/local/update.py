@@ -528,7 +528,7 @@ class FilesystemJob:
             log.error("a critical error occured -- reverting filesystem "
                       "changes")
             opJournal.revert()
-            if keepJournal:
+            if not keepJournal:
                 os.unlink(self.db.opJournalPath)
             raise
 
