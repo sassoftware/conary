@@ -17,6 +17,7 @@ class DerivedPackageRecipe(Recipe):
 
     _recipeType = RECIPE_TYPE_DERIVEDPKG
     internalAbstractBaseClass = 1
+    parentVersion = None
 
     def updateTroves(self, troves):
         for trv in troves:
@@ -32,7 +33,6 @@ class DerivedPackageRecipe(Recipe):
         self.removedPaths.add(pattern)
 
     def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
-        assert(0)
         self.repos = repos
         self.cfg = cfg
         self.branch = branch
