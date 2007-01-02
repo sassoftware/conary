@@ -114,6 +114,11 @@ class JobJournal(NoopJobJournal):
             ver = struct.unpack("!H", os.read(self.fd, self.hSize))[0]
             assert(ver == JOURNAL_VERSION)
 
+    def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
     def _record(self, kind, origName, newName):
         assert(not self.immutable)
         s = JournalEntry()
@@ -184,6 +189,7 @@ class JobJournal(NoopJobJournal):
         for kind, entry in self:
             if kind == JOURNAL_ENTRY_BACKUP:
                 os.unlink(self.root + entry.new())
+        self.close()
 
     def revert(self):
         for kind, entry in self:
@@ -213,6 +219,7 @@ class JobJournal(NoopJobJournal):
             except OSError, e:
                 log.warning('could not %s file %s: %s',
                             what, self.root + entry.new(), e.strerror)
+        self.close()
 
     def __iter__(self):
         self.immutable = False
