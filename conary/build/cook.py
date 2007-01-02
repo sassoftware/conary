@@ -422,8 +422,6 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     if needsSigning:
         # sign the changeset
-        import epdb
-        epdb.st()
         signAbsoluteChangeset(cs, signatureKey)
 
     if changeSetFile:
@@ -706,9 +704,6 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
         trv = trove.Trove(trvCs)
         l = trovesByFlavor.setdefault(trv.getFlavor(), [])
         l.append(trv)
-
-    import epdb
-    epdb.st()
 
     targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
                                 trovesByFlavor.keys(),
