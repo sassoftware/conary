@@ -1129,15 +1129,15 @@ class Database(SqlDbRepository):
 
     def __init__(self, root, path):
 	self.root = root
-        self.opJournalPath = util.joinPaths(root, path) + '/journal'
 
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:')
         else:
+            self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
             if os.path.exists(self.opJournalPath):
-                raise OpenError(top, 
+                raise ExistingJournalError(top, 
                         'journal file exists. use revert command to '
                         'undo the previous (failed) operation')
 
@@ -1255,6 +1255,10 @@ class OpenError(DatabaseError):
     def __init__(self, path, msg):
 	self.path = path
 	self.msg = msg
+
+class ExistingJournalError(OpenError):
+
+    pass
 
 class CommitError(DatabaseError, errors.InternalConaryError):
     pass
