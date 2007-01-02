@@ -357,8 +357,12 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
     def __init__(self, path):
-        self.db = dbstore.connect(path, driver = "sqlite", timeout=30000)
-        self.schemaVersion = self.db.getVersion()
+        self.db = None
+        try:
+            self.db = dbstore.connect(path, driver = "sqlite", timeout=30000)
+            self.schemaVersion = self.db.getVersion()
+        except sqlerrors.DatabaseLocked:
+            raise errors.DatabaseLockedError
         self.db.dbh._BEGIN = "BEGIN"
 
         try:
@@ -404,7 +408,7 @@ class Database:
         self.flavorsNeeded = {}
 
     def __del__(self):
-        if not self.db.closed:
+        if self.db and not self.db.closed:
             self.db.close()
         del self.db
 

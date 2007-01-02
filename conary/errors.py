@@ -53,6 +53,7 @@ class DatabaseError(ConaryError):
     """ Base class for errors communicating with the local database. """
     pass
 
+
 class ClientError(ConaryError):
     """Base class for errors in the conaryclient library."""
     pass
@@ -91,6 +92,15 @@ class DatabasePathConflicts(DatabaseError):
 
     def __init__(self, l):
         self.l = l
+
+class DatabaseLockedError(DatabaseError):
+    """
+    Occurs when the local database is locked
+    """
+    def __str__(self):
+        return ("The local database is locked.  It is possible that a "
+                "database journal file exists that needs to be rolled back, "
+                "but you don't have write permission to the database.")
 
 class ShadowRedirect(ConaryError):
     """User attempted to create a shadow (or branch, but branch's aren't

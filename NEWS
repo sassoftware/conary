@@ -65,6 +65,9 @@ Changes in @NEW@:
       like "conary rq --help" would not display help. (CNY-1153)
     * "conary [command] --help --verbose" now correctly displays
       verbose option help.
+    * Conary no longer fails with an unhandled exception when the 
+      local database is locked.  A useful error message is now
+      produced. (CNY-1175)
 
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line
