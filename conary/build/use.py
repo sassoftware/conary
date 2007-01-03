@@ -47,7 +47,7 @@ from conary.errors import CvcError
 class Flag(dict):
 
     def __init__(self, name, parent=None, value=False, 
-                             required=True, track=False):
+                 required=True, track=False, path=None):
         self._name = name
         self._value = value
         self._parent = parent
@@ -55,6 +55,7 @@ class Flag(dict):
         self._tracking = track
         self._used = False
         self._alias = None
+        self._path = path
 
     def __repr__(self):
         if self._alias: 

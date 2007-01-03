@@ -143,9 +143,11 @@ class UseFlagConfig(ConfigFile):
     def __init__(self, name):
 	ConfigFile.__init__(self)
         self.name = name
+        self.path = None
 
     def read(self, path):
         # Hack to allow old-style config files to be parsed
+        self.path = path
         contents = open(path).read().strip()
         if contents.strip() in ('disallowed', 'preferred', 'prefernot',
                                                            'required'):
@@ -157,7 +159,8 @@ class UseFlagConfig(ConfigFile):
         return (self.name, self.sense)
 
     def addUseFlag(self):
-        use.Use._addFlag(self.name, required=self.buildRequired) 
+        use.Use._addFlag(self.name, required=self.buildRequired,
+                         path=self.path) 
         if self.buildName and self.buildName != self.name:
             use.Use._addAlias(self.name, self.buildName)
 
@@ -181,11 +184,12 @@ class FlavorConfig:
             if not useDir or not os.path.exists(useDir):
                 continue
             for flag in os.listdir(useDir):
-                if (os.path.isfile(os.path.join(useDir, flag)) 
+                flagPath = os.path.join(useDir, flag)
+                if (os.path.isfile(flagPath) 
                     and not flag.startswith('.')):
                     if flag not in self.flags:
                         self.flags[flag] = UseFlagConfig(flag)
-                    self.flags[flag].read(os.path.join(useDir, flag))
+                    self.flags[flag].read(flagPath)
         for archDir in archDirs:
             useDir = os.path.expanduser(useDir)
             if archDir and os.path.exists(archDir):

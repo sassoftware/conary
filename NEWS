@@ -32,6 +32,7 @@ Changes in @NEW@:
     * cvc add will now refuse to add symbolic links that are absolute,
       dangling, pointing to files outside of the current directory or pointing
       to files that are not tracked by Conary. (CNY-468)
+    * Use objects now record which file on system defines it. (CNY-1179)
 
   o Bug Fixes:
     * Builds that resulted in changesets containg the same file
