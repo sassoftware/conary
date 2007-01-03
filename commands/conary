@@ -821,6 +821,7 @@ _register(MigrateCommand)
 class UpdateAllCommand(_UpdateCommand):
 
     commands = ['updateall']
+    paramHelp = ''
     docs = {'items': ('Display troves that conary updateall will update '
                       'to upgrade your system')}
     help = 'Update all the software on the system'
