@@ -54,9 +54,6 @@ Changes in @NEW@:
     * Builds that resulted in changesets containing the same file in
       different locations would fail to commit if the files differed
       only by mtime. (CNY-1114)
-    * Builds that resulted in changesets containg the same file in
-      different locations would fail to commit if the files differed
-      only by mtime. (CNY-1114)
     * The mirror script now correctly handles the cases where the
       PathIdConflict erros are raised by certain source repositories
       during mirroring. (CNY-426)
