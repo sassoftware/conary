@@ -50,6 +50,7 @@ def post(port, isSecure, repos, req):
             # if we got a read timeout, marshal an exception back
             # to the client
             print >> sys.stderr, 'error reading from client: %s' %e
+            method = 'unknown - client timeout'
             result = (False, True, ('ClientTimeout',
                                     'The server was not able to read the '
                                     'XML-RPC request sent by this client. '
