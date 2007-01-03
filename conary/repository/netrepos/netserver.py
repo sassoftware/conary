@@ -1968,7 +1968,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                           timeStamps, UP.permittedTrove 
                         FROM Instances
                         -- # Do the actual matching in a subselect
-                        -- # to avoid MySQL from doing a full join
+                        -- # to prevent MySQL from doing a full join
                         -- # between TroveFiles and Instances
                         JOIN (SELECT trovesByPathTmp.row AS row, instanceId
 			      FROM trovesByPathTmp JOIN TroveFiles ON
