@@ -34,6 +34,19 @@ Changes in @NEW@:
       to files that are not tracked by Conary. (CNY-468)
     * Use objects now record which file on system defines it. (CNY-1179)
 
+  o Client changes;
+    * Tag handler output is now redirected to a callback. The command line
+      callback places "[ tag ]" in front of the output from each tag handler
+      to help with debugging (CNY-906).
+
+  o Internal changes:
+    * Conary now supports being built against an internal copy of the
+      sqlite3 library for cases when the system sqlite3 is not the
+      optimal version for Conary.
+    * The repository schema's string types are no longer restricted to
+      arbitrary sizes for backends that support indexing larger strings
+      than MySQL's InnoDB storage engine. (CNY-1054)
+
   o Bug Fixes:
     * Builds that resulted in changesets containing the same file
       in different locations would fail to commit if the files differed
@@ -75,19 +88,6 @@ Changes in @NEW@:
       trove or changeset arguments. (CNY-1180)
     * Conary can now find the existing troves on an old-style branch
       when building a redirect. (CNY-1181)
-
-  o Client changes;
-    * Tag handler output is now redirected to a callback. The command line
-      callback places "[ tag ]" in front of the output from each tag handler
-      to help with debugging (CNY-906).
-
-  o Internal changes:
-    * Conary now supports being built against an internal copy of the
-      sqlite3 library for cases when the system sqlite3 is not the
-      optimal version for Conary.
-    * The repository schema's string types are no longer restricted to
-      arbitrary sizes for backends that support indexing larger strings
-      than MySQL's InnoDB storage engine. (CNY-1054)
 
 Changes in 1.0.40:
   o Build Changes:
