@@ -35,7 +35,7 @@ Changes in @NEW@:
     * Use objects now record which file on system defines it. (CNY-1179)
 
   o Bug Fixes:
-    * Builds that resulted in changesets containg the same file
+    * Builds that resulted in changesets containing the same file
       in different locations would fail to commit if the files differed
       only by mtime. (CNY-1114)
     * Builds that resulted in changesets containg the same file
