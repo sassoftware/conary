@@ -152,12 +152,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
                                                  sizeCb))
 
                     del cs
+                    if path.startswith(self.tmpDir):
+                        os.unlink(path)
                 else:
                     f = open(path)
                     util.copyfileobj(f, self.wfile)
-
-                if path.startswith(self.tmpDir):
-                    os.unlink(path)
         else:
             self.send_error(501, "Not Implemented")
 
@@ -284,23 +283,37 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_response(200, 'OK')
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
+    publicCalls = set(tuple(NetworkRepositoryServer.publicCalls) + ('reset',))
     def reset(self, authToken, clientVersion):
         import shutil
+        logMe(1, "resetting NetworkRepositoryServer", self.repDB)
         try:
-            shutil.rmtree(self.contentsDir)
+            shutil.rmtree(self.contentsDir[0])
         except OSError, e:
             if e.errno != errno.ENOENT:
                 raise
-        os.mkdir(self.contentsDir)
+        os.mkdir(self.contentsDir[0])
 
-        logMe(1, "resetting NetworkRepositoryServer", self.repDB)
         # cheap trick. sqlite3 doesn't mind zero byte files; just replace
         # the file with a zero byte one (to change the inode) and reopen
         open(self.repDB[1] + '.new', "w")
         os.rename(self.repDB[1] + '.new', self.repDB[1])
+        db = dbstore.connect(self.repDB[1], 'sqlite')
+        schema.loadSchema(db)
+        db.commit()
         self.reopen()
-
+        self.createUsers()
         return 0
+
+    def createUser(self, name, password, write = False, admin = False,
+                   remove = False):
+        self.auth.addUser(name, password)
+        self.auth.addAcl(name, None, None, write, False, admin, remove = remove)
+
+    def createUsers(self):
+        self.createUser('test', 'foo', admin = True, write = True,
+                        remove = True)
+        self.createUser('anonymous', 'anonymous', admin = False, write = False)
 
 class ServerConfig(netserver.ServerConfig):
 
@@ -442,6 +455,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     netRepos = NetworkRepositoryServer(cfg, baseUrl)
+    #netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
     if 'add-user' in argSet:
         admin = argSet.pop('admin', False)
