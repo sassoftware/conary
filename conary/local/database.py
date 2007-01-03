@@ -1136,7 +1136,8 @@ class Database(SqlDbRepository):
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
-            if os.path.exists(self.opJournalPath):
+            # FIXME: Remove the False when RAA-313 is implemented
+            if False and os.path.exists(self.opJournalPath):
                 raise ExistingJournalError(top, 
                         'journal file exists. use revert command to '
                         'undo the previous (failed) operation')
