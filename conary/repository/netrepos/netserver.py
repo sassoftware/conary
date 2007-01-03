@@ -1964,18 +1964,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # FIXME: MySQL 5.0.18 does not like "SELECT row, ..." so we are
         # explicit
-        query = """SELECT trovesByPathTmp.row, item, version, flavor,
+        query = """SELECT Matches.row, item, version, flavor,
                           timeStamps, UP.permittedTrove 
-                        FROM trovesByPathTmp 
-                        JOIN TroveFiles USING(path)
-                        JOIN Instances USING(instanceId)
+                        FROM Instances
+                        -- # Do the actual matching in a subselect
+                        -- # to avoid MySQL from doing a full join
+                        -- # between TroveFiles and Instances
+                        JOIN (SELECT trovesByPathTmp.row AS row, instanceId
+			      FROM trovesByPathTmp JOIN TroveFiles ON
+                                  TroveFiles.path = trovesByPathTmp.path)
+                              AS Matches ON
+                            Instances.instanceId = Matches.instanceId
                         JOIN Nodes ON
                             Nodes.itemId = Instances.itemId AND
                             Nodes.versionId = Instances.versionId
                         JOIN LabelMap ON
                             Nodes.itemId = LabelMap.itemId AND
                             Nodes.branchId = LabelMap.branchId
-                        JOIN Labels USING(labelId)
+                        JOIN Labels ON
+                            Labels.labelId = LabelMap.labelId
                         JOIN (SELECT
                                Permissions.labelId as labelId,
                                PerItems.item as permittedTrove,

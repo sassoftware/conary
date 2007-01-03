@@ -34,6 +34,9 @@ Changes in @NEW@:
       to files that are not tracked by Conary. (CNY-468)
 
   o Bug Fixes:
+    * The SQL query that implements the getTrovesByPath() repository
+      method has been reworked to avoid slow queries under
+      MySQL. (CNY-1178)
     * Builds that resulted in changesets containg the same file
       in different locations would fail to commit if the files differed
       only by mtime. (CNY-1114)
