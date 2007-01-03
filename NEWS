@@ -73,6 +73,8 @@ Changes in @NEW@:
       committed the initial revision of a file. (CNY-1066)
     * "conary updateall --help" no longer claims that updateall takes
       trove or changeset arguments. (CNY-1180)
+    * Conary can now find the existing troves on an old-style branch
+      when building a redirect. (CNY-1181)
 
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line
