@@ -801,10 +801,11 @@ def annotate(repos, filename):
                                             if not v.isAfter(curVersion)]
 
     if unmatchedLines > 0:
+        contact = oldTrove.changeLog.getName()
         # these lines are in the original version of the file
         for line in finalLines:
             if line[1] is None:
-                line[1] = (oldV, oldContact)
+                line[1] = (oldV, contact)
 
     # we have to do some preprocessing try to line up the code w/ long 
     # branch names, otherwise te output is (even more) unreadable
