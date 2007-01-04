@@ -734,6 +734,8 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
     changeSet = changeset.ChangeSet()
 
+    buildTime = time.time()
+
     for trvList in trovesByFlavor.itervalues():
         for trv in trvList:
             trv.changeVersion(targetVersion)
@@ -744,20 +746,36 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
                     trv.delTrove(missingOkay = False, *troveInfo)
                     trv.addTrove(troveInfo[0], targetVersion, troveInfo[2],
                                  byDefault = byDefault, weakRef = not isStrong)
+            else:
+                packageName = trv.getName().split(':')[0]
 
-            trv.setBuildTime(time.time())
+            # clear out all of trove info; we don't want to inherit things
+            # accidently
+            trv.troveInfo = trove.TroveInfo()
+            trv.setSourceName(fullName + ':source')
+            trv.setBuildTime(buildTime)
             trv.setConaryVersion(constants.version)
+            trv.setIsDerived(True)
+
+            if ':' not in trv.getName():
+                trv.setIsCollection(True)
+                trv.setBuildRequirements( [ (trv.getName(), parentVersion,
+                                             trv.getFlavor()) ] )
 
         recipeObj.updateTroves(trvList)
 
         for trv in trvList:
-            trv.computePathHashes()
             #trv.setSize(size)
-
-            trv.invalidateSignatures()
 
             trvCs = trv.diff(None, absolute = 1)[0]
             changeSet.newTrove(trvCs)
+
+            # must be a package
+            trv.computePathHashes()
+            trv.invalidateSignatures()
+
+        for trv in trvList:
+            if not trv.isCollection(): continue
 
     changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
 
