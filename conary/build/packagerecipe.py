@@ -441,6 +441,12 @@ class _AbstractPackageRecipe(Recipe):
         # returns list of policy files loaded
         return self._policyPathMap.keys()
 
+    def _addBuildAction(self, name, item):
+        self.externalMethods[name] = _recipeHelper(self._build, self, item)
+
+    def _addSourceAction(self, name, item):
+        self.externalMethods[name] = _sourceHelper(item, self)
+
     def doProcess(self, policyBucket):
 	for post in self._policies[policyBucket]:
             sys.stdout.write('Running policy: %s\r' %post.__class__.__name__)
@@ -854,12 +860,11 @@ class PackageRecipe(_AbstractPackageRecipe):
         _AbstractPackageRecipe.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
-                self.externalMethods[name] = \
-                    _recipeHelper(self._build, self, item)
+                self._addBuildAction(name, item)
 
         for name, item in source.__dict__.items():
             if name[0:3] == 'add' and issubclass(item, action.Action):
-                self.externalMethods[name] = _sourceHelper(item, self)
+                self._addSourceAction(name, item)
 
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)
