@@ -11,9 +11,10 @@
 # full details.
 
 from conary.build import macros
-from conary.build.recipe import Recipe, RECIPE_TYPE_DERIVEDPKG
+from conary.build.recipe import RECIPE_TYPE_DERIVEDPKG
+from conary.build.packagerecipe import _AbstractPackageRecipe
 
-class DerivedPackageRecipe(Recipe):
+class DerivedPackageRecipe(_AbstractPackageRecipe):
 
     _recipeType = RECIPE_TYPE_DERIVEDPKG
     internalAbstractBaseClass = 1
@@ -32,11 +33,11 @@ class DerivedPackageRecipe(Recipe):
     def remove(self, pattern):
         self.removedPaths.add(pattern)
 
-    def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
-        self.repos = repos
-        self.cfg = cfg
-        self.branch = branch
-        self.flavor = flavor
-        self.macros = macros.Macros()
-        self.macros.update(extraMacros)
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
+                 crossCompile=None, lightInstance=False):
+        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
+                                        extraMacros = extraMacros,
+                                        crossCompile = crossCompile,
+                                        lightInstance = lightInstance)
+        self.repos = laReposCache.repos
         self.removedPaths = set()
