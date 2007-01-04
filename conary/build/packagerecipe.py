@@ -23,6 +23,7 @@ from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
 from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
 
+from conary.build import action
 from conary.build import build
 from conary.build import errors
 from conary.build import macros
@@ -113,7 +114,19 @@ def _ignoreCall(*args, **kw):
     pass
 
 class _AbstractPackageRecipe(Recipe):
-    buildRequires = []
+    buildRequires = [
+        'filesystem:runtime',
+        'setup:runtime',
+        'python:runtime',
+        'python:lib',
+        'conary:runtime',
+        'conary:python',
+        'conary-build:runtime',
+        'conary-build:lib',
+        'conary-build:python',
+        'sqlite:lib',
+    ]
+
     Flags = use.LocalFlags
     explicitMainDir = False
 
@@ -421,8 +434,9 @@ class _AbstractPackageRecipe(Recipe):
         # Some policy needs to pass arguments to other policy at init
         # time, but that can't happen until after all policy has been
         # initialized
-        for policyObj in self._policyMap.values():
+        for name, policyObj in self._policyMap.iteritems():
             policyObj.postInit()
+            self.externalMethods[name] = _policyUpdater(policyObj)
 
         # returns list of policy files loaded
         return self._policyPathMap.keys()
@@ -524,17 +538,17 @@ class _AbstractPackageRecipe(Recipe):
 	   added to the build list.
 	"""
         if not name.startswith('_'):
-	    if name.startswith('add'):
-		return _sourceHelper(source.__dict__[name[3:]], self)
-	    if name in build.__dict__:
-		return _recipeHelper(self._build, self, build.__dict__[name])
-	    if name in self._policyMap:
-	        policyObj = self._policyMap[name]
-                return _policyUpdater(policyObj)
+            externalMethod = self.externalMethods.get(name, None)
+            if externalMethod is not None:
+                return externalMethod
+
             if self._lightInstance:
                 return _ignoreCall
-        if name in self.__dict__:
-            return self.__dict__[name]
+
+        method = self.__dict__.get(name, None)
+        if method is None:
+            return method
+
         raise AttributeError, name
 
     def __delattr__(self, name):
@@ -543,7 +557,7 @@ class _AbstractPackageRecipe(Recipe):
 	by deleting a name in the recipe self namespace.  For example,
 	to remove the AutoDoc package policy from the package policy
 	list, one could do::
-	 del self.AutoDoc
+         del r.AutoDoc
 	This would prevent the AutoDoc package policy from being
 	executed.
 
@@ -563,6 +577,7 @@ class _AbstractPackageRecipe(Recipe):
             self._policies[bucket] = [x for x in self._policies[bucket]
                                       if x is not policyObj]
             del self._policyMap[policyObj.__class__.__name__]
+            del self.externalMethods[name]
             return
 	del self.__dict__[name]
 
@@ -750,6 +765,8 @@ class _AbstractPackageRecipe(Recipe):
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
 
+        self.externalMethods = {}
+
         self._policyPathMap = {}
         self._policies = {}
         self._policyMap = {}
@@ -825,23 +842,25 @@ class PackageRecipe(_AbstractPackageRecipe):
     # of :lib in here is only for runtime, not to link against.
     # Any package that needs to link should still specify the :devel
     # component
-    buildRequires = [
-        'filesystem:runtime',
-        'setup:runtime',
-        'python:runtime',
-        'python:lib',
-        'conary:runtime',
-        'conary:python',
-        'conary-build:runtime',
-        'conary-build:lib',
-        'conary-build:python',
-        'sqlite:lib',
+    buildRequires = _AbstractPackageRecipe.buildRequires + [
         'bzip2:runtime',
         'gzip:runtime',
         'tar:runtime',
         'cpio:runtime',
         'patch:runtime',
     ]
+
+    def __init__(self, *args, **kwargs):
+        _AbstractPackageRecipe.__init__(self, *args, **kwargs)
+        for name, item in build.__dict__.items():
+            if inspect.isclass(item) and issubclass(item, action.Action):
+                self.externalMethods[name] = \
+                    _recipeHelper(self._build, self, item)
+
+        for name, item in source.__dict__.items():
+            if name[0:3] == 'add' and issubclass(item, action.Action):
+                self.externalMethods[name] = _sourceHelper(item, self)
+
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)
 
