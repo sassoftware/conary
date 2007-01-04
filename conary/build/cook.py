@@ -663,16 +663,21 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
                             cfg.flavor, macros)
 
-    try:
-        parentRevision = versions.Revision(recipeObj.parentVersion)
-    except conaryerrors.ParseError, e:
-        raise builderrors.RecipeFileError('Cannot parse parentVersion %s: %s',
-                            recipeObj.parentRevision, str(e))
+    if recipeObj.parentVersion:
+        try:
+            parentRevision = versions.Revision(recipeObj.parentVersion)
+        except conaryerrors.ParseError, e:
+            raise builderrors.RecipeFileError(
+                        'Cannot parse parentVersion %s: %s',
+                                recipeObj.parentRevision, str(e))
+    else:
+        parentRevision = None
 
     if not sourceVersion.hasParentVersion():
         raise builderrors.RecipeFileError(
                 "only shadowed sources can be derived packages")
-    elif sourceVersion.trailingRevision().getVersion() != \
+
+    if parentRevision and sourceVersion.trailingRevision().getVersion() != \
                                                 parentRevision.getVersion():
         raise builderrors.RecipeFileError(
                 "parentRevision must have the same upstream version as the "
@@ -686,13 +691,29 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
 
     # find all the flavors of the parent
     parentBranch = sourceVersion.branch().parentBranch()
-    parentVersion = parentBranch.createVersion(parentRevision)
-    d = repos.getTroveVersionFlavors({ recipeClass.name :
-                        { parentVersion : [ None ] } } )
-    if recipeClass.name not in d:
-        raise builderrors.RecipeFileError(
-                'Version %s of %s not found'
-                            % (parentVersion, recipeClass.name) )
+
+    if parentRevision:
+        parentVersion = parentBranch.createVersion(parentRevision)
+
+        d = repos.getTroveVersionFlavors({ recipeClass.name :
+                            { parentVersion : [ None ] } } )
+        if recipeClass.name not in d:
+            raise builderrors.RecipeFileError(
+                    'Version %s of %s not found'
+                                % (parentVersion, recipeClass.name) )
+    else:
+        d = repos.getTroveLeavesByBranch(
+                { recipeClass.name : { parentBranch : [ None ] } } )
+
+        if not d[recipeClass.name]:
+            raise builderrors.RecipeFileError(
+                'No versions of %s found on branch %s' % 
+                        (recipeClass.name, parentBranch))
+
+        parentVersion = sorted(d[recipeClass.name].keys())[-1]
+
+    log.info('deriving from %s=%s', recipeClass.name, parentVersion)
+
     parentFlavors = d[recipeClass.name][parentVersion]
 
     cs = repos.createChangeSet(
@@ -711,6 +732,8 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
     changeSet = changeset.ChangeSet()
 
+    buildTime = time.time()
+
     for trvList in trovesByFlavor.itervalues():
         for trv in trvList:
             trv.changeVersion(targetVersion)
@@ -721,20 +744,36 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
                     trv.delTrove(missingOkay = False, *troveInfo)
                     trv.addTrove(troveInfo[0], targetVersion, troveInfo[2],
                                  byDefault = byDefault, weakRef = not isStrong)
+            else:
+                packageName = trv.getName().split(':')[0]
 
-            trv.setBuildTime(time.time())
+            # clear out all of trove info; we don't want to inherit things
+            # accidently
+            trv.troveInfo = trove.TroveInfo()
+            trv.setSourceName(fullName + ':source')
+            trv.setBuildTime(buildTime)
             trv.setConaryVersion(constants.version)
+            trv.setIsDerived(True)
+
+            if ':' not in trv.getName():
+                trv.setIsCollection(True)
+                trv.setBuildRequirements( [ (trv.getName(), parentVersion,
+                                             trv.getFlavor()) ] )
 
         recipeObj.updateTroves(trvList)
 
         for trv in trvList:
-            trv.computePathHashes()
             #trv.setSize(size)
-
-            trv.invalidateSignatures()
 
             trvCs = trv.diff(None, absolute = 1)[0]
             changeSet.newTrove(trvCs)
+
+            # must be a package
+            trv.computePathHashes()
+            trv.invalidateSignatures()
+
+        for trv in trvList:
+            if not trv.isCollection(): continue
 
     changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
 
