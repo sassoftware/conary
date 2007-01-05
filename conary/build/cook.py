@@ -1032,6 +1032,8 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
+            grpMap[main].setIsDerived(recipeObj._isDerived)
+
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -1082,6 +1084,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
+        p.setIsDerived(recipeObj._isDerived)
 
         _signTrove(p, signatureKey)
 

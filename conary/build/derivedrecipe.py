@@ -20,6 +20,7 @@ from conary.lib import log
 class DerivedPackageRecipe(_AbstractPackageRecipe):
 
     internalAbstractBaseClass = 1
+    _isDerived = True
     parentVersion = None
 
     def updateTroves(self, troves):

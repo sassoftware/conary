@@ -44,6 +44,7 @@ class Recipe:
     _loadedTroves = []
     _loadedSpecs = {}
     _recipeType = RECIPE_TYPE_UNKNOWN
+    _isDerived = False
 
     def __init__(self):
         assert(self.__class__ is not Recipe)
