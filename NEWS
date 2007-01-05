@@ -33,6 +33,9 @@ Changes in @NEW@:
       dangling, pointing to files outside of the current directory or pointing
       to files that are not tracked by Conary. (CNY-468)
     * Use objects now record which file on system defines it. (CNY-1179)
+    * ExcludeDirectories built-in policy will now remove the empty directories
+      it has excluded from the _ROOT_ in order to prevent later policies from
+      thinking they are going to be on the target system. (CNY-1195)
 
   o Bug Fixes:
     * Builds that resulted in changesets containing the same file

@@ -1133,6 +1133,10 @@ class ExcludeDirectories(policy.Policy):
                           ' because of non-root group', path)
                 return
             self.info('excluding empty directory %s', path)
+            # if its empty and we're not packaging it, there's no need for it
+            # to continue to exist on the filesystem to potentially confuse
+            # other policy actions... see CNP-18
+            os.rmdir(fullpath)
 	self.recipe.autopkg.delFile(path)
 
 
