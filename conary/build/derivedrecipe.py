@@ -10,9 +10,11 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from conary.build import action, build, macros
+from conary import files
+from conary.build import build
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
+from conary.local import update
 from conary.lib import log
 
 class DerivedPackageRecipe(_AbstractPackageRecipe):
@@ -100,15 +102,26 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         log.info('deriving from %s=%s[%s]', self.name, parentVersion,
                  parentFlavor)
 
-        import epdb
-        epdb.st()
-        cs = self.repos.createChangeSet(
-                [ (recipeClass.name, (None, None),
+        self.cs = self.repos.createChangeSet(
+                [ (self.name, (None, None),
                   (parentVersion, parentFlavor), True) ], recurse = True )
+
+        fsJob = update.FilesystemJob(self.repos, self.cs, {}, destdir, [],
+                                     flags = update.IGNOREUGIDS)
+
+        errList = fsJob.getErrorList()
+        if errList:
+            for err in errList: log.error(err)
+            return False
+        fsJob.apply()
 
         _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
                                              resume = resume,
                                              downloadOnly = downloadOnly)
+
+    def loadPolicy(self):
+        return _AbstractPackageRecipe.loadPolicy(self, policySet = set(),
+                                internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
@@ -119,4 +132,4 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self.repos = laReposCache.repos
 
         self._addBuildAction('Remove', build.Remove)
-        self._addBuildAction('Install', Install)
+        #self._addBuildAction('Ownership', build.Ownership)

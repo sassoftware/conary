@@ -37,9 +37,6 @@ def isInfoRecipe(recipeClass):
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
 
-def isDerivedPackageRecipe(recipeClass):
-    return recipeClass.getType() == RECIPE_TYPE_DERIVEDPKG
-
 class Recipe:
     """Virtual base class for all Recipes"""
     _trove = None
