@@ -424,8 +424,12 @@ class _AbstractPackageRecipe(Recipe):
             for bld in self._build:
                 bld.doAction()
 
-    def loadPolicy(self):
-        (self._policyPathMap, self._policies) = policy.loadPolicy(self)
+    def loadPolicy(self, policySet = None,
+                   internalPolicyModules =
+                            ( 'destdirpolicy', 'packagepolicy') ):
+        (self._policyPathMap, self._policies) = \
+                policy.loadPolicy(self, policySet = policySet,
+                                  internalPolicyModules = internalPolicyModules)
         # create bucketless name->policy map for getattr
         policyList = []
         for bucket in self._policies.keys():
