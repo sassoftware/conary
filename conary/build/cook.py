@@ -663,56 +663,12 @@ def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
                             cfg.flavor, macros)
 
-    if recipeObj.parentVersion:
-        try:
-            parentRevision = versions.Revision(recipeObj.parentVersion)
-        except conaryerrors.ParseError, e:
-            raise builderrors.RecipeFileError(
-                        'Cannot parse parentVersion %s: %s',
-                                recipeObj.parentRevision, str(e))
-    else:
-        parentRevision = None
-
-    if not sourceVersion.hasParentVersion():
-        raise builderrors.RecipeFileError(
-                "only shadowed sources can be derived packages")
-
-    if parentRevision and sourceVersion.trailingRevision().getVersion() != \
-                                                parentRevision.getVersion():
-        raise builderrors.RecipeFileError(
-                "parentRevision must have the same upstream version as the "
-                "derived package recipe")
 
     _callSetup(cfg, recipeObj)
 
     log.info('Building %s=%s[%s]' % ( recipeClass.name,
                                       sourceVersion.branch().label(),
                                       use.usedFlagsToFlavor(recipeClass.name)))
-
-    # find all the flavors of the parent
-    parentBranch = sourceVersion.branch().parentBranch()
-
-    if parentRevision:
-        parentVersion = parentBranch.createVersion(parentRevision)
-
-        d = repos.getTroveVersionFlavors({ recipeClass.name :
-                            { parentVersion : [ None ] } } )
-        if recipeClass.name not in d:
-            raise builderrors.RecipeFileError(
-                    'Version %s of %s not found'
-                                % (parentVersion, recipeClass.name) )
-    else:
-        d = repos.getTroveLeavesByBranch(
-                { recipeClass.name : { parentBranch : [ None ] } } )
-
-        if not d[recipeClass.name]:
-            raise builderrors.RecipeFileError(
-                'No versions of %s found on branch %s' % 
-                        (recipeClass.name, parentBranch))
-
-        parentVersion = sorted(d[recipeClass.name].keys())[-1]
-
-    log.info('deriving from %s=%s', recipeClass.name, parentVersion)
 
     parentFlavors = d[recipeClass.name][parentVersion]
 
