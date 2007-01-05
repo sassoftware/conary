@@ -10,12 +10,13 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from conary import files
+from conary import files, trove
 from conary.build import build
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
 from conary.local import update
 from conary.lib import log
+from conary.repository import changeset
 
 class DerivedPackageRecipe(_AbstractPackageRecipe):
 
@@ -33,8 +34,36 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             for pathId in rmvList:
                 trv.removeFile(pathId)
 
+    def _expandChangeset(self):
+        destdir = self.macros.destdir
+
+        fileList = []
+        # sort the files by pathId
+        for trvCs in self.cs.iterNewTroveList():
+            trv = trove.Trove(trvCs)
+            for pathId, path, fileId, version in trv.iterFileList():
+                if path != self.macros.buildlogpath:
+                    fileList.append((pathId, path, fileId))
+
+        fileList.sort()
+
+        for pathId, path, fileId in fileList:
+            fileCs = self.cs.getFileChange(None, fileId)
+            fileObj = files.ThawFile(fileCs, pathId)
+            if fileObj.hasContents:
+                (contentType, contents) = self.cs.getFileContents(pathId)
+                assert(contentType == changeset.ChangedFileTypes.file)
+            else:
+                contents = None
+
+            fileObj.restore(contents, destdir, destdir + path)
+
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):
+        _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
+                                             resume = resume,
+                                             downloadOnly = downloadOnly)
+
         if self.parentVersion:
             try:
                 parentRevision = versions.Revision(self.parentVersion)
@@ -107,18 +136,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 [ (self.name, (None, None),
                   (parentVersion, parentFlavor), True) ], recurse = True )
 
-        fsJob = update.FilesystemJob(self.repos, self.cs, {}, destdir, [],
-                                     flags = update.IGNOREUGIDS)
-
-        errList = fsJob.getErrorList()
-        if errList:
-            for err in errList: log.error(err)
-            return False
-        fsJob.apply()
-
-        _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
-                                             resume = resume,
-                                             downloadOnly = downloadOnly)
+        self._expandChangeset()
 
     def loadPolicy(self):
         return _AbstractPackageRecipe.loadPolicy(self, policySet = set(),
