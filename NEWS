@@ -1,72 +1,60 @@
 Changes in @NEW@:
   o Build Changes:
-    * cvc will no longer fail if the EDITOR variable points to an
-      invalid editor. (CNY-688)
-    * Redirects now build erase redirects for package components which
-      existed in the past but have disappeared on the branch that is
-      the redirect target. (CNY-453)
+    * cvc will no longer fail if the EDITOR variable points to an invalid
+      editor. (CNY-688)
+    * Redirects now build erase redirects for package components which existed
+      in the past but have disappeared on head. (CNY-453)
     * The TagSpec policy now checks the transitive closure of build
-      requirements when determining whether the build requirements are
-      sufficient.  This ensures that a needed tag description will be
-      installed. (CNY-1109)
+      requirements when determining whether the build requirements
+      are sufficient to ensure that a needed tag description will
+      be installed. (CNY-1109)
+    * Repositories can now be made read only to allow for maintenance.
+      (CNY-659)
     * PIE executables, which appear to be shared libraries in binary
       directories, will no longer export soname dependencies. (CNY-1128)
-    * ELF files in %(testdir)s and %(debuglibdir)s will no longer
-      export soname provides.  (CNY-1138, CNY-1139)
-    * cvc is now able to check out source troves that have been
-      shadowed from a branch that no longer contains the
-      files. (CNY-462)
-    * The r.Install() recipe build action now has the ability to copy
-      symbolic links.  (CNY-288)
+    * ELF files in %(testdir)s and %(debuglibdir)s will no longer export
+      soname provides.  (CNY-1138, CNY-1139)
+    * cvc is now able to check out source troves that have been shadowed from
+      a branch that no longer contains the files. (CNY-462)
+    * the Install recipe class now has the ability to copy symbolic links.
+      (CNY-288)
     * The output produced by cvc when attempting to find the
       appropriate patch level when applying a patch has been
       improved. (CNY-588)
-    * When cooking (either from a recipe or from the repository), cvc
-      will always use the (auto)source files from the repository,
-      instead of re-downloading them. This allows for rebuilds of
-      sources even if the upstream source is no longer
-      available. (Auto)sources can still be re-downloaded using cvc
-      refresh. (CNY-31)
+    * When cooking (either from a recipe or from the repository), cvc will
+      always use the (auto)source files from the repository, instead of
+      re-downloading them. This allows for rebuilds of sources even if the
+      upstream source is no longer available. (Auto)sources can still be
+      re-downloaded using cvc refresh. (CNY-31)
     * The ordering for the rules used to determine which component a
       file should be in was reversed when a file was under /usr/share
       but had /lib/ somewhere in the path name. (CNY-1155)
-    * "cvc add" will now refuse to add symbolic links that are
-      absolute, dangling, pointing to files outside of the current
-      directory or pointing to files that are not tracked by
-      Conary. (CNY-468)
-    * Use objects now record which file on system define
-      them. (CNY-1179)
-
-  o Client changes;
-    * Tag handler output is now redirected to a callback. The command
-      line callback places "[ tag ]" in front of the output from each
-      tag handler to help with debugging. (CNY-906)
-
-  o Internal changes:
-    * Conary now supports being built against an internal copy of the
-      sqlite3 library for cases when the system sqlite3 is not the
-      optimal version for Conary.
-    * The repository schema's string types are no longer restricted to
-      arbitrary sizes for backends that support indexing larger
-      strings than MySQL's InnoDB storage engine. (CNY-1054)
-    * Repositories can now be made read only to allow for maintenance.
-      (CNY-659)
+    * cvc add will now refuse to add symbolic links that are absolute,
+      dangling, pointing to files outside of the current directory or pointing
+      to files that are not tracked by Conary. (CNY-468)
+    * Use objects now record which file on system defines it. (CNY-1179)
+    * ExcludeDirectories built-in policy will now remove the empty directories
+      it has excluded from the _ROOT_ in order to prevent later policies from
+      thinking they are going to be on the target system. (CNY-1195)
 
   o Bug Fixes:
-    * Builds that resulted in changesets containing the same file in
-      different locations would fail to commit if the files differed
+    * Builds that resulted in changesets containing the same file
+      in different locations would fail to commit if the files differed
       only by mtime. (CNY-1114)
-    * The mirror script now correctly handles the cases where the
-      PathIdConflict erros are raised by certain source repositories
+    * Builds that resulted in changesets containg the same file
+      in different locations would fail to commit if the files differed
+      only by mtime. (CNY-1114)
+    * The mirror script now correctly handles the cases where
+      the PathIdConflict erros are raised by certain source repositories
       during mirroring. (CNY-426)
-    * Perl dependency strings containing double colons are now
-      properly accepted on the command line. (CNY-1132)
-    * "cvc stat" now correctly displays the usage information when
-      extra arguments are specified. (CNY-1126)
-    * "conary update --apply-critical" will now behave corractly if
-      the update job contains (besides the conary package which is the
-      source of critical updates) linked troves. Linked troves are
-      troves with overlapping paths.  (CNY-1115)
+    * Perl dependency strings containing double colons are now properly
+      accepted on the command line. (CNY-1132)
+    * cvc stat now correctly displays the usage information when extra
+      arguments are specified. (CNY-1126)
+    * conary update --apply-critical will now behave corractly if the update
+      job contains (besides the conary package which is the source of critical
+      updates) linked troves. Linked troves are troves with overlapping paths.
+      (CNY-1115)
     * A GET request to the "changeset" URL of a repository server that
       does not supply any arguments no longer results in an Internal
       Server Error.  The repository can be configured to send email to
@@ -81,15 +69,24 @@ Changes in @NEW@:
       like "conary rq --help" would not display help. (CNY-1153)
     * "conary [command] --help --verbose" now correctly displays
       verbose option help.
-    * Conary no longer fails with an unhandled exception when the
+    * Conary no longer fails with an unhandled exception when the 
       local database is locked.  A useful error message is now
       produced. (CNY-1175)
     * "cvc annotate" now attributes the correct name to the person who
       committed the initial revision of a file. (CNY-1066)
-    * "conary updateall --help" no longer claims that updateall takes
-      trove or changeset arguments. (CNY-1180)
-    * Conary can now find the existing troves on an old-style branch
-      when building a redirect. (CNY-1181)
+
+  o Client changes;
+    * Tag handler output is now redirected to a callback. The command line
+      callback places "[ tag ]" in front of the output from each tag handler
+      to help with debugging (CNY-906).
+
+  o Internal changes:
+    * Conary now supports being built against an internal copy of the
+      sqlite3 library for cases when the system sqlite3 is not the
+      optimal version for Conary.
+    * The repository schema's string types are no longer restricted to
+      arbitrary sizes for backends that support indexing larger strings
+      than MySQL's InnoDB storage engine. (CNY-1054)
 
 Changes in 1.0.40:
   o Build Changes:
