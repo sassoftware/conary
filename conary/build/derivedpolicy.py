@@ -57,17 +57,33 @@ class PackageSpec(policy.Policy):
                     'Cannot add files to derived recipe (%s)' % path)
 
         self.recipe.autopkg.addFile(path, destdir + path)
+        component = self.recipe.autopkg.componentMap[path]
         pkgFile = self.recipe.autopkg.pathMap[path]
         fileObj = self.pathObjs[path]
         pkgFile.inode.owner.set(fileObj.inode.owner())
         pkgFile.inode.group.set(fileObj.inode.group())
         pkgFile.tags.thaw(fileObj.tags.freeze())
-        pkgFile.requires.thaw(fileObj.requires.freeze())
-        pkgFile.provides.thaw(fileObj.provides.freeze())
         pkgFile.flavor.thaw(fileObj.flavor.freeze())
+
+        component.requiresMap[path] = fileObj.requires()
+
+        pkgFile.provides.thaw(fileObj.provides.freeze())
 
 class Flavor(packagepolicy.Flavor):
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
+
+class Requires(packagepolicy.Requires):
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+    filetree = policy.PACKAGE
+
+    def doFile(self, path):
+        pkg = self.recipe.autopkg.componentMap[path]
+        f = pkg.getFile(path)
+        self.whiteOut(path, pkg)
+        self.unionDeps(path, pkg, f)
