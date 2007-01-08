@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.0.41:
   o Client changes;
     * Tag handler output is now redirected to a callback. The command line
       callback places "[ tag ]" in front of the output from each tag handler
