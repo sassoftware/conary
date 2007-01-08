@@ -79,6 +79,7 @@ class Requires(packagepolicy.Requires):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Provides', policy.REQUIRED_PRIOR),
     )
     filetree = policy.PACKAGE
 
@@ -86,4 +87,25 @@ class Requires(packagepolicy.Requires):
         pkg = self.recipe.autopkg.componentMap[path]
         f = pkg.getFile(path)
         self.whiteOut(path, pkg)
+        self.unionDeps(path, pkg, f)
+
+class Provides(packagepolicy.Provides):
+
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Requires', policy.REQUIRED_SUBSEQUENT),
+    )
+
+    def doFile(self, path):
+        pkg = self.recipe.autopkg.componentMap[path]
+        f = pkg.getFile(path)
+
+        m = self.recipe.magic[path]
+        macros = self.recipe.macros
+
+        fullpath = macros.destdir + path
+        dirpath = os.path.dirname(path)
+
+        self.addExplicitProvides(path, fullpath, pkg, macros, m, f)
+        self.addPathDeps(path, dirpath, pkg, f)
         self.unionDeps(path, pkg, f)
