@@ -3,6 +3,9 @@ Changes in @NEW@:
     * Tag handler output is now redirected to a callback. The command line
       callback places "[ tag ]" in front of the output from each tag handler
       to help with debugging (CNY-906).
+    * All filesystem operations are journaled now to allow recovery if an
+      unexpected failure occurs. "conary revert" has been added to recover
+      from cases where the journal is left behind unexpectedly (CNY-1010)
 
   o Build Changes:
     * cvc will no longer fail if the EDITOR variable points to an invalid
