@@ -2501,6 +2501,10 @@ class Requires(_addInfo, _dependency):
                 self._addRequirement(path, req, [], pkg,
                                      deps.PerlDependencies)
 
+        self.whiteOut(path, pkg)
+        self.unionDeps(path, pkg, f)
+
+    def whiteOut(self, path, pkg):
         # remove intentionally discarded dependencies
         if self.exceptDeps and path in pkg.requiresMap:
             depSet = deps.DependencySet()
@@ -2516,6 +2520,7 @@ class Requires(_addInfo, _dependency):
                     depSet.addDep(depClass, dep)
             pkg.requiresMap[path] = depSet
 
+    def unionDeps(self, path, pkg, f):
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
             return
