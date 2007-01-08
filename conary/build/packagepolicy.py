@@ -2959,6 +2959,8 @@ class Flavor(policy.Policy):
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Requires', policy.REQUIRED_PRIOR),
+        # For example: :lib component contains only a single packaged empty
+        # directory, which must be artificially flavored for multilib
         ('ExcludeDirectories', policy.REQUIRED_PRIOR),
     )
     filetree = policy.PACKAGE
@@ -3002,7 +3004,7 @@ class Flavor(policy.Policy):
                 isnset = self.baseIsnset
             else:
                 # this file can't be marked by arch, but the troves
-                # and package must be.
+                # and package must be.  (e.g. symlinks and empty directories)
                 # we don't need to union in the base arch flavor more
                 # than once.
                 if self.troveMarked:
