@@ -441,6 +441,8 @@ class FilesystemJob:
                                                 ptrId))
                         if not ptrTargets.has_key(ptrId):
                             ptrTargets[ptrId] = None
+                            # this doesn't insert duplicate records, they're
+                            # silently skipped
                             util.tupleListBsearchInsert(restores, 
                                 (ptrId, None, None, None, None),
                                 self.ptrCmp)
