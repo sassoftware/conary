@@ -243,6 +243,8 @@ def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
         d['debug'] = STRICT_OPT_PARAM, (VERBOSE_HELP, 'Print helpful debugging output (use --debug=all for internal debug info)')
         d['debugger'] = (NO_PARAM, optparse.SUPPRESS_HELP)
 
+    if 'verbose' in d:
+        addVerboseOptions = False
     if addVerboseOptions:
         d['verbose'] = STRICT_OPT_PARAM, (VERBOSE_HELP, 'Display more verbose output')
 
@@ -541,15 +543,13 @@ class MainHandler(object):
         thisCommand = self.abstractCommand()
         params, cfgMap = thisCommand.prepare()
         defaultGroup = thisCommand.defaultGroup
+        kwargs = self._getParserFlags(thisCommand)
         argSet, otherArgs, parser, optionSet = _processArgs(
                                                     params, {}, cfg,
-                                                    self.usage,
+                                                    usage=self.usage,
                                                     argv=argv[1:],
-                                                    version=None,
-                                                    useHelp=False,
-                                                    defaultGroup=defaultGroup,
                                                     interspersedArgs=False,
-                                    hobbleShortOpts=self.hobbleShortOpts)
+                                                    **kwargs)
         return argSet, [argv[0]] + otherArgs
 
     def usage(self, rc = 1, showAll = False):
@@ -606,33 +606,39 @@ class MainHandler(object):
     def getParser(self, command):
         thisCommand = self._supportedCommands[command]
         params, cfgMap = thisCommand.prepare()
-        kwargs = self._getParserFlags(command)
-        return _getParser(params, {}, **kwargs)
+        usage = self._getUsage(command)
+        kwargs = self._getParserFlags(thisCommand)
+        return _getParser(params, {}, usage=usage, **kwargs)
 
-    def _getParserFlags(self, commandName):
+    def _getUsage(self, commandName):
+        if self.name:
+            progName = self.name
+        else:
+            progName = argv[0]
+
         thisCommand = self._supportedCommands[commandName]
+        commandUsage = '%s %s %s' % (progName, commandName,
+                                     thisCommand.paramHelp)
+        return commandUsage
+
+    def _getParserFlags(self, thisCommand):
         if thisCommand.hobbleShortOpts is not None:
             hobbleShortOpts = thisCommand.hobbleShortOpts
         else:
             hobbleShortOpts = self.hobbleShortOpts
         defaultGroup = thisCommand.defaultGroup
-        if self.name:
-            progName = self.name
-        else:
-            progName = argv[0]
-        commandUsage = '%s %s %s' % (progName, commandName,
-                                     thisCommand.paramHelp)
         description = thisCommand.description
         if not description:
             description = thisCommand.__doc__
         if description is None:
             description = thisCommand.help
-        return dict(usage=commandUsage, version=None,
+        return dict(version=None,
                     useHelp=False,
                     defaultGroup=defaultGroup,
                     hobbleShortOpts=hobbleShortOpts,
                     addDebugOptions=self.useConaryOptions,
                     addConfigOptions=self.useConaryOptions,
+                    addVerboseOptions=self.useConaryOptions,
                     description=description)
 
     def main(self, argv=sys.argv, debuggerException=Exception,
@@ -672,11 +678,12 @@ class MainHandler(object):
 
         thisCommand = self._supportedCommands[commandName]
         params, cfgMap = thisCommand.prepare()
-        kwargs = self._getParserFlags(commandName)
+        kwargs = self._getParserFlags(thisCommand)
 
         try:
             newArgSet, otherArgs, parser, optionSet = _processArgs(
-                                        params, {}, cfg,
+                                        params, {}, cfg, 
+                                        usage=self._getUsage(commandName),
                                         argv=argv, **kwargs)
         except debuggerException, e:
             raise

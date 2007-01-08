@@ -2301,13 +2301,13 @@ class TagCommand:
                         os.close(stderrPipe[0])
                         os.close(stderrPipe[1])
 
-                        os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
+                        # CNY-1158: control the child process' environment
+                        env = { 'PATH' : "/sbin:/bin:/usr/sbin:/usr/bin" }
                         os.chdir(root)
                         if root != '/':
                             assert(root[0] == '/')
                             os.chroot(root)
-                        import time
-                        os.execv(command[0], command)
+                        os.execve(command[0], command, env)
                     except Exception, e:
                         try:
                             sys.stderr.write('%s\n' %e)
