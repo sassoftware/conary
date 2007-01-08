@@ -16,7 +16,7 @@ from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
 from conary.local import update
 from conary.lib import log
-from conary.repository import changeset
+from conary.repository import changeset, filecontents
 
 class DerivedPackageRecipe(_AbstractPackageRecipe):
 
@@ -37,6 +37,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
     def _expandChangeset(self):
         destdir = self.macros.destdir
 
+        delayedRestores = {}
+        ptrMap = {}
+
         fileList = []
         # sort the files by pathId
         for trvCs in self.cs.iterNewTroveList():
@@ -52,11 +55,29 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             fileObj = files.ThawFile(fileCs, pathId)
             if fileObj.hasContents:
                 (contentType, contents) = self.cs.getFileContents(pathId)
+                if contentType == changeset.ChangedFileTypes.ptr:
+                    targetPathId = contents.get().read()
+                    l = delayedRestores.setdefault(targetPathId, [])
+                    l.append((fileObj, path))
+                    continue
+
                 assert(contentType == changeset.ChangedFileTypes.file)
+                assert(not fileObj.linkGroup())
             else:
                 contents = None
 
+            if pathId in delayedRestores:
+                ptrMap[pathId] = path
+
             fileObj.restore(contents, destdir, destdir + path)
+
+        for targetPathId in delayedRestores:
+            for fileObj, targetPath in delayedRestores[targetPathId]:
+                sourcePath = ptrMap[targetPathId]
+                fileObj.restore(
+                    filecontents.FromFilesystem(destdir + sourcePath),
+                    destdir, destdir + targetPath)
+
 
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):
