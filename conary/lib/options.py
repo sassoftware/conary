@@ -606,8 +606,9 @@ class MainHandler(object):
     def getParser(self, command):
         thisCommand = self._supportedCommands[command]
         params, cfgMap = thisCommand.prepare()
+        usage = self._getUsage(command)
         kwargs = self._getParserFlags(thisCommand)
-        return _getParser(params, {}, **kwargs)
+        return _getParser(params, {}, usage=usage, **kwargs)
 
     def _getUsage(self, commandName):
         if self.name:
