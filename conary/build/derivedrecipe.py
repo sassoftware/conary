@@ -1,4 +1,4 @@
-# Copyright (c) 2006 rPath, Inc.
+# Copyright (c) 2006,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -10,13 +10,19 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from conary.build import macros
-from conary.build.recipe import Recipe, RECIPE_TYPE_DERIVEDPKG
+from conary import files, trove
+from conary.build import build, source
+from conary.build import errors as builderrors
+from conary.build.packagerecipe import _AbstractPackageRecipe
+from conary.local import update
+from conary.lib import log
+from conary.repository import changeset
 
-class DerivedPackageRecipe(Recipe):
+class DerivedPackageRecipe(_AbstractPackageRecipe):
 
-    _recipeType = RECIPE_TYPE_DERIVEDPKG
     internalAbstractBaseClass = 1
+    _isDerived = True
+    parentVersion = None
 
     def updateTroves(self, troves):
         for trv in troves:
@@ -28,15 +34,121 @@ class DerivedPackageRecipe(Recipe):
             for pathId in rmvList:
                 trv.removeFile(pathId)
 
-    def remove(self, pattern):
-        self.removedPaths.add(pattern)
+    def _expandChangeset(self):
+        destdir = self.macros.destdir
 
-    def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
-        assert(0)
-        self.repos = repos
-        self.cfg = cfg
-        self.branch = branch
-        self.flavor = flavor
-        self.macros = macros.Macros()
-        self.macros.update(extraMacros)
-        self.removedPaths = set()
+        fileList = []
+        # sort the files by pathId
+        for trvCs in self.cs.iterNewTroveList():
+            trv = trove.Trove(trvCs)
+            for pathId, path, fileId, version in trv.iterFileList():
+                if path != self.macros.buildlogpath:
+                    fileList.append((pathId, path, fileId))
+
+        fileList.sort()
+
+        for pathId, path, fileId in fileList:
+            fileCs = self.cs.getFileChange(None, fileId)
+            fileObj = files.ThawFile(fileCs, pathId)
+            if fileObj.hasContents:
+                (contentType, contents) = self.cs.getFileContents(pathId)
+                assert(contentType == changeset.ChangedFileTypes.file)
+            else:
+                contents = None
+
+            fileObj.restore(contents, destdir, destdir + path)
+
+    def unpackSources(self, builddir, destdir, resume=None,
+                      downloadOnly=False):
+        if self.parentVersion:
+            try:
+                parentRevision = versions.Revision(self.parentVersion)
+            except conaryerrors.ParseError, e:
+                raise builderrors.RecipeFileError(
+                            'Cannot parse parentVersion %s: %s',
+                                    self.parentRevision, str(e))
+        else:
+            parentRevision = None
+
+        if not self.sourceVersion.hasParentVersion():
+            raise builderrors.RecipeFileError(
+                    "only shadowed sources can be derived packages")
+
+        if parentRevision and \
+                self.sourceVersion.trailingRevision().getVersion() != \
+                                                parentRevision.getVersion():
+            raise builderrors.RecipeFileError(
+                    "parentRevision must have the same upstream version as the "
+                    "derived package recipe")
+
+        # find all the flavors of the parent
+        parentBranch = self.sourceVersion.branch().parentBranch()
+
+        if parentRevision:
+            parentVersion = parentBranch.createVersion(parentRevision)
+
+            d = self.repos.getTroveVersionFlavors({ self.name :
+                                { parentVersion : [ None ] } } )
+            if self.name not in d:
+                raise builderrors.RecipeFileError(
+                        'Version %s of %s not found'
+                                    % (parentVersion, self.name) )
+        else:
+            d = self.repos.getTroveLeavesByBranch(
+                    { self.name : { parentBranch : [ None ] } } )
+
+            if not d[self.name]:
+                raise builderrors.RecipeFileError(
+                    'No versions of %s found on branch %s' % 
+                            (self.name, parentBranch))
+
+            parentVersion = sorted(d[self.name].keys())[-1]
+
+        bestFlavor = (-1, [])
+        # choose which flavor to derive from
+        for flavor in d[self.name][parentVersion]:
+            score = self.cfg.buildFlavor.score(flavor)
+            if score is False: continue
+            if bestFlavor[0] < score:
+                bestFlavor = (score, [ flavor ])
+            elif bestFlavor[0] == score:
+                bestFlavor[1].append(flavor)
+
+        if bestFlavor[0] == -1:
+            raise builderrors.RecipeFileError(
+                    'No flavors of %s=%s found for build flavor %s',
+                    self.name, parentVersion, self.cfg.buildFlavor)
+        elif len(bestFlavor[1]) > 1:
+            raise builderrors.RecipeFileError(
+                    'Multiple flavors of %s=%s match build flavor %s',
+                    self.name, parentVersion, self.cfg.buildFlavor)
+
+        parentFlavor = bestFlavor[1][0]
+
+        log.info('deriving from %s=%s[%s]', self.name, parentVersion,
+                 parentFlavor)
+
+        self.cs = self.repos.createChangeSet(
+                [ (self.name, (None, None),
+                  (parentVersion, parentFlavor), True) ], recurse = True )
+
+        self._expandChangeset()
+
+        _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
+                                             resume = resume,
+                                             downloadOnly = downloadOnly)
+
+    def loadPolicy(self):
+        return _AbstractPackageRecipe.loadPolicy(self, policySet = set(),
+                                internalPolicyModules = ( 'derivedpolicy', ) )
+
+    def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
+                 crossCompile=None, lightInstance=False):
+        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
+                                        extraMacros = extraMacros,
+                                        crossCompile = crossCompile,
+                                        lightInstance = lightInstance)
+        self.repos = laReposCache.repos
+
+        self._addBuildAction('Remove', build.Remove)
+        self._addSourceAction('addPatch', source.addPatch)

@@ -328,6 +328,7 @@ class TroveSignatures(streams.StreamSet):
         return streams.StreamSet.freeze(self, skipSet = skipSet)
 
 _TROVE_FLAG_ISCOLLECTION = 1 << 0
+_TROVE_FLAG_ISDERIVED    = 1 << 1
 
 class TroveFlagsStream(streams.NumericStream):
 
@@ -336,6 +337,9 @@ class TroveFlagsStream(streams.NumericStream):
 
     def isCollection(self, set = None):
 	return self._isFlag(_TROVE_FLAG_ISCOLLECTION, set)
+
+    def isDerived(self, set = None):
+	return self._isFlag(_TROVE_FLAG_ISDERIVED, set)
 
     def _isFlag(self, flag, set):
 	if set != None:
@@ -1881,8 +1885,17 @@ class Trove(streams.StreamSet):
         else:
             return self.troveInfo.flags.isCollection(set = False)
 
+    def setIsDerived(self, b):
+        if b:
+            return self.troveInfo.flags.isDerived(set = True)
+        else:
+            return self.troveInfo.flags.isDerived(set = False)
+
     def isCollection(self):
         return self.troveInfo.flags.isCollection()
+
+    def isDerived(self):
+        return self.troveInfo.flags.isDerived()
 
     def setLabelPath(self, labelPath):
         self.troveInfo.labelPath = LabelPath()
