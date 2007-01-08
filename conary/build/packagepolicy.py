@@ -1966,17 +1966,16 @@ class Provides(_dependency):
 
         fullpath = macros.destdir + path
         basepath = os.path.basename(path)
+        dirpath = os.path.dirname(path)
 
         if os.path.exists(fullpath):
             mode = os.lstat(fullpath)[stat.ST_MODE]
 
-        # Now add in the manual provisions
-        for (filter, provision) in self.fileFilters:
-            if filter.match(path):
-                self._markProvides(path, fullpath, provision, pkg, macros, m, f)
+        # First, add in the manual provisions
+        self.addExplicitProvides(path, fullpath, pkg, macros, m, f)
 
+        # Next, discover all automatically-discoverable provisions
         if os.path.exists(fullpath):
-            dirpath = os.path.dirname(path)
             if (self._isELF(m, 'abi')
                 and m.contents['Type'] != elf.ET_EXEC
                 and not [ x for x in self.noProvDirs if path.startswith(x) ]):
@@ -2005,17 +2004,27 @@ class Provides(_dependency):
             elif self._isPerlModule(path):
                 self._addPerlProvides(path, m, pkg)
 
-            if dirpath in self.binDirs:
-                # CNY-930: automatically export paths in bindirs
-                f.flags.isPathDependencyTarget(True)
+        self.addPathDeps(path, dirpath, pkg, f)
+        self.unionDeps(path, pkg, f)
 
+    def addExplicitProvides(self, path, fullpath, pkg, macros, m, f):
+        for (filter, provision) in self.fileFilters:
+            if filter.match(path):
+                self._markProvides(path, fullpath, provision, pkg, macros, m, f)
+
+    def addPathDeps(self, path, dirpath, pkg, f):
         # Because paths can change, individual files do not provide their
         # paths.  However, within a trove, a file does provide its name.
         # Furthermore, non-regular files can be path dependency targets
         # Therefore, we have to handle this case a bit differently.
+        if dirpath in self.binDirs:
+            # CNY-930: automatically export paths in bindirs
+            f.flags.isPathDependencyTarget(True)
+
         if f.flags.isPathDependencyTarget():
             pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
 
+    def unionDeps(self, path, pkg, f):
         if path not in pkg.providesMap:
             return
         f.provides.set(pkg.providesMap[path])
