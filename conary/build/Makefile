@@ -18,6 +18,7 @@ python_files = __init__.py	\
 	buildinfo.py		\
 	buildpackage.py		\
 	cook.py			\
+	derivedrecipe.py	\
 	destdirpolicy.py	\
 	errors.py	        \
 	filter.py 		\
