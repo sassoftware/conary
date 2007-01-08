@@ -15,7 +15,7 @@
 import re, os
 
 from conary import files, trove
-from conary.build import buildpackage, filter, policy
+from conary.build import buildpackage, filter, packagepolicy, policy
 
 class PackageSpec(policy.Policy):
 
@@ -62,3 +62,12 @@ class PackageSpec(policy.Policy):
         pkgFile.inode.owner.set(fileObj.inode.owner())
         pkgFile.inode.group.set(fileObj.inode.group())
         pkgFile.tags.thaw(fileObj.tags.freeze())
+        pkgFile.requires.thaw(fileObj.requires.freeze())
+        pkgFile.provides.thaw(fileObj.provides.freeze())
+        pkgFile.flavor.thaw(fileObj.flavor.freeze())
+
+class Flavor(packagepolicy.Flavor):
+
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )

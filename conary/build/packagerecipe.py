@@ -383,8 +383,6 @@ class _AbstractPackageRecipe(Recipe):
 			yield action
 
     def unpackSources(self, builddir, destdir, resume=None, downloadOnly=False):
-	self.macros.builddir = builddir
-	self.macros.destdir = destdir
 	if resume == 'policy':
 	    return
 	elif resume:

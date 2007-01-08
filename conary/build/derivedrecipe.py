@@ -11,7 +11,7 @@
 # full details.
 
 from conary import files, trove
-from conary.build import build
+from conary.build import build, source
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
 from conary.local import update
@@ -60,10 +60,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):
-        _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
-                                             resume = resume,
-                                             downloadOnly = downloadOnly)
-
         if self.parentVersion:
             try:
                 parentRevision = versions.Revision(self.parentVersion)
@@ -138,6 +134,10 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         self._expandChangeset()
 
+        _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
+                                             resume = resume,
+                                             downloadOnly = downloadOnly)
+
     def loadPolicy(self):
         return _AbstractPackageRecipe.loadPolicy(self, policySet = set(),
                                 internalPolicyModules = ( 'derivedpolicy', ) )
@@ -151,4 +151,4 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self.repos = laReposCache.repos
 
         self._addBuildAction('Remove', build.Remove)
-        #self._addBuildAction('Ownership', build.Ownership)
+        self._addSourceAction('addPatch', source.addPatch)
