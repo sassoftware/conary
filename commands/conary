@@ -151,7 +151,12 @@ class EmergeCommand(ConaryCommand):
         # import this late to reduce the dependency set for
         # the main conary command in the common case.  This lets
         # conary run even if, for example, libelf is missing
-        from conary.build import cook
+        try:
+            from conary.build import cook
+        except ImportError:
+            log.error('Conary build tools not installed - cannot build packages.  Please install conary-build')
+            return 1
+
         log.setVerbosity(log.INFO)
 
         if not os.getuid():

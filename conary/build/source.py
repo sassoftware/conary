@@ -187,7 +187,7 @@ class _Source(action.RecipeAction):
 
 
 
-class Archive(_Source):
+class addArchive(_Source):
     """
     NAME
     ====
@@ -425,9 +425,9 @@ class Archive(_Source):
                     self.recipe.mainDir(oldMainDir)
             else:
                 self.recipe.mainDir(oldMainDir)
+Archive = addArchive
 
-
-class Patch(_Source):
+class addPatch(_Source):
     """
     NAME
     ====
@@ -673,8 +673,9 @@ class Patch(_Source):
             patch = pin.read()
         pin.close()
         self.patchme(patch, f, destDir, leveltuple)
+Patch = addPatch
 
-class Source(_Source):
+class addSource(_Source):
     """
     NAME
     ====
@@ -890,9 +891,9 @@ class Source(_Source):
             os.chmod(destFile, self.mode)
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
+Source = addSource
 
-
-class Action(action.RecipeAction):
+class addAction(action.RecipeAction):
     """
     NAME
     ====
@@ -992,6 +993,7 @@ class Action(action.RecipeAction):
 
     def fetch(self, refreshFilter=None):
 	return None
+Action = addAction
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
