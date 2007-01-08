@@ -2501,6 +2501,10 @@ class Requires(_addInfo, _dependency):
                 self._addRequirement(path, req, [], pkg,
                                      deps.PerlDependencies)
 
+        self.whiteOut(path, pkg)
+        self.unionDeps(path, pkg, f)
+
+    def whiteOut(self, path, pkg):
         # remove intentionally discarded dependencies
         if self.exceptDeps and path in pkg.requiresMap:
             depSet = deps.DependencySet()
@@ -2516,6 +2520,7 @@ class Requires(_addInfo, _dependency):
                     depSet.addDep(depClass, dep)
             pkg.requiresMap[path] = depSet
 
+    def unionDeps(self, path, pkg, f):
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
             return
@@ -2959,6 +2964,8 @@ class Flavor(policy.Policy):
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Requires', policy.REQUIRED_PRIOR),
+        # For example: :lib component contains only a single packaged empty
+        # directory, which must be artificially flavored for multilib
         ('ExcludeDirectories', policy.REQUIRED_PRIOR),
     )
     filetree = policy.PACKAGE
@@ -3002,7 +3009,7 @@ class Flavor(policy.Policy):
                 isnset = self.baseIsnset
             else:
                 # this file can't be marked by arch, but the troves
-                # and package must be.
+                # and package must be.  (e.g. symlinks and empty directories)
                 # we don't need to union in the base arch flavor more
                 # than once.
                 if self.troveMarked:
