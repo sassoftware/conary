@@ -152,6 +152,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self.cs = self.repos.createChangeSet(
                 [ (self.name, (None, None),
                   (parentVersion, parentFlavor), True) ], recurse = True )
+        self._loadedTroves += [
+            (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
+            in self.cs.iterNewTroveList() ]
 
         self._expandChangeset()
 
