@@ -79,6 +79,30 @@ class ChangesetCallback(Callback):
     def done(self):
         pass
 
+    def error(self, msg, *args, **kwargs):
+        """Error handling callback
+        If the optional keyword argument exc_text is passed, its value should
+        be printed verbatim since it is traceback information.
+        """
+        exc_text = kwargs.pop('exc_text', None)
+        # Append the traceback to the message
+        if exc_text:
+            msg += "\n%s"
+            args += (exc_text, )
+        return log.error(msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        """Warning handling callback
+        If the optional keyword argument exc_text is passed, its value should
+        be printed verbatim since it is traceback information.
+        """
+        exc_text = kwargs.pop('exc_text', None)
+        # Append the traceback to the message
+        if exc_text:
+            msg += "\n%s"
+            args += (exc_text, )
+        return log.warning(msg, *args, **kwargs)
+
     def __init__(self):
         Callback.__init__(self)
         self.rate = 0
