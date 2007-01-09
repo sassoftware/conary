@@ -1,5 +1,11 @@
+Changes in @NEW@:
+  o Client Changes:
+    * On the update path, errors and warnings are now handled by callbacks.
+      This allows applications using the Conary API to capture and process
+      them as appropriate. (CNY-1184)
+
 Changes in 1.0.41:
-  o Client changes;
+  o Client Changes:
     * Tag handler output is now redirected to a callback. The command line
       callback places "[ tag ]" in front of the output from each tag handler
       to help with debugging. (CNY-906)

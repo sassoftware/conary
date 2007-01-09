@@ -60,13 +60,15 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     """
     def __init__(self, cfg = None, passwordPrompter = None,
                  resolverClass=resolve.DependencySolver,
-                 entitlements = {}):
+                 entitlements = {}, updateCallback=None):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
                     If None, the standard Conary configuration is loaded
                     from /etc/conaryrc, ~/.conaryrc, and ./conaryrc.
         @type cfg: L{conarycfg.ConaryConfiguration}
         """
+
+        ClientUpdate.__init__(self, callback=updateCallback)
 
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
