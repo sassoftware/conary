@@ -5,7 +5,7 @@ Changes in @NEW@:
       them as appropriate. (CNY-1184)
 
 Changes in 1.1.14:
-  o Client changes;
+  o Client Changes:
     * Tag handler output is now redirected to a callback. The command line
       callback places "[ tag ]" in front of the output from each tag handler
       to help with debugging. (CNY-906)
