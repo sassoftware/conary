@@ -79,8 +79,9 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
                                 withFileContents = withFileContents,
                                 excludeAutoSource = excludeAutoSource)
 
-        (cs, trovesNeeded, filesNeeded) = ret
+        (cs, trovesNeeded, filesNeeded, removedTroveList) = ret
         assert(not filesNeeded)
+        assert(not removedTroveList)
 
         # FIXME: we need a way to remove these temporary
         # files when we're done with them.
@@ -88,7 +89,7 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
         os.close(fd)
         cs.writeToFile(tmpFile)
         size = os.stat(tmpFile).st_size
-        return (tmpFile, [size], _cvtTroveList(trovesNeeded), [])
+        return (tmpFile, [size], _cvtTroveList(trovesNeeded), [], [])
 
 
 class ShimNetClient(netclient.NetworkRepositoryClient):
