@@ -64,6 +64,7 @@ class PackageSpec(policy.Policy):
         pkgFile.inode.group.set(fileObj.inode.group())
         pkgFile.tags.thaw(fileObj.tags.freeze())
         pkgFile.flavor.thaw(fileObj.flavor.freeze())
+        pkgFile.flags.thaw(fileObj.flags.freeze())
 
         component.requiresMap[path] = fileObj.requires()
 
