@@ -368,6 +368,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   keepJournal = False):
 
     client = conaryclient.ConaryClient(cfg)
+    client.setUpdateCallback(callback)
 
 
     if not info:
@@ -392,8 +393,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                keepRequired = keepRequired,
                                test = test, recurse = recurse,
                                updateByDefault = updateByDefault,
-                               callback = callback, split = split,
-                               sync = sync, fromChangesets = fromChangesets,
+                               split = split, sync = sync,
+                               fromChangesets = fromChangesets,
                                checkPathConflicts = checkPathConflicts,
                                checkPrimaryPins = checkPrimaryPins,
                                syncChildren = syncChildren,
@@ -486,7 +487,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
                        justDatabase = justDatabase,
                        localRollbacks = cfg.localRollbacks,
-                       callback = callback, autoPinList = cfg.pinTroves,
+                       autoPinList = cfg.pinTroves,
                        keepJournal = keepJournal)
 
     log.syslog.commandComplete()
@@ -641,18 +642,18 @@ def updateConary(cfg, conaryVersion):
         )
     if not dlSize:
         return _urlNotFound(url)
-   
+    client.setUpdateCallback(callback)
     url.close()
     cs = changeset.ChangeSetFromFile(dst)
     # try to apply this changeset, with as much resemblance to a --force
     # option as we can flag in the applyUpdate call
     try:
-        (job, other) = client.updateChangeSet(set([cs]), callback=callback)
+        (job, other) = client.updateChangeSet(set([cs]))
     except:
         callback.done()
         raise
     return client.applyUpdate(job, localRollbacks = cfg.localRollbacks,
-                              callback = callback, replaceFiles = True)
+                              replaceFiles = True)
     
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
               test = False, showItems = False, checkPathConflicts = True,
