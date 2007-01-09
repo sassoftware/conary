@@ -422,6 +422,15 @@ Turn on flavor and branch affinity.  For example, when  using --best-flavors
 (the default), the best flavor that matches your install flavor is used.
 Note that affinity is not used when no trove specifiers are given.
 .RE
+.TP
+.B Type Selection
+You can also filter by type.  By default, rq shows all troves that actually 
+exist in the repository.  You can specify:
+.RS
+.TP
+.B \-\-show-removed
+Shows troves that have been removed from the repository.
+.RE
 .TP 4
 .B Flavor and Branch affinity
 .RS

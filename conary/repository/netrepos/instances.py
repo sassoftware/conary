@@ -20,22 +20,17 @@ class InstanceTable:
         self.db = db
 
     def addId(self, itemId, versionId, flavorId, clonedFromId,
-              isRedirect, isPresent = True):
+              troveType, isPresent = True):
 	if isPresent:
 	    isPresent = 1
 	else:
 	    isPresent = 0
 
-	if isRedirect:
-	    isRedirect = 1
-	else:
-	    isRedirect = 0
-
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances "
-                   "(itemId, versionId, flavorId, clonedFromId, isRedirect, isPresent) "
+                   "(itemId, versionId, flavorId, clonedFromId, troveType, isPresent) "
                    "VALUES (?, ?, ?, ?, ?, ?)",
-                   (itemId, versionId, flavorId, clonedFromId, isRedirect, isPresent))
+                   (itemId, versionId, flavorId, clonedFromId, troveType, isPresent))
 	return cu.lastrowid
 
     def getId(self, theId):

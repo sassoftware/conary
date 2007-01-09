@@ -490,7 +490,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     for (fromName, fromFlavor), (toName, toBranch, toFlavor,
                                  subTroveList) in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
-                            None, isRedirect = True)
+                            None, type = trove.TROVE_TYPE_REDIRECT)
 
         redirList.append(redir.getNameVersionFlavor())
 
@@ -587,8 +587,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     for recipeObj, grpFlavor in builtGroups:
         for group in recipeObj.iterGroupList():
             groupName = group.name
-            grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None,
-                                 isRedirect = False)
+            grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
             grpTrv.setRequires(group.getRequires())
 
             provides = deps.DependencySet()
@@ -1018,9 +1017,13 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     # create all of the package troves we need, and let each package provide
     # itself
     grpMap = {}
+    filePrefixes = set()
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
+        # Extract file prefixes
+        for f in buildPkg:
+            filePrefixes.add(os.path.dirname(f))
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
@@ -1037,6 +1040,18 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
 
+
+    filePrefixes = list(filePrefixes)
+    filePrefixes.sort()
+    # Now eliminate prefixes of prefixes
+    ret = []
+    oldp = None
+    for p in filePrefixes:
+        if oldp and p.startswith(oldp):
+            continue
+        ret.append(p)
+        oldp = p
+    filePrefixes = ret
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -1059,7 +1074,8 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         # look up the pathids for every file that has been built by
         # this source component, following our brach ancestry
         while True:
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch)
+            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                filePrefixes)
             ident.merge(d)
 
             if not searchBranch.hasParentBranch():

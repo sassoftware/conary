@@ -51,7 +51,7 @@
                         <td py:content="makeSelect('trove', troves, trove)"/>
                     </tr>
                     <tr>
-                        <td id="header" rowspan="2">Options:</td>
+                        <td id="header" rowspan="3">Options:</td>
                         <td><input type="checkbox" name="writeperm" py:attrs="{'checked': (writeperm) and 'checked' or None}" /> Write access</td>
                     </tr>
                     <tr style="display: none;">
@@ -59,6 +59,9 @@
                     </tr>
                     <tr>
                         <td><input type="checkbox" name="admin" py:attrs="{'checked': (admin) and 'checked' or None}" /> Admin access</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="remove" py:attrs="{'checked': (remove) and 'checked' or None}" /> Remove</td>
                     </tr>
 
                 </table>
