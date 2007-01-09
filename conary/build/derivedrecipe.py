@@ -39,6 +39,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         delayedRestores = {}
         ptrMap = {}
+        self.componentReqs = {}
+        self.componentProvs = {}
 
         fileList = []
         # sort the files by pathId
@@ -46,19 +48,24 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             trv = trove.Trove(trvCs)
 
             # these should all be the same anyway
-            flavor = trv.getFlavor()
+            flavor = trv.getFlavor().copy()
+            name = trv.getName()
+            self.componentReqs[name] = trv.getRequires().copy()
+            self.componentProvs[name] = trv.getProvides().copy()
 
             for pathId, path, fileId, version in trv.iterFileList():
                 if path != self.macros.buildlogpath:
-                    fileList.append((pathId, path, fileId))
+                    fileList.append((pathId, path, fileId, name))
 
         fileList.sort()
 
-        for pathId, path, fileId in fileList:
+        for pathId, path, fileId, troveName in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
 
             flavor -= fileObj.flavor()
+            self.componentReqs[troveName] -= fileObj.requires()
+            self.componentProvs[troveName] -= fileObj.requires()
 
             if fileObj.hasContents:
                 (contentType, contents) = self.cs.getFileContents(pathId)

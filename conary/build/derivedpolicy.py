@@ -67,11 +67,12 @@ class PackageSpec(policy.Policy):
         pkgFile.flags.thaw(fileObj.flags.freeze())
 
         component.requiresMap[path] = fileObj.requires()
-
-        pkgFile.provides.thaw(fileObj.provides.freeze())
+        component.providesMap[path] = fileObj.provides()
 
         for comp in self.recipe.autopkg.components.values():
             comp.flavor.union(self.recipe.useFlags)
+            comp.requires.union(self.recipe.componentReqs[comp.name])
+            comp.provides.union(self.recipe.componentProvs[comp.name])
 
 class Flavor(packagepolicy.Flavor):
 
