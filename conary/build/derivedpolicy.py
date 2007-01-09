@@ -70,11 +70,26 @@ class PackageSpec(policy.Policy):
 
         pkgFile.provides.thaw(fileObj.provides.freeze())
 
+        for comp in self.recipe.autopkg.components.values():
+            comp.flavor.union(self.recipe.useFlags)
+
 class Flavor(packagepolicy.Flavor):
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
+
+    def doFile(self, path):
+        componentMap = self.recipe.autopkg.componentMap
+        if path not in componentMap:
+            return
+        pkg = componentMap[path]
+        f = pkg.getFile(path)
+
+        if f.flavor().isEmpty():
+            Flavor.doFile(self, path)
+        else:
+            self.packageFlavor.union(f.flavor())
 
 class Requires(packagepolicy.Requires):
     bucket = policy.PACKAGE_CREATION

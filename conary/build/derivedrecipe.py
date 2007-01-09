@@ -44,6 +44,10 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         # sort the files by pathId
         for trvCs in self.cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
+
+            # these should all be the same anyway
+            flavor = trv.getFlavor()
+
             for pathId, path, fileId, version in trv.iterFileList():
                 if path != self.macros.buildlogpath:
                     fileList.append((pathId, path, fileId))
@@ -53,6 +57,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         for pathId, path, fileId in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
+
+            flavor -= fileObj.flavor()
+
             if fileObj.hasContents:
                 (contentType, contents) = self.cs.getFileContents(pathId)
                 if contentType == changeset.ChangedFileTypes.ptr:
@@ -78,6 +85,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                     filecontents.FromFilesystem(destdir + sourcePath),
                     destdir, destdir + targetPath)
 
+        self.useFlags = flavor
 
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):
