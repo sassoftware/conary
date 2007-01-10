@@ -96,6 +96,10 @@ class CfgType(object):
 
 
     def toStrings(self, val, displayOptions=None):
+        if displayOptions is None:
+            displayOptions = {}
+        if val is None:
+            return ['None']
         return [self.format(val, displayOptions)]
 
 #---------- simple configuration item types
@@ -163,6 +167,8 @@ class CfgPath(CfgType):
             return val
 
     def format(self, val, displayOptions=None):
+        if displayOptions is None:
+            displayOptions = {}
         if (not displayOptions.get('expandPaths', False)
             and hasattr(val, '_getUnexpanded')):
             return val._getUnexpanded()
@@ -249,7 +255,7 @@ class CfgEnum(CfgType):
         self.checkEntry(val)
         return self.validValues[val.lower()]
 
-    def format(self, val, displayOptions=None):
+    def format(self, val, displayOptions):
         if val not in self.origName:
             raise ParseError, "%s not in: %s" % (str(val),
                                                  '|'.join([str(x) for x in self.origName]))
@@ -336,6 +342,8 @@ class CfgQuotedLineList(CfgLineList):
                              for x in shlex.split(val) if x)
 
     def toStrings(self, value, displayOptions=None):
+        if displayOptions is None:
+            displayOptions = {}
         if value:
             yield "'" + "' '".join(
                     self.valueType.format(x, displayOptions) for x in value) + "'"
@@ -368,6 +376,8 @@ class CfgList(CfgType):
         return self.listType(self.valueType.copy(x) for x in val)
 
     def toStrings(self, value, displayOptions=None):
+        if displayOptions is None:
+            displayOptions = {}
         if not value:
             yield '[]'
         else:
@@ -502,12 +512,6 @@ class CfgRegExpList(CfgList):
     def __init__(self, default=listType()):
         CfgList.__init__(self, valueType=self.valueType, listType=self.listType,
                          default=default)
-
-    def updateFromString(self, val, newStr):
-        if newStr == '[]':
-            return val
-        return self.listType(val + [self.valueType.parseString(x)
-                                    for x in newStr.split()])
 
     def parseString(self, val):
         if val == '[]':
