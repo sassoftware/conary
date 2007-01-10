@@ -88,7 +88,7 @@ class Flavor(packagepolicy.Flavor):
         f = pkg.getFile(path)
 
         if f.flavor().isEmpty():
-            Flavor.doFile(self, path)
+            packagepolicy.Flavor.doFile(self, path)
         else:
             self.packageFlavor.union(f.flavor())
 
