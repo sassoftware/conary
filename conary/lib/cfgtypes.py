@@ -301,6 +301,8 @@ class CfgLineList(CfgType):
         self.default = default
 
     def parseString(self, val):
+        if val == '[]':
+            return self.listType()
         return self.listType(self.valueType.parseString(x) \
                              for x in val.split(self.separator) if x)
 
@@ -502,6 +504,8 @@ class CfgRegExpList(CfgList):
                          default=default)
 
     def updateFromString(self, val, newStr):
+        if newStr == '[]':
+            return val
         return self.listType(val + [self.valueType.parseString(x)
                                     for x in newStr.split()])
 
