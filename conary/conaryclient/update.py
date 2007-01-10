@@ -2218,7 +2218,7 @@ conary erase '%s=%s[%s]'
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
-                        updateByDefault = True,
+                        updateByDefault = True, callback=None,
                         split = True, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True, syncChildren = False,
@@ -2300,6 +2300,13 @@ conary erase '%s=%s[%s]'
         # meaningless at this level.
         # CNY-492
         assert(split)
+
+        # To go away eventually
+        if callback:
+            import warnings
+            warnings.warn("The callback argument to applyUpdate has been "
+                          "deprecated, use useUpdateCallback() instead")
+            self.setUpdateCallback(callback)
 
         if self.updateCallback is None:
             self.setUpdateCallback(UpdateCallback())
@@ -2542,9 +2549,16 @@ conary erase '%s=%s[%s]'
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
-                    localRollbacks = False,
+                    callback = None, localRollbacks = False,
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
+
+        # To go away eventually
+        if callback:
+            import warnings
+            warnings.warn("The callback argument to applyUpdate has been "
+                          "deprecated, use useUpdateCallback() instead")
+            self.setUpdateCallback(callback)
 
         def _createCs(repos, db, jobSet, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
