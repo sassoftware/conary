@@ -33,9 +33,11 @@ def install():
 def save():
     if 'coverage' in sys.modules:
         sys.modules['coverage'].the_coverage.save()
+        _install()
 
 def _save():
     sys.modules['coverage'].the_coverage.save()
+    _install()
 
 def _install():
     coverageLoc = os.environ.get('COVERAGE_PATH', None) + '/coverage.py'
