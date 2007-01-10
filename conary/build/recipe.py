@@ -56,11 +56,26 @@ class Recipe:
 
     @classmethod
     def getLoadedTroves(class_):
-        return class_._loadedTroves
+        # return a copy to avoid editing-in-place which
+        # could result in modifying the Recipe _loadedTroves
+        # list.
+        return list(class_._loadedTroves)
 
     @classmethod
     def getLoadedSpecs(class_):
-        return class_._loadedSpecs
+        return list(class_._loadedSpecs)
+
+    @classmethod
+    def addLoadedTroves(class_, newTroves):
+        # NOTE: we have these method to ensure that the
+        # class variable we're using is assigned to _this_
+        # class and not some superclass.
+        class_._loadedTroves = class_._loadedTroves + newTroves
+
+    @classmethod
+    def addLoadedSpecs(class_, newSpecs):
+        class_._loadedSpecs = dict(class_._loadedSpecs)
+        class_._loadedSpecs.update(newSpecs)
 
     def __repr__(self):
         return "<%s Object>" % self.__class__
