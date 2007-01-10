@@ -17,8 +17,8 @@ import stat
 import struct
 import tempfile
 
+from conary import callbacks
 from conary.files import InodeStream
-from conary.lib import log
 from conary.streams import *
 
 JOURNAL_VERSION = 1
@@ -92,7 +92,8 @@ class JobJournal(NoopJobJournal):
     def _normpath(path):
         return os.path.normpath(path).replace('//', '/')
 
-    def __init__(self, path, root = '/', create = False):
+    def __init__(self, path, root = '/', create = False, callback = None):
+        NoopJobJournal.__init__(self)
         # normpath leaves a leading // (probably for windows?)
         self.root = self._normpath(root)
         if root:
@@ -102,6 +103,11 @@ class JobJournal(NoopJobJournal):
 
         self.hSize = struct.calcsize("!H")
         self.hdrSize = struct.calcsize("!BH")
+
+        if callback is None:
+            self.callback = callbacks.UpdateCallback()
+        else:
+            self.callback = callback
 
         if create:
             self.immutable = False
@@ -129,9 +135,6 @@ class JobJournal(NoopJobJournal):
         os.write(self.fd, struct.pack("!BH", kind, len(frz)))
 
     def _backup(self, origName, newName, statBuf, kind = JOURNAL_ENTRY_BACKUP):
-        name = self._normpath(origName)
-        name = self._normpath(newName)
-
         assert(not self.immutable)
         s = JournalEntry()
         s.old.set(origName[self.rootLen:])
@@ -215,10 +218,10 @@ class JobJournal(NoopJobJournal):
                 elif kind == JOURNAL_ENTRY_BACKDIR:
                     pass
                 else:
-                    log.warning('unknown journal entry %d', kind)
+                    self.callback.warning('unknown journal entry %d', kind)
             except OSError, e:
-                log.warning('could not %s file %s: %s',
-                            what, self.root + entry.new(), e.strerror)
+                self.callback.warning('could not %s file %s: %s',
+                                      what, self.root + entry.new(), e.strerror)
         self.close()
 
     def __iter__(self):

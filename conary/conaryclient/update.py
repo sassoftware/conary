@@ -97,6 +97,18 @@ class ClientUpdate:
         except database.OpenError, e:
             log.error(str(e))
 
+    def __init__(self, callback=None):
+        self.updateCallback = None
+        self.setUpdateCallback(callback)
+
+    def getUpdateCallback(self):
+        return self.updateCallback
+
+    def setUpdateCallback(self, callback):
+        assert(callback is None or isinstance(callback, UpdateCallback))
+        self.updateCallback = callback
+        return self
+
     def _resolveDependencies(self, uJob, jobSet, split = False,
                              resolveDeps = True, useRepos = True,
                              resolveSource = None, keepRequired = True,
@@ -1227,7 +1239,7 @@ followLocalChanges: %s
         replaced = (None, None)
         if not force:
             name = replacedInfo[0]
-            log.warning(
+            self.updateCallback.warning(
 """
 Not removing old %s as part of update - it is pinned.
 Installing new version of %s side-by-side instead.
@@ -1660,7 +1672,7 @@ conary erase '%s=%s[%s]'
 
         return newJob
 
-    def _fullMigrate(self, itemList, uJob, callback, recurse=True):
+    def _fullMigrate(self, itemList, uJob, recurse=True):
         def _convertRedirects(searchSource, newTroves):
             troveNames = set(x.getName() for x in newTroves)
             redirects = [ x for x in newTroves if x.isRedirect() ]
@@ -1902,7 +1914,7 @@ conary erase '%s=%s[%s]'
         cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                 withFiles = False,
                                                 recurse = False,
-                                                callback = callback)
+                                                callback = self.updateCallback)
 
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         uJob.getTroveSource().addChangeSet(cs)
@@ -2210,7 +2222,7 @@ conary erase '%s=%s[%s]'
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
-                        updateByDefault = True, callback = UpdateCallback(),
+                        updateByDefault = True, callback=None,
                         split = True, sync = False, fromChangesets = [],
                         checkPathConflicts = True, checkPrimaryPins = True,
                         resolveRepos = True, syncChildren = False,
@@ -2251,8 +2263,6 @@ conary erase '%s=%s[%s]'
 	'-' or '+' prefix will be updated. If False, troves without a prefix 
 	will be erased.
         @type updateByDefault: bool
-        @param callback: L{callbacks.UpdateCallback} object.
-        @type L{callbacks.UpdateCallback}
         @param split: Split large update operations into separate jobs. As
                       of 1.0.10, this must be true (False broke how we
                       handle users and groups, which requires info- packages
@@ -2292,8 +2302,19 @@ conary erase '%s=%s[%s]'
         # (but expanding updateOnly meaning would require making incompatible
         # changes), split has lost meaning, keepExisting is also practically 
         # meaningless at this level.
+        # CNY-492
         assert(split)
-        callback.preparingChangeSet()
+
+        # To go away eventually
+        if callback:
+            import warnings
+            warnings.warn("The callback argument to applyUpdate has been "
+                          "deprecated, use useUpdateCallback() instead")
+            self.setUpdateCallback(callback)
+
+        if self.updateCallback is None:
+            self.setUpdateCallback(UpdateCallback())
+        self.updateCallback.preparingChangeSet()
 
         if criticalUpdateInfo is None:
             criticalUpdateInfo = CriticalUpdateInfo()
@@ -2355,8 +2376,7 @@ conary erase '%s=%s[%s]'
             resolveRepos = False
 
         if migrate:
-            jobSet = self._fullMigrate(itemList, uJob, callback,
-                                       recurse=recurse)
+            jobSet = self._fullMigrate(itemList, uJob, recurse=recurse)
         else:
             jobSet = self._updateChangeSet(itemList, uJob,
                                        keepExisting = keepExisting,
@@ -2383,7 +2403,7 @@ conary erase '%s=%s[%s]'
                     raise UpdateError, 'keepExisting specified for a ' \
                                        'relative change set'
 
-        callback.resolvingDependencies()
+        self.updateCallback.resolvingDependencies()
 
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
@@ -2396,9 +2416,9 @@ conary erase '%s=%s[%s]'
                                       keepRequired = keepRequired,
                                       criticalUpdateInfo = criticalUpdateInfo)
         if keepList:
-            callback.done()
+            self.updateCallback.done()
             for job, depSet, reqInfo in sorted(keepList):
-                log.warning('keeping %s - required by at least %s',
+                self.updateCallback.warning('keeping %s - required by at least %s',
                             job[0], reqInfo[0])
 
         if depList:
@@ -2533,9 +2553,16 @@ conary erase '%s=%s[%s]'
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
-                    localRollbacks = False, callback = UpdateCallback(),
+                    callback = None, localRollbacks = False,
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
+
+        # To go away eventually
+        if callback:
+            import warnings
+            warnings.warn("The callback argument to applyUpdate has been "
+                          "deprecated, use useUpdateCallback() instead")
+            self.setUpdateCallback(callback)
 
         def _createCs(repos, db, jobSet, uJob, standalone = False):
             baseCs = changeset.ReadOnlyChangeSet()
@@ -2547,7 +2574,7 @@ conary erase '%s=%s[%s]'
             baseCs.merge(cs)
             if remainder:
                 newCs = repos.createChangeSet(remainder, recurse = False,
-                                              callback = callback)
+                                              callback = self.updateCallback)
                 baseCs.merge(newCs)
 
             self._replaceIncomplete(baseCs, db, db, repos)
@@ -2563,7 +2590,7 @@ conary erase '%s=%s[%s]'
                 self.db.commitChangeSet(cs, uJob,
                         replaceFiles = replaceFiles, tagScript = tagScript, 
                         test = test, justDatabase = justDatabase,
-                        journal = journal, callback = callback,
+                        journal = journal, callback = self.updateCallback,
                         localRollbacks = localRollbacks,
                         removeHints = removeHints, autoPinList = autoPinList,
                         keepJournal = keepJournal)
@@ -2595,13 +2622,13 @@ conary erase '%s=%s[%s]'
             db = database.Database(cfg.root, cfg.dbPath)
             uJob.troveSource.db = db
             repos = self.createRepos(db, cfg)
-            callback.setAbortEvent(stopSelf)
+            self.updateCallback.setAbortEvent(stopSelf)
 
             for i, job in enumerate(allJobs):
                 if stopSelf.isSet():
                     return
 
-                callback.setChangesetHunk(i + 1, len(allJobs))
+                self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
                 try:
                     newCs = _createCs(repos, db, job, uJob)
                 except:
@@ -2620,7 +2647,7 @@ conary erase '%s=%s[%s]'
                         if stopSelf.isSet():
                             return
 
-            callback.setAbortEvent(None)
+            self.updateCallback.setAbortEvent(None)
             q.put(None)
 
             # returning terminates the thread
@@ -2633,13 +2660,13 @@ conary erase '%s=%s[%s]'
 
         if len(allJobs) == 1:
             # this handles change sets which include change set files
-            callback.setChangesetHunk(0, 0)
+            self.updateCallback.setChangesetHunk(0, 0)
             newCs = _createCs(self.repos, self.db, allJobs[0], uJob, 
                               standalone = True)
-            callback.setUpdateHunk(0, 0)
-            callback.setUpdateJob(allJobs[0])
+            self.updateCallback.setUpdateHunk(0, 0)
+            self.updateCallback.setUpdateJob(allJobs[0])
             _applyCs(newCs, uJob)
-            callback.updateDone()
+            self.updateCallback.updateDone()
         else:
             # build a set of everything which is being removed
             removeHints = dict()
@@ -2651,12 +2678,12 @@ conary erase '%s=%s[%s]'
 
             if not self.cfg.threaded:
                 for i, job in enumerate(allJobs):
-                    callback.setChangesetHunk(i + 1, len(allJobs))
+                    self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
                     newCs = _createCs(self.repos, self.db, job, uJob)
-                    callback.setUpdateHunk(i + 1, len(allJobs))
-                    callback.setUpdateJob(job)
+                    self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
+                    self.updateCallback.setUpdateJob(job)
                     _applyCs(newCs, uJob, removeHints = removeHints)
-                    callback.updateDone()
+                    self.updateCallback.updateDone()
             else:
                 import Queue
                 from conary.lib.fixedthreading import Thread
@@ -2690,11 +2717,11 @@ conary erase '%s=%s[%s]'
                         if newCs is None:
                             break
                         i += 1
-                        callback.setUpdateHunk(i, len(allJobs))
-                        callback.setUpdateJob(allJobs[i - 1])
+                        self.updateCallback.setUpdateHunk(i, len(allJobs))
+                        self.updateCallback.setUpdateJob(allJobs[i - 1])
                         _applyCs(newCs, uJob, removeHints = removeHints)
-                        callback.updateDone()
-                        if callback.exceptions:
+                        self.updateCallback.updateDone()
+                        if self.updateCallback.exceptions:
                             break
                 finally:
                     stopDownloadEvent.set()
@@ -2703,16 +2730,16 @@ conary erase '%s=%s[%s]'
                     downloadThread.join(20)
 
                     if downloadThread.isAlive():
-                        log.warning('timeout waiting for download '
-                                    'thread to terminate -- closing '
-                                    'database and exiting')
+                        self.updateCallback.warning('timeout waiting for '
+                            'download thread to terminate -- closing '
+                            'database and exiting')
                         self.db.close()
                         tb = sys.exc_info()[2]
                         if tb:
-                            log.warning('the following traceback may be '
-                                        'related:')
                             tb = traceback.format_tb(tb)
-                            print >>sys.stderr, ''.join(tb)
+                            self.updateCallback.warning('the following '
+                                'traceback may be related:',
+                                exc_text=''.join(tb))
                         # this will kill the download thread as well
                         os.kill(os.getpid(), 15)
                     else:

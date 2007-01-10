@@ -222,11 +222,10 @@ class FilesystemJob:
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
 
-    def preapply(self, tagSet = {}, tagScript = None,
-                 callback = UpdateCallback()):
+    def preapply(self, tagSet = {}, tagScript = None):
 	# this is run before the change make it to the database
 	rootLen = len(self.root)
-	tagCommands = TagCommand(callback = callback.tagHandlerOutput)
+	tagCommands = TagCommand(callback = self.callback)
 
         # processing these before the tagRemoves taghandler files ensures
         # we run them even if the taghandler will be removed in the same
@@ -304,7 +303,7 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
-    def _applyFileChanges(self, opJournal, callback, journal):
+    def _applyFileChanges(self, opJournal, journal):
 
 	def restoreFile(fileObj, contents, root, target, journal, opJournal):
             opJournal.backup(target)
@@ -341,31 +340,30 @@ class FilesystemJob:
         delayedRestores = []
         ptrTargets = {}
 
-        extraContents = []
-
         paths = self.removes.keys()
         paths.sort()
         paths.reverse()
         for fileNum, target in enumerate(paths):
             (fileObj, msg) = self.removes[target]
-            callback.removeFiles(fileNum + 1, len(paths))
+            self.callback.removeFiles(fileNum + 1, len(paths))
 
             # don't worry about files which don't exist
             try:
                 info = os.lstat(target)
             except OSError, e:
                 if e.errno == errno.ENOENT:
-                    log.warning("%s has already been removed",
-                                target[len(self.root):])
+                    self.callback.warning("%s has already been removed",
+                                          target[len(self.root):])
                 else:
-                    log.error("%s could not be removed: %s",
-                              target, e.strerror)
+                    self.callback.error("%s could not be removed: %s",
+                                        target, e.strerror)
                     raise
             else:
                 if (stat.S_ISDIR(info.st_mode)
                     and not isinstance(fileObj, files.Directory)):
-                    log.warning('%s was changed into a directory'
-                                ' - not removing', target[len(self.root):])
+                    self.callback.warning('%s was changed into a directory'
+                                          ' - not removing', 
+                                          target[len(self.root):])
                     continue
 
                 opJournal.backup(target)
@@ -373,8 +371,8 @@ class FilesystemJob:
                     fileObj.remove(target)
                     opJournal.remove(target)
                 except OSError, e:
-                    log.error("%s could not be removed: %s",
-                              target[len(self.root):], e.strerror)
+                    self.callback.error("%s could not be removed: %s",
+                                        target[len(self.root):], e.strerror)
                     raise
 
 	    log.debug(msg, target)
@@ -416,8 +414,8 @@ class FilesystemJob:
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
             if fileObj.hasContents:
-                callback.restoreFiles(fileObj.contents.size(), 
-                                      self.restoreSize)
+                self.callback.restoreFiles(fileObj.contents.size(), 
+                                           self.restoreSize)
 	    if override != "":
 		contents = override
 	    elif fileObj.hasContents:
@@ -441,6 +439,8 @@ class FilesystemJob:
                                                 ptrId))
                         if not ptrTargets.has_key(ptrId):
                             ptrTargets[ptrId] = None
+                            # this doesn't insert duplicate records, they're
+                            # silently skipped
                             util.tupleListBsearchInsert(restores, 
                                 (ptrId, None, None, None, None),
                                 self.ptrCmp)
@@ -506,30 +506,30 @@ class FilesystemJob:
             opJournal.create(target)
 	    f.write(str)
 	    f.close()
-	    log.warning(msg)
+	    self.callback.warning(msg)
 
     def apply(self, tagSet = {}, tagScript = None, journal = None,
-              callback = UpdateCallback(), opJournalPath = None,
-              keepJournal = False):
+              opJournalPath = None, keepJournal = False):
 
         assert(not self.errors)
 
 	# this is run after the changes are in the database (but before
 	# they are committed
-	tagCommands = TagCommand(callback = callback.tagHandlerOutput)
+	tagCommands = TagCommand(callback = self.callback)
 	runLdconfig = False
 	rootLen = len(self.root)
 
         if opJournalPath:
-            opJournal = JobJournal(opJournalPath, self.root, create = True)
+            opJournal = JobJournal(opJournalPath, self.root, create = True,
+                                   callback = self.callback)
         else:
             opJournal = NoopJobJournal()
 
         try:
-            self._applyFileChanges(opJournal, callback, journal)
-        except Exception, e:
-            log.error("a critical error occured -- reverting filesystem "
-                      "changes")
+            self._applyFileChanges(opJournal, journal)
+        except Exception:
+            self.callback.error("a critical error occured -- reverting "
+                                "filesystem changes")
             opJournal.revert()
             if not keepJournal and opJournalPath:
                 os.unlink(opJournalPath)
@@ -557,11 +557,11 @@ class FilesystemJob:
 
 	if 'shlib' in self.tagUpdates:
 	    shlibAction(self.root, self.tagUpdates['shlib'],
-                        tagScript = tagScript)
+                        tagScript = tagScript, logger=self.callback)
 	    del self.tagUpdates['shlib']
 	elif runLdconfig:
 	    # override to force ldconfig to run on shlib removal
-	    shlibAction(self.root, [])
+	    shlibAction(self.root, [], logger=self.callback)
 
         # build a set of the new tag descriptions. we index them two ways
         # to make the rest of this a bit easier
@@ -645,7 +645,7 @@ class FilesystemJob:
                     [x[rootLen:] for x in l])
 	    
 	if tagCommands:
-            callback.runningPostTagHandlers()
+            self.callback.runningPostTagHandlers()
 	    tagCommands.run(tagScript, self.root)
 
     def getErrorList(self):
@@ -711,13 +711,14 @@ class FilesystemJob:
 	    if oldFile.hasContents and localFile and localFile.hasContents and \
 			oldFile.contents != localFile.contents and \
                         not oldFile.flags.isTransient():
-		log.warning("%s has changed but has been removed "
-				   "on head", path)
+                self.callback.warning("%s has changed but has been removed "
+                                      "on head", path)
             if (localFile and isinstance(localFile, files.Directory)
                 and not isinstance(oldFile, files.Directory)):
                 # the user removed this file, and then remade it as a
                 # directory.  That is as good as a removal in my book.
-                log.warning("%s was changed to a directory - ignoring")
+                self.callback.warning("%s was changed to a directory - "
+                                      "ignoring")
                 continue
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsTrove.removeFile(pathId)
@@ -752,7 +753,7 @@ class FilesystemJob:
 
     def _mergeFile(self, baseFile, headFileId, headChanges, pathId):
         if headChanges is None:
-            log.error('File objects stored in your database do '
+            self.callback.error('File objects stored in your database do '
                       'not match the same version of those file '
                       'objects in the repository. The best thing '
                       'to do is erase the version on your system '
@@ -1268,8 +1269,8 @@ class FilesystemJob:
 		    # don't have a patch available for it, and we just leave
 		    # the old contents in place
 		    if headFile.contents.sha1() != baseFile.contents.sha1():
-			log.warning("preserving contents of %s (now a "
-				    "config file)" % finalPath)
+                        self.callback.warning("preserving contents of %s "
+                                              "(now a config file)" % finalPath)
 		elif headFile.flags.isConfig():
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
@@ -1369,7 +1370,6 @@ class FilesystemJob:
         removedFiles = {}
         for oldTroveInfo in changeSet.getOldTroveList():
             oldTrove = db.getTrove(pristine = False, *oldTroveInfo)
-            fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
             for (pathId, path, fileId, version) in oldTrove.iterFileList():
                 assert(path not in removedFiles)
                 removedFiles[path] = ((pathId, version, fileId), oldTroveInfo, 
@@ -1472,6 +1472,9 @@ class FilesystemJob:
         self.linkGroups = {}
 	self.db = db
         self.pathRemovedCache = (None, None, None)
+        if callback is None:
+            callback = UpdateCallback()
+        self.callback = callback
 
         if hasattr(self.db, 'iterFindPathReferences'):
             # this only works for local databases, not networked repositories
@@ -1512,8 +1515,7 @@ class FilesystemJob:
                                newFsTrove, root, flags)
 
 	for i, (troveCs, baseTrove, newFsTrove) in enumerate(troveList):
-	    if callback:
-		callback.preparingUpdate(i + 1, len(troveList))
+            callback.preparingUpdate(i + 1, len(troveList))
 
 	    if baseTrove:
 		self.oldTroves.append((baseTrove.getName(), 
@@ -1534,7 +1536,8 @@ class FilesystemJob:
 def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False,
                   ignoreTransient=False, ignoreAutoSource=False,
-                  crossRepositoryDeltas = True, allowMissingFiles = False):
+                  crossRepositoryDeltas = True, allowMissingFiles = False,
+                  callback=UpdateCallback()):
     """
     Populates a change set against the files in the filesystem and builds
     a trove object which describes the files installed.  The return
@@ -1651,12 +1654,14 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                                          possibleMatch = possibleMatch)
 	except OSError:
             if isSrcTrove:
-		log.error("%s is missing (use remove if this is intentional)" 
+		callback.error(
+                    "%s is missing (use remove if this is intentional)" 
 		    % util.normpath(path))
                 return None
 
 	    if (flags & MISSINGFILESOKAY) == 0:
-		log.warning("%s is missing (use remove if this is intentional)" 
+		callback.warning(
+                    "%s is missing (use remove if this is intentional)" 
 		    % util.normpath(path))
 
             newTrove.removeFile(pathId)
@@ -1797,7 +1802,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
                       ignoreAutoSource = False, updateContainers = False,
-                      crossRepositoryDeltas = True, allowMissingFiles = False):
+                      crossRepositoryDeltas = True, allowMissingFiles = False,
+                      callback=UpdateCallback()):
     """
     Builds a change set against a set of files currently installed and
     builds a trove object which describes the files installed.  The
@@ -1837,7 +1843,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                                ignoreTransient = ignoreTransient,
                                ignoreAutoSource = ignoreAutoSource,
                                crossRepositoryDeltas = crossRepositoryDeltas,
-                               allowMissingFiles = allowMissingFiles)
+                               allowMissingFiles = allowMissingFiles,
+                               callback = callback)
         if result is None:
             # an error occurred
             return None
@@ -1881,7 +1888,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
             
     return (changeSet, returnList)
 
-def shlibAction(root, shlibList, tagScript = None):
+def shlibAction(root, shlibList, tagScript = None, logger=log):
     p = "/sbin/ldconfig"
 
     # write any needed entries in ld.so.conf before running ldconfig
@@ -1931,9 +1938,9 @@ def shlibAction(root, shlibList, tagScript = None):
         f = open(tagScript, "a")
         f.write("/sbin/ldconfig\n")
     elif os.getuid():
-	log.warning("ldconfig skipped (insufficient permissions)")
-    elif os.access(util.joinPaths(root, p), os.X_OK) != True:
-	log.error("/sbin/ldconfig is not available")
+	logger.warning("ldconfig skipped (insufficient permissions)")
+    elif not os.access(util.joinPaths(root, p), os.X_OK):
+	logger.error("/sbin/ldconfig is not available")
     else:
 	log.debug("running ldconfig")
 	pid = os.fork()
@@ -1948,7 +1955,7 @@ def shlibAction(root, shlibList, tagScript = None):
 	    os._exit(1)
 	(id, status) = os.waitpid(pid, 0)
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-	    log.error("ldconfig failed")
+	    logger.error("ldconfig failed")
 
 
 def _checkHandler(tag, root):
@@ -2147,7 +2154,7 @@ class TagCommand:
             },
         }
 
-        self.outputCallback = callback
+        self.callback = callback
 
     def addCommand(self, tagInfo, updateType, updateClass, fileList):
         h = self.commands[updateType][updateClass].setdefault(
@@ -2157,8 +2164,8 @@ class TagCommand:
     def _badMultiTag(self, handler, tagInfoList):
         if len([x for x in tagInfoList if x.datasource != 'multitag']):
             # multiple description without multitag protocol
-            log.error('tag handler %s used by multiple tags'
-                      ' without multitag protocol' % handler)
+            self.callback.error('tag handler %s used by multiple tags'
+                                ' without multitag protocol' % handler)
             return True
         return False
 
@@ -2209,7 +2216,7 @@ class TagCommand:
                             f.write("%s%s\n" % (pre, fileName))
                         f.write("%sEOF\n" % pre)
                     else:
-                        log.error('unknown datasource %s' %datasource)
+                        self.callback.error('unknown datasource %s' %datasource)
 
             f.close()
             return
@@ -2218,6 +2225,7 @@ class TagCommand:
         # N.B. All changes in the logic for writing scripts need to
         # be paralleled by changes above in the tagScript branch,
         # where we're writing scripts instead.
+        tagHandlerOutput = self.callback.tagHandlerOutput
         for (updateType, updateClass) in self.commandOrder:
             for handler in sorted(self.commands[updateType][updateClass]):
                 # stable sort order
@@ -2243,7 +2251,7 @@ class TagCommand:
 
                 # double check that we're using a known protocol
                 if datasource not in ('multitag', 'args', 'stdin'):
-                    log.error('unknown datasource %s' %datasource)
+                    self.callback.error('unknown datasource %s' %datasource)
                     break
 
                 log.debug("running %s", " ".join(command))
@@ -2265,7 +2273,7 @@ class TagCommand:
                                 except OSError, e:
                                     if e.errno != errno.EPIPE:
                                         raise
-                                    log.error(str(e))
+                                    self.callback.error(str(e))
                                     break
                         elif datasource == 'multitag':
                             for fileName in sorted(hi.fileToTag):
@@ -2278,7 +2286,7 @@ class TagCommand:
                                 except OSError, e:
                                     if e.errno != errno.EPIPE:
                                         raise
-                                    log.error(str(e))
+                                    self.callback.error(str(e))
                                     break
                         os._exit(0)
 
@@ -2338,13 +2346,13 @@ class TagCommand:
                             count -= 1
                         else:
                             for line in lines:
-                                self.outputCallback(tagInfo.tag, line,
-                                                    stderr = isError)
+                                tagHandlerOutput(tagInfo.tag, line,
+                                                 stderr = isError)
 
                 if inputPid is not None: os.waitpid(inputPid, 0)
                 (id, status) = os.waitpid(pid, 0)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-                    log.error("%s failed", command[0])
+                    self.callback.error("%s failed", command[0])
 
 def silentlyReplace(newF, oldF):
     # Can the file already on the disk (oldF) be replaced with the new file

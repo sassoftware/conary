@@ -575,7 +575,8 @@ class Database(SqlDbRepository):
 
         callback.creatingRollback()
 
-	result = update.buildLocalChanges(self, troveList, root = self.root)
+	result = update.buildLocalChanges(self, troveList, root = self.root,
+                                          callback = callback)
 	if not result: return
 
         retList = result[1]
@@ -687,7 +688,7 @@ class Database(SqlDbRepository):
             # this makes --test a little inaccurate, but life goes on
             if not test:
                 callback.runningPreTagHandlers()
-                fsJob.preapply(tagSet, tagScript, callback = callback)
+                fsJob.preapply(tagSet, tagScript)
 
         for (troveName, troveVersion, troveFlavor, fileDict) in fsJob.iterUserRemovals():
             if sum(fileDict.itervalues()) == 0:
@@ -757,7 +758,7 @@ class Database(SqlDbRepository):
             return
 
         if not justDatabase:
-            fsJob.apply(tagSet, tagScript, journal, callback,
+            fsJob.apply(tagSet, tagScript, journal,
                         keepJournal = keepJournal,
                         opJournalPath = self.opJournalPath)
 
