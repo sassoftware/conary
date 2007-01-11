@@ -54,6 +54,7 @@ class PackageSpec(packagepolicy.PackageSpec):
         destdir = self.recipe.macros.destdir
 
         if path not in self.pathObjs:
+            # Cannot add a new packaged directory in a DerivedPackage
             if os.path.isdir(destdir + path):
                 return
 

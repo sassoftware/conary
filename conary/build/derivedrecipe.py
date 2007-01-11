@@ -180,6 +180,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                                         lightInstance = lightInstance)
         self.repos = laReposCache.repos
 
-        self._addBuildAction('Remove', build.Remove)
         self._addBuildAction('Create', build.Create)
+        self._addBuildAction('Remove', build.Remove)
+        self._addBuildAction('Replace', build.Replace)
+        self._addBuildAction('SetModes', build.SetModes)
+
         self._addSourceAction('addPatch', source.addPatch)
