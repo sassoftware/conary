@@ -10,7 +10,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from conary import files, trove
+from conary import files, trove, versions
+from conary import errors as conaryerrors
 from conary.build import build, source
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
