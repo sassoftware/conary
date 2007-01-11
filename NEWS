@@ -4,6 +4,11 @@ Changes in @NEW@:
       This allows applications using the Conary API to capture and process
       them as appropriate. (CNY-1184)
 
+  o Build Changes:
+    * Change in assembling recipe namespace changed how unknown recipe
+      attributes were handled (they appeared as None instead of raising
+      an Attribute Error).
+
 Changes in 1.0.41:
   o Client Changes:
     * Tag handler output is now redirected to a callback. The command line
