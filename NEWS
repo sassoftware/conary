@@ -8,6 +8,11 @@ Changes in @NEW@:
     * "conary erase --help" now displays options as "Erase Options"
       instead of "Update Options". (CNY-1090)
 
+  o Build Changes:
+    * Change in assembling recipe namespace changed how unknown recipe
+      attributes were handled (they appeared as None instead of raising
+      an Attribute Error).
+
 Changes in 1.1.14:
   o Client Changes:
     * Tag handler output is now redirected to a callback. The command line
