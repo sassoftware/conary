@@ -14,6 +14,8 @@
 #
 
 import subprocess
+import re
+import itertools
 
 fpu = set(('f2xm1', 'fabs', 'fadd', 'faddp', 'fiadd', 'fbld', 'fchs',
            'fclex', 'fnclex', 'fcom', 'fcomp', 'fcompp', 'ficom',
@@ -42,8 +44,6 @@ i486 = set(('bswap', 'cmpxchg', 'invd', 'invlpg', 'xadd', 'wbinvd'))
 i486.update(fpu)
 
 i586 = set(('cpuid', 'rdmsr', 'rdtsc', 'wrmsr'))
-
-cpuid = set(('cpuid',))
 
 i686 = set(('fcmova', 'fcmovae', 'fcmovb', 'fcmovbe', 'fcmove',
             'fcmovna', 'fcmovnae', 'fcmovnb', 'fcmovnbe', 'fcmovne',
@@ -143,7 +143,6 @@ InstructionSets = {
     '3dnowext': ext3dnow,
     'clflush': clflush,
     'cmov': cmov,
-    'cpuid': cpuid,
     'cx16': cx16,
     'cx8': cx8,
     'fxsr': fxsr,
@@ -159,33 +158,47 @@ InstructionSets = {
     'sse3': sse3,
     }
 
+InstructionToFlag = {}
+for flag, insset in InstructionSets.iteritems():
+    for isn in insset:
+        InstructionToFlag[isn] = flag
+strongFlags = set(('i486', 'i586', 'i686'))
+# Example objdump -d line:
+#  8049114:\t55                    \tpush   %ebp
+# look for two \t, then get the first match up to the first space.
+# [^\t]+\t is faster than .*?\t
+# ?: throws away the first group
+isnRe = re.compile('(?:[^\t]+\t){2}([^ ]+)')
+
 def getIsFlags(path):
-    isnsets = InstructionSets.copy()
     flags = set()
     p = subprocess.Popen('objdump -d %s' %path, stdout=subprocess.PIPE,
                          shell=True)
+    m = InstructionToFlag
+    cpuid = False
     for line in p.stdout:
-        # first split the interesting lines into 3 chunks
-        chunks = line.split('\t')
-        if len(chunks) < 3:
+        match = isnRe.match(line)
+        if not match:
             continue
-        # grab the instruction
-        isn = chunks[2].split(' ', 1)[0]
-        for name, isnset in isnsets.items():
-            if isn in isnset:
-                # once we know we have one, there is no need to continue
-                # to check
-                del isnsets[name]
-                flags.add(name)
+        isn = match.group(1)
+        # note if we have come across cpuid
+        if isn == 'cpuid':
+            cpuid = True
+        if isn not in m:
+            continue
+        flags.add(m[isn])
 
     # if the application uses cpuid, it's possible that it will choose
-    # the correct instructions for the CPU running it.
-    if 'cpuid' in flags:
+    # the correct instructions for the CPU running it.  Weaken the flags
+    # to ~.
+    if cpuid:
         strength = '~%s'
-        flags.remove('cpuid')
     else:
         strength = '%s'
-    return ','.join(sorted(strength %x for x in flags))
+
+    return ','.join(sorted(itertools.chain(
+        (strength %x for x in flags if x not in strongFlags),
+        (x for x in flags if x in strongFlags))))
 
 if __name__ == '__main__':
     def usage():

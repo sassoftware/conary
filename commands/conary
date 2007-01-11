@@ -800,6 +800,12 @@ _register(UpdateCommand)
 class EraseCommand(_UpdateCommand):
     commands = [ "erase" ]
     help = 'Erase software from the system'
+
+    def addParameters(self, argDef):
+        # rename Update Options to Erase Options (CNY-1090)
+        _UpdateCommand.addParameters(self, argDef)
+        argDef['Erase Options'] = argDef.pop('Update Options')
+
 _register(EraseCommand)
 
 

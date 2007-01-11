@@ -4,6 +4,10 @@ Changes in @NEW@:
       This allows applications using the Conary API to capture and process
       them as appropriate. (CNY-1184)
 
+  o Bug Fixes:
+    * "conary erase --help" now displays options as "Erase Options"
+      instead of "Update Options". (CNY-1090)
+
 Changes in 1.1.14:
   o Client Changes:
     * Tag handler output is now redirected to a callback. The command line
