@@ -21,7 +21,6 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
-RECIPE_TYPE_DERIVEDPKG= 6
 
 def isPackageRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_PACKAGE
@@ -38,9 +37,6 @@ def isInfoRecipe(recipeClass):
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
 
-def isDerivedPackageRecipe(recipeClass):
-    return recipeClass.getType() == RECIPE_TYPE_DERIVEDPKG
-
 class Recipe:
     """Virtual base class for all Recipes"""
     _trove = None
@@ -48,6 +44,7 @@ class Recipe:
     _loadedTroves = []
     _loadedSpecs = {}
     _recipeType = RECIPE_TYPE_UNKNOWN
+    _isDerived = False
 
     def __init__(self):
         assert(self.__class__ is not Recipe)
