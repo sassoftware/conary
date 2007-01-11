@@ -553,10 +553,7 @@ class _AbstractPackageRecipe(Recipe):
             if self._lightInstance:
                 return _ignoreCall
 
-        method = self.__dict__.get(name, None)
-        if method is None:
-            return method
-
+        # we don't get here if name is in __dict__, so it must not be defined
         raise AttributeError, name
 
     def __delattr__(self, name):

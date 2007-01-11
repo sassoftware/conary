@@ -17,14 +17,14 @@ import re, os
 from conary import files, trove
 from conary.build import buildpackage, filter, packagepolicy, policy
 
-class PackageSpec(policy.Policy):
+class ComponentSpec(packagepolicy.ComponentSpec):
 
-    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_SUBSEQUENT),
+    )
 
-    def preProcess(self):
+    def doProcess(self, recipe):
         # map paths into the correct components
-        filters = []
-        self.pathObjs = {}
         for trvCs in self.recipe.cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
 
@@ -32,18 +32,23 @@ class PackageSpec(policy.Policy):
                 regexs = [ re.escape(x[1]) for x in trv.iterFileList() ]
                 f = filter.Filter(regexs, self.recipe.macros,
                                   name = trv.getName().split(':')[1])
-                filters.append(f)
+                self.derivedFilters.append(f)
+
+        packagepolicy.ComponentSpec.doProcess(self, recipe)
+
+class PackageSpec(packagepolicy.PackageSpec):
+
+    def doProcess(self, recipe):
+        self.pathObjs = {}
+
+        for trvCs in self.recipe.cs.iterNewTroveList():
+            trv = trove.Trove(trvCs)
 
             for (pathId, path, fileId, version) in trv.iterFileList():
                 fileCs = self.recipe.cs.getFileChange(None, fileId)
                 self.pathObjs[path] = files.ThawFile(fileCs, pathId)
 
-        pkgFilter = filter.Filter('.*', self.recipe.macros,
-                                  name = self.recipe.name)
-
-        self.recipe.autopkg = \
-                buildpackage.AutoBuildPackage([ pkgFilter ], filters,
-                                              self.recipe)
+        packagepolicy.PackageSpec.doProcess(self, recipe)
 
     def doFile(self, path):
         destdir = self.recipe.macros.destdir
@@ -52,9 +57,7 @@ class PackageSpec(policy.Policy):
             if os.path.isdir(destdir + path):
                 return
 
-            # directories get created even if they aren't in any component
-            raise builderrors.RecipeFileError(
-                    'Cannot add files to derived recipe (%s)' % path)
+            return packagepolicy.PackageSpec.doFile(self, path)
 
         self.recipe.autopkg.addFile(path, destdir + path)
         component = self.recipe.autopkg.componentMap[path]
@@ -71,8 +74,11 @@ class PackageSpec(policy.Policy):
 
         for comp in self.recipe.autopkg.components.values():
             comp.flavor.union(self.recipe.useFlags)
-            comp.requires.union(self.recipe.componentReqs[comp.name])
-            comp.provides.union(self.recipe.componentProvs[comp.name])
+            if comp.name in self.recipe.componentReqs:
+                # we don't have dep information for components which were
+                # newly created in this derivation
+                comp.requires.union(self.recipe.componentReqs[comp.name])
+                comp.provides.union(self.recipe.componentProvs[comp.name])
 
 class Flavor(packagepolicy.Flavor):
 

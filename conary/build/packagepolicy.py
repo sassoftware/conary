@@ -278,6 +278,7 @@ class ComponentSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
         self.configFilters = []
+        self.derivedFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
@@ -310,12 +311,16 @@ class ComponentSpec(_filterSpec):
         # specs that absolutely should not be overridden in recipes.
         for filteritem in itertools.chain(self.invariantFilters,
                                           self.extraFilters,
+                                          self.derivedFilters,
                                           self.configFilters,
                                           self.baseFilters):
-	    name = filteritem[0] % self.macros
-	    assert(name != 'source')
-            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
-            compFilters.append(filter.Filter(*args, **kwargs))
+            if not isinstance(filteritem, filter.Filter):
+                name = filteritem[0] % self.macros
+                assert(name != 'source')
+                args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+                filteritem = filter.Filter(*args, **kwargs)
+
+            compFilters.append(filteritem)
 
 	# by default, everything that hasn't matched a filter pattern yet
 	# goes in the catchall component ('runtime' by default)

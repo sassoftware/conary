@@ -180,4 +180,5 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self.repos = laReposCache.repos
 
         self._addBuildAction('Remove', build.Remove)
+        self._addBuildAction('Create', build.Create)
         self._addSourceAction('addPatch', source.addPatch)
