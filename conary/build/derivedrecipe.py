@@ -24,16 +24,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
     _isDerived = True
     parentVersion = None
 
-    def updateTroves(self, troves):
-        for trv in troves:
-            rmvList = []
-            for (pathId, path, fileId, version) in trv.iterFileList():
-                if path in self.removedPaths:
-                    rmvList.append(pathId)
-
-            for pathId in rmvList:
-                trv.removeFile(pathId)
-
     def _expandChangeset(self):
         destdir = self.macros.destdir
 
