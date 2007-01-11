@@ -133,3 +133,5 @@ class Provides(packagepolicy.Provides):
         self.addExplicitProvides(path, fullpath, pkg, macros, m, f)
         self.addPathDeps(path, dirpath, pkg, f)
         self.unionDeps(path, pkg, f)
+
+Ownership = packagepolicy.Ownership

@@ -1291,22 +1291,24 @@ class Ownership(_UserGroup):
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
+	pkgfile = self.recipe.autopkg.pathMap[path]
+        pkgOwner = pkgfile.inode.owner()
+        pkgGroup = pkgfile.inode.group()
+        bestOwner = pkgOwner
+        bestGroup = pkgGroup
 	for (f, owner, group) in self.fileFilters:
 	    if f.match(path):
-		self._markOwnership(path, owner, group)
-		return
-	self._markOwnership(path, 'root', 'root')
+                bestOwner, bestGroup = owner, group
+		break
 
-    def _markOwnership(self, filename, owner, group):
-	pkgfile = self.recipe.autopkg.pathMap[filename]
-	if owner:
-	    pkgfile.inode.owner.set(owner)
-            if owner not in self.systemusers:
-                self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
-	if group:
-	    pkgfile.inode.group.set(group)
-            if group not in self.systemgroups:
-                self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
+	if bestOwner != pkgOwner:
+	    pkgfile.inode.owner.set(bestOwner)
+        if bestOwner and bestOwner not in self.systemusers:
+            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
+	if bestGroup != pkgGroup:
+	    pkgfile.inode.group.set(bestGroup)
+	if bestGroup and bestGroup not in self.systemgroups:
+            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
 
 class _Utilize(_UserGroup):
