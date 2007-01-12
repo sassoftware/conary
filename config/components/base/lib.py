@@ -16,7 +16,8 @@
 # have no architecture-neutral files, in order to enable multilib
 # support.
 
-filters = ('lib', (r'.*/(%(lib)s|lib)/',))
+import stat
+filters = ('lib', ((r'.*/(%(lib)s|lib)/', None, stat.S_IFDIR),))
 follows = ('python',
            'perl',
            'data',
