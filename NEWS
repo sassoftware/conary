@@ -12,6 +12,8 @@ Changes in @NEW@:
     * Change in assembling recipe namespace changed how unknown recipe
       attributes were handled (they appeared as None instead of raising
       an Attribute Error).
+    * Packaged directories are no longer included in :lib components
+      because doing so can create multilib failures.  (CNY-1199)
 
 Changes in 1.1.14:
   o Client Changes:
