@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.15:
   o Client Changes:
     * On the update path, errors and warnings are now handled by callbacks.
       This allows applications using the Conary API to capture and process
