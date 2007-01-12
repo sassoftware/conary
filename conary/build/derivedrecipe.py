@@ -82,6 +82,10 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
                 fileObj.restore(contents, destdir, destdir + path)
 
+            if isinstance(fileObj, files.Directory):
+                # remember to include this directory in the derived package
+                self.ExcludeDirectories(exceptions = path)
+
         for targetPathId in delayedRestores:
             for fileObj, targetPath in delayedRestores[targetPathId]:
                 sourcePath = ptrMap[targetPathId]
@@ -190,5 +194,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self._addBuildAction('Remove', build.Remove)
         self._addBuildAction('Replace', build.Replace)
         self._addBuildAction('SetModes', build.SetModes)
+        self._addBuildAction('MakeDirs', build.MakeDirs)
 
         self._addSourceAction('addPatch', source.addPatch)
