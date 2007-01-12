@@ -140,14 +140,16 @@ class ComponentRequires(packagepolicy.ComponentRequires):
         # are now empty. we wouldn't have created any, but we could have
         # inherited some
         components = self.recipe.autopkg.components
-        ourName = self.recipe.name + ':'
+        packageMap = self.recipe.autopkg.packageMap
         for comp in components.values():
             removeDeps = deps.DependencySet()
             for dep in comp.requires.iterDepsByClass(deps.TroveDependencies):
                 name = dep.getName()[0]
-                if name.startswith(ourName) and (
+                if ':' in name:
+                    main = name.split(':', 1)[0]
+                    if (main in packageMap and
                         name not in components or not components[name]):
-                    removeDeps.addDep(deps.TroveDependencies, dep)
+                        removeDeps.addDep(deps.TroveDependencies, dep)
 
             comp.requires -= removeDeps
 
