@@ -135,3 +135,4 @@ class Provides(packagepolicy.Provides):
         self.unionDeps(path, pkg, f)
 
 Ownership = packagepolicy.Ownership
+MakeDevices = packagepolicy.MakeDevices

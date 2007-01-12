@@ -58,23 +58,29 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             self.componentReqs[troveName] -= fileObj.requires()
             self.componentProvs[troveName] -= fileObj.requires()
 
-            if fileObj.hasContents:
-                (contentType, contents) = self.cs.getFileContents(pathId)
-                if contentType == changeset.ChangedFileTypes.ptr:
-                    targetPathId = contents.get().read()
-                    l = delayedRestores.setdefault(targetPathId, [])
-                    l.append((fileObj, path))
-                    continue
-
-                assert(contentType == changeset.ChangedFileTypes.file)
-                assert(not fileObj.linkGroup())
+            if isinstance(fileObj, files.DeviceFile):
+                self.MakeDevices(path, fileObj.lsTag,
+                                 fileObj.devt.major(), fileObj.devt.minor(),
+                                 fileObj.inode.owner(), fileObj.inode.group(),
+                                 fileObj.inode.perms())
             else:
-                contents = None
+                if fileObj.hasContents:
+                    (contentType, contents) = self.cs.getFileContents(pathId)
+                    if contentType == changeset.ChangedFileTypes.ptr:
+                        targetPathId = contents.get().read()
+                        l = delayedRestores.setdefault(targetPathId, [])
+                        l.append((fileObj, path))
+                        continue
 
-            if pathId in delayedRestores:
-                ptrMap[pathId] = path
+                    assert(contentType == changeset.ChangedFileTypes.file)
+                    assert(not fileObj.linkGroup())
+                else:
+                    contents = None
 
-            fileObj.restore(contents, destdir, destdir + path)
+                if pathId in delayedRestores:
+                    ptrMap[pathId] = path
+
+                fileObj.restore(contents, destdir, destdir + path)
 
         for targetPathId in delayedRestores:
             for fileObj, targetPath in delayedRestores[targetPathId]:
