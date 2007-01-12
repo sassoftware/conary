@@ -36,7 +36,7 @@ from conary import errors
 from conary import files
 from conary import trove
 from conary import versions
-from conary.build import recipe
+from conary.build import derivedrecipe, recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
 from conary.build.macros import Macros
@@ -1101,7 +1101,7 @@ def _determineRootVersion(repos, state):
         # We must have done a shadow at some point.
         assert(0)
 
-def merge(repos, versionSpec=None, callback=None):
+def merge(cfg, repos, versionSpec=None, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
     try:
@@ -1173,7 +1173,41 @@ def merge(repos, versionSpec=None, callback=None):
         # merging to the version we're based on doesn't make much sense
         log.error("No changes have been made on the parent branch; nothing "
                   "to merge.")
-        return
+        #return
+
+    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                     cfg=cfg, repos=repos,
+                                     branch=state.getBranch())
+    recipeClass = loader.getRecipe()
+    if issubclass(recipeClass, derivedrecipe.DerivedPackageRecipe):
+        # Merges between non-derived recipes and derived recipes don't
+        # do a patch merge.
+        loader = loadrecipe.recipeLoaderFromSourceComponent(troveName, cfg,
+                               repos, versionStr = str(parentHeadVersion))[0]
+        parentRecipeClass = loader.getRecipe()
+        if not issubclass(parentRecipeClass,
+                          derivedrecipe.DerivedPackageRecipe):
+            newVersion = parentHeadVersion.trailingRevision().getVersion()
+            if True or newVersion != state.getVersion().trailingRevision.getVersion():
+                recipePath = state.getRecipeFileName()
+                recipe = open(recipePath).read()
+                regexp = re.compile('''^[ \t]*version *=[ ]*['"](.*)['"] *$''',
+                                    re.MULTILINE)
+                l = list(regexp.finditer(recipe))
+                if len(l) != 1:
+                    log.warning("Couldn't find version assignment in %s. The "
+                                "version for this recipe needs to be set to "
+                                "%s." % (recipePath, newVersion) )
+                else:
+                    match = l[0]
+                    newRecipe = recipe[0:match.start(1)] + newVersion + \
+                                recipe[match.end(1):]
+                    open(recipePath, "w").write(newRecipe)
+
+            state.setLastMerged(parentHeadVersion)
+            state.changeVersion(shadowHeadVersion)
+            conaryState.write("CONARY")
+            return
 
     changeSet = repos.createChangeSet([(troveName,
                             (parentRootVersion, deps.deps.Flavor()), 

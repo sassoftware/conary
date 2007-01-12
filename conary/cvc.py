@@ -616,7 +616,7 @@ class MergeCommand(CvcCommand):
             kw = dict(versionSpec=args[1])
         else:
             kw = {}
-        checkin.merge(repos, **kw)
+        checkin.merge(cfg, repos, **kw)
 _register(MergeCommand)
 
 class MarkRemovedCommand(CvcCommand):
