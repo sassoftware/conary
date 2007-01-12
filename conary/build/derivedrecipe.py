@@ -30,8 +30,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         delayedRestores = {}
         ptrMap = {}
-        self.componentReqs = {}
-        self.componentProvs = {}
 
         fileList = []
         # sort the files by pathId
@@ -41,8 +39,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             # these should all be the same anyway
             flavor = trv.getFlavor().copy()
             name = trv.getName()
-            self.componentReqs[name] = trv.getRequires().copy()
-            self.componentProvs[name] = trv.getProvides().copy()
+            self._componentReqs[name] = trv.getRequires().copy()
+            self._componentProvs[name] = trv.getProvides().copy()
 
             for pathId, path, fileId, version in trv.iterFileList():
                 if path != self.macros.buildlogpath:
@@ -55,8 +53,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             fileObj = files.ThawFile(fileCs, pathId)
 
             flavor -= fileObj.flavor()
-            self.componentReqs[troveName] -= fileObj.requires()
-            self.componentProvs[troveName] -= fileObj.requires()
+            self._componentReqs[troveName] -= fileObj.requires()
+            self._componentProvs[troveName] -= fileObj.requires()
 
             if isinstance(fileObj, files.DeviceFile):
                 self.MakeDevices(path, fileObj.lsTag,
@@ -195,5 +193,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self._addBuildAction('Replace', build.Replace)
         self._addBuildAction('SetModes', build.SetModes)
         self._addBuildAction('MakeDirs', build.MakeDirs)
+        self._addBuildAction('Install', build.Install)
 
         self._addSourceAction('addPatch', source.addPatch)
+        self._addSourceAction('addSource', source.addSource)

@@ -1522,6 +1522,14 @@ class ComponentRequires(policy.Policy):
                     wantName = ':'.join((packageName, requiringComponent))
                     if (reqName in components and wantName in components and
                         components[reqName] and components[wantName]):
+                        if (d == self.depMap and
+                            reqName in self.recipe._componentReqs and
+                            wantName in self.recipe._componentReqs):
+                            # this is an automatically generated dependency
+                            # which was not in the parent of a derived
+                            # pacakge. don't add it here either
+                            continue
+
                         # Note: this does not add dependencies to files;
                         # these dependencies are insufficiently specific
                         # to attach to files.

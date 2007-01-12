@@ -775,6 +775,8 @@ class _AbstractPackageRecipe(Recipe):
         self._policyPathMap = {}
         self._policies = {}
         self._policyMap = {}
+        self._componentReqs = {}
+        self._componentProvs = {}
         self._includeSuperClassBuildReqs()
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()

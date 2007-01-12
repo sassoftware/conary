@@ -16,6 +16,7 @@ import re, os
 
 from conary import files, trove
 from conary.build import buildpackage, filter, packagepolicy, policy
+from conary.deps import deps
 
 class ComponentSpec(packagepolicy.ComponentSpec):
 
@@ -71,11 +72,11 @@ class PackageSpec(packagepolicy.PackageSpec):
 
         for comp in self.recipe.autopkg.components.values():
             comp.flavor.union(self.recipe.useFlags)
-            if comp.name in self.recipe.componentReqs:
-                # we don't have dep information for components which were
-                # newly created in this derivation
-                comp.requires.union(self.recipe.componentReqs[comp.name])
-                comp.provides.union(self.recipe.componentProvs[comp.name])
+            if comp.name in self.recipe._componentReqs:
+                # copy component dependencies for components which came
+                # from derived packages
+                comp.requires.union(self.recipe._componentReqs[comp.name])
+                comp.provides.union(self.recipe._componentProvs[comp.name])
 
 class Flavor(packagepolicy.Flavor):
 
@@ -129,6 +130,26 @@ class Provides(packagepolicy.Provides):
         self.addExplicitProvides(path, fullpath, pkg, macros, m, f)
         self.addPathDeps(path, dirpath, pkg, f)
         self.unionDeps(path, pkg, f)
+
+class ComponentRequires(packagepolicy.ComponentRequires):
+
+    def do(self):
+        packagepolicy.ComponentRequires.do(self)
+
+        # remove any intercomponent dependencies which point to troves which
+        # are now empty. we wouldn't have created any, but we could have
+        # inherited some
+        components = self.recipe.autopkg.components
+        ourName = self.recipe.name + ':'
+        for comp in components.values():
+            removeDeps = deps.DependencySet()
+            for dep in comp.requires.iterDepsByClass(deps.TroveDependencies):
+                name = dep.getName()[0]
+                if name.startswith(ourName) and (
+                        name not in components or not components[name]):
+                    removeDeps.addDep(deps.TroveDependencies, dep)
+
+            comp.requires -= removeDeps
 
 Ownership = packagepolicy.Ownership
 MakeDevices = packagepolicy.MakeDevices
