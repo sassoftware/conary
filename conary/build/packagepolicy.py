@@ -1577,11 +1577,22 @@ class ComponentProvides(policy.Policy):
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
-    # frozenset to make sure we do not modify class data
-    flags = frozenset()
+    def __init__(self, *args, **keywords):
+        self.flags = set()
+        self.excepts = set()
+        policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-        if len(args) == 2:
+        if 'exceptions' in keywords:
+            exceptions = keywords.pop('exceptions')
+            if type(exceptions) is str:
+                self.excepts.add(exceptions)
+            elif type(exceptions) in (tuple, list):
+                self.excepts.update(set(exceptions))
+
+        if not args:
+            return
+        if len(args) >= 2:
             # update the documentation if we ever support the
             # pkgname, flags calling convention
             #pkgname = args[0]
@@ -1590,9 +1601,13 @@ class ComponentProvides(policy.Policy):
             flags = args[0]
         if not isinstance(flags, (list, tuple, set)):
             flags=(flags,)
-        self.flags = frozenset(flags) | self.flags
+        self.flags |= set(flags)
 
     def do(self):
+        self.excepts = set(re.compile(x) for x in self.excepts)
+        self.flags = set(x for x in self.flags
+                         if not [y.match(x) for y in self.excepts])
+
         if self.flags:
             flags = [ (x % self.macros, deps.FLAG_SENSE_REQUIRED)
                       for x in self.flags ]

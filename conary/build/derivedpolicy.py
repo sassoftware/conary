@@ -73,10 +73,18 @@ class PackageSpec(packagepolicy.PackageSpec):
         for comp in self.recipe.autopkg.components.values():
             comp.flavor.union(self.recipe.useFlags)
             if comp.name in self.recipe._componentReqs:
-                # copy component dependencies for components which came
+                # copy component requirements for components which came
                 # from derived packages
                 comp.requires.union(self.recipe._componentReqs[comp.name])
-                comp.provides.union(self.recipe._componentProvs[comp.name])
+                # copy only the provisions that won't be handled through
+                # ComponentProvides
+                depSet = deps.DependencySet()
+                for dep in self.recipe._componentProvs[comp.name].iterDeps():
+                    if (dep[0] is deps.TroveDependencies and
+                        dep[1].getName()[0] in self.recipe._componentReqs):
+                        break
+                    depSet.addDep(*dep)
+                comp.provides.union(depSet)
 
 class Flavor(packagepolicy.Flavor):
 
@@ -152,6 +160,14 @@ class ComponentRequires(packagepolicy.ComponentRequires):
                         removeDeps.addDep(deps.TroveDependencies, dep)
 
             comp.requires -= removeDeps
+
+class ComponentProvides(packagepolicy.ComponentProvides):
+    def do(self):
+        # pick up parent component flags
+        for depSet in self.recipe._componentProvs.values():
+            for dep in depSet.iterDepsByClass(deps.TroveDependencies):
+                self.flags.update(dep.flags.keys())
+        packagepolicy.ComponentProvides.do(self)
 
 Ownership = packagepolicy.Ownership
 MakeDevices = packagepolicy.MakeDevices
