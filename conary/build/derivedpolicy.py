@@ -82,7 +82,7 @@ class PackageSpec(packagepolicy.PackageSpec):
                 for dep in self.recipe._componentProvs[comp.name].iterDeps():
                     if (dep[0] is deps.TroveDependencies and
                         dep[1].getName()[0] in self.recipe._componentReqs):
-                        break
+                        continue
                     depSet.addDep(*dep)
                 comp.provides.union(depSet)
 
