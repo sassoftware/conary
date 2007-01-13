@@ -1173,7 +1173,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         # merging to the version we're based on doesn't make much sense
         log.error("No changes have been made on the parent branch; nothing "
                   "to merge.")
-        #return
+        return
 
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
