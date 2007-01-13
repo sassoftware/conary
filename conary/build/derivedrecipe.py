@@ -16,7 +16,7 @@ from conary.build import build, source
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
 from conary.local import update
-from conary.lib import log
+from conary.lib import log, util
 from conary.repository import changeset, filecontents
 
 class DerivedPackageRecipe(_AbstractPackageRecipe):
@@ -32,6 +32,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         ptrMap = {}
 
         fileList = []
+        linkGroups = {}
+        linkGroupFirstPath = {}
         # sort the files by pathId
         for trvCs in self.cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
@@ -63,15 +65,22 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                                  fileObj.inode.perms())
             else:
                 if fileObj.hasContents:
+                    linkGroup = fileObj.linkGroup()
+                    if linkGroup:
+                        l = linkGroups.setdefault(linkGroup, [])
+                        l.append(path)
+
                     (contentType, contents) = self.cs.getFileContents(pathId)
                     if contentType == changeset.ChangedFileTypes.ptr:
                         targetPathId = contents.get().read()
                         l = delayedRestores.setdefault(targetPathId, [])
                         l.append((fileObj, path))
                         continue
+                    elif linkGroup and not linkGroup in linkGroupFirstPath:
+                        # only non-delayed restores can be initial target
+                        linkGroupFirstPath[linkGroup] = path
 
                     assert(contentType == changeset.ChangedFileTypes.file)
-                    assert(not fileObj.linkGroup())
                 else:
                     contents = None
 
@@ -90,6 +99,14 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 fileObj.restore(
                     filecontents.FromFilesystem(destdir + sourcePath),
                     destdir, destdir + targetPath)
+
+        # we do not have to worry about cross-device hardlinks in destdir
+        for linkGroup in linkGroups:
+            for path in linkGroups[linkGroup]:
+                initialPath = linkGroupFirstPath[linkGroup]
+                if path == initialPath:
+                    continue
+                util.createLink(destdir + initialPath, destdir + path)
 
         self.useFlags = flavor
 
