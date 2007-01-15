@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.15:
   o Client Changes:
     * On the update path, errors and warnings are now handled by callbacks.
       This allows applications using the Conary API to capture and process
@@ -12,6 +12,8 @@ Changes in @NEW@:
     * Change in assembling recipe namespace changed how unknown recipe
       attributes were handled (they appeared as None instead of raising
       an Attribute Error).
+    * Packaged directories are no longer included in :lib components
+      because doing so can create multilib failures.  (CNY-1199)
 
 Changes in 1.1.14:
   o Client Changes:

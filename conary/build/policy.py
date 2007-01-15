@@ -394,7 +394,8 @@ class _K:
 classType = type(_K)
 
 # loading, sorting, and initializing policy modules
-def loadPolicy(recipeObj):
+def loadPolicy(recipeObj, policySet = None,
+               internalPolicyModules = () ):
     # path -> module
     policyPathMap = {}
     # bucket -> ordered list of policy objects
@@ -432,13 +433,16 @@ def loadPolicy(recipeObj):
                 policyCls = m.__dict__[symbolName]
                 if type(policyCls) is not classType:
                     continue
+                if policySet is not None and symbolName not in policySet:
+                    continue
                 if symbolName[0].isupper() and issubclass(policyCls, Policy):
                     policyNameMap[symbolName] = policyCls
 
     # Load conary internal policy
     import conary.build.destdirpolicy
+    import conary.build.derivedpolicy
     import conary.build.packagepolicy
-    for pt in 'destdirpolicy', 'packagepolicy':
+    for pt in internalPolicyModules:
         m = sys.modules['conary.build.'+pt]
         for symbolName in m.__dict__.keys():
             policyCls = m.__dict__[symbolName]

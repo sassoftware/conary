@@ -89,7 +89,7 @@ class Filter:
                 except ValueError, msg:
                     log.error('invalid macro substitution in "%s", missing "s"?' %subre)
                     raise
-		tmplist.append('(' + subre + ')')
+		tmplist.append('(?:' + subre + ')')
 	    self.regexp = '|'.join(tmplist)
 	    self.re = re.compile(self.regexp)
 	else:

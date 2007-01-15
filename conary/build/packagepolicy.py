@@ -278,6 +278,7 @@ class ComponentSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
         self.configFilters = []
+        self.derivedFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
@@ -310,12 +311,16 @@ class ComponentSpec(_filterSpec):
         # specs that absolutely should not be overridden in recipes.
         for filteritem in itertools.chain(self.invariantFilters,
                                           self.extraFilters,
+                                          self.derivedFilters,
                                           self.configFilters,
                                           self.baseFilters):
-	    name = filteritem[0] % self.macros
-	    assert(name != 'source')
-            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
-            compFilters.append(filter.Filter(*args, **kwargs))
+            if not isinstance(filteritem, filter.Filter):
+                name = filteritem[0] % self.macros
+                assert(name != 'source')
+                args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+                filteritem = filter.Filter(*args, **kwargs)
+
+            compFilters.append(filteritem)
 
 	# by default, everything that hasn't matched a filter pattern yet
 	# goes in the catchall component ('runtime' by default)
@@ -1286,22 +1291,24 @@ class Ownership(_UserGroup):
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
+	pkgfile = self.recipe.autopkg.pathMap[path]
+        pkgOwner = pkgfile.inode.owner()
+        pkgGroup = pkgfile.inode.group()
+        bestOwner = pkgOwner
+        bestGroup = pkgGroup
 	for (f, owner, group) in self.fileFilters:
 	    if f.match(path):
-		self._markOwnership(path, owner, group)
-		return
-	self._markOwnership(path, 'root', 'root')
+                bestOwner, bestGroup = owner, group
+		break
 
-    def _markOwnership(self, filename, owner, group):
-	pkgfile = self.recipe.autopkg.pathMap[filename]
-	if owner:
-	    pkgfile.inode.owner.set(owner)
-            if owner not in self.systemusers:
-                self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
-	if group:
-	    pkgfile.inode.group.set(group)
-            if group not in self.systemgroups:
-                self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
+	if bestOwner != pkgOwner:
+	    pkgfile.inode.owner.set(bestOwner)
+        if bestOwner and bestOwner not in self.systemusers:
+            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
+	if bestGroup != pkgGroup:
+	    pkgfile.inode.group.set(bestGroup)
+	if bestGroup and bestGroup not in self.systemgroups:
+            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
 
 class _Utilize(_UserGroup):
@@ -1515,6 +1522,14 @@ class ComponentRequires(policy.Policy):
                     wantName = ':'.join((packageName, requiringComponent))
                     if (reqName in components and wantName in components and
                         components[reqName] and components[wantName]):
+                        if (d == self.depMap and
+                            reqName in self.recipe._componentReqs and
+                            wantName in self.recipe._componentReqs):
+                            # this is an automatically generated dependency
+                            # which was not in the parent of a derived
+                            # pacakge. don't add it here either
+                            continue
+
                         # Note: this does not add dependencies to files;
                         # these dependencies are insufficiently specific
                         # to attach to files.
@@ -1562,11 +1577,22 @@ class ComponentProvides(policy.Policy):
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
-    # frozenset to make sure we do not modify class data
-    flags = frozenset()
+    def __init__(self, *args, **keywords):
+        self.flags = set()
+        self.excepts = set()
+        policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-        if len(args) == 2:
+        if 'exceptions' in keywords:
+            exceptions = keywords.pop('exceptions')
+            if type(exceptions) is str:
+                self.excepts.add(exceptions)
+            elif type(exceptions) in (tuple, list):
+                self.excepts.update(set(exceptions))
+
+        if not args:
+            return
+        if len(args) >= 2:
             # update the documentation if we ever support the
             # pkgname, flags calling convention
             #pkgname = args[0]
@@ -1575,9 +1601,13 @@ class ComponentProvides(policy.Policy):
             flags = args[0]
         if not isinstance(flags, (list, tuple, set)):
             flags=(flags,)
-        self.flags = frozenset(flags) | self.flags
+        self.flags |= set(flags)
 
     def do(self):
+        self.excepts = set(re.compile(x) for x in self.excepts)
+        self.flags = set(x for x in self.flags
+                         if not [y.match(x) for y in self.excepts])
+
         if self.flags:
             flags = [ (x % self.macros, deps.FLAG_SENSE_REQUIRED)
                       for x in self.flags ]
