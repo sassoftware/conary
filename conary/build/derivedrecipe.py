@@ -122,7 +122,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         else:
             parentRevision = None
 
-        if not self.sourceVersion.hasParentVersion():
+        if not self.sourceVersion.isShadow():
             raise builderrors.RecipeFileError(
                     "only shadowed sources can be derived packages")
 
