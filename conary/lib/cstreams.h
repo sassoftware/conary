@@ -42,3 +42,6 @@ extern struct singleStream allStreams[5];
 #define SMALL 0
 #define LARGE 1
 #define DYNAMIC 2
+
+#define SKIP_UNKNOWN        1
+#define PRESERVE_UNKNOWN    2

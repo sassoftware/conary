@@ -9,6 +9,14 @@ Changes in @NEW@:
       attributes were handled (they appeared as None instead of raising
       an Attribute Error).
 
+  o Internal changes:
+    * StreamSet objects can now preserve unknown elements of the stream
+      instead of silently skipping them. Those elements are retained for
+      freeze(), letting the older stream object exactly replicate the
+      frozen stream of the newer object. Unknown elements are preserved
+      through merges into old object as long as the old object has not
+      been locally modified.
+
 Changes in 1.0.41:
   o Client Changes:
     * Tag handler output is now redirected to a callback. The command line

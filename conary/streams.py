@@ -31,6 +31,9 @@ SMALL = cstreams.SMALL
 LARGE = cstreams.LARGE
 DYNAMIC = cstreams.DYNAMIC
 
+SKIP_UNKNOWN = cstreams.SKIP_UNKNOWN
+PRESERVE_UNKNOWN = cstreams.PRESERVE_UNKNOWN
+
 class InfoStream(object):
 
     __slots__ = ()
