@@ -19,6 +19,7 @@ import copy
 import errno
 import inspect
 import os
+import socket
 import sys
 import textwrap
 import urllib2
@@ -360,14 +361,35 @@ class ConfigFile(_Config):
                                                                lineno, msg, key)
 
     def _openUrl(self, url):
+        oldTimeout = socket.getdefaulttimeout()
+        timeout = 2
+        socket.setdefaulttimeout(timeout)
         try:
-            return urllib2.urlopen(url)
-        except urllib2.HTTPError, err:
-            raise CfgEnvironmentError(err.filename, err.msg)
-        except urllib2.URLError, err:
-            raise CfgEnvironmentError(url, err.reason.args[1])
-        except EnvironmentError, err:
-            raise CfgEnvironmentError(err.filename, err.msg)
+            for i in range(4):
+                try:
+                    return urllib2.urlopen(url)
+                except urllib2.HTTPError, err:
+                    raise CfgEnvironmentError(err.filename, err.msg)
+                except urllib2.URLError, err:
+                    if err.args and isinstance(err.args[0], socket.timeout):
+                        # CNY-1161
+                        # We double the socket time out after each run; this
+                        # should allow very slow links to catch up while
+                        # providing some feedback to the user. For now, only
+                        # on stderr since logging is not enabled yet.
+                        sys.stderr.write("Timeout reading configuration "
+                            "file %s; retrying...\n" % url)
+                        timeout *= 2
+                        socket.setdefaulttimeout(timeout)
+                        continue
+                    raise CfgEnvironmentError(url, err.reason.args[1])
+                except EnvironmentError, err:
+                    raise CfgEnvironmentError(err.filename, err.msg)
+            else: # for
+                # URL timed out
+                raise CfgEnvironmentError(url, "socket timeout")
+        finally:
+            socket.setdefaulttimeout(oldTimeout)
 
     def isUrl(self, val):
         return val.startswith("http://") or val.startswith("https://")
