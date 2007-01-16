@@ -236,7 +236,7 @@ class _Config:
     def _write(self, out, options, includeDocs=True):
         for name, item in sorted(self._options.iteritems()):
             if includeDocs:
-                item.writeDoc(out)
+                item.writeDoc(out, options)
             self._writeKey(out, item, self[name], options)
 
     def _writeKey(self, out, cfgItem, value, options):
@@ -586,6 +586,8 @@ class ConfigOption:
     def write(self, out, value, displayOptions=None):
         """ Writes a config option name and value.
         """
+        if displayOptions is None:
+            diplayOptions = {}
         if self.isDefault() and value is None:
             return
 
@@ -598,13 +600,11 @@ class ConfigOption:
         """ Output documentation and default information in a way that
             is parsable by ConfigFiles
         """
+        if displayOptions is None:
+            displayOptions = {}
         tw = textwrap.TextWrapper(initial_indent='# ', 
                                   subsequent_indent='# ', width=70)
         out.write('# %s (Default: %s)\n' % (self.name, ', '.join(self.valueType.toStrings(self.default, displayOptions))))
         if self.__doc__:
             out.write('\n'.join(tw.wrap(self.__doc__)))
-        out.write('\n')
-
-
-
-
+            out.write('\n')

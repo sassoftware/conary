@@ -383,8 +383,6 @@ class _AbstractPackageRecipe(Recipe):
 			yield action
 
     def unpackSources(self, builddir, destdir, resume=None, downloadOnly=False):
-	self.macros.builddir = builddir
-	self.macros.destdir = destdir
 	if resume == 'policy':
 	    return
 	elif resume:
@@ -424,8 +422,12 @@ class _AbstractPackageRecipe(Recipe):
             for bld in self._build:
                 bld.doAction()
 
-    def loadPolicy(self):
-        (self._policyPathMap, self._policies) = policy.loadPolicy(self)
+    def loadPolicy(self, policySet = None,
+                   internalPolicyModules =
+                            ( 'destdirpolicy', 'packagepolicy') ):
+        (self._policyPathMap, self._policies) = \
+                policy.loadPolicy(self, policySet = policySet,
+                                  internalPolicyModules = internalPolicyModules)
         # create bucketless name->policy map for getattr
         policyList = []
         for bucket in self._policies.keys():
@@ -440,6 +442,12 @@ class _AbstractPackageRecipe(Recipe):
 
         # returns list of policy files loaded
         return self._policyPathMap.keys()
+
+    def _addBuildAction(self, name, item):
+        self.externalMethods[name] = _recipeHelper(self._build, self, item)
+
+    def _addSourceAction(self, name, item):
+        self.externalMethods[name] = _sourceHelper(item, self)
 
     def doProcess(self, policyBucket):
 	for post in self._policies[policyBucket]:
@@ -545,10 +553,7 @@ class _AbstractPackageRecipe(Recipe):
             if self._lightInstance:
                 return _ignoreCall
 
-        method = self.__dict__.get(name, None)
-        if method is None:
-            return method
-
+        # we don't get here if name is in __dict__, so it must not be defined
         raise AttributeError, name
 
     def __delattr__(self, name):
@@ -770,6 +775,8 @@ class _AbstractPackageRecipe(Recipe):
         self._policyPathMap = {}
         self._policies = {}
         self._policyMap = {}
+        self._componentReqs = {}
+        self._componentProvs = {}
         self._includeSuperClassBuildReqs()
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
@@ -854,12 +861,11 @@ class PackageRecipe(_AbstractPackageRecipe):
         _AbstractPackageRecipe.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
-                self.externalMethods[name] = \
-                    _recipeHelper(self._build, self, item)
+                self._addBuildAction(name, item)
 
         for name, item in source.__dict__.items():
             if name[0:3] == 'add' and issubclass(item, action.Action):
-                self.externalMethods[name] = _sourceHelper(item, self)
+                self._addSourceAction(name, item)
 
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)
