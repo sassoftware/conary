@@ -1,5 +1,8 @@
 Changes in @NEW@:
   o Client Changes:
+    * Including a configuration file from an unreachable URL will now
+      reasonably time out instead of hanging for 3 minutes (the default TCP
+      connection timeout). (CNY-1161)
 
   o Internal changes:
     * If cache database is locked, retry several times before giving up.
