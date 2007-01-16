@@ -172,7 +172,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.readOnlyRepository = cfg.readOnlyRepository
 
         if cfg.cacheDB:
-            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath)
+            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath,
+                                           self.deadlockRetry)
         else:
             self.cache = cacheset.NullCacheSet(self.tmpPath)
 
