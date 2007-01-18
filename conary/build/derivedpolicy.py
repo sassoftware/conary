@@ -70,27 +70,42 @@ class PackageSpec(packagepolicy.PackageSpec):
         component.requiresMap[path] = fileObj.requires()
         component.providesMap[path] = fileObj.provides()
 
+    def postProcess(self):
+        packagepolicy.PackageSpec.postProcess(self)
+        fileProvides = deps.DependencySet()
+        fileRequires = deps.DependencySet()
+        for fileObj in self.pathObjs.values():
+            fileProvides.union(fileObj.provides())
+            fileRequires.union(fileObj.requires())
+
         for comp in self.recipe.autopkg.components.values():
-            comp.flavor.union(self.recipe.useFlags)
             if comp.name in self.recipe._componentReqs:
-                # copy component requirements for components which came
-                # from derived packages
-                comp.requires.union(self.recipe._componentReqs[comp.name])
+                # copy component dependencies for components which came
+                # from derived packages, only for dependencies that are
+                # not expressed in the file dependencies
+                comp.requires.union(
+                    self.recipe._componentReqs[comp.name] - fileRequires)
                 # copy only the provisions that won't be handled through
-                # ComponentProvides
+                # ComponentProvides, which may remove capability flags
                 depSet = deps.DependencySet()
                 for dep in self.recipe._componentProvs[comp.name].iterDeps():
                     if (dep[0] is deps.TroveDependencies and
                         dep[1].getName()[0] in self.recipe._componentReqs):
                         continue
                     depSet.addDep(*dep)
-                comp.provides.union(depSet)
+                comp.provides.union(depSet - fileProvides)
 
 class Flavor(packagepolicy.Flavor):
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
+
+    def preProcess(self):
+        packagepolicy.Flavor.preProcess(self)
+
+        for comp in self.recipe.autopkg.components.values():
+            comp.flavor.union(self.recipe.useFlags)
 
     def doFile(self, path):
         componentMap = self.recipe.autopkg.componentMap
@@ -144,9 +159,9 @@ class ComponentRequires(packagepolicy.ComponentRequires):
     def do(self):
         packagepolicy.ComponentRequires.do(self)
 
-        # remove any intercomponent dependencies which point to troves which
-        # are now empty. we wouldn't have created any, but we could have
-        # inherited some
+        # Remove any intercomponent dependencies which point to troves which
+        # are now empty.  We wouldn't have created any, but we could have
+        # inherited some during PackageSpec
         components = self.recipe.autopkg.components
         packageMap = self.recipe.autopkg.packageMap
         for comp in components.values():
