@@ -1873,8 +1873,9 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
             continue
         if refreshFilter(path):
             if not state.fileIsAutoSource(pathId):
-                raise errors.CvcError('%s is not autosourced and cannot be '
-                                      'refreshed' % path)
+                log.warning('%s is not autosourced and cannot be refreshed' %
+                            path)
+                continue
             state.fileNeedsRefresh(pathId, True)
 
     conaryState.setSourceState(state)

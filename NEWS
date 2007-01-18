@@ -7,6 +7,12 @@ Changes in @NEW@:
   o Internal changes:
     * If cache database is locked, retry several times before giving up.
       (CNY-1143)
+  
+  o Build changes:
+    * cvc will now log a message when deleting old build trees to make way for
+      an upcomming build.
+    * cvc refresh will now print a warning instead of failing with an error
+      when an attempt to refresh a non-autosourced file is made. (CNY-1160)
 
 Changes in 1.1.15:
   o Client Changes:

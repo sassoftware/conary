@@ -860,6 +860,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     if not resume:
         destdir = ''
 	if os.path.exists(builddir):
+            log.info('Cleaning your old build tree')
 	    shutil.rmtree(builddir)
     else:
         try:
