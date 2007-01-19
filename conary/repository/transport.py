@@ -247,8 +247,6 @@ class Transport(xmlrpclib.Transport):
     def request(self, host, handler, body, verbose=0):
 	self.verbose = verbose
 
-        import epdb
-        epdb.st()
 	realhost = getrealhost(host)
         if realhost == 'localhost':
             # don't proxy localhost unless the proxy is running on

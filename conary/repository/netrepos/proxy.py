@@ -98,7 +98,12 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
             transporter.setCompress(True)
             proxy = ProxyClient(url, transporter)
 
-            return proxy.__getattr__(methodname)(*args)
+            try:
+                rc = proxy.__getattr__(methodname)(*args)
+            except IOError, e:
+                return [ 'OpenError', [], [] ]
+
+            return rc
 
     def checkVersion(self, authToken, clientVersion):
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
@@ -109,11 +114,3 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         return SERVER_VERSIONS
-
-    def prepareChangeSet(self, authToken, clientVersion, jobList=None,
-                         mirror=False):
-        raise errors.InsufficientPermission
-
-    def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
-        raise errors.InsufficientPermission
-
