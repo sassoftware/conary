@@ -247,12 +247,22 @@ class Transport(xmlrpclib.Transport):
     def request(self, host, handler, body, verbose=0):
 	self.verbose = verbose
 
-	# turn off proxy for localhost
+        import epdb
+        epdb.st()
 	realhost = getrealhost(host)
-	if realhost == 'localhost':
-	    opener = XMLOpener({})
-	else:
-	    opener = XMLOpener()
+        if realhost == 'localhost':
+            # don't proxy localhost unless the proxy is running on
+            # localhost as well
+            proxyHost = None
+            if self.proxies and 'http' in self.proxies:
+                proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
+
+            if proxyHost != 'localhost':
+                opener = XMLOpener({})
+            else:
+                opener = XMLOpener(self.proxies)
+        else:
+            opener = XMLOpener(self.proxies)
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 
