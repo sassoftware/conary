@@ -222,10 +222,11 @@ class Transport(xmlrpclib.Transport):
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
 
-    def __init__(self, https = False, entitlement = None):
+    def __init__(self, https = False, entitlement = None, proxies = None):
         self.https = https
         self.compress = False
         self.abortCheck = None
+        self.proxies = proxies
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))

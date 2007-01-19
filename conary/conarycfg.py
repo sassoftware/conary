@@ -283,6 +283,7 @@ class ConaryContext(ConfigSection):
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
+    proxy                 =  None
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
