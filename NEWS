@@ -3,6 +3,9 @@ Changes in @NEW@:
     * Including a configuration file from an unreachable URL will now
       reasonably time out instead of hanging for 3 minutes (the default TCP
       connection timeout). (CNY-1161)
+    * Conary will now correctly erase a trove whose files have changed owners
+      or groups to values not mapped to users or groups on the current system.
+      (CNY-1071)
 
   o Internal changes:
     * If cache database is locked, retry several times before giving up.

@@ -810,11 +810,18 @@ class TroveFormatter(TroveTupFormatter):
 
         spacer = '  ' * indent
 
+        owner = fileObj.inode.owner()
+        if owner[0] == '+':
+            owner = owner[1:]
+        group = fileObj.inode.group()
+        if group[0] == '+':
+            group = group[1:]
+
         if verbose: 
             ln = "%s%s%s%s%s    1 %-8s %-8s %s %s %s%s%s" % \
               (spacer,
-               prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), 
-               fileObj.inode.group(), fileObj.sizeString(), 
+               prefix, id, sha1, fileObj.modeString(), owner,
+               group, fileObj.sizeString(), 
                fileObj.timeString(), name, taglist, verStr)
         else:
             ln = "%s%s%s%s%s%s" % (spacer, id, sha1, path, taglist, verStr)
