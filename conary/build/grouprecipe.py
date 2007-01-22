@@ -1285,7 +1285,7 @@ class GroupReference:
         troveTups = [ x for x in chain(*results.itervalues())]
         self.sourceTups = troveTups
         self.source = trovesource.TroveListTroveSource(source, troveTups)
-        self.source.searchAsRepository()
+        self.source.searchAsDatabase()
 
     def findTroves(self, *args, **kw):
         return self.source.findTroves(*args, **kw)
@@ -1556,14 +1556,17 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
     for troveSource, troveSpecs in toFind.iteritems():
         if troveSource is None:
             source = repos
+            myLabelPath = labelPath
+            mySearchFlavor = searchFlavor
         else:
             source = troveSource
             troveSource.findSources(repos,  labelPath, searchFlavor),
-
+            myLabelPath = None
+            mySearchFlavor = None
         try:
-            results[troveSource] = source.findTroves(labelPath,
+            results[troveSource] = source.findTroves(myLabelPath,
                                                      toFind[troveSource],
-                                                     searchFlavor)
+                                                     mySearchFlavor)
         except errors.TroveNotFound, e:
             raise CookError, str(e)
 
