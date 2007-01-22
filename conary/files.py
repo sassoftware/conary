@@ -765,7 +765,7 @@ class UserGroupIdCache:
         if name and name[0] == '+':
             # An id mapped as a string
             try:
-                theId = int(name[1:])
+                theId = int(name)
             except ValueError:
                 log.warning('%s %s does not exist - using root', self.name,
                             name)
