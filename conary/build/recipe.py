@@ -12,6 +12,8 @@
 # full details.
 #
 
+from conary.errors import ParseError
+
 """
 Contains the base Recipe class
 """
@@ -82,7 +84,8 @@ class Recipe:
 
     @classmethod
     def validateClass(class_):
-        pass
+        if class_.version == '':
+            raise ParseError("empty release string")
 
     def validate(self):
         pass

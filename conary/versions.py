@@ -394,9 +394,6 @@ class Revision(AbstractRevision):
             elif len(fields) == 3:
                 version, sourceCount, buildCount = fields
 
-        if version == '':
-            raise ParseError("empty release string")
-
         if not version:
             raise ParseError("bad release string: %s" % value)
 
