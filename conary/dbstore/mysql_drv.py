@@ -458,7 +458,9 @@ class Database(BaseDatabase):
                 raise
         self.dbName = dbName
         self._setCharSet(cu)
-        self.loadSchema()
+        # wipe out the preloaded schema we had (if any), but don't
+        # load up the new one - on mysql this is a very expensive operation
+        BaseDatabase.loadSchema(self)
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
 
