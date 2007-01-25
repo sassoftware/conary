@@ -28,6 +28,9 @@ def getConaryLogEventList(lines=None):
     #
 
     def _stripdate(logentry):
+        if not logentry.startswith('['):
+            # no date present (e.g. part of a traceback)
+            return logentry
         dateend = logentry.find(']')
         if dateend <= 0:
             return logentry
