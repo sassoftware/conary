@@ -25,6 +25,8 @@ Changes in @NEW@:
       made. (CNY-1160)
     * The BuildPackageRecipe class now requires file:runtime, which is
       needed to run many configure scripts. (CNY-1259)
+    * Config files are now automatically added to :config components
+      only if they do not have any executable bits set. (CNY-1260)
 
 Changes in 1.1.15:
   o Client Changes:

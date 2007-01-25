@@ -218,7 +218,10 @@ class Config(policy.Policy):
             if lastchar != '\n':
                 self.error("config file %s missing trailing newline" %filename)
         f.close()
-        self.recipe.ComponentSpec(_config=filename)
+        mode = os.lstat(fullpath)[stat.ST_MODE]
+        if not (mode & 0111):
+            # only if no executable bits set (CNY-1260)
+            self.recipe.ComponentSpec(_config=filename)
 
 
 class ComponentSpec(_filterSpec):
