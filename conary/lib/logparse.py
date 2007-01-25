@@ -37,10 +37,23 @@ def getConaryLogEventList(lines=None):
         lines = getConaryLogLineList()
     eventStart = []
 
+    inTraceBack = False
     for n in range(len(lines)):
-        dateend = lines[n].find(']')
-        if dateend > 0 and lines[n][dateend+2] == ' ': continue
-        if lines[n].endswith('command complete'): continue
+        thisLine = lines[n]
+
+        if thisLine.startswith('Traceback '):
+            inTraceBack = True
+        if thisLine.startswith('['):
+            inTraceBack = False
+        if inTraceBack:
+            continue
+
+        dateend = thisLine.find(']')
+        if (dateend > 0 and len(thisLine) > dateend+2
+            and thisLine[dateend+2] == ' '):
+            continue
+        if lines[n].endswith('command complete'):
+            continue
         eventStart.append(n)
 
     slices = []

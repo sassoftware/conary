@@ -10,6 +10,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary 1.1.14 and 1.1.15 failed to update when encountering the
       multitag protocol; this regression is resolved. (CNY-1257)
+    * The logparse module now correctly parses python tracebacks in
+      conary log files. (CNY-1258)
 
   o Internal changes:
     * If cache database is locked, retry several times before giving up.
