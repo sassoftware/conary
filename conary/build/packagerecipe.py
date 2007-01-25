@@ -918,6 +918,7 @@ class BuildPackageRecipe(PackageRecipe):
         'make:runtime',
         'mktemp:runtime',
         # all the rest of these are for configure
+        'file:runtime',
         'findutils:runtime',
         'gawk:runtime',
         'grep:runtime',

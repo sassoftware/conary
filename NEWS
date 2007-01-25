@@ -20,8 +20,11 @@ Changes in @NEW@:
   o Build changes:
     * cvc will now log a message when deleting old build trees to make way for
       an upcomming build.
-    * cvc refresh will now print a warning instead of failing with an error
-      when an attempt to refresh a non-autosourced file is made. (CNY-1160)
+    * The cvc refresh command will now print a warning instead of failing
+      with an error when an attempt to refresh a non-autosourced file is
+      made. (CNY-1160)
+    * The BuildPackageRecipe class now requires file:runtime, which is
+      needed to run many configure scripts. (CNY-1259)
 
 Changes in 1.1.15:
   o Client Changes:
