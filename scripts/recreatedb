@@ -61,11 +61,11 @@ def collectTroves(db):
     troveList = []
     cu = db.cursor()
     cu.execute('SELECT trovename, version, flavor from '
-               '       DBInstances, Versions, DBFlavors '
+               '       Instances, Versions, Flavors '
                '   WHERE '
-               '           DBInstances.versionid=Versions.versionid '
-               '       AND DBInstances.flavorid=DBFlavors.flavorid '
-               '       AND DBInstances.isPresent = 1')
+               '           Instances.versionid=Versions.versionid '
+               '       AND Instances.flavorid=Flavors.flavorid '
+               '       AND Instances.isPresent = 1')
     for name, versionStr, flavorStr in cu:
         flavor = deps.ThawFlavor(flavorStr)
         version = versions.VersionFromString(versionStr)
