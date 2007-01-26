@@ -6,6 +6,8 @@ Changes in @NEW@:
     * Conary will now correctly erase a trove whose files have changed owners
       or groups to values not mapped to users or groups on the current system.
       (CNY-1071)
+    * Conary will now display files that are transient as transient when
+      --tags is used.
 
   o Bug Fixes:
     * Conary 1.1.14 and 1.1.15 failed to update when encountering the

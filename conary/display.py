@@ -788,6 +788,8 @@ class TroveFormatter(TroveTupFormatter):
                 tags.append('autosource')
             if fileObj.flags.isConfig():
                 tags.append('config')
+            if fileObj.flags.isTransient():
+                tags.append('transient')
             if tags:
                 taglist = ' [' + ' '.join(tags) + ']' 
         if dcfg.sha1s:
