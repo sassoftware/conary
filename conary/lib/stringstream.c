@@ -185,23 +185,19 @@ static int StringStream_Init(PyObject * self, PyObject * args,
 
 static PyObject * StringStream_Set(StringStreamObject * self, 
 				   PyObject * args) {
-    PyObject * o, * newval;
+    PyObject * o;
 
     if (!PyArg_ParseTuple(args, "O", &o))
         return NULL;
 
-    if (o == Py_None || PyString_CheckExact(o)) {
-	Py_INCREF(o);
-	newval = o;
-    } else if (PyUnicode_CheckExact(o)) {
-	newval = PyUnicode_AsUTF8String(o, "utf-8", "strict");
-    } else {
+    if (o != Py_None && !PyString_CheckExact(o)) {
         PyErr_SetString(PyExc_TypeError, "invalid type for set");
 	return NULL;
     }
 
+    Py_INCREF(o);
     Py_DECREF(self->s);
-    self->s = newval;
+    self->s = o;
 
     Py_INCREF(Py_None);
     return Py_None;
