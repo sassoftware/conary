@@ -1,4 +1,15 @@
 Changes in @NEW@:
+  o Build changes:
+    * cvc will now log a message when deleting old build trees to make way for
+      an upcomming build.
+    * The cvc refresh command will now print a warning instead of failing
+      with an error when an attempt to refresh a non-autosourced file is
+      made. (CNY-1160)
+    * The BuildPackageRecipe class now requires file:runtime, which is
+      needed to run many configure scripts. (CNY-1259)
+    * Config files are now automatically added to :config components
+      only if they do not have any executable bits set. (CNY-1260)
+
   o Client Changes:
     * Including a configuration file from an unreachable URL will now
       reasonably time out instead of hanging for 3 minutes (the default TCP
@@ -18,17 +29,6 @@ Changes in @NEW@:
   o Internal changes:
     * If cache database is locked, retry several times before giving up.
       (CNY-1143)
-  
-  o Build changes:
-    * cvc will now log a message when deleting old build trees to make way for
-      an upcomming build.
-    * The cvc refresh command will now print a warning instead of failing
-      with an error when an attempt to refresh a non-autosourced file is
-      made. (CNY-1160)
-    * The BuildPackageRecipe class now requires file:runtime, which is
-      needed to run many configure scripts. (CNY-1259)
-    * Config files are now automatically added to :config components
-      only if they do not have any executable bits set. (CNY-1260)
 
 Changes in 1.1.15:
   o Client Changes:

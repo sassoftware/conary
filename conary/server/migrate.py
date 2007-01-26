@@ -897,7 +897,7 @@ class MigrateTo_15(SchemaMigration):
             # more "original"
             cu.execute("insert into trovefiles "
                        "(instanceId, streamId, versionId, pathId, path) "
-                       "values (?,?,?,?,?)", ret[0])
+                       "values (?,?,?,?,?)", tuple(ret[0]))
             if len(ret) > 1:
                 # need to recompute the sha1 - we might have changed the trove manifest
                 # if the records were different

@@ -1464,6 +1464,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 (cs, trovesNeeded, filesNeeded, removedTroves) = ret
 
+                # check to make sure that this user has access to see all
+                # the troves included in a recursive changeset.
+                for tcs in cs.iterNewTroveList():
+                    if not self.auth.check(authToken, write = False,
+                                           trove = tcs.getName(),
+                                           label = tcs.getNewVersion().trailingLabel()):
+                        raise errors.InsufficientPermission
+
                 # look up the version w/ timestamps
                 primary = (l[0], l[2][0], l[2][1])
                 try:
