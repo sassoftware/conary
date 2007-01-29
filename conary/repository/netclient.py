@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1876,8 +1876,40 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[host].addPGPKeyList([ base64.encodestring(x) for x in keyList ])
 
     def getNewPGPKeys(self, host, mark):
-        return [ base64.decodestring(x) for x in 
+        return [ base64.decodestring(x) for x in
                     self.c[host].getNewPGPKeys(mark) ]
+
+    def getTrovesInfo(self, infoType, troveList):
+        # first, we need to know about this infoType
+        if infoType not in trove.TroveInfo.streamDict.keys():
+            raise Exception("Invalid infoType requested")
+        byServer = {}
+        results = [ None ] * len(troveList)
+        for i, info in enumerate(troveList):
+            l = byServer.setdefault(info[1].branch().label().getHost(), [])
+            l.append((i, info))
+        for host, l in byServer.iteritems():
+            tl = [ x[1] for x in l ]
+            if self.c[host]._protocolVersion < 41:
+                # this server does not support the getTroveInfo call,
+                # so we need to synthetize it from a getTroves call
+                troveInfoList = self.getTroves(tl, withFiles = False)
+                for (i, tup), trv in itertools.izip(l, troveInfoList):
+                    if trv is not None:
+                        attrname = trove.TroveInfo.streamDict[infoType][2]
+                        results[i] = getattr(trv.troveInfo, attrname, None)
+                continue
+            tl = [ (x[0], self.fromVersion(x[1]), self.fromFlavor(x[2]))
+                   for x in tl ]
+            infoList = self.c[host].getTroveInfo(infoType, tl)
+            for (i, tup), (present, dataStr) in itertools.izip(l, infoList):
+                if present == -1:
+                    raise errors.TroveMissing(tup[0], tup[1])
+                if present  == 0:
+                    continue
+                data = base64.decodestring(dataStr)
+                results[i] = trove.TroveInfo.streamDict[infoType][1](data)
+        return results
 
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
