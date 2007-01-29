@@ -21,7 +21,7 @@ SERVER_VERSIONS = [ 36, 37, 38, 39, 40 ]
 
 from conary import conarycfg
 from conary.lib import tracelog
-from conary.repository import netclient, transport, xmlshims
+from conary.repository import errors, netclient, transport, xmlshims
 from conary.repository.netrepos import netserver
 
 class ProxyClient(xmlrpclib.ServerProxy):
@@ -102,6 +102,11 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                 rc = proxy.__getattr__(methodname)(*args)
             except IOError, e:
                 return [ 'OpenError', [], [] ]
+            except xmlrpclib.ProtocolError, e:
+                if e.errcode == 403:
+                    raise errors.InsufficientPermission
+
+                raise
 
             return rc
 
