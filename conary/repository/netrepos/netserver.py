@@ -25,7 +25,7 @@ from conary.conarycfg import CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
-from conary.repository import changeset, errors, xmlshims
+from conary.repository import changeset, errors, xmlshims, filecontainer
 from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
@@ -1465,14 +1465,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 (cs, trovesNeeded, filesNeeded, removedTroves) = ret
 
-                # check to make sure that this user has access to see all
-                # the troves included in a recursive changeset.
-                for tcs in cs.iterNewTroveList():
-                    if not self.auth.check(authToken, write = False,
-                                           trove = tcs.getName(),
-                                           label = tcs.getNewVersion().trailingLabel()):
-                        raise errors.InsufficientPermission
-
                 # look up the version w/ timestamps
                 primary = (l[0], l[2][0], l[2][1])
                 try:
@@ -1519,17 +1511,72 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            "changeset?%s" % os.path.basename(path[:-4]))
         f = os.fdopen(fd, 'w')
         sizes = []
-        for path, size in pathList:
+        for cspath, size in pathList:
+            if recurse:
+                # check to make sure that this user has access to see all
+                # the troves included in a recursive changeset.
+                cs = changeset.ChangeSetFromFile(cspath)
+                newCs = changeset.ChangeSet()
+                rewrite = False
+                for tcs in cs.iterNewTroveList():
+                    if not self.auth.check(authToken, write = False,
+                                           trove = tcs.getName(),
+                                           label = tcs.getNewVersion().trailingLabel()):
+                        f.close()
+                        os.unlink(path)
+                        del cs
+                        raise errors.InsufficientPermission
+                    if (clientVersion < 38
+                        and tcs.troveType() == trove.TROVE_TYPE_REMOVED):
+                        ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
+                        if ti.flags.isMissing():
+                            # this was a missing trove for which we
+                            # synthesized a removed trove object. 
+                            # The client would have a much easier time
+                            # updating if we just made it a regular trove.
+                            missingName = tcs.getName()
+                            missingNewVersion = tcs.getNewVersion()
+                            missingOldVersion = tcs.getOldVersion()
+                            missingNewFlavor = tcs.getNewFlavor()
+                            missingOldFlavor = tcs.getOldFlavor()
+                            oldTrove = trove.Trove(missingName,
+                                                   missingOldVersion,
+                                                   missingOldFlavor)
+                            newTrove = trove.Trove(missingName,
+                                                   missingNewVersion,
+                                                   missingNewFlavor)
+                            diff = newTrove.diff(oldTrove)[0]
+                            newCs.newTrove(diff)
+                            rewrite = True
+                        else:
+                            # this really was marked as a removed trove.
+                            # raise a TroveMissing exception
+                            f.close()
+                            os.unlink(path)
+                            del cs
+                            raise errors.TroveMissing(missingName,
+                                                      version=missingVersion)
+                if rewrite:
+                    # we need to re-write the munged changeset for an
+                    # old client
+                    cs.merge(newCs)
+                    # create a new temporary file for the munged changeset
+                    (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                                    suffix = '.tmp')
+                    os.close(fd)
+                    # now make absolutely sure that the changeset file
+                    # will be compatible with conary-1.0.  We know
+                    # that there are no removed trove changesets becase
+                    # we re-wrote them all.
+                    cs.hasRemoved = False
+                    # now write out the munged changeset
+                    size = cs.writeToFile(cspath)
             sizes.append(size)
-            f.write("%s %d\n" % (path, size))
+            f.write("%s %d\n" % (cspath, size))
         f.close()
 
         if clientVersion < 38:
-            if allRemovedTroves:
-                raise errors.TroveMissing(allRemovedTroves[0][0],
-                                          version = allRemovedTroves[0][1][0])
-            else:
-                return url, sizes, newChgSetList, allFilesNeeded
+            return url, sizes, newChgSetList, allFilesNeeded
 
         return url, sizes, newChgSetList, allFilesNeeded, \
                _cvtTroveList(allRemovedTroves)

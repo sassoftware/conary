@@ -1,4 +1,30 @@
 Changes in @NEW@:
+  o Server Changes:
+    * The repository now returns recursive changesets with special
+      "removed" trove changesets if a trove is missing or has been
+      removed.  This allows the client to determine if it has the
+      needed troves to perform an update.  Previously, the repository
+      would raise an exception, which prevented updates from mirrors
+      with byDefault=False troves (such as :debuginfo) excluded.
+    * A getTroveInfo() method has been added to the Conary repository
+      server.
+
+  o Client Changes:
+    * A new "isMissing" trove flag has been added.  This flag is set
+      by a Conary repository when a Trove is missing.  This allows the
+      client to display an appropriate message when it attempts to
+      update from an incomplete mirror.
+    * Including a configuration file from an unreachable URL will now
+      reasonably time out instead of hanging for 3 minutes (the default TCP
+      connection timeout). (CNY-1161)
+    * Conary will now correctly erase a trove whose files have changed owners
+      or groups to values not mapped to users or groups on the current system.
+      (CNY-1071)
+    * Conary will now display files that are transient as transient when
+      --tags is used.
+    * Support for the new getTroveInfo() method has been added to the
+      Conary repository client.
+
   o Build changes:
     * cvc will now log a message when deleting old build trees to make way for
       an upcomming build.
@@ -10,17 +36,6 @@ Changes in @NEW@:
     * Config files are now automatically added to :config components
       only if they do not have any executable bits set. (CNY-1260)
 
-  o Client Changes:
-    * Including a configuration file from an unreachable URL will now
-      reasonably time out instead of hanging for 3 minutes (the default TCP
-      connection timeout). (CNY-1161)
-    * Conary will now correctly erase a trove whose files have changed owners
-      or groups to values not mapped to users or groups on the current system.
-      (CNY-1071)
-    * Conary will now display files that are transient as transient when
-      --tags is used.
-    * Implement support for the getTrovesInfo call
-
   o Bug Fixes:
     * Conary 1.1.14 and 1.1.15 failed to update when encountering the
       multitag protocol; this regression is resolved. (CNY-1257)
@@ -30,9 +45,6 @@ Changes in @NEW@:
   o Internal changes:
     * If cache database is locked, retry several times before giving up.
       (CNY-1143)
-
-  o Server Changes:
-    * implement support for getTroveInfo
 
 Changes in 1.1.15:
   o Client Changes:
