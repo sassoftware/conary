@@ -8,6 +8,8 @@ Changes in @NEW@:
       with byDefault=False troves (such as :debuginfo) excluded.
     * A getTroveInfo() method has been added to the Conary repository
       server.
+    * Repository changeset cache database operations are now retried
+      before giving up (CNY-1143)
 
   o Client Changes:
     * A new "isMissing" trove flag has been added.  This flag is set
@@ -26,25 +28,22 @@ Changes in @NEW@:
       Conary repository client.
 
   o Build changes:
-    * cvc will now log a message when deleting old build trees to make way for
-      an upcoming build.
-    * The cvc refresh command will now print a warning instead of failing
-      with an error when an attempt to refresh a non-autosourced file is
-      made. (CNY-1160)
+    * The "cvc cook" command will now log a message when deleting old
+      build trees to make way for an upcoming build.
+    * The "cvc refresh" command will now print a warning instead of
+      failing with an error when an attempt to refresh a
+      non-autosourced file is made. (CNY-1160)
     * The BuildPackageRecipe class now requires file:runtime, which is
       needed to run many configure scripts. (CNY-1259)
-    * Config files are now automatically added to :config components
-      only if they do not have any executable bits set. (CNY-1260)
+    * Configuration files are now automatically added to :config
+      components only if they do not have any executable bits
+      set. (CNY-1260)
 
   o Bug Fixes:
     * Conary 1.1.14 and 1.1.15 failed to update when encountering the
       multitag protocol; this regression is resolved. (CNY-1257)
     * The logparse module now correctly parses python tracebacks in
       conary log files. (CNY-1258)
-
-  o Internal changes:
-    * If cache database is locked, retry several times before giving up.
-      (CNY-1143)
 
 Changes in 1.1.15:
   o Client Changes:
