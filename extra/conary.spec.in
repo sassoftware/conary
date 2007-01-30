@@ -77,6 +77,7 @@ rm -rf $RPM_BUILD_ROOT
 %config %{_sysconfdir}/conary/site/*
 %config %{_sysconfdir}/conary/use/*
 %config %{_sysconfdir}/conary/mirrors/*
+%config %{_sysconfdir}/conary/components
 %config %{_sysconfdir}/conary/recipeTemplates/*
 %config(noreplace) %{_sysconfdir}/conary/macros
 %config(noreplace) %{_sysconfdir}/conary/pubring.gpg
@@ -101,7 +102,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/%{name}
 %{_libexecdir}/%{name}
 %{_datadir}/%{name}
-%{_datadir}//localupdateinfo
 %{_mandir}/man1/*.1*
 %dir /var/lib/conarydb
 
