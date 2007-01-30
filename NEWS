@@ -6,6 +6,7 @@ Changes in @NEW@:
       needed troves to perform an update.  Previously, the repository
       would raise an exception, which prevented updates from mirrors
       with byDefault=False troves (such as :debuginfo) excluded.
+    * implement support for getTroveInfo
 
   o Client Changes:
     * A new "isMissing" trove flag has been added.  This flag is set
@@ -20,6 +21,7 @@ Changes in @NEW@:
       (CNY-1071)
     * Conary will now display files that are transient as transient when
       --tags is used.
+    * Implement support for the getTrovesInfo call
 
 
   o Build changes:

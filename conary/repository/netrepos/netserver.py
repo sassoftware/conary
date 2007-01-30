@@ -42,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
 
 # Decorators for method access
 def accessReadOnly(f):
@@ -147,6 +147,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getNewPGPKeys',
                         'addPGPKeyList',
                         'getNewTroveList',
+                        'getTroveInfo',
                         'checkVersion' ])
 
 
@@ -2538,8 +2539,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
-        cu = self.db.cursor()
-
         # only show troves the user is allowed to see
         cu = self.db.cursor()
 
@@ -2623,6 +2622,62 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in list(l) ]
         return list(l)
+
+    @accessReadOnly
+    def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
+        # check we have access to all the troves for which we're asked
+        # to return an info field
+        nvSet = set()
+        for (n, v, f) in troveList:
+            nvSet.add((n,v))
+        # XXX: we should find a way of batching these auth.check() requests
+        for n, vStr in nvSet:
+            v = self.toVersion(vStr)
+            if not self.auth.check(authToken, trove = n,
+                                   label = v.branch().label()):
+                raise errors.InsufficientPermission
+        # infoType should be valid
+        if infoType not in trove.TroveInfo.streamDict.keys():
+            raise RepositoryError("Unknown trove infoType requested", infoType)
+
+        self.log(2, infoType, troveList)
+        cu = self.db.cursor()
+
+        # try to save some time by batching this
+        schema.resetTable(cu, "gtl")
+        for (n, v, f) in troveList:
+            cu.execute("INSERT INTO gtl (name, version, flavor) "
+                       "VALUES (?,?,?)", (n, v, f))
+        # we'll need the min idx to account for differences in SQL backends
+        cu.execute("SELECT MIN(idx) from gtl")
+        minIdx = cu.fetchone()[0]
+
+        cu.execute("""
+        SELECT gtl.idx, TroveInfo.data
+        FROM gtl
+        JOIN Items ON gtl.name = Items.item
+        JOIN Versions ON gtl.version = Versions.version
+        JOIN Flavors ON gtl.flavor = Flavors.flavor
+        JOIN Instances ON
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        LEFT JOIN TroveInfo ON
+            Instances.instanceId = TroveInfo.instanceId
+            AND TroveInfo.infoType = ?
+        ORDER BY gtl.idx""", infoType)
+        # by default we mark all troves as missing. The ones that are
+        # not missing will return a row in the above query
+        ret = [ (-1, False) ] * len(troveList)
+        # we return tuples (present, data) to aid netclient in making its decoding decisions
+        # present values are: -1=trovemissing, 0=valuemissing, 1=valueattached
+        for idx, data in cu:
+            i = idx - minIdx
+            if data is None:
+                ret[i] = (0, False)
+                continue
+            ret[i] = (1, base64.encodestring(cu.frombinary(data)))
+        return ret
 
     @accessReadOnly
     def checkVersion(self, authToken, clientVersion):
