@@ -224,7 +224,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	contentLength = int(self.headers['Content-Length'])
         data = self.rfile.read(contentLength)
 
-        hostname = self.headers.get('host', None)
+        targetServerName = self.headers.get('X-Conary-Servername', None)
 
         encoding = self.headers.get('Content-Encoding', None)
         if encoding == 'deflate':
@@ -236,7 +236,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	try:
 	    result = netRepos.callWrapper('http', None, method, authToken,
                         params, remoteIp = self.connection.getpeername()[0],
-                        targetServerName = hostname)
+                        targetServerName = targetServerName)
 	except errors.InsufficientPermission:
 	    self.send_error(403)
 	    return None

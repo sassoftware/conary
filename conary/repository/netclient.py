@@ -347,7 +347,8 @@ class ServerCache:
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlement = ent,
-                                          proxies = self.proxies)
+                                          proxies = self.proxies,
+                                          serverName = serverName)
         transporter.setCompress(True)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)

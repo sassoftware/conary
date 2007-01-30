@@ -61,11 +61,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
 
-        # we want to use the proxy's repositorymap to remap ports, not
-        # the clients
-        targetServer = targetServerName.split(':')[0]
-
-        url = self.cfg.repositoryMap.get(targetServer, None)
+        url = self.cfg.repositoryMap.get(targetServerName, None)
         if url is None:
             if authToken[0] != 'anonymous' or authToken[2]:
                 # with a username or entitlement, use https. otherwise
