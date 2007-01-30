@@ -61,18 +61,11 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
 
-        if hasattr(self, methodname):
-            # handled internally
-            method = self.__getattribute__(methodname)
-            r = method(targetServerName, authToken, *args)
+        # we want to use the proxy's repositorymap to remap ports, not
+        # the clients
+        targetServer = targetServerName.split(':')[0]
 
-            if self.callLog:
-                self.callLog.log(remoteIp, authToken, methodname, args)
-
-            return (False, False, r)
-
-        # FIXME: entitlements! https! users! ack!
-        url = self.cfg.repositoryMap.get(targetServerName, None)
+        url = self.cfg.repositoryMap.get(targetServer, None)
         if url is None:
             if authToken[0] != 'anonymous' or authToken[2]:
                 # with a username or entitlement, use https. otherwise
@@ -89,14 +82,25 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         url = '/'.join(s)
 
         if authToken[2] is not None:
-            entitlement = authToken[2:3]
+            entitlement = authToken[2:4]
         else:
             entitlement = None
 
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlement = entitlement)
+
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
+
+        if hasattr(self, methodname):
+            # handled internally
+            method = self.__getattribute__(methodname)
+            r = method(proxy, authToken, *args)
+
+            if self.callLog:
+                self.callLog.log(remoteIp, authToken, methodname, args)
+
+            return (False, False, r)
 
         try:
             rc = proxy.__getattr__(methodname)(*args)
@@ -110,11 +114,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
         return rc
 
-    def checkVersion(self, targetServer, authToken, clientVersion):
-        # we want to use the proxy's repositorymap to remap ports, not
-        # the clients
-        targetServer = targetServer.split(':')[0]
-
+    def checkVersion(self, proxy, authToken, clientVersion):
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
         # cut off older clients entirely, no negotiation
         if clientVersion < SERVER_VERSIONS[0]:
@@ -123,6 +123,8 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
 
-        parentVersions = self.reposSet.c[targetServer].checkVersion()
+        useAnon, isException, parentVersions = proxy.checkVersion(clientVersion)
+        if isException:
+            return (useAnon, isException, parentVersions)
 
         return sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
