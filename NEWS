@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.16:
   o Server Changes:
     * The repository now returns recursive changesets with special
       "removed" trove changesets if a trove is missing or has been
