@@ -113,15 +113,25 @@ class ShadowRedirect(ConaryError):
     def __init__(self, n, v, f):
         self.info = (n, v, f)
 
-class RemovedTrovesError(ConaryError):
+class MissingTrovesError(ConaryError):
 
     def __str__(self):
-        return "The following troves no longer exist in the repository and " \
-               "cannot be installed: %s" % \
-               ", ".join([ "%s=%s[%s]" % x for x in self.l ])
+        l = []
+        if self.missing:
+            l.append(
+                "The following troves are missing from the repository and " \
+                 "cannot be installed: %s" % \
+                 ", ".join([ "%s=%s[%s]" % x for x in self.missing ]))
+        if self.removed:
+            l.append(
+                "The following troves no longer exist in the repository and " \
+                 "cannot be installed: %s" % \
+                 ", ".join([ "%s=%s[%s]" % x for x in self.removed ]))
+        return '\n'.join(l)
 
-    def __init__(self, troveList):
-        self.l = troveList
+    def __init__(self, missing=[], removed=[]):
+        self.missing = missing
+        self.removed = removed
 
 class InvalidRegex(ParseError):
     """User attempted to input an invalid regular expression"""

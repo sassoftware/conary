@@ -2333,6 +2333,11 @@ class TagCommand:
                 poller.register(stderrPipe[0], select.POLLIN)
 
                 count = 2
+                if datasource in ('args', 'stdin'):
+                    tagName = tagInfo.tag
+                else:
+                    tagName = ' '.join(
+                        sorted(x.tag for x in hi.tagToFile.keys()))
                 while count:
                     fds = [ x[0] for x in poller.poll() ]
                     for (fd, reader, isError) in (
@@ -2346,7 +2351,7 @@ class TagCommand:
                             count -= 1
                         else:
                             for line in lines:
-                                tagHandlerOutput(tagInfo.tag, line,
+                                tagHandlerOutput(tagName, line,
                                                  stderr = isError)
 
                 if inputPid is not None: os.waitpid(inputPid, 0)

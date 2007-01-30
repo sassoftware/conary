@@ -437,8 +437,12 @@ class _AbstractPackageRecipe(Recipe):
         # time, but that can't happen until after all policy has been
         # initialized
         for name, policyObj in self._policyMap.iteritems():
-            policyObj.postInit()
             self.externalMethods[name] = _policyUpdater(policyObj)
+        # must be a second loop so that arbitrary policy cross-reference
+        # works; otherwise it is dependent on sort order whether or
+        # not it works
+        for name, policyObj in self._policyMap.iteritems():
+            policyObj.postInit()
 
         # returns list of policy files loaded
         return self._policyPathMap.keys()
@@ -914,6 +918,7 @@ class BuildPackageRecipe(PackageRecipe):
         'make:runtime',
         'mktemp:runtime',
         # all the rest of these are for configure
+        'file:runtime',
         'findutils:runtime',
         'gawk:runtime',
         'grep:runtime',

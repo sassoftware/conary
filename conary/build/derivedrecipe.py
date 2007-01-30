@@ -203,6 +203,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
+
+        log.info('Warning: Derived packages are experimental and subject to change')
+
         self.repos = laReposCache.repos
 
         self._addBuildAction('Create', build.Create)

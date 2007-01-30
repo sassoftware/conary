@@ -25,7 +25,7 @@ from conary.conarycfg import CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
-from conary.repository import changeset, errors, xmlshims
+from conary.repository import changeset, errors, xmlshims, filecontainer
 from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
@@ -42,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
 
 # Decorators for method access
 def accessReadOnly(f):
@@ -147,6 +147,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getNewPGPKeys',
                         'addPGPKeyList',
                         'getNewTroveList',
+                        'getTroveInfo',
                         'checkVersion' ])
 
 
@@ -1510,17 +1511,72 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            "changeset?%s" % os.path.basename(path[:-4]))
         f = os.fdopen(fd, 'w')
         sizes = []
-        for path, size in pathList:
+        for cspath, size in pathList:
+            if recurse:
+                # check to make sure that this user has access to see all
+                # the troves included in a recursive changeset.
+                cs = changeset.ChangeSetFromFile(cspath)
+                newCs = changeset.ChangeSet()
+                rewrite = False
+                for tcs in cs.iterNewTroveList():
+                    if not self.auth.check(authToken, write = False,
+                                           trove = tcs.getName(),
+                                           label = tcs.getNewVersion().trailingLabel()):
+                        f.close()
+                        os.unlink(path)
+                        del cs
+                        raise errors.InsufficientPermission
+                    if (clientVersion < 38
+                        and tcs.troveType() == trove.TROVE_TYPE_REMOVED):
+                        ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
+                        if ti.flags.isMissing():
+                            # this was a missing trove for which we
+                            # synthesized a removed trove object. 
+                            # The client would have a much easier time
+                            # updating if we just made it a regular trove.
+                            missingName = tcs.getName()
+                            missingNewVersion = tcs.getNewVersion()
+                            missingOldVersion = tcs.getOldVersion()
+                            missingNewFlavor = tcs.getNewFlavor()
+                            missingOldFlavor = tcs.getOldFlavor()
+                            oldTrove = trove.Trove(missingName,
+                                                   missingOldVersion,
+                                                   missingOldFlavor)
+                            newTrove = trove.Trove(missingName,
+                                                   missingNewVersion,
+                                                   missingNewFlavor)
+                            diff = newTrove.diff(oldTrove)[0]
+                            newCs.newTrove(diff)
+                            rewrite = True
+                        else:
+                            # this really was marked as a removed trove.
+                            # raise a TroveMissing exception
+                            f.close()
+                            os.unlink(path)
+                            del cs
+                            raise errors.TroveMissing(missingName,
+                                                      version=missingVersion)
+                if rewrite:
+                    # we need to re-write the munged changeset for an
+                    # old client
+                    cs.merge(newCs)
+                    # create a new temporary file for the munged changeset
+                    (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                                    suffix = '.tmp')
+                    os.close(fd)
+                    # now make absolutely sure that the changeset file
+                    # will be compatible with conary-1.0.  We know
+                    # that there are no removed trove changesets becase
+                    # we re-wrote them all.
+                    cs.hasRemoved = False
+                    # now write out the munged changeset
+                    size = cs.writeToFile(cspath)
             sizes.append(size)
-            f.write("%s %d\n" % (path, size))
+            f.write("%s %d\n" % (cspath, size))
         f.close()
 
         if clientVersion < 38:
-            if allRemovedTroves:
-                raise errors.TroveMissing(allRemovedTroves[0][0],
-                                          version = allRemovedTroves[0][1][0])
-            else:
-                return url, sizes, newChgSetList, allFilesNeeded
+            return url, sizes, newChgSetList, allFilesNeeded
 
         return url, sizes, newChgSetList, allFilesNeeded, \
                _cvtTroveList(allRemovedTroves)
@@ -2483,8 +2539,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
-        cu = self.db.cursor()
-
         # only show troves the user is allowed to see
         cu = self.db.cursor()
 
@@ -2568,6 +2622,62 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in list(l) ]
         return list(l)
+
+    @accessReadOnly
+    def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
+        # check we have access to all the troves for which we're asked
+        # to return an info field
+        nvSet = set()
+        for (n, v, f) in troveList:
+            nvSet.add((n,v))
+        # XXX: we should find a way of batching these auth.check() requests
+        for n, vStr in nvSet:
+            v = self.toVersion(vStr)
+            if not self.auth.check(authToken, trove = n,
+                                   label = v.branch().label()):
+                raise errors.InsufficientPermission
+        # infoType should be valid
+        if infoType not in trove.TroveInfo.streamDict.keys():
+            raise RepositoryError("Unknown trove infoType requested", infoType)
+
+        self.log(2, infoType, troveList)
+        cu = self.db.cursor()
+
+        # try to save some time by batching this
+        schema.resetTable(cu, "gtl")
+        for (n, v, f) in troveList:
+            cu.execute("INSERT INTO gtl (name, version, flavor) "
+                       "VALUES (?,?,?)", (n, v, f))
+        # we'll need the min idx to account for differences in SQL backends
+        cu.execute("SELECT MIN(idx) from gtl")
+        minIdx = cu.fetchone()[0]
+
+        cu.execute("""
+        SELECT gtl.idx, TroveInfo.data
+        FROM gtl
+        JOIN Items ON gtl.name = Items.item
+        JOIN Versions ON gtl.version = Versions.version
+        JOIN Flavors ON gtl.flavor = Flavors.flavor
+        JOIN Instances ON
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        LEFT JOIN TroveInfo ON
+            Instances.instanceId = TroveInfo.instanceId
+            AND TroveInfo.infoType = ?
+        ORDER BY gtl.idx""", infoType)
+        # by default we mark all troves as missing. The ones that are
+        # not missing will return a row in the above query
+        ret = [ (-1, False) ] * len(troveList)
+        # we return tuples (present, data) to aid netclient in making its decoding decisions
+        # present values are: -1=trovemissing, 0=valuemissing, 1=valueattached
+        for idx, data in cu:
+            i = idx - minIdx
+            if data is None:
+                ret[i] = (0, False)
+                continue
+            ret[i] = (1, base64.encodestring(cu.frombinary(data)))
+        return ret
 
     @accessReadOnly
     def checkVersion(self, authToken, clientVersion):

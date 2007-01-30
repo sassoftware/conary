@@ -556,17 +556,17 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
         owner = 'root'
         group = 'root'
     else:
+        # + is not a valid char in user/group names; if the uid is not mapped
+        # to a user, prepend it with + and store it as a string
         try:
             owner = userCache.lookupId('/', s.st_uid)
-        except KeyError, msg:
-            raise FilesError("Error mapping uid %d to user name for "
-                             "file %s: %s" %(s.st_uid, path, msg))
+        except KeyError:
+            owner = '+%d' % s.st_uid
 
         try:
             group = groupCache.lookupId('/', s.st_gid)
-        except KeyError, msg:
-            raise FilesError("Error mapping gid %d to group name for "
-                             "file %s: %s" %(s.st_gid, path, msg))
+        except KeyError:
+            group = '+%d' % s.st_gid
 
     needsSha1 = 0
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)
@@ -762,11 +762,19 @@ class UserGroupIdCache:
             os.chdir('/')
 	    os.chroot(root)
 	
-	try:
-	    theId = self.nameLookupFn(name)[2]
-	except KeyError:
-	    log.warning('%s %s does not exist - using root', self.name, name)
-	    theId = 0
+        if name and name[0] == '+':
+            # An id mapped as a string
+            try:
+                theId = int(name)
+            except ValueError:
+                log.warning('%s %s does not exist - using root', self.name,
+                            name)
+        else:
+            try:
+                theId = self.nameLookupFn(name)[2]
+            except KeyError:
+                log.warning('%s %s does not exist - using root', self.name, name)
+                theId = 0
 
 	if getChrootIds:
 	    os.chroot(".")

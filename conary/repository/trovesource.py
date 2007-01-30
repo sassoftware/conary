@@ -467,18 +467,14 @@ class TroveListTroveSource(SimpleTroveSource):
         foundTups = set()
         
         # recurse into the given trove tups to include all child troves
-        while troveTups:
-            for (n,v,f) in troveTups:
-                self._trovesByName.setdefault(n, set()).add((n,v,f))
-                newTroves = source.getTroves(troveTups, withFiles=False)
-            foundTups.update(newTroves)
-            troveTups = []
-            for newTrove in newTroves:
-                for tup in newTrove.iterTroveList(strongRefs=True,
-                                                  weakRefs=True):
-                    self._trovesByName.setdefault(tup[0], set()).add(tup)
-                    if tup not in foundTups:
-                        troveTups.append(tup)
+        for (n,v,f) in troveTups:
+            self._trovesByName.setdefault(n, set()).add((n,v,f))
+
+        newTroves = source.getTroves(troveTups, withFiles=False)
+        for newTrove in newTroves:
+            for tup in newTrove.iterTroveList(strongRefs=True,
+                                              weakRefs=True):
+                self._trovesByName.setdefault(tup[0], set()).add(tup)
 
     def getSourceTroves(self):
         return self.getTroves(self.sourceTups)

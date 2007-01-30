@@ -21,7 +21,7 @@ from conary import conarycfg
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import resolve
 from conary.deps import deps
-from conary.errors import ClientError, InternalConaryError, RemovedTrovesError
+from conary.errors import ClientError, InternalConaryError, MissingTrovesError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
@@ -1653,6 +1653,7 @@ conary erase '%s=%s[%s]'
             raise NoNewTrovesError
 
         removedTroves = list()
+        missingTroves = list()
         ts = uJob.getTroveSource()
         for job in newJob:
             if job[2][0] is None:
@@ -1661,12 +1662,18 @@ conary erase '%s=%s[%s]'
             cs = ts.getChangeSet(job)
             troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
             if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
-                removedTroves.append(job)
+                ti = trove.TroveInfo(troveCs.troveInfoDiff.freeze())
+                if ti.flags.isMissing():
+                    missingTroves.append(job)
+                else:
+                    removedTroves.append(job)
 
-        if removedTroves:
-            badTroves = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
-            badTroves.sort()
-            raise RemovedTrovesError(badTroves)
+        if removedTroves or missingTroves:
+            removed = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
+            removed.sort()
+            missing = [ (x[0], x[2][0], x[2][1]) for x in missingTroves ]
+            missing.sort()
+            raise MissingTrovesError(missing, removed)
 
         uJob.setPrimaryJobs(jobSet)
 
