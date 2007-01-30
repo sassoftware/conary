@@ -27,7 +27,7 @@ Changes in @NEW@:
 
   o Build changes:
     * cvc will now log a message when deleting old build trees to make way for
-      an upcomming build.
+      an upcoming build.
     * The cvc refresh command will now print a warning instead of failing
       with an error when an attempt to refresh a non-autosourced file is
       made. (CNY-1160)
