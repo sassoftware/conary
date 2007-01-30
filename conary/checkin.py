@@ -1175,10 +1175,14 @@ def merge(cfg, repos, versionSpec=None, callback=None):
                   "to merge.")
         return
 
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                     cfg=cfg, repos=repos,
-                                     branch=state.getBranch())
-    recipeClass = loader.getRecipe()
+    if os.path.exists(state.getRecipeFileName()):
+        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                         cfg=cfg, repos=repos,
+                                         branch=state.getBranch())
+        recipeClass = loader.getRecipe()
+    else:
+        recipeClass = None.__class__
+
     if issubclass(recipeClass, derivedrecipe.DerivedPackageRecipe):
         # Merges between non-derived recipes and derived recipes don't
         # do a patch merge.

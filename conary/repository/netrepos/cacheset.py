@@ -19,7 +19,7 @@ import cPickle
 from conary import dbstore
 from conary.lib import util
 from conary.local import schema, sqldb, versiontable
-from conary.dbstore import idtable
+from conary.dbstore import idtable, sqlerrors
 
 CACHE_SCHEMA_VERSION = 17
 
@@ -41,11 +41,28 @@ class NullCacheSet:
     def invalidateEntry(self, repos, name, version, flavor):
         pass
 
+def retry(fn):
+    """Decorator to retry database operations if the database is locked"""
+    def wrap(*args, **kwargs):
+        # First arg is self
+        count = args[0].deadlockRetry
+        while count > 0:
+            count -= 1
+            try:
+                return fn(*args, **kwargs)
+            except sqlerrors.DatabaseLocked:
+                # Roll back, try again
+                args[0].db.rollback()
+        else:
+            # Re-raise the last error
+            raise
+    return wrap
 
 class CacheSet:
     filePattern = "%s/cache-%s.ccs-out"
 
-    def __init__(self, cacheDB, tmpDir):
+    def __init__(self, cacheDB, tmpDir, deadlockRetry=5):
+        self.deadlockRetry = deadlockRetry
 	self.tmpDir = tmpDir
         self.db = dbstore.connect(cacheDB[1], driver = cacheDB[0])
         self.db.loadSchema()
@@ -135,6 +152,7 @@ class CacheSet:
 
         return None
 
+    @retry
     def addEntry(self, item, recurse, withFiles, withFileContents,
                  excludeAutoSource, returnVal, size):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
@@ -193,6 +211,7 @@ class CacheSet:
 
         return (row, path)
 
+    @retry
     def invalidateEntry(self, repos, name, version, flavor):
         """
         invalidates (and deletes) any cached changeset that matches
@@ -234,6 +253,7 @@ class CacheSet:
             fn = self.filePattern % (self.tmpDir, row)
             util.removeIfExists(fn)
 
+    @retry
     def __cleanDatabase(self, cu = None):
         global CACHE_SCHEMA_VERSION
         if self.db.version != CACHE_SCHEMA_VERSION:
