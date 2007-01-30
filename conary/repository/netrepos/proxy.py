@@ -56,61 +56,65 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""))
 
+        # simple proxy. FIXME: caching these might help; building all
+        # of this framework for every request seems dumb. it seems like
+        # we could get away with one total since we're just changing
+        # hostname/username/entitlement
+
         if hasattr(self, methodname):
             # handled internally
             method = self.__getattribute__(methodname)
-            r = method(authToken, *args)
+            r = method(targetServerName, authToken, *args)
 
             if self.callLog:
                 self.callLog.log(remoteIp, authToken, methodname, args)
 
             return (False, False, r)
-        else:
-            # simple proxy. FIXME: caching these might help; building all
-            # of this framework for every request seems dumb. it seems like
-            # we could get away with one total since we're just changing
-            # hostname/username/entitlement
-            
-            # FIXME: entitlements! https! users! ack!
-            url = self.cfg.repositoryMap.get(targetServerName, None)
-            if url is None:
-                if authToken[0] != 'anonymous' or authToken[2]:
-                    # with a username or entitlement, use https. otherwise
-                    # use the same protocol which was used to connect to us
-                    proxyProtocol = 'http'
-                else:
-                    proxyProtocol = protocol
-                url = '%s://%s/conary/' % (proxyProtocol, targetServerName)
 
-            # paste in the user/password info
-            s = url.split('/')
-            s[2] = ('%s:%s@' % (netclient.quote(authToken[0]),
-                                netclient.quote(authToken[1]))) + s[2]
-            url = '/'.join(s)
-
-            if authToken[2] is not None:
-                entitlement = authToken[2:3]
+        # FIXME: entitlements! https! users! ack!
+        url = self.cfg.repositoryMap.get(targetServerName, None)
+        if url is None:
+            if authToken[0] != 'anonymous' or authToken[2]:
+                # with a username or entitlement, use https. otherwise
+                # use the same protocol which was used to connect to us
+                proxyProtocol = 'http'
             else:
-                entitlement = None
+                proxyProtocol = protocol
+            url = '%s://%s/conary/' % (proxyProtocol, targetServerName)
 
-            transporter = transport.Transport(https = (protocol == 'https'),
-                                              entitlement = entitlement)
-            transporter.setCompress(True)
-            proxy = ProxyClient(url, transporter)
+        # paste in the user/password info
+        s = url.split('/')
+        s[2] = ('%s:%s@' % (netclient.quote(authToken[0]),
+                            netclient.quote(authToken[1]))) + s[2]
+        url = '/'.join(s)
 
-            try:
-                rc = proxy.__getattr__(methodname)(*args)
-            except IOError, e:
-                return [ 'OpenError', [], [] ]
-            except xmlrpclib.ProtocolError, e:
-                if e.errcode == 403:
-                    raise errors.InsufficientPermission
+        if authToken[2] is not None:
+            entitlement = authToken[2:3]
+        else:
+            entitlement = None
 
-                raise
+        transporter = transport.Transport(https = (protocol == 'https'),
+                                          entitlement = entitlement)
+        transporter.setCompress(True)
+        proxy = ProxyClient(url, transporter)
 
-            return rc
+        try:
+            rc = proxy.__getattr__(methodname)(*args)
+        except IOError, e:
+            return [ 'OpenError', [], [] ]
+        except xmlrpclib.ProtocolError, e:
+            if e.errcode == 403:
+                raise errors.InsufficientPermission
 
-    def checkVersion(self, authToken, clientVersion):
+            raise
+
+        return rc
+
+    def checkVersion(self, targetServer, authToken, clientVersion):
+        # we want to use the proxy's repositorymap to remap ports, not
+        # the clients
+        targetServer = targetServer.split(':')[0]
+
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
         # cut off older clients entirely, no negotiation
         if clientVersion < SERVER_VERSIONS[0]:
@@ -118,4 +122,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                'Invalid client version %s.  Server accepts client versions %s '
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
-        return SERVER_VERSIONS
+
+        parentVersions = self.reposSet.c[targetServer].checkVersion()
+
+        return sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
