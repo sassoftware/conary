@@ -699,21 +699,22 @@ def setupTempTables(db):
     if "tmpIdTable" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpIdTable(
-            tmpId1    INTEGER,
-            tmpId2    INTEGER
+            id1    INTEGER,
+            id2    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpIdTable"] = True
-        db.createIndex("tmpIdTable", "tmpIdTableIdx12", "tmpId1,tmpId2", check = False)
-        db.createIndex("tmpIdTable", "tmpIdTableIdx21", "tmpId2,tmpId1", check = False)
+        db.createIndex("tmpIdTable", "tmpIdTableIdx12", "id1,id2", check = False)
+        db.createIndex("tmpIdTable", "tmpIdTableIdx21", "id2,id1", check = False)
     if "tmpMapTable" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpMapTable(
-            tmpId    INTEGER,
-            tmpVal   %(STRING)s
+            id    INTEGER,
+            val   %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpMapTable"] = True
-        db.createIndex("tmpMapTable", "tmpMapTableIdx", "tmpId", check = False)
+        db.createIndex("tmpMapTable", "tmpMapTableIdx", "id", check = False)
 
+    # the following are specific temp tables for various functions.
     if "ffFlavor" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE ffFlavor(

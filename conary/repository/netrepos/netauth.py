@@ -268,8 +268,8 @@ class NetworkAuthorization:
             label = v.branch().label()
             if label.getHost() not in self.serverNameList:
                 raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
-            l = checkDict.setdefault(label.asString(), [])
-            l.append(n)
+            l = checkDict.setdefault(label.asString(), set())
+            l.add(n)
         if not authToken[0]:
             return False
         # check groupIds. this is teh same as the self.check() function
