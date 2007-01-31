@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Server Changes:
+    * Conary repositories no longer allow users or groups to be
+      created with names that include characters other than those
+      defined in the Portable Filename Character Set.
+
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
       parse a "user" line in a configuration line.  Previously Conary

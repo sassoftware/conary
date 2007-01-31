@@ -166,6 +166,11 @@ class UserNotFound(RepositoryError):
         self.user = user
         RepositoryError.__init__(self, "UserNotFound: %s" % self.user)
 
+class InvalidName(RepositoryError):
+    def __init__(self, name):
+        self.name = name
+        RepositoryError.__init__(self, "InvalidName: %s" % self.name)
+
 class InvalidServerVersion(RepositoryError):
     pass
 
@@ -258,5 +263,6 @@ simpleExceptions = (
     (InvalidEntitlement,         'InvalidEntitlement'),
     (CannotChangePassword,       'CannotChangePassword'),
     (InvalidRegex,               'InvalidRegex'),
+    (InvalidName,                'InvalidName'),
     (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
     )
