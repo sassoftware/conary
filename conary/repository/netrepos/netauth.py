@@ -348,6 +348,10 @@ class NetworkAuthorization:
             if not cu.fetchall():
                 return False
 
+        # shortcircuit if we don't need to check a trove
+        if trove is None:
+            return True
+
         stmt = """
         select Items.item
         from Permissions join items using (itemId)
