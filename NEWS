@@ -3,6 +3,12 @@ Changes in @NEW@:
     * Conary now displays a useful error message when it is unable to
       parse a "user" line in a configuration line.  Previously Conary
       would raise an unhandled exception. (CNY-1267)
+    * Mirror configurations no longer use /etc/conary/entitlements as
+      the default location to read entitlements used to mirror.
+      Normally the entitlements used to mirror are different than the
+      entitlements required to update the system.  Therefore they
+      should not be used when attempting to access source or target
+      repositories when mirroring. (CNY-1239)
 
 Changes in 1.1.16:
   o Server Changes:
