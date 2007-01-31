@@ -695,6 +695,26 @@ def setupTempTables(db):
     logMe(3)
     cu = db.cursor()
 
+    # generic temp tables that can be used in multiple places
+    if "tmpIdTable" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpIdTable(
+            id1    INTEGER,
+            id2    INTEGER
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpIdTable"] = True
+        db.createIndex("tmpIdTable", "tmpIdTableIdx12", "id1,id2", check = False)
+        db.createIndex("tmpIdTable", "tmpIdTableIdx21", "id2,id1", check = False)
+    if "tmpMapTable" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpMapTable(
+            id    INTEGER,
+            val   %(STRING)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpMapTable"] = True
+        db.createIndex("tmpMapTable", "tmpMapTableIdx", "id", check = False)
+
+    # the following are specific temp tables for various functions.
     if "ffFlavor" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE ffFlavor(
