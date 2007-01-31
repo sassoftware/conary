@@ -17,7 +17,7 @@ import os, tempfile, urllib, xmlrpclib
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and the
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40 ]
+SERVER_VERSIONS = [ 41 ]
 
 from conary import conarycfg
 from conary.lib import tracelog, util
