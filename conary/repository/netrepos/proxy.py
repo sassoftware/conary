@@ -12,16 +12,16 @@
 # full details.
 #
 
-import os, tempfile, urllib, xmlrpclib
+import base64, itertools, os, tempfile, urllib, xmlrpclib
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and the
 # last one is the current server protocol version
 SERVER_VERSIONS = [ 41 ]
 
-from conary import conarycfg
+from conary import conarycfg, trove
 from conary.lib import tracelog, util
-from conary.repository import errors, netclient, transport, xmlshims
+from conary.repository import changeset, errors, netclient, transport, xmlshims
 from conary.repository.netrepos import cacheset, netserver
 
 class ProxyClient(xmlrpclib.ServerProxy):
@@ -178,7 +178,41 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
             cacheEntry = self.cache.getEntry(job, recurse, withFiles,
                                      withFileContents, excludeAutoSource)
-            if cacheEntry is None:
+            path = None
+
+            if cacheEntry is not None:
+                path, (trovesNeeded, filesNeeded, removedTroves, sizes), \
+                        size = cacheEntry
+                invalidate = False
+
+                # revalidate the cache entries for both permissions and
+                # currency
+                troveList = []
+                cs = changeset.ChangeSetFromFile(path)
+                for trvCs in cs.iterNewTroveList():
+                    troveList.append(
+                            ((trvCs.getName(), trvCs.getNewVersion(),
+                              trvCs.getNewFlavor()),
+                              trvCs.getNewSigs().freeze()))
+
+                fetchList = [ (x[0][0], self.fromVersion(x[0][1]),
+                               self.fromFlavor(x[0][2]) ) for x in troveList ]
+                serverSigs = self._reposCall(proxy, 'getTroveInfo',
+                            [ clientVersion, trove._TROVEINFO_TAG_SIGS,
+                              fetchList ] )
+                for (troveInfo, cachedSigs), (present, reposSigs) in \
+                                    itertools.izip(troveList, serverSigs):
+                    if present < 1 or \
+                                cachedSigs != base64.decodestring(reposSigs):
+                        invalidate = True
+                        break
+
+                if invalidate:
+                    self.cache.invalidateEntry(None, job[0], job[2][0],
+                                               job[2][1])
+                    path = None
+
+            if path is None:
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
                     self._reposCall(proxy, 'getChangeSet',
                             [ clientVersion, [ rawJob ], recurse, withFiles,
@@ -196,9 +230,6 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                                      sizes), size = size)
 
                 os.rename(tmpPath, path)
-            else:
-                path, (trovesNeeded, filesNeeded, removedTroves, sizes), \
-                        size = cacheEntry
 
             pathList.append((path, size))
             allTrovesNeeded += trovesNeeded

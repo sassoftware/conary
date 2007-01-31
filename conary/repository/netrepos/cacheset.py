@@ -218,7 +218,8 @@ class CacheSet:
         the given name, version, flavor.
         """
         invList = [ (name, version, flavor) ]
-        invList.extend(repos.getParentTroves(name, version, flavor))
+        if repos is not None:
+            invList.extend(repos.getParentTroves(name, version, flavor))
 
         # start a transaction to retain a consistent state
         cu = self.db.transaction()
