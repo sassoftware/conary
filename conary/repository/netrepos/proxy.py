@@ -12,7 +12,7 @@
 # full details.
 #
 
-import xmlrpclib
+import os, tempfile, urllib, xmlrpclib
 
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and the
@@ -20,9 +20,9 @@ import xmlrpclib
 SERVER_VERSIONS = [ 36, 37, 38, 39, 40 ]
 
 from conary import conarycfg
-from conary.lib import tracelog
+from conary.lib import tracelog, util
 from conary.repository import errors, netclient, transport, xmlshims
-from conary.repository.netrepos import netserver
+from conary.repository.netrepos import cacheset, netserver
 
 class ProxyClient(xmlrpclib.ServerProxy):
 
@@ -51,10 +51,16 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         self.reposSet = netclient.NetworkRepositoryClient(
                                 cfg.repositoryMap, conarycfg.UserInformation())
 
+        self.cache = cacheset.CacheSet(self.cfg.cacheDB, self.cfg.tmpDir,
+                                       self.cfg.deadlockRetry)
+
     def callWrapper(self, protocol, port, methodname, authToken, args,
                     remoteIp = None, targetServerName = None):
         if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""))
+
+        self._port = port
+        self._protocol = protocol
 
         # simple proxy. FIXME: caching these might help; building all
         # of this framework for every request seems dumb. it seems like
@@ -91,13 +97,21 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         if hasattr(self, methodname):
             # handled internally
             method = self.__getattribute__(methodname)
-            r = method(proxy, authToken, *args)
 
             if self.callLog:
                 self.callLog.log(remoteIp, authToken, methodname, args)
 
+            try:
+                r = method(proxy, authToken, *args)
+            except ProxyRepositoryError, e:
+                return (False, True, e.args)
+
             return (False, False, r)
 
+        return self._proxyCall(proxy, methodname, args)
+
+    @staticmethod
+    def _proxyCall(proxy, methodname, args):
         try:
             rc = proxy.__getattr__(methodname)(*args)
         except IOError, e:
@@ -110,6 +124,18 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
         return rc
 
+    def _reposCall(self, proxy, methodname, args):
+        rc = self._proxyCall(proxy, methodname, args)
+        if rc[1]:
+            # exception occured
+            raise ProxyRepositoryError(rc[2])
+
+        return rc[2]
+
+    def urlBase(self):
+        return self.basicUrl % { 'port' : self._port,
+                                 'protocol' : self._protocol }
+
     def checkVersion(self, proxy, authToken, clientVersion):
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
         # cut off older clients entirely, no negotiation
@@ -119,8 +145,80 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
 
-        useAnon, isException, parentVersions = proxy.checkVersion(clientVersion)
-        if isException:
-            return (useAnon, isException, parentVersions)
+        parentVersions = self._reposCall(proxy, 'checkVersion',
+                                         [ clientVersion ])
 
         return sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
+
+    def _cvtJobEntry(self, authToken, jobEntry):
+        (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
+
+        newVer = self.toVersion(new)
+
+        if old == 0:
+            l = (name, (None, None),
+                       (self.toVersion(new), self.toFlavor(newFlavor)),
+                       absolute)
+        else:
+            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
+                       (self.toVersion(new), self.toFlavor(newFlavor)),
+                       absolute)
+        return l
+
+    def getChangeSet(self, proxy, authToken, clientVersion, chgSetList, recurse,
+                     withFiles, withFileContents, excludeAutoSource):
+        pathList = []
+        allTrovesNeeded = []
+        allFilesNeeded = []
+        allTrovesRemoved = []
+        allSizes = []
+
+        for rawJob in chgSetList:
+            job = self._cvtJobEntry(authToken, rawJob)
+
+            cacheEntry = self.cache.getEntry(job, recurse, withFiles,
+                                     withFileContents, excludeAutoSource)
+            if cacheEntry is None:
+                url, sizes, trovesNeeded, filesNeeded, removedTroves = \
+                    self._reposCall(proxy, 'getChangeSet',
+                            [ clientVersion, [ rawJob ], recurse, withFiles,
+                              withFileContents, excludeAutoSource ] )
+
+                (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                                 suffix = '.tmp')
+                dest = os.fdopen(fd, "w")
+                size = util.copyfileobj(urllib.urlopen(url), dest)
+                dest.close()
+
+                (key, path) = self.cache.addEntry(job, recurse, withFiles,
+                                    withFileContents, excludeAutoSource,
+                                    (trovesNeeded, filesNeeded, removedTroves,
+                                     sizes), size = size)
+
+                os.rename(tmpPath, path)
+            else:
+                path, (trovesNeeded, filesNeeded, removedTroves, sizes), \
+                        size = cacheEntry
+
+            pathList.append((path, size))
+            allTrovesNeeded += trovesNeeded
+            allFilesNeeded += filesNeeded
+            allTrovesRemoved += removedTroves
+            allSizes += sizes
+
+        (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir, suffix = '.cf-out')
+        url = os.path.join(self.urlBase(),
+                           "changeset?%s" % os.path.basename(path[:-4]))
+        f = os.fdopen(fd, 'w')
+
+        for path, size in pathList:
+            f.write("%s %d\n" % (path, size))
+
+        f.close()
+
+        return url, allSizes, allTrovesNeeded, allFilesNeeded, allTrovesRemoved
+
+class ProxyRepositoryError(Exception):
+
+    def __init__(self, args):
+        self.args = args

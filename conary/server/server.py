@@ -153,7 +153,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                                                  sizeCb))
 
                     del cs
-                    if path.startswith(self.tmpDir):
+                    if path.startswith(self.tmpDir) and \
+                         not(os.path.basename(path)[0:6].startswith('cache-')):
                         os.unlink(path)
                 else:
                     f = open(path)
