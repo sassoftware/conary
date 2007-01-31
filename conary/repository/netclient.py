@@ -1879,7 +1879,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return [ base64.decodestring(x) for x in
                     self.c[host].getNewPGPKeys(mark) ]
 
-    def getTrovesInfo(self, infoType, troveList):
+    def getTroveInfo(self, infoType, troveList):
         # first, we need to know about this infoType
         if infoType not in trove.TroveInfo.streamDict.keys():
             raise Exception("Invalid infoType requested")
