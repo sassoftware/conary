@@ -437,7 +437,7 @@ if __name__ == '__main__':
             (l, f) = cfg.traceLog
         initLog(filename = f, level = l, trace=1)
 
-    if cfg.proxy:
+    if cfg.proxyDB:
         if len(otherArgs) > 1:
             usage()
 

@@ -2718,6 +2718,7 @@ class ServerConfig(ConfigFile):
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
+    proxyDB                 = dbstore.CfgDriver
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap

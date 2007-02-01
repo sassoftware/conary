@@ -51,7 +51,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         self.reposSet = netclient.NetworkRepositoryClient(
                                 cfg.repositoryMap, conarycfg.UserInformation())
 
-        self.cache = cacheset.CacheSet(self.cfg.cacheDB, self.cfg.tmpDir,
+        self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
                                        self.cfg.deadlockRetry)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
