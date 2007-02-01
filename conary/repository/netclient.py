@@ -263,7 +263,7 @@ class ServerCache:
         self.entitlementDir = entitlementDir
         self.entitlements = entitlements
         if proxy:
-            self.proxies = { 'http' : proxy }
+            self.proxies = { 'http' : proxy, 'https' : proxy }
         else:
             self.proxies = None
 
