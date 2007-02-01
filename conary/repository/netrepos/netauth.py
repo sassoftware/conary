@@ -393,10 +393,13 @@ class NetworkAuthorization:
 
         return False
 
+    _cacheRe = {}
     def checkTrove(self, pattern, trove):
         if pattern == 'ALL' or trove is None:
             return True
-        regExp = re.compile(pattern + '$')
+        regExp = self._cacheRe.get(pattern, None)
+        if regExp is None:
+            regExp = self._cacheRe[pattern] = re.compile(pattern + '$')
         if regExp.match(trove):
             return True
         return False
