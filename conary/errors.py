@@ -40,7 +40,7 @@ class ConaryError(Exception):
     pass
 
 
-class CvcError(Exception):
+class CvcError(ConaryError):
     """Base class for errors that are cvc-specific."""
     pass
 

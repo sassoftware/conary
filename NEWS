@@ -14,6 +14,9 @@ Changes in @NEW@:
       entitlements required to update the system.  Therefore they
       should not be used when attempting to access source or target
       repositories when mirroring. (CNY-1239)
+    * "cvc emerge" displays error messages when the underlying cook
+       process results in an exception.  Previously, an unhandled
+       exception message was generated. (CNY-995)
 
 Changes in 1.1.16:
   o Server Changes:
