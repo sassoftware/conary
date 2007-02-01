@@ -2413,6 +2413,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getTroveSigs(self, authToken, clientVersion, infoList):
+        self.log(2, infoList)
         # process the results of the more generic call
         ret = self.getTroveInfo(authToken, clientVersion,
                                 trove._TROVEINFO_TAG_SIGS, infoList)
@@ -2461,7 +2462,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Instances on
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
-            Flavors.flavorId = Flavors.flavorId
+            Flavors.flavorId = Instances.flavorId
         """)
         # see what troves are missing, if any
         cu.execute("""
