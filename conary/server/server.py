@@ -58,6 +58,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
     tmpDir = None
 
+    netRepos = None
+    netProxy = None
+
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
 
@@ -234,8 +237,15 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
+        if not targetServerName or targetServerName == cfg.serverName:
+            repos = self.netRepos
+        elif self.netProxy:
+            repos = self.netProxy
+        else:
+            raise RepositoryMismatch(cfg.serverName, targetServerName)
+
 	try:
-	    result = netRepos.callWrapper('http', None, method, authToken,
+	    result = repos.callWrapper('http', None, method, authToken,
                         params, remoteIp = self.connection.getpeername()[0],
                         targetServerName = targetServerName)
 	except errors.InsufficientPermission:
@@ -441,12 +451,8 @@ if __name__ == '__main__':
         if len(otherArgs) > 1:
             usage()
 
-        netRepos = ProxyRepositoryServer(cfg, baseUrl)
-    else:
-        if not cfg.repositoryDB:
-            cfg.repositoryDB = ("sqlite",  "%s/sqldb" % otherArgs[1])
-            del otherArgs[1]
-
+        HttpRequests.netProxy = ProxyRepositoryServer(cfg, baseUrl)
+    elif cfg.repositoryDB:
         if len(otherArgs) > 1:
             usage()
 
@@ -466,8 +472,8 @@ if __name__ == '__main__':
         if 'migrate' in argSet:
             sys.exit(0)
 
-        netRepos = NetworkRepositoryServer(cfg, baseUrl)
-        #netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+        HttpRequests.netRepos = NetworkRepositoryServer(cfg, baseUrl)
+        HttpRequests.netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
 
         if 'add-user' in argSet:
             admin = argSet.pop('admin', False)
