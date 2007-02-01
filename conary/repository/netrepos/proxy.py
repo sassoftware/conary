@@ -72,7 +72,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
             if authToken[0] != 'anonymous' or authToken[2]:
                 # with a username or entitlement, use https. otherwise
                 # use the same protocol which was used to connect to us
-                proxyProtocol = 'http'
+                proxyProtocol = 'https'
             else:
                 proxyProtocol = protocol
             url = '%s://%s/conary/' % (proxyProtocol, targetServerName)
@@ -88,7 +88,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         else:
             entitlement = None
 
-        transporter = transport.Transport(https = (protocol == 'https'),
+        transporter = transport.Transport(https = url.startswith('https:'),
                                           entitlement = entitlement)
 
         transporter.setCompress(True)
