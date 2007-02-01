@@ -102,11 +102,11 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                 self.callLog.log(remoteIp, authToken, methodname, args)
 
             try:
-                r = method(proxy, authToken, *args)
+                anon, r = method(proxy, authToken, *args)
             except ProxyRepositoryError, e:
                 return (False, True, e.args)
 
-            return (False, False, r)
+            return (anon, False, r)
 
         return self._proxyCall(proxy, methodname, args)
 
@@ -130,7 +130,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
             # exception occured
             raise ProxyRepositoryError(rc[2])
 
-        return rc[2]
+        return (rc[0], rc[2])
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -145,10 +145,10 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
 
-        parentVersions = self._reposCall(proxy, 'checkVersion',
-                                         [ clientVersion ])
+        useAnon, parentVersions = self._reposCall(proxy, 'checkVersion',
+                                                  [ clientVersion ])
 
-        return sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
+        return useAnon, sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
 
     def _cvtJobEntry(self, authToken, jobEntry):
         (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
@@ -199,7 +199,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                                self.fromFlavor(x[0][2]) ) for x in troveList ]
                 serverSigs = self._reposCall(proxy, 'getTroveInfo',
                             [ clientVersion, trove._TROVEINFO_TAG_SIGS,
-                              fetchList ] )
+                              fetchList ] )[1]
                 for (troveInfo, cachedSigs), (present, reposSigs) in \
                                     itertools.izip(troveList, serverSigs):
                     if present < 1 or \
@@ -216,7 +216,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
                     self._reposCall(proxy, 'getChangeSet',
                             [ clientVersion, [ rawJob ], recurse, withFiles,
-                              withFileContents, excludeAutoSource ] )
+                              withFileContents, excludeAutoSource ] )[1]
 
                 (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                                  suffix = '.tmp')
@@ -247,7 +247,8 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
         f.close()
 
-        return url, allSizes, allTrovesNeeded, allFilesNeeded, allTrovesRemoved
+        return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
+                      allTrovesRemoved)
 
 class ProxyRepositoryError(Exception):
 
