@@ -353,10 +353,6 @@ class NetworkAuthorization:
             if not cu.fetchall():
                 return False
 
-        # shortcircuit if we don't need to check a trove
-        if trove is None:
-            return True
-
         stmt = """
         select Items.item
         from Permissions join items using (itemId)
@@ -397,10 +393,13 @@ class NetworkAuthorization:
 
         return False
 
+    _cacheRe = {}
     def checkTrove(self, pattern, trove):
         if pattern == 'ALL' or trove is None:
             return True
-        regExp = re.compile(pattern + '$')
+        regExp = self._cacheRe.get(pattern, None)
+        if regExp is None:
+            regExp = self._cacheRe[pattern] = re.compile(pattern + '$')
         if regExp.match(trove):
             return True
         return False
