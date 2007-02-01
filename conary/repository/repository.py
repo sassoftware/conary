@@ -247,7 +247,7 @@ class AbstractRepository(IdealRepository):
 	"""
 	raise NotImplementedError
 
-    def getTrovesInfo(self, infoType, troveList):
+    def getTroveInfo(self, infoType, troveList):
         """
         Returns a list of trove infoType streams for a list of (name, version, flavor)
         troves. if the trove does not exist, a TroveMissing exception is raised. If the

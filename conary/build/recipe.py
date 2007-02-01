@@ -65,7 +65,7 @@ class Recipe:
 
     @classmethod
     def getLoadedSpecs(class_):
-        return list(class_._loadedSpecs)
+        return dict(class_._loadedSpecs)
 
     @classmethod
     def addLoadedTroves(class_, newTroves):

@@ -695,6 +695,7 @@ def setupTempTables(db):
     logMe(3)
     cu = db.cursor()
 
+    # the following are specific temp tables for various functions.
     if "ffFlavor" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE ffFlavor(
