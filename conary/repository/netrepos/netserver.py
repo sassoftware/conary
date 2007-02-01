@@ -2443,8 +2443,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         updateCount = 0
 
         # look up if we have all the troves we're asked
-        schema.resetTable(cu, "tmpIdTable")
         schema.resetTable(cu, "gtl")
+        schema.resetTable(cu, "gtlInst")
         for (n,v,f), sig in infoList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
                        (n,v,f))
@@ -2453,7 +2453,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         minIdx = cu.fetchone()[0]
 
         cu.execute("""
-        insert into tmpIdTable(id1, id2)
+        insert into gtlInst(idx, instanceId)
         select idx, Instances.instanceId
         from gtl
         join Items on gtl.name = Items.item
@@ -2467,8 +2467,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # see what troves are missing, if any
         cu.execute("""
         select gtl.idx
-        from gtl left join tmpIdTable on gtl.idx = tmpIdTable.id1
-        where tmpIdtable.id1 is NULL
+        from gtl left join gtlInst on gtl.idx = gtlInst.idx
+        where gtlInst.instanceId is NULL
         """)
         ret = cu.fetchall()
         if len(ret):
@@ -2480,11 +2480,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # about to set sigs for. we look over the signatures we need
         # to update and perform the updates
         cu.execute("""
-        select gtl.idx, tmpIdTable.id2, TroveInfo.data
+        select gtl.idx, gtlInst.instanceId, TroveInfo.data
         from gtl
-        join tmpIdTable on gtl.idx = tmpIdTable.id1
+        join gtlInst on gtl.idx = gtlInst.idx
         left join TroveInfo on
-            tmpIdTable.id2 = TroveInfo.instanceId and
+            gtlInst.instanceId = TroveInfo.instanceId and
             TroveInfo.infoType = ?
         """, trove._TROVEINFO_TAG_SIGS)
         inserts = []
