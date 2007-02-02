@@ -241,8 +241,12 @@ class CacheSet:
             # delete all matching entries from the db and the file system
             for (row, returnVal, size) in cu.fetchall():
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-                path = self.filePattern % (self.tmpDir, row)
-                util.removeIfExists(path)
+                # unlink(path) is tempting here, but it's possible that
+                # some outstanding request still references it. gafton
+                # suggested hard linking the files for consumption to
+                # allow this remove
+                # path = self.filePattern % (self.tmpDir, row)
+                # util.removeIfExists(path)
 
         self.db.commit()
 

@@ -203,6 +203,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                 for (troveInfo, cachedSigs), (present, reposSigs) in \
                                     itertools.izip(troveList, serverSigs):
                     if present < 1 or \
+                                not cachedSigs or \
                                 cachedSigs != base64.decodestring(reposSigs):
                         invalidate = True
                         break
