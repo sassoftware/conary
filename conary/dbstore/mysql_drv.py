@@ -98,7 +98,7 @@ class Cursor(BaseCursor):
         if len(keys):
             return (sql, tuple(keys))
         # handle the ? syntax
-        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(SELECT|LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
         return (sql, ())
 
     # we need to "fix" the sql code before calling out
