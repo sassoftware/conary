@@ -831,6 +831,19 @@ def setupTempTables(db):
         db.createIndex("gfsTable", "gfsTableFileIdIdx", "fileId",
                        check = False)
 
+    if "newTroveTroves" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        newTroveTroves(
+            idx             %(PRIMARYKEY)s,
+            item            VARCHAR(254),
+            version         %(STRING)s,
+            frozenVersion   %(STRING)s,
+            flavor          %(STRING)s,
+            flags           INTEGER NOT NULL DEFAULT 0
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["newTroveTroves"] = True
+
     db.commit()
 
 def resetTable(cu, name):
