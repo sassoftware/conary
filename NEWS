@@ -22,6 +22,7 @@ Changes in @NEW@:
     * "cvc emerge" now displays error messages when the underlying
        cook process results in an exception.  Previously, an unhandled
        exception message was generated. (CNY-995)
+    * Derived packages now support setuid and setgid files (CNY-1281)
 
   o Build Changes:
     * A list of autosource mirrors has been added.

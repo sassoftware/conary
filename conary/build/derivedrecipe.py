@@ -58,6 +58,10 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             self._componentReqs[troveName] -= fileObj.requires()
             self._componentProvs[troveName] -= fileObj.requires()
 
+            # we don't restore setuid/setgid bits into the filesystem
+            if fileObj.inode.perms() & 06000 != 0:
+                self.SetModes(path, fileObj.inode.perms())
+
             if isinstance(fileObj, files.DeviceFile):
                 self.MakeDevices(path, fileObj.lsTag,
                                  fileObj.devt.major(), fileObj.devt.minor(),
@@ -194,7 +198,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                                              downloadOnly = downloadOnly)
 
     def loadPolicy(self):
-        return _AbstractPackageRecipe.loadPolicy(self, policySet = set(),
+        return _AbstractPackageRecipe.loadPolicy(self,
+                                policySet = set( [ 'WarnWriteable' ] ),
                                 internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
