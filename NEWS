@@ -23,6 +23,9 @@ Changes in @NEW@:
        cook process results in an exception.  Previously, an unhandled
        exception message was generated. (CNY-995)
 
+  o Build Changes:
+    * A list of autosource mirrors has been added.
+
 Changes in 1.1.16:
   o Server Changes:
     * The repository now returns recursive changesets with special
