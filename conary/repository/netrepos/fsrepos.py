@@ -20,11 +20,10 @@ import sys
 
 from conary import files, trove, callbacks
 from conary.deps import deps
-from conary.lib import util, openpgpfile, sha1helper
+from conary.lib import util, openpgpfile, sha1helper, openpgpkey
 from conary.repository import changeset, errors, filecontents
 from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.repository.datastore import DataStoreSet
-from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository import netclient
@@ -168,9 +167,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                          '%s label' %(label.asString()))
         self.troveStore.begin()
         if self.requireSigs:
-            threshold = TRUST_FULL
+            threshold = openpgpfile.TRUST_FULL
         else:
-            threshold = TRUST_UNTRUSTED
+            threshold = openpgpfile.TRUST_UNTRUSTED
         # Callback for signature verification
         callback = callbacks.UpdateCallback(trustThreshold=threshold,
                             keyCache=self.troveStore.keyTable.keyCache)
@@ -253,93 +252,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# make a copy to remove things from
 	troveList = troveList[:]
 
-        class troveListWrapper:
-            def _handleJob(self, job, recursed, idx):
-                t = self.trvIterator.next()
-                if t is None:
-                    if recursed:
-                        # synthesize a removed trove for this missing
-                        # trove
-                        t = trove.Trove(job[0], job[idx][0], job[idx][1],
-                                        type=trove.TROVE_TYPE_REMOVED)
-                        t.setIsMissing(True)
-                        t.computeSignatures()
-                        if self.withFiles:
-                            # synthesize empty filestreams
-                            t = t, {}
-                    else:
-                        # drain the iterator, in order to complete
-                        # the sql queries
-                        for x in self.trvIterator: pass
-                        raise errors.TroveMissing(job[0], job[idx][0])
-                if self.withFiles:
-                    t, streams = t
-                else:
-                    streams = {}
-                return t, streams
-
-            def next(self):
-                if not self.l and self.new:
-                    # self.l (and self.trvIterator) are empty; look to
-                    # self.new for new jobs we need
-
-                    troveList = []
-                    for job, recursed in self.new:
-                        # do we need the old trove?
-                        if job[1][0] is not None:
-                            troveList.append((job[0], job[1][0], job[1][1]))
-
-                        # do we need the new trove?
-                        if job[2][0] is not None:
-                            troveList.append((job[0], job[2][0], job[2][1]))
-
-                    # flip to the new job set and it's trove iterator, and
-                    # reset self.new for later additions
-                    self.trvIterator = self.troveStore.iterTroves(
-                                troveList, withFiles = self.withFiles,
-				withFileStreams = self.withFiles)
-                    self.l = self.new
-                    self.new = []
-
-                if self.l:
-                    job, recursed = self.l.pop(0)
-
-                    # Does it have an old job?
-                    if job[1][0] is None:
-                        old = None
-			oldStreams = {}
-                    else:
-                        old, oldStreams = self._handleJob(job, recursed, 1)
-
-                    # Does it have a new job
-                    if job[2][0] is None:
-                        new = None
-                        newStreams = {}
-                    else:
-                        new, newStreams = self._handleJob(job, recursed, 2)
-
-		    newStreams.update(oldStreams)
-                    return job, old, new, newStreams
-                else:
-                    raise StopIteration
-
-            def __iter__(self):
-                while True:
-                    yield self.next()
-
-            def append(self, item, recurse):
-                self.new.append((item, recurse))
-
-            def __init__(self, l, troveStore, withFiles):
-                self.trvIterator = None
-                self.new = [ (x, False) for x in l ]
-                self.l = []
-                self.troveStore = troveStore
-                self.withFiles = withFiles
-
         # def createChangeSet begins here
 
-        troveWrapper = troveListWrapper(troveList, self.troveStore, withFiles)
+        troveWrapper = _TroveListWrapper(troveList, self.troveStore, withFiles)
 
         for job in troveWrapper:
 	    ((troveName, (oldVersion, oldFlavor),
@@ -529,3 +444,88 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				       newFile.flags.isConfig(),
                                        compressed = compressed)
 	return (cs, externalTroveList, externalFileList, removedTroveList)
+
+class _TroveListWrapper:
+    def _handleJob(self, job, recursed, idx):
+        t = self.trvIterator.next()
+        if t is None:
+            if recursed:
+                # synthesize a removed trove for this missing
+                # trove
+                t = trove.Trove(job[0], job[idx][0], job[idx][1],
+                                type=trove.TROVE_TYPE_REMOVED)
+                t.setIsMissing(True)
+                t.computeSignatures()
+                if self.withFiles:
+                    # synthesize empty filestreams
+                    t = t, {}
+            else:
+                # drain the iterator, in order to complete
+                # the sql queries
+                for x in self.trvIterator: pass
+                raise errors.TroveMissing(job[0], job[idx][0])
+        if self.withFiles:
+            t, streams = t
+        else:
+            streams = {}
+        return t, streams
+
+    def next(self):
+        if not self.l and self.new:
+            # self.l (and self.trvIterator) are empty; look to
+            # self.new for new jobs we need
+
+            troveList = []
+            for job, recursed in self.new:
+                # do we need the old trove?
+                if job[1][0] is not None:
+                    troveList.append((job[0], job[1][0], job[1][1]))
+
+                # do we need the new trove?
+                if job[2][0] is not None:
+                    troveList.append((job[0], job[2][0], job[2][1]))
+
+            # flip to the new job set and it's trove iterator, and
+            # reset self.new for later additions
+            self.trvIterator = self.troveStore.iterTroves(
+                        troveList, withFiles = self.withFiles,
+                        withFileStreams = self.withFiles)
+            self.l = self.new
+            self.new = []
+
+        if self.l:
+            job, recursed = self.l.pop(0)
+
+            # Does it have an old job?
+            if job[1][0] is None:
+                old = None
+                oldStreams = {}
+            else:
+                old, oldStreams = self._handleJob(job, recursed, 1)
+
+            # Does it have a new job
+            if job[2][0] is None:
+                new = None
+                newStreams = {}
+            else:
+                new, newStreams = self._handleJob(job, recursed, 2)
+
+            newStreams.update(oldStreams)
+            return job, old, new, newStreams
+        else:
+            raise StopIteration
+
+    def __iter__(self):
+        while True:
+            yield self.next()
+
+    def append(self, item, recurse):
+        self.new.append((item, recurse))
+
+    def __init__(self, l, troveStore, withFiles):
+        self.trvIterator = None
+        self.new = [ (x, False) for x in l ]
+        self.l = []
+        self.troveStore = troveStore
+        self.withFiles = withFiles
+
