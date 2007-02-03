@@ -13,15 +13,16 @@
 #
 
 mirror_files =	\
+                autosource \
+                cpan \
                 cran \
                 debian \
                 fedora \
                 gentoo \
+                gnome \
+                gnu \
                 kde \
                 sourceforge \
-                gnu \
-                cpan \
-                gnome \
                 xorg
 
 
