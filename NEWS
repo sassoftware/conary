@@ -20,9 +20,9 @@ Changes in @NEW@:
       should not be used when attempting to access source or target
       repositories when mirroring. (CNY-1239)
     * "cvc emerge" now displays error messages when the underlying
-       cook process results in an exception.  Previously, an unhandled
-       exception message was generated. (CNY-995)
-    * Derived packages now support setuid and setgid files (CNY-1281)
+      cook process results in an exception.  Previously, an unhandled
+      exception message was generated. (CNY-995)
+    * Derived packages now support setuid and setgid files. (CNY-1281)
 
   o Build Changes:
     * A list of autosource mirrors has been added.
