@@ -1,7 +1,7 @@
 #!/usr/bin/python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -39,16 +39,17 @@ from conary.lib import coveragehook
 from conary import dbstore
 from conary.lib import options
 from conary.lib import util
-from conary.lib.cfg import CfgInt
+from conary.lib.cfg import CfgBool, CfgInt
 from conary.lib.tracelog import initLog, logMe
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository.filecontainer import FileContainer
 from conary.repository.netrepos import netserver
+from conary.repository.netrepos.proxy import ProxyRepositoryServer
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
 
-#sys.excepthook = util.genExcepthook(debug=True)
+sys.excepthook = util.genExcepthook(debug=True)
 
 class HttpRequests(SimpleHTTPRequestHandler):
 
@@ -56,6 +57,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
     inFiles = {}
 
     tmpDir = None
+
+    netRepos = None
+    netProxy = None
 
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
@@ -152,7 +156,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                                                  sizeCb))
 
                     del cs
-                    if path.startswith(self.tmpDir):
+                    if path.startswith(self.tmpDir) and \
+                         not(os.path.basename(path)[0:6].startswith('cache-')):
                         os.unlink(path)
                 else:
                     f = open(path)
@@ -223,6 +228,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	contentLength = int(self.headers['Content-Length'])
         data = self.rfile.read(contentLength)
 
+        targetServerName = self.headers.get('X-Conary-Servername', None)
+
         encoding = self.headers.get('Content-Encoding', None)
         if encoding == 'deflate':
             data = zlib.decompress(data)
@@ -230,9 +237,17 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
+        if not targetServerName or targetServerName == cfg.serverName:
+            repos = self.netRepos
+        elif self.netProxy:
+            repos = self.netProxy
+        else:
+            raise RepositoryMismatch(cfg.serverName, targetServerName)
+
 	try:
-	    result = netRepos.callWrapper(None, None, method, authToken, params,
-                              remoteIp = self.connection.getpeername()[0])
+	    result = repos.callWrapper('http', None, method, authToken,
+                        params, remoteIp = self.connection.getpeername()[0],
+                        targetServerName = targetServerName)
 	except errors.InsufficientPermission:
 	    self.send_error(403)
 	    return None
@@ -318,6 +333,7 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 class ServerConfig(netserver.ServerConfig):
 
     port		= (CfgInt,  8000)
+    proxy               = (CfgBool, False)
 
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)
@@ -431,44 +447,47 @@ if __name__ == '__main__':
             (l, f) = cfg.traceLog
         initLog(filename = f, level = l, trace=1)
 
-    if not cfg.repositoryDB:
-        cfg.repositoryDB = ("sqlite",  "%s/sqldb" % otherArgs[1])
-        del otherArgs[1]
-
-    if len(otherArgs) > 1:
-	usage()
-
-    if not cfg.contentsDir:
-        assert(cfg.repositoryDB[0] == "sqlite")
-        cfg.contentsDir = os.path.dirname(cfg.repositoryDB[1]) + '/contents'
-
-    if cfg.repositoryDB[0] == 'sqlite':
-        util.mkdirChain(os.path.dirname(cfg.repositoryDB[1]))
-
-    (driver, database) = cfg.repositoryDB
-    db = dbstore.connect(database, driver)
-    logMe(1, "checking schema version")
-    # if there is no schema or we're asked to migrate, loadSchema
-    if db.getVersion() == 0 or 'migrate' in argSet:
-        schema.loadSchema(db)
-    if 'migrate' in argSet:
-        sys.exit(0)
-
-    netRepos = NetworkRepositoryServer(cfg, baseUrl)
-    #netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
-
-    if 'add-user' in argSet:
-        admin = argSet.pop('admin', False)
-        mirror = argSet.pop('mirror', False)
-        userName = argSet.pop('add-user')
-        if argSet:
+    if cfg.proxyDB:
+        if len(otherArgs) > 1:
             usage()
-        sys.exit(addUser(netRepos, userName, admin = admin, mirror = mirror))
-    elif argSet.pop('analyze', False):
-        if argSet:
+
+        HttpRequests.netProxy = ProxyRepositoryServer(cfg, baseUrl)
+    elif cfg.repositoryDB:
+        if len(otherArgs) > 1:
             usage()
-        netRepos.db.analyze()
-        sys.exit(0)
+
+        if not cfg.contentsDir:
+            assert(cfg.repositoryDB[0] == "sqlite")
+            cfg.contentsDir = os.path.dirname(cfg.repositoryDB[1]) + '/contents'
+
+        if cfg.repositoryDB[0] == 'sqlite':
+            util.mkdirChain(os.path.dirname(cfg.repositoryDB[1]))
+
+        (driver, database) = cfg.repositoryDB
+        db = dbstore.connect(database, driver)
+        logMe(1, "checking schema version")
+        # if there is no schema or we're asked to migrate, loadSchema
+        if db.getVersion() == 0 or 'migrate' in argSet:
+            schema.loadSchema(db)
+        if 'migrate' in argSet:
+            sys.exit(0)
+
+        HttpRequests.netRepos = NetworkRepositoryServer(cfg, baseUrl)
+        HttpRequests.netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+
+        if 'add-user' in argSet:
+            admin = argSet.pop('admin', False)
+            mirror = argSet.pop('mirror', False)
+            userName = argSet.pop('add-user')
+            if argSet:
+                usage()
+            sys.exit(addUser(netRepos, userName, admin = admin,
+                             mirror = mirror))
+        elif argSet.pop('analyze', False):
+            if argSet:
+                usage()
+            netRepos.db.analyze()
+            sys.exit(0)
 
     if argSet:
         usage()

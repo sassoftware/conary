@@ -254,13 +254,18 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None,
-                 entitlementDir=None, entitlements={}, callback=None):
+                 entitlementDir=None, entitlements={}, callback=None,
+                 proxy=None):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
         self.entitlementDir = entitlementDir
         self.entitlements = entitlements
+        if proxy:
+            self.proxies = { 'http' : proxy, 'https' : proxy }
+        else:
+            self.proxies = None
 
     def __getPassword(self, host, user=None):
         user, pw = self.pwPrompt(host, user)
@@ -341,7 +346,9 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
-                                          entitlement = ent)
+                                          entitlement = ent,
+                                          proxies = self.proxies,
+                                          serverName = serverName)
         transporter.setCompress(True)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)
@@ -397,7 +404,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def __init__(self, repMap, userMap,
                  localRepository = None, pwPrompt = None,
                  entitlementDir = None, downloadRateLimit = 0,
-                 uploadRateLimit = 0, entitlements = {}):
+                 uploadRateLimit = 0, entitlements = {},
+                 proxy = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -406,9 +414,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         self.downloadRateLimit = downloadRateLimit
         self.uploadRateLimit = uploadRateLimit
+        self.proxy = proxy
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir,
-                             entitlements)
+                             entitlements, proxy = self.proxy)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
