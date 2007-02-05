@@ -2639,14 +2639,14 @@ conary erase '%s=%s[%s]'
                 try:
                     newCs = _createCs(repos, db, job, uJob)
                 except:
-                    q.put(None)
-                    raise
+                    q.put((True, sys.exc_info()))
+                    return
 
                 while True:
                     # block for no more than 5 seconds so we can
                     # check to see if we should abort
                     try:
-                        q.put(newCs, True, 5)
+                        q.put((False, newCs), True, 5)
                         break
                     except Queue.Full:
                         # if the queue is full, check to see if the
@@ -2723,6 +2723,12 @@ conary erase '%s=%s[%s]'
                                               ' unexpectedly, cannot continue update')
                         if newCs is None:
                             break
+                        # We expect a (boolean, value)
+                        isException, val = newCs
+                        if isException:
+                            raise val[0], val[1], val[2]
+
+                        newCs = val
                         i += 1
                         self.updateCallback.setUpdateHunk(i, len(allJobs))
                         self.updateCallback.setUpdateJob(allJobs[i - 1])
