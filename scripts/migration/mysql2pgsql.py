@@ -177,7 +177,8 @@ def fix_pk(table):
     assert (ret == pkval)
     print "    SETVAL %s(%s) = %d" % (table, pkname, ret)
 
-for t in tList:
+def migrate_table(t):
+    global pgsql, src, dst
     count = src.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
     # prepare the execution cursor
     src.execute("SELECT * FROM %s LIMIT 1" % (t,))
@@ -222,6 +223,10 @@ for t in tList:
         fix_pk(t)
     pgsql.commit()
 
+for t in tList:
+    print "Migrating table:", t
+    migrate_table(t)
+
 # and now create the indexes
 dst = pgsql.cursor()
 for stmt in getIndexes("postgresql"):
@@ -229,3 +234,9 @@ for stmt in getIndexes("postgresql"):
     dst.execute(stmt)
 pgsql.setVersion(VERSION)
 pgsql.commit()
+
+del src
+srcdb.close()
+
+del dst
+pgsql.close()
