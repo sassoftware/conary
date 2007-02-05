@@ -30,7 +30,7 @@ from conary.lib import openpgpkey
 from conary.streams import ByteStream
 from conary.streams import DependenciesStream, FlavorsStream
 from conary.streams import FrozenVersionStream
-from conary.streams import SMALL, LARGE
+from conary.streams import SMALL, LARGE, DYNAMIC
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
@@ -488,6 +488,44 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
 
         return new
 
+# FIXME: this should be a dynamically extendable stream.  StreamSet is a
+# little too rigid.
+_METADATA_ITEM_TAG_SHORTDESC = 1
+_METADATA_ITEM_TAG_LONGDESC = 2
+_METADATA_ITEM_TAG_LICENSES = 3
+_METADATA_ITEM_TAG_CRYPTO = 4
+_METADATA_ITEM_TAG_URL = 5
+_METADATA_ITEM_TAG_CATEGORIES = 6
+_METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
+
+class MetadataItem(streams.StreamSet):
+    streamDict = {
+        _METADATA_ITEM_TAG_SHORTDESC:
+        (DYNAMIC, streams.StringStream,  'shortDesc'  ),
+        _METADATA_ITEM_TAG_LONGDESC:
+        (DYNAMIC, streams.StringStream,  'longDesc'   ),
+        _METADATA_ITEM_TAG_LICENSES:
+        (DYNAMIC, streams.StringsStream, 'licenses'   ),
+        _METADATA_ITEM_TAG_CRYPTO:
+        (DYNAMIC, streams.StringsStream, 'crypto'     ),
+        _METADATA_ITEM_TAG_URL:
+        (DYNAMIC, streams.StringStream,  'url'        ),
+        _METADATA_ITEM_TAG_CATEGORIES:
+        (DYNAMIC, streams.StringsStream, 'categories' ),
+        _METADATA_ITEM_TAG_BIBLIOGRAPHY:
+        (DYNAMIC, streams.StringsStream, 'bibliography'),
+        }
+
+class Metadata(streams.StreamCollection):
+    streamDict = { 1: MetadataItem }
+
+    def add(self, item):
+        self.addStream(1, item)
+
+    def iter(self):
+        for item in self.getStreams(1):
+            yield item
+
 _STREAM_TRV_NAME            = 0
 _STREAM_TRV_VERSION         = 1
 _STREAM_TRV_FLAVOR          = 2
@@ -498,9 +536,10 @@ _STREAM_TRV_REQUIRES        = 6
 _STREAM_TRV_STRONG_TROVES   = 7
 _STREAM_TRV_FILES           = 8
 _STREAM_TRV_TYPE            = 9
-_STREAM_TRV_SIGS            = 10
+_STREAM_TRV_SIGS            = 10 # unused
 _STREAM_TRV_WEAK_TROVES     = 11
 _STREAM_TRV_REDIRECTS       = 12
+_STREAM_TRV_METADATA        = 13
 
 TROVE_TYPE_NORMAL          = 0
 TROVE_TYPE_REDIRECT        = 1
@@ -545,6 +584,8 @@ class Trove(streams.StreamSet):
                     (SMALL, ByteStream,                  "type"         ),
         _STREAM_TRV_REDIRECTS     :
                     (SMALL, TroveRedirectList,           "redirects"    ),
+        _STREAM_TRV_METADATA      :
+                    (LARGE, Metadata,                    "metadata"     ),
     }
     ignoreUnknown = False
 
@@ -553,7 +594,7 @@ class Trove(streams.StreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "strongTroves", "weakTroves",
-                  "idMap", "type", "redirects" ]
+                  "idMap", "type", "redirects", 'metadata' ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -563,7 +604,8 @@ class Trove(streams.StreamSet):
                                         skipSet = { 'sigs' : True,
                                                     'versionStrings' : True,
                                                     'incomplete' : True,
-                                                    'pathHashes' : True })
+                                                    'pathHashes' : True,
+                                                    'metadata': True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         """
         Computes a new signature for this trove and stores it.
