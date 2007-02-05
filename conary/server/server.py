@@ -237,7 +237,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
-        if not targetServerName or targetServerName == cfg.serverName:
+        if not targetServerName or targetServerName in cfg.serverName:
             repos = self.netRepos
         elif self.netProxy:
             repos = self.netProxy
