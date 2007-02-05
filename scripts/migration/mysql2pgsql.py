@@ -91,6 +91,9 @@ tList = [
     'FileStreams',
     'TroveFiles',
     ]
+# tables with non-integer primary keys require special handling
+noIntPK = [ 'PGPFingerprints' ]
+
 skip = ['databaseversion', 'instructionsets']
 knowns = [x.lower() for x in tList]
 missing = []
@@ -215,7 +218,8 @@ for t in tList:
             if i % 10000 == 0:
                 pgsql.commit()
     print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
-    fix_pk(t)
+    if t not in noIntPK:
+        fix_pk(t)
     pgsql.commit()
 
 # and now create the indexes
