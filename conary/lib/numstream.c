@@ -36,6 +36,10 @@
         SET(o, Int, val);                       \
     else if (STREAM_CHECK(o, SHORT_STREAM))     \
         SET(o, Short, val);                     \
+    else if (STREAM_CHECK(o, BYTE_STREAM))      \
+        SET(o, Byte, val);                      \
+    else if (STREAM_CHECK(o, LONG_LONG_STREAM)) \
+        SET(o, LongLong, val);                  \
     else                                        \
         assert(0);
 
@@ -62,11 +66,23 @@ typedef struct {
     short val;
 } ShortStreamObject;
 
+typedef struct {
+    NumericStreamObject_HEAD
+    unsigned char val;
+} ByteStreamObject;
+
+typedef struct {
+    NumericStreamObject_HEAD
+    unsigned long long val;
+} LongLongStreamObject;
+
 /* ------------------------------------- */
 /* NumericStream Implementation          */
 
 static inline PyObject * raw_IntStream_Freeze(IntStreamObject * o);
 static inline PyObject * raw_ShortStream_Freeze(ShortStreamObject * o);
+static inline PyObject * raw_ByteStream_Freeze(ByteStreamObject * o);
+static inline PyObject * raw_LongLongStream_Freeze(LongLongStreamObject * o);
 
 static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
                                   int frozenLen);
@@ -90,6 +106,12 @@ static PyObject * NumericStream_Call(PyObject * self, PyObject * args,
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
         return PyInt_FromLong(o->val);
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        ByteStreamObject * o = (void *) self;
+        return PyInt_FromLong(o->val);
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        LongLongStreamObject * o = (void *) self;
+        return PyLong_FromUnsignedLongLong(o->val);
     }
 
     PyErr_SetString(PyExc_TypeError, "invalid type");
@@ -118,8 +140,21 @@ static int NumericStream_Cmp(PyObject * self, PyObject * other) {
             return -1;
 
         return 1;
-    }
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        if (VALUE(self, Byte) == VALUE(other, Byte))
+            return 0;
+        else if (VALUE(self, Byte) < VALUE(other, Byte))
+            return -1;
 
+        return 1;
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        if (VALUE(self, LongLong) == VALUE(other, LongLong))
+            return 0;
+        else if (VALUE(self, LongLong) < VALUE(other, LongLong))
+            return -1;
+
+        return 1;
+    }
     assert(0);
 }
 
@@ -146,6 +181,18 @@ static PyObject * NumericStream_Diff(PyObject * self, PyObject * args) {
 
         if ((o1->isNone != o2->isNone) || (o1->val != o2->val))
             return raw_ShortStream_Freeze(o1);
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        ByteStreamObject * o1 = (void *) self;
+        ByteStreamObject * o2 = (void *) them;
+
+        if ((o1->isNone != o2->isNone) || (o1->val != o2->val))
+            return raw_ByteStream_Freeze(o1);
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        LongLongStreamObject * o1 = (void *) self;
+        LongLongStreamObject * o2 = (void *) them;
+
+        if ((o1->isNone != o2->isNone) || (o1->val != o2->val))
+            return raw_LongLongStream_Freeze(o1);
     } else {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return NULL;
@@ -190,6 +237,16 @@ static long ShortStream_Hash(PyObject * self) {
     return o->val;
 }
 
+static long ByteStream_Hash(PyObject * self) {
+    ByteStreamObject * o = (void *) self;
+    return o->val;
+}
+
+static long LongLongStream_Hash(PyObject * self) {
+    LongLongStreamObject * o = (void *) self;
+    return PyObject_Hash(PyLong_FromUnsignedLongLong(o->val));
+}
+
 static inline PyObject * raw_IntStream_Freeze(IntStreamObject * o) {
     int ordered = htonl(o->val);
     char buffer[20];
@@ -212,6 +269,26 @@ static inline PyObject * raw_ShortStream_Freeze(ShortStreamObject * o) {
     return PyString_FromStringAndSize(buffer, sizeof(ordered));
 }
 
+static inline PyObject * raw_ByteStream_Freeze(ByteStreamObject * o) {
+    if (o->isNone)
+        return PyString_FromString("");
+
+    return PyString_FromStringAndSize(&o->val, 1);
+}
+
+static inline PyObject * raw_LongLongStream_Freeze(LongLongStreamObject * o) {
+    int high = htonl(o->val >> 32 & 0xffffffff);
+    int low = htonl(o->val & 0xffffffff);
+    char buffer[40];
+
+    if (o->isNone)
+        return PyString_FromString("");
+
+    memcpy(buffer, &high, sizeof(high));
+    memcpy(buffer + sizeof(high), &low, sizeof(low));
+    return PyString_FromStringAndSize(buffer, sizeof(low) * 2);
+}
+
 static PyObject * NumericStream_Freeze(NumericStreamObject * self, 
                                        PyObject * args,
                                        PyObject * kwargs) {
@@ -228,6 +305,10 @@ static PyObject * NumericStream_Freeze(NumericStreamObject * self,
         return raw_IntStream_Freeze((IntStreamObject *) self);
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         return raw_ShortStream_Freeze((ShortStreamObject *) self);
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        return raw_ByteStream_Freeze((ByteStreamObject *) self);
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        return raw_LongLongStream_Freeze((LongLongStreamObject *) self);
     } else {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return NULL;
@@ -255,7 +336,9 @@ static int NumericStream_Init(PyObject * self, PyObject * args,
         if (!raw_NumericStream_Thaw(o, frozen, frozenLen))
             return 1;
     } else if (initObj && PyInt_Check(initObj)) {
-        NUMERICSTREAM_SET(self, PyInt_AsLong(initObj))
+        NUMERICSTREAM_SET(self, PyInt_AsLong(initObj));
+    } else if (initObj && PyLong_Check(initObj) && (STREAM_CHECK(o, LONG_LONG_STREAM))) {
+        SET(o, LongLong, PyLong_AsUnsignedLongLong(initObj));
     } else if (initObj == Py_None) {
         o->isNone = 1;
     } else if (initObj) {
@@ -274,20 +357,32 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
 
     o->isNone = 0;
 
-    if (!PyArg_ParseTuple(args, "i", &val))
-        return NULL;
-    
     if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
+	if (!PyArg_ParseTuple(args, "i", &val))
+	    return NULL;
         o->val = val;
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
+	if (!PyArg_ParseTuple(args, "i", &val))
+	    return NULL;
         o->val = val;
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        ByteStreamObject * o = (void *) self;
+	if (!PyArg_ParseTuple(args, "i", &val))
+	    return NULL;
+        o->val = val;
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        LongLongStreamObject * o = (void *) self;
+	unsigned long long lval;
+	if (!PyArg_ParseTuple(args, "K", &lval))
+	    return NULL;
+        o->val = lval;
     } else {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return NULL;
     }
-    
+
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -322,6 +417,36 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
             o->isNone = 1;
         else
             o->val = ntohs(*((int *) frozen));
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        ByteStreamObject * o = (void *) self;
+
+        if (frozenLen != 1) {
+            PyErr_SetString(PyExc_ValueError,
+                    "Frozen byte stream must be 1 byte long");
+            return 0;
+        }
+
+        if (!frozenLen)
+            o->isNone = 1;
+        else
+            o->val = (*((char *) frozen));
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        LongLongStreamObject * o = (void *) self;
+
+        if (frozenLen != 8) {
+            PyErr_SetString(PyExc_ValueError,
+                    "Frozen long long stream must be 8 byte long");
+            return 0;
+        }
+
+        if (!frozenLen)
+            o->isNone = 1;
+        else {
+	    o->val = (unsigned long long) ntohl(*((long *) frozen)) << 32;
+	    frozen += 4;
+	    o->val |= (unsigned long long) ntohl(*((long *) frozen));
+	    return 0;
+	}
     } else {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return 1;
@@ -393,6 +518,57 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
 
         if (diffLen)
             newVal = ntohs(*((int *) diff));
+        if (o->isNone == base->isNone && o->val == base->val) {
+            if (!diffLen)
+                o->isNone = 1;
+            else {
+                o->isNone = 0;
+                o->val = newVal;
+            }
+
+            retVal = Py_False;
+        } else if ((o->isNone && diffLen) ||
+                   (!o->isNone && !diffLen) ||
+                   (!o->isNone && diffLen && o->val != newVal))
+            retVal = Py_True;
+        else
+            retVal = Py_False;
+    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
+        ByteStreamObject * o = (void *) self;
+        ByteStreamObject * base = (void *) other;
+        char newVal = '\0';
+
+        assert(diffLen == 0 || diffLen == 1);
+
+        if (diffLen)
+            newVal = *((char *) diff);
+
+        if (o->isNone == base->isNone && o->val == base->val) {
+            if (!diffLen)
+                o->isNone = 1;
+            else {
+                o->isNone = 0;
+                o->val = newVal;
+            }
+
+            retVal = Py_False;
+        } else if ((o->isNone && diffLen) ||
+                   (!o->isNone && !diffLen) ||
+                   (!o->isNone && diffLen && o->val != newVal))
+            retVal = Py_True;
+        else
+            retVal = Py_False;
+    } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
+        LongLongStreamObject * o = (void *) self;
+        LongLongStreamObject * base = (void *) other;
+        unsigned long long newVal = 0;
+
+        assert(diffLen == 0 || diffLen == 8);
+
+        if (diffLen) {
+	    newVal = (unsigned long long) ntohl(*((long *) diff)) << 32;
+	    newVal |= (unsigned long long) ntohl(*((long *) (diff + 4)));
+	}
 
         if (o->isNone == base->isNone && o->val == base->val) {
             if (!diffLen)
@@ -410,11 +586,12 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
         else
             retVal = Py_False;
     } else {
-        assert(0);
+	PyErr_SetString(PyExc_TypeError, "invalid type");
+	return NULL;
     }
 
     Py_INCREF(retVal);
-	return retVal;
+    return retVal;
 }
 
 /* ------------------------------------- */
@@ -458,7 +635,7 @@ PyTypeObject NumericStreamType = {
     0,                              /*tp_getattro*/
     0,                              /*tp_setattro*/
     0,                              /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
     NULL,                           /* tp_doc */
     0,                              /* tp_traverse */
     0,                              /* tp_clear */
@@ -498,7 +675,7 @@ PyTypeObject IntStreamType = {
     0,                              /*tp_getattro*/
     0,                              /*tp_setattro*/
     0,                              /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
     NULL,                           /* tp_doc */
     0,                              /* tp_traverse */
     0,                              /* tp_clear */
@@ -533,6 +710,76 @@ PyTypeObject ShortStreamType = {
     0,                              /*tp_getattro*/
     0,                              /*tp_setattro*/
     0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
+    NULL,                           /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    0,                              /* tp_members */
+    0,                              /* tp_getset */
+    &NumericStreamType,             /* tp_base */
+};
+
+PyTypeObject ByteStreamType = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,                              /*ob_size*/
+    "cstreams.ByteStream",	    /*tp_name*/
+    sizeof(ByteStreamObject),      /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    0,                              /*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    NumericStream_Cmp,              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    ByteStream_Hash,               /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
+    NULL,                           /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    0,                              /* tp_members */
+    0,                              /* tp_getset */
+    &NumericStreamType,             /* tp_base */
+};
+
+PyTypeObject LongLongStreamType = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,                              /*ob_size*/
+    "cstreams.LongLongStream",	    /*tp_name*/
+    sizeof(LongLongStreamObject),      /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    0,                              /*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    NumericStream_Cmp,              /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    LongLongStream_Hash,               /*tp_hash */
+    0,                              /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT,             /*tp_flags*/
     NULL,                           /* tp_doc */
     0,                              /* tp_traverse */
@@ -551,4 +798,6 @@ void numericstreaminit(PyObject * m) {
     allStreams[NUMERIC_STREAM].pyType = NumericStreamType;
     allStreams[INT_STREAM].pyType     = IntStreamType;
     allStreams[SHORT_STREAM].pyType   = ShortStreamType;
+    allStreams[BYTE_STREAM].pyType    = ByteStreamType;
+    allStreams[LONG_LONG_STREAM].pyType = LongLongStreamType;
 }

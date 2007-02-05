@@ -228,9 +228,6 @@ class TroveStore:
 
 	return (cu, trv)
 
-    import epdb
-    epdb.stc(f = 2)
-
     def addTroveDone(self, troveInfo):
 	(cu, trv) = troveInfo
 

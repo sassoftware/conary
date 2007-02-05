@@ -9,6 +9,18 @@ Changes in @NEW@:
     * Reworked code which commit groups to the repository to significantly
       reduce the number of SQL queries executed (CNY-1273)
 
+  o Build Changes:
+    * A list of autosource mirrors has been added.
+
+  o Internal Changes:
+    * A StringStream can now be set from a Unicode object.  The
+      StringStream stores the UTF-8 encoding of the Unicode
+      object. (CNY-366)
+    * ByteStream and LongLongStream have been implemented in C.
+      Modifications have been made to the NumericStream types
+      implemented in C so that they can be used as base classes in
+      Python.
+
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
       parse a "user" line in a configuration line.  Previously Conary
@@ -20,12 +32,9 @@ Changes in @NEW@:
       should not be used when attempting to access source or target
       repositories when mirroring. (CNY-1239)
     * "cvc emerge" now displays error messages when the underlying
-       cook process results in an exception.  Previously, an unhandled
-       exception message was generated. (CNY-995)
-    * Derived packages now support setuid and setgid files (CNY-1281)
-
-  o Build Changes:
-    * A list of autosource mirrors has been added.
+      cook process results in an exception.  Previously, an unhandled
+      exception message was generated. (CNY-995)
+    * Derived packages now support setuid and setgid files. (CNY-1281)
 
 Changes in 1.1.16:
   o Server Changes:

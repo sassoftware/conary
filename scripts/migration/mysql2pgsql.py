@@ -91,6 +91,9 @@ tList = [
     'FileStreams',
     'TroveFiles',
     ]
+# tables with non-integer primary keys require special handling
+noIntPK = [ 'PGPFingerprints' ]
+
 skip = ['databaseversion', 'instructionsets']
 knowns = [x.lower() for x in tList]
 missing = []
@@ -174,7 +177,8 @@ def fix_pk(table):
     assert (ret == pkval)
     print "    SETVAL %s(%s) = %d" % (table, pkname, ret)
 
-for t in tList:
+def migrate_table(t):
+    global pgsql, src, dst
     count = src.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
     # prepare the execution cursor
     src.execute("SELECT * FROM %s LIMIT 1" % (t,))
@@ -215,8 +219,13 @@ for t in tList:
             if i % 10000 == 0:
                 pgsql.commit()
     print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
-    fix_pk(t)
+    if t not in noIntPK:
+        fix_pk(t)
     pgsql.commit()
+
+for t in tList:
+    print "Migrating table:", t
+    migrate_table(t)
 
 # and now create the indexes
 dst = pgsql.cursor()
@@ -225,3 +234,9 @@ for stmt in getIndexes("postgresql"):
     dst.execute(stmt)
 pgsql.setVersion(VERSION)
 pgsql.commit()
+
+del src
+srcdb.close()
+
+del dst
+pgsql.close()
