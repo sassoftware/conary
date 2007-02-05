@@ -12,6 +12,11 @@ Changes in @NEW@:
   o Build Changes:
     * A list of autosource mirrors has been added.
 
+  o Internal Changes:
+    * A StringStream can now be set from a Unicode object.  The
+      StringStream stores the UTF-8 encoding of the Unicode
+      object. (CNY-366)
+
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
       parse a "user" line in a configuration line.  Previously Conary
