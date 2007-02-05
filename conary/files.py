@@ -214,10 +214,7 @@ class InodeStream(streams.StreamSet):
 
     eq = __eq__
 
-class FlagsStream(streams.NumericStream):
-
-    __slots__ = "val"
-    format = "!I"
+class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
@@ -239,14 +236,14 @@ class FlagsStream(streams.NumericStream):
 
     def _isFlag(self, flag, set):
 	if set != None:
-            if self.val is None:
-                self.val = 0x0
+            if self() is None:
+                self.set(0x0)
 	    if set:
-		self.val |= flag
+		self.set(self() | flag)
 	    else:
-		self.val &= ~(flag)
+		self.set(self() & ~(flag))
 
-	return (self.val and self.val & flag)
+	return (self() and self() & flag)
 
 class File(streams.StreamSet):
 

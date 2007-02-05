@@ -16,6 +16,10 @@ Changes in @NEW@:
     * A StringStream can now be set from a Unicode object.  The
       StringStream stores the UTF-8 encoding of the Unicode
       object. (CNY-366)
+    * ByteStream and LongLongStream have been implemented in C.
+      Modifications have been made to the NumericStream types
+      implemented in C so that they can be used as base classes in
+      Python.
 
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
