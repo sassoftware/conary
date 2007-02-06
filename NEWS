@@ -11,6 +11,8 @@ Changes in @NEW@:
 
   o Build Changes:
     * A list of autosource mirrors has been added.
+    * cvc cook --show-buildreqs works properly now. Thanks to Pavel
+      Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
