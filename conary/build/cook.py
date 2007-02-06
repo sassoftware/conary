@@ -1503,6 +1503,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
             recipeObj = recipeClass(cfg, None, [], lightInstance=True)
             sys.stdout.write('\n'.join(sorted(recipeObj.buildRequires)))
+            sys.stdout.write('\n')
             sys.stdout.flush()
     if showBuildReqs:
         return None
@@ -1634,12 +1635,18 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                              crossCompile = crossCompile,
                              callback = CookCallback(),
                              downloadOnly = downloadOnly)
+            if built is None:
+                # showBuildReqs true, most likely
+                # Make sure we call os._exit in the child, sys.exit raises a
+                # SystemExit that confuses a try/except around cookCommand
+                os._exit(0)
             components, csFile = built
             if not components:
                 # --prep or --download or perhaps an error was logged
                 if log.errorOccurred():
+                    # Leave a sys.exit here, we may need it for debugging
                     sys.exit(1)
-                sys.exit(0)
+                os._exit(0)
             for component, version, flavor in sorted(components):
                 print "Created component:", component, version,
                 if flavor is not None:
@@ -1653,7 +1660,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 os.write(outpipe, csFile)
             if profile:
                 prof.stop()
-            sys.exit(0)
+            os._exit(0)
         else:
             # parent process, no need for the write side of the pipe
             os.close(outpipe)
