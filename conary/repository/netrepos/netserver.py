@@ -367,12 +367,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             # fall-through to debug this exception - this code should
             # not run on production servers
-            import traceback, sys, string
+            import traceback
             from conary.lib import debugger
             debugger.st()
             excInfo = sys.exc_info()
             lines = traceback.format_exception(*excInfo)
-            print string.joinfields(lines, "")
+            print "".joinfields(lines)
             if 1 or sys.stdout.isatty() and sys.stdin.isatty():
 		debugger.post_mortem(excInfo[2])
             raise
@@ -1529,22 +1529,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     if (clientVersion < 38
                         and tcs.troveType() == trove.TROVE_TYPE_REMOVED):
                         ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
+                        trvName = tcs.getName()
+                        trvNewVersion = tcs.getNewVersion()
+                        trvNewFlavor = tcs.getNewFlavor()
                         if ti.flags.isMissing():
                             # this was a missing trove for which we
                             # synthesized a removed trove object. 
                             # The client would have a much easier time
                             # updating if we just made it a regular trove.
-                            missingName = tcs.getName()
-                            missingNewVersion = tcs.getNewVersion()
                             missingOldVersion = tcs.getOldVersion()
-                            missingNewFlavor = tcs.getNewFlavor()
                             missingOldFlavor = tcs.getOldFlavor()
-                            oldTrove = trove.Trove(missingName,
+                            oldTrove = trove.Trove(trvName,
                                                    missingOldVersion,
                                                    missingOldFlavor)
-                            newTrove = trove.Trove(missingName,
-                                                   missingNewVersion,
-                                                   missingNewFlavor)
+                            newTrove = trove.Trove(trvName,
+                                                   trvNewVersion,
+                                                   trvNewFlavor)
                             diff = newTrove.diff(oldTrove)[0]
                             newCs.newTrove(diff)
                             rewrite = True
@@ -1554,8 +1554,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             f.close()
                             os.unlink(path)
                             del cs
-                            raise errors.TroveMissing(missingName,
-                                                      version=missingVersion)
+                            raise errors.TroveMissing(trvName,
+                                                      version=trvNewVersion)
                 if rewrite:
                     # we need to re-write the munged changeset for an
                     # old client
@@ -2638,7 +2638,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 raise errors.InsufficientPermission
         # infoType should be valid
         if infoType not in trove.TroveInfo.streamDict.keys():
-            raise RepositoryError("Unknown trove infoType requested", infoType)
+            raise errors.RepositoryError("Unknown trove infoType requested",
+                                         infoType)
 
         self.log(2, infoType, troveList)
         cu = self.db.cursor()
