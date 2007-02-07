@@ -242,16 +242,19 @@ class HttpRequests(SimpleHTTPRequestHandler):
         elif self.netProxy:
             repos = self.netProxy
         else:
-            raise RepositoryMismatch(cfg.serverName, targetServerName)
+            result = (False, True, [ 'RepositoryMismatch',
+                                   cfg.serverName, targetServerName ] )
+            repos = None
 
-	try:
-	    result = repos.callWrapper('http', None, method, authToken,
-                        params, remoteIp = self.connection.getpeername()[0],
-                        targetServerName = targetServerName)
-	except errors.InsufficientPermission:
-	    self.send_error(403)
-	    return None
-        logMe(3, "returned from", method)
+        if repos is not None:
+            try:
+                result = repos.callWrapper('http', None, method, authToken,
+                            params, remoteIp = self.connection.getpeername()[0],
+                            targetServerName = targetServerName)
+            except errors.InsufficientPermission:
+                self.send_error(403)
+                return None
+            logMe(3, "returned from", method)
 
         usedAnonymous = result[0]
         result = result[1:]
