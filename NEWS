@@ -39,6 +39,8 @@ Changes in @NEW@:
     * Derived packages now support setuid and setgid files. (CNY-1281)
     * You can no longer accidentally include a group in itself by using
       addAll. (CNY-1123, CNY-1124)
+    * No longer mask permissions errors in the TroveSourceStack.  This should
+      make some update errors involving permissions more obvious. (CNY-1171)
 
 Changes in 1.1.16:
   o Server Changes:

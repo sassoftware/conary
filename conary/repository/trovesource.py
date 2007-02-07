@@ -1177,14 +1177,11 @@ class TroveSourceStack(SearchableTroveSource):
             if not jobList:
                 break
 
-            try:
-                res = source.createChangeSet(jobList, 
-                                           withFiles = withFiles,
-                                           withFileContents = withFileContents,
-                                           recurse = recurse, 
-                                           callback = callback)
-            except errors.OpenError:
-                res = changeset.ReadOnlyChangeSet(), jobList
+            res = source.createChangeSet(jobList,
+                                       withFiles = withFiles,
+                                       withFileContents = withFileContents,
+                                       recurse = recurse, 
+                                       callback = callback)
             if isinstance(res, (list, tuple)):
                 newCs, jobList = res
             else: 
