@@ -1097,7 +1097,8 @@ class SingleGroup(object):
 
     def addNewGroup(self, name, byDefault = None, explicit = True,
                     childDefaults=None):
-
+        if name == self.name:
+            raise CookError('Tried to add %s to itself.  This would create a cycle.')
         if not childDefaults:
             childDefaults = []
         elif not isinstance(childDefaults, list):
@@ -1584,6 +1585,7 @@ def processAddAllDirectives(recipeObj, troveMap, cache, repos):
 def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
+    topGroup = parentGroup
 
     if recurse:
         groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True,
@@ -1624,6 +1626,8 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                     groupsByName[name] = childGroup
 
 
+                if parentGroup.name == name:
+                    raise CookError('Tried to addAll "%s=%s" into %s - which resulted in trying to add %s to itself.  This is not allowed.  You may wish to pass recurse=False to addAll.' % (topTrove.getName(), topTrove.getVersion(), topGroup.name, name))
                 parentGroup.addNewGroup(name, byDefault=byDefault,
                                         explicit = True, childDefaults = trv)
 

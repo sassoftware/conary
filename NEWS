@@ -37,6 +37,8 @@ Changes in @NEW@:
       cook process results in an exception.  Previously, an unhandled
       exception message was generated. (CNY-995)
     * Derived packages now support setuid and setgid files. (CNY-1281)
+    * You can no longer accidentally include a group in itself by using
+      addAll. (CNY-1123, CNY-1124)
 
 Changes in 1.1.16:
   o Server Changes:
