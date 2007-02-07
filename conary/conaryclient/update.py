@@ -234,6 +234,7 @@ class ClientUpdate:
             redirectCs, notFound = csSource.createChangeSet(
                     [ x[1] for x in nextSet ],
                     withFiles = False, recurse = True)
+
             uJob.getTroveSource().addChangeSet(redirectCs)
             transitiveClosure.update(redirectCs.getJobSet(primaries = False))
 
@@ -1341,6 +1342,20 @@ conary erase '%s=%s[%s]'
             sets.append([ jobSet[x][1] for x in set(val) ])
         return sets
 
+    def _trovesNotFound(self, notFound):
+        """
+            Raises a nice error message when changeset creation failed
+            to include all the necessary troves.
+        """
+        nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
+        if nonLocal:
+            troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) 
+                                     for x in nonLocal])
+            raise UpdateError(
+                   'Failed to find required troves for update:\n   %s' 
+                    % troveList)
+
+
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
                          useAffinity = True, checkPrimaryPins = True,
@@ -1582,12 +1597,9 @@ conary erase '%s=%s[%s]'
         self._replaceIncomplete(cs, csSource, 
                                 self.db, self.repos)
         if notFound:
-            nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
-            if nonLocal:
-                troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) for x in nonLocal])
-                raise UpdateError(
-                       'Failed to find required troves for update:\n   %s' 
-                        % troveList)
+            self._trovesNotFound(notFound) # may raise an error 
+                                           # if there are non-local troves
+                                           # in the list
             jobSet.difference_update(notFound)
             if not jobSet:
                 raise NoNewTrovesError
@@ -1922,6 +1934,13 @@ conary erase '%s=%s[%s]'
                                                 withFiles = False,
                                                 recurse = False,
                                                 callback = self.updateCallback)
+        if notFound:
+            self._trovesNotFound(notFound) # may raise an error
+                                           # if there are non-local troves
+                                           # in the list
+            reposChangeSetList.difference_update(notFound)
+            if not reposChangeSetList:
+                raise NoNewTrovesError
 
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         uJob.getTroveSource().addChangeSet(cs)
