@@ -115,7 +115,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         try:
             rc = proxy.__getattr__(methodname)(*args)
         except IOError, e:
-            return [ 'OpenError', [], [] ]
+            return [ False, True, [ 'ProxyError', e.strerror[1] ] ]
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission
