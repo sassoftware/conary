@@ -41,8 +41,6 @@ def post(port, isSecure, repos, req):
     else:
         protocol = "http"
 
-    targetServerName = req.headers_in.get('X-Conary-Servername', None)
-
     if req.headers_in['Content-Type'] == "text/xml":
         # handle XML-RPC requests
         encoding = req.headers_in.get('Content-Encoding', None)
@@ -74,7 +72,7 @@ def post(port, isSecure, repos, req):
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
                                            remoteIp = req.connection.remote_ip,
-                                           targetServerName = targetServerName)
+                                           rawUrl = req.unparsed_uri)
             except errors.InsufficientPermission:
                 return apache.HTTP_FORBIDDEN
 

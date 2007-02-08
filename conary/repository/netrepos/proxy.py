@@ -49,14 +49,11 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
             self.callLog = None
 
         self.log(1, "proxy url=%s" % basicUrl)
-        self.reposSet = netclient.NetworkRepositoryClient(
-                                cfg.repositoryMap, conarycfg.UserInformation())
-
         self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
                                        self.cfg.deadlockRetry)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
-                    remoteIp = None, targetServerName = None):
+                    remoteIp = None, rawUrl = None):
         if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""))
 
@@ -68,15 +65,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
 
-        url = self.cfg.repositoryMap.get(targetServerName, None)
-        if url is None:
-            if authToken[0] != 'anonymous' or authToken[2]:
-                # with a username or entitlement, use https. otherwise
-                # use the same protocol which was used to connect to us
-                proxyProtocol = 'https'
-            else:
-                proxyProtocol = protocol
-            url = '%s://%s/conary/' % (proxyProtocol, targetServerName)
+        url = rawUrl
 
         # paste in the user/password info
         s = url.split('/')

@@ -236,7 +236,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.open(connect=False)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
-                    remoteIp = None, targetServerName = None):
+                    remoteIp = None, rawUrl = None):
         """
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
         is a Boolean stating whether the operation was performed as the

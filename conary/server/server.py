@@ -250,7 +250,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             try:
                 result = repos.callWrapper('http', None, method, authToken,
                             params, remoteIp = self.connection.getpeername()[0],
-                            targetServerName = targetServerName)
+                            rawUrl = self.path)
             except errors.InsufficientPermission:
                 self.send_error(403)
                 return None
