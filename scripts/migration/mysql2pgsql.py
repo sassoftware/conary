@@ -15,7 +15,6 @@
 
 import sys
 import os
-sys.path.insert(0, "/home/gafton/python-pgsql")
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
     sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
