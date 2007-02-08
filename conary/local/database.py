@@ -1155,6 +1155,9 @@ class Database(SqlDbRepository):
                         # wat not a directory
                         d = os.path.dirname(e.filename)
                         raise OpenError(top, '%s is not a directory' %d)
+                    elif e.errno == errno.EACCES:
+                        d = os.path.dirname(e.filename)
+                        raise OpenError(top, 'cannot create directory %s' %d)
                     else:
                         raise
 
