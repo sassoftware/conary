@@ -41,6 +41,8 @@ Changes in @NEW@:
       addAll. (CNY-1123, CNY-1124)
     * No longer mask permissions errors in the TroveSourceStack.  This should
       make some update errors involving permissions more obvious. (CNY-1171)
+    * Fix a bug where shared contents in a changeset between InitialContents
+      and a regular file could cause an update failure.  (CNY-1084)
 
 Changes in 1.1.16:
   o Server Changes:

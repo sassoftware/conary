@@ -413,12 +413,13 @@ class FilesystemJob:
 	    # contents from the change set or from the database". If we 
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
-            if fileObj.hasContents:
+            needContents = fileObj.hasContents
+            if override and pathId not in ptrTargets:
+                needContents = False
+                contents = override
+            if needContents and fileObj.hasContents:
                 self.callback.restoreFiles(fileObj.contents.size(), 
                                            self.restoreSize)
-	    if override != "":
-		contents = override
-	    elif fileObj.hasContents:
                 if fileObj.flags.isConfig() and not fileObj.flags.isSource():
                     # take the config file from the local database
                     contents = self.db.getFileContents(
@@ -457,10 +458,21 @@ class FilesystemJob:
                         open(target, "w")
                         continue
 
+            if pathId in ptrTargets:
+                # someone is requesting that we use this path as a place 
+                # to grab its contents from.  That will only
+                # work if the contents are correct - which won't be the
+                # case for initial contents files
+                if override != "":
+                    ptrTargets[pathId] = contents
+                else:
+                    ptrTargets[pathId] = target
+
+            if override != "":
+                contents = override
+
 	    restoreFile(fileObj, contents, self.root, target, journal,
                         opJournal)
-            if ptrTargets.has_key(pathId):
-                ptrTargets[pathId] = target
 	    log.debug(msg, target)
 
             if fileObj.hasContents and fileObj.linkGroup():
@@ -488,14 +500,20 @@ class FilesystemJob:
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
 
-	    restoreFile(fileObj, filecontents.FromFilesystem(ptrTargets[ptrId]),
+            if isinstance(ptrTargets[ptrId], str):
+                contents = filecontents.FromFilesystem(ptrTargets[ptrId])
+            else:
+                contents = ptrTargets[ptrId]
+                ptrTargets[ptrId] = target
+                
+	    restoreFile(fileObj, contents,
 			self.root, target, journal=journal,
                         opJournal = opJournal)
             log.debug(msg, target)
 
         del delayedRestores
 
-	for (target, str, msg) in self.newFiles:
+	for (target, contents, msg) in self.newFiles:
             opJournal.backup(target)
             try:
                 os.unlink(target)
@@ -504,7 +522,7 @@ class FilesystemJob:
                     raise
 	    f = open(target, "w")
             opJournal.create(target)
-	    f.write(str)
+	    f.write(contents)
 	    f.close()
 	    self.callback.warning(msg)
 
