@@ -450,6 +450,10 @@ if __name__ == '__main__':
             (l, f) = cfg.traceLog
         initLog(filename = f, level = l, trace=1)
 
+    if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
+        print "tmpDir cannot include symbolic links"
+        sys.exit(1)
+
     if cfg.proxyDB:
         if len(otherArgs) > 1:
             usage()
