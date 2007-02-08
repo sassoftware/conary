@@ -236,7 +236,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.open(connect=False)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
-                    remoteIp = None):
+                    remoteIp = None, rawUrl = None):
         """
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
         is a Boolean stating whether the operation was performed as the
@@ -2717,6 +2717,7 @@ class ServerConfig(ConfigFile):
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
+    proxyDB                 = dbstore.CfgDriver
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap

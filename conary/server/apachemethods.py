@@ -71,7 +71,8 @@ def post(port, isSecure, repos, req):
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
-                                           remoteIp = req.connection.remote_ip)
+                                           remoteIp = req.connection.remote_ip,
+                                           rawUrl = req.unparsed_uri)
             except errors.InsufficientPermission:
                 return apache.HTTP_FORBIDDEN
 

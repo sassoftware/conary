@@ -229,6 +229,9 @@ class DigitalSignatureError(RepositoryError):
         RepositoryError.__init__(self, error)
         self.error = error
 
+class ProxyError(RepositoryError):
+    pass
+
 class InternalServerError(RepositoryError, InternalConaryError):
     def __init__(self,  err):
         self.err = err
@@ -265,4 +268,5 @@ simpleExceptions = (
     (InvalidRegex,               'InvalidRegex'),
     (InvalidName,                'InvalidName'),
     (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
+    (ProxyError,                 'ProxyError'),
     )

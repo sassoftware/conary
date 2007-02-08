@@ -14,6 +14,7 @@
 
 import itertools
 
+from conary import errors as conaryerrors
 from conary import files
 from conary import trove
 from conary.local import deptable
@@ -582,8 +583,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
-                    # FIXME: there is no such exception in this context
-                    raise DuplicateTrove
+                    raise conaryerrors.InternalConaryError
                 self.troveCsMap[info] = cs
                 self.jobMap[(info[0], (None, None), info[1:], 
                              trvCs.isAbsolute())] = cs, includesFileContents
@@ -602,7 +602,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             for (trvCs, info) in relative:
                 if info in self.troveCsMap:
                     # FIXME: there is no such exception in this context
-                    raise DuplicateTrove
+                    raise conaryerrors.InternalConaryError
                 if not self.db.hasTrove(*trvCs.getOldNameVersionFlavor()):
                     # we don't has the old version of this trove, don't 
                     # use this changeset when updating this trove.
