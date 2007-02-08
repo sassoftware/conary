@@ -399,7 +399,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
             needsSigning = True
         elif type == recipe.RECIPE_TYPE_FILESET:
             ret = cookFilesetObject(repos, db, cfg, recipeClass, 
-                                    sourceVersion, 
+                                    sourceVersion, buildFlavor,
                                     macros = macros, 
                                     targetLabel = targetLabel,
                                     alwaysBumpCount = alwaysBumpCount)
@@ -623,8 +623,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
     return (changeSet, built, None)
 
-def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
-		      targetLabel = None, alwaysBumpCount=False):
+def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
+                      macros={}, targetLabel = None, alwaysBumpCount=False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -652,7 +652,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     fullName = recipeClass.name
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
-                            cfg.flavor, macros)
+                            buildFlavor, macros)
     _callSetup(cfg, recipeObj)
 
     log.info('Building %s=%s[%s]' % ( recipeClass.name,
