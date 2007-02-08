@@ -188,6 +188,7 @@ def migrate_table(t):
     stmt = dst.compile(sql)
     funcs = [ getfunc(x) for x in fields ]
     i = 0
+    dst.execute("ALTER TABLE %s DISABLE TRIGGER ALL" % t)
     src.execute("SELECT * FROM %s" % t)
     t1 = time.time()
     while True:
@@ -221,10 +222,11 @@ def migrate_table(t):
     print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
     if t not in noIntPK:
         fix_pk(t)
+    dst.execute("ALTER TABLE %s ENABLE TRIGGER ALL" % t)
     pgsql.commit()
 
 for t in tList:
-    print "Migrating table:", t
+    print "Migrating table:", t,
     migrate_table(t)
 
 # and now create the indexes
