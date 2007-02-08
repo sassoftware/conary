@@ -234,6 +234,7 @@ class ClientUpdate:
             redirectCs, notFound = csSource.createChangeSet(
                     [ x[1] for x in nextSet ],
                     withFiles = False, recurse = True)
+
             uJob.getTroveSource().addChangeSet(redirectCs)
             transitiveClosure.update(redirectCs.getJobSet(primaries = False))
 
@@ -1341,6 +1342,20 @@ conary erase '%s=%s[%s]'
             sets.append([ jobSet[x][1] for x in set(val) ])
         return sets
 
+    def _trovesNotFound(self, notFound):
+        """
+            Raises a nice error message when changeset creation failed
+            to include all the necessary troves.
+        """
+        nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
+        if nonLocal:
+            troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) 
+                                     for x in nonLocal])
+            raise UpdateError(
+                   'Failed to find required troves for update:\n   %s' 
+                    % troveList)
+
+
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
                          useAffinity = True, checkPrimaryPins = True,
@@ -1582,12 +1597,9 @@ conary erase '%s=%s[%s]'
         self._replaceIncomplete(cs, csSource, 
                                 self.db, self.repos)
         if notFound:
-            nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
-            if nonLocal:
-                troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) for x in nonLocal])
-                raise UpdateError(
-                       'Failed to find required troves for update:\n   %s' 
-                        % troveList)
+            self._trovesNotFound(notFound) # may raise an error 
+                                           # if there are non-local troves
+                                           # in the list
             jobSet.difference_update(notFound)
             if not jobSet:
                 raise NoNewTrovesError
@@ -1922,6 +1934,13 @@ conary erase '%s=%s[%s]'
                                                 withFiles = False,
                                                 recurse = False,
                                                 callback = self.updateCallback)
+        if notFound:
+            self._trovesNotFound(notFound) # may raise an error
+                                           # if there are non-local troves
+                                           # in the list
+            reposChangeSetList.difference_update(notFound)
+            if not reposChangeSetList:
+                raise NoNewTrovesError
 
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         uJob.getTroveSource().addChangeSet(cs)
@@ -2639,14 +2658,14 @@ conary erase '%s=%s[%s]'
                 try:
                     newCs = _createCs(repos, db, job, uJob)
                 except:
-                    q.put(None)
-                    raise
+                    q.put((True, sys.exc_info()))
+                    return
 
                 while True:
                     # block for no more than 5 seconds so we can
                     # check to see if we should abort
                     try:
-                        q.put(newCs, True, 5)
+                        q.put((False, newCs), True, 5)
                         break
                     except Queue.Full:
                         # if the queue is full, check to see if the
@@ -2723,6 +2742,12 @@ conary erase '%s=%s[%s]'
                                               ' unexpectedly, cannot continue update')
                         if newCs is None:
                             break
+                        # We expect a (boolean, value)
+                        isException, val = newCs
+                        if isException:
+                            raise val[0], val[1], val[2]
+
+                        newCs = val
                         i += 1
                         self.updateCallback.setUpdateHunk(i, len(allJobs))
                         self.updateCallback.setUpdateJob(allJobs[i - 1])

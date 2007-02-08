@@ -11,6 +11,8 @@ Changes in @NEW@:
 
   o Build Changes:
     * A list of autosource mirrors has been added.
+    * cvc cook --show-buildreqs works properly now. Thanks to Pavel
+      Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
@@ -35,6 +37,13 @@ Changes in @NEW@:
       cook process results in an exception.  Previously, an unhandled
       exception message was generated. (CNY-995)
     * Derived packages now support setuid and setgid files. (CNY-1281)
+    * You can no longer accidentally include a group in itself by using
+      addAll. (CNY-1123, CNY-1124)
+    * Alert the users when troves could not be found during migrate
+      in the same manner they are alerted during a regular update. (CNY-1171)
+    * Fix a bug where shared contents in a changeset between InitialContents
+      and a regular file could cause an update failure.  (CNY-1084)
+    * Make filesets support buildFlavor (CNY-1127)
 
 Changes in 1.1.16:
   o Server Changes:

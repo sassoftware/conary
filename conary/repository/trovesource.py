@@ -117,11 +117,12 @@ class AbstractTroveSource:
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossSources = True, 
                   acrossFlavors = True, affinityDatabase = None,
-                  bestFlavor = None, getLeaves = None):
+                  bestFlavor = None, getLeaves = None, 
+                  troveTypes=TROVE_QUERY_PRESENT):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossSources, acrossFlavors,
                               affinityDatabase, bestFlavor=bestFlavor,
-                              getLeaves=getLeaves)
+                              getLeaves=getLeaves, troveTypes=troveTypes)
         return res[(name, versionStr, flavor)]
 
     def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
@@ -1055,7 +1056,11 @@ class TroveSourceStack(SearchableTroveSource):
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
                    acrossLabels=True, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False,
+                   bestFlavor=None, getLeaves=None,
                    troveTypes=TROVE_QUERY_PRESENT):
+
+        sourceBestFlavor = bestFlavor
+        sourceGetLeaves = getLeaves
         troveSpecs = list(troveSpecs)
 
         results = {}
@@ -1081,12 +1086,17 @@ class TroveSourceStack(SearchableTroveSource):
             else:
                 sourceTroveTypes = TROVE_QUERY_PRESENT
 
+            if bestFlavor is None:
+                sourceBestFlavor = source._bestFlavor
+            if getLeaves is None:
+                sourceGetLeaves = source._getLeavesOnly
+
             troveFinder = findtrove.TroveFinder(source, sourceLabelPath, 
                                             sourceDefaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=source._allowNoLabel,
-                                            bestFlavor=source._bestFlavor,
-                                            getLeaves=source._getLeavesOnly,
+                                            bestFlavor=sourceBestFlavor,
+                                            getLeaves=sourceGetLeaves,
                                             troveTypes=sourceTroveTypes)
 
             foundTroves = troveFinder.findTroves(troveSpecs, allowMissing=True)
@@ -1106,15 +1116,25 @@ class TroveSourceStack(SearchableTroveSource):
             sourceLabelPath = None
         else:
             sourceLabelPath = labelPath
-         
-        troveFinder = findtrove.TroveFinder(source, labelPath, 
+        if source.searchableByType():
+            sourceTroveTypes = troveTypes
+        else:
+            sourceTroveTypes = TROVE_QUERY_PRESENT
+        if bestFlavor is None:
+            sourceBestFlavor = source._bestFlavor
+        if getLeaves is None:
+            sourceGetLeaves = source._getLeavesOnly
+
+
+        troveFinder = findtrove.TroveFinder(source, labelPath,
                                         defaultFlavor, acrossLabels,
                                         acrossFlavors, affinityDatabase,
                                         allowNoLabel=source._allowNoLabel,
-                                        bestFlavor=source._bestFlavor,
-                                        getLeaves=source._getLeavesOnly)
+                                        bestFlavor=sourceBestFlavor,
+                                        getLeaves=sourceGetLeaves,
+                                        troveTypes=sourceTroveTypes)
 
-        results.update(troveFinder.findTroves(troveSpecs, 
+        results.update(troveFinder.findTroves(troveSpecs,
                                               allowMissing=allowMissing))
         return results
 
@@ -1158,17 +1178,17 @@ class TroveSourceStack(SearchableTroveSource):
                 break
 
             try:
-                res = source.createChangeSet(jobList, 
+                res = source.createChangeSet(jobList,
                                            withFiles = withFiles,
                                            withFileContents = withFileContents,
                                            recurse = recurse, 
                                            callback = callback)
+                if isinstance(res, (list, tuple)):
+                    newCs, jobList = res
+                else: 
+                    newCs, jobList = res, None
             except errors.OpenError:
-                res = changeset.ReadOnlyChangeSet(), jobList
-            if isinstance(res, (list, tuple)):
-                newCs, jobList = res
-            else: 
-                newCs, jobList = res, None
+                newCs = changeset.ReadOnlyChangeSet()
             cs.merge(newCs)
 
         return cs, jobList
