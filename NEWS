@@ -44,6 +44,8 @@ Changes in @NEW@:
     * Fix a bug where shared contents in a changeset between InitialContents
       and a regular file could cause an update failure.  (CNY-1084)
     * Make filesets support buildFlavor (CNY-1127)
+    * TroveSource tried to raise a DuplicateTrove exception, which doesn't
+      exist. Replaced with InternalConaryError (CNY-1197)
 
 Changes in 1.1.16:
   o Server Changes:
