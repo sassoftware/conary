@@ -44,6 +44,10 @@ Changes in @NEW@:
     * Fix a bug where shared contents in a changeset between InitialContents
       and a regular file could cause an update failure.  (CNY-1084)
     * Make filesets support buildFlavor (CNY-1127)
+    * Group recipes could sometimes include a trove for dep resolution but
+      not move to include the package directly in the group that is doing dep
+      resolution.  Now the package + component are always included immediately
+      in the group that is resolving deps.  (CNY-1305)
 
 Changes in 1.1.16:
   o Server Changes:
