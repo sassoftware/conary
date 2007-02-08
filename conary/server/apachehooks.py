@@ -23,6 +23,7 @@ import traceback
 from conary.lib import coveragehook
 from conary.lib import log
 from conary.repository.netrepos import netserver
+from conary.repository.netrepos import proxy
 from conary.server.apachemethods import get, post, putFile
 
 def writeTraceback(wfile, cfg):
@@ -129,18 +130,28 @@ def _handler(req):
         urlBase = "%%(protocol)s://%s:%%(port)d" % \
                         (req.server.server_hostname) + rest
 
-        if not cfg.repositoryDB:
-            log.error("repositoryDB is required in %s" % req.filename)
+        if not cfg.repositoryDB and not cfg.proxyDB:
+            log.error("repositoryDB or proxyDB is required in %s" % 
+                      req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
-        elif not cfg.contentsDir:
-            log.error("contentsDir is required in %s" % req.filename)
+        elif cfg.repositoryDB and cfg.proxyDB:
+            log.error("only one of repositoryDB or proxyDB may be specified "
+                      "in %s" % req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
-        elif not cfg.serverName:
-            log.error("serverName is required in %s" % req.filename)
-            return apache.HTTP_INTERNAL_SERVER_ERROR
+
+        if cfg.repositoryDB:
+            if not cfg.contentsDir:
+                log.error("contentsDir is required in %s" % req.filename)
+                return apache.HTTP_INTERNAL_SERVER_ERROR
+            elif not cfg.serverName:
+                log.error("serverName is required in %s" % req.filename)
+                return apache.HTTP_INTERNAL_SERVER_ERROR
 
         if cfg.closed:
             repositories[repName] = netserver.ClosedRepositoryServer(cfg)
+            repositories[repName].forceSecure = False
+        elif cfg.proxyDB:
+            repositories[repName] = proxy.ProxyRepositoryServer(cfg, urlBase)
             repositories[repName].forceSecure = False
         else:
             repositories[repName] = netserver.NetworkRepositoryServer(

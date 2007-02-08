@@ -36,6 +36,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         self.cfg = cfg
         self.basicUrl = basicUrl
         self.logFile = cfg.logFile
+        self.tmpPath = cfg.tmpDir
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
