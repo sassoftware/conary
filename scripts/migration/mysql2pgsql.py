@@ -15,12 +15,14 @@
 
 import sys
 import os
+sys.path.insert(0, "/home/gafton/python-pgsql")
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
     sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
 
 import time
 import types
+import itertools
 
 from conary import dbstore
 from conary.dbstore import sqlerrors, sqllib
@@ -74,21 +76,21 @@ tList = [
     'EntitlementAccessMap',
     'Caps',
     'Permissions',
+    'FileStreams',
+    'Nodes',
+    'ChangeLogs',
     'Instances',
+    'TroveInfo',
     'Dependencies',
     'Latest',
     'Metadata',
     'MetadataItems',
-    'Nodes',
-    'ChangeLogs',
     'PGPKeys',
     'PGPFingerprints',
     'Provides',
     'Requires',
     'TroveRedirects',
     'TroveTroves',
-    'TroveInfo',
-    'FileStreams',
     'TroveFiles',
     ]
 # tables with non-integer primary keys require special handling
@@ -179,53 +181,94 @@ def fix_pk(table):
 
 def migrate_table(t):
     global pgsql, src, dst
+
     count = src.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
     # prepare the execution cursor
     src.execute("SELECT * FROM %s LIMIT 1" % (t,))
     fields = src.fields()
-    sql = "INSERT INTO %s (%s) VALUES (%s)" % (
-        t, ", ".join(fields), ",".join(["?"]*len(fields)))
-    stmt = dst.compile(sql)
     funcs = [ getfunc(x) for x in fields ]
-    i = 0
-    src.execute("SELECT * FROM %s" % t)
-    t1 = time.time()
-    while True:
-        row = src.fetchone()
-        if row is None:
-            break
-        i += 1
-        rowval = map(lambda (f, x): f(x), zip(funcs, row))
-        try:
-            dst.execstmt(stmt, *tuple(rowval))
-        except sqlerrors.ColumnNotUnique:
-            print "\r%s: SKIPPING DUPLICATE" % t, row
-            pgsql.commit()
-        except sqlerrors.ConstraintViolation, e:
-            print
-            print "%s: SKIPPED CONSTRAINT VIOLATION: %s" % (t, sql)
-            print row, e.msg
-            print
-            pgsql.commit()
-        except Exception, e:
-            print "ERROR - SQL", sql
-            epdb.st()
-            raise
-        else:
+
+    # fix up the values in a row to match the transforms
+    def rowvals(funcs, row):
+        return tuple(map(lambda (f, x): f(x), zip(funcs, row)))
+
+    def copy1by1(t, src):
+        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
+            t, ", ".join(fields), ",".join(["?"]*len(fields)))
+        stmt = dst.compile(sql)
+        i = 0
+        while True:
+            lastrow = row = src.fetchone()
+            if row is None:
+                break
+            i += 1
+            dst.execstmt(stmt, *rowvals(funcs, row))
             if i % 1000 == 0:
                 t2 = time.time()
                 sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
                 sys.stdout.flush()
             if i % 10000 == 0:
                 pgsql.commit()
-    print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
-    if t not in noIntPK:
-        fix_pk(t)
+        pgsql.commit()
+        return i
+
+    def copyBulk(t, src):
+        pgsql.dbh.bulkload(t, (rowvals(funcs, row) for row in src), fields)
+        pgsql.commit()
+        dst.execute("select count(*) from %s" %(t,))
+        return dst.fetchall()[0][0]
+
+    src.execute("SELECT * FROM %s" % t)
+    t1 = time.time()
+    try:
+        if hasattr(pgsql.dbh, "bulkload"):
+            sys.stdout.write("Bulk load table: %s (%d records...)\r" % (t, count))
+            sys.stdout.flush()
+            ret = copyBulk(t, src)
+        else:
+            ret = copy1by1(t, src)
+        assert (ret == count), "Inserted %d rows != source count %d rows" % (ret, count)
+    except Exception, e:
+        print "ERROR:", e, e.args
+        epdb.st()
+        raise
+    else:
+        print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
+        if t not in noIntPK:
+            fix_pk(t)
     pgsql.commit()
 
+def verify_table(t, quick=False):
+    nrsrc = src.execute("select count(*) from %s" % (t,)).fetchall()[0][0]
+    nrdst = src.execute("select count(*) from %s" % (t,)).fetchall()[0][0]
+    assert(nrsrc == nrdst), "not all records were copied: src=%d, dst=%d" % (nrsrc, nrdst)
+    src.execute("select * from %s limit 1" % (t,))
+    dst.execute("select * from %s limit 1" % (t,))
+    setsrc = set([x.lower() for x in src.fields()])
+    setdst = set([x.lower() for x in dst.fields()])
+    assert ( setsrc == setdst ), "columns are different: src=%d, dst=%d" % (setsrc, setdst)
+    if quick:
+        return True
+    fields = ",".join(setsrc)
+    src.execute("select %s from %s" %(fields, t))
+    dst.execute("select %s from %s" %(fields, t))
+    t1 = time.time()
+    i = 0
+    for row1, row2 in itertools.izip(src, dst):
+        i = i+1
+        for a,b in zip(row1, row2):
+            assert (a==b), "\nrow differences in table %s:\nsrc: %s\ndst: %s\n" %(
+                t, row1, row2)
+        if i%100 and i<nrsrc: continue
+        sys.stdout.write("\rVerify %s: %s" % (t, timings(i, nrsrc, t1)))
+        sys.stdout.flush()
+    print
+    return True
+
+# PROGRAM MAIN LOOP
 for t in tList:
-    print "Migrating table:", t
     migrate_table(t)
+    verify_table(t)
 
 # and now create the indexes
 dst = pgsql.cursor()
