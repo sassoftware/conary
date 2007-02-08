@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Client Changes:
+    * Added 'proxy' configuration item to allow conaryrc to tell Conary
+      to use a Conary protocol proxy server. General http proxies should
+      still be configured using the http_proxy environment variable.
+
   o Server Changes:
     * Conary repositories no longer allow users or groups to be
       created with names that include characters other than those
@@ -8,6 +13,8 @@ Changes in @NEW@:
       throughput
     * Reworked code which commit groups to the repository to significantly
       reduce the number of SQL queries executed (CNY-1273)
+    * Implemented a proxy server which caches changesets. It is supported
+      in both the standalone server and the apache server.
 
   o Build Changes:
     * A list of autosource mirrors has been added.

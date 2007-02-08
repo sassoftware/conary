@@ -109,7 +109,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                           cfg.downloadRateLimit,
                                        uploadRateLimit =
                                           cfg.uploadRateLimit,
-                                       entitlements = entitlements)
+                                       entitlements = entitlements,
+                                       proxy = cfg.proxy)
 
     def getRepos(self):
         return self.repos
