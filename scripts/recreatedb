@@ -23,6 +23,8 @@ retrievable.
 
 import os
 import sys
+import tempfile
+
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
 	fullPath = os.path.dirname(sys.argv[0])
@@ -154,7 +156,7 @@ def main(argv):
         usage()
         sys.exit(1)
 
-    cfg = conarycfg.ConaryConfiguration()
+    cfg = conarycfg.ConaryConfiguration(True)
     cfg.root = sys.argv[2]
     client = conaryclient.ConaryClient(cfg)
     callback = updatecmd.UpdateCallback()
@@ -177,12 +179,15 @@ def main(argv):
     # add the config file contents
     addConfigFileContents(client, cs)
 
-    # retarget the changeset for the database, this shouldn't do much
-    # except give us an updJob to apply
-    updJob = client.updateChangeSet([cs], resolveDeps = False, recurse = False,
-                                    callback = callback, split = 1)[0]
-    # apply the update
-    client.applyUpdate(updJob, justDatabase = True, callback = callback)
+    (fd, path) = tempfile.mkstemp()
+    os.close(fd)
+    cs.writeToFile(path)
+
+    try:
+        updatecmd.doUpdate(cfg, [ path ], depCheck = False,
+                           recurse = False, justDatabase = False)
+    finally:
+        os.unlink(path)
 
     # success!
     return 0
