@@ -310,11 +310,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if isinstance(e, HiddenException):
                 self.callLog.log(remoteIp, authToken, methodname, args,
                                  exception = e.forLog)
+                e = e.forReturn
             else:
                 self.callLog.log(remoteIp, authToken, methodname, args,
                                  exception = e)
-
-            e = e.forReturn
 
         if isinstance(e, errors.TroveMissing):
 	    if not e.troveName:
