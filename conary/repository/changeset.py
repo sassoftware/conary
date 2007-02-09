@@ -1160,8 +1160,6 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         try:
             if type(fileName) is str:
                 try:
-                    import epdb
-                    epdb.st()
                     f = open(fileName, "r")
                 except IOError, err:
                     raise errors.ConaryError(
