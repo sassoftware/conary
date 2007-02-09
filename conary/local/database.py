@@ -42,7 +42,8 @@ class Rollback:
         repos.writeToFile(self.reposName % (self.dir, self.count), mode = 0600)
         local.writeToFile(self.localName % (self.dir, self.count), mode = 0600)
         self.count += 1
-        fd = os.open("%s/count" % self.dir, os.O_CREAT | os.O_WRONLY , 0600)
+        fd = os.open("%s/count" % self.dir, os.O_CREAT | os.O_WRONLY |
+                                            os.O_TRUNC, 0600)
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 

@@ -320,11 +320,13 @@ class ChangeSet(streams.StreamSet):
     def writeToFile(self, outFileName, withReferences = False, mode = None):
 	try:
             if mode is not None:
-                outFileFd = os.open(outFileName, os.O_RDWR | os.O_CREAT, mode)
+                outFileFd = os.open(outFileName,
+                                    os.O_RDWR | os.O_CREAT | os.O_TRUNC, mode)
             else:
-                outFileFd = os.open(outFileName, os.O_RDWR | os.O_CREAT)
+                outFileFd = os.open(outFileName,
+                                    os.O_RDWR | os.O_CREAT | os.O_TRUNC)
 
-            outFile = os.fdopen(outFileFd, "w")
+            outFile = os.fdopen(outFileFd, "w+")
 	    csf = filecontainer.FileContainer(outFile,
                                               withRemoves = self.hasRemoved)
 
