@@ -44,6 +44,19 @@ from conary.errors import InvalidRegex
 # last one is the current server protocol version
 SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
 
+# A list of changeset versions we support
+# These are just shortcuts
+_CSVER0 = filecontainer.FILE_CONTAINER_VERSION
+_CSVER1 = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+# The first in the list is the one the current generation clients understand
+CHANGESET_VERSIONS = [ _CSVER1, _CSVER0 ]
+# Precedence list of versions - the version specified as key can be generated
+# from the version specified as value
+CHANGESET_VERSIONS_PRECEDENCE = {
+    _CSVER0 : _CSVER1,
+}
+# We need to provide transitions from VALUE to KEY, we cache them as we go
+
 # Decorators for method access
 def accessReadOnly(f):
     f._accessType = 'readOnly'
@@ -1385,6 +1398,115 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return (cs, trovesNeeded, filesNeeded, removedTroves)
 
+    def _getChangeSetVersion(self, clientVersion):
+        # Determine the changeset version based on the client version
+        # Add more params if necessary
+        if clientVersion < 38:
+            return CHANGESET_VERSIONS[-1]
+        # Add more changeset versions here as the currently newest client is
+        # replaced by a newer one
+        return CHANGESET_VERSIONS[0]
+
+    def _convertChangeSet(self, csPath, size, destCsVersion, **key):
+        # Changeset is in the file csPath
+        # Changeset was fetched from the cache using key
+        # Convert it to destCsVersion
+        csVersion = key['csVersion']
+        if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
+            return self._convertChangeSetV1V0(csPath, size, destCsVersion,
+                                              **key)
+        assert False, "Unknown versions"
+
+    def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
+        recurse = key.get('recurse', False)
+        if not recurse:
+            return cspath, size
+
+        # check to make sure that this user has access to see all
+        # the troves included in a recursive changeset.
+        cs = changeset.ChangeSetFromFile(cspath)
+        newCs = changeset.ChangeSet()
+        rewrite = False
+
+        for tcs in cs.iterNewTroveList():
+            if tcs.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
+
+            # Even though it's possible for (old) clients to request
+            # removed relative changesets recursively, the update
+            # code never does that. Raising an exception to make
+            # sure we know how the code behaves.
+            if not tcs.isAbsolute():
+                raise errors.InternalServerError(
+                    "Relative recursive changesets not supported "
+                    "for removed troves")
+            ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
+            trvName = tcs.getName()
+            trvNewVersion = tcs.getNewVersion()
+            trvNewFlavor = tcs.getNewFlavor()
+            if ti.flags.isMissing():
+                # this was a missing trove for which we
+                # synthesized a removed trove object. 
+                # The client would have a much easier time
+                # updating if we just made it a regular trove.
+                missingOldVersion = tcs.getOldVersion()
+                missingOldFlavor = tcs.getOldFlavor()
+                oldTrove = trove.Trove(trvName,
+                                       missingOldVersion,
+                                       missingOldFlavor)
+                newTrove = trove.Trove(trvName,
+                                       trvNewVersion,
+                                       trvNewFlavor)
+                diff = newTrove.diff(oldTrove)[0]
+                newCs.newTrove(diff)
+                rewrite = True
+            else:
+                # this really was marked as a removed trove.
+                # raise a TroveMissing exception
+                raise errors.TroveMissing(trvName,
+                                          version=trvNewVersion)
+        if not rewrite:
+            # No change
+            return cspath, size
+
+        # we need to re-write the munged changeset for an
+        # old client
+        cs.merge(newCs)
+        # create a new temporary file for the munged changeset
+        (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                        suffix = '.tmp')
+        os.close(fd)
+        # now make absolutely sure that the changeset file
+        # will be compatible with conary-1.0.  We know
+        # that there are no removed trove changesets becase
+        # we re-wrote them all.
+        cs.hasRemoved = False
+        # now write out the munged changeset
+        size = cs.writeToFile(cspath)
+        return cspath, size
+
+    def _createChangeSet(self, jobEntry, **kwargs):
+        ret = self.repos.createChangeSet([ jobEntry ], **kwargs)
+        (cs, trovesNeeded, filesNeeded, removedTroves) = ret
+
+        # look up the version w/ timestamps
+        primary = (jobEntry[0], jobEntry[2][0], jobEntry[2][1])
+        try:
+            trvCs = cs.getNewTroveVersion(*primary)
+            primary = (jobEntry[0], trvCs.getNewVersion(), jobEntry[2][1])
+            cs.addPrimaryTrove(*primary)
+        except KeyError:
+            # primary troves could be in the externalTroveList, in
+            # which case they aren't primries
+            pass
+
+        (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                         suffix = '.tmp')
+        os.close(fd)
+
+        size = cs.writeToFile(tmpPath, withReferences = True)
+        return tmpPath, (trovesNeeded, filesNeeded, removedTroves), size
+
     @accessReadOnly
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
@@ -1440,10 +1562,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             return new
 
-        pathList = []
+        sizes = []
         newChgSetList = []
         allFilesNeeded = []
         allRemovedTroves = []
+        (fd, retpath) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cf-out')
+        url = os.path.join(self.urlBase(),
+                           "changeset?%s" % os.path.basename(retpath[:-4]))
+        fout = os.fdopen(fd, 'w')
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -1452,134 +1578,109 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             recurse, withFiles, withFileContents))
         # XXX all of these cache lookups should be a single operation through a
         # temporary table
-	for jobEntry in chgSetList:
-            l = self._cvtJobEntry(authToken, jobEntry)
-            cacheEntry = self.cache.getEntry(l, recurse, withFiles,
-                                             withFileContents, excludeAutoSource)
-            if cacheEntry is None:
-                ret = self.repos.createChangeSet([ l ],
-                                        recurse = recurse,
-                                        withFiles = withFiles,
-                                        withFileContents = withFileContents,
-                                        excludeAutoSource = excludeAutoSource)
+        key = {
+            'recurse'   : recurse,
+            'withFiles' : withFiles,
+            'withFileContents' : withFileContents,
+            'excludeAutoSource' : excludeAutoSource,
+        }
+        # Big try-except to clean up files
+        try:
+            for jobEntry in chgSetList:
+                l = self._cvtJobEntry(authToken, jobEntry)
 
-                (cs, trovesNeeded, filesNeeded, removedTroves) = ret
+                # Get the desired changeset version for this client
+                csVersion = self._getChangeSetVersion(clientVersion)
+                iterV = csVersion
+                verPath = [iterV]
+                while 1:
+                    key['csVersion'] = iterV
+                    cacheEntry = self.cache.getEntry(l, **key)
+                    if cacheEntry is not None:
+                        # We found a cached version
+                        break
+                    if iterV not in CHANGESET_VERSIONS_PRECEDENCE:
+                        # No way to move forward
+                        break
+                    # Move one edge in the DAG, try again
+                    iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
+                    verPath.append(iterV)
 
-                # look up the version w/ timestamps
-                primary = (l[0], l[2][0], l[2][1])
-                try:
-                    trvCs = cs.getNewTroveVersion(*primary)
-                    primary = (l[0], trvCs.getNewVersion(), l[2][1])
-                    cs.addPrimaryTrove(*primary)
-                except KeyError:
-                    # primary troves could be in the externalTroveList, in
-                    # which case they aren't primries
-                    pass
-
-                (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                                 suffix = '.tmp')
-                os.close(fd)
-
-                size = cs.writeToFile(tmpPath, withReferences = True)
-
-		(key, path) = self.cache.addEntry(l, recurse, withFiles,
-						  withFileContents,
-						  excludeAutoSource,
-						  (trovesNeeded,
-						   filesNeeded,
-                                                   removedTroves),
-                                                  size = size)
-
-                os.rename(tmpPath, path)
-            else:
-                path, otherDetails, size = cacheEntry
-                if len(otherDetails) == 2:
-                    # conary 1.0 caches
-                   (trovesNeeded, filesNeeded) = otherDetails
-                   removedTroves = []
+                # At the end of the loop, either cacheEntry is None, which
+                # means no version is cached, or cacheEntry is not None and
+                # iterV points to the version of the cached entry. Either way,
+                # iterV is the last entry in verPath
+                if cacheEntry is None:
+                    # No entry was found. Produce it
+                    iterV = CHANGESET_VERSIONS[0]
+                    cspath, otherDetails, size = self._createChangeSet(l,
+                                            recurse = recurse,
+                                            withFiles = withFiles,
+                                            withFileContents = withFileContents,
+                                            excludeAutoSource = excludeAutoSource)
                 else:
-                   (trovesNeeded, filesNeeded, removedTroves) = otherDetails
+                    cspath, otherDetails, size = cacheEntry
 
-            newChgSetList += _cvtTroveList(trovesNeeded)
-            allFilesNeeded += _cvtFileList(filesNeeded)
-            allRemovedTroves += removedTroves
+                (trovesNeeded, filesNeeded, removedTroves) = otherDetails
 
-            pathList.append((path, size))
+                # Now walk the precedence list backwards
+                oldV = None
+                while verPath:
+                    iterV = verPath.pop()
+                    if oldV:
+                        # Convert the changeset - not the first time around
+                        key['csVersion'] = oldV
+                        cspath, size = self._convertChangeSet(cspath, size,
+                                                              iterV, **key)
 
-        (fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cf-out')
-        url = os.path.join(self.urlBase(),
-                           "changeset?%s" % os.path.basename(path[:-4]))
-        f = os.fdopen(fd, 'w')
-        sizes = []
-        for cspath, size in pathList:
-            if recurse:
-                # check to make sure that this user has access to see all
-                # the troves included in a recursive changeset.
-                cs = changeset.ChangeSetFromFile(cspath)
-                newCs = changeset.ChangeSet()
-                rewrite = False
-                for tcs in cs.iterNewTroveList():
-                    if not self.auth.check(authToken, write = False,
-                                           trove = tcs.getName(),
-                                           label = tcs.getNewVersion().trailingLabel()):
-                        f.close()
-                        os.unlink(path)
-                        del cs
-                        raise errors.InsufficientPermission
-                    if (clientVersion < 38
-                        and tcs.troveType() == trove.TROVE_TYPE_REMOVED):
-                        ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
-                        trvName = tcs.getName()
-                        trvNewVersion = tcs.getNewVersion()
-                        trvNewFlavor = tcs.getNewFlavor()
-                        if ti.flags.isMissing():
-                            # this was a missing trove for which we
-                            # synthesized a removed trove object. 
-                            # The client would have a much easier time
-                            # updating if we just made it a regular trove.
-                            missingOldVersion = tcs.getOldVersion()
-                            missingOldFlavor = tcs.getOldFlavor()
-                            oldTrove = trove.Trove(trvName,
-                                                   missingOldVersion,
-                                                   missingOldFlavor)
-                            newTrove = trove.Trove(trvName,
-                                                   trvNewVersion,
-                                                   trvNewFlavor)
-                            diff = newTrove.diff(oldTrove)[0]
-                            newCs.newTrove(diff)
-                            rewrite = True
-                        else:
-                            # this really was marked as a removed trove.
-                            # raise a TroveMissing exception
-                            f.close()
-                            os.unlink(path)
-                            del cs
-                            raise errors.TroveMissing(trvName,
-                                                      version=trvNewVersion)
-                if rewrite:
-                    # we need to re-write the munged changeset for an
-                    # old client
-                    cs.merge(newCs)
-                    # create a new temporary file for the munged changeset
-                    (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                                    suffix = '.tmp')
-                    os.close(fd)
-                    # now make absolutely sure that the changeset file
-                    # will be compatible with conary-1.0.  We know
-                    # that there are no removed trove changesets becase
-                    # we re-wrote them all.
-                    cs.hasRemoved = False
-                    # now write out the munged changeset
-                    size = cs.writeToFile(cspath)
-            sizes.append(size)
-            f.write("%s %d\n" % (cspath, size))
-        f.close()
+                    oldV = iterV
+
+                    if cacheEntry:
+                        # First entry already cached
+                        cacheEntry = None
+                        continue
+
+                    # Cache it
+                    (k, chpath) = self.cache.addEntry(l, recurse, withFiles,
+                                                      withFileContents,
+                                                      excludeAutoSource,
+                                                      (trovesNeeded,
+                                                       filesNeeded,
+                                                       removedTroves),
+                                                      size = size,
+                                                      csVersion = iterV)
+                    # Rename the changeset file to the cache file
+                    os.rename(cspath, chpath)
+                    # Next reference changeset file is the cached one
+                    cspath = chpath
+
+                if recurse:
+                    # check to make sure that this user has access to see all
+                    # the troves included in a recursive changeset.
+                    cs = changeset.ChangeSetFromFile(cspath)
+                    for tcs in cs.iterNewTroveList():
+                        if not self.auth.check(authToken, write = False,
+                                               trove = tcs.getName(),
+                                               label = tcs.getNewVersion().trailingLabel()):
+                            raise errors.InsufficientPermission
+
+                newChgSetList.extend(_cvtTroveList(trovesNeeded))
+                allFilesNeeded.extend(_cvtFileList(filesNeeded))
+                allRemovedTroves.extend(removedTroves)
+                sizes.append(size)
+                fout.write("%s %d\n" % (cspath, size))
+        except:
+            fout.close()
+            os.unlink(retpath)
+            raise
+        fout.close()
 
         if clientVersion < 38:
             return url, sizes, newChgSetList, allFilesNeeded
 
         return url, sizes, newChgSetList, allFilesNeeded, \
                _cvtTroveList(allRemovedTroves)
+
 
     @accessReadOnly
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):

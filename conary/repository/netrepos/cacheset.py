@@ -21,7 +21,7 @@ from conary.lib import util
 from conary.local import schema, sqldb, versiontable
 from conary.dbstore import idtable, sqlerrors
 
-CACHE_SCHEMA_VERSION = 17
+CACHE_SCHEMA_VERSION = 18
 
 class NullCacheSet:
     def __init__(self, tmpDir):
@@ -86,7 +86,8 @@ class CacheSet:
                withFileContents BOOLEAN,
                excludeAutoSource BOOLEAN,
                returnValue      BINARY,
-               size             INTEGER
+               size             INTEGER,
+               csVersion        INTEGER
             ) %(TABLEOPTS)s""" % self.db.keywords)
             cu.execute("CREATE INDEX CacheContentsIdx "
                        "ON CacheContents(troveName)")
@@ -98,7 +99,7 @@ class CacheSet:
         self.db.loadSchema()
 
     def getEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource):
+                 excludeAutoSource, csVersion):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -133,9 +134,10 @@ class CacheSet:
                 newFlavorId=? AND newVersionId=? AND
                 absolute=? AND recurse=? AND withFiles=?
                 AND withFileContents=? AND excludeAutoSource=?
+                AND csVersion=?
             """, (name, oldFlavorId, oldVersionId, newFlavorId,
                   newVersionId, absolute, recurse, withFiles, withFileContents,
-                  excludeAutoSource))
+                  excludeAutoSource, csVersion))
 
         # since we begin and commit a transaction inside the loop
         # over the returned rows, we must use fetchall() here so that we
@@ -154,7 +156,7 @@ class CacheSet:
 
     @retry
     def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal, size):
+                 excludeAutoSource, returnVal, size, csVersion):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -191,13 +193,14 @@ class CacheSet:
             (row, troveName, size,
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
-            excludeAutoSource, returnValue )
-            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?)""",
+            excludeAutoSource, csVersion,
+            returnValue)
+            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?,   ?)""",
                        (name, size,
                        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
                        absolute, recurse, withFiles, withFileContents,
-                       excludeAutoSource, cPickle.dumps(returnVal, 
-                                                        protocol = -1)))
+                       excludeAutoSource, csVersion,
+                       cPickle.dumps(returnVal, protocol = -1)))
 
             row = cu.lastrowid
             path = self.filePattern % (self.tmpDir, row)
