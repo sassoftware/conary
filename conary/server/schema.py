@@ -695,6 +695,7 @@ def setupTempTables(db):
     logMe(3)
     cu = db.cursor()
 
+    # the following are specific temp tables for various functions.
     if "ffFlavor" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE ffFlavor(
@@ -829,6 +830,19 @@ def setupTempTables(db):
         db.tempTables["gfsTable"] = True
         db.createIndex("gfsTable", "gfsTableFileIdIdx", "fileId",
                        check = False)
+
+    if "newTroveTroves" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        newTroveTroves(
+            idx             %(PRIMARYKEY)s,
+            item            VARCHAR(254),
+            version         %(STRING)s,
+            frozenVersion   %(STRING)s,
+            flavor          %(STRING)s,
+            flags           INTEGER NOT NULL DEFAULT 0
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["newTroveTroves"] = True
 
     db.commit()
 

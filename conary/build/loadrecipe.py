@@ -93,7 +93,8 @@ def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.lib', ('util',))
     for x in ('os', 're', 'sys', 'stat'):
         localImport(d, x)
-    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
+    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                        'PackageFlags'))
     d['filename'] = filename
     if not directory:
         directory = os.path.dirname(filename)

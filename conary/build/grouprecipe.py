@@ -1097,7 +1097,8 @@ class SingleGroup(object):
 
     def addNewGroup(self, name, byDefault = None, explicit = True,
                     childDefaults=None):
-
+        if name == self.name:
+            raise CookError('Tried to add %s to itself.  This would create a cycle.')
         if not childDefaults:
             childDefaults = []
         elif not isinstance(childDefaults, list):
@@ -1584,6 +1585,7 @@ def processAddAllDirectives(recipeObj, troveMap, cache, repos):
 def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
+    topGroup = parentGroup
 
     if recurse:
         groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True,
@@ -1624,6 +1626,8 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                     groupsByName[name] = childGroup
 
 
+                if parentGroup.name == name:
+                    raise CookError('Tried to addAll "%s=%s" into %s - which resulted in trying to add %s to itself.  This is not allowed.  You may wish to pass recurse=False to addAll.' % (topTrove.getName(), topTrove.getVersion(), topGroup.name, name))
                 parentGroup.addNewGroup(name, byDefault=byDefault,
                                         explicit = True, childDefaults = trv)
 
@@ -1976,7 +1980,9 @@ def addPackagesForComponents(group, repos, troveCache):
 
     # if the user mentions both foo and foo:runtime, don't remove
     # direct link to foo:runtime
-    troveTups = [ x for x in packages if not group.hasTrove(*x)]
+    troveTups = [ x for x in packages
+                    if not (group.hasTrove(*x) and group.isExlicit(*x)) ]
+    troveTups = packages.keys()
     hasTroves = repos.hasTroves(troveTups)
     troveTups = [ x for x in troveTups if hasTroves[x] ]
 
@@ -2050,8 +2056,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 
     # there's nothing worse than seeing a bunch of nice group debugging
     # information and then having your screen filled up with all 
-    # of the update code's debug mess.  Until that logging is moved
-    # to it's own private location, turn it off.
+    # of the update code's debug mess.
     resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
     if resetVerbosity:
         log.setVerbosity(log.DEBUG)
@@ -2092,13 +2097,12 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                 flavorStr = ''
 
             log.info("\t%s=%s%s" % (provTroveTup[0], verStr, flavorStr))
+            explicit = True # always include this trove immediately
+                            # in the package, even if it used to be included
+                            # implicitly through a sub-package.
 
-            if group.hasTrove(*provTroveTup):
-                explicit = False
-            else:
-                explicit = True
-            group.addTrove(provTroveTup, explicit, byDefault, [],
-                           reason=(ADD_REASON_DEP, troveTup) )
+            group.addTrove(provTroveTup, explicit, True, [],
+                           reason=(ADD_REASON_DEP, troveTup))
             neededTups.append(provTroveTup)
 
     cache.cacheTroves(neededTups)

@@ -27,7 +27,7 @@ class MirrorConfigurationSection(cfg.ConfigSection):
 
 class MirrorConfiguration(cfg.SectionedConfigFile):
     host                  =  cfg.CfgString
-    entitlementDirectory  =  (cfg.CfgPath, '/etc/conary/entitlements')
+    entitlementDirectory  =  cfg.CfgPath
     labels                =  conarycfg.CfgInstallLabelPath
     matchTroves           =  cfg.CfgSignedRegExpList
     recurseGroups         =  (cfg.CfgBool, False)

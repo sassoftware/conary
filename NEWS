@@ -1,3 +1,79 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Added 'proxy' configuration item to allow conaryrc to tell Conary
+      to use a Conary protocol proxy server. General http proxies should
+      still be configured using the http_proxy environment variable.
+    * Filesystem permissions on rollback data restrict access to owner
+      (normally root) (CNY-1289)
+
+  o Server Changes:
+    * Conary repositories no longer allow users or groups to be
+      created with names that include characters other than those
+      defined in the Portable Filename Character Set.
+    * Server side functions that work on large datasets (getTroveSigs
+      and setTroveSigs) are now using batched SQL operations for faster
+      throughput
+    * Reworked code which commit groups to the repository to significantly
+      reduce the number of SQL queries executed (CNY-1273)
+    * Implemented a proxy server which caches changesets. It is supported
+      in both the standalone server and the apache server.
+    * Including symbolic links in the path to the temporary directory returns
+      an error at startup (CNY-958)
+    * Errors opening a to-be-committed changeset now have the internal
+      exception logged and CommitError returned to the client (CNY-1182)
+
+  o Build Changes:
+    * A list of autosource mirrors has been added.
+    * cvc cook --show-buildreqs works properly now. Thanks to Pavel
+      Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
+    * The flags for other packages that are specified in the build flavor
+      are now available when cooking as a part of the PackageFlags object.
+      For example, if you wish to check to see if kernel.pae is set, you can
+      add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
+      the final flavor of your build, and should be used with care. (CNY-1201)
+
+  o Internal Changes:
+    * A StringStream can now be set from a Unicode object.  The
+      StringStream stores the UTF-8 encoding of the Unicode
+      object. (CNY-366)
+    * ByteStream and LongLongStream have been implemented in C.
+      Modifications have been made to the NumericStream types
+      implemented in C so that they can be used as base classes in
+      Python.
+
+  o Bug Fixes:
+    * Conary now displays a useful error message when it is unable to
+      parse a "user" line in a configuration line.  Previously Conary
+      would raise an unhandled exception. (CNY-1267)
+    * Mirror configurations no longer use /etc/conary/entitlements as
+      the default location to read entitlements used to mirror.
+      Normally the entitlements used to mirror are different than the
+      entitlements required to update the system.  Therefore they
+      should not be used when attempting to access source or target
+      repositories when mirroring. (CNY-1239)
+    * "cvc emerge" now displays error messages when the underlying
+      cook process results in an exception.  Previously, an unhandled
+      exception message was generated. (CNY-995)
+    * Derived packages now support setuid and setgid files. (CNY-1281)
+    * You can no longer accidentally include a group in itself by using
+      addAll. (CNY-1123, CNY-1124)
+    * Alert the users when troves could not be found during migrate
+      in the same manner they are alerted during a regular update. (CNY-1171)
+    * Fix a bug where shared contents in a changeset between InitialContents
+      and a regular file could cause an update failure.  (CNY-1084)
+    * Make filesets support buildFlavor (CNY-1127)
+    * TroveSource tried to raise a DuplicateTrove exception, which doesn't
+      exist. Replaced with InternalConaryError (CNY-1197)
+    * Give a proper error message when we cannot create the directory
+      for the local database due to a permission failure (CNY-953)
+    * Group recipes could sometimes include a trove for dep resolution but
+      not move to include the package directly in the group that is doing dep
+      resolution.  Now the package + component are always included immediately
+      in the group that is resolving deps.  (CNY-1305)
+    * Updated recreatedb for API changes (CNY-1263)
+    * A "no new troves available" error message is now given when there are
+      no new versions to migrate to (CNY-1246)
+
 Changes in 1.1.16:
   o Server Changes:
     * The repository now returns recursive changesets with special

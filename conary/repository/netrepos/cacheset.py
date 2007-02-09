@@ -28,11 +28,11 @@ class NullCacheSet:
         self.tmpDir = tmpDir
 
     def getEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource):
+                 excludeAutoSource, csVersion):
         return None
 
     def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal, size):
+                 excludeAutoSource, returnVal, size, csVersion):
         (fd, path) = tempfile.mkstemp(dir = self.tmpDir,
                                       suffix = '.ccs-out')
         os.close(fd)
@@ -221,7 +221,8 @@ class CacheSet:
         the given name, version, flavor.
         """
         invList = [ (name, version, flavor) ]
-        invList.extend(repos.getParentTroves(name, version, flavor))
+        if repos is not None:
+            invList.extend(repos.getParentTroves(name, version, flavor))
 
         # start a transaction to retain a consistent state
         cu = self.db.transaction()
@@ -243,8 +244,12 @@ class CacheSet:
             # delete all matching entries from the db and the file system
             for (row, returnVal, size) in cu.fetchall():
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-                path = self.filePattern % (self.tmpDir, row)
-                util.removeIfExists(path)
+                # unlink(path) is tempting here, but it's possible that
+                # some outstanding request still references it. gafton
+                # suggested hard linking the files for consumption to
+                # allow this remove
+                # path = self.filePattern % (self.tmpDir, row)
+                # util.removeIfExists(path)
 
         self.db.commit()
 

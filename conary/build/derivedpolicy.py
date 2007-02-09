@@ -184,6 +184,7 @@ class ComponentProvides(packagepolicy.ComponentProvides):
                 self.flags.update(dep.flags.keys())
         packagepolicy.ComponentProvides.do(self)
 
-Ownership = packagepolicy.Ownership
-MakeDevices = packagepolicy.MakeDevices
 ExcludeDirectories = packagepolicy.ExcludeDirectories
+MakeDevices = packagepolicy.MakeDevices
+Ownership = packagepolicy.Ownership
+setModes = packagepolicy.setModes

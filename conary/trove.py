@@ -334,10 +334,7 @@ _TROVE_FLAG_ISCOLLECTION = 1 << 0
 _TROVE_FLAG_ISDERIVED    = 1 << 1
 _TROVE_FLAG_ISMISSING    = 1 << 2
 
-class TroveFlagsStream(streams.NumericStream):
-
-    __slots__ = "val"
-    format = "B"
+class TroveFlagsStream(streams.ByteStream):
 
     def isCollection(self, set = None):
 	return self._isFlag(_TROVE_FLAG_ISCOLLECTION, set)
@@ -350,14 +347,14 @@ class TroveFlagsStream(streams.NumericStream):
 
     def _isFlag(self, flag, set):
 	if set != None:
-            if self.val is None:
-                self.val = 0x0
+            if self() is None:
+                self.set(0x0)
 	    if set:
-		self.val |= flag
+		self.set(self() | flag)
 	    else:
-		self.val &= ~(flag)
+		self.set(self() & ~(flag))
 
-	return (self.val and self.val & flag)
+	return (self() and self() & flag)
 
 _TROVEINFO_TAG_SIZE           =  0
 _TROVEINFO_TAG_SOURCENAME     =  1
@@ -1889,7 +1886,7 @@ class Trove(streams.StreamSet):
         return self.troveInfo.buildTime()
 
     def setBuildTime(self, nm):
-        return self.troveInfo.buildTime.set(nm)
+        return self.troveInfo.buildTime.set(int(nm))
 
     def getConaryVersion(self):
         return self.troveInfo.conaryVersion()

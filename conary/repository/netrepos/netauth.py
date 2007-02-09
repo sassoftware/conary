@@ -23,12 +23,15 @@ from conary import conarycfg
 from conary.repository import errors
 from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
+from conary.server import schema
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists
 GroupAlreadyExists = errors.GroupAlreadyExists
 
 MAX_ENTITLEMENT_LENGTH = 255
+
+nameCharacterSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-'
 
 class UserAuthorization:
     def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
@@ -39,6 +42,9 @@ class UserAuthorization:
 
 
     def addUserByMD5(self, cu, user, salt, password, ugid):
+        for letter in user:
+            if letter not in nameCharacterSet:
+                raise errors.InvalidName(user)
         try:
             cu.execute("INSERT INTO Users (userName, salt, password) "
                        "VALUES (?, ?, ?)",
@@ -255,6 +261,63 @@ class NetworkAuthorization:
 
         return groupSet
 
+    # a faster way for batch checking access to a list of troves
+    def batchCheck(self, authToken, troveTupList, write = False, remove = False):
+        # troveTupList is a list of (name, VFS) tuples
+        self.log(3, authToken[0], "entitlement=%s write=%s remove=%s" %(
+            authToken[2], int(bool(write)), int(bool(remove))),
+                 troveTupList)
+        checkDict = {}
+        # first check that we handle all the labels we're asked about
+        for (n, v) in troveTupList:
+            label = v.branch().label()
+            if label.getHost() not in self.serverNameList:
+                raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
+            l = checkDict.setdefault(label.asString(), set())
+            l.add(n)
+        if not authToken[0]:
+            return False
+        # check groupIds. this is teh same as the self.check() function
+        cu = self.db.cursor()
+        try:
+            groupIds = self.getAuthGroups(cu, authToken)
+        except errors.InsufficientPermission:
+            return False
+        if not len(groupIds):
+            return False
+        # build the query statement for permissions check
+        stmt = """
+        select Items.item
+        from Permissions join Items using (itemId)
+        """
+        where = []
+        where.append("Permissions.userGroupId IN (%s)" %
+                     ",".join("%d" % x for x in groupIds))
+        if write:
+            where.append("Permissions.canWrite=1")
+        if remove:
+            where.append("Permissions.canRemove=1")
+        if len(checkDict):
+            where.append("""(
+            Permissions.labelId = 0 OR
+            Permissions.labelId in (select labelId from Labels where label=?)
+            )""")
+        stmt += "WHERE " + " AND ".join(where)
+        self.log(4, stmt)
+        # we need to test for each label separately in case we have
+        # mutiple troves living of multiple lables with different
+        # permission settings
+        for label in checkDict.iterkeys():
+            cu.execute(stmt, label)
+            patterns = [ x[0] for x in cu ]
+            for trove in checkDict[label]:
+                for pattern in patterns:
+                    if self.checkTrove(pattern, trove):
+                        break
+                else:
+                    return False
+        return True
+
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False, remove = False):
         self.log(3, authToken[0],
@@ -330,10 +393,13 @@ class NetworkAuthorization:
 
         return False
 
+    _cacheRe = {}
     def checkTrove(self, pattern, trove):
         if pattern == 'ALL' or trove is None:
             return True
-        regExp = re.compile(pattern + '$')
+        regExp = self._cacheRe.get(pattern, None)
+        if regExp is None:
+            regExp = self._cacheRe[pattern] = re.compile(pattern + '$')
         if regExp.match(trove):
             return True
         return False
@@ -578,6 +644,9 @@ class NetworkAuthorization:
             raise errors.GroupAlreadyExists, 'usergroup: %s' % userGroupName
 
     def _addGroup(self, cu, userGroupName):
+        for letter in userGroupName:
+            if letter not in nameCharacterSet:
+                raise errors.InvalidName(userGroupName)
         try:
             cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)",
                        userGroupName)

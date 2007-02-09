@@ -224,6 +224,7 @@ class TroveStore:
 
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
+        schema.resetTable(cu, 'newTroveTroves')
 
 	return (cu, trv)
 
@@ -401,23 +402,52 @@ class TroveStore:
                 itertools.izip(trv.iterTroveList(strongRefs = False,
                                                    weakRefs   = True),
                                itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
-	    itemId = self.getItemId(name)
 
-	    if flavor is not None:
-		flavorId = flavors[flavor]
-	    else:
-		flavorId = 0
-
-	    # make sure the versionId and nodeId exists for this (we need
-	    # a nodeId, or the version doesn't get timestamps)
-	    versionId = self.getVersionId(version)
+            flags = weakFlag
+            if trv.includeTroveByDefault(name, version, flavor):
+                flags |= schema.TROVE_TROVES_BYDEFAULT
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
             assert(trv.isRedirect() or
-                            (not isPackage or versionId == troveVersionId))
+                            (not isPackage or version == trv.getVersion()))
             assert(trv.isRedirect() or
-                            (not isPackage or flavorId == troveFlavorId))
+                            (not isPackage or flavor == trv.getFlavor()))
+
+            cu.execute("INSERT INTO newTroveTroves "
+                       "(item, version, frozenVersion, flavor, flags) "
+                       "VALUES (?, ?, ?, ?, ?)",
+                       name, str(version), version.freeze(), flavor.freeze(),
+                       flags)
+
+        cu.execute("""
+        INSERT INTO Items (item)
+        SELECT DISTINCT newTroveTroves.item FROM
+        newTroveTroves LEFT OUTER JOIN
+        Items USING (item) WHERE Items.itemId is NULL
+        """)
+
+        # look for included troves with no instances yet; we make those
+        # entries manually here
+        cu.execute("""
+        SELECT Items.itemId, newTroveTroves.frozenVersion, Flavors.flavorId FROM
+        newTroveTroves
+        JOIN Items USING (item)
+        JOIN Flavors ON Flavors.flavor = newTroveTroves.flavor
+        LEFT OUTER JOIN Versions ON Versions.version = newTroveTroves.version
+        LEFT OUTER JOIN Instances ON
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        WHERE
+            Instances.instanceId is NULL
+        """)
+
+        for (itemId, version, flavorId) in cu.fetchall():
+	    # make sure the versionId and nodeId exists for this (we need
+	    # a nodeId, or the version doesn't get timestamps)
+            version = versions.ThawVersion(version)
+	    versionId = self.getVersionId(version)
 
 	    if versionId is not None:
 		nodeId = self.versionOps.nodes.getRow(itemId,
@@ -434,22 +464,23 @@ class TroveStore:
                                                 flavorId, sourceName,
                                                 updateLatest = False)
 
-	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
+            instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             clonedFromId,
-                                            trv.getType(),
+                                            trv.isRedirect(),
                                             isPresent = False)
 
-            flags = weakFlag
-            if trv.includeTroveByDefault(name, version, flavor):
-                flags |= schema.TROVE_TROVES_BYDEFAULT
-
-            if trv.includeTroveByDefault(name, version, flavor):
-                byDefault = 1
-            else:
-                byDefault = 0
-
-            cu.execute("INSERT INTO TroveTroves (instanceId, includedId, flags) "
-                       "VALUES (?, ?, ?)", (troveInstanceId, instanceId, flags))
+        cu.execute("""
+        INSERT INTO TroveTroves (instanceId, includedId, flags)
+        SELECT ?, Instances.instanceId, newTroveTroves.flags
+        FROM newTroveTroves
+        JOIN Items USING (item)
+        JOIN Versions ON Versions.version = newTroveTroves.version
+        JOIN Flavors ON Flavors.flavor = newTroveTroves.flavor
+        JOIN Instances ON
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        """, troveInstanceId)
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 

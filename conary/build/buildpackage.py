@@ -39,7 +39,7 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     f.inode.owner.set(owner)
     f.inode.group.set(group)
     f.inode.perms.set(perms)
-    f.inode.mtime.set(time.time())
+    f.inode.mtime.set(int(time.time()))
     f.flags.set(0)
 
     return f

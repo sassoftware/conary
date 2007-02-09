@@ -34,8 +34,7 @@ class ClientClone:
     def createCloneChangeSet(self, targetBranch, troveList = [],
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
                              infoOnly=False, fullRecurse=False,
-                             cloneSources=False,
-                             callback=None):
+                             cloneSources=False, callback=None, trackClone=True):
         # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
         # info
         def _createSourceVersion(targetBranch, targetBranchVersionList, 
@@ -517,7 +516,7 @@ class ClientClone:
 
             # if this is a clone of a clone, use the original clonedFrom value
             # so that all clones refer back to the source-of-all-clones trove
-            if trv.troveInfo.clonedFrom() is None:
+            if trv.troveInfo.clonedFrom() is None and trackClone:
                 trv.troveInfo.clonedFrom.set(trv.getVersion())
 
             # clone the labelPath 
