@@ -22,7 +22,7 @@ SERVER_VERSIONS = [ 41 ]
 from conary import conarycfg, trove
 from conary.lib import tracelog, util
 from conary.repository import changeset, errors, netclient, transport, xmlshims
-from conary.repository.netrepos import cacheset, netserver
+from conary.repository.netrepos import cacheset, netserver, calllog
 
 class ProxyClient(xmlrpclib.ServerProxy):
 
