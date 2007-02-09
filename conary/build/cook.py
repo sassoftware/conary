@@ -1186,6 +1186,13 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
         write("%s\n" % (use.LocalFlags[flag]))
 
     write("*"*60 +'\n')
+
+    write("Package Local flags:\n")
+    for package in sorted(use.PackageFlags.keys()):
+        for flag in use.PackageFlags[package].keys():
+            write("%s\n" % (use.PackageFlags[package][flag]))
+
+    write("*"*60 +'\n')
     
     write("Arch flags:\n")
     for majarch in sorted(use.Arch.keys()):
