@@ -370,13 +370,11 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
 
-
     if not info:
         client.checkWriteableRoot()
 
     if migrate and not info and not cfg.interactive:
-        print ('As of conary 1.0.21, the migrate command has changed.'
-               '  Migrate must be run with --interactive '
+        print ('Migrate must be run with --interactive'
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
         return

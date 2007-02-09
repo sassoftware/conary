@@ -71,6 +71,8 @@ Changes in @NEW@:
       resolution.  Now the package + component are always included immediately
       in the group that is resolving deps.  (CNY-1305)
     * Updated recreatedb for API changes (CNY-1263)
+    * A "no new troves available" error message is now given when there are
+      no new versions to migrate to (CNY-1246)
 
 Changes in 1.1.16:
   o Server Changes:
