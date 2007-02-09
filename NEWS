@@ -65,6 +65,7 @@ Changes in @NEW@:
       not move to include the package directly in the group that is doing dep
       resolution.  Now the package + component are always included immediately
       in the group that is resolving deps.  (CNY-1305)
+    * Updated recreatedb for API changes (CNY-1263)
 
 Changes in 1.1.16:
   o Server Changes:
