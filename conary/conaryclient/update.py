@@ -1893,6 +1893,8 @@ conary erase '%s=%s[%s]'
                                  (None, None), False))
         finalJobs = set(finalJobs)
 
+        if not finalJobs:
+            raise NoNewTrovesError
 
         updateJobs = set(x for x in finalJobs if x[2][0])
 
