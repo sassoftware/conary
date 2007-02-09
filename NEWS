@@ -26,6 +26,11 @@ Changes in @NEW@:
     * A list of autosource mirrors has been added.
     * cvc cook --show-buildreqs works properly now. Thanks to Pavel
       Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
+    * The flags for other packages that are specified in the build flavor
+      are now available when cooking as a part of the PackageFlags object.
+      For example, if you wish to check to see if kernel.pae is set, you can
+      add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
+      the final flavor of your build, and should be used with care. (CNY-1201)
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
