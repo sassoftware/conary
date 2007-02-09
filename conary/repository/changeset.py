@@ -317,9 +317,14 @@ class ChangeSet(streams.StreamSet):
 
         return one + two
 
-    def writeToFile(self, outFileName, withReferences = False):
+    def writeToFile(self, outFileName, withReferences = False, mode = None):
 	try:
-	    outFile = open(outFileName, "w+")
+            if mode is not None:
+                outFileFd = os.open(outFileName, os.O_RDWR | os.O_CREAT, mode)
+            else:
+                outFileFd = os.open(outFileName, os.O_RDWR | os.O_CREAT)
+
+            outFile = os.fdopen(outFileFd, "w")
 	    csf = filecontainer.FileContainer(outFile,
                                               withRemoves = self.hasRemoved)
 

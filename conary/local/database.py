@@ -39,10 +39,12 @@ class Rollback:
     localName = "%s/local.%d"
 
     def add(self, repos, local):
-        repos.writeToFile(self.reposName % (self.dir, self.count))
-        local.writeToFile(self.localName % (self.dir, self.count))
+        repos.writeToFile(self.reposName % (self.dir, self.count), mode = 0600)
+        local.writeToFile(self.localName % (self.dir, self.count), mode = 0600)
         self.count += 1
-        open("%s/count" % self.dir, "w").write("%d\n" % self.count)
+        fd = os.open("%s/count" % self.dir, os.O_CREAT | os.O_WRONLY , 0600)
+        os.write(fd, "%d\n" % self.count)
+        os.close(fd)
 
     def _getChangeSets(self, item):
         repos = changeset.ChangeSetFromFile(self.reposName % (self.dir, item))
@@ -895,7 +897,7 @@ class Database(SqlDbRepository):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
         if os.path.exists(rbDir):
             shutil.rmtree(rbDir)
-        os.mkdir(rbDir)
+        os.mkdir(rbDir, 0700)
 	self.lastRollback += 1
         self.writeRollbackStatus()
         return Rollback(rbDir)
@@ -919,9 +921,9 @@ class Database(SqlDbRepository):
     def writeRollbackStatus(self):
 	newStatus = self.rollbackCache + ".new"
 
-	f = open(newStatus, "w")
-	f.write("%s %d\n" % (self.firstRollback, self.lastRollback))
-	f.close()
+        fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
+        os.write(fd, "%s %d\n" % (self.firstRollback, self.lastRollback))
+        os.close(fd)
 
 	os.rename(newStatus, self.rollbackStatus)
 
@@ -1148,7 +1150,8 @@ class Database(SqlDbRepository):
             self.rollbackStatus = self.rollbackCache + "/status"
             if not os.path.exists(self.rollbackCache):
                 try:
-                    util.mkdirChain(self.rollbackCache)
+                    util.mkdirChain(top)
+                    os.mkdir(self.rollbackCache, 0700)
                 except OSError, e:
                     if e.errno == errno.ENOTDIR:
                         # when making a directory, the partent

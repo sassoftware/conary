@@ -3,6 +3,8 @@ Changes in @NEW@:
     * Added 'proxy' configuration item to allow conaryrc to tell Conary
       to use a Conary protocol proxy server. General http proxies should
       still be configured using the http_proxy environment variable.
+    * Filesystem permissions on rollback data restrict access to owner
+      (normally root) (CNY-1289)
 
   o Server Changes:
     * Conary repositories no longer allow users or groups to be
