@@ -1981,7 +1981,7 @@ def addPackagesForComponents(group, repos, troveCache):
     # if the user mentions both foo and foo:runtime, don't remove
     # direct link to foo:runtime
     troveTups = [ x for x in packages
-                    if not (group.hasTrove(*x) and group.isExlicit(*x)) ]
+                    if not (group.hasTrove(*x) and group.isExplicit(*x)) ]
     troveTups = packages.keys()
     hasTroves = repos.hasTroves(troveTups)
     troveTups = [ x for x in troveTups if hasTroves[x] ]
