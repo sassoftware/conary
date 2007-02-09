@@ -17,6 +17,8 @@ Changes in @NEW@:
       in both the standalone server and the apache server.
     * Including symbolic links in the path to the temporary directory returns
       an error at startup (CNY-958)
+    * Errors opening a to-be-committed changeset now have the internal
+      exception logged and CommitError returned to the client (CNY-1182)
 
   o Build Changes:
     * A list of autosource mirrors has been added.

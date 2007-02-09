@@ -307,8 +307,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.db.rollback()
 
         if self.callLog:
-            self.callLog.log(remoteIp, authToken, methodname, args,
-                             exception = e)
+            if isinstance(e, HiddenException):
+                self.callLog.log(remoteIp, authToken, methodname, args,
+                                 exception = e.forLog)
+            else:
+                self.callLog.log(remoteIp, authToken, methodname, args,
+                                 exception = e)
+
+            e = e.forReturn
 
         if isinstance(e, errors.TroveMissing):
 	    if not e.troveName:
@@ -1681,8 +1687,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # raise InsufficientPermission if we can't read the changeset
             try:
                 cs = changeset.ChangeSetFromFile(path)
-            except:
-                raise errors.InsufficientPermission
+            except Exception, e:
+                raise HiddenException(e, errors.CommitError(
+                                "server cannot open change set to commit"))
             # because we have a temporary file we need to delete, we
             # need to catch the DatabaseLocked errors here and retry
             # the commit ourselves
@@ -2701,6 +2708,12 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def __init__(self, cfg):
         self.log = tracelog.getLog(None)
         self.cfg = cfg
+
+class HiddenException(Exception):
+
+    def __init__(self, forLog, forReturn):
+        self.forLog = forLog
+        self.forReturn = forReturn
 
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
