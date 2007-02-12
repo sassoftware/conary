@@ -181,7 +181,7 @@ class AbstractTroveSource:
                 lst = [ [] for x in trovesByDepList ]
                 allSuggs[depSet] = lst
             else:
-                lst = r[depSet]
+                lst = allSuggs[depSet]
 
             for i, troveList in enumerate(trovesByDepList):
                 lst[i].extend(troveList)
