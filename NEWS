@@ -23,7 +23,7 @@ Changes in @NEW@:
       exception logged and CommitError returned to the client (CNY-1182)
     * Changesets cached are now versioned depending on the client's version.
       This allows for the same changeset to be cached for different client
-      geenrations. (CNY-1302)
+      generations. (CNY-1302)
 
   o Build Changes:
     * A list of autosource mirrors has been added.
