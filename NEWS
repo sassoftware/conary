@@ -75,6 +75,8 @@ Changes in @NEW@:
       no new versions to migrate to (CNY-1246)
     * Attempting to clone without name or contact information set now gives
       a proper error message (CNY-1315)
+    * The client code no longer exits with a sys.exit(0) if one of the
+      callbacks fails (CNY-1271).
 
 Changes in 1.1.16:
   o Server Changes:
