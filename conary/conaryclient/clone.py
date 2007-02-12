@@ -472,6 +472,8 @@ class ClientClone:
         # needDict is indexed by all of the items which don't have versions
         # to map to; we need to look at the target branch and see if there
         # is something good to map to there
+
+        # *** BEGIN search for previously existing clones
         q = {}
         for info in needDict:
             brDict = q.setdefault(info[0], {})
@@ -484,18 +486,25 @@ class ClientClone:
         for name, verDict in currentVersions.iteritems():
             for version, flavorList in verDict.iteritems():
                 matches += [ (name, version, flavor) for flavor in flavorList ]
+        # matches is a (name, version, flavor) list of all the troves that
+        # could be previous clones of the trove we're cloning now.
         trvs = self.repos.getTroves(matches, withFiles = False, 
                                     callback = callback)
         trvDict = dict(((info[0], info[2]), trv) for (info, trv) in
                             itertools.izip(matches, trvs))
+        # troveDict is a (name, flavor) -> trove mapping of things that
+        # exist on the target branch
 
         for info in needDict.keys():
             trv = trvDict.get((info[0], info[2]), None)
             if trv is not None and (trv.getVersion() == info[1] or
                                     trv.troveInfo.clonedFrom() == info[1]):
                 versionMap[info] = trv.getVersion()
+                # There is a trove of the target label that has a clonedFrom()
+                # entry that points to the trove we're trying to clone now.
+                # This clone is a duplicate!
                 del needDict[info]
-
+        # *** END search for previously existing clones
         _checkNeedsFulfilled(needDict)
 
 
