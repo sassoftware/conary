@@ -1315,7 +1315,7 @@ class JobSource(AbstractJobSource):
             self.jobsByNew[name, job[2][0], job[2][1]] = job
 
     def findTroves(self, *args, **kw):
-        return self.allTroves.findTroves(*args, **kw)
+        return self.allTroveList.findTroves(*args, **kw)
 
     def findJobs(self, jobList):
         """ Finds a job given a changeSpec
