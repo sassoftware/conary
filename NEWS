@@ -23,7 +23,7 @@ Changes in @NEW@:
       exception logged and CommitError returned to the client (CNY-1182)
     * Changesets cached are now versioned depending on the client's version.
       This allows for the same changeset to be cached for different client
-      generations. (CNY-1302)
+      generations. (CNY-1203)
 
   o Build Changes:
     * A list of autosource mirrors has been added.
@@ -43,6 +43,9 @@ Changes in @NEW@:
       Modifications have been made to the NumericStream types
       implemented in C so that they can be used as base classes in
       Python.
+    * Path ID lookups is now done by file prefix and file ID. This allows for
+      identifying files in different package flavors or in versions older than
+      the latest one. (CNY-1203)
 
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
