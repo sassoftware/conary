@@ -573,7 +573,12 @@ class ClientClone:
                     trv.updateFile(pathId, path, ver, fileId)
 
             if trv.getName().endswith(':source') and not infoOnly:
-                cl = callback.getCloneChangeLog(trv)
+                try:
+                    cl = callback.getCloneChangeLog(trv)
+                except:
+                    log.error(str(cl))
+                    return False, None
+
                 if cl is None:
                     log.error("no change log message was given"
                               " for %s." % trv.getName())

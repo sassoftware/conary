@@ -73,6 +73,8 @@ Changes in @NEW@:
     * Updated recreatedb for API changes (CNY-1263)
     * A "no new troves available" error message is now given when there are
       no new versions to migrate to (CNY-1246)
+    * Attempting to clone without name or contact information set now gives
+      a proper error message (CNY-1315)
 
 Changes in 1.1.16:
   o Server Changes:

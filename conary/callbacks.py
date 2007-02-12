@@ -17,8 +17,15 @@ import types
 from conary import errors
 from conary.lib import log
 
+def passExceptions(f):
+    f._passExceptions = True
+    return f
+
 def exceptionProtection(method, exceptionCallback):
     def wrapper(*args, **kwargs):
+        if hasattr(method, '_passExceptions') and method._passExceptions:
+            return method(*args, **kwargs)
+
         try:
             return method(*args, **kwargs)
         except Exception, e:
