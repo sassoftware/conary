@@ -1986,16 +1986,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName,
-                                branch, filePrefixes=None):
+                                branch, filePrefixes=None, fileIds=None):
         # filePrefixes should be a list of prefixes to look for
         # It tries to limit the number of results for things that generate
         # unique paths with each build (e.g. the kernel).
         # Added as part of protocol version 39
+        # fileIds should be a string with concatenated fileId's to be searched
+        # in the database. A path found with a search of file ids should be
+        # preferred over a path found by looking up the latest paths built
+        # from that source trove.
+        # In practical terms, this means that we could jump several revisions
+        # back in a file's history.
+        # Added as part of protocol version 41
 	if not self.auth.check(authToken, write = False,
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
 	    raise errors.InsufficientPermission
-        self.log(2, sourceName, branch)
+        self.log(2, sourceName, branch, clientVersion, fileIds)
         cu = self.db.cursor()
         query = """
         SELECT DISTINCT
@@ -2014,43 +2021,88 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             TroveFiles.versionId = Versions.versionId
         INNER JOIN FileStreams ON
             TroveFiles.streamId = FileStreams.streamId
+        JOIN tmpFilePrefixes ON
+            TroveFiles.path LIKE tmpFilePrefixes.prefix
         WHERE
             Items.item = ? AND
-            Branches.branch = ?%s
+            Branches.branch = ?
         ORDER BY
             Nodes.finalTimestamp DESC
         """
 
+        schema.resetTable(cu, 'tmpFilePrefixes')
         if filePrefixes is None:
-            query = query % ''
-        else:
-            # Add the filtering by path prefix
-            query = query % " AND\n            TroveFiles.path LIKE ?"
+            # Will look for anything - gets expanded as "LIKE '%'" which is a
+            # bit lame
+            filePrefixes = ['']
+        cu.executemany("INSERT INTO tmpFilePrefixes (prefix) VALUES (?)",
+                       ( f + '%' for f in filePrefixes ))
 
-        def executeIterArgs(cursor, query, argsList):
-            # Execute query by iterating over the list of arguments
-            # Result set is the union of the result sets on each argument list
-            for args in argsList:
-                cursor.execute(query, args)
-                self.log(4, "execute query", query, args)
-                for tup in cursor:
-                    yield tup
-
-        def genArgsList():
-            if filePrefixes is None:
-                yield (sourceName, branch)
-            else:
-                for f in filePrefixes:
-                    yield (sourceName, branch, f + '%')
-
-        rsIter = executeIterArgs(cu, query, genArgsList())
+        cu.execute(query, sourceName, branch)
         ids = {}
-        for (pathId, path, version, fileId, timeStamp) in rsIter:
+        for (pathId, path, version, fileId, timeStamp) in cu:
             encodedPath = self.fromPath(path)
             if not encodedPath in ids:
                 ids[encodedPath] = (self.fromPathId(pathId),
                                    version,
                                    self.fromFileId(fileId))
+        if not fileIds:
+            return ids
+
+        fileIds = base64.b64decode(fileIds)
+
+        # Length of a fileId - same as len of sha1
+        fileIdLen = 20
+        assert(len(fileIds) % fileIdLen == 0)
+        fileIdCount = len(fileIds) // fileIdLen
+
+        def splitFileIds():
+            for i in range(fileIdCount):
+                start = fileIdLen * i
+                end = start + fileIdLen
+                yield fileIds[start : end]
+
+        schema.resetTable(cu, 'tmpFileIds')
+        cu.executemany("INSERT INTO tmpFileIds (fileId) "
+                       "VALUES (?)", splitFileIds())
+
+        # Fetch paths by file id too
+        query = """
+        SELECT DISTINCT
+            TroveFiles.pathId, TroveFiles.path, Versions.version,
+            FileStreams.fileId, Nodes.finalTimestamp
+        FROM Instances
+        JOIN Nodes ON
+            Instances.itemid = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        JOIN Branches using (branchId)
+        JOIN Items ON
+            Nodes.sourceItemId = Items.itemId
+        JOIN TroveFiles ON
+            Instances.instanceId = TroveFiles.instanceId
+        JOIN Versions ON
+            TroveFiles.versionId = Versions.versionId
+        INNER JOIN FileStreams ON
+            TroveFiles.streamId = FileStreams.streamId
+        JOIN tmpFileIds ON
+            FileStreams.fileId = tmpFileIds.fileId
+        WHERE
+            Items.item = ? AND
+            Branches.branch = ?
+        ORDER BY
+            Nodes.finalTimestamp DESC
+        """
+
+        cu.execute(query, sourceName, branch)
+
+        newids = {}
+        for (pathId, path, version, fileId, timeStamp) in cu:
+            encodedPath = self.fromPath(path)
+            if not encodedPath in newids:
+                newids[encodedPath] = (self.fromPathId(pathId),
+                                       version,
+                                       self.fromFileId(fileId))
+        ids.update(newids)
         return ids
 
     @accessReadOnly
