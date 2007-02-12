@@ -1179,7 +1179,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 os.unlink(url)
 
             if totalSize == None:
-                sys.exit(0)
+                raise errors.RepositoryError("Unknown error downloading changeset")
             #assert(totalSize == sum(sizes))
             inF.close()
 
