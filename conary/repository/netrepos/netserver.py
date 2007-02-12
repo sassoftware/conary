@@ -42,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42 ]
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -1997,7 +1997,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # from that source trove.
         # In practical terms, this means that we could jump several revisions
         # back in a file's history.
-        # Added as part of protocol version 41
+        # Added as part of protocol version 42
 	if not self.auth.check(authToken, write = False,
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):

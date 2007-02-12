@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1784,7 +1784,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             args = [sourceName, self.fromVersion(branch)]
         else:
             args = [sourceName, self.fromVersion(branch), filePrefixes]
-        if fileIds is not None and self.c[branch]._protocolVersion >= 41:
+        if fileIds is not None and self.c[branch]._protocolVersion >= 42:
             # Make sure we send a (possibly empty) filePrefixes
             assert(filePrefixes is not None)
             args.append(base64.b64encode("".join(fileIds)))
