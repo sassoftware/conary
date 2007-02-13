@@ -25,6 +25,12 @@ Changes in @NEW@:
       This allows for the same changeset to be cached for different client
       generations. (CNY-1203)
 
+  o Client Changes:
+    * The Conary client now sends data across an idle connection to a
+      Conary repository.  This will keep the connection alive when the
+      repository is behind a firewall or proxy that has short timeouts
+      for idle connections. (CNY-1045)
+
   o Build Changes:
     * A list of autosource mirrors has been added.
     * cvc cook --show-buildreqs works properly now. Thanks to Pavel
