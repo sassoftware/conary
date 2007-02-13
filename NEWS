@@ -9,6 +9,12 @@ Changes in @NEW@:
     * Reworked code which commit groups to the repository to significantly
       reduce the number of SQL queries executed (CNY-1273)
 
+  o Client Changes:
+    * The Conary client now sends data across an idle connection to a
+      Conary repository.  This will keep the connection alive when the
+      repository is behind a firewall or proxy that has short timeouts
+      for idle connections. (CNY-1045)
+
   o Build Changes:
     * A list of autosource mirrors has been added.
 
