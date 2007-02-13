@@ -30,6 +30,8 @@ Changes in @NEW@:
       Conary repository.  This will keep the connection alive when the
       repository is behind a firewall or proxy that has short timeouts
       for idle connections. (CNY-1045)
+    * The error message produced by Conary when a callback method
+      raises an unhandled exception has been improved.
 
   o Build Changes:
     * A list of autosource mirrors has been added.

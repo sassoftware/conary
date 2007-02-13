@@ -12,6 +12,7 @@
 #
 
 import sys
+import traceback
 import types
 
 from conary import errors
@@ -29,17 +30,33 @@ def exceptionProtection(method, exceptionCallback):
         try:
             return method(*args, **kwargs)
         except Exception, e:
+            exc_info = sys.exc_info()
             if errors.exceptionIsUncatchable(e):
                 raise
-
-            exceptionCallback(e)
+            exceptionCallback(exc_info)
 
     return wrapper
 
 class Callback(object):
 
-    def _exceptionOccured(self, e):
-        log.warning("%s: %s" % (e.__class__.__name__, e))
+    def _exceptionOccured(self, exc_info):
+        etype, e, tb = exc_info
+        # format the exception
+        msg = '%s' % etype.__name__
+        s = str(e)
+        if s:
+            msg += ': %s' % s
+        # get the line info that raised the exception
+        inner = tb.tb_next
+        while inner.tb_next:
+            inner = inner.tb_next
+        filename = inner.tb_frame.f_code.co_filename
+        linenum = inner.tb_frame.f_lineno
+        log.warning('Unhandled exception occurred when invoking callback:\n'
+                    '%s:%s\n'
+                    ' %s', filename, linenum, msg)
+        # log the full traceback if debugging (--debug=all)
+        log.debug(''.join(traceback.format_exception(*exc_info)))
         self.exceptions.append(e)
 
     def __getattribute__(self, name):
