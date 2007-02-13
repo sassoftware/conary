@@ -92,6 +92,8 @@ Changes in @NEW@:
     * When multiple labels of a trove exist in a group and that group is 
       being searched for that trove, conary will no longer arbitrarily pick
       one of the labels to return.
+    * A bug in the default update callback class that causes a hang
+      when unhandled exceptions occur has been fixed.
 
 Changes in 1.1.16:
   o Server Changes:
