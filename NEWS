@@ -83,6 +83,9 @@ Changes in @NEW@:
       a proper error message (CNY-1315)
     * The client code no longer exits with a sys.exit(0) if one of the
       callbacks fails (CNY-1271).
+    * When multiple labels of a trove exist in a group and that group is 
+      being searched for that trove, conary will no longer arbitrarily pick
+      one of the labels to return.
 
 Changes in 1.1.16:
   o Server Changes:
