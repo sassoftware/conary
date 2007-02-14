@@ -163,11 +163,15 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         allTrovesRemoved = []
         allSizes = []
 
+        csVersion = netserver.NetworkRepositoryServer._getChangeSetVersion(
+                                                                clientVersion)
+
         for rawJob in chgSetList:
             job = self._cvtJobEntry(authToken, rawJob)
 
             cacheEntry = self.cache.getEntry(job, recurse, withFiles,
-                                     withFileContents, excludeAutoSource)
+                                     withFileContents, excludeAutoSource,
+                                     csVersion)
             path = None
 
             if cacheEntry is not None:
@@ -218,7 +222,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                 (key, path) = self.cache.addEntry(job, recurse, withFiles,
                                     withFileContents, excludeAutoSource,
                                     (trovesNeeded, filesNeeded, removedTroves,
-                                     sizes), size = size)
+                                     sizes), size = size, csVersion = csVersion)
 
                 os.rename(tmpPath, path)
 

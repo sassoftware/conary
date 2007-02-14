@@ -1403,7 +1403,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return (cs, trovesNeeded, filesNeeded, removedTroves)
 
-    def _getChangeSetVersion(self, clientVersion):
+    @staticmethod
+    def _getChangeSetVersion(clientVersion):
         # Determine the changeset version based on the client version
         # Add more params if necessary
         if clientVersion < 38:
