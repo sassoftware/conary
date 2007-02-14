@@ -2336,7 +2336,7 @@ conary erase '%s=%s[%s]'
         # To go away eventually
         if callback:
             import warnings
-            warnings.warn("The callback argument to applyUpdate has been "
+            warnings.warn("The callback argument to updateChangeSet has been "
                           "deprecated, use setUpdateCallback() instead")
             self.setUpdateCallback(callback)
 
@@ -2589,7 +2589,7 @@ conary erase '%s=%s[%s]'
         if callback:
             import warnings
             warnings.warn("The callback argument to applyUpdate has been "
-                          "deprecated, use useUpdateCallback() instead")
+                          "deprecated, use setUpdateCallback() instead")
             self.setUpdateCallback(callback)
 
         def _createCs(repos, db, jobSet, uJob, standalone = False):
