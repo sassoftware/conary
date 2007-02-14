@@ -895,6 +895,7 @@ class Database(SqlDbRepository):
         self.db.commit()
 
     def createRollback(self):
+        self.readRollbackStatus()
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
         if os.path.exists(rbDir):
             shutil.rmtree(rbDir)
@@ -905,6 +906,7 @@ class Database(SqlDbRepository):
 
     # name looks like "r.%d"
     def removeRollback(self, name):
+        self.readRollbackStatus()
 	rollback = int(name[2:])
         try:
             shutil.rmtree(self.rollbackCache + "/%d" % rollback)
@@ -916,10 +918,12 @@ class Database(SqlDbRepository):
 	    self.writeRollbackStatus()
 
     def removeLastRollback(self):
+        self.readRollbackStatus()
         name = 'r.%d' %self.lastRollback
         self.removeRollback(name)
 
     def writeRollbackStatus(self):
+        self.readRollbackStatus()
 	newStatus = self.rollbackCache + ".new"
 
         fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
@@ -929,6 +933,7 @@ class Database(SqlDbRepository):
 	os.rename(newStatus, self.rollbackStatus)
 
     def getRollbackList(self):
+        self.readRollbackStatus()
 	list = []
 	for i in range(self.firstRollback, self.lastRollback + 1):
 	    list.append("r.%d" % i)
@@ -936,6 +941,10 @@ class Database(SqlDbRepository):
 	return list
 
     def readRollbackStatus(self):
+        if not os.path.exists(self.rollbackStatus):
+            self.firstRollback = 0
+            self.lastRollback = -1
+            return
 	f = open(self.rollbackStatus)
 	(first, last) = f.read()[:-1].split()
 	self.firstRollback = int(first)
@@ -943,6 +952,7 @@ class Database(SqlDbRepository):
 	f.close()
 
     def hasRollback(self, name):
+        self.readRollbackStatus()
 	try:
 	    num = int(name[2:])
 	except ValueError:
@@ -962,6 +972,7 @@ class Database(SqlDbRepository):
 
     def applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None):
+        self.readRollbackStatus()
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -1165,11 +1176,6 @@ class Database(SqlDbRepository):
                     else:
                         raise
 
-            if not os.path.exists(self.rollbackStatus):
-                self.firstRollback = 0
-                self.lastRollback = -1
-            else:
-                self.readRollbackStatus()
             SqlDbRepository.__init__(self, root + path)
 
 class DatabaseCacheWrapper:
