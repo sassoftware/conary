@@ -2337,7 +2337,7 @@ conary erase '%s=%s[%s]'
         if callback:
             import warnings
             warnings.warn("The callback argument to applyUpdate has been "
-                          "deprecated, use useUpdateCallback() instead")
+                          "deprecated, use setUpdateCallback() instead")
             self.setUpdateCallback(callback)
 
         if self.updateCallback is None:
