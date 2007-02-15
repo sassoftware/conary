@@ -42,7 +42,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42 ]
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -1309,12 +1309,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           troveTypes = troveTypes)
 
     @accessReadOnly
-    def getFileContents(self, authToken, clientVersion, fileList):
+    def getFileContents(self, authToken, clientVersion, fileList,
+                        authCheckOnly = False):
         self.log(2, "fileList", fileList)
 
         # We use _getFileStreams here for the permission checks.
         fileIdGen = (self.toFileId(x[0]) for x in fileList)
         rawStreams = self._getFileStreams(authToken, fileIdGen)
+
+        if authCheckOnly:
+            for stream, (encFileId, encVersion) in \
+                                itertools.izip(rawStreams, fileList):
+                if stream is None:
+                    raise errors.FileStreamNotFound(
+                                    (self.toFileId(encFileId),
+                                     self.toVersion(encVersion)))
+            return True
+
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
@@ -2831,6 +2842,7 @@ class ServerConfig(ConfigFile):
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
+    proxyContentsDir        = CfgPath
     proxyDB                 = dbstore.CfgDriver
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver
