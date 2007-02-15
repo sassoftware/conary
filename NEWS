@@ -42,6 +42,9 @@ Changes in @NEW@:
       For example, if you wish to check to see if kernel.pae is set, you can
       add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
       the final flavor of your build, and should be used with care. (CNY-1201)
+    * Component and package selection by manifest, as with the "package="
+      option, could fail when large numbers of files were found; this
+      bug has been resolved. (CNY-1339)
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
