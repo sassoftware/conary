@@ -23,7 +23,15 @@ Changes in @NEW@:
       exception logged and CommitError returned to the client (CNY-1182)
     * Changesets cached are now versioned depending on the client's version.
       This allows for the same changeset to be cached for different client
-      generations. (CNY-1302)
+      generations. (CNY-1203)
+
+  o Client Changes:
+    * The Conary client now sends data across an idle connection to a
+      Conary repository.  This will keep the connection alive when the
+      repository is behind a firewall or proxy that has short timeouts
+      for idle connections. (CNY-1045)
+    * The error message produced by Conary when a callback method
+      raises an unhandled exception has been improved.
 
   o Build Changes:
     * A list of autosource mirrors has been added.
@@ -34,6 +42,9 @@ Changes in @NEW@:
       For example, if you wish to check to see if kernel.pae is set, you can
       add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
       the final flavor of your build, and should be used with care. (CNY-1201)
+    * Component and package selection by manifest, as with the "package="
+      option, could fail when large numbers of files were found; this
+      bug has been resolved. (CNY-1339)
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
@@ -43,6 +54,9 @@ Changes in @NEW@:
       Modifications have been made to the NumericStream types
       implemented in C so that they can be used as base classes in
       Python.
+    * Path ID lookups is now done by file prefix and file ID. This allows for
+      identifying files in different package flavors or in versions older than
+      the latest one. (CNY-1203)
 
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
@@ -80,6 +94,11 @@ Changes in @NEW@:
       a proper error message (CNY-1315)
     * The client code no longer exits with a sys.exit(0) if one of the
       callbacks fails (CNY-1271).
+    * When multiple labels of a trove exist in a group and that group is 
+      being searched for that trove, conary will no longer arbitrarily pick
+      one of the labels to return.
+    * A bug in the default update callback class that causes a hang
+      when unhandled exceptions occur has been fixed.
 
 Changes in 1.1.16:
   o Server Changes:

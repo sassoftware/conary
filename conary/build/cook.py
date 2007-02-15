@@ -1019,12 +1019,14 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     # itself
     grpMap = {}
     filePrefixes = set()
+    fileIds = set()
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
-        # Extract file prefixes
-        for f in buildPkg:
-            filePrefixes.add(os.path.dirname(f))
+        # Extract file prefixes and file ids
+        for (path, (realPath, f)) in buildPkg.iteritems():
+            filePrefixes.add(os.path.dirname(path))
+            fileIds.add(f.fileId())
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
@@ -1054,6 +1056,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         oldp = p
     filePrefixes = ret
 
+    # Sort the file ids to make sure we get consistent behavior
+    fileIds = sorted(fileIds)
+
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
 
@@ -1073,10 +1078,10 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         log.info('looking up pathids from repository history')
         # look up the pathids for every file that has been built by
-        # this source component, following our brach ancestry
+        # this source component, following our branch ancestry
         while True:
             d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                filePrefixes)
+                                              filePrefixes, fileIds)
             ident.merge(d)
 
             if not searchBranch.hasParentBranch():

@@ -199,13 +199,12 @@ class QueryByLabelPath(Query):
         name = troveTup[0]
         self.map[name] = [troveTup, labelPath]
 
-        if self.acrossLabels:
+        if self.acrossLabels or isinstance(labelPath, set):
             if not flavorList:
                 self.query[name] = [ dict.fromkeys(labelPath, None)]
             elif self.acrossFlavors:
                 # create one big query: {name : [{label  : [flavor1, flavor2],
                 #                                 label2 : [flavor1, flavor2]}
- 
                 d = {}
                 for label in labelPath:
                     d[label] = flavorList[:]
@@ -774,9 +773,9 @@ class TroveFinder:
             return self.labelPath
         if not self.allowNoLabel:
             return []
-        return [ x.branch().label() \
-                 for x in self.troveSource.getTroveVersionList(troveTup[0],
-                                                        troveTypes=self.troveTypes)]
+        return set([ x.branch().label() \
+                    for x in self.troveSource.getTroveVersionList(troveTup[0],
+                                                troveTypes=self.troveTypes)])
 
     def sortNoVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup
@@ -793,7 +792,7 @@ class TroveFinder:
             flavorList = self.mergeFlavors(flavor)
             labelPath = self._getLabelPath(troveTup)
             self.query[QUERY_BY_LABEL_PATH].addQuery(troveTup,
-                                                     labelPath, 
+                                                     labelPath,
                                                      flavorList)
 
     def sortBranch(self, troveTup, affinityTroves):
@@ -864,6 +863,8 @@ class TroveFinder:
         for serverName, namespace in repositories:
             newLabelPath.append(versions.Label("%s@%s%s" %
                                (serverName, namespace, versionStr)))
+        if isinstance(labelPath, set):
+            newLabelPath = set(newLabelPath)
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
     def sortHost(self, troveTup, affinityTroves):
@@ -875,6 +876,8 @@ class TroveFinder:
         for nameSpace, branchName in repositories:
             newLabelPath.append(versions.Label("%s%s:%s" %
                                (serverName, nameSpace, branchName)))
+        if isinstance(labelPath, set):
+            newLabelPath = set(newLabelPath)
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
     def _sortLabel(self, labelPath, troveTup, affinityTroves):

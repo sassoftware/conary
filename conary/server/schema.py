@@ -844,6 +844,26 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["newTroveTroves"] = True
 
+    if "tmpFileIds" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        tmpFileIds(
+            fileId          %(BINARY20)s NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpFileIds"] = True
+        db.createIndex("tmpFileIds", "tmpFileIdsFileIdIdx", "fileId",
+                       check = False)
+
+    if "tmpFilePrefixes" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        tmpFilePrefixes(
+            prefix          %(STRING)s NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpFilePrefixes"] = True
+        db.createIndex("tmpFilePrefixes", "tmpFilePrefixesPrefixIdx", "prefix",
+                       check = False)
+
     db.commit()
 
 def resetTable(cu, name):
