@@ -273,7 +273,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None,
-            use = True):
+            use = True, labelPath=None):
         """
         NAME
         ====
@@ -283,7 +283,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName}])}
+        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName},] [I{labelPath}])}
 
         DESCRIPTION
         ===========
@@ -322,10 +322,13 @@ class GroupRecipe(_BaseGroupRecipe):
         B{versionStr} : (None) A version specifier like that passed to
 
         B{repquery} which determines the trove returned.
-        
+
         B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the trove(s) are added to the
         group
+
+        B{labelPath} : (None) Set a specific labelPath to search for this
+        particular trove.  This cannot be used with the B{ref} flag.
 
         EXAMPLES
         ========
@@ -340,7 +343,7 @@ class GroupRecipe(_BaseGroupRecipe):
         for group in self._getGroups(groupName):
             group.addSpec(name, versionStr = versionStr, flavor = flavor,
                           source = source, byDefault = byDefault, ref = ref,
-                          components = components)
+                          components = components, labelPath = labelPath)
 
     # maintain addTrove for backwards compatibility
     addTrove = add
@@ -1060,8 +1063,25 @@ class SingleGroup(object):
     def getRequires(self):
         return self.requires
 
+    def _makeLabelPathRef(self, labelPath):
+        if isinstance(labelPath, str):
+            labelPath = [ labelPath ]
+        path = []
+        for label in labelPath:
+            try:
+                label = versions.Label(label)
+                path.append(label)
+            except:
+                raise RecipeFileError("Invalid label '%s'" % label)
+        return tuple(path)
+
     def addSpec(self, name, versionStr = None, flavor = None, source = None,
-                byDefault = None, ref = None, components=None):
+                byDefault = None, ref = None, components=None, labelPath=None):
+        if labelPath and ref:
+            raise RecipeFileError(
+                    "Cannot specify both ref and labelPath for '%s'" % name)
+        elif labelPath:
+            ref = self._makeLabelPathRef(labelPath)
         self.addTroveList.append(((name, versionStr, flavor), source,
                                  byDefault, ref, components))
 
@@ -1558,6 +1578,10 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
         if troveSource is None:
             source = repos
             myLabelPath = labelPath
+            mySearchFlavor = searchFlavor
+        elif isinstance(troveSource, tuple):
+            source = repos
+            myLabelPath = troveSource
             mySearchFlavor = searchFlavor
         else:
             source = troveSource
