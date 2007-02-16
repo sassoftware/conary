@@ -191,17 +191,27 @@ class ClientClone:
                                     % (srcTroveName, targetBranch.asString()) 
                         return False, None
 
+                    # We are trying to make sure that, if a source exists in
+                    # the target branch (while we are cloning binary only), we
+                    # match it with the source for the binaries in the
+                    # originating branch - it has to be either clonedFrom()
+                    # the one on the originating branch, or clonedFrom() the
+                    # same trove the source trove on the originating branch
+                    # was clonedFrom()
+
+                    # get the trove version for the latest trove on the branch
+                    # we try to clone on
                     trv = self.repos.getTrove(srcTroveName, 
                                      currentVersionList[-1],
                                      deps.Flavor(), withFiles = False)
 
-                    # get the trove version for the latest trove on the branch
-                    # we try to clone on
                     clfrom = trv.troveInfo.clonedFrom()
                     srctup = (srcTroveName, sourceVersion, deps.Flavor())
                     if srctup in allTroves:
                         trvcl = allTroves[trvtup]
                     else:
+                        # This should not fail, it would mean the upstream
+                        # branch has the binaries but not the sources
                         trvcl = self.repos.getTrove(srctup[0], srctup[1],
                                                     srctup[2], withFiles=False)
                     if clfrom and clfrom in [sourceVersion,
