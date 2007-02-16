@@ -247,6 +247,21 @@ class AbstractRepository(IdealRepository):
 	"""
 	raise NotImplementedError
 
+    def getTroveInfo(self, infoType, troveList):
+        """
+        Returns a list of trove infoType streams for a list of (name, version, flavor)
+        troves. if the trove does not exist, a TroveMissing exception is raised. If the
+        requested infoType does not exist for a trove the returned list will have None at
+        the corresponding position.
+
+        @param infoType: trove._TROVE_INFO_*
+        @type infoType: integer
+        @param troveList: (name, versions.Version, deps.Flavor) of the troves needed.
+        @type troveList: list of tuples
+        @rtype: list of Stream objects or None
+        """
+        raise NotImplementedError
+    
     ### File functions
 
     def __init__(self):
@@ -271,6 +286,9 @@ class ChangeSetJob:
 
     def oldTrove(self, *args):
 	pass
+
+    def markTroveRemoved(self, name, version, flavor):
+        raise NotImplementedError
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
                         restoreContents, isConfig, precompressed = False):
@@ -326,9 +344,17 @@ class ChangeSetJob:
 	# file objects which map up with them are created later, but
 	# we do need a map from pathId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	for i, csTrove in enumerate(newList):
+        i = 0
+	for csTrove in newList:
+            if csTrove.troveType() == trove.TROVE_TYPE_REMOVED:
+                # deal with these later on to ensure any changesets which
+                # are relative to removed troves can be processed
+                continue
+
+            i += 1
+
 	    if callback:
-		callback.creatingDatabaseTransaction(i + 1, len(newList))
+		callback.creatingDatabaseTransaction(i, len(newList))
 
 	    newVersion = csTrove.getNewVersion()
 	    oldTroveVersion = csTrove.getOldVersion()
@@ -551,6 +577,18 @@ class ChangeSetJob:
 
 	del configRestoreList
 	del normalRestoreList
+
+        for csTrove in newList:
+            if csTrove.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
+
+            i += 1
+
+            if callback:
+                callback.creatingDatabaseTransaction(i, len(newList))
+
+            self.markTroveRemoved(csTrove.getName(), csTrove.getNewVersion(),
+                                  csTrove.getNewFlavor())
 
 	for (troveName, version, flavor) in cs.getOldTroveList():
 	    trv = self.repos.getTrove(troveName, version, flavor)

@@ -17,34 +17,52 @@ import tempfile
 import cPickle
 
 from conary import dbstore
+from conary.lib import util
 from conary.local import schema, sqldb, versiontable
-from conary.dbstore import idtable
+from conary.dbstore import idtable, sqlerrors
 
-CACHE_SCHEMA_VERSION = 17
+CACHE_SCHEMA_VERSION = 18
 
 class NullCacheSet:
     def __init__(self, tmpDir):
         self.tmpDir = tmpDir
 
     def getEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource):
+                 excludeAutoSource, csVersion):
         return None
 
     def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal, size):
+                 excludeAutoSource, returnVal, size, csVersion):
         (fd, path) = tempfile.mkstemp(dir = self.tmpDir,
                                       suffix = '.ccs-out')
         os.close(fd)
         return None, path
 
-    def invalidateEntry(self, name, version, flavor):
+    def invalidateEntry(self, repos, name, version, flavor):
         pass
 
+def retry(fn):
+    """Decorator to retry database operations if the database is locked"""
+    def wrap(*args, **kwargs):
+        # First arg is self
+        count = args[0].deadlockRetry
+        while count > 0:
+            count -= 1
+            try:
+                return fn(*args, **kwargs)
+            except sqlerrors.DatabaseLocked:
+                # Roll back, try again
+                args[0].db.rollback()
+        else:
+            # Re-raise the last error
+            raise
+    return wrap
 
 class CacheSet:
     filePattern = "%s/cache-%s.ccs-out"
 
-    def __init__(self, cacheDB, tmpDir):
+    def __init__(self, cacheDB, tmpDir, deadlockRetry=5):
+        self.deadlockRetry = deadlockRetry
 	self.tmpDir = tmpDir
         self.db = dbstore.connect(cacheDB[1], driver = cacheDB[0])
         self.db.loadSchema()
@@ -68,7 +86,8 @@ class CacheSet:
                withFileContents BOOLEAN,
                excludeAutoSource BOOLEAN,
                returnValue      BINARY,
-               size             INTEGER
+               size             INTEGER,
+               csVersion        INTEGER
             ) %(TABLEOPTS)s""" % self.db.keywords)
             cu.execute("CREATE INDEX CacheContentsIdx "
                        "ON CacheContents(troveName)")
@@ -80,7 +99,7 @@ class CacheSet:
         self.db.loadSchema()
 
     def getEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource):
+                 excludeAutoSource, csVersion):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -115,9 +134,10 @@ class CacheSet:
                 newFlavorId=? AND newVersionId=? AND
                 absolute=? AND recurse=? AND withFiles=?
                 AND withFileContents=? AND excludeAutoSource=?
+                AND csVersion=?
             """, (name, oldFlavorId, oldVersionId, newFlavorId,
                   newVersionId, absolute, recurse, withFiles, withFileContents,
-                  excludeAutoSource))
+                  excludeAutoSource, csVersion))
 
         # since we begin and commit a transaction inside the loop
         # over the returned rows, we must use fetchall() here so that we
@@ -134,8 +154,9 @@ class CacheSet:
 
         return None
 
+    @retry
     def addEntry(self, item, recurse, withFiles, withFileContents,
-                 excludeAutoSource, returnVal, size):
+                 excludeAutoSource, returnVal, size, csVersion):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -172,13 +193,14 @@ class CacheSet:
             (row, troveName, size,
             oldFlavorId, oldVersionId, newFlavorId, newVersionId,
             absolute, recurse, withFiles, withFileContents,
-            excludeAutoSource, returnValue )
-            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?)""",
+            excludeAutoSource, csVersion,
+            returnValue)
+            VALUES (NULL,?,?,   ?,?,?,?,   ?,?,?,?,   ?,?,   ?)""",
                        (name, size,
                        oldFlavorId, oldVersionId, newFlavorId, newVersionId,
                        absolute, recurse, withFiles, withFileContents,
-                       excludeAutoSource, cPickle.dumps(returnVal, 
-                                                        protocol = -1)))
+                       excludeAutoSource, csVersion,
+                       cPickle.dumps(returnVal, protocol = -1)))
 
             row = cu.lastrowid
             path = self.filePattern % (self.tmpDir, row)
@@ -192,35 +214,43 @@ class CacheSet:
 
         return (row, path)
 
-    def invalidateEntry(self, name, version, flavor):
+    @retry
+    def invalidateEntry(self, repos, name, version, flavor):
         """
         invalidates (and deletes) any cached changeset that matches
         the given name, version, flavor.
         """
-        flavorId = self.flavors.get(flavor, None)
-        versionId = self.versions.get(version, None)
-
-        if flavorId is None or versionId is None:
-            # this should not happen, but we'll handle it anyway
-            return
+        invList = [ (name, version, flavor) ]
+        if repos is not None:
+            invList.extend(repos.getParentTroves(name, version, flavor))
 
         # start a transaction to retain a consistent state
         cu = self.db.transaction()
-        cu.execute("""
-        SELECT row, returnValue, size
-        FROM CacheContents
-        WHERE troveName=? AND newFlavorId=? AND newVersionId=?
-        """, (name, flavorId, versionId))
 
-        # delete all matching entries from the db and the file system
-        for (row, returnVal, size) in cu.fetchall():
-            cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-            path = self.filePattern % (self.tmpDir, row)
-            if os.path.exists(path):
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
+        for name, version, flavor in invList:
+            flavorId = self.flavors.get(flavor, None)
+            versionId = self.versions.get(version, None)
+
+            if flavorId is None or versionId is None:
+                # this should not happen, but we'll handle it anyway
+                return
+
+            cu.execute("""
+            SELECT row, returnValue, size
+            FROM CacheContents
+            WHERE troveName=? AND newFlavorId=? AND newVersionId=?
+            """, (name, flavorId, versionId))
+
+            # delete all matching entries from the db and the file system
+            for (row, returnVal, size) in cu.fetchall():
+                cu.execute("DELETE FROM CacheContents WHERE row=?", row)
+                # unlink(path) is tempting here, but it's possible that
+                # some outstanding request still references it. gafton
+                # suggested hard linking the files for consumption to
+                # allow this remove
+                # path = self.filePattern % (self.tmpDir, row)
+                # util.removeIfExists(path)
+
         self.db.commit()
 
     def __cleanCache(self, cu = None):
@@ -229,12 +259,9 @@ class CacheSet:
         cu.execute("SELECT row from CacheContents")
         for (row,) in cu:
             fn = self.filePattern % (self.tmpDir, row)
-            if os.path.exists(fn):
-                try:
-                    os.unlink(fn)
-                except OSError:
-                    pass
+            util.removeIfExists(fn)
 
+    @retry
     def __cleanDatabase(self, cu = None):
         global CACHE_SCHEMA_VERSION
         if self.db.version != CACHE_SCHEMA_VERSION:

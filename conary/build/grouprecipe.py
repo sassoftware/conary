@@ -273,7 +273,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None,
-            use = True):
+            use = True, labelPath=None):
         """
         NAME
         ====
@@ -283,7 +283,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName}])}
+        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName},] [I{labelPath}])}
 
         DESCRIPTION
         ===========
@@ -322,10 +322,13 @@ class GroupRecipe(_BaseGroupRecipe):
         B{versionStr} : (None) A version specifier like that passed to
 
         B{repquery} which determines the trove returned.
-        
+
         B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the trove(s) are added to the
         group
+
+        B{labelPath} : (None) Set a specific labelPath to search for this
+        particular trove.  This cannot be used with the B{ref} flag.
 
         EXAMPLES
         ========
@@ -340,7 +343,7 @@ class GroupRecipe(_BaseGroupRecipe):
         for group in self._getGroups(groupName):
             group.addSpec(name, versionStr = versionStr, flavor = flavor,
                           source = source, byDefault = byDefault, ref = ref,
-                          components = components)
+                          components = components, labelPath = labelPath)
 
     # maintain addTrove for backwards compatibility
     addTrove = add
@@ -1060,8 +1063,25 @@ class SingleGroup(object):
     def getRequires(self):
         return self.requires
 
+    def _makeLabelPathRef(self, labelPath):
+        if isinstance(labelPath, str):
+            labelPath = [ labelPath ]
+        path = []
+        for label in labelPath:
+            try:
+                label = versions.Label(label)
+                path.append(label)
+            except:
+                raise RecipeFileError("Invalid label '%s'" % label)
+        return tuple(path)
+
     def addSpec(self, name, versionStr = None, flavor = None, source = None,
-                byDefault = None, ref = None, components=None):
+                byDefault = None, ref = None, components=None, labelPath=None):
+        if labelPath and ref:
+            raise RecipeFileError(
+                    "Cannot specify both ref and labelPath for '%s'" % name)
+        elif labelPath:
+            ref = self._makeLabelPathRef(labelPath)
         self.addTroveList.append(((name, versionStr, flavor), source,
                                  byDefault, ref, components))
 
@@ -1097,7 +1117,8 @@ class SingleGroup(object):
 
     def addNewGroup(self, name, byDefault = None, explicit = True,
                     childDefaults=None):
-
+        if name == self.name:
+            raise CookError('Tried to add %s to itself.  This would create a cycle.')
         if not childDefaults:
             childDefaults = []
         elif not isinstance(childDefaults, list):
@@ -1285,7 +1306,7 @@ class GroupReference:
         troveTups = [ x for x in chain(*results.itervalues())]
         self.sourceTups = troveTups
         self.source = trovesource.TroveListTroveSource(source, troveTups)
-        self.source.searchAsRepository()
+        self.source.searchAsDatabase()
 
     def findTroves(self, *args, **kw):
         return self.source.findTroves(*args, **kw)
@@ -1556,14 +1577,21 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
     for troveSource, troveSpecs in toFind.iteritems():
         if troveSource is None:
             source = repos
+            myLabelPath = labelPath
+            mySearchFlavor = searchFlavor
+        elif isinstance(troveSource, tuple):
+            source = repos
+            myLabelPath = troveSource
+            mySearchFlavor = searchFlavor
         else:
             source = troveSource
             troveSource.findSources(repos,  labelPath, searchFlavor),
-
+            myLabelPath = None
+            mySearchFlavor = None
         try:
-            results[troveSource] = source.findTroves(labelPath,
+            results[troveSource] = source.findTroves(myLabelPath,
                                                      toFind[troveSource],
-                                                     searchFlavor)
+                                                     mySearchFlavor)
         except errors.TroveNotFound, e:
             raise CookError, str(e)
 
@@ -1581,6 +1609,7 @@ def processAddAllDirectives(recipeObj, troveMap, cache, repos):
 def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
+    topGroup = parentGroup
 
     if recurse:
         groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True,
@@ -1621,6 +1650,8 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                     groupsByName[name] = childGroup
 
 
+                if parentGroup.name == name:
+                    raise CookError('Tried to addAll "%s=%s" into %s - which resulted in trying to add %s to itself.  This is not allowed.  You may wish to pass recurse=False to addAll.' % (topTrove.getName(), topTrove.getVersion(), topGroup.name, name))
                 parentGroup.addNewGroup(name, byDefault=byDefault,
                                         explicit = True, childDefaults = trv)
 
@@ -1973,7 +2004,9 @@ def addPackagesForComponents(group, repos, troveCache):
 
     # if the user mentions both foo and foo:runtime, don't remove
     # direct link to foo:runtime
-    troveTups = [ x for x in packages if not group.hasTrove(*x)]
+    troveTups = [ x for x in packages
+                    if not (group.hasTrove(*x) and group.isExplicit(*x)) ]
+    troveTups = packages.keys()
     hasTroves = repos.hasTroves(troveTups)
     troveTups = [ x for x in troveTups if hasTroves[x] ]
 
@@ -2047,8 +2080,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 
     # there's nothing worse than seeing a bunch of nice group debugging
     # information and then having your screen filled up with all 
-    # of the update code's debug mess.  Until that logging is moved
-    # to it's own private location, turn it off.
+    # of the update code's debug mess.
     resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
     if resetVerbosity:
         log.setVerbosity(log.DEBUG)
@@ -2089,13 +2121,12 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                 flavorStr = ''
 
             log.info("\t%s=%s%s" % (provTroveTup[0], verStr, flavorStr))
+            explicit = True # always include this trove immediately
+                            # in the package, even if it used to be included
+                            # implicitly through a sub-package.
 
-            if group.hasTrove(*provTroveTup):
-                explicit = False
-            else:
-                explicit = True
-            group.addTrove(provTroveTup, explicit, byDefault, [],
-                           reason=(ADD_REASON_DEP, troveTup) )
+            group.addTrove(provTroveTup, explicit, True, [],
+                           reason=(ADD_REASON_DEP, troveTup))
             neededTups.append(provTroveTup)
 
     cache.cacheTroves(neededTups)

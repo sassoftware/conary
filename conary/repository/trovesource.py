@@ -14,10 +14,15 @@
 
 import itertools
 
+from conary import errors as conaryerrors
 from conary import files
 from conary import trove
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
+
+TROVE_QUERY_ALL = 0                 # normal, removed, redirect
+TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)
+TROVE_QUERY_NORMAL = 2              # hide branches which end in redirects
 
 class AbstractTroveSource:
     """ Provides the interface necessary for performing
@@ -28,27 +33,35 @@ class AbstractTroveSource:
         well.
     """
 
-    def __init__(self):
+    def __init__(self, searchableByType=False):
         self._allowNoLabel = True
         self._bestFlavor = False
         self._getLeavesOnly = False
+        self._searchableByType = searchableByType
 
     def requiresLabelPath(self):
         return not self._allowNoLabel
 
-    def getTroveLeavesByLabel(self, query, bestFlavor=True):
+    def searchableByType(self):
+        return self._searchableByType
+
+    def getTroveLeavesByLabel(self, query, bestFlavor=True, troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
-    def getTroveVersionsByLabel(self, query, bestFlavor=True):
+    def getTroveVersionsByLabel(self, query, bestFlavor=True,
+                                troveTyes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
-    def getTroveLeavesByBranch(self, query, bestFlavor=True):
+    def getTroveLeavesByBranch(self, query, bestFlavor=True,
+                               troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
-    def getTroveVersionsByBranch(self, query, bestFlavor=True):
+    def getTroveVersionsByBranch(self, query, bestFlavor=True,
+                                 troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
-    def getTroveVersionFlavors(self, query, bestFlavor=True):
+    def getTroveVersionFlavors(self, query, bestFlavor=True,
+                                 troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
     def getTroves(self, troveList, withFiles = True):
@@ -78,14 +91,16 @@ class AbstractTroveSource:
             raise errors.TroveMissing(name, version)
         else:
             return trv
-            
-    def getTroveVersionList(self, name, withFlavors=False):
+
+    def getTroveVersionList(self, name, withFlavors=False,
+                            troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
     def findTroves(self, labelPath, troves, defaultFlavor=None, 
                    acrossLabels=True, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False, 
-                   bestFlavor=None, getLeaves=None):
+                   bestFlavor=None, getLeaves=None, 
+                   troveTypes=TROVE_QUERY_PRESENT):
 
         if bestFlavor is None:
             bestFlavor = self._bestFlavor
@@ -103,11 +118,12 @@ class AbstractTroveSource:
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossSources = True, 
                   acrossFlavors = True, affinityDatabase = None,
-                  bestFlavor = None, getLeaves = None):
+                  bestFlavor = None, getLeaves = None, 
+                  troveTypes=TROVE_QUERY_PRESENT):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossSources, acrossFlavors,
                               affinityDatabase, bestFlavor=bestFlavor,
-                              getLeaves=getLeaves)
+                              getLeaves=getLeaves, troveTypes=troveTypes)
         return res[(name, versionStr, flavor)]
 
     def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
@@ -165,7 +181,7 @@ class AbstractTroveSource:
                 lst = [ [] for x in trovesByDepList ]
                 allSuggs[depSet] = lst
             else:
-                lst = r[depSet]
+                lst = allSuggs[depSet]
 
             for i, troveList in enumerate(trovesByDepList):
                 lst[i].extend(troveList)
@@ -201,9 +217,9 @@ class SearchableTroveSource(AbstractTroveSource):
         implement.
     """
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.searchAsDatabase()
-        AbstractTroveSource.__init__(self)
+        AbstractTroveSource.__init__(self, *args, **kwargs)
 
     def trovesByName(self, name):
         raise NotImplementedError
@@ -235,7 +251,8 @@ class SearchableTroveSource(AbstractTroveSource):
     def isSearchAsDatabase(self):
         return self._allowNoLabel
 
-    def getTroveVersionList(self, name, withFlavors=False):
+    def getTroveVersionList(self, name, withFlavors=False, 
+                            troveTypes=TROVE_QUERY_PRESENT):
         if withFlavors:
             return [ x[1:] for x in self.trovesByName(name) ]
         else:
@@ -250,7 +267,7 @@ class SearchableTroveSource(AbstractTroveSource):
     def _getTrovesByType(self, troveSpecs, 
                          versionType=_GTL_VERSION_TYPE_NONE,
                          latestFilter=_GET_TROVE_ALL_VERSIONS, 
-                         bestFlavor=False):
+                         bestFlavor=False, troveTypes=TROVE_QUERY_PRESENT):
         """ Implements the various getTrove methods by grabbing
             information from trovesByName.  Note it takes an 
             extra parameter over the netrepos/netserver version - 
@@ -271,6 +288,12 @@ class SearchableTroveSource(AbstractTroveSource):
         # == _GET_TROVE_BEST_FLAVOR
         # get the latest version that has an allowed flavor, then get
         # only the best one of the flavors at that latest version
+
+        # we don't handle queries for non-present troves at this moment.
+        # doing so may be impossible and/or expensive - for example, we would 
+        # have to instantiate matching troves from changesets before we could
+        # filter by flavor.
+        assert(troveTypes == TROVE_QUERY_PRESENT)
 
         if bestFlavor:
             flavorFilter = _GET_TROVE_BEST_FLAVOR
@@ -375,29 +398,37 @@ class SearchableTroveSource(AbstractTroveSource):
                                     break
         return allTroves
 
-    def getTroveLeavesByLabel(self, troveSpecs, bestFlavor=True):
-        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_LABEL, 
-                                 _GET_TROVE_VERY_LATEST, bestFlavor)
+    def getTroveLeavesByLabel(self, troveSpecs, bestFlavor=True,
+                            troveTypes=TROVE_QUERY_PRESENT):
+        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_LABEL,
+                                 _GET_TROVE_VERY_LATEST, bestFlavor, troveTypes=troveTypes)
 
-    def getTroveVersionsByLabel(self, troveSpecs, bestFlavor=True):
-        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_LABEL, 
-                                     _GET_TROVE_ALL_VERSIONS, bestFlavor)
+    def getTroveVersionsByLabel(self, troveSpecs, bestFlavor=True,
+                                troveTypes=TROVE_QUERY_PRESENT):
+        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_LABEL,
+                                     _GET_TROVE_ALL_VERSIONS, bestFlavor,
+                                     troveTypes=troveTypes)
 
-    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor=True):
+    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor=True,
+                               troveTypes=TROVE_QUERY_PRESENT):
         """ Takes {n : { Version : [f,...]}} dict """
         return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH,
-                                     _GET_TROVE_VERY_LATEST, bestFlavor)
+                                     _GET_TROVE_VERY_LATEST, bestFlavor,
+                                     troveTypes=troveTypes)
 
-    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor=True):
+    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor=True,
+                                 troveTypes=TROVE_QUERY_PRESENT):
         return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH, 
-                                     _GET_TROVE_ALL_VERSIONS, bestFlavor)
+                                     _GET_TROVE_ALL_VERSIONS, bestFlavor,
+                                     troveTypes=troveTypes)
 
-    def getTroveVersionFlavors(self, troveSpecs, bestFlavor=True):
+    def getTroveVersionFlavors(self, troveSpecs, bestFlavor=True,
+                               troveTypes=TROVE_QUERY_PRESENT):
         """ Takes {n : { Version : [f,...]}} dict """
         return self._getTrovesByType(troveSpecs, 
                                      _GTL_VERSION_TYPE_VERSION, 
                                      _GET_TROVE_ALL_VERSIONS, 
-                                     bestFlavor)
+                                     bestFlavor, troveTypes=troveTypes)
 
 class SimpleTroveSource(SearchableTroveSource):
 
@@ -438,18 +469,14 @@ class TroveListTroveSource(SimpleTroveSource):
         foundTups = set()
         
         # recurse into the given trove tups to include all child troves
-        while troveTups:
-            for (n,v,f) in troveTups:
-                self._trovesByName.setdefault(n, set()).add((n,v,f))
-                newTroves = source.getTroves(troveTups, withFiles=False)
-            foundTups.update(newTroves)
-            troveTups = []
-            for newTrove in newTroves:
-                for tup in newTrove.iterTroveList(strongRefs=True,
-                                                  weakRefs=True):
-                    self._trovesByName.setdefault(tup[0], set()).add(tup)
-                    if tup not in foundTups:
-                        troveTups.append(tup)
+        for (n,v,f) in troveTups:
+            self._trovesByName.setdefault(n, set()).add((n,v,f))
+
+        newTroves = source.getTroves(troveTups, withFiles=False)
+        for newTrove in newTroves:
+            for tup in newTrove.iterTroveList(strongRefs=True,
+                                              weakRefs=True):
+                self._trovesByName.setdefault(tup[0], set()).add(tup)
 
     def getSourceTroves(self):
         return self.getTroves(self.sourceTups)
@@ -556,8 +583,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             if trvCs.getOldVersion() is None:
                 if info in self.troveCsMap:
-                    # FIXME: there is no such exception in this context
-                    raise DuplicateTrove
+                    raise conaryerrors.InternalConaryError
                 self.troveCsMap[info] = cs
                 self.jobMap[(info[0], (None, None), info[1:], 
                              trvCs.isAbsolute())] = cs, includesFileContents
@@ -576,7 +602,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             for (trvCs, info) in relative:
                 if info in self.troveCsMap:
                     # FIXME: there is no such exception in this context
-                    raise DuplicateTrove
+                    raise conaryerrors.InternalConaryError
                 if not self.db.hasTrove(*trvCs.getOldNameVersionFlavor()):
                     # we don't has the old version of this trove, don't 
                     # use this changeset when updating this trove.
@@ -951,7 +977,7 @@ class TroveSourceStack(SearchableTroveSource):
     def insertSource(self, source, idx=0):
         if source is not None and source not in self:
             self.sources.insert(idx, source)
-        
+
     def hasSource(self, source):
         return source in self
 
@@ -973,7 +999,6 @@ class TroveSourceStack(SearchableTroveSource):
                 else:
                     results[index] = True
         return results
-        
 
     def iterSources(self):
         for source in self.sources:
@@ -1030,7 +1055,12 @@ class TroveSourceStack(SearchableTroveSource):
 
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
                    acrossLabels=True, acrossFlavors=True, 
-                   affinityDatabase=None, allowMissing=False):
+                   affinityDatabase=None, allowMissing=False,
+                   bestFlavor=None, getLeaves=None,
+                   troveTypes=TROVE_QUERY_PRESENT):
+
+        sourceBestFlavor = bestFlavor
+        sourceGetLeaves = getLeaves
         troveSpecs = list(troveSpecs)
 
         results = {}
@@ -1050,13 +1080,24 @@ class TroveSourceStack(SearchableTroveSource):
             else:
                 sourceLabelPath = labelPath
                 sourceDefaultFlavor = defaultFlavor
-                
+
+            if source.searchableByType():
+                sourceTroveTypes = troveTypes
+            else:
+                sourceTroveTypes = TROVE_QUERY_PRESENT
+
+            if bestFlavor is None:
+                sourceBestFlavor = source._bestFlavor
+            if getLeaves is None:
+                sourceGetLeaves = source._getLeavesOnly
+
             troveFinder = findtrove.TroveFinder(source, sourceLabelPath, 
                                             sourceDefaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=source._allowNoLabel,
-                                            bestFlavor=source._bestFlavor,
-                                            getLeaves=source._getLeavesOnly)
+                                            bestFlavor=sourceBestFlavor,
+                                            getLeaves=sourceGetLeaves,
+                                            troveTypes=sourceTroveTypes)
 
             foundTroves = troveFinder.findTroves(troveSpecs, allowMissing=True)
 
@@ -1075,17 +1116,25 @@ class TroveSourceStack(SearchableTroveSource):
             sourceLabelPath = None
         else:
             sourceLabelPath = labelPath
-         
-        troveFinder = findtrove.TroveFinder(source, labelPath, 
+        if source.searchableByType():
+            sourceTroveTypes = troveTypes
+        else:
+            sourceTroveTypes = TROVE_QUERY_PRESENT
+        if bestFlavor is None:
+            sourceBestFlavor = source._bestFlavor
+        if getLeaves is None:
+            sourceGetLeaves = source._getLeavesOnly
+
+
+        troveFinder = findtrove.TroveFinder(source, labelPath,
                                         defaultFlavor, acrossLabels,
                                         acrossFlavors, affinityDatabase,
                                         allowNoLabel=source._allowNoLabel,
-                                        bestFlavor=source._bestFlavor,
-                                        getLeaves=source._getLeavesOnly)
+                                        bestFlavor=sourceBestFlavor,
+                                        getLeaves=sourceGetLeaves,
+                                        troveTypes=sourceTroveTypes)
 
-
-
-        results.update(troveFinder.findTroves(troveSpecs, 
+        results.update(troveFinder.findTroves(troveSpecs,
                                               allowMissing=allowMissing))
         return results
 
@@ -1129,17 +1178,17 @@ class TroveSourceStack(SearchableTroveSource):
                 break
 
             try:
-                res = source.createChangeSet(jobList, 
+                res = source.createChangeSet(jobList,
                                            withFiles = withFiles,
                                            withFileContents = withFileContents,
                                            recurse = recurse, 
                                            callback = callback)
+                if isinstance(res, (list, tuple)):
+                    newCs, jobList = res
+                else: 
+                    newCs, jobList = res, None
             except errors.OpenError:
-                res = changeset.ReadOnlyChangeSet(), jobList
-            if isinstance(res, (list, tuple)):
-                newCs, jobList = res
-            else: 
-                newCs, jobList = res, None
+                newCs = changeset.ReadOnlyChangeSet()
             cs.merge(newCs)
 
         return cs, jobList
@@ -1219,7 +1268,8 @@ class AbstractJobSource(AbstractTroveSource):
     def getTroves(self, troves, withFiles=False):
         raise NotImplementedError
 
-    def getTroveVersionList(self, name, withFlavors=False):
+    def getTroveVersionList(self, name, withFlavors=False,
+                            troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
     def iterFilesInJob(self, job, sortByPath=False, withFiles=False,
@@ -1265,7 +1315,7 @@ class JobSource(AbstractJobSource):
             self.jobsByNew[name, job[2][0], job[2][1]] = job
 
     def findTroves(self, *args, **kw):
-        return self.allTroves.findTroves(*args, **kw)
+        return self.allTroveList.findTroves(*args, **kw)
 
     def findJobs(self, jobList):
         """ Finds a job given a changeSpec

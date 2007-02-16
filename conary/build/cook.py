@@ -399,17 +399,10 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
             needsSigning = True
         elif type == recipe.RECIPE_TYPE_FILESET:
             ret = cookFilesetObject(repos, db, cfg, recipeClass, 
-                                    sourceVersion, 
+                                    sourceVersion, buildFlavor,
                                     macros = macros, 
                                     targetLabel = targetLabel,
                                     alwaysBumpCount = alwaysBumpCount)
-            needsSigning = True
-        elif type == recipe.RECIPE_TYPE_DERIVEDPKG:
-            ret = cookDerivedPackageObject(repos, db, cfg, recipeClass,
-                                           sourceVersion,
-                                           macros = macros, 
-                                           targetLabel = targetLabel,
-                                           alwaysBumpCount = alwaysBumpCount)
             needsSigning = True
         else:
             raise AssertionError
@@ -497,7 +490,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     for (fromName, fromFlavor), (toName, toBranch, toFlavor,
                                  subTroveList) in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
-                            None, isRedirect = True)
+                            None, type = trove.TROVE_TYPE_REDIRECT)
 
         redirList.append(redir.getNameVersionFlavor())
 
@@ -594,8 +587,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     for recipeObj, grpFlavor in builtGroups:
         for group in recipeObj.iterGroupList():
             groupName = group.name
-            grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None,
-                                 isRedirect = False)
+            grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
             grpTrv.setRequires(group.getRequires())
 
             provides = deps.DependencySet()
@@ -631,130 +623,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
     return (changeSet, built, None)
 
-def cookDerivedPackageObject(repos, db, cfg, recipeClass, sourceVersion,
-                             macros={}, targetLabel = None,
-                             alwaysBumpCount=False):
-    """
-    Turns a derived package recipe object into a change set. Returns the
-    absolute changeset created, a list of the names of the packages built, and
-    and None (for compatibility with cookPackageObject).
-
-    @param repos: Repository to both look for source files and file id's in.
-    @type repos: repository.Repository
-    @param cfg: conary configuration
-    @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
-    @param macros: set of macros for the build
-    @type macros: dict
-    @param targetLabel: label to use for the cooked troves; it is used
-    as a new branch from whatever version was previously built
-    default), the sourceVersion's branch is used
-    @type targetLabel: versions.Label
-    @param alwaysBumpCount: if True, the cooked troves will not share a 
-    full version with any other existing troves with the same name, 
-    even if their flavors would differentiate them.  
-    @type alwaysBumpCount: bool
-    @rtype: tuple
-    """
-
-    fullName = recipeClass.name
-
-    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
-                            cfg.flavor, macros)
-
-    try:
-        parentRevision = versions.Revision(recipeObj.parentVersion)
-    except conaryerrors.ParseError, e:
-        raise builderrors.RecipeFileError('Cannot parse parentVersion %s: %s',
-                            recipeObj.parentRevision, str(e))
-
-    if not sourceVersion.hasParentVersion():
-        raise builderrors.RecipeFileError(
-                "only shadowed sources can be derived packages")
-    elif sourceVersion.trailingRevision().getVersion() != \
-                                                parentRevision.getVersion():
-        raise builderrors.RecipeFileError(
-                "parentRevision must have the same upstream version as the "
-                "derived package recipe")
-
-    _callSetup(cfg, recipeObj)
-
-    log.info('Building %s=%s[%s]' % ( recipeClass.name,
-                                      sourceVersion.branch().label(),
-                                      use.usedFlagsToFlavor(recipeClass.name)))
-
-    # find all the flavors of the parent
-    parentBranch = sourceVersion.branch().parentBranch()
-    parentVersion = parentBranch.createVersion(parentRevision)
-    d = repos.getTroveVersionFlavors({ recipeClass.name :
-                        { parentVersion : [ None ] } } )
-    if recipeClass.name not in d:
-        raise builderrors.RecipeFileError(
-                'Version %s of %s not found'
-                            % (parentVersion, recipeClass.name) )
-    parentFlavors = d[recipeClass.name][parentVersion]
-
-    cs = repos.createChangeSet(
-            [ (recipeClass.name, (None, None), (parentVersion, flavor), True)
-                for flavor in parentFlavors ], withFileContents = False,
-            recurse = True )
-
-    trovesByFlavor = {}
-    for trvCs in cs.iterNewTroveList():
-        trv = trove.Trove(trvCs)
-        l = trovesByFlavor.setdefault(trv.getFlavor(), [])
-        l.append(trv)
-
-    targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
-                                trovesByFlavor.keys(),
-                                targetLabel, alwaysBumpCount=alwaysBumpCount)
-    changeSet = changeset.ChangeSet()
-
-    for trvList in trovesByFlavor.itervalues():
-        for trv in trvList:
-            trv.changeVersion(targetVersion)
-            if trv.isCollection():
-                # it has to be a package to get here
-                includes = [ x for x in trv.iterTroveListInfo() ]
-                for (troveInfo), byDefault, isStrong in includes:
-                    trv.delTrove(missingOkay = False, *troveInfo)
-                    trv.addTrove(troveInfo[0], targetVersion, troveInfo[2],
-                                 byDefault = byDefault, weakRef = not isStrong)
-
-            trv.setBuildTime(time.time())
-            trv.setConaryVersion(constants.version)
-
-        recipeObj.updateTroves(trvList)
-
-        for trv in trvList:
-            trv.computePathHashes()
-            #trv.setSize(size)
-
-            trv.invalidateSignatures()
-
-            trvCs = trv.diff(None, absolute = 1)[0]
-            changeSet.newTrove(trvCs)
-
-    changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
-
-    #if targetVersion.isOnLocalHost():
-        # We need the file contents. Go get 'em
-
-        # pass (fileId, fileVersion)
-        #contentList = repos.getFileContents([ (x[3], x[2]) for x in l ])
-        #for (pathId, path, version, fileId, isConfig), contents in \
-                                                #itertools.izip(l, contentList):
-            #changeSet.addFileContents(pathId, changeset.ChangedFileTypes.file, 
-                                      #contents, isConfig)
-
-    built = [ (fullName, targetVersion.asString(), x) for x in
-                    trovesByFlavor.keys() ]
-
-    return (changeSet, built, None)
-
-def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
-		      targetLabel = None, alwaysBumpCount=False):
+def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
+                      macros={}, targetLabel = None, alwaysBumpCount=False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -782,7 +652,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     fullName = recipeClass.name
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
-                            cfg.flavor, macros)
+                            buildFlavor, macros)
     _callSetup(cfg, recipeObj)
 
     log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -990,6 +860,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     if not resume:
         destdir = ''
 	if os.path.exists(builddir):
+            log.info('Cleaning your old build tree')
 	    shutil.rmtree(builddir)
     else:
         try:
@@ -1046,6 +917,9 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             recipeObj.mainDir(maindir)
         if resume is True:
             resume = bldInfo.lastline
+
+        recipeObj.macros.builddir = builddir
+        recipeObj.macros.destdir = destdir
 
         recipeObj.unpackSources(builddir, destdir, resume, downloadOnly=downloadOnly)
 
@@ -1144,9 +1018,15 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     # create all of the package troves we need, and let each package provide
     # itself
     grpMap = {}
+    filePrefixes = set()
+    fileIds = set()
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
+        # Extract file prefixes and file ids
+        for (path, (realPath, f)) in buildPkg.iteritems():
+            filePrefixes.add(os.path.dirname(path))
+            fileIds.add(f.fileId())
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
@@ -1161,6 +1041,23 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
+            grpMap[main].setIsDerived(recipeObj._isDerived)
+
+
+    filePrefixes = list(filePrefixes)
+    filePrefixes.sort()
+    # Now eliminate prefixes of prefixes
+    ret = []
+    oldp = None
+    for p in filePrefixes:
+        if oldp and p.startswith(oldp):
+            continue
+        ret.append(p)
+        oldp = p
+    filePrefixes = ret
+
+    # Sort the file ids to make sure we get consistent behavior
+    fileIds = sorted(fileIds)
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -1181,9 +1078,10 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         log.info('looking up pathids from repository history')
         # look up the pathids for every file that has been built by
-        # this source component, following our brach ancestry
+        # this source component, following our branch ancestry
         while True:
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch)
+            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                                              filePrefixes, fileIds)
             ident.merge(d)
 
             if not searchBranch.hasParentBranch():
@@ -1211,6 +1109,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
+        p.setIsDerived(recipeObj._isDerived)
 
         _signTrove(p, signatureKey)
 
@@ -1290,6 +1189,13 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write("Local flags:" + '\n')
     for flag in use.LocalFlags.keys():
         write("%s\n" % (use.LocalFlags[flag]))
+
+    write("*"*60 +'\n')
+
+    write("Package Local flags:\n")
+    for package in sorted(use.PackageFlags.keys()):
+        for flag in use.PackageFlags[package].keys():
+            write("%s\n" % (use.PackageFlags[package][flag]))
 
     write("*"*60 +'\n')
     
@@ -1609,6 +1515,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
             recipeObj = recipeClass(cfg, None, [], lightInstance=True)
             sys.stdout.write('\n'.join(sorted(recipeObj.buildRequires)))
+            sys.stdout.write('\n')
             sys.stdout.flush()
     if showBuildReqs:
         return None
@@ -1740,12 +1647,18 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                              crossCompile = crossCompile,
                              callback = CookCallback(),
                              downloadOnly = downloadOnly)
+            if built is None:
+                # showBuildReqs true, most likely
+                # Make sure we call os._exit in the child, sys.exit raises a
+                # SystemExit that confuses a try/except around cookCommand
+                os._exit(0)
             components, csFile = built
             if not components:
                 # --prep or --download or perhaps an error was logged
                 if log.errorOccurred():
+                    # Leave a sys.exit here, we may need it for debugging
                     sys.exit(1)
-                sys.exit(0)
+                os._exit(0)
             for component, version, flavor in sorted(components):
                 print "Created component:", component, version,
                 if flavor is not None:
@@ -1759,7 +1672,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 os.write(outpipe, csFile)
             if profile:
                 prof.stop()
-            sys.exit(0)
+            os._exit(0)
         else:
             # parent process, no need for the write side of the pipe
             os.close(outpipe)

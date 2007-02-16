@@ -616,8 +616,20 @@ class MergeCommand(CvcCommand):
             kw = dict(versionSpec=args[1])
         else:
             kw = {}
-        checkin.merge(repos, **kw)
+        checkin.merge(cfg, repos, **kw)
 _register(MergeCommand)
+
+class MarkRemovedCommand(CvcCommand):
+    commands = [ 'markremoved' ]
+    commandGroup = 'Hidden Commands'
+    hidden = True
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or not args or len(args) != 2: return self.usage()
+        checkin.markRemoved(cfg, repos, args[1])
+_register(MarkRemovedCommand)
 
 class SetCommand(CvcCommand):
 
@@ -648,8 +660,20 @@ class SetCommand(CvcCommand):
         if len(args) < 2: return self.usage()
 
         checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
-
 _register(SetCommand)
+
+class StatCommand(CvcCommand):
+    
+    commands = ['stat', 'st']
+    help = 'Show changed files in the working directory'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or not args or len(args) > 2: return self.usage()
+
+        args[0] = repos
+        checkin.stat_(*args)
+_register(StatCommand)
 
 class StatCommand(CvcCommand):
     

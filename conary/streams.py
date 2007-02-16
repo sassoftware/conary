@@ -27,6 +27,9 @@ ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
 StreamSet = cstreams.StreamSet
 StreamSetDef = cstreams.StreamSetDef
+ByteStream = cstreams.ByteStream
+LongLongStream = cstreams.LongLongStream
+
 SMALL = cstreams.SMALL
 LARGE = cstreams.LARGE
 DYNAMIC = cstreams.DYNAMIC
@@ -68,69 +71,7 @@ class InfoStream(object):
     def __ne__(self, them):
 	return not self.__eq__(them)
 
-class NumericStream(InfoStream):
-
-    __slots__ = "val"
-
-    def __deepcopy__(self, mem):
-        return self.__class__.thaw(self, self.freeze())
-
-    def __call__(self):
-	return self.val
-
-    def set(self, val):
-	self.val = val
-
-    def freeze(self, skipSet = None):
-        if self.val is None:
-            return ""
-
-	return struct.pack(self.format, self.val)
-
-    def diff(self, them):
-	if self.val != them.val:
-            if self.val is None:
-                return ''
-	    return struct.pack(self.format, self.val)
-
-	return None
-
-    def thaw(self, frz):
-        if frz == "":
-            self.val = None
-        else:
-            self.val = struct.unpack(self.format, frz)[0]
-
-    def twm(self, diff, base):
-        if diff == '':
-            newVal = None
-        else:
-            newVal = struct.unpack(self.format, diff)[0]
-	if self.val == base.val:
-	    self.val = newVal
-	    return False
-	elif self.val != newVal:
-	    return True
-
-	return False
-
-    def __eq__(self, other, skipSet = None):
-	return other.__class__ == self.__class__ and \
-	       self.val == other.val
-
-    def __init__(self, val = None):
-	if type(val) == str:
-	    self.thaw(val)
-	else:
-	    self.val = val
-
-class ByteStream(NumericStream):
-
-    format = "!B"
-
-class MtimeStream(NumericStream):
-
-    format = "!I"
+class MtimeStream(IntStream):
 
     def __eq__(self, other, skipSet = None):
 	# don't ever compare mtimes
@@ -138,12 +79,8 @@ class MtimeStream(NumericStream):
 
     def twm(self, diff, base):
 	# and don't let merges fail
-	NumericStream.twm(self, diff, base)
+	IntStream.twm(self, diff, base)
 	return False
-
-class LongLongStream(NumericStream):
-
-    format = "!Q"
 
 class Md5Stream(StringStream):
 

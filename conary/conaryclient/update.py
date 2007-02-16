@@ -21,7 +21,7 @@ from conary import conarycfg
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import resolve
 from conary.deps import deps
-from conary.errors import ClientError, InternalConaryError
+from conary.errors import ClientError, InternalConaryError, MissingTrovesError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
@@ -234,6 +234,7 @@ class ClientUpdate:
             redirectCs, notFound = csSource.createChangeSet(
                     [ x[1] for x in nextSet ],
                     withFiles = False, recurse = True)
+
             uJob.getTroveSource().addChangeSet(redirectCs)
             transitiveClosure.update(redirectCs.getJobSet(primaries = False))
 
@@ -1163,27 +1164,15 @@ followLocalChanges: %s
                 erasePrimaries.add((job[0], job[1], (None, None), False))
             alreadyInstalled.discard((job[0], job[1][0], job[1][1]))
 
+        # items which were updated to redirects should be removed, no matter
+        # what
+        for info in set(itertools.chain(*redirectHack.values())):
+            erasePrimaries.add((info[0], (info[1], info[2]), (None, None), False))
+
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse, ineligible)
         assert(not x for x in newJob if x[2][0] is None)
         newJob.update(eraseSet)
-
-        # items which were updated to redirects should be removed, no matter
-        # what - IF there's no job removing them now, we need to add it now.
-        redirects = {}
-        for info in set(itertools.chain(*redirectHack.values())):
-            redirects.setdefault(info[0], []).append(info)
-
-        for job in newJob:
-            if job[0] in redirects:
-                redirectList = redirects[job[0]]
-                info = (job[0], job[1][0], job[1][1])
-                if info in redirectList:
-                    redirectList.remove(info)
-        for troveList in redirects.itervalues():
-            for info in set(troveList):
-                newJob.add((info[0], (info[1], info[2]), (None, None), False))
-
         return newJob
 
     def _splitPinnedJob(self, uJob, troveSource, job, force=False):
@@ -1352,6 +1341,20 @@ conary erase '%s=%s[%s]'
                 continue
             sets.append([ jobSet[x][1] for x in set(val) ])
         return sets
+
+    def _trovesNotFound(self, notFound):
+        """
+            Raises a nice error message when changeset creation failed
+            to include all the necessary troves.
+        """
+        nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
+        if nonLocal:
+            troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) 
+                                     for x in nonLocal])
+            raise UpdateError(
+                   'Failed to find required troves for update:\n   %s' 
+                    % troveList)
+
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
@@ -1594,12 +1597,9 @@ conary erase '%s=%s[%s]'
         self._replaceIncomplete(cs, csSource, 
                                 self.db, self.repos)
         if notFound:
-            nonLocal = [ x for x in notFound if not x[2][0].isOnLocalHost() ]
-            if nonLocal:
-                troveList = '\n   '.join(['%s=%s[%s]' % (x[0], x[2][0], x[2][1]) for x in nonLocal])
-                raise UpdateError(
-                       'Failed to find required troves for update:\n   %s' 
-                        % troveList)
+            self._trovesNotFound(notFound) # may raise an error 
+                                           # if there are non-local troves
+                                           # in the list
             jobSet.difference_update(notFound)
             if not jobSet:
                 raise NoNewTrovesError
@@ -1663,6 +1663,29 @@ conary erase '%s=%s[%s]'
 
         if not newJob:
             raise NoNewTrovesError
+
+        removedTroves = list()
+        missingTroves = list()
+        ts = uJob.getTroveSource()
+        for job in newJob:
+            if job[2][0] is None:
+                continue
+
+            cs = ts.getChangeSet(job)
+            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                ti = trove.TroveInfo(troveCs.troveInfoDiff.freeze())
+                if ti.flags.isMissing():
+                    missingTroves.append(job)
+                else:
+                    removedTroves.append(job)
+
+        if removedTroves or missingTroves:
+            removed = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
+            removed.sort()
+            missing = [ (x[0], x[2][0], x[2][1]) for x in missingTroves ]
+            missing.sort()
+            raise MissingTrovesError(missing, removed)
 
         uJob.setPrimaryJobs(jobSet)
 
@@ -1870,6 +1893,8 @@ conary erase '%s=%s[%s]'
                                  (None, None), False))
         finalJobs = set(finalJobs)
 
+        if not finalJobs:
+            raise NoNewTrovesError
 
         updateJobs = set(x for x in finalJobs if x[2][0])
 
@@ -1911,6 +1936,13 @@ conary erase '%s=%s[%s]'
                                                 withFiles = False,
                                                 recurse = False,
                                                 callback = self.updateCallback)
+        if notFound:
+            self._trovesNotFound(notFound) # may raise an error
+                                           # if there are non-local troves
+                                           # in the list
+            reposChangeSetList.difference_update(notFound)
+            if not reposChangeSetList:
+                raise NoNewTrovesError
 
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         uJob.getTroveSource().addChangeSet(cs)
@@ -2628,14 +2660,14 @@ conary erase '%s=%s[%s]'
                 try:
                     newCs = _createCs(repos, db, job, uJob)
                 except:
-                    q.put(None)
-                    raise
+                    q.put((True, sys.exc_info()))
+                    return
 
                 while True:
                     # block for no more than 5 seconds so we can
                     # check to see if we should abort
                     try:
-                        q.put(newCs, True, 5)
+                        q.put((False, newCs), True, 5)
                         break
                     except Queue.Full:
                         # if the queue is full, check to see if the
@@ -2712,6 +2744,12 @@ conary erase '%s=%s[%s]'
                                               ' unexpectedly, cannot continue update')
                         if newCs is None:
                             break
+                        # We expect a (boolean, value)
+                        isException, val = newCs
+                        if isException:
+                            raise val[0], val[1], val[2]
+
+                        newCs = val
                         i += 1
                         self.updateCallback.setUpdateHunk(i, len(allJobs))
                         self.updateCallback.setUpdateJob(allJobs[i - 1])

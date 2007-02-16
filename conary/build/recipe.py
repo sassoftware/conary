@@ -12,6 +12,8 @@
 # full details.
 #
 
+from conary.errors import ParseError
+
 """
 Contains the base Recipe class
 """
@@ -21,7 +23,6 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
-RECIPE_TYPE_DERIVEDPKG= 6
 
 def isPackageRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_PACKAGE
@@ -38,9 +39,6 @@ def isInfoRecipe(recipeClass):
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
 
-def isDerivedPackageRecipe(recipeClass):
-    return recipeClass.getType() == RECIPE_TYPE_DERIVEDPKG
-
 class Recipe:
     """Virtual base class for all Recipes"""
     _trove = None
@@ -48,6 +46,7 @@ class Recipe:
     _loadedTroves = []
     _loadedSpecs = {}
     _recipeType = RECIPE_TYPE_UNKNOWN
+    _isDerived = False
 
     def __init__(self):
         assert(self.__class__ is not Recipe)
@@ -59,18 +58,34 @@ class Recipe:
 
     @classmethod
     def getLoadedTroves(class_):
-        return class_._loadedTroves
+        # return a copy to avoid editing-in-place which
+        # could result in modifying the Recipe _loadedTroves
+        # list.
+        return list(class_._loadedTroves)
 
     @classmethod
     def getLoadedSpecs(class_):
-        return class_._loadedSpecs
+        return dict(class_._loadedSpecs)
+
+    @classmethod
+    def addLoadedTroves(class_, newTroves):
+        # NOTE: we have these method to ensure that the
+        # class variable we're using is assigned to _this_
+        # class and not some superclass.
+        class_._loadedTroves = class_._loadedTroves + newTroves
+
+    @classmethod
+    def addLoadedSpecs(class_, newSpecs):
+        class_._loadedSpecs = dict(class_._loadedSpecs)
+        class_._loadedSpecs.update(newSpecs)
 
     def __repr__(self):
         return "<%s Object>" % self.__class__
 
     @classmethod
     def validateClass(class_):
-        pass
+        if class_.version == '':
+            raise ParseError("empty release string")
 
     def validate(self):
         pass

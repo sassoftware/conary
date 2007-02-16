@@ -40,14 +40,24 @@ class CriticalUpdateInfo(conaryclient.CriticalUpdateInfo):
 
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
+    def locked(method):
+        def wrapper(self, *args, **kwargs):
+            self.lock.acquire()
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                self.lock.release()
+
+        return wrapper
+
     def done(self):
         self._message('')
 
     def _message(self, text):
         callbacks.LineOutput._message(self, text)
 
+    @locked
     def update(self):
-        self.lock.acquire()
         t = ""
 
         if self.updateText:
@@ -72,7 +82,6 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 	    t += '...'
 
         self._message(t)
-        self.lock.release()
 
     def updateMsg(self, text):
         self.updateText = text
@@ -88,11 +97,10 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def resolvingDependencies(self):
         self.updateMsg("Resolving dependencies")
 
+    @locked
     def updateDone(self):
-        self.lock.acquire()
         self._message('')
         self.updateText = None
-        self.lock.release()
 
     def _downloading(self, msg, got, rate, need):
         if got == need:
@@ -167,8 +175,8 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.restored = 0
         self.updateHunk = (num, total)
 
+    @locked
     def setUpdateJob(self, jobs):
-        self.lock.acquire()
         self._message('')
         if self.updateHunk[1] < 2:
             self.out.write('Applying update job:\n')
@@ -180,16 +188,16 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         for line in self.formatter.formatJobTups(jobs, indent='    '):
             self.out.write(line + '\n')
 
-        self.lock.release()
-
+    @locked
     def tagHandlerOutput(self, tag, msg, stderr = False):
-        self.lock.acquire()
         self._message('')
         self.out.write('[%s] %s\n' % (tag, msg))
-        self.lock.release()
 
     def __init__(self, cfg=None):
-        callbacks.UpdateCallback.__init__(self)
+        if cfg:
+            callbacks.UpdateCallback.__init__(self, cfg.trustThreshold)
+        else:
+            callbacks.UpdateCallback.__init__(self)
         callbacks.LineOutput.__init__(self)
         self.restored = 0
         self.csHunk = (0, 0)
@@ -280,11 +288,6 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                migrate = False, keepRequired = False,
                                removeNotByDefault = False, restartInfo = None,
                                applyCriticalOnly = False, keepJournal = False):
-    if not callback:
-        callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
-    else:
-        callback.setTrustThreshold(cfg.trustThreshold)
-
     if syncChildren or syncUpdate:
         installMissing = True
     else:
@@ -370,13 +373,11 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
 
-
     if not info:
         client.checkWriteableRoot()
 
     if migrate and not info and not cfg.interactive:
-        print ('As of conary 1.0.21, the migrate command has changed.'
-               '  Migrate must be run with --interactive '
+        print ('Migrate must be run with --interactive'
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
         return

@@ -98,7 +98,7 @@ class Cursor(BaseCursor):
         if len(keys):
             return (sql, tuple(keys))
         # handle the ? syntax
-        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(SELECT|LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
         return (sql, ())
 
     # we need to "fix" the sql code before calling out
@@ -458,7 +458,9 @@ class Database(BaseDatabase):
                 raise
         self.dbName = dbName
         self._setCharSet(cu)
-        self.loadSchema()
+        # wipe out the preloaded schema we had (if any), but don't
+        # load up the new one - on mysql this is a very expensive operation
+        BaseDatabase.loadSchema(self)
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
 

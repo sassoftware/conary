@@ -193,6 +193,11 @@ class Collection(dict):
         return "%s: {%s}" % (self._name,
                              ', '.join((repr(x) for x in self.values())))
 
+    def __nonzero__(self):
+        raise RuntimeError(
+                    'Cannot compare collection as True/False')
+
+
     def _clear(self):
         for flag in self.keys():
             del self[flag]
@@ -244,7 +249,7 @@ class Collection(dict):
 
     def _reverseParents(self):
         """ Traverse through the parents from the topmost parent down. """
-        if self._parent:
+        if self._parent is not None:
             for parent in self._parent._reverseParents():
                 yield parent
             yield self._parent
@@ -658,6 +663,42 @@ class LocalFlagCollection(Collection):
                 self._addFlag(key) 
             self[key]._set(value)
 
+####################### Package Local Flags Here ###################
+
+
+class PackageFlagCollection(Collection):
+
+    def __init__(self, track=False):
+        self._collectionType = PackageFlagPackageCollection
+        Collection.__init__(self, 'PackageFlags')
+
+    def __getitem__(self, key):
+        if key not in self:
+            return self._getNonExistantKey(key)
+        return Collection.__getitem__(self, key)
+
+    def _getNonExistantKey(self, key):
+        self._addFlag(key)
+        self[key]._setStrictMode(False)
+        return self[key]
+
+class PackageFlagPackageCollection(Collection):
+    
+    def __init__(self, name, parent, track=False):
+        self._collectionType = PackageFlag
+        Collection.__init__(self, name, parent)
+
+    def __getitem__(self, key):
+        if key not in self:
+            return self._getNonExistantKey(key)
+        return Collection.__getitem__(self, key)
+
+    def _getNonExistantKey(self, key):
+        self._addFlag(key)
+        return self[key]
+
+class PackageFlag(Flag):
+    pass
 
 def allowUnknownFlags(value=True):
     Use._setStrictMode(not value)
@@ -681,6 +722,7 @@ def clearFlags():
     Use._clear()
     Arch._clear()
     LocalFlags._clear()
+    PackageFlags._clear()
 
 
 def track(value=True):
@@ -691,13 +733,14 @@ def track(value=True):
 def iterAll():
     return itertools.chain(Arch._iterAll(), 
                            Use._iterAll(), 
-                           LocalFlags._iterAll())
+                           LocalFlags._iterAll(),
+                           PackageFlags._iterAll())
 def getUsed():
     return [ x for x in iterUsed() ]
 
 def iterUsed():
-    return itertools.chain(Arch._iterUsed(), 
-                           Use._iterUsed(), 
+    return itertools.chain(Arch._iterUsed(),
+                           Use._iterUsed(),
                            LocalFlags._iterUsed())
 
 def usedFlagsToFlavor(recipeName):
@@ -764,18 +807,19 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                 log.warning(
                                         'ignoring unknown Use flag %s' % flag)
                                 continue
-                    elif recipeName:
+                    else:
                         packageName, flag = parts
-                        if packageName == recipeName:
-                            # local flag values set from a build flavor
-                            # are overrides -- the recipe should not 
-                            # change these values
-                            LocalFlags._override(flag, value)
-                    elif error:
-                        raise RuntimeError, ('Trying to set a flavor with '
-                                             'localflag %s when no trove '
-                                             ' name was given' % flag)
-
+                        PackageFlags[packageName][flag]._set(value)
+                        if recipeName:
+                            if packageName == recipeName:
+                                # local flag values set from a build flavor
+                                # are overrides -- the recipe should not 
+                                # change these values
+                                LocalFlags._override(flag, value)
+                        elif error:
+                            raise RuntimeError, ('Trying to set a flavor with '
+                                                 'localflag %s when no trove '
+                                                 ' name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             if len([ x for x in depGroup.getDeps()]) > 1:
                 setOnlyIfMajArchSet = True
@@ -806,3 +850,4 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
 Arch = ArchCollection()
 Use = UseCollection()
 LocalFlags = LocalFlagCollection()
+PackageFlags = PackageFlagCollection()

@@ -166,6 +166,11 @@ class UserNotFound(RepositoryError):
         self.user = user
         RepositoryError.__init__(self, "UserNotFound: %s" % self.user)
 
+class InvalidName(RepositoryError):
+    def __init__(self, name):
+        self.name = name
+        RepositoryError.__init__(self, "InvalidName: %s" % self.name)
+
 class InvalidServerVersion(RepositoryError):
     pass
 
@@ -224,6 +229,9 @@ class DigitalSignatureError(RepositoryError):
         RepositoryError.__init__(self, error)
         self.error = error
 
+class ProxyError(RepositoryError):
+    pass
+
 class InternalServerError(RepositoryError, InternalConaryError):
     def __init__(self,  err):
         self.err = err
@@ -258,5 +266,7 @@ simpleExceptions = (
     (InvalidEntitlement,         'InvalidEntitlement'),
     (CannotChangePassword,       'CannotChangePassword'),
     (InvalidRegex,               'InvalidRegex'),
+    (InvalidName,                'InvalidName'),
     (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
+    (ProxyError,                 'ProxyError'),
     )

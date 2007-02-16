@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -197,15 +197,26 @@ class XMLOpener(urllib.FancyURLopener):
 
     def _wait(self, h):
         # wait for data if abortCheck is set
-        if not self.abortCheck:
-            return
+        if self.abortCheck:
+            check = self.abortCheck
+        else:
+            check = lambda: False
         # FIXME: this is poking at httplib internals.  Should subclass.
         sourceFd = h._conn.sock.fileno()
-        l1 = []
-        while not l1:
-            if self.abortCheck():
+        while True:
+            if check():
                 raise AbortError
+            # wait 5 seconds for a response
             l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
+            if not l1:
+                # still no response from the server.  send a space to
+                # keep the connection alive - in case the server is
+                # behind a load balancer/firewall with short
+                # connection timeouts.
+                h.send(' ')
+            else:
+                # ready to read response
+                break
 
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
@@ -222,10 +233,13 @@ class Transport(xmlrpclib.Transport):
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
 
-    def __init__(self, https = False, entitlement = None):
+    def __init__(self, https = False, entitlement = None, proxies = None,
+                 serverName = None):
         self.https = https
         self.compress = False
         self.abortCheck = None
+        self.proxies = proxies
+        self.serverName = serverName
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))
@@ -246,12 +260,20 @@ class Transport(xmlrpclib.Transport):
     def request(self, host, handler, body, verbose=0):
 	self.verbose = verbose
 
-	# turn off proxy for localhost
 	realhost = getrealhost(host)
-	if realhost == 'localhost':
-	    opener = XMLOpener({})
-	else:
-	    opener = XMLOpener()
+        if realhost == 'localhost':
+            # don't proxy localhost unless the proxy is running on
+            # localhost as well
+            proxyHost = None
+            if self.proxies and 'http' in self.proxies:
+                proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
+
+            if proxyHost != 'localhost':
+                opener = XMLOpener({})
+            else:
+                opener = XMLOpener(self.proxies)
+        else:
+            opener = XMLOpener(self.proxies)
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 
@@ -265,6 +287,9 @@ class Transport(xmlrpclib.Transport):
 
         if self.entitlement:
             opener.addheader('X-Conary-Entitlement', self.entitlement)
+
+        if self.serverName:
+            opener.addheader('X-Conary-Servername', self.serverName)
 
 	opener.addheader('User-agent', self.user_agent)
         tries = 0

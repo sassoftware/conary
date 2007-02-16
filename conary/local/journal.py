@@ -170,6 +170,7 @@ class JobJournal(NoopJobJournal):
         self._record(JOURNAL_ENTRY_REMOVE, '', name)
 
     def backup(self, target, skipDirs = False):
+        target = self._normpath(target)
         try:
             sb = os.lstat(target)
         except OSError:

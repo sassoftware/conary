@@ -36,7 +36,7 @@ from conary import errors
 from conary import files
 from conary import trove
 from conary import versions
-from conary.build import recipe
+from conary.build import derivedrecipe, recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
 from conary.build.macros import Macros
@@ -1101,7 +1101,7 @@ def _determineRootVersion(repos, state):
         # We must have done a shadow at some point.
         assert(0)
 
-def merge(repos, versionSpec=None, callback=None):
+def merge(cfg, repos, versionSpec=None, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
     try:
@@ -1175,6 +1175,44 @@ def merge(repos, versionSpec=None, callback=None):
                   "to merge.")
         return
 
+    if os.path.exists(state.getRecipeFileName()):
+        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                         cfg=cfg, repos=repos,
+                                         branch=state.getBranch())
+        recipeClass = loader.getRecipe()
+    else:
+        recipeClass = None.__class__
+
+    if issubclass(recipeClass, derivedrecipe.DerivedPackageRecipe):
+        # Merges between non-derived recipes and derived recipes don't
+        # do a patch merge.
+        loader = loadrecipe.recipeLoaderFromSourceComponent(troveName, cfg,
+                               repos, versionStr = str(parentHeadVersion))[0]
+        parentRecipeClass = loader.getRecipe()
+        if not issubclass(parentRecipeClass,
+                          derivedrecipe.DerivedPackageRecipe):
+            newVersion = parentHeadVersion.trailingRevision().getVersion()
+            if True or newVersion != state.getVersion().trailingRevision.getVersion():
+                recipePath = state.getRecipeFileName()
+                recipe = open(recipePath).read()
+                regexp = re.compile('''^[ \t]*version *=[ ]*['"](.*)['"] *$''',
+                                    re.MULTILINE)
+                l = list(regexp.finditer(recipe))
+                if len(l) != 1:
+                    log.warning("Couldn't find version assignment in %s. The "
+                                "version for this recipe needs to be set to "
+                                "%s." % (recipePath, newVersion) )
+                else:
+                    match = l[0]
+                    newRecipe = recipe[0:match.start(1)] + newVersion + \
+                                recipe[match.end(1):]
+                    open(recipePath, "w").write(newRecipe)
+
+            state.setLastMerged(parentHeadVersion)
+            state.changeVersion(shadowHeadVersion)
+            conaryState.write("CONARY")
+            return
+
     changeSet = repos.createChangeSet([(troveName,
                             (parentRootVersion, deps.deps.Flavor()), 
                             (parentHeadVersion, deps.deps.Flavor()), 
@@ -1207,6 +1245,51 @@ def merge(repos, versionSpec=None, callback=None):
 
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
+
+def markRemoved(cfg, repos, troveSpec):
+    troveSpec = cmdline.parseTroveSpec(troveSpec)
+    trvList = repos.findTrove(cfg.buildLabel, troveSpec,
+                              defaultFlavor = cfg.flavor)
+    if len(trvList) > 1:
+        log.error("multiple troves found " + 
+            " ".join([ "%s=%s[%s]" % x for x in trvList ] ))
+        return 1
+
+    # XXX should this do a full recursive descent? seems scary.
+    existingTrove = repos.getTrove(withFiles = False, *trvList[0])
+    if not existingTrove.getName().startswith('group'):
+        trvList += [ x for x in
+                     existingTrove.iterTroveList(strongRefs = True) ]
+
+    cs = changeset.ChangeSet()
+
+    for (name, version, flavor) in trvList:
+        trv = trove.Trove(name, version, flavor,
+                          type = trove.TROVE_TYPE_REMOVED)
+        trv.computeSignatures()
+        signatureKey = selectSignatureKey(cfg,
+                                          version.trailingLabel().asString())
+        if signatureKey is not None:
+            # skip integrity checks since we just want to compute the
+            # new sha1 with all our changes accounted for
+            trv.addDigitalSignature(signatureKey, skipIntegrityChecks=True)
+
+        cs.newTrove(trv.diff(None, absolute = True)[0])
+
+    # XXX This forces interactive mode for removing troves. Seems like a good
+    # idea.
+    if True or cfg.interactive:
+        print 'The contents of the following troves will be removed:'
+        print
+        for (name, version, flavor) in trvList:
+            print '\t%s=%s[%s]' % (name, version.asString(), str(flavor))
+        print
+        okay = cmdline.askYn('continue with commit? [Y/n]', default=True)
+
+        if not okay:
+            return
+
+    repos.commitChangeSet(cs)
 
 def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
              repos=None, defaultToText=True):
@@ -1790,8 +1873,9 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
             continue
         if refreshFilter(path):
             if not state.fileIsAutoSource(pathId):
-                raise errors.CvcError('%s is not autosourced and cannot be '
-                                      'refreshed' % path)
+                log.warning('%s is not autosourced and cannot be refreshed' %
+                            path)
+                continue
             state.fileNeedsRefresh(pathId, True)
 
     conaryState.setSourceState(state)

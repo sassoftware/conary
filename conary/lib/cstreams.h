@@ -24,20 +24,24 @@ extern PyTypeObject NumericStreamType;
 extern PyTypeObject IntStreamType;
 extern PyTypeObject ShortStreamType;
 extern PyTypeObject StreamSetType;
+extern PyTypeObject ByteStreamType;
+extern PyTypeObject LongLongStreamType;
 
 #define STRING_STREAM	    0
 #define NUMERIC_STREAM	    1
 #define INT_STREAM	    2
 #define SHORT_STREAM	    3
 #define STREAM_SET	    4
+#define BYTE_STREAM	    5
+#define LONG_LONG_STREAM    6
 
 struct singleStream {
     PyTypeObject pyType;
 };
 
-extern struct singleStream allStreams[5];
+extern struct singleStream allStreams[7];
 
-#define STREAM_CHECK(x, t) x->ob_type == (PyTypeObject *) &allStreams[t]
+#define STREAM_CHECK(x, t) PyType_IsSubtype(x->ob_type, (PyTypeObject *) &allStreams[t])
 
 #define SMALL 0
 #define LARGE 1

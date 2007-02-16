@@ -118,7 +118,12 @@ class CloneCallback(ChangesetCallback, callbacks.CloneCallback):
         callbacks.CloneCallback.__init__(self, cfg)
         ChangesetCallback.__init__(self)
 
+    @callbacks.passExceptions
     def getCloneChangeLog(self, trv):
+        if self.cfg.name is None or self.cfg.contact is None:
+            raise ValueError, \
+                    "name and contact information must be set for clone"
+
         message = self.defaultMessage
         cl = changelog.ChangeLog(self.cfg.name, self.cfg.contact, message)
         prompt = ('Please enter the clone message'

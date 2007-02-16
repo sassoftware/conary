@@ -93,7 +93,8 @@ def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.lib', ('util',))
     for x in ('os', 're', 'sys', 'stat'):
         localImport(d, x)
-    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
+    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                        'PackageFlags'))
     d['filename'] = filename
     if not directory:
         directory = os.path.dirname(filename)
@@ -260,8 +261,8 @@ class RecipeLoader:
             # inherit any tracked flags that we found while loading parent
             # classes.  Also inherit the list of recipes classes needed to load
             # this recipe.
-            self.recipe._loadedTroves = self.module.__dict__['loadedTroves']
-            self.recipe._loadedSpecs = self.module.__dict__['loadedSpecs']
+            self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
+            self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
 
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)

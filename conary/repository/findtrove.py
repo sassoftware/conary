@@ -49,7 +49,8 @@ VERSION_STR_HOST                 = 8 # host@
 
 class Query:
     def __init__(self, defaultFlavorPath, labelPath, 
-                 acrossLabels, acrossFlavors, getLeaves, bestFlavor):
+                 acrossLabels, acrossFlavors, getLeaves, bestFlavor,
+                 troveTypes):
         self.map = {}
         self.defaultFlavorPath = defaultFlavorPath
         if not self.defaultFlavorPath:
@@ -61,6 +62,7 @@ class Query:
         self.acrossFlavors = acrossFlavors
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
+        self.troveTypes = troveTypes
 
     def reset(self):
         for dct in self.query:
@@ -147,7 +149,8 @@ class QueryByVersion(Query):
             for name in foundNames:
                 query.pop(name, None)
             res = troveSource.getTroveVersionFlavors(query, 
-                                                     bestFlavor=self.bestFlavor)
+                                                     bestFlavor=self.bestFlavor,
+                                                     troveTypes=self.troveTypes)
             for name in res:
                 matches = self.filterTroveMatches(name, res[name])
                 if not matches: 
@@ -164,7 +167,8 @@ class QueryByVersion(Query):
 
     def _findAllNoFlavor(self, troveSource, missing, finalMap):
         res = troveSource.getTroveVersionFlavors(self.queryNoFlavor, 
-                                                 bestFlavor=False)
+                                                 bestFlavor=False,
+                                                 troveTypes=self.troveTypes)
         for name in self.queryNoFlavor:
             if name not in res or not res[name]:
                 self.addMissing(missing, name)
@@ -195,13 +199,12 @@ class QueryByLabelPath(Query):
         name = troveTup[0]
         self.map[name] = [troveTup, labelPath]
 
-        if self.acrossLabels:
+        if self.acrossLabels or isinstance(labelPath, set):
             if not flavorList:
                 self.query[name] = [ dict.fromkeys(labelPath, None)]
             elif self.acrossFlavors:
                 # create one big query: {name : [{label  : [flavor1, flavor2],
                 #                                 label2 : [flavor1, flavor2]}
- 
                 d = {}
                 for label in labelPath:
                     d[label] = flavorList[:]
@@ -267,10 +270,12 @@ class QueryByLabelPath(Query):
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:
             return troveSource.getTroveLeavesByLabel(query, 
-                                                     bestFlavor=self.bestFlavor)
+                                                     bestFlavor=self.bestFlavor,
+                                                     troveTypes=self.troveTypes)
         else:
             return troveSource.getTroveVersionsByLabel(query, 
-                                                   bestFlavor=self.bestFlavor)
+                                                   bestFlavor=self.bestFlavor,
+                                                   troveTypes=self.troveTypes)
 
         
     def findAll(self, troveSource, missing, finalMap):
@@ -422,9 +427,10 @@ class QueryByBranch(Query):
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:
             return troveSource.getTroveLeavesByBranch(query,
-                                                     bestFlavor=self.bestFlavor)
+                                                     bestFlavor=self.bestFlavor,
+                                                     troveTypes=self.troveTypes)
         else:
-            return troveSource.getTroveVersionsByBranch(query)
+            return troveSource.getTroveVersionsByBranch(query, troveTypes=self.troveTypes)
 
     def _findAllFlavor(self, troveSource, missing, finalMap):
         # list of names not yet found
@@ -472,10 +478,12 @@ class QueryByBranch(Query):
         if not self.queryNoFlavor:
             return
         if self.getLeaves:
-            res = troveSource.getTroveLeavesByBranch(self.queryNoFlavor, 
-                                                     bestFlavor=False)
+            res = troveSource.getTroveLeavesByBranch(self.queryNoFlavor,
+                                                     bestFlavor=False,
+                                                     troveTypes=self.troveTypes)
         else:
-            res = troveSource.getTroveVersionsByBranch(self.queryNoFlavor)
+            res = troveSource.getTroveVersionsByBranch(self.queryNoFlavor,
+                                                       troveTypes=self.troveTypes)
 
         for name in self.queryNoFlavor:
             if name not in res or not res[name]:
@@ -515,7 +523,8 @@ class QueryRevisionByBranch(QueryByBranch):
 
     def callQueryFunction(self, troveSource, query):
         return troveSource.getTroveVersionsByBranch(query,
-                                                    bestFlavor=self.bestFlavor)
+                                                    bestFlavor=self.bestFlavor,
+                                                    troveTypes=self.troveTypes)
 
     def filterTroveMatches(self, name, versionFlavorDict):
         versionFlavorDict = QueryByBranch.filterTroveMatches(self, name, 
@@ -552,7 +561,8 @@ class QueryRevisionByLabel(QueryByLabelPath):
 
     def callQueryFunction(self, troveSource, query):
         return troveSource.getTroveVersionsByLabel(query,
-                                                   bestFlavor=self.bestFlavor)
+                                                   bestFlavor=self.bestFlavor,
+                                                   troveTypes=self.troveTypes)
 
     def filterTroveMatches(self, name, versionFlavorDict):
         """ Take the results found in QueryByLabelPath.findAll for name
@@ -763,8 +773,9 @@ class TroveFinder:
             return self.labelPath
         if not self.allowNoLabel:
             return []
-        return [ x.branch().label() \
-                 for x in self.troveSource.getTroveVersionList(troveTup[0])]
+        return set([ x.branch().label() \
+                    for x in self.troveSource.getTroveVersionList(troveTup[0],
+                                                troveTypes=self.troveTypes)])
 
     def sortNoVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup
@@ -781,7 +792,7 @@ class TroveFinder:
             flavorList = self.mergeFlavors(flavor)
             labelPath = self._getLabelPath(troveTup)
             self.query[QUERY_BY_LABEL_PATH].addQuery(troveTup,
-                                                     labelPath, 
+                                                     labelPath,
                                                      flavorList)
 
     def sortBranch(self, troveTup, affinityTroves):
@@ -852,6 +863,8 @@ class TroveFinder:
         for serverName, namespace in repositories:
             newLabelPath.append(versions.Label("%s@%s%s" %
                                (serverName, namespace, versionStr)))
+        if isinstance(labelPath, set):
+            newLabelPath = set(newLabelPath)
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
     def sortHost(self, troveTup, affinityTroves):
@@ -863,6 +876,8 @@ class TroveFinder:
         for nameSpace, branchName in repositories:
             newLabelPath.append(versions.Label("%s%s:%s" %
                                (serverName, nameSpace, branchName)))
+        if isinstance(labelPath, set):
+            newLabelPath = set(newLabelPath)
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
     def _sortLabel(self, labelPath, troveTup, affinityTroves):
@@ -919,7 +934,7 @@ class TroveFinder:
     def __init__(self, troveSource, labelPath, defaultFlavorPath, 
                  acrossLabels, acrossFlavors, affinityDatabase, 
                  getLeaves=True, bestFlavor=True,
-                 allowNoLabel=False):
+                 allowNoLabel=False, troveTypes=None):
 
         self.troveSource = troveSource
         self.affinityDatabase = affinityDatabase
@@ -931,6 +946,10 @@ class TroveFinder:
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
         self.allowNoLabel = allowNoLabel
+        if troveTypes is None:
+            from conary.repository import netclient
+            troveTypes = netclient.TROVE_QUERY_PRESENT
+        self.troveTypes = troveTypes
 
         if defaultFlavorPath is not None and not isinstance(defaultFlavorPath,
                                                             list):
@@ -946,7 +965,8 @@ class TroveFinder:
                                                              acrossLabels,
                                                              acrossFlavors,
                                                              getLeaves,
-                                                             bestFlavor)
+                                                             bestFlavor,
+                                                             troveTypes)
     # class variable for TroveFinder
     #
     # set up map from a version string type to the source fn to use

@@ -93,7 +93,7 @@ for entry in iterator:
         params = ""
 
     if entry.exceptionStr is not None:
-        excpt = " " + str(entry.exceptionStr)
+        excpt = " EXCEPTION(%s)" % str(entry.exceptionStr)
     elif options.showExcepts:
         continue
     else:

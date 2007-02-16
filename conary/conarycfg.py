@@ -71,9 +71,7 @@ class CfgUserInfoItem(CfgType):
     def parseString(self, str):
         val = str.split()
         if len(val) < 2 or len(val) > 3:
-            raise ParseError, ("%s:%s: expected <hostglob> <user> "
-                               "<password> for configuration value %s"
-                                            % (file, self.lineno, key))
+            raise ParseError("expected <hostglob> <user> [<password>]")
         elif len(val) == 2:
             return (val[0], val[1], None)
         else:
@@ -283,6 +281,7 @@ class ConaryContext(ConfigSection):
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
+    proxy                 =  None
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
