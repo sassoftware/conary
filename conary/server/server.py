@@ -19,11 +19,12 @@ import errno
 import os
 import posixpath
 import select
+import socket
 import sys
 import xmlrpclib
 import urllib
 import zlib
-from BaseHTTPServer import HTTPServer
+import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
 thisFile = sys.modules[__name__].__file__
@@ -332,6 +333,16 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
         self.createUser('test', 'foo', admin = True, write = True,
                         remove = True)
         self.createUser('anonymous', 'anonymous', admin = False, write = False)
+
+class HTTPServer(BaseHTTPServer.HTTPServer):
+    def close_request(self, request):
+        while select.select([request], [], [], 0.1)[0]:
+            # drain any remaining data on this request
+            # This avoids the problem seen with the keepalive code sending
+            # extra bytes after all the request has been sent.
+            if not request.recv(8096):
+                break
+        BaseHTTPServer.HTTPServer.close_request(self, request)
 
 class ServerConfig(netserver.ServerConfig):
 
