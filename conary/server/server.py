@@ -237,13 +237,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
-        if not targetServerName or targetServerName in cfg.serverName:
+        if not targetServerName or targetServerName in self.cfg.serverName:
             repos = self.netRepos
         elif self.netProxy:
             repos = self.netProxy
         else:
             result = (False, True, [ 'RepositoryMismatch',
-                                   cfg.serverName, targetServerName ] )
+                                   self.cfg.serverName, targetServerName ] )
             repos = None
 
         if repos is not None:
@@ -389,7 +389,7 @@ def addUser(netRepos, userName, admin = False, mirror = False):
     netRepos.auth.addAcl(userName, None, None, write, False, admin)
     netRepos.auth.setMirror(userName, mirror)
 
-if __name__ == '__main__':
+def getServer():
     argDef = {}
     cfgMap = {
         'contents-dir'  : 'contentsDir',
@@ -434,6 +434,7 @@ if __name__ == '__main__':
         print cfg.tmpDir + " needs to allow full read/write access"
         sys.exit(1)
     HttpRequests.tmpDir = cfg.tmpDir
+    HttpRequests.cfg = cfg
 
     profile = 0
     if profile:
@@ -500,7 +501,9 @@ if __name__ == '__main__':
         usage()
 
     httpServer = HTTPServer(("", cfg.port), HttpRequests)
+    return httpServer, profile
 
+def serve(httpServer, profile=False):
     fds = {}
     fds[httpServer.fileno()] = httpServer
 
@@ -524,3 +527,11 @@ if __name__ == '__main__':
                 sys.exit(1)
             else:
                 raise
+
+def main():
+    server, profile = getServer()
+    serve(server)
+
+if __name__ == '__main__':
+    main()
+
