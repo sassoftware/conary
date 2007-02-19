@@ -261,6 +261,9 @@ class ClientClone:
         cs, newFilesNeeded = self._buildChangeSet(cloneJob, allTroves,
             allTroveInfo, versionMap, leafMap, trackClone, updateBuildInfo,
             targetBranch, fullRecurse, infoOnly, callback)
+        # Propagate empty response
+        if cs is None:
+            return False, None
 
         if infoOnly:
             return True, cs
@@ -392,12 +395,12 @@ class ClientClone:
                     cl = callback.getCloneChangeLog(trv)
                 except:
                     log.error(str(cl))
-                    return False, None
+                    return None, None
 
                 if cl is None:
                     log.error("no change log message was given"
                               " for %s." % trv.getName())
-                    return False, None
+                    return None, None
                 trv.changeChangeLog(cl)
             # reset the signatures, because all the versions have now
             # changed, thus invalidating the old sha1 hash
