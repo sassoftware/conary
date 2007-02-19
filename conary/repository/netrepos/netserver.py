@@ -1309,12 +1309,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           troveTypes = troveTypes)
 
     @accessReadOnly
-    def getFileContents(self, authToken, clientVersion, fileList):
+    def getFileContents(self, authToken, clientVersion, fileList,
+                        authCheckOnly = False):
         self.log(2, "fileList", fileList)
 
         # We use _getFileStreams here for the permission checks.
         fileIdGen = (self.toFileId(x[0]) for x in fileList)
         rawStreams = self._getFileStreams(authToken, fileIdGen)
+
+        if authCheckOnly:
+            for stream, (encFileId, encVersion) in \
+                                itertools.izip(rawStreams, fileList):
+                if stream is None:
+                    raise errors.FileStreamNotFound(
+                                    (self.toFileId(encFileId),
+                                     self.toVersion(encVersion)))
+            return True
+
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')
@@ -1403,7 +1414,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return (cs, trovesNeeded, filesNeeded, removedTroves)
 
-    def _getChangeSetVersion(self, clientVersion):
+    @staticmethod
+    def _getChangeSetVersion(clientVersion):
         # Determine the changeset version based on the client version
         # Add more params if necessary
         if clientVersion < 38:
@@ -2882,6 +2894,7 @@ class ServerConfig(ConfigFile):
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
+    proxyContentsDir        = CfgPath
     proxyDB                 = dbstore.CfgDriver
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver

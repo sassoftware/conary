@@ -17,11 +17,12 @@ import base64, itertools, os, tempfile, urllib, xmlrpclib
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and the
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 41 ]
+SERVER_VERSIONS = [ 41, 42 ]
 
 from conary import conarycfg, trove
-from conary.lib import tracelog, util
-from conary.repository import changeset, errors, netclient, transport, xmlshims
+from conary.lib import sha1helper, tracelog, util
+from conary.repository import changeset, datastore, errors, netclient
+from conary.repository import transport, xmlshims
 from conary.repository.netrepos import cacheset, netserver, calllog
 
 class ProxyClient(xmlrpclib.ServerProxy):
@@ -51,6 +52,8 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         self.log(1, "proxy url=%s" % basicUrl)
         self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
                                        self.cfg.deadlockRetry)
+
+        self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
                     remoteIp = None, rawUrl = None):
@@ -163,11 +166,15 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         allTrovesRemoved = []
         allSizes = []
 
+        csVersion = netserver.NetworkRepositoryServer._getChangeSetVersion(
+                                                                clientVersion)
+
         for rawJob in chgSetList:
             job = self._cvtJobEntry(authToken, rawJob)
 
             cacheEntry = self.cache.getEntry(job, recurse, withFiles,
-                                     withFileContents, excludeAutoSource)
+                                     withFileContents, excludeAutoSource,
+                                     csVersion)
             path = None
 
             if cacheEntry is not None:
@@ -218,7 +225,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                 (key, path) = self.cache.addEntry(job, recurse, withFiles,
                                     withFileContents, excludeAutoSource,
                                     (trovesNeeded, filesNeeded, removedTroves,
-                                     sizes), size = size)
+                                     sizes), size = size, csVersion = csVersion)
 
                 os.rename(tmpPath, path)
 
@@ -240,6 +247,82 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
         return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
                       allTrovesRemoved)
+
+    def getFileContents(self, proxy, authToken, clientVersion, fileList,
+                        authCheckOnly = False):
+        if clientVersion < 42:
+            # server doesn't support auth checks through getFileContents
+            return self._reposCall(proxy, 'getFileContents',
+                                   [ clientVersion, fileList, authCheckOnly ])
+
+        hasFiles = []
+        neededFiles = []
+
+        for encFileId, encVersion in fileList:
+            fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
+            if self.contents.hasFile(fileId + '-c'):
+                path = self.contents.hashToPath(fileId + '-c')
+                try:
+                    # touch the file; we don't want it to be removed
+                    # by a cleanup job when we need it
+                    os.open(path, os.O_RDONLY)
+                    hasFiles.append((encFileId, encVersion))
+                    continue
+                except OSError:
+                    pass
+
+            neededFiles.append((encFileId, encVersion))
+
+        # make sure this user has permissions for these file contents. an
+        # exception will get raised if we don't have sufficient permissions
+        if hasFiles:
+            self._reposCall(proxy, 'getFileContents',
+                    [ clientVersion, hasFiles, True ])
+
+        if neededFiles:
+            # now get the contents we don't have cached
+            (url, sizes) = self._reposCall(proxy, 'getFileContents',
+                    [ clientVersion, neededFiles, False ])[1]
+
+            (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                             suffix = '.tmp')
+            dest = os.fdopen(fd, "w+")
+            size = util.copyfileobj(urllib.urlopen(url), dest)
+            dest.seek(0)
+
+            totalSize = sum(sizes)
+            start = 0
+
+            # We skip the integrity check here because (1) the hash we're using
+            # has '-c' applied and (2) the hash is a fileId sha1, not a file
+            # contents sha1
+            for (encFileId, envVersion), size in itertools.izip(neededFiles,
+                                                                sizes):
+                fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
+                nestedF = util.SeekableNestedFile(dest, size, start)
+                self.contents.addFile(nestedF, fileId + '-c',
+                                      precompressed = True,
+                                      integrityCheck = False)
+                totalSize -= size
+                start += size
+
+        (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
+                                      suffix = '.cf-out')
+        sizeList = []
+
+        try:
+            for encFileId, encVersion in fileList:
+                fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
+                filePath = self.contents.hashToPath(fileId + '-c')
+                size = os.stat(filePath).st_size
+                sizeList.append(size)
+                os.write(fd, "%s %d\n" % (filePath, size))
+
+            url = os.path.join(self.urlBase(),
+                               "changeset?%s" % os.path.basename(path)[:-4])
+            return False, (url, sizeList)
+        finally:
+            os.close(fd)
 
 class ProxyRepositoryError(Exception):
 

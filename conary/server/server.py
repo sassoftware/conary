@@ -19,11 +19,12 @@ import errno
 import os
 import posixpath
 import select
+import socket
 import sys
 import xmlrpclib
 import urllib
 import zlib
-from BaseHTTPServer import HTTPServer
+import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
 thisFile = sys.modules[__name__].__file__
@@ -237,13 +238,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
-        if not targetServerName or targetServerName in cfg.serverName:
+        if not targetServerName or targetServerName in self.cfg.serverName:
             repos = self.netRepos
         elif self.netProxy:
             repos = self.netProxy
         else:
             result = (False, True, [ 'RepositoryMismatch',
-                                   cfg.serverName, targetServerName ] )
+                                   self.cfg.serverName, targetServerName ] )
             repos = None
 
         if repos is not None:
@@ -333,6 +334,16 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
                         remove = True)
         self.createUser('anonymous', 'anonymous', admin = False, write = False)
 
+class HTTPServer(BaseHTTPServer.HTTPServer):
+    def close_request(self, request):
+        while select.select([request], [], [], 0.1)[0]:
+            # drain any remaining data on this request
+            # This avoids the problem seen with the keepalive code sending
+            # extra bytes after all the request has been sent.
+            if not request.recv(8096):
+                break
+        BaseHTTPServer.HTTPServer.close_request(self, request)
+
 class ServerConfig(netserver.ServerConfig):
 
     port		= (CfgInt,  8000)
@@ -389,7 +400,7 @@ def addUser(netRepos, userName, admin = False, mirror = False):
     netRepos.auth.addAcl(userName, None, None, write, False, admin)
     netRepos.auth.setMirror(userName, mirror)
 
-if __name__ == '__main__':
+def getServer():
     argDef = {}
     cfgMap = {
         'contents-dir'  : 'contentsDir',
@@ -434,6 +445,7 @@ if __name__ == '__main__':
         print cfg.tmpDir + " needs to allow full read/write access"
         sys.exit(1)
     HttpRequests.tmpDir = cfg.tmpDir
+    HttpRequests.cfg = cfg
 
     profile = 0
     if profile:
@@ -500,7 +512,9 @@ if __name__ == '__main__':
         usage()
 
     httpServer = HTTPServer(("", cfg.port), HttpRequests)
+    return httpServer, profile
 
+def serve(httpServer, profile=False):
     fds = {}
     fds[httpServer.fileno()] = httpServer
 
@@ -524,3 +538,11 @@ if __name__ == '__main__':
                 sys.exit(1)
             else:
                 raise
+
+def main():
+    server, profile = getServer()
+    serve(server)
+
+if __name__ == '__main__':
+    main()
+

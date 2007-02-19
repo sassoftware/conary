@@ -936,11 +936,18 @@ class Database(SqlDbRepository):
 	return list
 
     def readRollbackStatus(self):
-	f = open(self.rollbackStatus)
-	(first, last) = f.read()[:-1].split()
-	self.firstRollback = int(first)
-	self.lastRollback = int(last)
-	f.close()
+        try:
+            f = open(self.rollbackStatus)
+            (first, last) = f.read()[:-1].split()
+            self.firstRollback = int(first)
+            self.lastRollback = int(last)
+            f.close()
+        except IOError, e:
+            if e.errno == errno.EACCES:
+                self.firstRollback = None
+                self.lastRollback = None
+            else:
+                raise
 
     def hasRollback(self, name):
 	try:

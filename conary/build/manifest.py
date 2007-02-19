@@ -80,7 +80,7 @@ class Manifest:
         fileList = [ re.escape(x[:-1]) \
                      for x in open(self.manifestFile).readlines() ]
 
-        regexp = '^('+'|'.join(fileList)+')$'
+        regexp = '^(?:'+'|'.join(fileList)+')$'
         regexp = re.compile(regexp)
 
         return regexp

@@ -5,6 +5,18 @@ Changes in @NEW@:
       still be configured using the http_proxy environment variable.
     * Filesystem permissions on rollback data restrict access to owner
       (normally root) (CNY-1289)
+    * The Conary client now sends data across an idle connection to a
+      Conary repository.  This will keep the connection alive when the
+      repository is behind a firewall or proxy that has short timeouts
+      for idle connections. (CNY-1045)
+    * The error message produced by Conary when a callback method
+      raises an unhandled exception has been improved.
+    * StreamSet objects can now preserve unknown elements of the stream
+      instead of silently skipping them. Those elements are retained for
+      freeze(), letting the older stream object exactly replicate the
+      frozen stream of the newer object. Unknown elements are preserved
+      through merges into old object as long as the old object has not
+      been locally modified.
 
   o Server Changes:
     * Conary repositories no longer allow users or groups to be
@@ -24,14 +36,7 @@ Changes in @NEW@:
     * Changesets cached are now versioned depending on the client's version.
       This allows for the same changeset to be cached for different client
       generations. (CNY-1203)
-
-  o Client Changes:
-    * The Conary client now sends data across an idle connection to a
-      Conary repository.  This will keep the connection alive when the
-      repository is behind a firewall or proxy that has short timeouts
-      for idle connections. (CNY-1045)
-    * The error message produced by Conary when a callback method
-      raises an unhandled exception has been improved.
+    * Proxy caches file contents for getFileContents call
 
   o Build Changes:
     * A list of autosource mirrors has been added.
@@ -42,6 +47,11 @@ Changes in @NEW@:
       For example, if you wish to check to see if kernel.pae is set, you can
       add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
       the final flavor of your build, and should be used with care. (CNY-1201)
+    * Component and package selection by manifest, as with the "package="
+      option, could fail when large numbers of files were found; this
+      bug has been resolved. (CNY-1339)
+    * You can now add a labelPath to an group add() line by specifying
+      labelPath=[<label1>, <label2>] to an add line.
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The

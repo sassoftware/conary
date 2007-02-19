@@ -59,4 +59,8 @@ initcstreams(void)
     PyModule_AddObject(m, "SMALL", (PyObject *) PyInt_FromLong(SMALL));
     PyModule_AddObject(m, "LARGE", (PyObject *) PyInt_FromLong(LARGE));
     PyModule_AddObject(m, "DYNAMIC", (PyObject *) PyInt_FromLong(DYNAMIC));
+    PyModule_AddObject(m, "SKIP_UNKNOWN",
+                       (PyObject *) PyInt_FromLong(SKIP_UNKNOWN));
+    PyModule_AddObject(m, "PRESERVE_UNKNOWN",
+                       (PyObject *) PyInt_FromLong(PRESERVE_UNKNOWN));
 }
