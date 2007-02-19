@@ -106,6 +106,8 @@ Changes in @NEW@:
       one of the labels to return.
     * A bug in the default update callback class that causes a hang
       when unhandled exceptions occur has been fixed.
+    * Cloning multiple times a trove that was already cloned no longer
+      increments the source count (CNY-1335).
 
 Changes in 1.1.16:
   o Server Changes:
