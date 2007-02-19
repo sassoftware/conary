@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -317,14 +317,11 @@ class ChangeSet(streams.StreamSet):
 
         return one + two
 
-    def writeToFile(self, outFileName, withReferences = False, mode = None):
+    def writeToFile(self, outFileName, withReferences = False, mode = 0666):
+        # 0666 is right for mode because of umask
 	try:
-            if mode is not None:
-                outFileFd = os.open(outFileName,
-                                    os.O_RDWR | os.O_CREAT | os.O_TRUNC, mode)
-            else:
-                outFileFd = os.open(outFileName,
-                                    os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+            outFileFd = os.open(outFileName,
+                                os.O_RDWR | os.O_CREAT | os.O_TRUNC, mode)
 
             outFile = os.fdopen(outFileFd, "w+")
 	    csf = filecontainer.FileContainer(outFile,

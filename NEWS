@@ -4,7 +4,7 @@ Changes in @NEW@:
       to use a Conary protocol proxy server. General http proxies should
       still be configured using the http_proxy environment variable.
     * Filesystem permissions on rollback data restrict access to owner
-      (normally root) (CNY-1289, CNY-1331))
+      (normally root) (CNY-1289)
     * The Conary client now sends data across an idle connection to a
       Conary repository.  This will keep the connection alive when the
       repository is behind a firewall or proxy that has short timeouts
