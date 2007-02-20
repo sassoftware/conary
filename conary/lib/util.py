@@ -815,3 +815,156 @@ class LineReader:
 
 exists = misc.exists
 removeIfExists = misc.removeIfExists
+
+class _LazyFile(object):
+    __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
+                 '_timestamp']
+    def __init__(self, cache, path, mode):
+        self.path = path
+        self.mode = mode
+        self.marker = (0, 0)
+        self._hash = cache._getCounter()
+        self._cache = weakref.ref(cache, self._closeCallback)
+        self._realFd = None
+        self._timestamp = time.time()
+
+    def reopen(method):
+        """Decorator to perform the housekeeping of opening/closing of fds"""
+        def wrapper(self, *args, **kwargs):
+            if self._realFd is not None:
+                # Object is already open
+                # Mark it as being used
+                self._timestamp = time.time()
+                # Return the real method
+                return getattr(self._realFd, method.func_name)(*args, **kwargs)
+            if self._cache is None:
+                raise Exception("Cache object is closed")
+            try:
+                self._cache()._getSlot()
+            except ReferenceError:
+                # re-raise for now, until we decide what to do
+                raise
+            self._reopen()
+            return getattr(self._realFd, method.func_name)(*args, **kwargs)
+        return wrapper
+
+    def _reopen(self):
+        # Initialize the file descriptor
+        self._realFd = open(self.path, self.mode)
+        self._realFd.seek(*self.marker)
+        self._timestamp = time.time()
+
+    def _release(self):
+        assert self._realFd is not None, "Cannot release file descriptor"
+        self._close()
+
+    def _closeCallback(self, cache):
+        """Called when the cache object gets destroyed"""
+        self._close()
+        self._cache = None
+
+    @reopen
+    def read(self, bytes):
+        pass
+
+    @reopen
+    def seek(self, loc, type):
+        pass
+
+    @reopen
+    def trucate(self):
+        pass
+
+    def _close(self):
+        # Close only the file descriptor
+        if self._realFd is not None:
+            self.marker = (self._realFd.tell(), 0)
+            self._realFd.close()
+            self._realFd = None
+
+    def close(self):
+        self._close()
+        if self._cache is None:
+            return
+        cache = self._cache()
+        if cache is not None:
+            try:
+                cache._closeSlot(self)
+            except ReferenceError:
+                # cache object is already gone
+                pass
+        self._cache = None
+
+    @reopen
+    def tell(self):
+        pass
+
+    def __hash__(self):
+        return self._hash
+
+    def __del__(self):
+        self.close()
+
+class LazyFileCache:
+    """An object tracking open files. It will serve file-like objects that get
+    closed behind the scene (and reopened on demand) if the number of open 
+    files in the current process exceeds a threshold.
+    The objects will close automatically when they fall out of scope.
+    """
+    # Assuming maxfd is 1024, this should be ok
+    threshold = 900
+
+    def __init__(self, threshold=None):
+        if threshold:
+            self.threshold = threshold
+        # Counter used for hashing
+        self._fdCounter = 0
+        self._fdMap = {}
+    
+    def open(self, path, mode="r"):
+        fd = _LazyFile(self, path, mode=mode)
+        self._fdMap[fd._hash] = fd
+        return fd
+
+    def _getFdCount(self):
+        return len(os.listdir("/proc/self/fd"))
+
+    def _getCounter(self):
+        ret = self._fdCounter;
+        self._fdCounter += 1;
+        return ret;
+
+    def _getSlot(self):
+        if self._getFdCount() < self.threshold:
+            # We can open more file descriptors
+            return
+        # There are several ways we can obtain a slot if the object is full:
+        # 1. free one slot
+        # 2. free a batch of slots
+        # 3. free all slots
+        # Running tests which are not localized (i.e. walk over the list of
+        # files and do some operation on them) shows that 1. is extremely
+        # expensive. 2. and 3. are comparatively similar if we're freeing 10%
+        # of the threshold, so that's the current implementation.
+
+        # Sorting would be expensive for selecting just the oldest fd, but
+        # when selecting the oldest m fds, performance is m * n. For m large
+        # enough, log n will be smaller. For n = 5k, 10% is 500, while log n
+        # is about 12. Even factoring in other sorting constants, you're still
+        # winning.
+        l = sorted([ x for x in self._fdMap.values() if x._realFd is not None],
+                   lambda a, b: cmp(a._timestamp, b._timestamp))
+        for i in range(int(self.threshold / 10)):
+            l[i]._release()
+
+    def _closeSlot(self, fd):
+        del self._fdMap[fd._hash]
+
+    def close(self):
+        # No need to call fd's close(), we're destroying this object
+        for fd in self._fdMap.values():
+            fd._close()
+            fd._cache = None
+        self._fdMap.clear()
+
+    __del__ = close
