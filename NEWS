@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.17:
   o New Feature:
     * A caching proxy has been implemented for Conary.  A proxy server
       caches changesets as clients request them.  This can
