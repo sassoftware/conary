@@ -17,23 +17,14 @@ Changes in @NEW@:
       "http_proxy" environment variable.
 
   o Client Changes:
-    * Filesystem permissions on rollback data restrict access to owner
-      (normally root) (CNY-1289)
+    * Filesystem permissions on rollback data restrict access to the
+      owner of the database (normally root). (CNY-1289)
     * The Conary client now sends data across an idle connection to a
       Conary repository.  This will keep the connection alive when the
       repository is behind a firewall or proxy that has short timeouts
       for idle connections. (CNY-1045)
     * The error message produced by Conary when a progress callback
       method raises an unhandled exception has been improved.
-    * StreamSet objects can now preserve unknown elements of the stream
-      instead of silently skipping them. Those elements are retained for
-      freeze(), letting the older stream object exactly replicate the
-      frozen stream of the newer object. Unknown elements are preserved
-      through merges into old object as long as the old object has not
-      been locally modified.
-    * Client always specified the latest protocol version it knew about
-      when calling a server, even if the server couldn't understand that
-      version (CNY-1345)
 
   o Server Changes:
     * Conary repositories no longer allow users or groups to be
@@ -43,10 +34,10 @@ Changes in @NEW@:
       and setTroveSigs) are now using batched SQL operations for faster
       throughput. (CNY-1118, CNY-1243)
     * The code that commits groups to the repository has been reworked
-      to significantly reduce the number of SQL queries executed
+      to significantly reduce the number of SQL queries executed.
       (CNY-1273)
-    * Including symbolic links in the path to the temporary directory returns
-      an error at startup (CNY-958)
+    * Including a symbolic link in the path to the temporary now
+      returns an error immediately at startup. (CNY-958)
     * Errors opening a to-be-committed changeset now have the internal
       exception logged and CommitError returned to the client (CNY-1182)
     * Changesets cached are now versioned depending on the client's version.
@@ -81,6 +72,12 @@ Changes in @NEW@:
     * PathID lookups are now done by file prefix and file ID. This
       allows for identifying files in different package flavors or in
       versions older than the latest one. (CNY-1203)
+    * StreamSet objects can now preserve unknown elements of the stream
+      instead of silently skipping them. Those elements are retained for
+      freeze(), letting the older stream object exactly replicate the
+      frozen stream of the newer object. Unknown elements are preserved
+      through merges into old object as long as the old object has not
+      been locally modified.
 
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
@@ -125,7 +122,10 @@ Changes in @NEW@:
     * A bug in the default update callback class that causes a hang
       when unhandled exceptions occur has been fixed.
     * Cloning multiple times a trove that was already cloned no longer
-      increments the source count (CNY-1335).
+      increments the source count. (CNY-1335)
+    * The Conary network client erroneously specified the latest
+      protocol version it knew about when calling a server, even if
+      the server couldn't understand that version. (CNY-1345)
 
 Changes in 1.1.16:
   o Server Changes:
