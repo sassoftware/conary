@@ -1,8 +1,20 @@
 Changes in @NEW@:
+  o New Features:
+    * A caching proxy has been implemented for Conary.  A proxy
+      server caches changesets as clients request them.  The server is
+      implemented using the existing standalone and Apache-based
+      Conary repository server modules.
+
+      Two new Conary repository configuration variables, "proxyDB" and
+      "proxyContentsDir" have been created to define the proxy
+      database and contents store.
+
+      To configure the Conary client to use a proxy, a new "proxy"
+      configuration variable has been added to the conaryrc file.
+      Generic HTTP proxies should still be configured using the
+      "http_proxy" environment variable.
+
   o Client Changes:
-    * Added 'proxy' configuration item to allow conaryrc to tell Conary
-      to use a Conary protocol proxy server. General http proxies should
-      still be configured using the http_proxy environment variable.
     * Filesystem permissions on rollback data restrict access to owner
       (normally root) (CNY-1289)
     * The Conary client now sends data across an idle connection to a
@@ -31,8 +43,6 @@ Changes in @NEW@:
     * The code that commits groups to the repository has been reworked
       to significantly reduce the number of SQL queries executed
       (CNY-1273)
-    * Implemented a proxy server which caches changesets. It is supported
-      in both the standalone server and the apache server.
     * Including symbolic links in the path to the temporary directory returns
       an error at startup (CNY-958)
     * Errors opening a to-be-committed changeset now have the internal
@@ -40,7 +50,6 @@ Changes in @NEW@:
     * Changesets cached are now versioned depending on the client's version.
       This allows for the same changeset to be cached for different client
       generations. (CNY-1203)
-    * Proxy caches file contents for getFileContents call
 
   o Build Changes:
     * A list of autosource mirrors has been added.
