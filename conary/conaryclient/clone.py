@@ -190,6 +190,9 @@ class ClientClone:
                         print "No versions of %s exist on branch %s." \
                                     % (srcTroveName, targetBranch.asString()) 
                         return False, None
+                    # Sort the list of versions retrieved from the existing
+                    # branch
+                    currentVersionList.sort()
 
                     # We are trying to make sure that, if a source exists in
                     # the target branch (while we are cloning binary only), we
