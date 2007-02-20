@@ -45,7 +45,6 @@ Changes in @NEW@:
       generations. (CNY-1203)
 
   o Build Changes:
-    * A list of autosource mirrors has been added.
     * cvc cook --show-buildreqs works properly now. Thanks to Pavel
       Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
     * The flags for other packages that are specified in the build flavor
