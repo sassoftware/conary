@@ -194,10 +194,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.out.write('[%s] %s\n' % (tag, msg))
 
     def __init__(self, cfg=None):
+        callbacks.UpdateCallback.__init__(self)
         if cfg:
-            callbacks.UpdateCallback.__init__(self, cfg.trustThreshold)
-        else:
-            callbacks.UpdateCallback.__init__(self)
+            self.setTrustThreshold(cfg.trustThreshold)
         callbacks.LineOutput.__init__(self)
         self.restored = 0
         self.csHunk = (0, 0)
@@ -288,6 +287,11 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                migrate = False, keepRequired = False,
                                removeNotByDefault = False, restartInfo = None,
                                applyCriticalOnly = False, keepJournal = False):
+    if not callback:
+        callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
+    else:
+        callback.setTrustThreshold(cfg.trustThreshold)
+
     if syncChildren or syncUpdate:
         installMissing = True
     else:
