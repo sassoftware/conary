@@ -336,7 +336,7 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
 class HTTPServer(BaseHTTPServer.HTTPServer):
     def close_request(self, request):
-        while select.select([request], [], [], 0.1)[0]:
+        while select.select([request], [], [], 0)[0]:
             # drain any remaining data on this request
             # This avoids the problem seen with the keepalive code sending
             # extra bytes after all the request has been sent.
