@@ -27,9 +27,10 @@ Changes in @NEW@:
       defined in the Portable Filename Character Set.
     * Server side functions that work on large datasets (getTroveSigs
       and setTroveSigs) are now using batched SQL operations for faster
-      throughput
-    * Reworked code which commit groups to the repository to significantly
-      reduce the number of SQL queries executed (CNY-1273)
+      throughput. (CNY-1118, CNY-1243)
+    * The code that commits groups to the repository has been reworked
+      to significantly reduce the number of SQL queries executed
+      (CNY-1273)
     * Implemented a proxy server which caches changesets. It is supported
       in both the standalone server and the apache server.
     * Including symbolic links in the path to the temporary directory returns
