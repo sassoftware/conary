@@ -54,6 +54,7 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                 key = match.group()
                 if not key.startswith('CNY'):
                     print 'not checking', key
+                    continue
                 print 'getting', key
                 issue = client.getIssue(key)
                 fixVers = [ x for x in issue.fixVersions if x.name == version ]
