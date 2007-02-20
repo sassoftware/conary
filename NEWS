@@ -28,17 +28,21 @@ Changes in @NEW@:
 
   o Build Changes:
     * cvc cook --show-buildreqs works properly now.  Thanks to Pavel
-      Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
-    * The flags for other packages that are specified in the build flavor
-      are now available when cooking as a part of the PackageFlags object.
-      For example, if you wish to check to see if kernel.pae is set, you can
-      add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
-      the final flavor of your build, and should be used with care. (CNY-1201)
-    * Component and package selection by manifest, as with the "package="
-      option, could fail when large numbers of files were found; this
-      bug has been resolved. (CNY-1339)
-    * You can now add a labelPath to an group add() line by specifying
-      labelPath=[<label1>, <label2>] to an add line.
+      Volkovitskiy for reporting the issue and providing the
+      patch. (CNY-1196)
+    * The flags for other packages that are specified in the build
+      flavor are now available when cooking as a part of the
+      PackageFlags object.  For example, if you wish to check to see
+      if kernel.pae is set, you can add "if PackageFlags.kernel.pae:".
+      Note that such checks do not affect the final flavor of your
+      build, and should be used with care. (CNY-1201)
+    * Component and package selection by manifest, as with the
+      "package=" option, could fail when large numbers of files were
+      found; this bug has been resolved. (CNY-1339)
+    * You can now add a labelPath to a group r.add() line by
+      specifying a labelPath keyword argument.  For example:
+         r.add('conary', labelPath=['conary-unstable.rpath.org@rpl:1',
+                                    'conary.rpath.com@rpl:1'])
     * Repeated shadow merges now fail with an error suggesting a
       commit.  Previously, the merge operation would be attempted
       again. (CNY-1278)
@@ -57,9 +61,9 @@ Changes in @NEW@:
       returns an error immediately at startup. (CNY-958)
     * Errors opening a to-be-committed changeset now have the internal
       exception logged and CommitError returned to the client (CNY-1182)
-    * Changesets cached are now versioned depending on the client's version.
-      This allows for the same changeset to be cached for different client
-      generations. (CNY-1203)
+    * Cached Changesets are now versioned depending on the client's
+      version.  This allows for the same changeset to be cached for
+      different client generations. (CNY-1203)
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
@@ -83,7 +87,7 @@ Changes in @NEW@:
     * Conary now displays a useful error message when it is unable to
       parse a "user" line in a configuration line.  Previously Conary
       would raise an unhandled exception. (CNY-1267)
-    * Mirror configurations no longer use /etc/conary/entitlements as
+    * Mirror configurations no longer use /etc/conary/entitlements/ as
       the default location to read entitlements used to mirror.
       Normally the entitlements used to mirror are different than the
       entitlements required to update the system.  Therefore they
@@ -93,35 +97,39 @@ Changes in @NEW@:
       cook process results in an exception.  Previously, an unhandled
       exception message was generated. (CNY-995)
     * Derived packages now support setuid and setgid files. (CNY-1281)
-    * You can no longer accidentally include a group in itself by using
-      addAll. (CNY-1123, CNY-1124)
-    * Alert the users when troves could not be found during migrate
-      in the same manner they are alerted during a regular update. (CNY-1171)
-    * Fix a bug where shared contents in a changeset between InitialContents
-      and a regular file could cause an update failure.  (CNY-1084)
-    * Make filesets support buildFlavor (CNY-1127)
-    * TroveSource tried to raise a DuplicateTrove exception, which doesn't
-      exist. Replaced with InternalConaryError (CNY-1197)
-    * Give a proper error message when we cannot create the directory
-      for the local database due to a permission failure (CNY-953)
+    * You can no longer accidentally include a group in itself by
+      using addAll. (CNY-1123, CNY-1124)
+    * An error message is produced when troves could not be found
+      during "conary migrate" in the same manner they are alerted
+      during a "conary update".  Previously these errors were
+      masked. (CNY-1171)
+    * A bug that caused update failures when a changeset held file
+      contents that were both InitialContents and a normal file has
+      been fixed. (CNY-1084)
+    * Filesets now honor buildFlavor. (CNY-1127)
+    * The TroveSource class tried to raise a DuplicateTrove exception,
+      which doesn't exist. It now raises InternalConaryError instead.
+      (CNY-1197)
+    * A proper error is now produced when Conary is unable to create
+      the directory for the local database due to a permission
+      failure. (CNY-953)
     * Group recipes could sometimes include a trove for dependency
       resolution but not move to include the package directly in the
-      group that is doing dependency resolution.  Now the package +
-      component are always included immediately in the group that is
-      resolving dependencies.  (CNY-1305)
-    * Updated recreatedb for API changes (CNY-1263)
-    * A "no new troves available" error message is now given when there are
-      no new versions to migrate to (CNY-1246)
-    * Attempting to clone without name or contact information set now gives
-      a proper error message (CNY-1315)
+      group that is doing dependency resolution.  Now the package and
+      component both are always included immediately in the group that
+      is resolving dependencies. (CNY-1305)
+    * A "no new troves available" error message is now given when
+      there are no new versions to migrate to (CNY-1246)
+    * Attempting to clone without name or contact information set now
+      gives a proper error message. (CNY-1315)
     * The client code no longer exits with a sys.exit(0) if one of the
-      callbacks fails (CNY-1271).
+      callbacks fails. (CNY-1271)
     * When multiple labels of a trove exist in a group and that group is 
       being searched for that trove, conary will no longer arbitrarily pick
       one of the labels to return.
     * A bug in the default update callback class that causes a hang
       when unhandled exceptions occur has been fixed.
-    * Cloning multiple times a trove that was already cloned no longer
+    * Cloning a trove multiple times that was already cloned no longer
       increments the source count. (CNY-1335)
     * The Conary network client erroneously specified the latest
       protocol version it knew about when calling a server, even if
