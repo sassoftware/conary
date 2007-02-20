@@ -1,5 +1,5 @@
 Changes in @NEW@:
-  o New Features:
+  o New Feature:
     * A caching proxy has been implemented for Conary.  A proxy
       server caches changesets as clients request them.  The server is
       implemented using the existing standalone and Apache-based
@@ -21,8 +21,8 @@ Changes in @NEW@:
       Conary repository.  This will keep the connection alive when the
       repository is behind a firewall or proxy that has short timeouts
       for idle connections. (CNY-1045)
-    * The error message produced by Conary when a callback method
-      raises an unhandled exception has been improved.
+    * The error message produced by Conary when a progress callback
+      method raises an unhandled exception has been improved.
     * StreamSet objects can now preserve unknown elements of the stream
       instead of silently skipping them. Those elements are retained for
       freeze(), letting the older stream object exactly replicate the
