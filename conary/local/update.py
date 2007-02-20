@@ -1218,6 +1218,9 @@ class FilesystemJob:
 
 	    beenRestored = False
 
+            import epdb
+            epdb.st()
+
 	    if forceUpdate or (
                    headFile.hasContents and \
                    fsFile.hasContents and \

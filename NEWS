@@ -17,6 +17,9 @@ Changes in @NEW@:
       frozen stream of the newer object. Unknown elements are preserved
       through merges into old object as long as the old object has not
       been locally modified.
+    * Client always specified the latest protocol version it knew about
+      when calling a server, even if the server couldn't understand that
+      version (CNY-1345)
 
   o Server Changes:
     * Conary repositories no longer allow users or groups to be

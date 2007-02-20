@@ -66,12 +66,13 @@ def _cleanseUrl(protocol, url):
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
-                 altHostCallback):
+                 altHostCallback, protocolVersion):
         xmlrpclib._Method.__init__(self, send, name)
         self.__host = host
         self.__pwCallback = pwCallback
         self.__anonymousCallback = anonymousCallback
         self.__altHostCallback = altHostCallback
+        self.__protocolVersion = protocolVersion
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -80,7 +81,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         return self.__repr__()
 
     def __call__(self, *args):
-        return self.doCall(CLIENT_VERSIONS[-1], *args)
+        return self.doCall(self.__protocolVersion, *args)
 
     def __doCall(self, clientVersion, argList):
         newArgs = ( clientVersion, ) + argList
@@ -235,10 +236,16 @@ class ServerProxy(xmlrpclib.ServerProxy):
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
-                       self.__altHostCallback)
+                       self.__altHostCallback, self.__protocolVersion)
 
     def setAbortCheck(self, check):
         self.__transport.setAbortCheck(check)
+
+    def setProtocolVersion(self, val):
+        self.__protocolVersion = val
+
+    def getProtocolVersion(self):
+        return self.__protocolVersion
 
     def __init__(self, url, serverName, transporter, pwCallback, usedMap):
         try:
@@ -251,6 +258,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__altHost = None
         self.__serverName = serverName
         self.__usedMap = usedMap
+        self.__protocolVersion = CLIENT_VERSIONS[-1]
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None,
@@ -384,8 +392,7 @@ class ServerCache:
 
         # this is the protocol version we should use when talking
         # to this repository - the maximum we both understand
-        server._protocolVersion = max(intersection)
-        self.cache[serverName] = server
+        server.setProtocolVersion(max(intersection))
 
         self.cache[serverName] = server
 
@@ -581,7 +588,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        if remove and self.c[reposLabel]._protocolVersion < 38:
+        if remove and self.c[reposLabel].getProtocolVersion() < 38:
             raise InvalidServerVersion, "Setting canRemove for an acl " \
                     "requires a repository running Conary 1.1 or later."
         elif remove:
@@ -615,7 +622,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
-        if canRemove and self.c[reposLabel]._protocolVersion < 38:
+        if canRemove and self.c[reposLabel].getProtocolVersion() < 38:
             raise InvalidServerVersion, "Setting canRemove for an acl " \
                     "requires a repository running Conary 1.1 or later."
         elif canRemove:
@@ -752,7 +759,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return resultD
 
     def _setTroveTypeArgs(self, serverIdent, *args, **kwargs):
-        if self.c[serverIdent]._protocolVersion >= 38:
+        if self.c[serverIdent].getProtocolVersion() >= 38:
             return args + ( kwargs.get('troveTypes', TROVE_QUERY_PRESENT), )
         else:
             return args
@@ -1141,7 +1148,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                     withFiles,
                                     withFileContents,
                                     excludeAutoSource)
-            if server._protocolVersion < 38:
+            if server.getProtocolVersion() < 38:
                 (url, sizes, extraTroveList, extraFileList) = l
                 removedTroveList = []
             else:
@@ -1780,11 +1787,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @param branch: branch to restrict the source to
         @type branch: versions.Branch
         """
-        if filePrefixes is None or self.c[branch]._protocolVersion < 39:
+        if filePrefixes is None or self.c[branch].getProtocolVersion() < 39:
             args = [sourceName, self.fromVersion(branch)]
         else:
             args = [sourceName, self.fromVersion(branch), filePrefixes]
-        if fileIds is not None and self.c[branch]._protocolVersion >= 42:
+        if fileIds is not None and self.c[branch].getProtocolVersion() >= 42:
             # Make sure we send a (possibly empty) filePrefixes
             assert(filePrefixes is not None)
             args.append(base64.b64encode("".join(fileIds)))
@@ -1876,7 +1883,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getNewTroveList(self, host, mark):
         server = self.c[host]
         # from server protocol 40 onward we get returned the real troveTypes
-        if server._protocolVersion < 40:
+        if server.getProtocolVersion() < 40:
             return [ ( x[0],
                        (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
                        trove.TROVE_TYPE_NORMAL
@@ -1904,7 +1911,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             l.append((i, info))
         for host, l in byServer.iteritems():
             tl = [ x[1] for x in l ]
-            if self.c[host]._protocolVersion < 41:
+            if self.c[host].getProtocolVersion() < 41:
                 # this server does not support the getTroveInfo call,
                 # so we need to synthetize it from a getTroves call
                 troveInfoList = self.getTroves(tl, withFiles = False)
@@ -2049,7 +2056,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         server = self.c[serverName]
         url = server.prepareChangeSet()
-        if server._protocolVersion >= 38:
+        if server.getProtocolVersion() >= 38:
             url = server.prepareChangeSet(jobs, mirror)
         else:
             url = server.prepareChangeSet()
