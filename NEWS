@@ -26,6 +26,23 @@ Changes in @NEW@:
     * The error message produced by Conary when a progress callback
       method raises an unhandled exception has been improved.
 
+  o Build Changes:
+    * cvc cook --show-buildreqs works properly now.  Thanks to Pavel
+      Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
+    * The flags for other packages that are specified in the build flavor
+      are now available when cooking as a part of the PackageFlags object.
+      For example, if you wish to check to see if kernel.pae is set, you can
+      add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
+      the final flavor of your build, and should be used with care. (CNY-1201)
+    * Component and package selection by manifest, as with the "package="
+      option, could fail when large numbers of files were found; this
+      bug has been resolved. (CNY-1339)
+    * You can now add a labelPath to an group add() line by specifying
+      labelPath=[<label1>, <label2>] to an add line.
+    * Repeated shadow merges now fail with an error suggesting a
+      commit.  Previously, the merge operation would be attempted
+      again. (CNY-1278)
+
   o Server Changes:
     * Conary repositories no longer allow users or groups to be
       created with names that include characters other than those
@@ -44,30 +61,14 @@ Changes in @NEW@:
       This allows for the same changeset to be cached for different client
       generations. (CNY-1203)
 
-  o Build Changes:
-    * cvc cook --show-buildreqs works properly now. Thanks to Pavel
-      Volkovitskiy for reporting the issue and providing the patch (CNY-1196).
-    * The flags for other packages that are specified in the build flavor
-      are now available when cooking as a part of the PackageFlags object.
-      For example, if you wish to check to see if kernel.pae is set, you can
-      add "if PackageFlags.kernel.pae:".  Note that such checks do not affect
-      the final flavor of your build, and should be used with care. (CNY-1201)
-    * Component and package selection by manifest, as with the "package="
-      option, could fail when large numbers of files were found; this
-      bug has been resolved. (CNY-1339)
-    * You can now add a labelPath to an group add() line by specifying
-      labelPath=[<label1>, <label2>] to an add line.
-    * Repeated shadow merges now fail with an error suggesting a commit
-      (CNY-1278)
-
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The
       StringStream stores the UTF-8 encoding of the Unicode
       object. (CNY-366)
-    * ByteStream and LongLongStream have been implemented in C.
-      Modifications have been made to the NumericStream types
-      implemented in C so that they can be used as base classes in
-      Python.
+    * The ByteStream and LongLongStream classes have been
+      reimplemented in C.  Modifications have been made to the
+      NumericStream types implemented in C so that they can be used as
+      base classes in Python.
     * PathID lookups are now done by file prefix and file ID. This
       allows for identifying files in different package flavors or in
       versions older than the latest one. (CNY-1203)
