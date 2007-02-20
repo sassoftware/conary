@@ -16,7 +16,6 @@ import bdb
 import bz2
 import debugger
 import errno
-import fcntl
 import log
 import misc
 import os
