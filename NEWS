@@ -1,11 +1,13 @@
 Changes in @NEW@:
   o New Feature:
-    * A caching proxy has been implemented for Conary.  A proxy
-      server caches changesets as clients request them.  The server is
-      implemented using the existing standalone and Apache-based
-      Conary repository server modules.
+    * A caching proxy has been implemented for Conary.  A proxy server
+      caches changesets as clients request them.  This can
+      dramatically improve the performance of Conary when a subsequent
+      request is made for the same changeset. 
 
-      Two new Conary repository configuration variables, "proxyDB" and
+      The server is implemented using the existing standalone and
+      Apache-based Conary repository server modules. Two new Conary
+      repository configuration variables, "proxyDB" and
       "proxyContentsDir" have been created to define the proxy
       database and contents store.
 
