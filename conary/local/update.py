@@ -325,8 +325,8 @@ class FilesystemJob:
                 opJournal.create(target)
 
 	for (oldPath, newPath, msg) in self.renames:
-	    os.rename(oldPath, newPath)
             opJournal.rename(oldPath, newPath)
+	    os.rename(oldPath, newPath)
 	    log.debug(msg)
 
 	contents = None
