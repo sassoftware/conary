@@ -55,6 +55,8 @@ Changes in @NEW@:
       bug has been resolved. (CNY-1339)
     * You can now add a labelPath to an group add() line by specifying
       labelPath=[<label1>, <label2>] to an add line.
+    * Repeated shadow merges now fail with an error suggesting a commit
+      (CNY-1278)
 
   o Internal Changes:
     * A StringStream can now be set from a Unicode object.  The

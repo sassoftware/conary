@@ -1116,6 +1116,10 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     troveName = state.getName()
     troveBranch = state.getBranch()
 
+    if state.getLastMerged():
+        log.error("outstanding merge must be committed before merging again")
+        return
+
     if not state.getVersion().isShadow():
         log.error("%s=%s is not a shadow" % (troveName, troveBranch.asString()))
         return
