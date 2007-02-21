@@ -180,8 +180,6 @@ class ChangeSet(streams.StreamSet):
 	if (old and old.onLocalLabel()) or new.onLocalLabel():
 	    self.local = 1
 
-        self.hasRemoved |= (csTrove.troveType() == trove.TROVE_TYPE_REMOVED)
-
     def newPackage(self, csTrove):
         import warnings
         warnings.warn("newPackage is deprecated, use newTrove",
@@ -317,15 +315,17 @@ class ChangeSet(streams.StreamSet):
 
         return one + two
 
-    def writeToFile(self, outFileName, withReferences = False, mode = 0666):
+    def writeToFile(self, outFileName, withReferences = False, mode = 0666,
+                    versionOverride = None):
         # 0666 is right for mode because of umask
 	try:
             outFileFd = os.open(outFileName,
                                 os.O_RDWR | os.O_CREAT | os.O_TRUNC, mode)
 
             outFile = os.fdopen(outFileFd, "w+")
-	    csf = filecontainer.FileContainer(outFile,
-                                              withRemoves = self.hasRemoved)
+
+            csf = filecontainer.FileContainer(outFile,
+                                              version = versionOverride)
 
 	    str = self.freeze()
 	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
@@ -714,7 +714,6 @@ class ChangeSet(streams.StreamSet):
 	self.fileContents = {}
 	self.absolute = False
 	self.local = 0
-        self.hasRemoved = False
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
