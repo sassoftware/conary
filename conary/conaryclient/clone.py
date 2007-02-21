@@ -451,7 +451,7 @@ class ClientClone:
                 itertools.izip(pathIdsNeeded, contentsNeeded, contents, 
                                fileObjsNeeded):
 
-            cs.addFileContents(pathId, changeset.ChangedFileTypes.file, 
+            cs.addFileContents(pathId, fileId, changeset.ChangedFileTypes.file,
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
 

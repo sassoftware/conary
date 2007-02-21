@@ -1431,14 +1431,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
                         fetchItems.append( (oldFileId, oldFileVersion, 
                                             oldFileObj) ) 
-                        needItems.append( (pathId, oldFileObj) ) 
+                        needItems.append( (pathId, None, oldFileObj) ) 
 
                     fetchItems.append( (newFileId, newFileVersion, newFileObj) )
-                    needItems.append( (pathId, newFileObj) )
+                    needItems.append( (pathId, newFileId, newFileObj) )
                     contentsNeeded += fetchItems
 
-
-                    fileJob += (needItems,)
+                    fileJob.extend([ needItems ])
 
             contentList = self.getFileContents(contentsNeeded, 
                                                tmpFile = outFile,
@@ -1447,24 +1446,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             i = 0
             for item in fileJob:
-                pathId = item[0][0]
-                fileObj = item[0][1]
+                pathId, fileId, fileObj = item[0]
                 contents = contentList[i]
                 i += 1
 
                 if len(item) == 1:
-                    internalCs.addFileContents(pathId, 
+                    internalCs.addFileContents(pathId, fileId,
                                    changeset.ChangedFileTypes.file, 
                                    contents, 
                                    fileObj.flags.isConfig())
                 else:
-                    newFileObj = item[1][1]
+                    fileId = item[1][1]
+                    newFileObj = item[1][2]
                     newContents = contentList[i]
                     i += 1
 
                     (contType, cont) = changeset.fileContentsDiff(fileObj, 
                                             contents, newFileObj, newContents)
-                    internalCs.addFileContents(pathId, contType,
+                    internalCs.addFileContents(pathId, fileId, contType,
                                                cont, True)
 
         if not cs and internalCs:

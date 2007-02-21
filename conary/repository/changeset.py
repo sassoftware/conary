@@ -224,7 +224,7 @@ class ChangeSet(streams.StreamSet):
         (tag, cont, compressed) = self.configCache.get(pathId, (None, None, None))
         return tag == ChangedFileTypes.diff
 
-    def addFileContents(self, pathId, contType, contents, cfgFile,
+    def addFileContents(self, pathId, fileId, contType, contents, cfgFile,
                         compressed = False):
 	if cfgFile:
             assert(not compressed)
@@ -400,7 +400,7 @@ class ChangeSet(streams.StreamSet):
 			invertedTrove.newTroveVersion(name, version, flavor,
                             trv.includeTroveByDefault(name, version, flavor))
 
-	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
+	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)
 
 	    for pathId in troveCs.getOldFileList():
@@ -409,11 +409,11 @@ class ChangeSet(streams.StreamSet):
                     # so it does not go in the rollback
                     continue
                 
-		(path, fileId, version) = trv.getFile(pathId)
-		invertedTrove.newFile(pathId, path, fileId, version)
+		(path, origFileId, version) = trv.getFile(pathId)
+		invertedTrove.newFile(pathId, path, origFileId, version)
 
-		origFile = db.getFileVersion(pathId, fileId, version)
-		rollback.addFile(None, fileId, origFile.freeze())
+		origFile = db.getFileVersion(pathId, origFileId, version)
+		rollback.addFile(None, origFileId, origFile.freeze())
 
 		if not origFile.hasContents:
 		    continue
@@ -427,7 +427,7 @@ class ChangeSet(streams.StreamSet):
 		if origFile.flags.isConfig():
 		    cont = filecontents.FromDataStore(db.contentsStore, 
 						      origFile.contents.sha1())
-		    rollback.addFileContents(pathId,
+                    rollback.addFileContents(pathId, origFileId,
 					     ChangedFileTypes.file, cont, 1)
 		else:
 		    fullPath = db.root + path
@@ -450,7 +450,8 @@ class ChangeSet(streams.StreamSet):
 			cont = filecontents.FromString("")
                         contType = ChangedFileTypes.hldr
 
-		    rollback.addFileContents(pathId, contType, cont, 0)
+		    rollback.addFileContents(pathId, origFileId, contType,
+                                             cont, 0)
 
 	    for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
 		if not trv.hasFile(pathId):
@@ -503,12 +504,12 @@ class ChangeSet(streams.StreamSet):
 			diff = "".join(patch.reverse(f.readlines()))
 			f.seek(0)
 			cont = filecontents.FromString(diff)
-			rollback.addFileContents(pathId,
+                        rollback.addFileContents(pathId, curFileId,
 						 ChangedFileTypes.diff, cont, 1)
 		    else:
 			cont = filecontents.FromDataStore(db.contentsStore, 
 				    origFile.contents.sha1())
-			rollback.addFileContents(pathId,
+                        rollback.addFileContents(pathId, curFileId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
 		elif origFile.hasContents and newFile.hasContents and \
@@ -539,7 +540,7 @@ class ChangeSet(streams.StreamSet):
 			cont = filecontents.FromString("")
                         contType = ChangedFileTypes.hldr
 
-                    rollback.addFileContents(pathId, contType, cont,
+                    rollback.addFileContents(pathId, curFileId, contType, cont,
 					     origFile.flags.isConfig() or
 					     newFile.flags.isConfig())
 
@@ -583,7 +584,7 @@ class ChangeSet(streams.StreamSet):
 			cont = filecontents.FromString("")
                         contType = ChangedFileTypes.hldr
 
-                    rollback.addFileContents(pathId, contType, cont,
+                    rollback.addFileContents(pathId, fileId, contType, cont,
 					     fileObj.flags.isConfig())
 
 	return rollback
@@ -917,23 +918,26 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                             assert(not failures)
                             fileContents = filecontents.FromString(
                                                             "".join(newLines))
-                            absCs.addFileContents(pathId, 
+                            absCs.addFileContents(pathId, newFileId,
                                                   ChangedFileTypes.file, 
                                                   fileContents, True)
                         else:
-                            absCs.addFileContents(pathId, ChangedFileTypes.file,
+                            absCs.addFileContents(pathId, newFileId,
+                                                  ChangedFileTypes.file,
                                                   cont, True)
                     else:
                         (contType, cont) = self.getFileContents(pathId,
                                                         compressed = True)
                         assert(contType == ChangedFileTypes.file)
-                        absCs.addFileContents(pathId, ChangedFileTypes.file,
+                        absCs.addFileContents(pathId, newFileId,
+                                              ChangedFileTypes.file,
                                               cont, False, compressed = True)
                 else:
                     # include the old contents; we might need them for
                     # a distributed branch
                     cont = repos.getFileContents([(oldFileId, oldVersion)])[0]
-                    absCs.addFileContents(pathId, ChangedFileTypes.file, cont,
+                    absCs.addFileContents(pathId, newFileId,
+                                          ChangedFileTypes.file, cont,
                                           fileObj.flags.isConfig())
 
         return absCs
@@ -1300,7 +1304,7 @@ def CreateFromFilesystem(troveList):
 	    cs.addFile(oldFileId, newFileId, filecs)
 
 	    if hash:
-		cs.addFileContents(pathId, ChangedFileTypes.file,
+		cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
 			  file.flags.isConfig())
 

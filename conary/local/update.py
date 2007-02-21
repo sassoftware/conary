@@ -153,7 +153,8 @@ class FilesystemJob:
                 if files.frozenFileHasContents(stream):
                     flags = files.frozenFileFlags(stream)
                     # this file is seen as *added* in the rollback
-                    cs.addFileContents(pathId, changeset.ChangedFileTypes.file,
+                    cs.addFileContents(pathId, fileId,
+                       changeset.ChangedFileTypes.file,
                        filecontents.FromFilesystem(util.joinPaths(self.root,
                                                                   path)),
                        flags.isConfig())
@@ -1732,7 +1733,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 		if srcFile.hasContents:
                     if needAbsolute:
-                        changeSet.addFileContents(pathId,
+                        changeSet.addFileContents(pathId, newFileId,
                                           changeset.ChangedFileTypes.file,
                                           newCont, f.flags.isConfig())
                     else:
@@ -1742,7 +1743,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                         (contType, cont) = changeset.fileContentsDiff(
                                     srcFile, srcCont, f, newCont)
 
-                        changeSet.addFileContents(pathId, contType, cont,
+                        changeSet.addFileContents(pathId, newFileId,
+                                                  contType, cont,
                                                   f.flags.isConfig())
 
     # anything left in pathIds has been newly added
@@ -1795,7 +1797,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 	if f.hasContents and withFileContents:
 	    newCont = filecontents.FromFilesystem(realPath)
-	    changeSet.addFileContents(pathId,
+	    changeSet.addFileContents(pathId, f.fileId(),
 				      changeset.ChangedFileTypes.file,
 				      newCont, f.flags.isConfig())
 
