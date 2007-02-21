@@ -46,6 +46,7 @@ Changes in 1.1.17:
     * Repeated shadow merges now fail with an error suggesting a
       commit.  Previously, the merge operation would be attempted
       again. (CNY-1278)
+    * A list of rPath mirrors for source components has been added.
 
   o Server Changes:
     * Conary repositories no longer allow users or groups to be

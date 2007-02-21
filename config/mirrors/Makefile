@@ -21,6 +21,7 @@ mirror_files =	\
                 gnome \
                 gnu \
                 kde \
+                rpath \
                 sourceforge \
                 xorg
 
