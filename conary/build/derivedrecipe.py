@@ -74,7 +74,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                         l = linkGroups.setdefault(linkGroup, [])
                         l.append(path)
 
-                    (contentType, contents) = self.cs.getFileContents(pathId)
+                    (contentType, contents) = \
+                                    self.cs.getFileContents(pathId, fileId)
                     if contentType == changeset.ChangedFileTypes.ptr:
                         targetPathId = contents.get().read()
                         l = delayedRestores.setdefault(targetPathId, [])

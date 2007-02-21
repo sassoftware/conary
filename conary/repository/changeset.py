@@ -232,7 +232,7 @@ class ChangeSet(streams.StreamSet):
 	else:
 	    self.fileContents[pathId] = (contType, contents, compressed)
 
-    def getFileContents(self, pathId, compressed = False):
+    def getFileContents(self, pathId, fileId, compressed = False):
         assert(not compressed)
 	if self.fileContents.has_key(pathId):
 	    cont = self.fileContents[pathId]
@@ -499,7 +499,8 @@ class ChangeSet(streams.StreamSet):
 		if origFile.flags.isConfig() and newFile.flags.isConfig() and \
                         (origFile.contents.sha1() != newFile.contents.sha1()):
                     if self.configFileIsDiff(newFile.pathId()):
-                        (contType, cont) = self.getFileContents(newFile.pathId())
+                        (contType, cont) = self.getFileContents(
+                                    newFile.pathId(), newFileId)
 			f = cont.get()
 			diff = "".join(patch.reverse(f.readlines()))
 			f.seek(0)
@@ -804,7 +805,7 @@ class ReadOnlyChangeSet(ChangeSet):
 
         return rc
 
-    def getFileContents(self, pathId, compressed = False):
+    def getFileContents(self, pathId, fileId, compressed = False):
         name = None
 	if self.configCache.has_key(pathId):
             assert(not compressed)
@@ -908,7 +909,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 if files.contentsChanged(filecs):
                     if fileObj.flags.isConfig():
                         # config files aren't available compressed
-                        (contType, cont) = self.getFileContents(pathId)
+                        (contType, cont) = self.getFileContents(
+                                     pathId, newFileId)
                         if contType == ChangedFileTypes.diff:
                             origCont = repos.getFileContents([(oldFileId, 
                                                                oldVersion)])[0]
@@ -927,7 +929,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                                                   cont, True)
                     else:
                         (contType, cont) = self.getFileContents(pathId,
-                                                        compressed = True)
+                                                newFileId, compressed = True)
                         assert(contType == ChangedFileTypes.file)
                         absCs.addFileContents(pathId, newFileId,
                                               ChangedFileTypes.file,
