@@ -13,7 +13,6 @@
 #
 
 mirror_files =	\
-                autosource \
                 cpan \
                 cran \
                 debian \
