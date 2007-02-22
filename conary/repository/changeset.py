@@ -218,7 +218,7 @@ class ChangeSet(streams.StreamSet):
     def getOldTroveList(self):
 	return self.oldTroves
 
-    def configFileIsDiff(self, pathId):
+    def configFileIsDiff(self, pathId, fileId):
         (tag, cont, compressed) = self.configCache.get(pathId, (None, None, None))
         return tag == ChangedFileTypes.diff
 
@@ -498,7 +498,7 @@ class ChangeSet(streams.StreamSet):
 		# a diff rather then saving the full contents
 		if origFile.flags.isConfig() and newFile.flags.isConfig() and \
                         (origFile.contents.sha1() != newFile.contents.sha1()):
-                    if self.configFileIsDiff(newFile.pathId()):
+                    if self.configFileIsDiff(newFile.pathId(), newFileId):
                         (contType, cont) = self.getFileContents(
                                     newFile.pathId(), newFileId)
 			f = cont.get()
@@ -781,7 +781,7 @@ class ReadOnlyChangeSet(ChangeSet):
 
     fileQueueCmp = staticmethod(fileQueueCmp)
 
-    def configFileIsDiff(self, pathId):
+    def configFileIsDiff(self, pathId, fileId):
         (tag, cont, compressed) = self.configCache.get(pathId, 
                                                        (None, None, None))
         return tag == ChangedFileTypes.diff

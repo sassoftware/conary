@@ -523,7 +523,7 @@ class ChangeSetJob:
         for (pathId, newFileId, sha1, oldPath, oldfile, troveName,
              oldTroveVersion, troveFlavor, newVersion, newFileId, oldVersion,
              oldFileId, restoreContents) in configRestoreList:
-            if cs.configFileIsDiff(pathId):
+            if cs.configFileIsDiff(pathId, newFileId):
                 (contType, fileContents) = cs.getFileContents(pathId, newFileId)
 
 		# the content for this file is in the form of a
