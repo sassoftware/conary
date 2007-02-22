@@ -1061,13 +1061,23 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                                         self.fileQueueCmp)
 
         next = self._nextFile()
+        correction = 0
         while next:
             name, tagInfo, f, otherCsf = next
-            csf.addFile(name, filecontents.FromFile(f), tagInfo,
-                        precompressed = True)
+
+            if tagInfo[2:] == ChangedFileTypes.refr[4:]:
+                path = f.read()
+                realSize = os.stat(path).st_size
+                correction += realSize - len(path)
+                f.seek(0)
+                contents = filecontents.FromString(path)
+            else:
+                contents = filecontents.FromFile(f)
+
+            csf.addFile(name, contents, tagInfo, precompressed = True)
             next = self._nextFile()
 
-        return 0
+        return correction
 
     def _mergeConfigs(self, otherCs):
         for pathId, f in otherCs.configCache.iteritems():
