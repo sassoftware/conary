@@ -94,6 +94,9 @@ Changes in 1.1.17:
       frozen stream of the newer object. Unknown elements are preserved
       through merges into old object as long as the old object has not
       been locally modified.
+    * UpdateJob objects are now versioned for a specific state of the Conary
+      database, and can only be applied if the state of the database has not
+      changed. (CNY-1300)
 
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to
