@@ -20,7 +20,9 @@ Changes in 1.1.17:
       invalidation features, new Conary repository methods have been
       introduced.  This means that the Conary proxy requires that
       repositories it connects to run Conary version 1.1.17 or later.
-      The Conary proxy is considered experimental
+      The Conary proxy is considered experimental.  Therefore future
+      versions of Conary may not be able to communicate with the proxy
+      as implemented in Conary 1.1.17.
 
   o Client Changes:
     * Filesystem permissions on rollback data restrict access to the
