@@ -456,6 +456,9 @@ def getServer():
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     # start the logging
+    if 'migrate' in argSet:
+        # make sure the migration progress is visible
+        cfg.traceLog = (3, "stderr")
     if 'add-user' not in argSet and 'analyze' not in argSet:
         (l, f) = (3, "stderr")
         if cfg.traceLog:
