@@ -184,6 +184,24 @@ def createDataStore(db):
     db.commit()
     db.loadSchema()
 
+def createDatabaseAttributes(db):
+    if "DatabaseAttributes" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE DatabaseAttributes(
+        id      %(PRIMARYKEY)s,
+        name    STRING,
+        value   STRING
+    )
+    """ % db.keywords)
+    cu.execute("CREATE UNIQUE INDEX DatabaseAttributesNameIdx "
+               "ON DatabaseAttributes(name)")
+    cu.execute("INSERT INTO DatabaseAttributes (name, value) "
+               "VALUES ('transaction counter', '0')")
+    db.commit()
+    db.loadSchema()
+
 def createDepTable(db, cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
@@ -371,6 +389,7 @@ def createSchema(db):
     createDependencies(db)
     createTroveInfo(db)
     createDataStore(db)
+    createDatabaseAttributes(db)
 
 # SCHEMA Migration
 
@@ -835,6 +854,8 @@ class MigrateTo_20(SchemaMigration):
 # index, so there is no need to do a full blown migration and stop
 # conary from working until a schema migration is done
 def optSchemaUpdate(db):
+    # Create DatabaseAttributes (if it doesn't exist yet)
+    createDatabaseAttributes(db)
     #do we have the index we need?
     if "TroveInfoInstTypeIdx" in db.tables["TroveInfo"]:
         return

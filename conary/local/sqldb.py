@@ -1937,6 +1937,52 @@ order by
 
         return [ x[0] for x in cu ]
 
+    def _getTransactionCounter(self, field):
+        """Get transaction counter
+        Return (Boolean, value) with boolean being True if the counter was
+        found in the table"""
+        cu = self.db.cursor()
+        cu.execute("SELECT value FROM DatabaseAttributes WHERE name = ?",
+                   field)
+        try:
+            row = cu.next()
+            counter = row[0]
+        except StopIteration:
+            return False, 0
+
+        try:
+            counter = int(counter)
+        except ValueError:
+            return True, 0
+
+        return True, counter
+
+    def getTransactionCounter(self):
+        """Get transaction counter"""
+        field = "transaction counter"
+        return self._getTransactionCounter(field)[1]
+
+    def incrementTransactionCounter(self):
+        """Increment the transaction counter.
+        To work reliably, you should already have the database locked, you
+        don't want the read and update to be interrupted by another update"""
+
+        field = "transaction counter"
+
+        exists, counter = self._getTransactionCounter(field)
+
+        cu = self.db.cursor()
+        if not exists:
+            # Row is not in the table
+            cu.execute("INSERT INTO DatabaseAttributes (name, value) "
+                       "VALUES (?, ?)", field, '1')
+            return 1
+
+        counter += 1
+        cu.execute("UPDATE DatabaseAttributes SET value = ? WHERE name = ?",
+                   str(counter), field)
+        return counter
+
     def close(self):
 	self.db.close()
 

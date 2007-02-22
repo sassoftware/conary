@@ -138,6 +138,12 @@ class UpdateJob:
     def getCriticalJobs(self):
         return self.criticalJobs
 
+    def setTransactionCounter(self, transactionCounter):
+        self.transactionCounter = transactionCounter
+
+    def getTransactionCounter(self):
+        return self.transactionCounter
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -147,6 +153,7 @@ class UpdateJob:
         self.criticalJobs = []
 
         self.searchSource = searchSource
+        self.transactionCounter = None
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
@@ -311,6 +318,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def getFileVersions(self, l, allowMissingFiles=False):
 	return self.db.iterFiles(l)
 
+    def getTransactionCounter(self):
+        return self.db.getTransactionCounter()
+
     def findUnreferencedTroves(self):
         return self.db.findUnreferencedTroves()
 
@@ -327,13 +337,16 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version,
                        fileStream = None, isPresent = True):
+        self._updateTransactionCounter = True
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version,
                         fileStream = fileStream, isPresent = isPresent)
 
     def addTrove(self, trove, pin = False):
+        self._updateTransactionCounter = True
 	return self.db.addTrove(trove, pin = pin)
 
     def addTroveDone(self, troveInfo):
+        self._updateTransactionCounter = True
         return self.db.addTroveDone(troveInfo)
 
     def pinTroves(self, troveList, pin):
@@ -345,18 +358,28 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
                                   subTrove.getVersion(),
                                   subTrove.getFlavor(), pin = pin)
 
-        self.db.commit()
+        if troves:
+            self._updateTransactionCounter = True
+        self.commit()
 
     def trovesArePinned(self, troveList):
         return self.db.trovesArePinned(troveList)
 
     def commit(self):
+        # At this point we should already have a write lock on the database, 
+        # we can safely increment the transaction count
+        # This works as long as the underlying database has only
+        # database-level locking. If table locking or row locking are
+        # available, we need a different technique
+        if self._updateTransactionCounter:
+            self.db.incrementTransactionCounter()
 	self.db.commit()
 
     def close(self):
 	self.db.close()
 
     def eraseTrove(self, troveName, version, flavor):
+        self._updateTransactionCounter = True
 	self.db.eraseTrove(troveName, version, flavor)
 
     def pathIsOwned(self, path):
@@ -392,6 +415,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         self._db = None
         repository.AbstractRepository.__init__(self)
         trovesource.SearchableTroveSource.__init__(self)
+        self._updateTransactionCounter = False
 
 class Database(SqlDbRepository):
 
@@ -816,6 +840,7 @@ class Database(SqlDbRepository):
                        deps.formatFlavor(flavor))
 
         callback.committingTransaction()
+        self._updateTransactionCounter = True
 	self.commit()
 
     def removeFiles(self, pathList):
@@ -892,7 +917,8 @@ class Database(SqlDbRepository):
             self.removeRollback("r." + rb.dir.split("/")[-1])
             raise
 
-        self.db.commit()
+        self._updateTransactionCounter = True
+        self.commit()
 
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))

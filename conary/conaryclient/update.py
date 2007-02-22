@@ -2558,6 +2558,7 @@ conary erase '%s=%s[%s]'
             uJob.addJob(newJob)
         uJob.setCriticalJobs(finalCriticalJobs)
 
+        uJob.setTransactionCounter(self.db.getTransactionCounter())
         return (uJob, suggMap)
 
     def _validateJob(self, jobSet):
@@ -2584,6 +2585,12 @@ conary erase '%s=%s[%s]'
                     callback = None, localRollbacks = False,
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
+
+        if uJob.getTransactionCounter() != self.db.getTransactionCounter():
+            # Normally, this should not happen, unless someone froze the
+            # update job and are trying to reapply it after the state of the
+            # database has changed
+            raise InternalConaryError("Stale update job")
 
         # To go away eventually
         if callback:
