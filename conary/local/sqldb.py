@@ -1941,6 +1941,13 @@ order by
         """Get transaction counter
         Return (Boolean, value) with boolean being True if the counter was
         found in the table"""
+        if 'DatabaseAttributes' not in self.db.tables:
+            # We should already have converted the schema to have the table in
+            # place. This may mean an update code path run with --info as
+            # non-root (or owner of the schema)
+            # incrementTransactionCounter should fail though.
+            return False, 0
+
         cu = self.db.cursor()
         cu.execute("SELECT value FROM DatabaseAttributes WHERE name = ?",
                    field)
