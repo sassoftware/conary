@@ -1,9 +1,13 @@
+Changes in @NEW@:
+  o Build Changes
+    * A list of rPath mirrors for source components has been added.
+
 Changes in 1.1.17:
   o New Feature:
     * A caching proxy has been implemented for Conary.  A proxy server
       caches changesets as clients request them.  This can
       dramatically improve the performance of Conary when a subsequent
-      request is made for the same changeset. 
+      request is made for the same changeset.
 
       The server is implemented using the existing standalone and
       Apache-based Conary repository server modules. Two new Conary
@@ -15,6 +19,14 @@ Changes in 1.1.17:
       configuration variable has been added to the conaryrc file.
       Generic HTTP proxies should still be configured using the
       "http_proxy" environment variable.
+
+      In order to facilitate authentication and proxy cache
+      invalidation features, new Conary repository methods have been
+      introduced.  This means that the Conary proxy requires that
+      repositories it connects to run Conary version 1.1.17 or later.
+      The Conary proxy is considered experimental.  Therefore future
+      versions of Conary may not be able to communicate with the proxy
+      as implemented in Conary 1.1.17.
 
   o Client Changes:
     * Filesystem permissions on rollback data restrict access to the
@@ -46,7 +58,6 @@ Changes in 1.1.17:
     * Repeated shadow merges now fail with an error suggesting a
       commit.  Previously, the merge operation would be attempted
       again. (CNY-1278)
-    * A list of rPath mirrors for source components has been added.
 
   o Server Changes:
     * Conary repositories no longer allow users or groups to be

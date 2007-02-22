@@ -253,19 +253,10 @@ class CacheSet:
 
         self.db.commit()
 
-    def __cleanCache(self, cu = None):
-        if cu is None:
-            cu = self.db.cursor()
-        cu.execute("SELECT row from CacheContents")
-        for (row,) in cu:
-            fn = self.filePattern % (self.tmpDir, row)
-            util.removeIfExists(fn)
-
     @retry
     def __cleanDatabase(self, cu = None):
         global CACHE_SCHEMA_VERSION
         if self.db.version != CACHE_SCHEMA_VERSION:
-            self.__cleanCache(cu)
             if cu is None:
                 cu = self.db.cursor()
             for t in self.db.tables:
