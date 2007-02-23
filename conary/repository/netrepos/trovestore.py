@@ -1148,26 +1148,36 @@ class TroveStore:
     def markTroveRemoved(self, name, version, flavor):
         return self._removeTrove(name, version, flavor, markOnly = True)
 
-    def getParentTroves(self, name, versionStr, flavorStr):
+    def getParentTroves(self, troveList):
         cu = self.db.cursor()
+        schema.resetTable(cu, "gtl")
+        schema.resetTable(cu, "gtlInst")
+        for (n,v,f) in troveList:
+            cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
+                       (n,v,f), start_transaction=False)
+        # get the instanceIds of the parents of what we can find
+        cu.execute("""
+        insert into gtlInst(instanceId)
+        select distinct TroveTroves.instanceId
+        from gtl
+        join Items on gtl.name = Items.item
+        join Versions on gtl.version = Versions.version
+        join Flavors on gtl.flavor = Flavors.flavor
+        join Instances on
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        join TroveTroves on TroveTroves.includedId = Instances.instanceId
+        """)
+        # gtlInst now has instanceIds of the parents
         cu.execute("""
         select Items.item, Versions.version, Flavors.flavor
-        from TroveTroves
-        join Instances as Included on TroveTroves.includedId = Included.instanceId
-        join Items as IncludedItems on
-            Included.itemId = IncludedItems.itemId
-        join Versions as IncludedVersions on
-            Included.versionId = IncludedVersions.versionId
-        join Flavors as IncludedFlavors on
-            Included.flavorId = IncludedFlavors.flavorId
-        join Instances on TroveTroves.instanceId = Instances.instanceId
+        from gtlInst
+        join Instances on gtlInst.instanceId = Instances.instanceId
         join Items on Instances.itemId = Items.itemId
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
-        where IncludedItems.item=?
-          and IncludedVersions.version=?
-          and IncludedFlavors.flavor=?
-        """, (name, versionStr, flavorStr))
+        """)
         return cu.fetchall()
 
     def commit(self):

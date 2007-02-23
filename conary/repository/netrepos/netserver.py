@@ -2688,11 +2688,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 (n,v,f),s = infoList[i]
                 invList.append((n,v,f))
         self.log(3, "updated signatures for", len(inserts+updates), "troves")
-        # cache invalidation of the troves takes a long time. Because
-        # the cache database is separate, it doesn't make much sense
-        # to hold the locks on the repository database while the cache
-        # does its thing. Therefore the commit here - gafton
-        self.db.commit()
         if len(invList):
             self.cache.invalidateEntries(self.repos, invList)
         self.log(3, "invalidated cache for", len(invList), "troves")

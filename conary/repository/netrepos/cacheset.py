@@ -273,7 +273,7 @@ class CacheSet:
         """
         invList = [ (name, version.asString(), flavor.freeze()) ]
         if repos is not None:
-            invList.extend(repos.getParentTroves(*invList[0]))
+            invList.extend(repos.getParentTroves(invList))
         return self.__invalidateRows(invList)
 
     @retry
@@ -282,12 +282,9 @@ class CacheSet:
         invalidates (and deletes) any cached changeset that match
         the given list of (name, version, flavor) tuples
         """
-        invSet = set()
-        # FIXME: a batched query using temp tables for all the
-        # getTroveParents calls will probably save a bit of time
-        for (n,v,f) in set(troveList):
-            invSet.add((n,v,f))
-            ret = repos.getParentTroves(n,v,f)
+        invSet = set(troveList)
+        if repos is not None:
+            ret = repos.getParentTroves(invSet)
             invSet.update(set(ret))
         return self.__invalidateRows(invSet)
 
