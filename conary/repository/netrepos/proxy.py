@@ -52,7 +52,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         self.log(1, "proxy url=%s" % basicUrl)
         self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
                                        self.cfg.deadlockRetry)
-
+        util.mkdirChain(self.cfg.proxyContentsDir)
         self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
