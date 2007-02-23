@@ -321,12 +321,14 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
 
     updateCount = 0
     if sigList:
+        log.debug("downloading %d signatures from source repository", len(sigList))
         sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
         # build the ((n,v,f), signature) list only for the troves that have signatures
         sigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
         if test:
             log.debug("not mirroring %d signatures due to test mode", len(sigs))
         else:
+            log.debug("uploading %d unique signatures to target repository", len(sigs))
             updateCount = targetRepos.setTroveSigs(sigs)
 
     return updateCount
