@@ -41,6 +41,9 @@ class NullCacheSet:
     def invalidateEntry(self, repos, name, version, flavor):
         pass
 
+    def invalidateEntries(self, repos, troveList):
+        pass
+
 def retry(fn):
     """Decorator to retry database operations if the database is locked"""
     def wrap(*args, **kwargs):
