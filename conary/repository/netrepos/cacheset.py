@@ -214,19 +214,9 @@ class CacheSet:
 
         return (row, path)
 
-    @retry
-    def invalidateEntry(self, repos, name, version, flavor):
-        """
-        invalidates (and deletes) any cached changeset that matches
-        the given name, version, flavor.
-        """
-        invList = [ (name, version.asString(), flavor.freeze()) ]
-        if repos is not None:
-            invList.extend(repos.getParentTroves(name, version, flavor))
-
+    def __invalidateRows(self, invList):
         # start a transaction to retain a consistent state
         cu = self.db.transaction()
-
         # for speed reasons we use these local functions to avoid
         # repeated freeze/thaws. These functions also cache negative
         # responses to minimize database roundtrips
@@ -273,6 +263,33 @@ class CacheSet:
             # gafton suggested hard linking the files for consumption to
             # allow this remove
         self.db.commit()
+        return
+
+    @retry
+    def invalidateEntry(self, repos, name, version, flavor):
+        """
+        invalidates (and deletes) any cached changeset that matches
+        the given name, version, flavor.
+        """
+        invList = [ (name, version.asString(), flavor.freeze()) ]
+        if repos is not None:
+            invList.extend(repos.getParentTroves(*invList[0]))
+        return self.__invalidateRows(invList)
+
+    @retry
+    def invalidateEntries(self, repos, troveList):
+        """
+        invalidates (and deletes) any cached changeset that match
+        the given list of (name, version, flavor) tuples
+        """
+        invSet = set()
+        # FIXME: a batched query using temp tables for all the
+        # getTroveParents calls will probably save a bit of time
+        for (n,v,f) in set(troveList):
+            invSet.add((n,v,f))
+            ret = repos.getParentTroves(n,v,f)
+            invSet.update(set(ret))
+        return self.__invalidateRows(invSet)
 
     def __cleanCache(self, cu = None):
         if cu is None:
