@@ -876,11 +876,12 @@ class MigrateTo_15(SchemaMigration):
         cu.execute("insert into tmpDupPath (instanceId, path) "
                    "select instanceId, path from TroveFiles")
         logMe(2, "looking for troves with duplicate paths...")
-        cu.execute("""insert into tmpDups (counter, instanceId, path)
+        cu.execute("""
+        insert into tmpDups (counter, instanceId, path)
         select count(*) as c, instanceId, path
         from tmpDupPath
         group by instanceId, path
-        having c > 1""")
+        having count(*) > 1""")
         counter = cu.execute("select count(*) from tmpDups").fetchall()[0][0]
         logMe(3, "detected %d duplicates" % (counter,))
         # loop over every duplicate and apply the appropiate fix

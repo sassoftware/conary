@@ -1148,26 +1148,37 @@ class TroveStore:
     def markTroveRemoved(self, name, version, flavor):
         return self._removeTrove(name, version, flavor, markOnly = True)
 
-    def getParentTroves(self, name, version, flavor):
+    def getParentTroves(self, troveList):
         cu = self.db.cursor()
+        schema.resetTable(cu, "gtl")
+        schema.resetTable(cu, "gtlInst")
+        for (n,v,f) in troveList:
+            cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
+                       (n,v,f), start_transaction=False)
+        # get the instanceIds of the parents of what we can find
         cu.execute("""
-            SELECT item, version, flavor FROM TroveTroves
-                JOIN Instances USING (instanceId)
-                JOIN Items ON Instances.itemId = Items.itemId
-                JOIN Versions ON Instances.versionId = Versions.versionId
-                JOIN Flavors ON Instances.flavorId = Flavors.flavorId
-            WHERE includedId =
-                (SELECT instanceId FROM Instances WHERE
-                    itemId = (SELECT itemId FROM Items WHERE item=?) AND
-                    versionId = (SELECT versionId FROM Versions
-                                 WHERE version=?) AND
-                    flavorId = (SELECT flavorId FROM Flavors
-                                WHERE flavor=?)
-                )
-        """, name, version.asString(), flavor.freeze())
-
-        return [ (x[0], versions.VersionFromString(x[1]),
-                  deps.ThawFlavor(x[2])) for x in cu ]
+        insert into gtlInst(instanceId)
+        select distinct TroveTroves.instanceId
+        from gtl
+        join Items on gtl.name = Items.item
+        join Versions on gtl.version = Versions.version
+        join Flavors on gtl.flavor = Flavors.flavor
+        join Instances on
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        join TroveTroves on TroveTroves.includedId = Instances.instanceId
+        """)
+        # gtlInst now has instanceIds of the parents
+        cu.execute("""
+        select Items.item, Versions.version, Flavors.flavor
+        from gtlInst
+        join Instances on gtlInst.instanceId = Instances.instanceId
+        join Items on Instances.itemId = Items.itemId
+        join Versions on Instances.versionId = Versions.versionId
+        join Flavors on Instances.flavorId = Flavors.flavorId
+        """)
+        return cu.fetchall()
 
     def commit(self):
 	if self.needsCleanup:

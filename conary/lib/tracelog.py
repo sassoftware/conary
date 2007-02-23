@@ -102,7 +102,7 @@ class FileLog(NullLog):
         if self.level > 3:
             return ret
         # otherwise, of this takes too much space, just print it's length
-        if type(val) in set([list,tuple,dict]) and len(ret) > MaxArgLen:
+        if type(val) in set([list,tuple,dict,set]) and len(ret) > MaxArgLen:
             if len(val) > 1:
                 ret = "len(%s)=%d" % (type(val), len(val))
         return ret

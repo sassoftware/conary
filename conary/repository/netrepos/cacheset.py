@@ -205,7 +205,7 @@ class CacheSet:
             row = cu.lastrowid
             path = self.filePattern % (self.tmpDir, row)
 
-            self.db.commit()   
+            self.db.commit()
         except:
             # something went wrong.  make sure that we roll
             # back any pending change
@@ -214,44 +214,79 @@ class CacheSet:
 
         return (row, path)
 
+    def __invalidateRows(self, invList):
+        # start a transaction to retain a consistent state
+        cu = self.db.transaction()
+        # for speed reasons we use these local functions to avoid
+        # repeated freeze/thaws. These functions also cache negative
+        # responses to minimize database roundtrips
+        _flavCache = {}
+        def _getFlavor(cu, frozenFlavor):
+            ret = _flavCache.get(frozenFlavor, False)
+            if ret is not False:
+                return ret
+            cu.execute("select flavorId from Flavors where flavor=?",
+                       frozenFlavor)
+            ret = cu.fetchall()
+            if not ret:
+                ret = None
+            else:
+                ret = ret[0][0]
+            _flavCache[frozenFlavor] = ret
+            return ret
+        _verCache = {}
+        def _getVersion(cu, frozenVersion):
+            ret = _verCache.get(frozenVersion, False)
+            if ret is not False:
+                return ret
+            cu.execute("select versionId from Versions where version=?",
+                       frozenVersion)
+            ret = cu.fetchall()
+            if not ret:
+                ret = None
+            else:
+                ret = ret[0][0]
+            _verCache[frozenVersion] = ret
+            return ret
+        for name, version, flavor in invList:
+            flavorId = _getFlavor(cu, flavor)
+            versionId = _getVersion(cu, version)
+            if flavorId is None or versionId is None:
+                # this should not happen, but we'll handle it anyway
+                continue
+            cu.execute("""
+            delete from CacheContents
+            WHERE troveName=? AND newFlavorId=? AND newVersionId=?
+            """, (name, flavorId, versionId))
+            # unlinks are tempting here, but it's possible that
+            # some outstanding request still references these files.
+            # gafton suggested hard linking the files for consumption to
+            # allow this remove
+        self.db.commit()
+        return
+
     @retry
     def invalidateEntry(self, repos, name, version, flavor):
         """
         invalidates (and deletes) any cached changeset that matches
         the given name, version, flavor.
         """
-        invList = [ (name, version, flavor) ]
+        invList = [ (name, version.asString(), flavor.freeze()) ]
         if repos is not None:
-            invList.extend(repos.getParentTroves(name, version, flavor))
+            invList.extend(repos.getParentTroves(invList))
+        return self.__invalidateRows(invList)
 
-        # start a transaction to retain a consistent state
-        cu = self.db.transaction()
-
-        for name, version, flavor in invList:
-            flavorId = self.flavors.get(flavor, None)
-            versionId = self.versions.get(version, None)
-
-            if flavorId is None or versionId is None:
-                # this should not happen, but we'll handle it anyway
-                return
-
-            cu.execute("""
-            SELECT row, returnValue, size
-            FROM CacheContents
-            WHERE troveName=? AND newFlavorId=? AND newVersionId=?
-            """, (name, flavorId, versionId))
-
-            # delete all matching entries from the db and the file system
-            for (row, returnVal, size) in cu.fetchall():
-                cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-                # unlink(path) is tempting here, but it's possible that
-                # some outstanding request still references it. gafton
-                # suggested hard linking the files for consumption to
-                # allow this remove
-                # path = self.filePattern % (self.tmpDir, row)
-                # util.removeIfExists(path)
-
-        self.db.commit()
+    @retry
+    def invalidateEntries(self, repos, troveList):
+        """
+        invalidates (and deletes) any cached changeset that match
+        the given list of (name, version, flavor) tuples
+        """
+        invSet = set(troveList)
+        if repos is not None:
+            ret = repos.getParentTroves(invSet)
+            invSet.update(set(ret))
+        return self.__invalidateRows(invSet)
 
     @retry
     def __cleanDatabase(self, cu = None):

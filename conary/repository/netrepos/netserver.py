@@ -2599,7 +2599,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def setTroveSigs(self, authToken, clientVersion, infoList):
         # return the number of signatures which have changed
-
         self.log(2, infoList)
         # this requires mirror access and write access for that trove
         if not self.auth.check(authToken, mirror=True):
@@ -2670,6 +2669,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             elif sig != sigList[i]:
                 # it has changed
                 updates.append((i, instanceId, sigList[i]))
+        invList = []
         if len(inserts):
             cu.executemany("insert into TroveInfo (instanceId, infoType, data) "
                            "values (?,?,?) ",
@@ -2677,8 +2677,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             for i, instanceId, sig in inserts])
             for i, instanceId, sig in inserts:
                 (n,v,f),s = infoList[i]
-                self.cache.invalidateEntry(
-                    self.repos, n, self.toVersion(v), self.toFlavor(f))
+                invList.append((n,v,f))
         if len(updates):
             # SQL update does not executemany() very well
             for i, instanceId, sig in updates:
@@ -2687,8 +2686,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 WHERE infoType = ? AND instanceId = ?
                 """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
                 (n,v,f),s = infoList[i]
-                self.cache.invalidateEntry(
-                    self.repos, n, self.toVersion(v), self.toFlavor(f))
+                invList.append((n,v,f))
+        self.log(3, "updated signatures for", len(inserts+updates), "troves")
+        if len(invList):
+            self.cache.invalidateEntries(self.repos, invList)
+        self.log(3, "invalidated cache for", len(invList), "troves")
         return len(inserts) + len(updates)
 
     @accessReadOnly
