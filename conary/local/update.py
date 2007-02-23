@@ -333,9 +333,9 @@ class FilesystemJob:
 
 	contents = None
 	# restore in the same order files appear in the change set (which
-        # is sorted by pathId
-        # pathId, fileObj, targetPath, contentsOverride, msg
-        restores = [ (x[1][0], x[1][1], x[0], x[1][2], x[1][3], x[1][5]) for x
+        # is sorted by pathId,fileId combos
+        # pathId, fileId, fileObj, targetPath, contentsOverride, msg
+        restores = [ (x[1][0], x[1][5], x[1][1], x[0], x[1][2], x[1][3]) for x
                             in self.restores.iteritems() ]
 
         restores.sort()
@@ -382,7 +382,7 @@ class FilesystemJob:
         restoreIndex = 0
         j = 0
         while restoreIndex < len(restores):
-            (pathId, fileObj, target, override, msg, fileId) = \
+            (pathId, fileId, fileObj, target, override, msg) = \
                                                 restores[restoreIndex]
             restoreIndex += 1
 

@@ -34,7 +34,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         fileList = []
         linkGroups = {}
         linkGroupFirstPath = {}
-        # sort the files by pathId
+        # sort the files by pathId,fileId
         for trvCs in self.cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
 
@@ -46,11 +46,11 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
             for pathId, path, fileId, version in trv.iterFileList():
                 if path != self.macros.buildlogpath:
-                    fileList.append((pathId, path, fileId, name))
+                    fileList.append((pathId, fileId, path, name))
 
         fileList.sort()
 
-        for pathId, path, fileId, troveName in fileList:
+        for pathId, fileId, path, troveName in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
 

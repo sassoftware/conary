@@ -248,7 +248,8 @@ use cvc co %s=<branch> for the following branches:
 	    fileObj.restore(None, '/', fullPath, nameLookup=False)
 	else:
 	    # tracking the pathId separately from the fileObj lets
-	    # us sort the list of files by fileid
+	    # us sort the list of files by pathId,fileId (which is how
+            # changesets are ordered)
 	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
 		earlyRestore.append((pathId, fileId, fileObj, '/', fullPath))
