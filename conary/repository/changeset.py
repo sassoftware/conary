@@ -43,6 +43,12 @@ _FILEINFO_CSINFO    = 3
 SMALL = streams.SMALL
 LARGE = streams.LARGE
 
+def makeKey(pathId, fileId):
+    return pathId + fileId
+
+def parseKey(key):
+    return key[0:16], key[16:]
+
 class FileInfo(streams.StreamSet):
 
     streamDict = {
@@ -219,23 +225,29 @@ class ChangeSet(streams.StreamSet):
 	return self.oldTroves
 
     def configFileIsDiff(self, pathId, fileId):
-        (tag, cont, compressed) = self.configCache.get(pathId, (None, None, None))
+        key = makeKey(pathId, fileId)
+        (tag, cont, compressed) = self.configCache.get(key, (None, None, None))
+        if tag is None:
+            (tag, cont, compressed) = self.configCache.get(pathId,
+                                                           (None, None, None))
         return tag == ChangedFileTypes.diff
 
     def addFileContents(self, pathId, fileId, contType, contents, cfgFile,
                         compressed = False):
+        key = makeKey(pathId, fileId)
 	if cfgFile:
             assert(not compressed)
-	    self.configCache[pathId] = (contType, contents, compressed)
+	    self.configCache[key] = (contType, contents, compressed)
 	else:
-	    self.fileContents[pathId] = (contType, contents, compressed)
+	    self.fileContents[key] = (contType, contents, compressed)
 
     def getFileContents(self, pathId, fileId, compressed = False):
         assert(not compressed)
-	if self.fileContents.has_key(pathId):
-	    cont = self.fileContents[pathId]
+        key = makeKey(pathId, fileId)
+	if self.fileContents.has_key(key):
+	    cont = self.fileContents[key]
 	else:
-	    cont = self.configCache[pathId]
+	    cont = self.configCache[key]
 
         # this shouldn't be done on precompressed contents
         assert(not cont[2])
@@ -781,11 +793,6 @@ class ReadOnlyChangeSet(ChangeSet):
 
     fileQueueCmp = staticmethod(fileQueueCmp)
 
-    def configFileIsDiff(self, pathId, fileId):
-        (tag, cont, compressed) = self.configCache.get(pathId, 
-                                                       (None, None, None))
-        return tag == ChangedFileTypes.diff
-
     def _nextFile(self):
         if self.lastCsf:
             next = self.lastCsf.getNextFile()
@@ -806,10 +813,16 @@ class ReadOnlyChangeSet(ChangeSet):
 
     def getFileContents(self, pathId, fileId, compressed = False):
         name = None
+        key = makeKey(pathId, fileId)
 	if self.configCache.has_key(pathId):
             assert(not compressed)
             name = pathId
 	    (tag, contents, compressed) = self.configCache[pathId]
+            cont = contents
+	elif self.configCache.has_key(key):
+            assert(not compressed)
+            name = key
+	    (tag, contents, compressed) = self.configCache[key]
 
             cont = contents
 	else:
@@ -821,21 +834,24 @@ class ReadOnlyChangeSet(ChangeSet):
                 if not compressed:
                     f = gzip.GzipFile(None, "r", fileobj = f)
                 
-                # if we found the pathId we're looking for, or the pathId
+                # if we found the key we're looking for, or the pathId
                 # we got is a config file, cache or break out of the loop
                 # accordingly
-                if name == pathId or tagInfo[0] == '1':
+                #
+                # we check for both the key and the pathId here for backwards
+                # compatibility reading old change set formats
+                if name == key or name == pathId or tagInfo[0] == '1':
                     tag = 'cft-' + tagInfo.split()[1]
                     cont = filecontents.FromFile(f)
 
                     # we found the one we're looking for, break out
-                    if name == pathId:
+                    if name == key or name == pathId:
                         self.lastCsf = csf
                         break
 
                 rc = self._nextFile()
 
-        if name != pathId:
+        if name != key and name != pathId:
             raise KeyError, 'pathId %s is not in the changeset' % \
                             sha1helper.md5ToString(pathId)
         else:
@@ -1026,17 +1042,17 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         assert(not withReferences)
         self.filesRead = True
 
-        idList = self.configCache.keys()
-        idList.sort()
+        keyList = self.configCache.keys()
+        keyList.sort()
 
         # write out the diffs. these are always in the cache
-        for pathId in idList:
-            (tag, contents, compressed) = self.configCache[pathId]
+        for key in keyList:
+            (tag, contents, compressed) = self.configCache[key]
             if isinstance(contents, str):
                 contents = filecontents.FromString(contents)
 
             if tag == ChangedFileTypes.diff:
-                csf.addFile(pathId, contents, "1 " + tag[4:])
+                csf.addFile(key, contents, "1 " + tag[4:])
 
         # Absolute change sets will have other contents which may or may
         # not be cached. For the ones which are cached, turn them into a
@@ -1046,10 +1062,10 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         # make in self.fileQueue since you can't write a changeset multiple
         # times anyway.
         allContents = {}
-        for pathId in idList:
-            (tag, contents, compressed) = self.configCache[pathId]
+        for key in keyList:
+            (tag, contents, compressed) = self.configCache[key]
             if tag == ChangedFileTypes.file:
-                allContents[pathId] = (ChangedFileTypes.file, contents, False)
+                allContents[key] = (ChangedFileTypes.file, contents, False)
 
         wrapper = DictAsCsf({})
         wrapper.addConfigs(allContents)
@@ -1080,11 +1096,11 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         return correction
 
     def _mergeConfigs(self, otherCs):
-        for pathId, f in otherCs.configCache.iteritems():
-            if not self.configCache.has_key(pathId):
-                self.configCache[pathId] = f
-            if self.configCache[pathId] != f:
-                raise PathIdsConflictError(pathId)
+        for key, f in otherCs.configCache.iteritems():
+            if not self.configCache.has_key(key):
+                self.configCache[key] = f
+            if self.configCache[key] != f:
+                raise PathIdsConflictError(key)
 
     def _mergeReadOnly(self, otherCs):
         assert(not self.lastCsf)
@@ -1222,7 +1238,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         # load the diff cache
         nextFile = csf.getNextFile()
         while nextFile:
-            name, tagInfo, f = nextFile
+            key, tagInfo, f = nextFile
 
             (isConfig, tag) = tagInfo.split()
             tag = 'cft-' + tag
@@ -1239,7 +1255,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                 break
 
             cont = filecontents.FromFile(gzip.GzipFile(None, 'r', fileobj = f))
-            self.configCache[name] = (tag, cont, False)
+            self.configCache[key] = (tag, cont, False)
 
             nextFile = csf.getNextFile()
 

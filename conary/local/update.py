@@ -335,7 +335,7 @@ class FilesystemJob:
 	# restore in the same order files appear in the change set (which
         # is sorted by pathId
         # pathId, fileObj, targetPath, contentsOverride, msg
-        restores = [ (x[1][0], x[1][1], x[0], x[1][2], x[1][3], x[1][4]) for x
+        restores = [ (x[1][0], x[1][1], x[0], x[1][2], x[1][3], x[1][5]) for x
                             in self.restores.iteritems() ]
 
         restores.sort()

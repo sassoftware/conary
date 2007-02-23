@@ -559,7 +559,7 @@ class ChangeSetJob:
         # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()
         ptrRestores = []
-        for (pathId, fileID, sha1, version, restoreContents) in \
+        for (pathId, fileId, sha1, version, restoreContents) in \
                                                     normalRestoreList:
             try:
                 (contType, fileContents) = cs.getFileContents(pathId, fileId,
