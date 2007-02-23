@@ -1148,7 +1148,7 @@ class TroveStore:
     def markTroveRemoved(self, name, version, flavor):
         return self._removeTrove(name, version, flavor, markOnly = True)
 
-    def getParentTroves(self, name, version, flavor):
+    def getParentTroves(self, name, versionStr, flavorStr):
         cu = self.db.cursor()
         cu.execute("""
         select Items.item, Versions.version, Flavors.flavor
@@ -1167,7 +1167,7 @@ class TroveStore:
         where IncludedItems.item=?
           and IncludedVersions.version=?
           and IncludedFlavors.flavor=?
-        """, (name, version.asString(), flavor.freeze()))
+        """, (name, versionStr, flavorStr))
         return cu.fetchall()
 
     def commit(self):
