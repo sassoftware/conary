@@ -843,10 +843,12 @@ class MigrateTo_15(SchemaMigration):
         # which was cooked as only a redirect in the repository; any other
         # instances would still need the depId anyway
         cu.execute("delete from provides where instanceId in "
-                   "(select instanceId from instances where troveType=?)",
+                   "(select instanceId from instances "
+                   "where troveType=? and isPresent=1)",
                    trove.TROVE_TYPE_REDIRECT)
         # loop over redirects...
-        cu.execute("select instanceId from instances where troveType = ?",
+        cu.execute("select instanceId from instances "
+                   "where troveType=? and isPresent=1",
                    trove.TROVE_TYPE_REDIRECT)
         for (instanceId,) in cu:
             self.fixTroveSig(repos, instanceId)
