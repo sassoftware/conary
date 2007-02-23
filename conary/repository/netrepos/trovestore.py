@@ -1151,23 +1151,24 @@ class TroveStore:
     def getParentTroves(self, name, version, flavor):
         cu = self.db.cursor()
         cu.execute("""
-            SELECT item, version, flavor FROM TroveTroves
-                JOIN Instances USING (instanceId)
-                JOIN Items ON Instances.itemId = Items.itemId
-                JOIN Versions ON Instances.versionId = Versions.versionId
-                JOIN Flavors ON Instances.flavorId = Flavors.flavorId
-            WHERE includedId =
-                (SELECT instanceId FROM Instances WHERE
-                    itemId = (SELECT itemId FROM Items WHERE item=?) AND
-                    versionId = (SELECT versionId FROM Versions
-                                 WHERE version=?) AND
-                    flavorId = (SELECT flavorId FROM Flavors
-                                WHERE flavor=?)
-                )
-        """, name, version.asString(), flavor.freeze())
-
-        return [ (x[0], versions.VersionFromString(x[1]),
-                  deps.ThawFlavor(x[2])) for x in cu ]
+        select Items.item, Versions.version, Flavors.flavor
+        from TroveTroves
+        join Instances as Included on TroveTroves.includedId = Included.instanceId
+        join Items as IncludedItems on
+            Included.itemId = IncludedItems.itemId
+        join Versions as IncludedVersions on
+            Included.versionId = IncludedVersions.versionId
+        join Flavors as IncludedFlavors on
+            Included.flavorId = IncludedFlavors.flavorId
+        join Instances on TroveTroves.instanceId = Instances.instanceId
+        join Items on Instances.itemId = Items.itemId
+        join Versions on Instances.versionId = Versions.versionId
+        join Flavors on Instances.flavorId = Flavors.flavorId
+        where IncludedItems.item=?
+          and IncludedVersions.version=?
+          and IncludedFlavors.flavor=?
+        """, (name, version.asString(), flavor.freeze()))
+        return cu.fetchall()
 
     def commit(self):
 	if self.needsCleanup:
