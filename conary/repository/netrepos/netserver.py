@@ -2893,7 +2893,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute("""
         select
             gtlInst.idx, Items.item, Versions.version, Flavors.flavor,
-            UP.permittedTrove as pattern, Nodes.timeStamps
+            UP.permittedTrove as pattern
         from gtlInst
         join Instances on gtlInst.instanceId = Instances.instanceId
         join Nodes USING (itemId, versionId)
@@ -2913,11 +2913,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
         ret = [ [] ] * len(troveInfoList)
-        for i, n,v,f, pattern, timeStamps in cu:
+        for i, n,v,f, pattern in cu:
             l = ret[i-minIdx]
             if self.auth.checkTrove(pattern, n):
-                version = versions.strToFrozen(
-                    v, [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
                 l.append((n,version,f))
         return ret
 
@@ -2947,7 +2945,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute("""
         select
             gtl.idx, gtl.name, Versions.version, Flavors.flavor,
-            UP.permittedTrove, Nodes.timeStamps
+            UP.permittedTrove
         from gtl
         join Items on gtl.name = Items.item
         join Flavors on (gtl.flavor IS NULL or gtl.flavor = Flavors.flavor)
@@ -2970,11 +2968,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """ % (",".join("%d" % x for x in userGroupIds),))
         # parse results
         ret = [ [] ] * len(troveInfo)
-        for i, n,v,f, pattern, timeStamps in cu:
+        for i, n,v,f, pattern in cu:
             l = ret[i-minIdx]
             if self.auth.checkTrove(pattern, n):
-                version = versions.strToFrozen(
-                    v, [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
                 l.append(version,f)
         return ret
 
