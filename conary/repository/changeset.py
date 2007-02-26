@@ -735,14 +735,27 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
 
-class PathIdsConflictError(Exception): 
-    def __init__(self, pathId, trove1=None, file1=None, 
-                               trove2=None, file2=None):
-        self.pathId = pathId
+class ChangeSetKeyConflictError(Exception):
+
+    name = "ChangeSetKeyConflictError"
+
+    def __init__(self, key, trove1=None, file1=None, trove2=None, file2=None):
+        if len(key) == 16:
+            self.pathId = key
+            self.fileId = None
+        else:
+            self.pathId, self.fileId = parseKey(key)
+
         self.trove1 = trove1
         self.file1 = file1
         self.trove2 = trove2
         self.file2 = file2
+
+    def getKey(self):
+        if self.fileId:
+            return self.pathId + self.fileId
+        else:
+            return self.pathId
 
     def getPathId(self):
         return self.pathId
@@ -752,13 +765,15 @@ class PathIdsConflictError(Exception):
 
     def getTroves(self):
         return self.trove1, self.trove2
-    
+
     def getPaths(self):
         return self.file1[1], self.file2[1]
 
     def __str__(self):
         if self.trove1 is None:
-            return 'PathIdsConflict: %s' % sha1helper.md5ToString(self.pathId)
+            return '%s: %s,%s' % (self.name,
+                                  sha1helper.md5ToString(self.pathId),
+                                  sha1helper.sha1ToString(self.fileId))
         else:
             path1, path2 = self.getPaths()
             trove1, trove2 = self.getTroves()
@@ -771,10 +786,20 @@ class PathIdsConflictError(Exception):
             if path2:
                 trove2Info = path2 + ' ' + trove2Info
 
-            return (('PathIdConflictsError:\n'
+            return (('%s:\n'
                      '  %s\n'
                      '     conflicts with\n'
-                     '  %s') % (trove1Info, trove2Info))
+                     '  %s') % (self.name, trove1Info, trove2Info))
+
+class PathIdsConflictError(ChangeSetKeyConflictError):
+
+    name = "PathIdsConflictError"
+
+    def __str__(self):
+        if self.trove1 is None:
+            return '%s: %s' % (self.name, sha1helper.md5ToString(self.pathId))
+        else:
+            return ChangeSetKeyConflictError.__str__(self)
 
 class ReadOnlyChangeSet(ChangeSet):
 
@@ -787,7 +812,10 @@ class ReadOnlyChangeSet(ChangeSet):
         if a[0] < b[0]:
             return -1
         elif a[0] == b[0]:
-            raise PathIdsConflictError(a[0])
+            if len(a[0]) == 16:
+                raise PathIdsConflictError(a[0])
+            else:
+                raise ChangeSetKeyConflictError(a[0])
         else:
             return 1
 
@@ -1100,7 +1128,10 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             if not self.configCache.has_key(key):
                 self.configCache[key] = f
             if self.configCache[key] != f:
-                raise PathIdsConflictError(key)
+                if len(key) == 16:
+                    raise PathIdsConflictError(key)
+                else:
+                    raise ChangeSetKeyConflictError(key)
 
     def _mergeReadOnly(self, otherCs):
         assert(not self.lastCsf)
@@ -1137,13 +1168,15 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             del self.oldTroves[:]
             self.oldTroves.extend(l)
 
+        err = None
         try:
             if isinstance(otherCs, ReadOnlyChangeSet):
                 self._mergeReadOnly(otherCs)
             else:
                 self._mergeCs(otherCs)
-        except PathIdsConflictError, err:
+        except ChangeSetKeyConflictError, err:
             pathId = err.pathId
+
             # look up the trove and file that caused the pathId
             # conflict.
             troves = set(itertools.chain(self.iterNewTroveList(),
@@ -1153,10 +1186,11 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 files = (myTrove.getNewFileList()
                          + myTrove.getChangedFileList())
                 conflicts.extend((myTrove, x) for x in files if x[0] == pathId)
+
             if len(conflicts) >= 2:
-                raise PathIdsConflictError(pathId,
-                                           conflicts[0][0], conflicts[0][1],
-                                           conflicts[1][0], conflicts[1][1])
+                raise err.__class__(err.getKey(),
+                                    conflicts[0][0], conflicts[0][1],
+                                    conflicts[1][0], conflicts[1][1])
             else:
                 raise
 

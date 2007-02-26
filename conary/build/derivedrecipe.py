@@ -77,8 +77,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                     (contentType, contents) = \
                                     self.cs.getFileContents(pathId, fileId)
                     if contentType == changeset.ChangedFileTypes.ptr:
-                        targetPathId = contents.get().read()
-                        l = delayedRestores.setdefault(targetPathId, [])
+                        targetPtrId = contents.get().read()
+                        l = delayedRestores.setdefault(targetPtrId, [])
                         l.append((fileObj, path))
                         continue
                     elif linkGroup and not linkGroup in linkGroupFirstPath:
@@ -89,8 +89,11 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 else:
                     contents = None
 
+                ptrId = pathId + fileId
                 if pathId in delayedRestores:
                     ptrMap[pathId] = path
+                elif ptrId in delayedRestores:
+                    ptrMap[ptrId] = path
 
                 fileObj.restore(contents, destdir, destdir + path)
 
@@ -98,9 +101,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 # remember to include this directory in the derived package
                 self.ExcludeDirectories(exceptions = path)
 
-        for targetPathId in delayedRestores:
-            for fileObj, targetPath in delayedRestores[targetPathId]:
-                sourcePath = ptrMap[targetPathId]
+        for targetPtrId in delayedRestores:
+            for fileObj, targetPath in delayedRestores[targetPtrId]:
+                sourcePath = ptrMap[targetPtrId]
                 fileObj.restore(
                     filecontents.FromFilesystem(destdir + sourcePath),
                     destdir, destdir + targetPath)

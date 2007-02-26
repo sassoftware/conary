@@ -26,6 +26,7 @@ from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims, filecontainer
+from conary.repository import filecontents
 from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
@@ -1442,14 +1443,41 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert False, "Unknown versions"
 
     def _convertChangeSetV2V1(self, cspath, size, destCsVersion, **key):
-        cs = changeset.ChangeSetFromFile(cspath)
-
+        inFc = filecontainer.FileContainer(open(cspath, "r"))
+        assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
         (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                         suffix = '.tmp')
         os.close(fd)
-        # now write out the munged changeset
-        size = cs.writeToFile(cspath,
-            versionOverride = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
+        outFcObj = open(cspath, "w+")
+        outFc = filecontainer.FileContainer(outFcObj,
+                version = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
+
+        info = inFc.getNextFile()
+        lastPathId = None
+        while info:
+            key, tag, f = info
+            if len(key) == 36:
+                # snip off the fileId
+                key = key[0:16]
+
+                if key == lastPathId:
+                    raise changeset.PathIdsConflictError(key)
+
+                size -= 20
+
+            if 'ptr' in tag:
+                # I'm not worried about this pointing to the wrong file; that
+                # can only happen if there are multiple files with the same
+                # PathId, which would cause the conflict we test for above
+                s = f.get().read()[0:16]
+                fc = filecontents.FromString(s)
+            else:
+                fc = filecontents.FromFile(f)
+
+            outFc.addFile(key, fc, tag, precompressed = True)
+            info = inFc.getNextFile()
+
+        outFcObj.close()
 
         return cspath, size
 

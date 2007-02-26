@@ -423,7 +423,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                             contType = changeset.ChangedFileTypes.ptr
                             cont = filecontents.FromString(ptr)
                         else:
-                            ptrTable[contentsHash] = pathId
+                            ptrTable[contentsHash] = pathId + newFileId
 
                     if not newFile.flags.isConfig() and \
                                 contType == changeset.ChangedFileTypes.file:

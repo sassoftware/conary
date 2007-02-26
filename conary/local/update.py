@@ -296,12 +296,16 @@ class FilesystemJob:
         return False
 
     def ptrCmp(a, b):
-        if a[0] == b[0]:
-            return 0
-        elif a[0] < b[0]:
+        if a[0] < b[0]:
             return -1
-        else:
+        elif a[0] > b[0]:
             return 1
+        elif a[1] < b[1]:
+            return -1
+        elif a[1] > b[1]:
+            return 1
+
+        return 0
 
     ptrCmp = staticmethod(ptrCmp)
 
@@ -385,6 +389,7 @@ class FilesystemJob:
             (pathId, fileId, fileObj, target, override, msg) = \
                                                 restores[restoreIndex]
             restoreIndex += 1
+            ptrId = pathId + fileId
 
             if not fileObj:
                 # this means we've reached some contents that are the
@@ -392,7 +397,7 @@ class FilesystemJob:
                 # the delayedRestore list for someplace to put this file
                 match = None
                 for j, item in enumerate(delayedRestores):
-                    if pathId == item[4]:
+                    if pathId == item[4] or ptrId == item[4]:
                         match = j, item
                         break
 
@@ -410,7 +415,7 @@ class FilesystemJob:
                 if fileObj.hasContents and fileObj.linkGroup():
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
-                ptrTargets[pathId] = target
+                ptrTargets[ptrId] = target
                 continue
 
 	    # None means "don't restore contents"; "" means "take the
@@ -418,7 +423,8 @@ class FilesystemJob:
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
             needContents = fileObj.hasContents
-            if override != "" and pathId not in ptrTargets:
+            if (override != "" and pathId not in ptrTargets
+                               and ptrId not in ptrTargets):
                 needContents = False
                 contents = override
             if needContents and fileObj.hasContents:
@@ -440,16 +446,18 @@ class FilesystemJob:
                     assert(contType != changeset.ChangedFileTypes.diff)
                     # PTR types are restored later
                     if contType == changeset.ChangedFileTypes.ptr:
-                        ptrId = contents.get().read()
-                        delayedRestores.append((pathId, fileObj, target, msg, 
-                                                ptrId, fileId))
-                        if not ptrTargets.has_key(ptrId):
-                            ptrTargets[ptrId] = None
+                        targetPtrId = contents.get().read()
+                        delayedRestores.append((pathId, fileObj, target, msg,
+                                                targetPtrId, fileId))
+                        if not ptrTargets.has_key(targetPtrId):
+                            ptrTargets[targetPtrId] = None
+                            targetPtrPathId = targetPtrId[:16]
+                            targetPtrFileId = targetPtrId[16:]
                             # this doesn't insert duplicate records, they're
                             # silently skipped
                             util.tupleListBsearchInsert(restores,
-                                (ptrId, None, None, None, None, None),
-                                self.ptrCmp)
+                                (targetPtrPathId, targetPtrFileId, None, None,
+                                 None, None), self.ptrCmp)
 
                         continue
                     elif contType == changeset.ChangedFileTypes.hldr:
@@ -463,11 +471,16 @@ class FilesystemJob:
                         open(target, "w")
                         continue
 
-            if pathId in ptrTargets:
-                # someone is requesting that we use this path as a place 
-                # to grab its contents from.  That will only
-                # work if the contents are correct - which won't be the
-                # case for initial contents files
+            # someone is requesting that we use this path as a place 
+            # to grab its contents from.  That will only
+            # work if the contents are correct - which won't be the
+            # case for initial contents files
+            if ptrId in ptrTargets:
+                if override != "":
+                    ptrTargets[ptrId] = contents
+                else:
+                    ptrTargets[ptrId] = target
+            elif pathId in ptrTargets:
                 if override != "":
                     ptrTargets[pathId] = contents
                 else:
@@ -1272,7 +1285,8 @@ class FilesystemJob:
                                       "replacing %s with merged "
                                       "config file",
 				      contentsOverride = headFileContents,
-                                      replaceFiles = replaceFiles)
+                                      replaceFiles = replaceFiles,
+                                      fileId = headFileId)
 		    else:
                         # switch the fsFile to the sha1 for the new file
                         if fsFile.hasContents:
@@ -1329,7 +1343,8 @@ class FilesystemJob:
                     self._restore(fsFile, realPath, newTroveInfo,
                           filePriorityPath,
                           "merging changes from repository into %s",
-                          contentsOverride = cont, replaceFiles = replaceFiles)
+                          contentsOverride = cont, replaceFiles = replaceFiles,
+                          fileId = headFileId)
                     beenRestored = True
 
                     if failedHunks:
@@ -1355,7 +1370,8 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
                       filePriorityPath,
 		      "merging changes from repository into %s",
-                      contentsOverride = None, replaceFiles = replaceFiles)
+                      contentsOverride = None, replaceFiles = replaceFiles,
+                      fileId = headFileId)
             elif not attributesChanged and not beenRestored and headChanges:
                 # Nothing actually changed, but the diff isn't empty
                 # either! This can happen when the version changes but
@@ -1366,7 +1382,8 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
                       filePriorityPath,
                       "file has not changed",
-                      contentsOverride = None, replaceFiles = replaceFiles)
+                      contentsOverride = None, replaceFiles = replaceFiles,
+                      fileId = headFileId)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
