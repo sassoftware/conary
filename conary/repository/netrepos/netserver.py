@@ -2824,7 +2824,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         schema.resetTable(cu, "gtl")
         for n, v, f in troveList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
-                       (n, v, f))
+                       (n, v, f), start_transaction=False)
         # we'll need the min idx to account for differences in SQL backends
         cu.execute("SELECT MIN(idx) from gtl")
         minIdx = cu.fetchone()[0]
@@ -2874,7 +2874,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         for (n,v,f) in troveInfoList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
-                       (n, v, f))
+                       (n, v, f), start_transaction=False)
         # we'll need the min idx to account for differences in SQL backends
         cu.execute("SELECT MIN(idx) from gtl")
         minIdx = cu.fetchone()[0]
@@ -2891,7 +2891,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
         join TroveTroves on TroveTroves.includedId = Instances.instanceId
-        """)
+        """, start_transaction=False)
         # gtlInst now has instanceIds of the parents. retrieve the data we need
         cu.execute("""
         select
