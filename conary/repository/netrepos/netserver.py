@@ -2365,7 +2365,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND Versions.version = ?
           AND Flavors.flavor = ?
         """, (name, version.asString(), flavor.freeze()))
-        instanceId = cu.fetchone()[0]
+        ret = cu.fetchone()
+        if not ret:
+            raise errors.TroveMissing(name, version)
+        instanceId = ret[0]
         # try to create a row lock for the signature record if needed
         cu.execute("UPDATE TroveInfo SET changed = changed "
                    "WHERE instanceId = ? AND infoType = ?",
