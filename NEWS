@@ -1,6 +1,9 @@
 Changes in @NEW@:
   o Build Changes
     * A list of rPath mirrors for source components has been added.
+    * Group recipes now support a setSearchPath method.  This provides a way
+      to tell groups how to find and resolve packages by specifying a list
+      containing either packages or labels. (CNY-1316)
 
   o Server Changes
     * Two new calls have been added to the server API -
