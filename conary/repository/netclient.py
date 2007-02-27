@@ -897,18 +897,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not troveInfoList:
             return []
         byServer = {}
-        for i, (name, version, flavor) in eumerate(troveInfoList):
+        for i, (name, version, flavor) in enumerate(troveInfoList):
             l = byServer.setdefault(version.branch().label().getHost(), [])
             tup = (name, self.fromVersion(version), self.fromFlavor(flavor))
             l.append( (i, tup) )
-        retlist = [ [] ] * len(troveInfoList)
+        retlist = [ [] for x in range(len(troveInfoList)) ]
         for server, l in byServer.iteritems():
             # if the server can't talk to us, don't traceback
             if self.c[server].getProtocolVersion() < 43:
                 continue
             ret = self.c[server].getTroveReferences([x[1] for x in l])
             for ri, rl in enumerate(ret):
-                retlist[ l[ri][0] ] = rl
+                retlist[ l[ri][0] ] = [ (x[0], self.toVersion(x[1]), self.toFlavor(x[2]))
+                                        for x in rl ]
         return retlist
 
     # added at protocol version 43
@@ -920,14 +921,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             l = byServer.setdefault(label.getHost(), [])
             tup = (name, self.fromLabel(label), self.fromFlavor(flavor))
             l.append( (i, tup) )
-        retlist = [ [] ] * len(troveList)
-        for server, l in byServer:
+        retlist = [ [] for x in range(len(troveList)) ]
+        for server, l in byServer.iteritems():
             # if the server can't talk to us, don't traceback
             if self.c[server].getProtocolVersion() < 43:
                 continue
             ret = self.c[server].getTroveDescendants([x[1] for x in l])
-            for ri, rl in enumerate[ret]:
-                retlist[ l[ri][0] ] = rl
+            for ri, rl in enumerate(ret):
+                retlist[ l[ri][0] ] = [ (self.toVersion(x[0]), self.toFlavor(x[1]))
+                                        for x in rl ]
         return retlist
 
     def hasTrove(self, name, version, flavor):

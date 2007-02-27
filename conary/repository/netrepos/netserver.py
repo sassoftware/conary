@@ -2865,7 +2865,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         (the user must have permission to see the referencing trove, but
         not the trove being referenced).
         """
-        if not self.uth.check(authToken):
+        if not self.auth.check(authToken):
             raise errors.InsufficientPermission
         self.log(2, troveInfoList)
         cu = self.db.cursor()
@@ -2915,11 +2915,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         where Instances.isPresent = 1
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
-        ret = [ [] ] * len(troveInfoList)
+        ret = [ [] for x in range(len(troveInfoList)) ]
         for i, n,v,f, pattern in cu:
             l = ret[i-minIdx]
             if self.auth.checkTrove(pattern, n):
-                l.append((n,version,f))
+                l.append((n,v,f))
         return ret
 
     @accessReadOnly
@@ -2939,7 +2939,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         schema.resetTable(cu, "gtl")
         schema.resetTable(cu, "gtlInst")
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        for (n, l, f) in troveInfo:
+        for (n, l, f) in troveList:
             cu.execute("insert into gtl(name,version,flavor) values(?,?,?)",
                        (n,l,f), start_transaction=False)
         # we'll need the min idx to account for differences in SQL backends
@@ -2968,13 +2968,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               join Items as PerItems ON Permissions.itemId = PerItems.itemId
               where Permissions.userGroupId in (%s)
               ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
+        join Versions on Instances.versionId = Versions.versionId
         """ % (",".join("%d" % x for x in userGroupIds),))
         # parse results
-        ret = [ [] ] * len(troveInfo)
+        ret = [ [] for x in range(len(troveList)) ]
         for i, n,v,f, pattern in cu:
             l = ret[i-minIdx]
             if self.auth.checkTrove(pattern, n):
-                l.append(version,f)
+                l.append((v,f))
         return ret
 
     @accessReadOnly
