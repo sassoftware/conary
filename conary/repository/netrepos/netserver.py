@@ -1443,43 +1443,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert False, "Unknown versions"
 
     def _convertChangeSetV2V1(self, cspath, size, destCsVersion, **key):
-        inFc = filecontainer.FileContainer(open(cspath, "r"))
-        assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
-        (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+        (fd, newCsPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                         suffix = '.tmp')
         os.close(fd)
-        outFcObj = open(cspath, "w+")
-        outFc = filecontainer.FileContainer(outFcObj,
-                version = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
+        delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
 
-        info = inFc.getNextFile()
-        lastPathId = None
-        while info:
-            key, tag, f = info
-            if len(key) == 36:
-                # snip off the fileId
-                key = key[0:16]
-
-                if key == lastPathId:
-                    raise changeset.PathIdsConflictError(key)
-
-                size -= 20
-
-            if 'ptr' in tag:
-                # I'm not worried about this pointing to the wrong file; that
-                # can only happen if there are multiple files with the same
-                # PathId, which would cause the conflict we test for above
-                s = f.get().read()[0:16]
-                fc = filecontents.FromString(s)
-            else:
-                fc = filecontents.FromFile(f)
-
-            outFc.addFile(key, fc, tag, precompressed = True)
-            info = inFc.getNextFile()
-
-        outFcObj.close()
-
-        return cspath, size
+        return newCsPath, size + delta
 
     def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
         # check to make sure that this user has access to see all
