@@ -27,7 +27,7 @@ from conary import callbacks
 from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
-from conary.repository import trovesource
+from conary.repository import trovesource, searchsource
 from conary import trove
 from conary import versions
 
@@ -192,7 +192,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
         - L{setDefaultGroup} : Defines default group
 
-        - L{setLabelPath} : Specify the labelPath to search for troves
+        - L{setSearchPath} : Specify the searchPath to search for troves
 
     """
     Flags = use.LocalFlags
@@ -205,12 +205,16 @@ class GroupRecipe(_BaseGroupRecipe):
     checkPathConflicts = True
 
     def __init__(self, repos, cfg, label, flavor, extraMacros={}):
-        self.repos = repos
-        self.cfg = cfg
+        self.troveSource = repos
         self.labelPath = [ label ]
+        self.cfg = cfg
         self.flavor = flavor
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
+        self.defaultSource = None
+        self.searchSource = self._getSearchSource()
+        self.defaultSource = self.searchSource
+        self.resolveSource = None
 
         self.replaceSpecs = []
         self.resolveTroveSpecs = []
@@ -222,6 +226,16 @@ class GroupRecipe(_BaseGroupRecipe):
                          checkPathConflicts = self.checkPathConflicts,
                          byDefault = True)
         self._setDefaultGroup(group)
+
+    def _getSearchSource(self):
+        if isinstance(self.defaultSource, (list, tuple)):
+            return searchsource.createSearchPathSource(self.searchSource,
+                                                       self.defaultSource,
+                                                       self.getSearchFlavor())
+        else:
+            return searchsource.NetworkSearchSource(self.troveSource,
+                                                    self.getLabelPath(),
+                                                    self.getSearchFlavor())
 
     def _parseFlavor(self, flavor):
         assert(flavor is None or isinstance(flavor, str))
@@ -273,7 +287,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None,
-            use = True, labelPath=None):
+            use = True, labelPath=None, searchPath=None):
         """
         NAME
         ====
@@ -283,7 +297,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName},] [I{labelPath}])}
+        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName},] [I{searchPath}])}
 
         DESCRIPTION
         ===========
@@ -312,9 +326,6 @@ class GroupRecipe(_BaseGroupRecipe):
         B{name} : (None) Specifies the name of trove to add- This parameter is
         required.
 
-        B{ref} : (None) Trove reference to search for this trove in. See
-        C{r.addReference} for more information.
-
         B{source} : (None) Specifies the source from which this trove
         originates for programs which read group recipes.
         This parameter's explicit use is generally unnecessary.
@@ -327,8 +338,8 @@ class GroupRecipe(_BaseGroupRecipe):
         boolean values which determine whether the trove(s) are added to the
         group
 
-        B{labelPath} : (None) Set a specific labelPath to search for this
-        particular trove.  This cannot be used with the B{ref} flag.
+        B{searchPath} : (None) Set a specific searchPath to search for this
+        particular trove.  This overrides the B{ref} flag.
 
         EXAMPLES
         ========
@@ -340,10 +351,16 @@ class GroupRecipe(_BaseGroupRecipe):
         if not use:
             return
         flavor = self._parseFlavor(flavor)
+        if labelPath:
+            searchPath = labelPath
+
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
+
         for group in self._getGroups(groupName):
             group.addSpec(name, versionStr = versionStr, flavor = flavor,
                           source = source, byDefault = byDefault, ref = ref,
-                          components = components, labelPath = labelPath)
+                          components = components)
 
     # maintain addTrove for backwards compatibility
     addTrove = add
@@ -456,6 +473,9 @@ class GroupRecipe(_BaseGroupRecipe):
         for group in self._getGroups(groupName):
             group.removeComponents(componentList)
 
+    def setSearchPath(self, *path):
+        self.defaultSource = searchsource.createSearchPathFromStrings(path)
+
     def setByDefault(self, byDefault = True, groupName = None):
         """
         NAME
@@ -496,7 +516,8 @@ class GroupRecipe(_BaseGroupRecipe):
             group.setByDefault(byDefault)
 
     def addAll(self, name, versionStr = None, flavor = None, ref = None,
-                           recurse=True, groupName = None, use = True):
+                           recurse=True, groupName = None, use = True, 
+                           searchPath = None):
         """
         NAME
         ====
@@ -560,12 +581,16 @@ class GroupRecipe(_BaseGroupRecipe):
             return
         flavor = self._parseFlavor(flavor)
 
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
+
         for group in self._getGroups(groupName):
             group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
 
 
     def addCopy(self, name, versionStr = None, flavor = None, ref = None,
-                recurse=True, groupName = None, use = True):
+                recurse=True, groupName = None, use = True, 
+                searchPath = None):
         """
         NAME
         ====
@@ -633,6 +658,8 @@ class GroupRecipe(_BaseGroupRecipe):
             return
         if name not in self.groups:
             self.createGroup(name)
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
         self.addAll(name, versionStr = versionStr, flavor = flavor, ref = ref,
                     recurse=recurse, groupName = name)
         for group in self._getGroups(groupName):
@@ -1048,7 +1075,7 @@ class SingleGroup(object):
 
         self.requires = deps.DependencySet()
 
-        self.troves ={}
+        self.troves = {}
         self.reasons = {}
         self.childTroves = {}
         self.size = None
@@ -1076,12 +1103,7 @@ class SingleGroup(object):
         return tuple(path)
 
     def addSpec(self, name, versionStr = None, flavor = None, source = None,
-                byDefault = None, ref = None, components=None, labelPath=None):
-        if labelPath and ref:
-            raise RecipeFileError(
-                    "Cannot specify both ref and labelPath for '%s'" % name)
-        elif labelPath:
-            ref = self._makeLabelPathRef(labelPath)
+                byDefault = None, ref = None, components=None):
         self.addTroveList.append(((name, versionStr, flavor), source,
                                  byDefault, ref, components))
 
@@ -1295,18 +1317,18 @@ class GroupReference:
     def __hash__(self):
         return hash((self.troveSpecs, self.upstreamSource))
 
-    def findSources(self, repos, labelPath, flavorPath):
+    def findSources(self, searchSource):
         """ Find the troves that make up this trove reference """
         if self.upstreamSource is None:
-            source = repos
+            source = searchSource
         else:
             source = self.upstreamSource
 
-        results = source.findTroves(labelPath, self.troveSpecs, flavorPath)
+        results = source.findTroves(self.troveSpecs)
         troveTups = [ x for x in chain(*results.itervalues())]
         self.sourceTups = troveTups
-        self.source = trovesource.TroveListTroveSource(source, troveTups)
-        self.source.searchAsDatabase()
+        self.source = searchsource.TroveSearchSource(source, troveTups,
+                                                     source.flavor)
 
     def findTroves(self, *args, **kw):
         return self.source.findTroves(*args, **kw)
@@ -1451,10 +1473,14 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     # find all the groups needed for all groups in a few massive findTroves
     # calls.
     replaceSpecs = dict(recipeObj.iterReplaceSpecs())
+    resolveSpecs = recipeObj.getResolveTroveSpecs()
     log.info('Getting initial set of troves for'
              ' building all %s groups' % (len(recipeObj.iterGroupList())))
-    resolveSpecs = recipeObj.getResolveTroveSpecs()
-    troveMap = findTrovesForGroups(repos, recipeObj.iterGroupList(),
+    defaultSource = recipeObj._getSearchSource()
+
+    troveMap = findTrovesForGroups(recipeObj.searchSource,
+                                   recipeObj._getSearchSource(),
+                                   recipeObj.iterGroupList(),
                                    replaceSpecs, resolveSpecs,
                                    labelPath, flavor, callback)
     troveTupList = list(chain(*chain(*(x.values() for x in troveMap.itervalues()))))
@@ -1462,10 +1488,12 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     log.info('Troves cached.')
 
     # get resolve source to be used for dependency resolution.
-    resolveSource = getResolveSource(recipeObj.getResolveTroveSpecs(),
-                                     troveMap, cache, cfg)
-
-
+    if resolveSpecs:
+        flavor = recipeObj.getSearchFlavor()
+        resolveSource = getResolveSource(recipeObj.searchSource, 
+                                         resolveSpecs, troveMap, cache, flavor)
+    else:
+        resolveSource = recipeObj._getSearchSource()
     groupsWithConflicts = {}
 
     newGroups = processAddAllDirectives(recipeObj, troveMap, cache, repos)
@@ -1548,9 +1576,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         raise GroupPathConflicts(groupsWithConflicts, recipeObj.getGroupDict())
 
 
-
-def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
-                        labelPath, searchFlavor, callback):
+def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs, 
+                        resolveSpecs, labelPath, searchFlavor, callback):
     toFind = {}
     troveMap = {}
 
@@ -1574,24 +1601,18 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
     results = {}
 
     callback.findingTroves(len(list(chain(*toFind.itervalues()))))
-    for troveSource, troveSpecs in toFind.iteritems():
-        if troveSource is None:
-            source = repos
-            myLabelPath = labelPath
-            mySearchFlavor = searchFlavor
-        elif isinstance(troveSource, tuple):
-            source = repos
-            myLabelPath = troveSource
-            mySearchFlavor = searchFlavor
+    for item, troveSpecs in toFind.iteritems():
+        if item is None:
+            source = defaultSource
+        elif isinstance(item, (tuple, list)):
+            source = searchsource.createSearchPathSource(searchSource,
+                                                         item, searchFlavor)
         else:
-            source = troveSource
-            troveSource.findSources(repos,  labelPath, searchFlavor),
-            myLabelPath = None
-            mySearchFlavor = None
+            source = item
+            if isinstance(item, GroupReference):
+                item.findSources(defaultSource)
         try:
-            results[troveSource] = source.findTroves(myLabelPath,
-                                                     toFind[troveSource],
-                                                     mySearchFlavor)
+            results[item] = source.findTroves(troveSpecs)
         except errors.TroveNotFound, e:
             raise CookError, str(e)
 
@@ -1692,7 +1713,6 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
     unmatchedGlobalReplaceSpecs = set()
     if removeSpecs or replaceSpecs:
         groupAsSource = trovesource.GroupRecipeSource(repos, group)
-        groupAsSource.searchAsDatabase()
 
         unmatchedRemoveSpecs = set(x[0] for x in removeSpecs.items() 
                                    if not x[1])
@@ -2035,21 +2055,17 @@ def addPackagesForComponents(group, repos, troveCache):
             group.addTrove(comp, False, byDefault, [],
                            reason=(ADD_REASON_ADDED,))
 
-def getResolveSource(troveSpecList, troveMap, cache, cfg):
+def getResolveSource(searchSource, troveSpecList, troveMap, cache, flavor):
     """
         Returns the resolveSource object to be used for dep resolution.
         If no resolveTroves have been added, then will return None.
     """
-    if troveSpecList:
-        resolveTups = []
-        for troveSpec, ref in troveSpecList:
-            resolveTups.extend(troveMap[ref][troveSpec])
-        resolveTroves = [ cache[x] for x in resolveTups ]
-        resolveSource = conaryclient.resolve.DepResolutionByTroveList(cfg,
-                                                None, resolveTroves)
-    else:
-        resolveSource = None
-    return resolveSource
+    resolveTups = []
+    for troveSpec, ref in troveSpecList:
+        resolveTups.extend(troveMap[ref][troveSpec])
+    resolveTroves = [ cache[x] for x in resolveTups ]
+    return searchsource.createSearchPathSource(searchSource, [resolveTroves],
+                                               flavor)
 
 def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                              callback, resolveSource):
@@ -2088,7 +2104,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                                              resolveDeps = True,
                                              test = True,
                                              checkPathConflicts=False,
-                                             resolveSource=resolveSource)
+                                 resolveSource=resolveSource.getResolveMethod())
 
     if resetVerbosity:
         log.setVerbosity(log.LOWLEVEL)
