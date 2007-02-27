@@ -892,45 +892,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
 
-    # added at protocl version 43
-    def getTroveReferences(self, troveInfoList):
+    # added at protocol version 43
+    def getTroveReferences(self, serverName, troveInfoList):
         if not troveInfoList:
             return []
-        byServer = {}
-        for i, (name, version, flavor) in enumerate(troveInfoList):
-            l = byServer.setdefault(version.branch().label().getHost(), [])
-            tup = (name, self.fromVersion(version), self.fromFlavor(flavor))
-            l.append( (i, tup) )
-        retlist = [ [] for x in range(len(troveInfoList)) ]
-        for server, l in byServer.iteritems():
-            # if the server can't talk to us, don't traceback
-            if self.c[server].getProtocolVersion() < 43:
-                continue
-            ret = self.c[server].getTroveReferences([x[1] for x in l])
-            for ri, rl in enumerate(ret):
-                retlist[ l[ri][0] ] = [ (x[0], self.toVersion(x[1]), self.toFlavor(x[2]))
-                                        for x in rl ]
-        return retlist
+        # if the server can't talk to us, don't traceback
+        if self.c[serverName].getProtocolVersion() < 43:
+            return []
+        ret = self.c[serverName].getTroveReferences(
+            [(n,self.fromVersion(v),self.fromFlavor(f)) for (n,v,f) in troveInfoList])
+        return [ [(n,self.toVersion(v),self.toFlavor(f)) for (n,v,f) in retl] for retl in ret ]
 
     # added at protocol version 43
-    def getTroveDescendants(self, troveList):
+    def getTroveDescendants(self, serverName, troveList):
         if not troveList:
             return []
-        byServer = {}
-        for i, (name, label, flavor) in enumerate(troveList):
-            l = byServer.setdefault(label.getHost(), [])
-            tup = (name, self.fromLabel(label), self.fromFlavor(flavor))
-            l.append( (i, tup) )
-        retlist = [ [] for x in range(len(troveList)) ]
-        for server, l in byServer.iteritems():
-            # if the server can't talk to us, don't traceback
-            if self.c[server].getProtocolVersion() < 43:
-                continue
-            ret = self.c[server].getTroveDescendants([x[1] for x in l])
-            for ri, rl in enumerate(ret):
-                retlist[ l[ri][0] ] = [ (self.toVersion(x[0]), self.toFlavor(x[1]))
-                                        for x in rl ]
-        return retlist
+        # if the server can't talk to us, don't traceback
+        if self.c[serverName].getProtocolVersion() < 43:
+            return []
+        ret = self.c[serverName].getTroveDescendants(
+            [(n,self.fromLabel(l),self.fromFlavor(f)) for (n,l,f) in troveList])
+        return [ [(self.toVersion(v), self.toFlavor(f)) for (v,f) in retl] for retl in ret ]
 
     def hasTrove(self, name, version, flavor):
         return self.hasTroves([(name, version, flavor)])[name, version, flavor]
