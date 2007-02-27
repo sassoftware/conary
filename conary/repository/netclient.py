@@ -911,7 +911,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if self.c[serverName].getProtocolVersion() < 43:
             return []
         ret = self.c[serverName].getTroveDescendants(
-            [(n,self.fromLabel(l),self.fromFlavor(f)) for (n,l,f) in troveList])
+            [(n,self.fromBranch(b),self.fromFlavor(f)) for (n,b,f) in troveList])
         return [ [(self.toVersion(v), self.toFlavor(f)) for (v,f) in retl] for retl in ret ]
 
     def hasTrove(self, name, version, flavor):

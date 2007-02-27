@@ -2928,12 +2928,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getTroveDescendants(self, authToken, clientVersion, troveList):
         """
-        troveList is a list of (name, label, flavor) tuples. For
-        each item, return the full version and flavor of each trove
-        named name which exists on a branch which includes label and
-        is of the specified flavor. If the flavor is not specified,
-        all matches should be returned. Only troves the user has
-        permission to view should be returned.
+        troveList is a list of (name, branch, flavor) tuples. For each
+        item, return the full version and flavor of each trove named
+        Name which exists on a downstream branch from the branch
+        passed in and is of the specified flavor. If the flavor is not
+        specified, all matches should be returned. Only troves the
+        user has permission to view should be returned.
         """
         if not self.auth.check(authToken):
             raise errors.InsufficientPermission
@@ -2943,9 +2943,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return []
         ret = [ [] for x in range(len(troveList)) ]
-        for i, (n, l, f) in enumerate(troveList):
-            d = {"gids" : ",".join(["%d" % x for x in userGroupIds])}
-            args = [n, '%%/%s/%%' % (l,)]
+        d = {"gids" : ",".join(["%d" % x for x in userGroupIds])}
+        for i, (n, branch, f) in enumerate(troveList):
+            args = [n, '/%s/%%' % (branch,)]
+            d["flavor"] = ""
             if f is not None:
                 d["flavor"] = "and Flavors.flavor = ?"
                 args.append(f)
