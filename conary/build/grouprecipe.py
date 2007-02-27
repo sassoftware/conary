@@ -39,6 +39,10 @@ ADD_REASON_ADDALL = 3   # added as part of an "addAll"
 ADD_REASON_REPLACE = 4  # added as part of a "replace" command.
 ADD_REASON_INCLUDED_GROUP = 5 # added because its in an included group
 
+ADDALL_NORECURSE = 0
+ADDALL_RECURSE   = 1
+ADDALL_FLATTEN   = 2
+
 class _BaseGroupRecipe(Recipe):
     """ Defines a group recipe as collection of groups and provides
         operations on those groups.
@@ -516,8 +520,8 @@ class GroupRecipe(_BaseGroupRecipe):
             group.setByDefault(byDefault)
 
     def addAll(self, name, versionStr = None, flavor = None, ref = None,
-                           recurse=True, groupName = None, use = True, 
-                           searchPath = None):
+                           recurse=None, groupName = None, use = True, 
+                           searchPath = None, flatten=False):
         """
         NAME
         ====
@@ -585,12 +589,13 @@ class GroupRecipe(_BaseGroupRecipe):
             ref = searchsource.createSearchPathFromStrings(searchPath)
 
         for group in self._getGroups(groupName):
-            group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
+            group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse,
+                         flatten = flatten)
 
 
     def addCopy(self, name, versionStr = None, flavor = None, ref = None,
                 recurse=True, groupName = None, use = True, 
-                searchPath = None):
+                searchPath = None, flatten = False):
         """
         NAME
         ====
@@ -661,7 +666,7 @@ class GroupRecipe(_BaseGroupRecipe):
         if searchPath:
             ref = searchsource.createSearchPathFromStrings(searchPath)
         self.addAll(name, versionStr = versionStr, flavor = flavor, ref = ref,
-                    recurse=recurse, groupName = name)
+                    recurse=recurse, groupName = name, flatten = flatten)
         for group in self._getGroups(groupName):
             self.addNewGroup(name)
 
@@ -1119,7 +1124,17 @@ class SingleGroup(object):
         self.replaceTroveList.append((((name, newVersionStr, newFlavor), ref),
                                       (allowNoMatch, isGlobal)))
 
-    def addAll(self, name, versionStr, flavor, ref, recurse):
+    def addAll(self, name, versionStr, flavor, ref, recurse, flatten):
+        if flatten:
+            if recurse:
+                raise RecipeFileError('Can only specify one of'
+                                      'flatten + recurse')
+            recurse = ADDALL_FLATTEN
+        elif recurse is None or recurse:
+            recurse = ADDALL_RECURSE
+        else:
+            recurse = ADDALL_NORECURSE
+
         self.addReferenceList.append(((name, versionStr, flavor), ref, recurse))
 
     def getComponentsToRemove(self):
@@ -1642,21 +1657,26 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
         groupTrvDict = dict(izip(groupTups, trvs))
 
         if len(set(x[0] for x in groupTups)) != len(groupTups):
+            # multiple groups with the same name were added.
+            # addAll can't handle that.
             raise GroupAddAllError(parentGroup, troveTup, groupTups)
 
 
     createdGroups = set()
     groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
 
-    stack = [(topTrove, parentGroup)]
+    stack = [(topTrove, topTrove, parentGroup)]
     troveTups = []
 
     while stack:
-        trv, parentGroup = stack.pop()
+        trv, byDefaultTrv, parentGroup = stack.pop()
         for troveTup in trv.iterTroveList(strongRefs=True):
-            byDefault = trv.includeTroveByDefault(*troveTup)
-
+            byDefault = byDefaultTrv.includeTroveByDefault(*troveTup)
             if recurse and troveTup[0].startswith('group-'):
+                if recurse == ADDALL_FLATTEN:
+                    stack.append((groupTrvDict[troveTup], trv, parentGroup))
+                    continue
+
                 name = troveTup[0]
                 childGroup = groupsByName.get(name, None)
                 if not childGroup:
@@ -1674,14 +1694,16 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                 if parentGroup.name == name:
                     raise CookError('Tried to addAll "%s=%s" into %s - which resulted in trying to add %s to itself.  This is not allowed.  You may wish to pass recurse=False to addAll.' % (topTrove.getName(), topTrove.getVersion(), topGroup.name, name))
                 parentGroup.addNewGroup(name, byDefault=byDefault,
-                                        explicit = True, childDefaults = trv)
+                                        explicit = True,
+                                        childDefaults = byDefaultTrv)
 
                 if troveTup not in createdGroups:
-                    stack.append((groupTrvDict[troveTup], childGroup))
+                    childTrove = groupTrvDict[troveTup]
+                    stack.append((childTrove, childTrove, childGroup))
                     createdGroups.add(troveTup)
             else:
                 parentGroup.addTrove(troveTup, True, byDefault, [],
-                                     childDefaults=trv, 
+                                     childDefaults=byDefaultTrv, 
                                      reason = (ADD_REASON_ADDALL, topTrove.getNameVersionFlavor()))
                 troveTups.append(troveTup)
 
