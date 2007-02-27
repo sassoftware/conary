@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -892,6 +892,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
 
+    # added at protocl version 43
     def getTroveReferences(self, troveInfoList):
         if not troveInfoList:
             return []
@@ -902,11 +903,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             l.append( (i, tup) )
         retlist = [ [] ] * len(troveInfoList)
         for server, l in byServer.iteritems():
+            # if the server can't talk to us, don't traceback
+            if self.c[server].getProtocolVersion() < 43:
+                continue
             ret = self.c[server].getTroveReferences([x[1] for x in l])
             for ri, rl in enumerate(ret):
                 retlist[ l[ri][0] ] = rl
         return retlist
 
+    # added at protocol version 43
     def getTroveDescendants(self, troveList):
         if not troveList:
             return []
@@ -917,6 +922,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             l.append( (i, tup) )
         retlist = [ [] ] * len(troveList)
         for server, l in byServer:
+            # if the server can't talk to us, don't traceback
+            if self.c[server].getProtocolVersion() < 43:
+                continue
             ret = self.c[server].getTroveDescendants([x[1] for x in l])
             for ri, rl in enumerate[ret]:
                 retlist[ l[ri][0] ] = rl
