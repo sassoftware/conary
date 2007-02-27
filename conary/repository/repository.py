@@ -261,7 +261,26 @@ class AbstractRepository(IdealRepository):
         @rtype: list of Stream objects or None
         """
         raise NotImplementedError
-    
+
+    def getTroveReferences(self, troveInfoList):
+        """
+        troveInfoList is a list of (name, version, flavor) tuples. For
+        each (name, version, flavor) specied, return a list of the troves
+        (groups and packages) which reference it (either strong or weak)
+        (the user must have permission to see the referencing trove, but
+        not the trove being referenced).
+        """
+
+    def getTroveDescendants(self, troveList):
+        """
+        troveList is a list of (name, label, flavor) tuples. For
+        each item, return the full version and flavor of each trove
+        named Name which exists on a branch which includes label and
+        is of the specified flavor. If the flavor is not specified,
+        all matches should be returned. Only troves the user has
+        permission to view should be returned.
+        """
+
     ### File functions
 
     def __init__(self):

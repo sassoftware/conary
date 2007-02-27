@@ -162,7 +162,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getNewTroveList',
                         'getTroveInfo',
                         'getTroveReferences',
-                        'getTroveDescendents',
+                        'getTroveDescendants',
                         'checkVersion' ])
 
 
@@ -2923,11 +2923,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ret
 
     @accessReadOnly
-    def getTroveDescendents(self, authToken, clientVersion, troveList):
+    def getTroveDescendants(self, authToken, clientVersion, troveList):
         """
         troveList is a list of (name, label, flavor) tuples. For
         each item, return the full version and flavor of each trove
-        named Name which exists on a branch which includes label and
+        named name which exists on a branch which includes label and
         is of the specified flavor. If the flavor is not specified,
         all matches should be returned. Only troves the user has
         permission to view should be returned.
@@ -2941,7 +2941,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         for (n, l, f) in troveInfo:
             cu.execute("insert into gtl(name,version,flavor) values(?,?,?)",
-                       (n,l,f))
+                       (n,l,f), start_transaction=False)
         # we'll need the min idx to account for differences in SQL backends
         cu.execute("SELECT MIN(idx) from gtl")
         minIdx = cu.fetchone()[0]
@@ -2956,7 +2956,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Instances.itemId = Items.itemId AND
             Instances.flavorId = Flavors.flavorId
         join Nodes using (itemId, versionId)
-        join LabelMap USING (itemId, branchId)
+        join LabelMap using (itemId, branchId)
         join Labels on
             LabelMap.labelId = Labels.labelId AND
             Labels.label = gtl.version

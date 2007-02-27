@@ -892,6 +892,36 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
 
+    def getTroveReferences(self, troveInfoList):
+        if not troveInfoList:
+            return []
+        byServer = {}
+        for i, (name, version, flavor) in eumerate(troveInfoList):
+            l = byServer.setdefault(version.branch().label().getHost(), [])
+            tup = (name, self.fromVersion(version), self.fromFlavor(flavor))
+            l.append( (i, tup) )
+        retlist = [ [] ] * len(troveInfoList)
+        for server, l in byServer.iteritems():
+            ret = self.c[server].getTroveReferences([x[1] for x in l])
+            for ri, rl in enumerate(ret):
+                retlist[ l[ri][0] ] = rl
+        return retlist
+
+    def getTroveDescendants(self, troveList):
+        if not troveList:
+            return []
+        byServer = {}
+        for i, (name, label, flavor) in enumerate(troveList):
+            l = byServer.setdefault(label.getHost(), [])
+            tup = (name, self.fromLabel(label), self.fromFlavor(flavor))
+            l.append( (i, tup) )
+        retlist = [ [] ] * len(troveList)
+        for server, l in byServer:
+            ret = self.c[server].getTroveDescendants([x[1] for x in l])
+            for ri, rl in enumerate[ret]:
+                retlist[ l[ri][0] ] = rl
+        return retlist
+
     def hasTrove(self, name, version, flavor):
         return self.hasTroves([(name, version, flavor)])[name, version, flavor]
 
