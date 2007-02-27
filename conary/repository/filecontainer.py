@@ -62,10 +62,14 @@ from conary.repository import filecontents
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 SUBFILE_MAGIC = 0x3FBB
-FILE_CONTAINER_VERSION = 2005101901
+
+FILE_CONTAINER_VERSION_FILEID_IDX   = 2007022001
 FILE_CONTAINER_VERSION_WITH_REMOVES = 2006071301
-READABLE_VERSIONS = [ FILE_CONTAINER_VERSION,
-                      FILE_CONTAINER_VERSION_WITH_REMOVES ]
+FILE_CONTAINER_VERSION_NO_REMOVES   = 2005101901
+
+READABLE_VERSIONS = [ FILE_CONTAINER_VERSION_FILEID_IDX,
+                      FILE_CONTAINER_VERSION_WITH_REMOVES,
+                      FILE_CONTAINER_VERSION_NO_REMOVES ]
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -176,7 +180,7 @@ class FileContainer:
 	if self.file:
 	    self.close()
 
-    def __init__(self, file, withRemoves = False):
+    def __init__(self, file, version = None):
         """
         Create a FileContainer object.
         
@@ -186,13 +190,11 @@ class FileContainer:
         is retained, so the caller may optionally close it.
         """
 
-        if withRemoves:
-            version = FILE_CONTAINER_VERSION_WITH_REMOVES
-        else:
-            version = FILE_CONTAINER_VERSION
-
 	# make our own copy of this file which nobody can close underneath us
 	self.file = file
+
+        if version is None:
+            version = FILE_CONTAINER_VERSION_FILEID_IDX
 
 	self.file.seek(0, SEEK_END)
 	if not self.file.tell():

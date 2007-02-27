@@ -62,7 +62,8 @@ class FilesystemJob:
         self.linkGroups[linkGroup] = target
 
     def _restore(self, fileObj, target, troveInfo, filePriorityPath, msg, 
-                 contentsOverride = "", replaceFiles = False):
+                 contentsOverride = "", replaceFiles = False, fileId = None):
+        assert(contentsOverride != "" or fileId is not None)
         restoreFile = True
 
         if target in self.restores:
@@ -95,7 +96,7 @@ class FilesystemJob:
 
         if restoreFile:
             self.restores[target] = (fileObj.pathId(), fileObj,
-                                     contentsOverride, msg, troveInfo)
+                                     contentsOverride, msg, troveInfo, fileId)
             if fileObj.hasContents:
                 self.restoreSize += fileObj.contents.size()
 
@@ -153,7 +154,8 @@ class FilesystemJob:
                 if files.frozenFileHasContents(stream):
                     flags = files.frozenFileFlags(stream)
                     # this file is seen as *added* in the rollback
-                    cs.addFileContents(pathId, changeset.ChangedFileTypes.file,
+                    cs.addFileContents(pathId, fileId,
+                       changeset.ChangedFileTypes.file,
                        filecontents.FromFilesystem(util.joinPaths(self.root,
                                                                   path)),
                        flags.isConfig())
@@ -294,12 +296,16 @@ class FilesystemJob:
         return False
 
     def ptrCmp(a, b):
-        if a[0] == b[0]:
-            return 0
-        elif a[0] < b[0]:
+        if a[0] < b[0]:
             return -1
-        else:
+        elif a[0] > b[0]:
             return 1
+        elif a[1] < b[1]:
+            return -1
+        elif a[1] > b[1]:
+            return 1
+
+        return 0
 
     ptrCmp = staticmethod(ptrCmp)
 
@@ -331,9 +337,9 @@ class FilesystemJob:
 
 	contents = None
 	# restore in the same order files appear in the change set (which
-        # is sorted by pathId
-        # pathId, fileObj, targetPath, contentsOverride, msg
-        restores = [ (x[1][0], x[1][1], x[0], x[1][2], x[1][3]) for x
+        # is sorted by pathId,fileId combos
+        # pathId, fileId, fileObj, targetPath, contentsOverride, msg
+        restores = [ (x[1][0], x[1][5], x[1][1], x[0], x[1][2], x[1][3]) for x
                             in self.restores.iteritems() ]
 
         restores.sort()
@@ -380,8 +386,10 @@ class FilesystemJob:
         restoreIndex = 0
         j = 0
         while restoreIndex < len(restores):
-	    (pathId, fileObj, target, override, msg) = restores[restoreIndex]
+            (pathId, fileId, fileObj, target, override, msg) = \
+                                                restores[restoreIndex]
             restoreIndex += 1
+            ptrId = pathId + fileId
 
             if not fileObj:
                 # this means we've reached some contents that are the
@@ -389,15 +397,16 @@ class FilesystemJob:
                 # the delayedRestore list for someplace to put this file
                 match = None
                 for j, item in enumerate(delayedRestores):
-                    if pathId == item[4]:
+                    if pathId == item[4] or ptrId == item[4]:
                         match = j, item
                         break
 
                 assert(match)
 
-                (otherId, fileObj, target, msg, ptrId) = match[1]
-                
-                contType, contents = self.changeSet.getFileContents(pathId)
+                (otherId, fileObj, target, msg, ptrId, otherFileId) = match[1]
+
+                contType, contents = self.changeSet.getFileContents(
+                                            pathId, otherFileId)
                 assert(contType == changeset.ChangedFileTypes.file)
 		restoreFile(fileObj, contents, self.root, target, journal,
                             opJournal)
@@ -406,7 +415,7 @@ class FilesystemJob:
                 if fileObj.hasContents and fileObj.linkGroup():
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
-                ptrTargets[pathId] = target
+                ptrTargets[ptrId] = target
                 continue
 
 	    # None means "don't restore contents"; "" means "take the
@@ -414,7 +423,8 @@ class FilesystemJob:
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
             needContents = fileObj.hasContents
-            if override != "" and pathId not in ptrTargets:
+            if (override != "" and pathId not in ptrTargets
+                               and ptrId not in ptrTargets):
                 needContents = False
                 contents = override
             if needContents and fileObj.hasContents:
@@ -431,20 +441,23 @@ class FilesystemJob:
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
                         continue
                 else:
-                    contType, contents = self.changeSet.getFileContents(pathId)
+                    contType, contents = self.changeSet.getFileContents(
+                                                            pathId, fileId)
                     assert(contType != changeset.ChangedFileTypes.diff)
                     # PTR types are restored later
                     if contType == changeset.ChangedFileTypes.ptr:
-                        ptrId = contents.get().read()
-                        delayedRestores.append((pathId, fileObj, target, msg, 
-                                                ptrId))
-                        if not ptrTargets.has_key(ptrId):
-                            ptrTargets[ptrId] = None
+                        targetPtrId = contents.get().read()
+                        delayedRestores.append((pathId, fileObj, target, msg,
+                                                targetPtrId, fileId))
+                        if not ptrTargets.has_key(targetPtrId):
+                            ptrTargets[targetPtrId] = None
+                            targetPtrPathId = targetPtrId[:16]
+                            targetPtrFileId = targetPtrId[16:]
                             # this doesn't insert duplicate records, they're
                             # silently skipped
-                            util.tupleListBsearchInsert(restores, 
-                                (ptrId, None, None, None, None),
-                                self.ptrCmp)
+                            util.tupleListBsearchInsert(restores,
+                                (targetPtrPathId, targetPtrFileId, None, None,
+                                 None, None), self.ptrCmp)
 
                         continue
                     elif contType == changeset.ChangedFileTypes.hldr:
@@ -458,11 +471,16 @@ class FilesystemJob:
                         open(target, "w")
                         continue
 
-            if pathId in ptrTargets:
-                # someone is requesting that we use this path as a place 
-                # to grab its contents from.  That will only
-                # work if the contents are correct - which won't be the
-                # case for initial contents files
+            # someone is requesting that we use this path as a place 
+            # to grab its contents from.  That will only
+            # work if the contents are correct - which won't be the
+            # case for initial contents files
+            if ptrId in ptrTargets:
+                if override != "":
+                    ptrTargets[ptrId] = contents
+                else:
+                    ptrTargets[ptrId] = target
+            elif pathId in ptrTargets:
                 if override != "":
                     ptrTargets[pathId] = contents
                 else:
@@ -479,7 +497,7 @@ class FilesystemJob:
                 linkGroup = fileObj.linkGroup()
                 self.linkGroups[linkGroup] = target
 
-	for (pathId, fileObj, target, msg, ptrId) in delayedRestores:
+	for (pathId, fileObj, target, msg, ptrId, fileId) in delayedRestores:
             # we wouldn't be here if the fileObj didn't have contents and
             # no override
 
@@ -995,7 +1013,8 @@ class FilesystemJob:
             if restoreFile:
                 self._restore(headFile, headRealPath, newTroveInfo, 
                               filePriorityPath,
-                              "creating %s", replaceFiles = replaceFiles)
+                              "creating %s", replaceFiles = replaceFiles,
+                              fileId = headFileId)
                 if isSrcTrove:
                     fsTrove.addFile(pathId, headPath, headFileVersion,
                                 headFileId,
@@ -1111,7 +1130,8 @@ class FilesystemJob:
                               filePriorityPath,
                               "creating %s with contents "
                               "from repository",
-                              replaceFiles = replaceFiles)
+                              replaceFiles = replaceFiles,
+                              fileId = headFileId)
                 continue
             elif isSrcTrove:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId,
@@ -1238,9 +1258,10 @@ class FilesystemJob:
 		    # the contents changed in just the repository, so take
 		    # those changes
                     if headFile.flags.isConfig and \
-                                changeSet.configFileIsDiff(pathId):
+                                changeSet.configFileIsDiff(pathId, headFileId):
 			(headFileContType,
-			 headFileContents) = changeSet.getFileContents(pathId)
+			 headFileContents) = changeSet.getFileContents(
+                                                pathId, headFileId)
 
 			baseLineF = repos.getFileContents([ (baseFileId,
 					baseTrove.getFile(pathId)[2]) ])[0].get()
@@ -1261,10 +1282,11 @@ class FilesystemJob:
                         fsFile.contents.size.set(len(newContents))
                         self._restore(fsFile, realPath, newTroveInfo,
                                       filePriorityPath,
-				      "replacing %s with contents "
-				      "from repository",
+                                      "replacing %s with merged "
+                                      "config file",
 				      contentsOverride = headFileContents,
-                                      replaceFiles = replaceFiles)
+                                      replaceFiles = replaceFiles,
+                                      fileId = headFileId)
 		    else:
                         # switch the fsFile to the sha1 for the new file
                         if fsFile.hasContents:
@@ -1274,7 +1296,8 @@ class FilesystemJob:
                                       filePriorityPath,
 				      "replacing %s with contents "
 				      "from repository",
-                                      replaceFiles = replaceFiles)
+                                      replaceFiles = replaceFiles,
+                                      fileId = headFileId)
 
 		    beenRestored = True
 		elif headFile.contents == baseFile.contents:
@@ -1294,16 +1317,18 @@ class FilesystemJob:
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
 
-                    if changeSet.configFileIsDiff(pathId):
+                    if changeSet.configFileIsDiff(pathId, headFileId):
                         (headFileContType,
-                         headFileContents) = changeSet.getFileContents(pathId)
+                         headFileContents) = changeSet.getFileContents(
+                                                pathId, headFileId)
                     else:
                         assert(baseFile.hasContents)
                         oldCont = self.db.getConfigFileContents(
                                             baseFile.contents.sha1())
 
                         # we're supposed to have a diff
-                        cont = filecontents.FromChangeSet(changeSet, pathId)
+                        cont = filecontents.FromChangeSet(changeSet, pathId,
+                                                          headFileId)
                         (headFileContType, headFileContents) = \
                                 changeset.fileContentsDiff(baseFile, oldCont,
                                                            headFile, cont)
@@ -1318,7 +1343,8 @@ class FilesystemJob:
                     self._restore(fsFile, realPath, newTroveInfo,
                           filePriorityPath,
                           "merging changes from repository into %s",
-                          contentsOverride = cont, replaceFiles = replaceFiles)
+                          contentsOverride = cont, replaceFiles = replaceFiles,
+                          fileId = headFileId)
                     beenRestored = True
 
                     if failedHunks:
@@ -1344,7 +1370,8 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
                       filePriorityPath,
 		      "merging changes from repository into %s",
-                      contentsOverride = None, replaceFiles = replaceFiles)
+                      contentsOverride = None, replaceFiles = replaceFiles,
+                      fileId = headFileId)
             elif not attributesChanged and not beenRestored and headChanges:
                 # Nothing actually changed, but the diff isn't empty
                 # either! This can happen when the version changes but
@@ -1354,8 +1381,9 @@ class FilesystemJob:
                 # does important file conflict handling.
                 self._restore(fsFile, realPath, newTroveInfo,
                       filePriorityPath,
-		      "merging changes from repository into %s",
-                      contentsOverride = None, replaceFiles = replaceFiles)
+                      "file has not changed",
+                      contentsOverride = None, replaceFiles = replaceFiles,
+                      fileId = headFileId)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
@@ -1732,7 +1760,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 		if srcFile.hasContents:
                     if needAbsolute:
-                        changeSet.addFileContents(pathId,
+                        changeSet.addFileContents(pathId, newFileId,
                                           changeset.ChangedFileTypes.file,
                                           newCont, f.flags.isConfig())
                     else:
@@ -1742,7 +1770,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                         (contType, cont) = changeset.fileContentsDiff(
                                     srcFile, srcCont, f, newCont)
 
-                        changeSet.addFileContents(pathId, contType, cont,
+                        changeSet.addFileContents(pathId, newFileId,
+                                                  contType, cont,
                                                   f.flags.isConfig())
 
     # anything left in pathIds has been newly added
@@ -1795,7 +1824,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 	if f.hasContents and withFileContents:
 	    newCont = filecontents.FromFilesystem(realPath)
-	    changeSet.addFileContents(pathId,
+	    changeSet.addFileContents(pathId, f.fileId(),
 				      changeset.ChangedFileTypes.file,
 				      newCont, f.flags.isConfig())
 

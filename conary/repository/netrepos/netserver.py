@@ -26,6 +26,7 @@ from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims, filecontainer
+from conary.repository import filecontents
 from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
@@ -46,14 +47,16 @@ SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
 
 # A list of changeset versions we support
 # These are just shortcuts
-_CSVER0 = filecontainer.FILE_CONTAINER_VERSION
+_CSVER0 = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
 _CSVER1 = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+_CSVER2 = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
 # The first in the list is the one the current generation clients understand
-CHANGESET_VERSIONS = [ _CSVER1, _CSVER0 ]
+CHANGESET_VERSIONS = [ _CSVER2, _CSVER1, _CSVER0 ]
 # Precedence list of versions - the version specified as key can be generated
 # from the version specified as value
 CHANGESET_VERSIONS_PRECEDENCE = {
     _CSVER0 : _CSVER1,
+    _CSVER1 : _CSVER2,
 }
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1421,10 +1424,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # Determine the changeset version based on the client version
         # Add more params if necessary
         if clientVersion < 38:
-            return CHANGESET_VERSIONS[-1]
+            return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
+        elif clientVersion < 43:
+            return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
         # Add more changeset versions here as the currently newest client is
         # replaced by a newer one
-        return CHANGESET_VERSIONS[0]
+        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
 
     def _convertChangeSet(self, csPath, size, destCsVersion, **key):
         # Changeset is in the file csPath
@@ -1434,18 +1439,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
             return self._convertChangeSetV1V0(csPath, size, destCsVersion,
                                               **key)
+        elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
+            return self._convertChangeSetV2V1(csPath, size, destCsVersion,
+                                              **key)
         assert False, "Unknown versions"
 
-    def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
-        recurse = key.get('recurse', False)
-        if not recurse:
-            return cspath, size
+    def _convertChangeSetV2V1(self, cspath, size, destCsVersion, **key):
+        (fd, newCsPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                        suffix = '.tmp')
+        os.close(fd)
+        delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
 
+        return newCsPath, size + delta
+
+    def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
         # check to make sure that this user has access to see all
         # the troves included in a recursive changeset.
         cs = changeset.ChangeSetFromFile(cspath)
         newCs = changeset.ChangeSet()
-        rewrite = False
 
         for tcs in cs.iterNewTroveList():
             if tcs.troveType() != trove.TROVE_TYPE_REMOVED:
@@ -1478,15 +1489,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                        trvNewFlavor)
                 diff = newTrove.diff(oldTrove)[0]
                 newCs.newTrove(diff)
-                rewrite = True
             else:
                 # this really was marked as a removed trove.
                 # raise a TroveMissing exception
                 raise errors.TroveMissing(trvName,
                                           version=trvNewVersion)
-        if not rewrite:
-            # No change
-            return cspath, size
 
         # we need to re-write the munged changeset for an
         # old client
@@ -1495,13 +1502,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                         suffix = '.tmp')
         os.close(fd)
-        # now make absolutely sure that the changeset file
-        # will be compatible with conary-1.0.  We know
-        # that there are no removed trove changesets becase
-        # we re-wrote them all.
-        cs.hasRemoved = False
         # now write out the munged changeset
-        size = cs.writeToFile(cspath)
+        size = cs.writeToFile(cspath,
+            versionOverride = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
         return cspath, size
 
     def _createChangeSet(self, jobEntry, **kwargs):

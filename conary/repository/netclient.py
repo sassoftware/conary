@@ -1471,14 +1471,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
                         fetchItems.append( (oldFileId, oldFileVersion, 
                                             oldFileObj) ) 
-                        needItems.append( (pathId, oldFileObj) ) 
+                        needItems.append( (pathId, None, oldFileObj) ) 
 
                     fetchItems.append( (newFileId, newFileVersion, newFileObj) )
-                    needItems.append( (pathId, newFileObj) )
+                    needItems.append( (pathId, newFileId, newFileObj) )
                     contentsNeeded += fetchItems
 
-
-                    fileJob += (needItems,)
+                    fileJob.extend([ needItems ])
 
             contentList = self.getFileContents(contentsNeeded, 
                                                tmpFile = outFile,
@@ -1487,24 +1486,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             i = 0
             for item in fileJob:
-                pathId = item[0][0]
-                fileObj = item[0][1]
+                pathId, fileId, fileObj = item[0]
                 contents = contentList[i]
                 i += 1
 
                 if len(item) == 1:
-                    internalCs.addFileContents(pathId, 
+                    internalCs.addFileContents(pathId, fileId,
                                    changeset.ChangedFileTypes.file, 
                                    contents, 
                                    fileObj.flags.isConfig())
                 else:
-                    newFileObj = item[1][1]
+                    fileId = item[1][1]
+                    newFileObj = item[1][2]
                     newContents = contentList[i]
                     i += 1
 
                     (contType, cont) = changeset.fileContentsDiff(fileObj, 
                                             contents, newFileObj, newContents)
-                    internalCs.addFileContents(pathId, contType,
+                    internalCs.addFileContents(pathId, fileId, contType,
                                                cont, True)
 
         if not cs and internalCs:
@@ -2092,16 +2091,31 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                           self.fromFlavor(trove.getNewFlavor())),
                          trove.isAbsolute()))
 
-
-
+        # XXX We don't check the version of the changeset we're committing,
+        # so we might do an unnecessary conversion. It won't hurt anything
+        # though.
         server = self.c[serverName]
+
         url = server.prepareChangeSet()
         if server.getProtocolVersion() >= 38:
             url = server.prepareChangeSet(jobs, mirror)
         else:
             url = server.prepareChangeSet()
 
-        self._putFile(url, fName, callback = callback)
+        if server.getProtocolVersion() <= 42:
+            (outFd, tmpName) = util.mkstemp()
+            os.close(outFd)
+            changeset._convertChangeSetV2V1(fName, tmpName)
+            autoUnlink = True
+            fName = tmpName
+        else:
+            autoUnlink = False
+
+        try:
+            self._putFile(url, fName, callback = callback)
+        finally:
+            if autoUnlink:
+                os.unlink(fName)
 
         if mirror:
             # avoid sending the mirror keyword unless we have to.
