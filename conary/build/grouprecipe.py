@@ -592,6 +592,17 @@ class GroupRecipe(_BaseGroupRecipe):
             group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse,
                          flatten = flatten)
 
+    def removeItemsAlsoInNewGroup(self, name, groupName = None):
+        for group in self._getGroups(groupName):
+            group.differenceUpdateNewGroup(name)
+
+    def removeItemsAlsoInGroup(self, name, versionStr = None, flavor = None,
+                               groupName = None, searchPath = None):
+        if searchPath:
+            searchPath = searchsource.createSearchPathFromStrings(searchPath)
+        for group in self._getGroups(groupName):
+            group.differenceUpdate(name, versionStr = versionStr, 
+                                   flavor=flavor, ref=searchPath)
 
     def addCopy(self, name, versionStr = None, flavor = None, ref = None,
                 recurse=True, groupName = None, use = True, 
@@ -981,6 +992,9 @@ class GroupRecipe(_BaseGroupRecipe):
     def getChildGroups(self, groupName):
         return [ (self._getGroup(x[0]), x[1], x[2]) for x in self._getGroup(groupName).iterNewGroupList() ]
 
+    def getGroupMap(self):
+        return self.groups
+
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
                     byDefault = None, checkOnlyByDefaultDeps = None,
                     checkPathConflicts = None):
@@ -1077,6 +1091,8 @@ class SingleGroup(object):
         self.replaceTroveList = []
         self.newGroupList = {}
         self.addAllTroveList = []
+        self.newGroupDifferenceList = []
+        self.differenceSpecs = []
 
         self.requires = deps.DependencySet()
 
@@ -1106,6 +1122,13 @@ class SingleGroup(object):
             except:
                 raise RecipeFileError("Invalid label '%s'" % label)
         return tuple(path)
+
+    def differenceUpdate(self, newGroupName, versionStr = None, flavor = None,
+                         ref = None):
+        self.differenceSpecs.append(((newGroupName, versionStr, flavor), ref))
+
+    def differenceUpdateNewGroup(self, newGroupName):
+        self.newGroupDifferenceList.append(newGroupName)
 
     def addSpec(self, name, versionStr = None, flavor = None, source = None,
                 byDefault = None, ref = None, components=None):
@@ -1139,6 +1162,12 @@ class SingleGroup(object):
 
     def getComponentsToRemove(self):
         return self.removeComponentList
+
+    def iterNewGroupDifferenceList(self):
+        return iter(self.newGroupDifferenceList)
+
+    def iterDifferenceSpecs(self):
+        return iter(self.differenceSpecs)
 
     def iterAddSpecs(self):
         return iter(self.addTroveList)
@@ -1466,6 +1495,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
                 # this should ensure that the child is listed before
                 # this group.
                 g.addEdge(childName, group.name)
+            for childName in group.iterNewGroupDifferenceList():
+                g.addEdge(childName, group.name)
 
         cycles = [ x for x in g.getStronglyConnectedComponents() if len(x) > 1 ]
         if cycles:
@@ -1528,6 +1559,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         callback.buildingGroup(group.name, groupIdx + 1, len(groupList))
 
         childGroups = recipeObj.getChildGroups(group.name)
+        groupMap = recipeObj.getGroupMap()
 
         # check to see if any of our children groups have conflicts,
         # if so, we won't bother building up this group since it's
@@ -1544,7 +1576,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
         # add troves to this group.
         unmatchedGlobalReplaceSpecs &= addTrovesToGroup(group, troveMap, cache,
-                                                    childGroups, repos)
+                                                    childGroups, repos, 
+                                                    groupMap)
 
         log.debug('Troves in %s:' % group.name)
         for troveTup, isStrong, byDefault, _ in sorted(group.iterTroveListInfo()):
@@ -1611,6 +1644,9 @@ def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs,
             toFind.setdefault(ref, set()).add(troveSpec)
 
         for (troveSpec, ref), _ in group.iterReplaceSpecs():
+            toFind.setdefault(ref, set()).add(troveSpec)
+
+        for (troveSpec, ref) in group.iterDifferenceSpecs():
             toFind.setdefault(ref, set()).add(troveSpec)
 
     results = {}
@@ -1710,8 +1746,32 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
     cache.cacheTroves(troveTups)
 
 
+def removeDifferences(group, differenceGroupList, differenceSpecs, troveMap,
+                      cache):
+    """
+        If the user has specified removeTrovesAlsoInNewGroup()
+        or removeTrovesAlsoInGroup(), this will go through and remove
+        troves listed in those groups.
+    """
+    for groupToRemove in differenceGroupList:
+        for troveTup in groupToRemove.iterTroveList(strongRefs=True,
+                                                    weakRefs=True):
+            if group.hasTrove(*troveTup):
+                group.delTrove(*troveTup)
 
-def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
+    for troveSpec, ref in differenceSpecs:
+        troveTups = troveMap[ref][troveSpec]
+        for troveTup in troveTups:
+            trv = cache[troveTup]
+            for childTrove in trv.iterTroveList(strongRefs=True,
+                                              weakRefs=True):
+                if group.hasTrove(*childTrove):
+                    group.delTrove(*childTrove)
+            if group.hasTrove(*troveTup):
+                group.delTrove(*troveTup)
+
+
+def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
     def _componentMatches(troveName, compList):
         return ':' in troveName and troveName.split(':', 1)[1] in compList
 
@@ -1730,6 +1790,9 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
     # remove/replace explicit troves
     removeSpecs = dict(group.iterRemoveSpecs())
     replaceSpecs = dict(group.iterReplaceSpecs())
+    differenceGroupList = [ groupMap[x] for x in
+                            group.iterNewGroupDifferenceList()]
+    differenceSpecs = list(group.iterDifferenceSpecs())
     unmatchedRemoveSpecs = set()
     unmatchedReplaceSpecs = set()
     unmatchedGlobalReplaceSpecs = set()
@@ -1793,6 +1856,9 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                     group.addTrove(newTup, True, byDefault, allComponents,
                                    reason=(ADD_REASON_REPLACE, newTup))
                     groupAsSource.addTrove(*newTup)
+
+    removeDifferences(group, differenceGroupList, differenceSpecs, troveMap, 
+                      cache)
 
     # add implicit troves
     # first from children of explicit troves.
@@ -1907,6 +1973,8 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                                                   childGroups):
             group.delTrove(*troveTup)
 
+    removeDifferences(group, differenceGroupList, differenceSpecs, troveMap, 
+                      cache)
     # change packages to be by default False if all their components
     # are by default False - this avoids having a package being installed
     # w/o any components.

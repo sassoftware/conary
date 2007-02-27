@@ -7,6 +7,10 @@ Changes in @NEW@:
     * The group addAll command supports "flatten" - a way to cause all troves
       in all subgroups to be included directly in the top level group - 
       flattening any structure created by intermediate groups.
+    * Groups now allow you to use the command "removeTrovesAlsoInGroup"
+      and "removeTrovesAlsoInNewGroup".  These commands subtract out the
+      troves included within the specified group from the currently
+      active group. (CNY-1380)
 
   o Server Changes
     * Two new calls have been added to the server API -
