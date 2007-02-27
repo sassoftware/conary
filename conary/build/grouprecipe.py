@@ -416,17 +416,16 @@ class GroupRecipe(_BaseGroupRecipe):
         ===========
 
         The C{r.remove} command removes a trove from the group which was
-        previously added with C{r.addAll}, or C{addTrove} commands.
+        previously added with C{r.addAll} or C{add} commands.
 
         Note: If the trove is not included explicitly, such as by C{r.add()},
         but rather implicitly, as a component in a package which has been
         added, then removing the trove only changes its B{byDefault} setting,
         so that installing this group will not install the trove.
 
-        Troves may be removed from a super group which are present due to an
-        included subgroup. For example, the group I{group-os} is a top
-        level group, and includes I{group-dist}, which in turn, includes
-        package I{foo}.
+        Troves present due to an included subgroup can be removed from a
+        supergroup. For example, the group I{group-os} is a top level group,
+        and includes I{group-dist}, which in turn, includes package I{foo}.
 
         Using C{r.remove('foo', groupName='group-os')} prevents installation
         of package I{foo} during the installation of the group I{group-os}.
@@ -736,7 +735,7 @@ class GroupRecipe(_BaseGroupRecipe):
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addAll(name, versionStr, flavor)} would be
-        equivalent to adding the C{r.addTrove} lines:
+        equivalent to adding the C{r.add} lines:
 
         C{r.add('foo1', <version>)}
         C{r.add('foo2', <version>)}.
@@ -953,7 +952,7 @@ class GroupRecipe(_BaseGroupRecipe):
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addCopy('group-foo')} would be
-        equivalent to adding the C{r.addTrove} lines:
+        equivalent to adding the C{r.add} lines:
 
         C{r.createNewGroup('group-foo')}
         C{r.add('foo1', <version>, groupName='group-foo')}
