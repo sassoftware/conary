@@ -2945,7 +2945,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ret = [ [] for x in range(len(troveList)) ]
         d = {"gids" : ",".join(["%d" % x for x in userGroupIds])}
         for i, (n, branch, f) in enumerate(troveList):
-            args = [n, '/%s/%%' % (branch,)]
+            assert ( branch.startswith('/') )
+            args = [n, '%s/%%' % (branch,)]
             d["flavor"] = ""
             if f is not None:
                 d["flavor"] = "and Flavors.flavor = ?"
@@ -2973,6 +2974,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Versions on Nodes.versionId = Versions.versionId
             where Items.item = ?
               and Branches.branch like ?
+              and Instances.isPresent = 1
               %(flavor)s
             """ % d, args)
             for verStr, flavStr, pattern in cu:
