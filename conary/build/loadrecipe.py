@@ -675,11 +675,13 @@ def validateRecipe(recipeClass, packageName, fileName):
         if not recipeClass.name.startswith(prefixes[packageType]):
             raise builderrors.BadRecipeNameError(
                     'recipe name must start with "%s"' % prefixes[packageType])
-    else:   
+    elif packageType == recipe.RECIPE_TYPE_REDIRECT:
+        # redirects are allowed to have any format
+        pass
+    else:
         for prefix in prefixes.itervalues():
             if recipeClass.name.startswith(prefix):
                 raise builderrors.BadRecipeNameError(
                                 'recipe name cannot start with "%s"' % prefix)
-                
     recipeClass.validateClass()
 

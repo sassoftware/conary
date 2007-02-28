@@ -19,6 +19,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Fixed a bug where an invalid flavor at the command line would result
       in a traceback. (CNY-1070)
+    * Added an exception to allow redirect recipe names to have any format -
+      including those usually reserved for group- and info- packages.
 
 Changes in 1.1.17:
   o New Feature:
