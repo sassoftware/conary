@@ -923,6 +923,8 @@ class LazyFileCache:
     def open(self, path, mode="r"):
         fd = _LazyFile(self, path, mode=mode)
         self._fdMap[fd._hash] = fd
+        # Try to open the fd, to push the errors up early
+        fd.tell()
         return fd
 
     def _getFdCount(self):
