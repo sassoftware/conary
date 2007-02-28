@@ -15,6 +15,7 @@ Changes in @NEW@:
   o Server Changes
     * Two new calls have been added to the server API -
       getTroveReferences and getTroveDescendants (CNY-1349)
+    * Proxy server proxies put calls now
 
   o Bug Fixes:
     * Fixed a bug where an invalid flavor at the command line would result
