@@ -2580,6 +2580,91 @@ conary erase '%s=%s[%s]'
                               + '\n    '.join('%s=%s[%s]' % ((x[0],) + x[1]) 
                                               for x in sorted(extraTroves)))
 
+    def _createCs(self, repos, db, jobSet, uJob, standalone = False):
+        baseCs = changeset.ReadOnlyChangeSet()
+
+        cs, remainder = uJob.getTroveSource().createChangeSet(jobSet,
+                                    recurse = False, withFiles = True,
+                                    withFileContents = True,
+                                    useDatabase = False)
+        baseCs.merge(cs)
+        if remainder:
+            newCs = repos.createChangeSet(remainder, recurse = False,
+                                          callback = self.updateCallback)
+            baseCs.merge(newCs)
+
+        self._replaceIncomplete(baseCs, db, db, repos)
+
+        return baseCs
+
+    def _applyCs(self, cs, uJob, removeHints = {}, **kwargs):
+        # Before applying this job, reset the underlying changesets. This
+        # lets us traverse user-supplied changesets multiple times.
+        uJob.troveSource.reset()
+
+        try:
+            self.db.commitChangeSet(cs, uJob, callback=self.updateCallback, 
+                                    **kwargs)
+        except Exception, e:
+            # an exception happened, clean up
+            rb = uJob.getRollback()
+            if rb:
+                # remove the last entry from this rollback set
+                # (which is the rollback entriy that roll back
+                # applying this changeset)
+                rb.removeLast()
+                # if there aren't any entries left in the rollback,
+                # remove it altogether, unless we're about to try again
+                if (rb.getCount() == 0):
+                    self.db.removeLastRollback()
+            # rollback the current transaction
+            self.db.db.rollback()
+            if isinstance(e, database.CommitError):
+                raise UpdateError, "changeset cannot be applied:\n%s" % e
+            raise
+
+    def _createAllCs(self, q, allJobs, uJob, cfg, stopSelf):
+        # Reopen the local database so we don't share a sqlite object
+        # with the main thread. This gets the user map from the already
+        # existing repository object to ensure we still have access to
+        # any passwords we need.
+        # _createCs accesses the database through the uJob.troveSource,
+        # so make sure that references this fresh db as well.
+        import Queue
+
+        db = database.Database(cfg.root, cfg.dbPath)
+        uJob.troveSource.db = db
+        repos = self.createRepos(db, cfg)
+        self.updateCallback.setAbortEvent(stopSelf)
+
+        for i, job in enumerate(allJobs):
+            if stopSelf.isSet():
+                return
+
+            self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
+            try:
+                newCs = self._createCs(repos, db, job, uJob)
+            except:
+                q.put((True, sys.exc_info()))
+                return
+
+            while True:
+                # block for no more than 5 seconds so we can
+                # check to see if we should abort
+                try:
+                    q.put((False, newCs), True, 5)
+                    break
+                except Queue.Full:
+                    # if the queue is full, check to see if the
+                    # other thread wants to quit
+                    if stopSelf.isSet():
+                        return
+
+        self.updateCallback.setAbortEvent(None)
+        q.put(None)
+
+        # returning terminates the thread
+
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     callback = None, localRollbacks = False,
@@ -2599,108 +2684,27 @@ conary erase '%s=%s[%s]'
                           "deprecated, use setUpdateCallback() instead")
             self.setUpdateCallback(callback)
 
-        def _createCs(repos, db, jobSet, uJob, standalone = False):
-            baseCs = changeset.ReadOnlyChangeSet()
-
-            cs, remainder = uJob.getTroveSource().createChangeSet(jobSet,
-                                        recurse = False, withFiles = True,
-                                        withFileContents = True,
-                                        useDatabase = False)
-            baseCs.merge(cs)
-            if remainder:
-                newCs = repos.createChangeSet(remainder, recurse = False,
-                                              callback = self.updateCallback)
-                baseCs.merge(newCs)
-
-            self._replaceIncomplete(baseCs, db, db, repos)
-
-            return baseCs
-
-        def _applyCs(cs, uJob, removeHints = {}):
-            # Before applying this job, reset the underlying changesets. This
-            # lets us traverse user-supplied changesets multiple times.
-            uJob.troveSource.reset()
-
-            try:
-                self.db.commitChangeSet(cs, uJob,
-                        replaceFiles = replaceFiles, tagScript = tagScript, 
-                        test = test, justDatabase = justDatabase,
-                        journal = journal, callback = self.updateCallback,
-                        localRollbacks = localRollbacks,
-                        removeHints = removeHints, autoPinList = autoPinList,
-                        keepJournal = keepJournal)
-            except Exception, e:
-                # an exception happened, clean up
-                rb = uJob.getRollback()
-                if rb:
-                    # remove the last entry from this rollback set
-                    # (which is the rollback entriy that roll back
-                    # applying this changeset)
-                    rb.removeLast()
-                    # if there aren't any entries left in the rollback,
-                    # remove it altogether, unless we're about to try again
-                    if (rb.getCount() == 0):
-                        self.db.removeLastRollback()
-                # rollback the current transaction
-                self.db.db.rollback()
-                if isinstance(e, database.CommitError):
-                    raise UpdateError, "changeset cannot be applied:\n%s" % e
-                raise
-
-        def _createAllCs(q, allJobs, uJob, cfg, stopSelf):
-            # Reopen the local database so we don't share a sqlite object
-            # with the main thread. This gets the user map from the already
-            # existing repository object to ensure we still have access to
-            # any passwords we need.
-            # _createCs accesses the database through the uJob.troveSource,
-            # so make sure that references this fresh db as well.
-            db = database.Database(cfg.root, cfg.dbPath)
-            uJob.troveSource.db = db
-            repos = self.createRepos(db, cfg)
-            self.updateCallback.setAbortEvent(stopSelf)
-
-            for i, job in enumerate(allJobs):
-                if stopSelf.isSet():
-                    return
-
-                self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
-                try:
-                    newCs = _createCs(repos, db, job, uJob)
-                except:
-                    q.put((True, sys.exc_info()))
-                    return
-
-                while True:
-                    # block for no more than 5 seconds so we can
-                    # check to see if we should abort
-                    try:
-                        q.put((False, newCs), True, 5)
-                        break
-                    except Queue.Full:
-                        # if the queue is full, check to see if the
-                        # other thread wants to quit
-                        if stopSelf.isSet():
-                            return
-
-            self.updateCallback.setAbortEvent(None)
-            q.put(None)
-
-            # returning terminates the thread
-
         # def applyUpdate -- body begins here
 
         allJobs = uJob.getJobs()
 
         self._validateJob(list(itertools.chain(*allJobs)))
 
+        # Simplify arg passing a bit
+        kwargs = dict(
+            replaceFiles=replaceFiles, tagScript=tagScript,
+            justDatabase=justDatabase, test=test, journal=journal,
+            localRollbacks=localRollbacks, autoPinList=autoPinList,
+            keepJournal=keepJournal)
+
         if len(allJobs) == 1:
             # this handles change sets which include change set files
             self.updateCallback.setChangesetHunk(0, 0)
-            newCs = _createCs(self.repos, self.db, allJobs[0], uJob, 
+            newCs = self._createCs(self.repos, self.db, allJobs[0], uJob, 
                               standalone = True)
             self.updateCallback.setUpdateHunk(0, 0)
             self.updateCallback.setUpdateJob(allJobs[0])
-            _applyCs(newCs, uJob)
+            self._applyCs(newCs, uJob, **kwargs)
             self.updateCallback.updateDone()
         else:
             # build a set of everything which is being removed
@@ -2714,10 +2718,11 @@ conary erase '%s=%s[%s]'
             if not self.cfg.threaded:
                 for i, job in enumerate(allJobs):
                     self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
-                    newCs = _createCs(self.repos, self.db, job, uJob)
+                    newCs = self._createCs(self.repos, self.db, job, uJob)
                     self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
                     self.updateCallback.setUpdateJob(job)
-                    _applyCs(newCs, uJob, removeHints = removeHints)
+                    self._applyCs(newCs, uJob, removeHints = removeHints,
+                                  **kwargs)
                     self.updateCallback.updateDone()
             else:
                 import Queue
@@ -2731,8 +2736,8 @@ conary erase '%s=%s[%s]'
                 csQueue = Queue.Queue(5)
                 stopDownloadEvent = Event()
 
-                downloadThread = Thread(None, _createAllCs, args = 
-                            (csQueue, allJobs, uJob, self.cfg, 
+                downloadThread = Thread(None, self._createAllCs, 
+                            args = (csQueue, allJobs, uJob, self.cfg, 
                              stopDownloadEvent))
                 downloadThread.start()
 
@@ -2760,7 +2765,8 @@ conary erase '%s=%s[%s]'
                         i += 1
                         self.updateCallback.setUpdateHunk(i, len(allJobs))
                         self.updateCallback.setUpdateJob(allJobs[i - 1])
-                        _applyCs(newCs, uJob, removeHints = removeHints)
+                        self._applyCs(newCs, uJob, removeHints = removeHints,
+                                      **kwargs)
                         self.updateCallback.updateDone()
                         if self.updateCallback.exceptions:
                             break
