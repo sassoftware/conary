@@ -25,7 +25,7 @@ class DepResolutionMethod(object):
     def __init__(self, cfg, db, flavor=None):
         self.cfg = cfg
         self.db = db
-        if flavor is None:
+        if flavor is None and cfg:
             flavor = self.cfg.flavor
         if not isinstance(flavor, list):
             flavor = [flavor]
