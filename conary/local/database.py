@@ -159,6 +159,7 @@ class UpdateJob:
                                                     self.troveSource, frzdir)
         drep['jobs'] = list(self._freezeJobs(self.getJobs()))
         drep['primaryJobs'] = list(self._freezeJobList(self.getPrimaryJobs()))
+        drep['critical'] = self.getCriticalJobs()
         drep['transactionCounter'] = self.transactionCounter
 
         jobfile = os.path.join(frzdir, "jobfile")
@@ -183,6 +184,7 @@ class UpdateJob:
         self.setJobs(list(self._thawJobs(drep['jobs'])))
         self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
 
+        self.setCriticalJobs(drep['critical'])
         self.transactionCounter = drep['transactionCounter']
 
     def _freezeJobs(self, jobs):
