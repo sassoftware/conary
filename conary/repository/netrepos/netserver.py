@@ -2915,7 +2915,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Items on Instances.itemId = Items.itemId
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
-        where Instances.isPresent = 1
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
         ret = [ [] for x in range(len(troveInfoList)) ]
@@ -2974,7 +2973,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Versions on Nodes.versionId = Versions.versionId
             where Items.item = ?
               and Branches.branch like ?
-              and Instances.isPresent = 1
               %(flavor)s
             """ % d, args)
             for verStr, flavStr, pattern in cu:
