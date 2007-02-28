@@ -283,7 +283,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
         authToken = self.getAuth()
 
         if self.cfg.proxyDB:
-            # mask the user/password; putFile can't handle it
             status = netclient.httpPutFile(self.path, self.rfile, contentLength)
             self.send_response(status)
             return
