@@ -17,6 +17,7 @@ import errno
 import itertools
 import os
 import shutil
+import xmlrpclib
 
 #conary
 from conary import files, trove, versions
@@ -144,6 +145,204 @@ class UpdateJob:
     def getTransactionCounter(self):
         return self.transactionCounter
 
+    def freeze(self, frzdir):
+        # Require clean directory
+        assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
+        assert not os.listdir(frzdir), "Directory %s not empty" % frzdir
+
+        assert isinstance(self.troveSource, 
+            trovesource.ChangesetFilesTroveSource), "Unsupported %s" % self.troveSource
+
+        drep = {'dumpVersion' : self._dumpVersion}
+
+        drep['troveSource'] = self._freezeChangesetFilesTroveSource(
+                                                    self.troveSource, frzdir)
+        drep['jobs'] = list(self._freezeJobs(self.getJobs()))
+        drep['primaryJobs'] = list(self._freezeJobList(self.getPrimaryJobs()))
+        drep['transactionCounter'] = self.transactionCounter
+
+        jobfile = os.path.join(frzdir, "jobfile")
+        f = open(jobfile, "w+")
+        f.write(xmlrpclib.dumps((drep, )))
+
+        return drep
+
+    def thaw(self, frzdir):
+        jobfile = os.path.join(frzdir, "jobfile")
+        ((drep, ), _) = xmlrpclib.loads(open(jobfile).read())
+
+        if 'dumpVersion' not in drep or drep['dumpVersion'] > self._dumpVersion:
+            # We don't understand this format
+            raise errors.InternalConaryError("Unknown dump format")
+
+        # Need to keep a reference to the lazy cache, or else the changesets
+        # are invalid
+        self._lazyFileCache = self._thawChangesetFilesTroveSource(
+                                                        drep['troveSource'])
+
+        self.setJobs(list(self._thawJobs(drep['jobs'])))
+        self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
+
+        self.transactionCounter = drep['transactionCounter']
+
+    def _freezeJobs(self, jobs):
+        for jobList in jobs:
+            yield list(self._freezeJobList(jobList))
+
+    def _thawJobs(self, jobs):
+        for jobList in jobs:
+            yield list(self._thawJobList(jobList))
+
+    def _freezeJobList(self, jobList):
+        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
+            yield (trvName,
+                   (self._freezeRevision(oRev), self._freezeFlavor(oFlv)),
+                   (self._freezeRevision(rev), self._freezeFlavor(flv)),
+                   int(searchLocalRepo))
+
+    def _thawJobList(self, jobList):
+        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
+            yield (trvName,
+                   (self._thawRevision(oRev), self._thawFlavor(oFlv)),
+                   (self._thawRevision(rev), self._thawFlavor(flv)),
+                   bool(searchLocalRepo))
+
+    def _freezeRevision(self, rev):
+        if rev is None:
+            return ''
+        return rev.freeze()
+
+    def _thawRevision(self, rev):
+        if '' == rev:
+            return None
+        return versions.ThawVersion(rev)
+
+    def _freezeFlavor(self, flavor):
+        if flavor is None:
+            # Frozen flavors are either empty strings or start with a digit
+            return '*None*'
+        return flavor.freeze()
+
+    def _thawFlavor(self, flavor):
+        if '*None*' == flavor:
+            return None
+        return deps.ThawFlavor(flavor)
+
+    def _freezeChangesetFilesTroveSource(self, troveSource, frzdir):
+        assert isinstance(troveSource, trovesource.ChangesetFilesTroveSource)
+        frzrepr = {'type' : 'ChangesetFilesTroveSource'}
+        ccsdir = os.path.join(frzdir, 'changesets')
+        util.mkdirChain(ccsdir)
+        csList = []
+        # csMap is a hash from the object ID of the changeset to the position
+        # in csList (which is a file name)
+        csMap = {}
+        for i, cs in enumerate(troveSource.csList):
+            fname = os.path.join(ccsdir, "%03d.ccs" % i)
+            cs.writeToFile(fname)
+            csList.append(fname)
+            csMap[id(cs)] = i
+
+        frzrepr['changesets'] = csList
+
+        id2trvMap = []
+        trv2idMap = {}
+        for (i, (trvName, trvRev, trvFlavor)) in troveSource.idMap.iteritems():
+            id2trvMap.append( (trvName, 
+                               self._freezeRevision(trvRev),
+                               self._freezeFlavor(trvFlavor)) )
+            trv2idMap[(trvName, trvRev, trvFlavor)] = str(i)
+
+        # idMapLen is the length of the idMap hash. Because of the way we
+        # construct it, we know we can get the data from the beginning of 
+        # trv2idMap, so we can simply slice it
+        frzrepr['idMapLen'] = len(id2trvMap)
+
+        # Map trove IDs to changeset IDs
+        for field in 'troveCsMap', 'erasuresMap':
+            id2csMap = {}
+            troveCsMap = {}
+            for trv, cs in getattr(troveSource, field).iteritems():
+                if trv not in trv2idMap:
+                    trv2idMap[trv] = idx = str(len(id2trvMap))
+                    id2trvMap.append((trv[0],
+                                      self._freezeRevision(trv[1]),
+                                      self._freezeFlavor(trv[2])))
+                else:
+                    idx = trv2idMap[trv]
+                id2csMap[idx] = csMap[id(cs)]
+            frzrepr[field] = id2csMap
+
+        # XXX jobMap
+
+        providesMap = {}
+        for thawdep, trvList in troveSource.providesMap.iteritems():
+            providesMap[thawdep.freeze()] = [ int(trv2idMap[t])
+                                                for t in trvList ]
+        frzrepr['providesMap'] = providesMap
+
+        frzrepr['storeDeps'] = int(troveSource.storeDeps)
+        frzrepr['invalidated'] = int(troveSource.invalidated)
+
+        # The trove map (may be more than idMap)
+        # it's an array, values in the other trove-related maps are indices in
+        # this array
+        frzrepr['troveMap'] = id2trvMap
+
+        # XXX rooted
+
+        return frzrepr
+
+    def _thawChangesetFilesTroveSource(self, frzrepr):
+        assert frzrepr.get('type') == 'ChangesetFilesTroveSource'
+
+        lazycache = util.LazyFileCache()
+        csList = frzrepr['changesets']
+        try:
+            csList = [ changeset.ChangeSetFromFile(lazycache.open(x)) 
+                       for x in csList ]
+        except IOError, e:
+            raise errors.InternalConaryError("Missing changeset file %s" % 
+                                             e.filename)
+
+        troveSource = self.getTroveSource()
+
+        idMapLen = frzrepr['idMapLen']
+
+        troveMap = [ (t[0], self._thawRevision(t[1]), self._thawFlavor(t[2])) 
+                    for t in frzrepr['troveMap'] ]
+
+
+        troveSource.csList.extend(csList)
+        # XMLRPC converts tuples to lists
+        troveSource.idMap.update(dict(enumerate(troveMap[:idMapLen])))
+
+        # Map trove IDs to changeset IDs
+        for field in 'troveCsMap', 'erasuresMap':
+            id2csMap = frzrepr[field]
+            realMap = {}
+            for trvId, csId in id2csMap.iteritems():
+                trvId = int(trvId)
+                realMap[troveMap[trvId]] = csList[csId]
+            getattr(troveSource, field).update(realMap)
+
+        # XXX jobMap
+
+        providesMap = {}
+        for frzdep, trvList in frzrepr['providesMap'].iteritems():
+            providesMap[deps.ThawDependencySet(frzdep)] = [
+                troveMap[trvId] for trvId in trvList ]
+        troveSource.providesMap.update(providesMap)
+
+        troveSource.storeDeps = bool(frzrepr['storeDeps'])
+        troveSource.invalidated = bool(frzrepr['invalidated'])
+
+        # XXX rooted
+
+        return lazycache
+
+
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -154,6 +353,8 @@ class UpdateJob:
 
         self.searchSource = searchSource
         self.transactionCounter = None
+        # Version of the serialized format we support
+        self._dumpVersion = 1
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
