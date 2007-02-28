@@ -23,6 +23,8 @@ Changes in @NEW@:
       including those usually reserved for group- and info- packages.
     * Removed a harmful assert that kept trove source stacks from working w/o
       installLabelPaths in some cases. (CNY-1351)
+    * cfg.root is always treated as absolute internally, even if it is 
+      specified in a relatively.  This resolves CNY-1276.
 
 Changes in 1.1.17:
   o New Feature:
