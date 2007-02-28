@@ -1134,8 +1134,6 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
         results = {}
 
         someRequireLabel = not self.isSearchAsDatabase()
-        if someRequireLabel:
-            assert(labelPath)
 
         for source in self.sources[:-1]:
             # FIXME: it should be possible to reuse the trove finder
