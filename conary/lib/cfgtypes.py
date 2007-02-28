@@ -112,13 +112,13 @@ CfgString = CfgType
 _pathCache = {}
 def Path(str):
     if str not in _pathCache:
-        if '~' not in str and '$' not in str:
+        if '~' not in str and '$' not in str and str[0] == '/':
             p = _Path(str)
         else:
             p = _ExpandedPath(str)
         _pathCache[str] = p
         return p
-    elif '~' in str or '$' in str:
+    elif '~' in str or '$' in str or str[0] != '/':
         p = _ExpandedPath(str)
         if p != _pathCache[str]:
             _pathCache[str] = p
@@ -139,7 +139,7 @@ class _Path(str):
 class _ExpandedPath(_Path):
 
     def __new__(cls, origString):
-        string = os.path.expanduser(os.path.expandvars(origString))
+        string = os.path.abspath(os.path.expanduser(os.path.expandvars(origString)))
         return str.__new__(cls, string)
 
     def __init__(self, origString):
