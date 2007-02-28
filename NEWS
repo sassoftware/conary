@@ -16,6 +16,10 @@ Changes in @NEW@:
     * Two new calls have been added to the server API -
       getTroveReferences and getTroveDescendants (CNY-1349)
 
+  o Bug Fixes:
+    * Fixed a bug where an invalid flavor at the command line would result
+      in a traceback. (CNY-1070)
+
 Changes in 1.1.17:
   o New Feature:
     * A caching proxy has been implemented for Conary.  A proxy server
