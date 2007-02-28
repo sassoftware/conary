@@ -10,6 +10,38 @@
 # without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
+"""
+    A SearchSource is a TroveSource + information about how to search it
+    (using findTroves).  This allows the user to abstract away information
+    about whether the trove source will work without an installLabelPath
+    or not, what flavor to use, etc.
+
+    It also makes it easier to stack sources (see TroveSourceStack findTroves
+    for an example of the pain of stacking trove sources.).
+
+    Finally a SearchSource is closely tied to a resolve method.  This resolve
+    method resolves dependencies against the SearchSource.  A SearchSource
+    stack that searches against a trove list first and then against
+    an installLabelPath will have a resolve method that works the same way
+    (see resolvemethod.py for implementation).
+
+    Currently, there are 3 types of SearchSources.
+
+        NetworkSearchSource(repos, installLabelPath, flavor, db=None)
+        - searches the network on the given installLabelPath.
+
+        TroveSearchSource(repos, troveList, flavor=None, db=None)
+        - searches the given trove list.
+
+        SearchSourceStack(*sources)
+        - searches the sources in order.
+
+    For all of these sources, you simply call findTroves(troveSpecs),
+    without passing in flavor or installLabelPath.
+
+    You can also create a searchSourceStack by calling 
+    createSearchSourceStackFromStrings.
+"""
 
 import itertools
 
@@ -28,82 +60,76 @@ class SearchSource(object):
         self.source = source
         self.db = db
         self.flavor = flavor
+        self.installLabelPath = None
 
+        # pass through methods that are valid in both the searchSource
+        # and its underlying trove source.
         for method in ('getTroveLeavesByLabel', 'getTroveVersionsByLabel',
                        'getTroveLeavesByBranch', 'getTroveVersionsByBranch',
-                       'getTroveVersionFlavors', 'getMetadata'):
+                       'getTroveVersionFlavors', 'getMetadata', 'hasTroves',
+                       'createChangeSet', 'iterFilesInTrove', 'getFileVersion',
+                       'getTrove', 'getTroves'):
             if hasattr(source, method):
                 setattr(self, method, getattr(source, method))
 
     def getTroveSource(self):
+        """
+            Returns the source that this stack is wrapping, if there is one.
+        """
         return self.source
 
     def findTrove(self, troveSpec, useAffinity=False, **kw):
+        """
+            Finds the trove matching the given (name, versionSpec, flavor)
+            troveSpec.  If useAffinity is True, uses the associated database
+            for branch/flavor affinity.
+        """
         res = self.findTroves([troveSpec], useAffinity=useAffinity, **kw)
         return res[troveSpec]
 
     def findTroves(self, troveSpecs, useAffinity=False, **kw):
+        """
+            Finds the trove matching the given list of 
+            (name, versionSpec, flavor) troveSpecs.  If useAffinity is True, 
+            uses the associated database for branch/flavor affinity.
+        """
         if useAffinity:
             kw['affinityDatabase'] = self.db
-        return self.source.findTroves(None, troveSpecs, self.flavor, **kw)
-
-    def resolveDependencies(self, label, depList):
-        return self.source.resolveDependencies(label, depList)
-
-    def hasTroves(self, troveList):
-        return self.source.hasTroves(troveList)
-
-    def getTrove(self, name, version, flavor, withFiles = True):
-        trv = self.getTroves([(name, version, flavor)], withFiles=withFiles)[0]
-        return trv
-
-    def getTroves(self, troveList, *args, **kw):
-        allowMissing = kw.pop('allowMissing', True)
-        troves =  self.source.getTroves(troveList, *args, **kw)
-        if allowMissing:
-            return troves
-        for idx, trove in enumerate(troves):
-            if trove is None:
-                raise errors.TroveMissing(troveList[idx][0], troveList[idx][1])
-        return troves
-
-    def createChangeSet(self, *args, **kw):
-        return self.source.createChangeSet(*args, **kw)
+        return self.source.findTroves(self.installLabelPath, troveSpecs,
+                                      self.flavor, **kw)
 
     def getResolveMethod(self):
+        """
+            Returns the dep resolution method
+        """
         m = resolvemethod.BasicResolutionMethod(None, self.db, self.flavor)
         m.setTroveSource(self.source)
         return m
 
-    def iterFilesInTrove(self, *args, **kw):
-        return self.source.iterFilesInTrove(*args, **kw)
-
-    def getFileVersion(self, *args, **kw):
-        return self.source.getFileVersion(*args, **kw)
-
 
 class NetworkSearchSource(SearchSource):
+    """
+        Search source using an installLabelPath.
+    """
     def __init__(self, repos, installLabelPath, flavor, db=None):
         SearchSource.__init__(self, repos, flavor, db)
         self.installLabelPath = installLabelPath
 
     def getResolveMethod(self):
+        """
+            Resolves using the given installLabelPath.
+        """
         m =  resolvemethod.DepResolutionByLabelPath(None, self.db,
                                                       self.installLabelPath, 
                                                       self.flavor)
         m.setTroveSource(self.source)
         return m
 
-    def findTroves(self, troveSpecs, useAffinity=False, allowMissing=False,
-                   **kw):
-        if useAffinity:
-            kw['affinityDatabase'] = self.db
-        return self.source.findTroves(self.installLabelPath, troveSpecs,
-                                      self.flavor, allowMissing=allowMissing,
-                                      **kw)
-
-
 class TroveSearchSource(SearchSource):
+    """
+        Search source using a list of troves.  Accepts either
+        a list of trove tuples or a list of trove objects.
+    """
     def __init__(self, troveSource, troveList, flavor=None, db=None):
         if not isinstance(troveList, (list, tuple)):
             troveList = [troveList]
@@ -119,6 +145,10 @@ class TroveSearchSource(SearchSource):
         self.troveList = troveList
 
     def getResolveMethod(self):
+        """
+            Returns a dep resolution method that will resolve dependencies
+            against these troves.
+        """
         m = resolvemethod.DepResolutionByTroveList(None, self.db,
                                                    self.troveList,
                                                    self.flavor)
@@ -126,13 +156,29 @@ class TroveSearchSource(SearchSource):
         return m
 
 class SearchSourceStack(trovesource.SourceStack):
+    """
+        Created by SearchSourceStack(*sources)
 
+        Method for searching a stack of sources.  Call in the same way
+        as a single searchSource:
+            findTroves(troveSpecs, useAffinity=False)
+    """
     def findTrove(self, troveSpec, useAffinity=False, **kw):
+        """
+            Finds the trove matching the given (name, versionSpec, flavor)
+            troveSpec.  If useAffinity is True, uses the associated database
+            for branch/flavor affinity.
+        """
         res = self.findTroves([troveSpec], useAffinity=useAffinity, **kw)
         return res[troveSpec]
 
     def findTroves(self, troveSpecs, useAffinity=False, allowMissing=False,
                     **kw):
+        """
+            Finds the trove matching the given list of
+            (name, versionSpec, flavor) troveSpecs.  If useAffinity is True,
+            uses the associated database for branch/flavor affinity.
+        """
         troveSpecs = list(troveSpecs)
         results = {}
         for source in self.sources[:1]:
@@ -155,10 +201,18 @@ class SearchSourceStack(trovesource.SourceStack):
                             [x.getResolveMethod() for x in self.sources])
 
 def stack(*sources):
-    """ create a trove source that will search first source1, then source2 """
+    """ create a search source that will search first source1, then source2 """
     return SearchSourceStack(*sources)
 
 def createSearchPathFromStrings(searchPath):
+    """
+        Creates a list of items that can be passed into createSearchSource.
+
+        Valid items in the searchPath include:
+            1. troveSpec (foo=:devel)
+            2. string for label (conary.rpath.com@rpl:devel)
+            3. label objects or list of label objects.
+    """
     from conary.conaryclient import cmdline
     from conary import conarycfg
     labelList = []
@@ -197,12 +251,29 @@ def createSearchPathFromStrings(searchPath):
         finalPath.append(tuple(labelList))
     return tuple(finalPath)
 
-def createSearchPathSourceFromStrings(searchSource, searchPath, flavor,
-                                      db=None):
-    searchPath = createSearchPathFromStrings(searchPath)
-    return createSearchPathSource(searchSource, searchPath, flavor, db)
+def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
+                                       db=None):
+    """
+        Creates a list of items that can be passed into createSearchSource.
 
-def createSearchPathSource(searchSource, searchPath, flavor, db=None):
+        Valid items in the searchPath include:
+            1. troveSpec (foo=:devel)
+            2. string for label (conary.rpath.com@rpl:devel)
+            3. label objects or list of label objects.
+    """
+    searchPath = createSearchPathFromStrings(searchPath)
+    return createSearchSourceStack(searchSource, searchPath, flavor, db)
+
+def createSearchSourceStack(searchSource, searchPath, flavor, db=None):
+    """
+        Creates a searchSourceStack based on a searchPath.
+
+        Valid parameters include:
+            * a label object
+            * a trove tuple
+            * a trove object
+            * a list of any of the above.
+    """
     troveSource = searchSource.getTroveSource()
     searchStack = SearchSourceStack()
     for item in searchPath:
@@ -225,4 +296,3 @@ def createSearchPathSource(searchSource, searchPath, flavor, db=None):
         else:
             raise baseerrors.ParseError('unknown search path item %s' % (item,))
     return searchStack
-
