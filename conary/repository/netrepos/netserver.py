@@ -2550,7 +2550,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
         self.log(2, mark)
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
-
+        if not userGroupIds:
+            return []
         # Since signatures are small blobs, it doesn't make a lot
         # of sense to use a LIMIT on this query...
         query = """
@@ -2730,9 +2731,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], mark)
         # only show troves the user is allowed to see
         cu = self.db.cursor()
-
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
-
+        if not userGroupIds:
+            return []
         # compute the max number of troves with the same mark for
         # dynamic sizing; the client can get stuck if we keep
         # returning the same subset because of a LIMIT too low
@@ -2875,6 +2876,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         schema.resetTable(cu, "gtl")
         schema.resetTable(cu, "gtlInst")
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return []
         for (n,v,f) in troveInfoList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
                        (n, v, f), start_transaction=False)
@@ -2928,57 +2931,58 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getTroveDescendants(self, authToken, clientVersion, troveList):
         """
-        troveList is a list of (name, label, flavor) tuples. For
-        each item, return the full version and flavor of each trove
-        named name which exists on a branch which includes label and
-        is of the specified flavor. If the flavor is not specified,
-        all matches should be returned. Only troves the user has
-        permission to view should be returned.
+        troveList is a list of (name, branch, flavor) tuples. For each
+        item, return the full version and flavor of each trove named
+        Name which exists on a downstream branch from the branch
+        passed in and is of the specified flavor. If the flavor is not
+        specified, all matches should be returned. Only troves the
+        user has permission to view should be returned.
         """
         if not self.auth.check(authToken):
             raise errors.InsufficientPermission
         self.log(2, troveList)
         cu = self.db.cursor()
-        schema.resetTable(cu, "gtl")
-        schema.resetTable(cu, "gtlInst")
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        for (n, l, f) in troveList:
-            cu.execute("insert into gtl(name,version,flavor) values(?,?,?)",
-                       (n,l,f), start_transaction=False)
-        # we'll need the min idx to account for differences in SQL backends
-        cu.execute("SELECT MIN(idx) from gtl")
-        minIdx = cu.fetchone()[0]
-        cu.execute("""
-        select
-            gtl.idx, gtl.name, Versions.version, Flavors.flavor,
-            UP.permittedTrove
-        from gtl
-        join Items on gtl.name = Items.item
-        join Flavors on (gtl.flavor IS NULL or gtl.flavor = Flavors.flavor)
-        join Instances on
-            Instances.itemId = Items.itemId AND
-            Instances.flavorId = Flavors.flavorId
-        join Nodes using (itemId, versionId)
-        join LabelMap using (itemId, branchId)
-        join Labels on
-            LabelMap.labelId = Labels.labelId AND
-            Labels.label = gtl.version
-        join (select
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove
-              from Permissions
-              join UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-              join Items as PerItems ON Permissions.itemId = PerItems.itemId
-              where Permissions.userGroupId in (%s)
-              ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
-        join Versions on Instances.versionId = Versions.versionId
-        """ % (",".join("%d" % x for x in userGroupIds),))
-        # parse results
+        if not userGroupIds:
+            return []
         ret = [ [] for x in range(len(troveList)) ]
-        for i, n,v,f, pattern in cu:
-            l = ret[i-minIdx]
-            if self.auth.checkTrove(pattern, n):
-                l.append((v,f))
+        d = {"gids" : ",".join(["%d" % x for x in userGroupIds])}
+        for i, (n, branch, f) in enumerate(troveList):
+            assert ( branch.startswith('/') )
+            args = [n, '%s/%%' % (branch,)]
+            d["flavor"] = ""
+            if f is not None:
+                d["flavor"] = "and Flavors.flavor = ?"
+                args.append(f)
+            cu.execute("""
+            select
+            Versions.version, Flavors.flavor, UP.permittedTrove
+            from Items
+            join Nodes on Items.itemId = Nodes.itemId
+            join Instances on
+                Nodes.versionId = Instances.versionId and
+                Nodes.itemId = Instances.itemId
+            join Flavors on Instances.flavorId = Flavors.flavorId
+            join LabelMap on
+                Nodes.itemId = LabelMap.itemId and
+                Nodes.branchId = LabelMap.branchId
+            join ( select Permissions.labelId as labelId,
+                          PerItems.item as permittedTrove
+                   from Permissions
+                   join UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
+                   join Items as PerItems ON Permissions.itemId = PerItems.itemId
+                   where Permissions.userGroupId in (%(gids)s)
+                 ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
+            join Branches on Nodes.branchId = Branches.branchId
+            join Versions on Nodes.versionId = Versions.versionId
+            where Items.item = ?
+              and Branches.branch like ?
+              and Instances.isPresent = 1
+              %(flavor)s
+            """ % d, args)
+            for verStr, flavStr, pattern in cu:
+                if self.auth.checkTrove(pattern, n):
+                    ret[i].append((verStr,flavStr))
         return ret
 
     @accessReadOnly

@@ -1,6 +1,16 @@
 Changes in @NEW@:
   o Build Changes
     * A list of rPath mirrors for source components has been added.
+    * Group recipes now support a setSearchPath method.  This provides a way
+      to tell groups how to find and resolve packages by specifying a list
+      containing either packages or labels. (CNY-1316)
+    * The group addAll command supports "flatten" - a way to cause all troves
+      in all subgroups to be included directly in the top level group - 
+      flattening any structure created by intermediate groups.
+    * Groups now allow you to use the command "removeTrovesAlsoInGroup"
+      and "removeTrovesAlsoInNewGroup".  These commands subtract out the
+      troves included within the specified group from the currently
+      active group. (CNY-1380)
 
   o Server Changes
     * Two new calls have been added to the server API -

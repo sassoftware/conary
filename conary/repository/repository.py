@@ -273,12 +273,12 @@ class AbstractRepository(IdealRepository):
 
     def getTroveDescendants(self, troveList):
         """
-        troveList is a list of (name, label, flavor) tuples. For
-        each item, return the full version and flavor of each trove
-        named Name which exists on a branch which includes label and
-        is of the specified flavor. If the flavor is not specified,
-        all matches should be returned. Only troves the user has
-        permission to view should be returned.
+        troveList is a list of (name, branch, flavor) tuples. For each
+        item, return the full version and flavor of each trove named
+        Name which exists on a downstream branch from the branch
+        passed in and is of the specified flavor. If the flavor is not
+        specified, all matches should be returned. Only troves the
+        user has permission to view should be returned.
         """
 
     ### File functions
