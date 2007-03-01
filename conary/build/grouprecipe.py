@@ -27,6 +27,7 @@ from conary import callbacks
 from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
+from conary.local import database
 from conary.repository import trovesource, searchsource
 from conary import trove
 from conary import versions
@@ -1570,6 +1571,26 @@ class GroupReference:
         return self.getTroves(self.sourceTups, withFiles=False)
 
 
+class TroveCacheWrapper(object):
+    def __init__(self, cache):
+        self.repos = cache.repos
+        self.cache = cache
+
+    def getDepsForTroveList(self, troveList):
+        return [ (x.getProvides(), x.getRequires())
+                 for x in self.getTroves(troveList) ]
+
+    def getPathHashesForTroveList(self, troveList):
+        return [ x.getPathHashes() for x in self.getTroves(troveList) ]
+
+    def getTroves(self, troveList, *args, **kw):
+        self.cache.cacheTroves(troveList)
+        return [self.cache[x] for x in troveList]
+
+    def getTrove(self, troveTup, *args, **kw):
+        self.cache.cacheTroves([troveTup])
+        return self.cache[troveTup]
+
 class TroveCache(dict):
     """ Simple cache for relevant information about troves needed for
         recipes in case they are needed again for other recipes.
@@ -1579,6 +1600,10 @@ class TroveCache(dict):
         if not callback:
             callback = callbacks.CookCallback()
         self.callback = callback
+
+    def getTroves(self, troveList, *args, **kw):
+        self.cacheTroves(troveList)
+        return [self[x] for x in troveList]
 
     def cacheTroves(self, troveTupList):
         troveTupList = [x for x in troveTupList if x not in self]
@@ -2424,9 +2449,10 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 def checkGroupDependencies(group, cfg, cache, callback):
     callback.groupCheckingDependencies()
     if group.checkOnlyByDefaultDeps:
-        troveList = group.iterDefaultTroveList()
+        troveList = list(group.iterDefaultTroveList())
     else:
-        troveList = group.iterTroveList()
+        troveList = list(group.iterTroveList())
+    cache.cacheTroves(troveList)
 
     jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList
                 if not ((n,v,f) in cache and cache.isRedirect((n,v,f))) ]
@@ -2436,18 +2462,8 @@ def checkGroupDependencies(group, cfg, cache, callback):
     cfg.root   = ':memory:'
 
     client = conaryclient.ConaryClient(cfg)
-    if group.checkOnlyByDefaultDeps:
-        cs = client.createChangeSet(jobSet, recurse = False, withFiles = False,
-                                    callback = callback)
-    else:
-        cs = client.repos.createChangeSet(jobSet, recurse = False,
-                                          withFiles = False,
-                                          callback = callback)
 
-    jobSet = cs.getJobSet()
-    trvSrc = trovesource.ChangesetFilesTroveSource(client.db)
-    trvSrc.addChangeSet(cs, includesFileContents = False)
-    failedDeps = client.db.depCheck(jobSet, trvSrc)[0]
+    failedDeps = client.db.depCheck(jobSet, TroveCacheWrapper(cache))[0]
     callback.done()
     return failedDeps
 
