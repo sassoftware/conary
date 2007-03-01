@@ -22,8 +22,10 @@ python_files = __init__.py	\
 		filecontents.py	\
                 findtrove.py    \
 		netclient.py 	\
+		searchsource.py	\
 		shimclient.py	\
 		repository.py	\
+		resolvemethod.py\
 		transport.py	\
 		trovesource.py	\
 		xmlshims.py
