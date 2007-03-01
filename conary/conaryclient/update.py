@@ -2665,6 +2665,18 @@ conary erase '%s=%s[%s]'
 
         # returning terminates the thread
 
+    def downloadUpdate(self, uJob, destDir):
+        allJobs = uJob.getJobs()
+        csFiles = []
+        for i, job in enumerate(allJobs):
+            self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
+            newCs = self._createCs(self.repos, self.db, job, uJob)
+            # Dump the changeset to disk
+            path = os.path.join(destDir, "%04d.ccs" % i)
+            newCs.writeToFile(path)
+            csFiles.append(path)
+        uJob.setJobsChangesetList(csFiles)
+
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
                     callback = None, localRollbacks = False,
@@ -2687,6 +2699,7 @@ conary erase '%s=%s[%s]'
         # def applyUpdate -- body begins here
 
         allJobs = uJob.getJobs()
+        jobsCsList = uJob.getJobsChangesetList()
 
         self._validateJob(list(itertools.chain(*allJobs)))
 
@@ -2706,94 +2719,104 @@ conary erase '%s=%s[%s]'
             self.updateCallback.setUpdateJob(allJobs[0])
             self._applyCs(newCs, uJob, **kwargs)
             self.updateCallback.updateDone()
-        else:
-            # build a set of everything which is being removed
-            removeHints = dict()
-            for job in allJobs:
-                # the None in this dict means that all files in this trove
-                # should be overridden
-                removeHints.update([ ((x[0], x[1][0], x[1][1]), None)
-                                        for x in job if x[1][0] is not None ])
+            return
 
-            if not self.cfg.threaded:
-                for i, job in enumerate(allJobs):
-                    self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
-                    newCs = self._createCs(self.repos, self.db, job, uJob)
-                    self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
-                    self.updateCallback.setUpdateJob(job)
-                    self._applyCs(newCs, uJob, removeHints = removeHints,
-                                  **kwargs)
-                    self.updateCallback.updateDone()
-            else:
-                import Queue
-                from conary.lib.fixedthreading import Thread
-                # turn up the thread verbosity if we're in --debug=lowlevel
-                if log.getVerbosity() == log.LOWLEVEL:
-                    import threading
-                    threading._VERBOSE = True
-                from threading import Event
+        # build a set of everything which is being removed
+        removeHints = dict()
+        for job in allJobs:
+            # the None in this dict means that all files in this trove
+            # should be overridden
+            removeHints.update([ ((x[0], x[1][0], x[1][1]), None)
+                                    for x in job if x[1][0] is not None ])
 
-                csQueue = Queue.Queue(5)
-                stopDownloadEvent = Event()
+        if len(allJobs) == len(jobsCsList):
+            # We have everything already downloaded
+            for i, job in enumerate(allJobs):
+                cs = changeset.ChangeSetFromFile(jobsCsList[i])
+                self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
+                self.updateCallback.setUpdateJob(job)
+                self._applyCs(cs, uJob, removeHints = removeHints, **kwargs)
+                self.updateCallback.updateDone()
+            return
 
-                downloadThread = Thread(None, self._createAllCs, 
-                            args = (csQueue, allJobs, uJob, self.cfg, 
-                             stopDownloadEvent))
-                downloadThread.start()
+        if not self.cfg.threaded:
+            for i, job in enumerate(allJobs):
+                self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
+                newCs = self._createCs(self.repos, self.db, job, uJob)
+                self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
+                self.updateCallback.setUpdateJob(job)
+                self._applyCs(newCs, uJob, removeHints = removeHints, **kwargs)
+                self.updateCallback.updateDone()
+            return
 
+        import Queue
+        from conary.lib.fixedthreading import Thread
+        # turn up the thread verbosity if we're in --debug=lowlevel
+        if log.getVerbosity() == log.LOWLEVEL:
+            import threading
+            threading._VERBOSE = True
+        from threading import Event
+
+        csQueue = Queue.Queue(5)
+        stopDownloadEvent = Event()
+
+        downloadThread = Thread(None, self._createAllCs,
+                args = (csQueue, allJobs, uJob, self.cfg, stopDownloadEvent))
+        downloadThread.start()
+
+        try:
+            i = 0
+            while True:
                 try:
-                    i = 0
-                    while True:
-                        try:
-                            # get the next changeset object from the
-                            # download thread.  Block for 10 seconds max
-                            newCs = csQueue.get(True, 10)
-                        except Queue.Empty:
-                            if downloadThread.isAlive():
-                                continue
-
-                            raise UpdateError('error: download thread terminated'
-                                              ' unexpectedly, cannot continue update')
-                        if newCs is None:
-                            break
-                        # We expect a (boolean, value)
-                        isException, val = newCs
-                        if isException:
-                            raise val[0], val[1], val[2]
-
-                        newCs = val
-                        i += 1
-                        self.updateCallback.setUpdateHunk(i, len(allJobs))
-                        self.updateCallback.setUpdateJob(allJobs[i - 1])
-                        self._applyCs(newCs, uJob, removeHints = removeHints,
-                                      **kwargs)
-                        self.updateCallback.updateDone()
-                        if self.updateCallback.exceptions:
-                            break
-                finally:
-                    stopDownloadEvent.set()
-                    # the download thread _should_ respond to the
-                    # stopDownloadEvent in ~5 seconds.
-                    downloadThread.join(20)
-
+                    # get the next changeset object from the
+                    # download thread.  Block for 10 seconds max
+                    newCs = csQueue.get(True, 10)
+                except Queue.Empty:
                     if downloadThread.isAlive():
-                        self.updateCallback.warning('timeout waiting for '
-                            'download thread to terminate -- closing '
-                            'database and exiting')
-                        self.db.close()
-                        tb = sys.exc_info()[2]
-                        if tb:
-                            tb = traceback.format_tb(tb)
-                            self.updateCallback.warning('the following '
-                                'traceback may be related:',
-                                exc_text=''.join(tb))
-                        # this will kill the download thread as well
-                        os.kill(os.getpid(), 15)
-                    else:
-                        # DEBUGGING NOTE: if you need to debug update code not
-                        # related to threading, the easiest thing is to add 
-                        # 'threaded False' to your conary config.
-                        pass
+                        continue
+
+                    raise UpdateError('error: download thread terminated'
+                                      ' unexpectedly, cannot continue update')
+                if newCs is None:
+                    break
+                # We expect a (boolean, value)
+                isException, val = newCs
+                if isException:
+                    raise val[0], val[1], val[2]
+
+                newCs = val
+                i += 1
+                self.updateCallback.setUpdateHunk(i, len(allJobs))
+                self.updateCallback.setUpdateJob(allJobs[i - 1])
+                self._applyCs(newCs, uJob, removeHints = removeHints,
+                              **kwargs)
+                self.updateCallback.updateDone()
+                if self.updateCallback.exceptions:
+                    break
+        finally:
+            stopDownloadEvent.set()
+            # the download thread _should_ respond to the
+            # stopDownloadEvent in ~5 seconds.
+            downloadThread.join(20)
+
+            if downloadThread.isAlive():
+                self.updateCallback.warning('timeout waiting for '
+                    'download thread to terminate -- closing '
+                    'database and exiting')
+                self.db.close()
+                tb = sys.exc_info()[2]
+                if tb:
+                    tb = traceback.format_tb(tb)
+                    self.updateCallback.warning('the following '
+                        'traceback may be related:',
+                        exc_text=''.join(tb))
+                # this will kill the download thread as well
+                os.kill(os.getpid(), 15)
+            else:
+                # DEBUGGING NOTE: if you need to debug update code not
+                # related to threading, the easiest thing is to add 
+                # 'threaded False' to your conary config.
+                pass
 
 
 class UpdateError(ClientError):

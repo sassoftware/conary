@@ -145,6 +145,13 @@ class UpdateJob:
     def getTransactionCounter(self):
         return self.transactionCounter
 
+    def setJobsChangesetList(self, csList):
+        del self.jobsCsList[:]
+        self.jobsCsList.extend(csList)
+
+    def getJobsChangesetList(self):
+        return self.jobsCsList
+
     def freeze(self, frzdir):
         # Require clean directory
         assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
@@ -161,6 +168,7 @@ class UpdateJob:
         drep['primaryJobs'] = list(self._freezeJobList(self.getPrimaryJobs()))
         drep['critical'] = self.getCriticalJobs()
         drep['transactionCounter'] = self.transactionCounter
+        drep['jobsCsList'] = self.jobsCsList
 
         jobfile = os.path.join(frzdir, "jobfile")
         f = open(jobfile, "w+")
@@ -183,6 +191,7 @@ class UpdateJob:
 
         self.setJobs(list(self._thawJobs(drep['jobs'])))
         self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
+        self.setJobsChangesetList(drep['jobsCsList'])
 
         self.setCriticalJobs(drep['critical'])
         self.transactionCounter = drep['transactionCounter']
@@ -343,8 +352,6 @@ class UpdateJob:
 
         return lazycache
 
-
-
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -352,6 +359,8 @@ class UpdateJob:
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
         self.criticalJobs = []
+        # Changesets we could use for upload - a parallel list to self.jobs
+        self.jobsCsList = []
 
         self.searchSource = searchSource
         self.transactionCounter = None
