@@ -1,5 +1,5 @@
 Changes in @NEW@:
-  o Build Changes
+  o Build Changes:
     * A list of rPath mirrors for source components has been added.
     * Group recipes now support a setSearchPath method.  This provides a way
       to tell groups how to find and resolve packages by specifying a list
@@ -12,7 +12,7 @@ Changes in @NEW@:
       troves included within the specified group from the currently
       active group. (CNY-1380)
 
-  o Server Changes
+  o Server Changes:
     * Two new calls have been added to the server API -
       getTroveReferences and getTroveDescendants (CNY-1349)
     * Proxy server proxies put calls now
@@ -28,6 +28,11 @@ Changes in @NEW@:
       even if it is specified as a relative path. (CNY-1276)
     * cvc now properly cleans up 000-permission files from the old build 
       directory. (CNY-1359)
+
+  o Internal Changes:
+    * Changesets in an update job can be downloaded in a step separate from
+      the installation. Additionally, update jobs can be frozen and reapplied
+      later. (CNY-1300)
 
 Changes in 1.1.17:
   o New Feature:
