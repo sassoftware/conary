@@ -2683,7 +2683,13 @@ conary erase '%s=%s[%s]'
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
 
-        if uJob.getTransactionCounter() != self.db.getTransactionCounter():
+        uJobTransactionCounter = uJob.getTransactionCounter()
+        if uJobTransactionCounter is None:
+            # Legacy applications
+            import warnings
+            warnings.warn("Update jobs without a transaction counter have "
+                          "been deprecated, use setTransactionCounter()")
+        elif uJobTransactionCounter != self.db.getTransactionCounter():
             # Normally, this should not happen, unless someone froze the
             # update job and are trying to reapply it after the state of the
             # database has changed
