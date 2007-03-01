@@ -11,6 +11,7 @@ Changes in @NEW@:
       and "removeTrovesAlsoInNewGroup".  These commands subtract out the
       troves included within the specified group from the currently
       active group. (CNY-1380)
+    * checking dependencies is now faster when building groups.
 
   o Server Changes:
     * Two new calls have been added to the server API -
