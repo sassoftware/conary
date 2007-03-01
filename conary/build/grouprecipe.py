@@ -501,7 +501,7 @@ class GroupRecipe(_BaseGroupRecipe):
         while troves are of the form <name>[=version][[flavor]].
 
         For example, a label might be myproject.rpath.org@rpl:1, while a trove
-        may be specified as:
+        may be specified as::
 
             group-dist, or group-dist=1.0, or group-dist=:1[!xen], or
             group-dist=/myproject.rpath.org@rpl:1/1.0-1-1.
@@ -529,8 +529,7 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        C{r.setSearchPath('myproject.rpath.org@rpl:1', 
-                          'group-dist=conary.rpath.com@rpl:1')}
+        C{r.setSearchPath('myproject.rpath.org@rpl:1', 'group-dist=conary.rpath.com@rpl:1')}
 
         Uses C{r.setSearchPath} to specify troves are to be sought in the
         label myproject.rpath.org@rpl:1 first, and then fallback to
@@ -730,8 +729,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.removeItemsAlsoInGroup(I{name}, [I{versionStr}], [I{flavor},] 
-                                   [I{groupName},] [I{searchPath},])}
+        C{r.removeItemsAlsoInGroup(I{name}, [I{versionStr}], [I{flavor},] [I{groupName},] [I{searchPath},])}
 
         DESCRIPTION
         ===========
@@ -772,8 +770,7 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        C{r.removeItemsAlsoInGroup('group-core', 'conary.rpath.com@rpl:1',
-                                   groupName='group-extras')}
+        C{r.removeItemsAlsoInGroup('group-core', 'conary.rpath.com@rpl:1', groupName='group-extras')}
 
         Removes troves from group-extras if they are contained in group-core.
         (group-core must already be cooked and exist at conaryr.rpath.com@rpl:1)
