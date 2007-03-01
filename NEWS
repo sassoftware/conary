@@ -26,6 +26,8 @@ Changes in @NEW@:
       installLabelPaths in some cases. (CNY-1351)
     * cfg.root is always treated as absolute internally, even if it is 
       specified in a relatively.  This resolves CNY-1276.
+    * cvc now properly cleans up 000-permission files from the old build 
+      directory. (CNY-1359)
 
 Changes in 1.1.17:
   o New Feature:
