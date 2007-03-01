@@ -2559,6 +2559,32 @@ conary erase '%s=%s[%s]'
         uJob.setCriticalJobs(finalCriticalJobs)
 
         uJob.setTransactionCounter(self.db.getTransactionCounter())
+
+        # Save some misc information that could be useful to recreate the
+        # update job
+
+        kwargs = dict(
+            keepExisting = keepExisting,
+            recurse = recurse,
+            resolveDeps = resolveDeps,
+            test = test,
+            updateByDefault = updateByDefault,
+            split = split,
+            sync = sync,
+            checkPathConflicts = checkPathConflicts,
+            checkPrimaryPins = checkPrimaryPins,
+            resolveRepos = resolveRepos,
+            syncChildren = syncChildren,
+            updateOnly = updateOnly,
+            installMissing = installMissing,
+            removeNotByDefault = removeNotByDefault,
+            keepRequired = keepRequired,
+            migrate = migrate)
+        # Make sure we store them as booleans
+        kwargs = dict( (k, bool(v)) for k, v in kwargs.iteritems())
+        uJob.setItemList(itemList)
+        uJob.setKeywordArguments(kwargs)
+
         return (uJob, suggMap)
 
     def _validateJob(self, jobSet):

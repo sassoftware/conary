@@ -20,7 +20,7 @@ import shutil
 import xmlrpclib
 
 #conary
-from conary import files, trove, versions
+from conary import constants, files, trove, versions
 from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.callbacks import UpdateCallback
@@ -152,6 +152,18 @@ class UpdateJob:
     def getJobsChangesetList(self):
         return self.jobsCsList
 
+    def getItemList(self):
+        return self._itemList
+
+    def setItemList(self, itemList):
+        self._itemList = itemList
+
+    def getKeywordArguments(self):
+        return self._kwargs
+
+    def setKeywordArguments(self, kwargs):
+        self._kwargs = kwargs
+
     def freeze(self, frzdir):
         # Require clean directory
         assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
@@ -169,6 +181,8 @@ class UpdateJob:
         drep['critical'] = self.getCriticalJobs()
         drep['transactionCounter'] = self.transactionCounter
         drep['jobsCsList'] = self.jobsCsList
+        drep['itemList'] = self._freezeItemList()
+        drep['keywordArguments'] = self.getKeywordArguments()
 
         jobfile = os.path.join(frzdir, "jobfile")
         f = open(jobfile, "w+")
@@ -192,6 +206,8 @@ class UpdateJob:
         self.setJobs(list(self._thawJobs(drep['jobs'])))
         self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
         self.setJobsChangesetList(drep['jobsCsList'])
+        self.setItemList(self._thawItemList(drep['itemList']))
+        self.setKeywordArguments(drep['keywordArguments'])
 
         self.setCriticalJobs(drep['critical'])
         self.transactionCounter = drep['transactionCounter']
@@ -300,6 +316,9 @@ class UpdateJob:
         # this array
         frzrepr['troveMap'] = id2trvMap
 
+        # Save the Conary version
+        frzrepr['conaryVersion'] = constants.version
+
         # XXX rooted
 
         return frzrepr
@@ -352,6 +371,32 @@ class UpdateJob:
 
         return lazycache
 
+    def __freezeVF(self, tup):
+        ver = tup[0]
+        if ver is None:
+            ver = ''
+        flv = tup[1]
+        if flv is None:
+            flv = '\0'
+        return (ver, flv)
+
+    def __thawVF(self, tup):
+        ver = tup[0]
+        if ver == '':
+            ver = None
+        flv = tup[1]
+        if flv == '\0':
+            flv = None
+        return (ver, flv)
+
+    def _freezeItemList(self):
+        return [ (t[0], self.__freezeVF(t[1]), self.__freezeVF(t[2]), int(t[3]))
+                 for t in self.getItemList() ]
+
+    def _thawItemList(self, frzrep):
+        return [ (t[0],self. __thawVF(t[1]), self.__thawVF(t[2]), bool(t[3]))
+                 for t in frzrep ]
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -359,13 +404,16 @@ class UpdateJob:
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
         self.criticalJobs = []
-        # Changesets we could use for upload - a parallel list to self.jobs
+        # Changesets with files - a parallel list to self.jobs
         self.jobsCsList = []
 
         self.searchSource = searchSource
         self.transactionCounter = None
         # Version of the serialized format we support
         self._dumpVersion = 1
+        # The options that created this update job
+        self._itemList = []
+        self._kwargs = {}
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
