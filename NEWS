@@ -1,4 +1,6 @@
 Changes in @NEW@:
+  o Client Changes:
+    * conary rblist --flavors now properly displays trove flavors. (CNY-1255)
   o Build Changes:
     * A list of rPath mirrors for source components has been added.
     * Group recipes now support a setSearchPath method.  This provides a way
