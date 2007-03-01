@@ -236,6 +236,10 @@ class SearchableTroveSource(AbstractTroveSource):
         cs = changeset.ReadOnlyChangeSet()
         return cs, jobList
 
+    def searchWithFlavor(self):
+        self._bestFlavor = True
+        self._flavorCheck = _CHECK_TROVE_REG_FLAVOR
+
     def searchAsRepository(self):
         self._allowNoLabel = False
         self._bestFlavor = True
@@ -460,9 +464,8 @@ class SimpleTroveSource(SearchableTroveSource):
 
 
 class TroveListTroveSource(SimpleTroveSource):
-    def __init__(self, source, troveTups, withDeps=False):
+    def __init__(self, source, troveTups):
         SimpleTroveSource.__init__(self, troveTups)
-        self.deps = {}
         self.source = source
         self.sourceTups = troveTups[:]
 
@@ -486,6 +489,10 @@ class TroveListTroveSource(SimpleTroveSource):
 
     def hasTroves(self, troveTups):
         return self.source.hasTroves(troveTups)
+
+    def resolveDependenciesByGroups(self, troveList, deps):
+        return self.source.resolveDependenciesByGroups(troveList, deps)
+        
 
 
 class GroupRecipeSource(SearchableTroveSource):
@@ -562,6 +569,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         if storeDeps:
             self.depDb = deptable.DependencyDatabase()
+
+    def addChangeSets(self, csList, includesFileContents = False):
+        for cs in csList:
+            self.addChangeSet(cs, includesFileContents=includesFileContents)
 
     def addChangeSet(self, cs, includesFileContents = False):
         relative = []
@@ -949,24 +960,18 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.storeDeps = self.storeDeps or source.storeDeps
 
 
-class TroveSourceStack(SearchableTroveSource):
+class SourceStack(object):
 
     def __init__(self, *sources):
         self.sources = []
         for source in sources:
             self.addSource(source)
 
-    def requiresLabelPath(self):
-        for source in self.iterSources():
-            if source.requiresLabelPath():
-                return True
-        return False
-
     def addSource(self, source):
         if source is None:
             return
 
-        if isinstance(source, TroveSourceStack):
+        if isinstance(source, self.__class__):
             for subSource in source.iterSources():
                 self.addSource(subSource)
             return
@@ -974,9 +979,9 @@ class TroveSourceStack(SearchableTroveSource):
         if source not in self:
             self.sources.append(source)
 
-    def insertSource(self, source, idx=0):
-        if source is not None and source not in self:
-            self.sources.insert(idx, source)
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__,
+                           ', '.join(repr(x) for x in self.sources))
 
     def hasSource(self, source):
         return source in self
@@ -1005,10 +1010,7 @@ class TroveSourceStack(SearchableTroveSource):
             yield source
 
     def copy(self):
-        return TroveSourceStack(*self.sources)
-
-    def __repr__(self):
-        return 'TroveSourceStack(%s)' % (', '.join(repr(x) for x in self.sources))
+        return self.__class__(*self.sources)
 
     def __contains__(self, newSource):
         # don't use == because some sources may define ==
@@ -1017,16 +1019,13 @@ class TroveSourceStack(SearchableTroveSource):
                 return True
         return False
 
-    def trovesByName(self, name):
-        return list(itertools.chain(*(x.trovesByName(name) for x in self.sources)))
-
     def getTrove(self, name, version, flavor, withFiles = True):
         trv = self.getTroves([(name, version, flavor)], withFiles=withFiles)[0]
         if trv is None:
             raise errors.TroveMissing(name, version)
         return trv
 
-    def getTroves(self, troveList, withFiles = True):
+    def getTroves(self, troveList, withFiles = True, allowMissing=True):
         troveList = list(enumerate(troveList)) # make a copy and add indexes
         numTroves = len(troveList)
         results = [None] * numTroves
@@ -1045,7 +1044,76 @@ class TroveSourceStack(SearchableTroveSource):
                 else:
                     results[index] = trove
             troveList = newTroveList
+        if troveList and not allowMissing:
+            raise errors.TroveMissingError(troveList[0][1][0],
+                                           troveList[0][1][1])
         return results
+
+
+    def createChangeSet(self, jobList, withFiles = True, recurse = False,
+                        withFileContents = False, callback = None):
+
+        cs = changeset.ReadOnlyChangeSet()
+
+        for source in self.sources:
+            if not jobList:
+                break
+
+            try:
+                res = source.createChangeSet(jobList,
+                                           withFiles = withFiles,
+                                           withFileContents = withFileContents,
+                                           recurse = recurse, 
+                                           callback = callback)
+                if isinstance(res, (list, tuple)):
+                    newCs, jobList = res
+                else: 
+                    newCs, jobList = res, None
+            except errors.OpenError:
+                newCs = changeset.ReadOnlyChangeSet()
+            cs.merge(newCs)
+
+        return cs, jobList
+
+    def getFileVersion(self, pathId, fileId, version):
+        for source in self.sources:
+            try:
+                return source.getFileVersion(pathId, fileId, version)
+            # FIXME: there should be a better error for this
+            except KeyError:
+                continue
+        return None
+
+    def iterFilesInTrove(self, n, v, f, *args, **kw):
+        for source in self.sources:
+            try:
+                for value in source.iterFilesInTrove(n, v, f, *args, **kw):
+                    yield value
+                return
+            except NotImplementedError:
+                pass
+            except errors.TroveMissing:
+                pass
+        raise errors.TroveMissing(n,v)
+
+
+class TroveSourceStack(SourceStack, SearchableTroveSource):
+    def __init__(self, *args, **kw):
+        SourceStack.__init__(self, *args, **kw)
+        SearchableTroveSource.__init__(self)
+
+    def requiresLabelPath(self):
+        for source in self.iterSources():
+            if source.requiresLabelPath():
+                return True
+        return False
+
+    def insertSource(self, source, idx=0):
+        if source is not None and source not in self:
+            self.sources.insert(idx, source)
+
+    def trovesByName(self, name):
+        return list(itertools.chain(*(x.trovesByName(name) for x in self.sources)))
 
     def isSearchAsDatabase(self):
         for source in self.sources:
@@ -1066,8 +1134,6 @@ class TroveSourceStack(SearchableTroveSource):
         results = {}
 
         someRequireLabel = not self.isSearchAsDatabase()
-        if someRequireLabel:
-            assert(labelPath)
 
         for source in self.sources[:-1]:
             # FIXME: it should be possible to reuse the trove finder
@@ -1168,51 +1234,6 @@ class TroveSourceStack(SearchableTroveSource):
             self.mergeDepSuggestions(allSugg, sugg)
         return allSugg
 
-    def createChangeSet(self, jobList, withFiles = True, recurse = False,
-                        withFileContents = False, callback = None):
-
-        cs = changeset.ReadOnlyChangeSet()
-
-        for source in self.sources:
-            if not jobList:
-                break
-
-            try:
-                res = source.createChangeSet(jobList,
-                                           withFiles = withFiles,
-                                           withFileContents = withFileContents,
-                                           recurse = recurse, 
-                                           callback = callback)
-                if isinstance(res, (list, tuple)):
-                    newCs, jobList = res
-                else: 
-                    newCs, jobList = res, None
-            except errors.OpenError:
-                newCs = changeset.ReadOnlyChangeSet()
-            cs.merge(newCs)
-
-        return cs, jobList
-
-    def getFileVersion(self, pathId, fileId, version):
-        for source in self.sources:
-            try:
-                return source.getFileVersion(pathId, fileId, version)
-            # FIXME: there should be a better error for this
-            except KeyError:
-                continue
-        return None
-
-    def iterFilesInTrove(self, n, v, f, *args, **kw):
-        for source in self.sources:
-            try:
-                for value in source.iterFilesInTrove(n, v, f, *args, **kw):
-                    yield value
-                return
-            except NotImplementedError:
-                pass
-            except errors.TroveMissing:
-                pass
-        raise errors.TroveMissing(n,v)
 
 def stack(*sources):
     """ create a trove source that will search first source1, then source2 """
@@ -1532,3 +1553,5 @@ class ChangeSetJobSource(JobSource):
                            oldVersion, oldFileObj, modType)
                 else:
                     yield pathId, path, fileId, version, fileObj, modType
+
+

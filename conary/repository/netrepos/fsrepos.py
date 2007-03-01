@@ -118,8 +118,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return self.troveStore.getTrove(pkgName, version, flavor,
                                         withFiles = withFiles)
 
-    def getParentTroves(self, name, version, flavor):
-        return self.troveStore.getParentTroves(name, version, flavor)
+    def getParentTroves(self, troveList):
+        return self.troveStore.getParentTroves(troveList)
 
     def addTrove(self, pkg):
 	return self.troveStore.addTrove(pkg)

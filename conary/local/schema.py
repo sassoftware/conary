@@ -877,8 +877,12 @@ def checkVersion(db):
     if version == VERSION:
         # the actions performed by this function should be integrated
         # in the next schema update, when we have a reason to block
-        # conary functionality...
-        optSchemaUpdate(db)
+        # conary functionality...  These schema changes *MUST* not be
+        # required for Read Only functionality
+        try:
+            optSchemaUpdate(db)
+        except sqlerrors.ReadOnlyDatabase:
+            pass
         return version
     if version > VERSION:
         raise NewDatabaseSchema

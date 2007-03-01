@@ -1215,7 +1215,7 @@ def formatFlavor(flavor):
 
     return ""
 
-def parseFlavor(s, mergeBase = None):
+def parseFlavor(s, mergeBase = None, raiseError = False):
     # return a Flavor dep set for the string passed. format is
     # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
     #
@@ -1244,6 +1244,8 @@ def parseFlavor(s, mergeBase = None):
     s = s.strip()
     match = flavorRegexp.match(s)
     if not match:
+        if raiseError:
+            raise ParseError, ("invalid flavor '%s'" % s)
         return None
 
     groups = match.groups()
@@ -1296,8 +1298,6 @@ def parseFlavor(s, mergeBase = None):
         set.addEmptyDepClass(UseDependency)
 
     return mergeFlavor(set, mergeBase)
-
-    return set
 
 def parseDep(s):
     """ 

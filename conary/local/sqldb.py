@@ -385,11 +385,13 @@ class Database:
         self.db.loadSchema()
 
         newCursor = self.schemaVersion < schema.VERSION
+
         schema.checkVersion(self.db)
         if newCursor:
             cu = self.db.cursor()
 
-        schema.createSchema(self.db)
+        if self.schemaVersion == 0:
+            schema.createSchema(self.db)
         schema.setupTempDepTables(self.db, cu)
 
 	self.troveFiles = DBTroveFiles(self.db)

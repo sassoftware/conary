@@ -42,10 +42,9 @@ from conary.lib import options
 from conary.lib import util
 from conary.lib.cfg import CfgBool, CfgInt
 from conary.lib.tracelog import initLog, logMe
-from conary.repository import changeset
-from conary.repository import errors
+from conary.repository import changeset, errors, netclient
 from conary.repository.filecontainer import FileContainer
-from conary.repository.netrepos import netserver
+from conary.repository.netrepos import netserver, proxy
 from conary.repository.netrepos.proxy import ProxyRepositoryServer
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
@@ -108,19 +107,19 @@ class HttpRequests(SimpleHTTPRequestHandler):
         if base == 'changeset':
             if not queryString:
                 # handle CNY-1142
-                self.send_error(400, "Bad Request")
+                self.send_error(400)
                 return None
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = self.tmpDir + "/" + queryString + "-out"
             if os.path.realpath(localName) != localName:
-                self.send_error(404, "File not found")
+                self.send_error(404)
                 return None
 
             if localName.endswith(".cf-out"):
                 try:
                     f = open(localName, "r")
                 except IOError:
-                    self.send_error(404, "File not found")
+                    self.send_error(404)
                     return None
 
                 os.unlink(localName)
@@ -138,7 +137,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 try:
                     size = os.stat(localName).st_size;
                 except OSError:
-                    self.send_error(404, "File not found")
+                    self.send_error(404)
                     return None
                 items = [ (localName, size) ]
                 totalSize = size
@@ -164,7 +163,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                     f = open(path)
                     util.copyfileobj(f, self.wfile)
         else:
-            self.send_error(501, "Not Implemented")
+            self.send_error(501)
 
     def do_POST(self):
         if self.headers.get('Content-Type', '') == 'text/xml':
@@ -174,7 +173,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
             return self.handleXml(authToken)
         else:
-            self.send_error(501, "Not Implemented")
+            self.send_error(501)
 
     def getAuth(self):
         info = self.headers.get('Authorization', None)
@@ -279,27 +278,35 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	return resp
 
     def do_PUT(self):
+        util.FOO=1
+        contentLength = int(self.headers['Content-Length'])
+        authToken = self.getAuth()
+
+        if self.cfg.proxyDB:
+            status = netclient.httpPutFile(self.path, self.rfile, contentLength)
+            self.send_response(status)
+            return
+
 	path = self.path.split("?")[-1]
 
         if '/' in path:
-	    self.send_error(403, "Forbidden")
+	    self.send_error(403)
 
 	path = self.tmpDir + '/' + path + "-in"
 
 	size = os.stat(path).st_size
 	if size != 0:
-	    self.send_error(410, "Gone")
+	    self.send_error(410)
 	    return
 
 	out = open(path, "w")
 
-	contentLength = int(self.headers['Content-Length'])
 	while contentLength:
 	    s = self.rfile.read(contentLength)
 	    contentLength -= len(s)
 	    out.write(s)
 
-	self.send_response(200, 'OK')
+	self.send_response(200)
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     publicCalls = set(tuple(NetworkRepositoryServer.publicCalls) + ('reset',))
@@ -456,6 +463,9 @@ def getServer():
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     # start the logging
+    if 'migrate' in argSet:
+        # make sure the migration progress is visible
+        cfg.traceLog = (3, "stderr")
     if 'add-user' not in argSet and 'analyze' not in argSet:
         (l, f) = (3, "stderr")
         if cfg.traceLog:

@@ -350,9 +350,11 @@ def copyfile(sources, dest, verbose=True):
 	    log.info('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
-def copyfileobj(source, dest, callback = None, digest = None,
-                abortCheck = None, bufSize = 128*1024, rateLimit = None):
+FOO=0
 
+def copyfileobj(source, dest, callback = None, digest = None,
+                abortCheck = None, bufSize = 128*1024, rateLimit = None,
+                sizeLimit = None):
     if hasattr(dest, 'send'):
         write = dest.send
     else:
@@ -379,6 +381,9 @@ def copyfileobj(source, dest, callback = None, digest = None,
         sourceFd = None
 
     while True:
+        if sizeLimit and (sizeLimit -total < bufSize):
+            bufSize = sizeLimit - total
+
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time
             # read returns, and every five seconds
@@ -400,12 +405,16 @@ def copyfileobj(source, dest, callback = None, digest = None,
         else:
             rate = total / ((now - starttime)) 
 
+        if callback:
+            callback(total, rate)
+
+        if total == sizeLimit:
+            break
+
         if rateLimit > 0 and rate > rateLimit:
             time.sleep((total / rateLimit) - (total / rate))
 
         if digest: digest.update(buf)
-        if callback:
-            callback(total, rate)
 
     return total
 
