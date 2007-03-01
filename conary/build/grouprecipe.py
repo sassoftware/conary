@@ -1006,7 +1006,7 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        C{r.addResolveSource('foo.example.com@foo:devel')
+        C{r.addResolveSource('foo.example.com@foo:devel')}
 
         Uses C{r.addResolveSource} to specify dependency resolution should
         be performed against the labelPath I{foo.example.com@foo:devel}
