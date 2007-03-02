@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1551,7 +1551,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
         l = [ self.fromDepSet(x) for x in depList ]
-        if self.c[label].getProtocolVersion() < 44:
+        if self.c[label].getProtocolVersion() < 43:
             args = ()
         else:
             args = (leavesOnly,)
