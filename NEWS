@@ -1,4 +1,12 @@
 Changes in @NEW@:
+  o Major Changes:
+    * Changesets are now indexed by pathId,fileId combination instead of
+      just pathId. This should eliminate the vast majority of conflicts
+      when creating groups containing multiple flavors of the same trove.
+      Old clients will be serverd old-format changesets by the repository,
+      and new clients continue to support old format changesets. Old and
+      new format changes can be merged into a single changeset (CNY-1314).
+
   o Client Changes:
     * conary rblist --flavors now properly displays trove flavors. (CNY-1255)
     * When resolving dependencies when updating, conary will now search 
@@ -28,6 +36,7 @@ Changes in @NEW@:
     * Two new calls have been added to the server API -
       getTroveReferences and getTroveDescendants (CNY-1349)
     * Proxy server proxies put calls now
+    * Cleaned up string compression code in changeset merging
 
   o Bug Fixes:
     * Fixed a bug where an invalid flavor at the command line would result
