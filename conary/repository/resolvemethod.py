@@ -195,15 +195,45 @@ class BasicResolutionMethod(DepResolutionMethod):
     def resolveDependencies(self):
         return self.troveSource.resolveDependencies(None, self.depList)
 
+
+RESOLVE_ALL = 0
+RESOLVE_LEAVES_FIRST = 1
+RESOLVE_LEAVES_ONLY = 2
+
+
 class DepResolutionByLabelPath(DepResolutionMethod):
-    def __init__(self, cfg, db, installLabelPath, flavor=None):
+    def __init__(self, cfg, db, installLabelPath, flavor=None, 
+                 searchMethod=RESOLVE_ALL):
         DepResolutionMethod.__init__(self, cfg, db, flavor)
         self.index = 0
         self.depList = None
-        self.installLabelPath = installLabelPath
+        self.searchMethod = searchMethod
+        self.setLabelPath(installLabelPath)
+
+    def searchLeavesOnly(self):
+        self.searchMethod = RESOLVE_LEAVES_ONLY
+        self._updateLabelPath()
+
+    def searchLeavesFirst(self):
+        self.searchMethod = RESOLVE_LEAVES_FIRST
+        self._updateLabelPath()
+
+    def searchAllVersions(self):
+        self.searchMethod = RESOLVE_ALL
+        self._updateLabelPath()
 
     def setLabelPath(self, labelPath):
         self.installLabelPath = labelPath
+        self._updateLabelPath()
+
+    def _updateLabelPath(self):
+        labelPath = self.installLabelPath
+        l = []
+        if self.searchMethod in (RESOLVE_LEAVES_ONLY, RESOLVE_LEAVES_FIRST):
+            l = [ (x, True) for x in labelPath ]
+        if self.searchMethod in (RESOLVE_ALL, RESOLVE_LEAVES_FIRST):
+            l += [ (x, False) for x in labelPath ]
+        self._labelPathWithLeaves = l
 
     def prepareForResolution(self, depList):
         if not depList:
@@ -216,19 +246,19 @@ class DepResolutionByLabelPath(DepResolutionMethod):
         else:
             self.index += 1
 
-        if self.index < len(self.installLabelPath):
+        if self.index < len(self._labelPathWithLeaves):
             return True
         else:
             return False
 
     def resolveDependencies(self):
         try:
-            return self.troveSource.resolveDependencies(
-                            self.installLabelPath[self.index],
-                            self.depList)
+            label, leavesOnly = self._labelPathWithLeaves[self.index]
+            return self.troveSource.resolveDependencies(label,
+                            self.depList, leavesOnly=leavesOnly)
         except repoerrors.OpenError, err:
             log.warning('Could not access %s for dependency resolution: %s' % (
-                                self.installLabelPath[self.index], err))
+                                self._labelPathWithLeaves[self.index][0], err))
             # return an empty result.
             results = {}
             for depSet in self.depList:

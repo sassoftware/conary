@@ -111,17 +111,21 @@ class NetworkSearchSource(SearchSource):
     """
         Search source using an installLabelPath.
     """
-    def __init__(self, repos, installLabelPath, flavor, db=None):
+    def __init__(self, repos, installLabelPath, flavor, db=None, 
+                 resolveSearchMethod=resolvemethod.RESOLVE_ALL):
         SearchSource.__init__(self, repos, flavor, db)
         self.installLabelPath = installLabelPath
+        self.resolveSearchMethod = resolveSearchMethod
 
     def getResolveMethod(self):
         """
             Resolves using the given installLabelPath.
         """
+        searchMethod = self.resolveSearchMethod
         m =  resolvemethod.DepResolutionByLabelPath(None, self.db,
-                                                      self.installLabelPath, 
-                                                      self.flavor)
+                                                    self.installLabelPath,
+                                                    self.flavor,
+                                                    searchMethod=searchMethod)
         m.setTroveSource(self.source)
         return m
 
@@ -163,6 +167,11 @@ class SearchSourceStack(trovesource.SourceStack):
         as a single searchSource:
             findTroves(troveSpecs, useAffinity=False)
     """
+
+    def getTroveSource(self):
+        if len(self.sources) == 1:
+            return self.sources[0].getTroveSource()
+
     def findTrove(self, troveSpec, useAffinity=False, **kw):
         """
             Finds the trove matching the given (name, versionSpec, flavor)
@@ -264,7 +273,8 @@ def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
     searchPath = createSearchPathFromStrings(searchPath)
     return createSearchSourceStack(searchSource, searchPath, flavor, db)
 
-def createSearchSourceStack(searchSource, searchPath, flavor, db=None):
+def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
+                            resolveLeavesFirst=True, troveSource=None):
     """
         Creates a searchSourceStack based on a searchPath.
 
@@ -274,17 +284,23 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None):
             * a trove object
             * a list of any of the above.
     """
-    troveSource = searchSource.getTroveSource()
+    if troveSource is None:
+        troveSource = searchSource.getTroveSource()
     searchStack = SearchSourceStack()
+    if resolveLeavesFirst:
+        searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
+    else:
+        searchMethod = resolvemethod.RESOLVE_ALL
+
     for item in searchPath:
         if not isinstance(item, (list, tuple)):
             item = [item]
         if isinstance(item[0], versions.Label):
             searchStack.addSource(NetworkSearchSource(troveSource,
-                                                      item, flavor, db))
+                                              item, flavor, db,
+                                              resolveSearchMethod=searchMethod))
         elif isinstance(item[0], trove.Trove):
-            s = TroveSearchSource(searchSource.getTroveSource(), item,
-                                  flavor)
+            s = TroveSearchSource(searchSource.getTroveSource(), item, flavor)
             searchStack.addSource(s)
         elif isinstance(item[0], (list, tuple)):
             if not isinstance(item[0][1], versions.Version):

@@ -83,7 +83,8 @@ class DependencySolver(object):
 
         if resolveSource is None:
             resolveSource = DepResolutionByLabelPath(self.cfg, self.db,
-                                                     self.cfg.installLabelPath)
+                                             self.cfg.installLabelPath,
+                                             searchMethod=RESOLVE_LEAVES_FIRST)
 
         resolveSource.setTroveSource(troveSource)
 

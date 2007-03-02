@@ -238,9 +238,10 @@ class GroupRecipe(_BaseGroupRecipe):
                                                         self.defaultSource,
                                                         self.getSearchFlavor())
         else:
-            return searchsource.NetworkSearchSource(self.troveSource,
-                                                    self.getLabelPath(),
-                                                    self.getSearchFlavor())
+            return searchsource.createSearchSourceStack(None,
+                                                self.getLabelPath(),
+                                                self.getSearchFlavor(),
+                                                troveSource=self.troveSource)
 
     def _parseFlavor(self, flavor):
         assert(flavor is None or isinstance(flavor, str))
@@ -1545,7 +1546,7 @@ class GroupReference:
     def __hash__(self):
         return hash((self.troveSpecs, self.upstreamSource))
 
-    def findSources(self, searchSource):
+    def findSources(self, searchSource, flavor):
         """ Find the troves that make up this trove reference """
         if self.upstreamSource is None:
             source = searchSource
@@ -1555,8 +1556,7 @@ class GroupReference:
         results = source.findTroves(self.troveSpecs)
         troveTups = [ x for x in chain(*results.itervalues())]
         self.sourceTups = troveTups
-        self.source = searchsource.TroveSearchSource(source, troveTups,
-                                                     source.flavor)
+        self.source = searchsource.TroveSearchSource(source, troveTups, flavor)
 
     def findTroves(self, *args, **kw):
         return self.source.findTroves(*args, **kw)
@@ -1865,11 +1865,11 @@ def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs,
             source = defaultSource
         elif isinstance(item, (tuple, list)):
             source = searchsource.createSearchSourceStack(searchSource,
-                                                          item, searchFlavor)
+                                                      item, searchFlavor)
         else:
             source = item
             if isinstance(item, GroupReference):
-                item.findSources(defaultSource)
+                item.findSources(defaultSource, searchFlavor)
         try:
             results[item] = source.findTroves(troveSpecs)
         except errors.TroveNotFound, e:

@@ -67,7 +67,7 @@ class AbstractTroveSource:
     def getTroves(self, troveList, withFiles = True):
         raise NotImplementedError
 
-    def resolveDependencies(self, label, depList):
+    def resolveDependencies(self, label, depList, leavesOnly=False):
         results = {}
         for depSet in depList:
             results[depSet] = [ [] for x in depSet.iterDeps() ]
@@ -778,9 +778,9 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
     def iterChangeSets(self):
         return iter(self.csList)
 
-    def resolveDependencies(self, label, depList):
+    def resolveDependencies(self, label, depList, leavesOnly=False):
         assert(self.storeDeps)
-        suggMap = self.depDb.resolve(label, depList)
+        suggMap = self.depDb.resolve(label, depList, leavesOnly=leavesOnly)
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
@@ -1204,7 +1204,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                                               allowMissing=allowMissing))
         return results
 
-    def resolveDependencies(self, label, depList):
+    def resolveDependencies(self, label, depList, leavesOnly=False):
         results = {}
         depList = set(depList)
         for depSet in depList:
@@ -1214,7 +1214,8 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
             if not depList:
                 break
 
-            sugg = source.resolveDependencies(label, depList)
+            sugg = source.resolveDependencies(label, depList,
+                                              leavesOnly=leavesOnly)
             for depSet, troves in sugg.iteritems():
                 if [ x for x in troves if x ]:
                     # only consider this depSet 'solved' if at least

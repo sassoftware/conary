@@ -1,6 +1,12 @@
 Changes in @NEW@:
   o Client Changes:
     * conary rblist --flavors now properly displays trove flavors. (CNY-1255)
+    * When resolving dependencies when updating, conary will now search 
+      the latest versions of packages for every label in your installLabelPath
+      first before searching the histories of those labels.  This should make
+      sure that conary prefers installing maintained troves over unmaintained 
+      ones. (CNY-1312)
+
   o Build Changes:
     * A list of rPath mirrors for source components has been added.
     * Group recipes now support a setSearchPath method.  This provides a way
@@ -14,7 +20,10 @@ Changes in @NEW@:
       troves included within the specified group from the currently
       active group. (CNY-1380)
     * checking dependencies is now faster when building groups.
-
+    * When resolving dependencies in groups, conary will now search the 
+      latest trove in every label in your label/search path before
+      searching back in the history of that label. (CNY-1312)
+  
   o Server Changes:
     * Two new calls have been added to the server API -
       getTroveReferences and getTroveDescendants (CNY-1349)
