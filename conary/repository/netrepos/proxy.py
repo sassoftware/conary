@@ -25,11 +25,35 @@ from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import transport, xmlshims
 from conary.repository.netrepos import cacheset, netserver, calllog
 
+class ProxyCalls:
+
+    @staticmethod
+    def _proxyCall(proxy, methodname, args):
+        try:
+            rc = proxy.__getattr__(methodname)(*args)
+        except IOError, e:
+            return [ False, True, [ 'ProxyError', e.strerror[1] ] ]
+        except xmlrpclib.ProtocolError, e:
+            if e.errcode == 403:
+                raise errors.InsufficientPermission
+
+            raise
+
+        return rc
+
+    def _reposCall(self, proxy, methodname, args):
+        rc = self._proxyCall(proxy, methodname, args)
+        if rc[1]:
+            # exception occured
+            raise ProxyRepositoryError(rc[2])
+
+        return (rc[0], rc[2])
+
 class ProxyClient(xmlrpclib.ServerProxy):
 
     pass
 
-class ProxyRepositoryServer(xmlshims.NetworkConvertors):
+class BaseProxy(xmlshims.NetworkConvertors):
 
     publicCalls = netserver.NetworkRepositoryServer.publicCalls
 
@@ -50,10 +74,6 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
             self.callLog = None
 
         self.log(1, "proxy url=%s" % basicUrl)
-        self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
-                                       self.cfg.deadlockRetry)
-        util.mkdirChain(self.cfg.proxyContentsDir)
-        self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
                     remoteIp = None, rawUrl = None):
@@ -97,28 +117,6 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
         return self._proxyCall(proxy, methodname, args)
 
-    @staticmethod
-    def _proxyCall(proxy, methodname, args):
-        try:
-            rc = proxy.__getattr__(methodname)(*args)
-        except IOError, e:
-            return [ False, True, [ 'ProxyError', e.strerror[1] ] ]
-        except xmlrpclib.ProtocolError, e:
-            if e.errcode == 403:
-                raise errors.InsufficientPermission
-
-            raise
-
-        return rc
-
-    def _reposCall(self, proxy, methodname, args):
-        rc = self._proxyCall(proxy, methodname, args)
-        if rc[1]:
-            # exception occured
-            raise ProxyRepositoryError(rc[2])
-
-        return (rc[0], rc[2])
-
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
@@ -136,6 +134,13 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
                                                   [ clientVersion ])
 
         return useAnon, sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
+
+class ChangesetProxy(BaseProxy):
+
+    def __init__(self, cfg, basicUrl):
+        BaseProxy.__init__(self, cfg, basicUrl)
+        self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
+                                       self.cfg.deadlockRetry)
 
     def _cvtJobEntry(self, authToken, jobEntry):
         (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
@@ -241,6 +246,13 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
 
         return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
                       allTrovesRemoved)
+
+class ProxyRepositoryServer(ProxyCalls, ChangesetProxy):
+
+    def __init__(self, cfg, basicUrl):
+        ChangesetProxy.__init__(self, cfg, basicUrl)
+        util.mkdirChain(self.cfg.proxyContentsDir)
+        self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
 
     def getFileContents(self, proxy, authToken, clientVersion, fileList,
                         authCheckOnly = False):
