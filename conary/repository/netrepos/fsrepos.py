@@ -423,7 +423,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                             contType = changeset.ChangedFileTypes.ptr
                             cont = filecontents.FromString(ptr)
                         else:
-                            ptrTable[contentsHash] = pathId
+                            ptrTable[contentsHash] = pathId + newFileId
 
                     if not newFile.flags.isConfig() and \
                                 contType == changeset.ChangedFileTypes.file:
@@ -440,7 +440,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     if contType == changeset.ChangedFileTypes.ptr:
                         compressed = False
 
-		    cs.addFileContents(pathId, contType, cont,
+		    cs.addFileContents(pathId, newFileId, contType, cont,
 				       newFile.flags.isConfig(),
                                        compressed = compressed)
 	return (cs, externalTroveList, externalFileList, removedTroveList)

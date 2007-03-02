@@ -3,6 +3,7 @@
 Version 43:
   - added getTroveReferences call.
   - added getTroveDescendants call
+  - switched to fileId,pathId indexed changesets (changeset 2007022001)
 
 Version 42: Conary 1.1.17
  - Client uses negotiated protocol version

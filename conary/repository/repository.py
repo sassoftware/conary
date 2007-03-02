@@ -523,13 +523,14 @@ class ChangeSetJob:
  					 fileContents, restoreContents, 
                                          fileFlags.isConfig())
                 elif fileFlags.isConfig():
-                    tup = (pathId, contentInfo.sha1(), oldPath, oldfile, 
-                           troveName, oldTroveVersion, troveFlavor, newVersion, 
-                           fileId, oldVersion, oldFileId, restoreContents)
+                    tup = (pathId, fileId, contentInfo.sha1(), oldPath,
+                           oldfile, troveName, oldTroveVersion, troveFlavor,
+                           newVersion, fileId, oldVersion, oldFileId,
+                           restoreContents)
 		    configRestoreList.append(tup)
 		else:
-                    tup = (pathId, contentInfo.sha1(), newVersion, 
-			   restoreContents)
+                    tup = (pathId, fileId, contentInfo.sha1(), newVersion,
+                           restoreContents)
 		    normalRestoreList.append(tup)
 
 	    del newFileMap
@@ -538,11 +539,11 @@ class ChangeSetJob:
 	configRestoreList.sort()
 	normalRestoreList.sort()
 
-	for (pathId, sha1, oldPath, oldfile, troveName, oldTroveVersion,
-	     troveFlavor, newVersion, newFileId, oldVersion, 
+        for (pathId, newFileId, sha1, oldPath, oldfile, troveName,
+             oldTroveVersion, troveFlavor, newVersion, newFileId, oldVersion,
              oldFileId, restoreContents) in configRestoreList:
-            if cs.configFileIsDiff(pathId):
-                (contType, fileContents) = cs.getFileContents(pathId)
+            if cs.configFileIsDiff(pathId, newFileId):
+                (contType, fileContents) = cs.getFileContents(pathId, newFileId)
 
 		# the content for this file is in the form of a
 		# diff, which we need to apply against the file in
@@ -569,7 +570,7 @@ class ChangeSetJob:
             else:
                 # config files are not always available compressed (due
                 # to the config file cache)
-                fileContents = filecontents.FromChangeSet(cs, pathId)
+                fileContents = filecontents.FromChangeSet(cs, pathId, newFileId)
 
 	    self.addFileContents(sha1, newVersion, fileContents, 
                                  restoreContents, 1)
@@ -577,9 +578,10 @@ class ChangeSetJob:
         # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()
         ptrRestores = []
-	for (pathId, sha1, version, restoreContents) in normalRestoreList:
+        for (pathId, fileId, sha1, version, restoreContents) in \
+                                                    normalRestoreList:
             try:
-                (contType, fileContents) = cs.getFileContents(pathId,
+                (contType, fileContents) = cs.getFileContents(pathId, fileId,
                                                               compressed = True)
             except KeyError:
                 raise errors.IntegrityError
