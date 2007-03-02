@@ -1382,17 +1382,13 @@ class DictAsCsf:
         (name, contType, contObj) = self.items[self.next]
         self.next += 1
 
-        # XXX there must be a better way, but I can't think of it
-        f = contObj.get()
-        (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
-        os.unlink(path)
-        gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
-        util.copyfileobj(f, gzf)
+        compressedFile = StringIO()
+        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+        util.copyfileobj(contObj.get(), gzf)
         gzf.close()
-        # don't close the result of contObj.get(); we may need it again
-        os.lseek(fd, 0, 0)
-        f = os.fdopen(fd, "r")
-        return (name, contType, f)
+        compressedFile.seek(0)
+
+        return (name, contType, compressedFile)
 
     def addConfigs(self, contents):
         # this is like __init__, but it knows things are config files so
