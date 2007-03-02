@@ -52,6 +52,8 @@ elif len(sys.argv) == 3:
     name = sys.argv[2]
     if len(name) == 32:
 	name = md5FromString(name)
+    elif len(name) == 73:
+	name = md5FromString(name[0:32]) + sha1FromString(name[33:])
 
     nf = c.getNextFile()
     while nf:

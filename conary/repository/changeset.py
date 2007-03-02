@@ -20,6 +20,8 @@ import gzip
 import itertools
 import os
 
+from StringIO import StringIO
+
 from conary import files, streams, trove, versions
 from conary.lib import enum, log, misc, patch, sha1helper, util
 from conary.repository import filecontainer, filecontents, errors
@@ -1437,8 +1439,15 @@ def _convertChangeSetV2V1(inPath, outPath):
             # I'm not worried about this pointing to the wrong file; that
             # can only happen if there are multiple files with the same
             # PathId, which would cause the conflict we test for above
-            s = f.get().read()[0:16]
-            fc = filecontents.FromString(s)
+            oldCompressed = f.read()
+            old = gzip.GzipFile(None, "r", 
+                                fileobj = StringIO(oldCompressed)).read()
+            new = old[0:16]
+            newCompressedF = StringIO()
+            gzip.GzipFile(None, "w", fileobj = newCompressedF).write(new)
+            newCompressed = newCompressedF.getvalue()
+            fc = filecontents.FromString(newCompressed)
+            size -= len(oldCompressed) - len(newCompressed)
         else:
             fc = filecontents.FromFile(f)
 
