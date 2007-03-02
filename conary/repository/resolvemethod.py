@@ -228,6 +228,10 @@ class DepResolutionByLabelPath(DepResolutionMethod):
 
     def _updateLabelPath(self):
         labelPath = self.installLabelPath
+        if not labelPath:
+            self._labelPathWithLeaves = []
+            return
+
         l = []
         if self.searchMethod in (RESOLVE_LEAVES_ONLY, RESOLVE_LEAVES_FIRST):
             l = [ (x, True) for x in labelPath ]
