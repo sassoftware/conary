@@ -501,8 +501,9 @@ def getServer():
         if 'migrate' in argSet:
             sys.exit(0)
 
-        HttpRequests.netRepos = NetworkRepositoryServer(cfg, baseUrl)
-        HttpRequests.netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+        #netRepos = NetworkRepositoryServer(cfg, baseUrl)
+        netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+        HttpRequests.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
 
         if 'add-user' in argSet:
             admin = argSet.pop('admin', False)

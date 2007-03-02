@@ -14,11 +14,6 @@
 
 import base64, itertools, os, tempfile, urllib, xmlrpclib
 
-# a list of the protocol versions we understand. Make sure the first
-# one in the list is the lowest protocol version we support and the
-# last one is the current server protocol version
-SERVER_VERSIONS = [ 41, 42, 43 ]
-
 from conary import conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
@@ -57,7 +52,7 @@ class ProxyCaller:
 class ProxyCallFactory:
 
     @staticmethod
-    def createCaller(rawUrl, authToken):
+    def createCaller(protocol, port, rawUrl, authToken):
         url = redirectUrl(authToken, rawUrl)
 
         if authToken[2] is not None:
@@ -73,8 +68,41 @@ class ProxyCallFactory:
 
         return ProxyCaller(proxy)
 
+class RepositoryCaller:
+
+    def callByName(self, methodname, *args):
+        rc = self.repos.callWrapper(self.protocol, self.port, methodname,
+                                    self.authToken, args)
+
+        if rc[1]:
+            # exception occured
+            raise ProxyRepositoryError(rc[2])
+
+        return (rc[0], rc[2])
+
+    def __getattr__(self, method):
+        return lambda *args: self.callByName(method, *args)
+
+    def __init__(self, protocol, port, authToken, repos):
+        self.repos = repos
+        self.protocol = protocol
+        self.port = port
+        self.authToken = authToken
+
+class RepositoryCallFactory:
+
+    def __init__(self, repos):
+        self.repos = repos
+
+    def createCaller(self, protocol, port, rawUrl, authToken):
+        return RepositoryCaller(protocol, port, authToken, self.repos)
+
 class BaseProxy(xmlshims.NetworkConvertors):
 
+    # a list of the protocol versions we understand. Make sure the first
+    # one in the list is the lowest protocol version we support and the
+    # last one is the current server protocol version.
+    SERVER_VERSIONS = netserver.SERVER_VERSIONS
     publicCalls = netserver.NetworkRepositoryServer.publicCalls
 
     def __init__(self, cfg, basicUrl):
@@ -107,7 +135,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # of this framework for every request seems dumb. it seems like
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
-        caller = self.callFactory.createCaller(rawUrl, authToken)
+        caller = self.callFactory.createCaller(protocol, port, rawUrl,
+                                               authToken)
 
         if hasattr(self, methodname):
             # handled internally
@@ -136,18 +165,33 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
     def checkVersion(self, caller, authToken, clientVersion):
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
+
         # cut off older clients entirely, no negotiation
-        if clientVersion < SERVER_VERSIONS[0]:
+        if clientVersion < self.SERVER_VERSIONS[0]:
             raise errors.InvalidClientVersion(
                'Invalid client version %s.  Server accepts client versions %s '
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
-               (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
+               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS)))
 
         useAnon, parentVersions = caller.checkVersion(clientVersion)
 
-        return useAnon, sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
+        if self.SERVER_VERSIONS is not None:
+            commonVersions = sorted(list(set(self.SERVER_VERSIONS) &
+                                         set(parentVersions)))
+        else:
+            commonVersions = parentVersions
+
+        return useAnon, commonVersions
+
+class SimpleRepositoryFilter(BaseProxy):
+
+    def __init__(self, cfg, basicUrl, repos):
+        BaseProxy.__init__(self, cfg, basicUrl)
+        self.callFactory = RepositoryCallFactory(repos)
 
 class ChangesetProxy(BaseProxy):
+
+    SERVER_VERSIONS = [ 41, 42, 43 ]
 
     def __init__(self, cfg, basicUrl):
         BaseProxy.__init__(self, cfg, basicUrl)

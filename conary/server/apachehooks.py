@@ -157,10 +157,10 @@ def _handler(req):
             repositories[repName] = proxy.ProxyRepositoryServer(cfg, urlBase)
             repositories[repName].forceSecure = False
         else:
-            repositories[repName] = netserver.NetworkRepositoryServer(
-                                                    cfg, urlBase)
-
-            repositories[repName].forceSecure = cfg.forceSSL
+            repos = netserver.NetworkRepositoryServer(cfg, urlBase)
+            repositories[repName] = proxy.SimpleRepositoryFilter(
+                                                cfg, urlBase, repos)
+            repositories[repName].forceSecure = False
             repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]
