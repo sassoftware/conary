@@ -31,7 +31,7 @@ class ProxyClient(xmlrpclib.ServerProxy):
 
 class ProxyCaller:
 
-    def _proxyCall(self, methodname, args):
+    def callByName(self, methodname, *args):
         try:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
@@ -42,15 +42,14 @@ class ProxyCaller:
 
             raise
 
-        return rc
-
-    def _reposCall(self, methodname, args):
-        rc = self._proxyCall(methodname, args)
         if rc[1]:
             # exception occured
             raise ProxyRepositoryError(rc[2])
 
         return (rc[0], rc[2])
+
+    def __getattr__(self, method):
+        return lambda *args: self.callByName(method, *args)
 
     def __init__(self, proxy):
         self.proxy = proxy
@@ -108,7 +107,6 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # of this framework for every request seems dumb. it seems like
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
-
         caller = self.callFactory.createCaller(rawUrl, authToken)
 
         if hasattr(self, methodname):
@@ -125,7 +123,12 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
             return (anon, False, r)
 
-        return caller._proxyCall(methodname, args)
+        try:
+            r = caller.callByName(methodname, *args)
+        except ProxyRepositoryError, e:
+            return (False, True, e.args)
+
+        return (r[0], False, r[1])
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -140,8 +143,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
 
-        useAnon, parentVersions = caller._reposCall('checkVersion',
-                                                    [ clientVersion ])
+        useAnon, parentVersions = caller.checkVersion(clientVersion)
 
         return useAnon, sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
 
@@ -203,9 +205,9 @@ class ChangesetProxy(BaseProxy):
 
                 fetchList = [ (x[0][0], self.fromVersion(x[0][1]),
                                self.fromFlavor(x[0][2]) ) for x in troveList ]
-                serverSigs = caller._reposCall('getTroveInfo',
-                            [ clientVersion, trove._TROVEINFO_TAG_SIGS,
-                              fetchList ] )[1]
+                serverSigs = caller.getTroveInfo(
+                              clientVersion, trove._TROVEINFO_TAG_SIGS,
+                              fetchList)[1]
                 for (troveInfo, cachedSigs), (present, reposSigs) in \
                                     itertools.izip(troveList, serverSigs):
                     if present < 1 or \
@@ -221,9 +223,9 @@ class ChangesetProxy(BaseProxy):
 
             if path is None:
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
-                    caller._reposCall('getChangeSet',
-                            [ clientVersion, [ rawJob ], recurse, withFiles,
-                              withFileContents, excludeAutoSource ] )[1]
+                    caller.getChangeSet(
+                              clientVersion, [ rawJob ], recurse, withFiles,
+                              withFileContents, excludeAutoSource)[1]
 
                 (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                                  suffix = '.tmp')
@@ -269,8 +271,8 @@ class ProxyRepositoryServer(ChangesetProxy):
                         authCheckOnly = False):
         if clientVersion < 42:
             # server doesn't support auth checks through getFileContents
-            return caller._reposCall('getFileContents',
-                                     [ clientVersion, fileList, authCheckOnly ])
+            return caller(getFileContents,
+                                clientVersion, fileList, authCheckOnly)
 
         hasFiles = []
         neededFiles = []
@@ -293,13 +295,12 @@ class ProxyRepositoryServer(ChangesetProxy):
         # make sure this user has permissions for these file contents. an
         # exception will get raised if we don't have sufficient permissions
         if hasFiles:
-            caller._reposCall('getFileContents',
-                              [ clientVersion, hasFiles, True ])
+            caller.getFileContents(clientVersion, hasFiles, True)
 
         if neededFiles:
             # now get the contents we don't have cached
-            (url, sizes) = caller._reposCall('getFileContents',
-                    [ clientVersion, neededFiles, False ])[1]
+            (url, sizes) = caller.getFileContents(
+                    clientVersion, neededFiles, False)[1]
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                              suffix = '.tmp')
