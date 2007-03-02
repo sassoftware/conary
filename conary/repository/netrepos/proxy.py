@@ -183,20 +183,13 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         return useAnon, commonVersions
 
-class SimpleRepositoryFilter(BaseProxy):
-
-    def __init__(self, cfg, basicUrl, repos):
-        BaseProxy.__init__(self, cfg, basicUrl)
-        self.callFactory = RepositoryCallFactory(repos)
-
-class ChangesetProxy(BaseProxy):
+class ChangesetFilter(BaseProxy):
 
     SERVER_VERSIONS = [ 41, 42, 43 ]
 
-    def __init__(self, cfg, basicUrl):
+    def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
-        self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
-                                       self.cfg.deadlockRetry)
+        self.cache = cache
 
     def _cvtJobEntry(self, authToken, jobEntry):
         (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
@@ -270,12 +263,17 @@ class ChangesetProxy(BaseProxy):
                     caller.getChangeSet(
                               clientVersion, [ rawJob ], recurse, withFiles,
                               withFileContents, excludeAutoSource)[1]
+                assert(len(sizes) == 1)
 
-                (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                                 suffix = '.tmp')
-                dest = os.fdopen(fd, "w")
-                size = util.copyfileobj(urllib.urlopen(url), dest)
-                dest.close()
+                if url.startswith('file://localhost/'):
+                    tmpPath = url[17:]
+                    size = sizes[0]
+                else:
+                    (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                                     suffix = '.tmp')
+                    dest = os.fdopen(fd, "w")
+                    size = util.copyfileobj(urllib.urlopen(url), dest)
+                    dest.close()
 
                 (key, path) = self.cache.addEntry(job, recurse, withFiles,
                                     withFileContents, excludeAutoSource,
@@ -303,10 +301,25 @@ class ChangesetProxy(BaseProxy):
         return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
                       allTrovesRemoved)
 
-class ProxyRepositoryServer(ChangesetProxy):
+class SimpleRepositoryFilter(ChangesetFilter):
+
+    def __init__(self, cfg, basicUrl, repos):
+        if cfg.cacheDB:
+            cache = cacheset.CacheSet(cfg.cacheDB, cfg.tmpDir,
+                                      cfg.deadlockRetry)
+        else:
+            cache = cacheset.NullCacheSet(cfg.tmpDir)
+
+        ChangesetFilter.__init__(self, cfg, basicUrl, cache)
+        self.callFactory = RepositoryCallFactory(repos)
+
+class ProxyRepositoryServer(ChangesetFilter):
 
     def __init__(self, cfg, basicUrl):
-        ChangesetProxy.__init__(self, cfg, basicUrl)
+        cache = cacheset.CacheSet(cfg.proxyDB, cfg.tmpDir, cfg.deadlockRetry)
+
+        ChangesetFilter.__init__(self, cfg, basicUrl, cache)
+
         util.mkdirChain(self.cfg.proxyContentsDir)
         self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
         self.callFactory = ProxyCallFactory()

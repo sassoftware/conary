@@ -190,7 +190,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.entitlementCheckURL = cfg.entitlementCheckURL
         self.readOnlyRepository = cfg.readOnlyRepository
 
-        if cfg.cacheDB:
+        if False and cfg.cacheDB:
             self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath,
                                            self.deadlockRetry)
         else:
@@ -1507,27 +1507,27 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             versionOverride = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
         return cspath, size
 
-    def _createChangeSet(self, jobEntry, **kwargs):
-        ret = self.repos.createChangeSet([ jobEntry ], **kwargs)
+    def _createChangeSet(self, path, jobList, **kwargs):
+        ret = self.repos.createChangeSet(jobList, **kwargs)
         (cs, trovesNeeded, filesNeeded, removedTroves) = ret
 
         # look up the version w/ timestamps
-        primary = (jobEntry[0], jobEntry[2][0], jobEntry[2][1])
-        try:
-            trvCs = cs.getNewTroveVersion(*primary)
-            primary = (jobEntry[0], trvCs.getNewVersion(), jobEntry[2][1])
-            cs.addPrimaryTrove(*primary)
-        except KeyError:
-            # primary troves could be in the externalTroveList, in
-            # which case they aren't primries
-            pass
+        for jobEntry in jobList:
+            if jobEntry[2][0] is None:
+                continue
 
-        (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                         suffix = '.tmp')
-        os.close(fd)
+            newJob = (jobEntry[0], jobEntry[2][0], jobEntry[2][1])
+            try:
+                trvCs = cs.getNewTroveVersion(*newJob)
+                primary = (jobEntry[0], trvCs.getNewVersion(), jobEntry[2][1])
+                cs.addPrimaryTrove(*primary)
+            except KeyError:
+                # primary troves could be in the externalTroveList, in
+                # which case they aren't primries
+                pass
 
-        size = cs.writeToFile(tmpPath, withReferences = True)
-        return tmpPath, (trovesNeeded, filesNeeded, removedTroves), size
+        size = cs.writeToFile(path, withReferences = True)
+        return (trovesNeeded, filesNeeded, removedTroves), size
 
     @accessReadOnly
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
@@ -1588,10 +1588,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         newChgSetList = []
         allFilesNeeded = []
         allRemovedTroves = []
-        (fd, retpath) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cf-out')
+        (fd, retpath) = tempfile.mkstemp(dir = self.tmpPath,
+                                         suffix = '.ccs-out')
         url = os.path.join(self.urlBase(),
                            "changeset?%s" % os.path.basename(retpath[:-4]))
-        fout = os.fdopen(fd, 'w')
+        url = 'file://localhost/' + retpath
+        os.close(fd)
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -1608,94 +1610,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         }
         # Big try-except to clean up files
         try:
-            for jobEntry in chgSetList:
-                l = self._cvtJobEntry(authToken, jobEntry)
+            chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
+            csVersion = self._getChangeSetVersion(clientVersion)
 
-                # Get the desired changeset version for this client
-                csVersion = self._getChangeSetVersion(clientVersion)
-                iterV = csVersion
-                verPath = [iterV]
-                while 1:
-                    key['csVersion'] = iterV
-                    cacheEntry = self.cache.getEntry(l, **key)
-                    if cacheEntry is not None:
-                        # We found a cached version
-                        break
-                    if iterV not in CHANGESET_VERSIONS_PRECEDENCE:
-                        # No way to move forward
-                        break
-                    # Move one edge in the DAG, try again
-                    iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
-                    verPath.append(iterV)
+            otherDetails, size = self._createChangeSet(retpath, chgSetList,
+                                    recurse = recurse,
+                                    withFiles = withFiles,
+                                    withFileContents = withFileContents,
+                                    excludeAutoSource = excludeAutoSource)
 
-                # At the end of the loop, either cacheEntry is None, which
-                # means no version is cached, or cacheEntry is not None and
-                # iterV points to the version of the cached entry. Either way,
-                # iterV is the last entry in verPath
-                if cacheEntry is None:
-                    # No entry was found. Produce it
-                    iterV = CHANGESET_VERSIONS[0]
-                    cspath, otherDetails, size = self._createChangeSet(l,
-                                            recurse = recurse,
-                                            withFiles = withFiles,
-                                            withFileContents = withFileContents,
-                                            excludeAutoSource = excludeAutoSource)
-                else:
-                    cspath, otherDetails, size = cacheEntry
+            (trovesNeeded, filesNeeded, removedTroves) = otherDetails
 
-                (trovesNeeded, filesNeeded, removedTroves) = otherDetails
-
-                # Now walk the precedence list backwards
-                oldV = None
-                while verPath:
-                    iterV = verPath.pop()
-                    if oldV:
-                        # Convert the changeset - not the first time around
-                        key['csVersion'] = oldV
-                        cspath, size = self._convertChangeSet(cspath, size,
-                                                              iterV, **key)
-
-                    oldV = iterV
-
-                    if cacheEntry:
-                        # First entry already cached
-                        cacheEntry = None
-                        continue
-
-                    # Cache it
-                    (k, chpath) = self.cache.addEntry(l, recurse, withFiles,
-                                                      withFileContents,
-                                                      excludeAutoSource,
-                                                      (trovesNeeded,
-                                                       filesNeeded,
-                                                       removedTroves),
-                                                      size = size,
-                                                      csVersion = iterV)
-                    # Rename the changeset file to the cache file
-                    os.rename(cspath, chpath)
-                    # Next reference changeset file is the cached one
-                    cspath = chpath
-
-                if recurse:
-                    # check to make sure that this user has access to see all
-                    # the troves included in a recursive changeset.
-                    cs = changeset.ChangeSetFromFile(cspath)
-                    for tcs in cs.iterNewTroveList():
-                        if not self.auth.check(authToken, write = False,
-                                               trove = tcs.getName(),
-                                               label = tcs.getNewVersion().trailingLabel()):
-                            raise errors.InsufficientPermission
-
-                newChgSetList.extend(_cvtTroveList(trovesNeeded))
-                allFilesNeeded.extend(_cvtFileList(filesNeeded))
-                allRemovedTroves.extend(removedTroves)
-                sizes.append(size)
-                fout.write("%s %d\n" % (cspath, size))
+            newChgSetList.extend(_cvtTroveList(trovesNeeded))
+            allFilesNeeded.extend(_cvtFileList(filesNeeded))
+            allRemovedTroves.extend(removedTroves)
+            sizes.append(size)
         except:
-            fout.close()
             os.unlink(retpath)
             raise
-        fout.close()
 
         if clientVersion < 38:
             return url, sizes, newChgSetList, allFilesNeeded
