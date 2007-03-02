@@ -25,12 +25,15 @@ from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import transport, xmlshims
 from conary.repository.netrepos import cacheset, netserver, calllog
 
-class ProxyCalls:
+class ProxyClient(xmlrpclib.ServerProxy):
 
-    @staticmethod
-    def _proxyCall(proxy, methodname, args):
+    pass
+
+class ProxyCaller:
+
+    def _proxyCall(self, methodname, args):
         try:
-            rc = proxy.__getattr__(methodname)(*args)
+            rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
             return [ False, True, [ 'ProxyError', e.strerror[1] ] ]
         except xmlrpclib.ProtocolError, e:
@@ -41,17 +44,35 @@ class ProxyCalls:
 
         return rc
 
-    def _reposCall(self, proxy, methodname, args):
-        rc = self._proxyCall(proxy, methodname, args)
+    def _reposCall(self, methodname, args):
+        rc = self._proxyCall(methodname, args)
         if rc[1]:
             # exception occured
             raise ProxyRepositoryError(rc[2])
 
         return (rc[0], rc[2])
 
-class ProxyClient(xmlrpclib.ServerProxy):
+    def __init__(self, proxy):
+        self.proxy = proxy
 
-    pass
+class ProxyCallFactory:
+
+    @staticmethod
+    def createCaller(rawUrl, authToken):
+        url = redirectUrl(authToken, rawUrl)
+
+        if authToken[2] is not None:
+            entitlement = authToken[2:4]
+        else:
+            entitlement = None
+
+        transporter = transport.Transport(https = url.startswith('https:'),
+                                          entitlement = entitlement)
+
+        transporter.setCompress(True)
+        proxy = ProxyClient(url, transporter)
+
+        return ProxyCaller(proxy)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -88,18 +109,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
 
-        url = redirectUrl(authToken, rawUrl)
-
-        if authToken[2] is not None:
-            entitlement = authToken[2:4]
-        else:
-            entitlement = None
-
-        transporter = transport.Transport(https = url.startswith('https:'),
-                                          entitlement = entitlement)
-
-        transporter.setCompress(True)
-        proxy = ProxyClient(url, transporter)
+        caller = self.callFactory.createCaller(rawUrl, authToken)
 
         if hasattr(self, methodname):
             # handled internally
@@ -109,19 +119,19 @@ class BaseProxy(xmlshims.NetworkConvertors):
                 self.callLog.log(remoteIp, authToken, methodname, args)
 
             try:
-                anon, r = method(proxy, authToken, *args)
+                anon, r = method(caller, authToken, *args)
             except ProxyRepositoryError, e:
                 return (False, True, e.args)
 
             return (anon, False, r)
 
-        return self._proxyCall(proxy, methodname, args)
+        return caller._proxyCall(methodname, args)
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 
-    def checkVersion(self, proxy, authToken, clientVersion):
+    def checkVersion(self, caller, authToken, clientVersion):
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
         # cut off older clients entirely, no negotiation
         if clientVersion < SERVER_VERSIONS[0]:
@@ -130,8 +140,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
 
-        useAnon, parentVersions = self._reposCall(proxy, 'checkVersion',
-                                                  [ clientVersion ])
+        useAnon, parentVersions = caller._reposCall('checkVersion',
+                                                    [ clientVersion ])
 
         return useAnon, sorted(list(set(SERVER_VERSIONS) & set(parentVersions)))
 
@@ -157,8 +167,8 @@ class ChangesetProxy(BaseProxy):
                        absolute)
         return l
 
-    def getChangeSet(self, proxy, authToken, clientVersion, chgSetList, recurse,
-                     withFiles, withFileContents, excludeAutoSource):
+    def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
+                     recurse, withFiles, withFileContents, excludeAutoSource):
         pathList = []
         allTrovesNeeded = []
         allFilesNeeded = []
@@ -193,7 +203,7 @@ class ChangesetProxy(BaseProxy):
 
                 fetchList = [ (x[0][0], self.fromVersion(x[0][1]),
                                self.fromFlavor(x[0][2]) ) for x in troveList ]
-                serverSigs = self._reposCall(proxy, 'getTroveInfo',
+                serverSigs = caller._reposCall('getTroveInfo',
                             [ clientVersion, trove._TROVEINFO_TAG_SIGS,
                               fetchList ] )[1]
                 for (troveInfo, cachedSigs), (present, reposSigs) in \
@@ -211,7 +221,7 @@ class ChangesetProxy(BaseProxy):
 
             if path is None:
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
-                    self._reposCall(proxy, 'getChangeSet',
+                    caller._reposCall('getChangeSet',
                             [ clientVersion, [ rawJob ], recurse, withFiles,
                               withFileContents, excludeAutoSource ] )[1]
 
@@ -247,19 +257,20 @@ class ChangesetProxy(BaseProxy):
         return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
                       allTrovesRemoved)
 
-class ProxyRepositoryServer(ProxyCalls, ChangesetProxy):
+class ProxyRepositoryServer(ChangesetProxy):
 
     def __init__(self, cfg, basicUrl):
         ChangesetProxy.__init__(self, cfg, basicUrl)
         util.mkdirChain(self.cfg.proxyContentsDir)
         self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
+        self.callFactory = ProxyCallFactory()
 
-    def getFileContents(self, proxy, authToken, clientVersion, fileList,
+    def getFileContents(self, caller, authToken, clientVersion, fileList,
                         authCheckOnly = False):
         if clientVersion < 42:
             # server doesn't support auth checks through getFileContents
-            return self._reposCall(proxy, 'getFileContents',
-                                   [ clientVersion, fileList, authCheckOnly ])
+            return caller._reposCall('getFileContents',
+                                     [ clientVersion, fileList, authCheckOnly ])
 
         hasFiles = []
         neededFiles = []
@@ -282,12 +293,12 @@ class ProxyRepositoryServer(ProxyCalls, ChangesetProxy):
         # make sure this user has permissions for these file contents. an
         # exception will get raised if we don't have sufficient permissions
         if hasFiles:
-            self._reposCall(proxy, 'getFileContents',
-                    [ clientVersion, hasFiles, True ])
+            caller._reposCall('getFileContents',
+                              [ clientVersion, hasFiles, True ])
 
         if neededFiles:
             # now get the contents we don't have cached
-            (url, sizes) = self._reposCall(proxy, 'getFileContents',
+            (url, sizes) = caller._reposCall('getFileContents',
                     [ clientVersion, neededFiles, False ])[1]
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
