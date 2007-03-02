@@ -45,19 +45,6 @@ from conary.errors import InvalidRegex
 # last one is the current server protocol version
 SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
 
-# A list of changeset versions we support
-# These are just shortcuts
-_CSVER0 = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
-_CSVER1 = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
-_CSVER2 = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
-# The first in the list is the one the current generation clients understand
-CHANGESET_VERSIONS = [ _CSVER2, _CSVER1, _CSVER0 ]
-# Precedence list of versions - the version specified as key can be generated
-# from the version specified as value
-CHANGESET_VERSIONS_PRECEDENCE = {
-    _CSVER0 : _CSVER1,
-    _CSVER1 : _CSVER2,
-}
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
 # Decorators for method access
@@ -1419,94 +1406,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return (cs, trovesNeeded, filesNeeded, removedTroves)
 
-    @staticmethod
-    def _getChangeSetVersion(clientVersion):
-        # Determine the changeset version based on the client version
-        # Add more params if necessary
-        if clientVersion < 38:
-            return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
-        elif clientVersion < 43:
-            return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
-        # Add more changeset versions here as the currently newest client is
-        # replaced by a newer one
-        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
-
-    def _convertChangeSet(self, csPath, size, destCsVersion, **key):
-        # Changeset is in the file csPath
-        # Changeset was fetched from the cache using key
-        # Convert it to destCsVersion
-        csVersion = key['csVersion']
-        if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
-            return self._convertChangeSetV1V0(csPath, size, destCsVersion,
-                                              **key)
-        elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
-            return self._convertChangeSetV2V1(csPath, size, destCsVersion,
-                                              **key)
-        assert False, "Unknown versions"
-
-    def _convertChangeSetV2V1(self, cspath, size, destCsVersion, **key):
-        (fd, newCsPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                        suffix = '.tmp')
-        os.close(fd)
-        delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
-
-        return newCsPath, size + delta
-
-    def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
-        # check to make sure that this user has access to see all
-        # the troves included in a recursive changeset.
-        cs = changeset.ChangeSetFromFile(cspath)
-        newCs = changeset.ChangeSet()
-
-        for tcs in cs.iterNewTroveList():
-            if tcs.troveType() != trove.TROVE_TYPE_REMOVED:
-                continue
-
-            # Even though it's possible for (old) clients to request
-            # removed relative changesets recursively, the update
-            # code never does that. Raising an exception to make
-            # sure we know how the code behaves.
-            if not tcs.isAbsolute():
-                raise errors.InternalServerError(
-                    "Relative recursive changesets not supported "
-                    "for removed troves")
-            ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
-            trvName = tcs.getName()
-            trvNewVersion = tcs.getNewVersion()
-            trvNewFlavor = tcs.getNewFlavor()
-            if ti.flags.isMissing():
-                # this was a missing trove for which we
-                # synthesized a removed trove object. 
-                # The client would have a much easier time
-                # updating if we just made it a regular trove.
-                missingOldVersion = tcs.getOldVersion()
-                missingOldFlavor = tcs.getOldFlavor()
-                oldTrove = trove.Trove(trvName,
-                                       missingOldVersion,
-                                       missingOldFlavor)
-                newTrove = trove.Trove(trvName,
-                                       trvNewVersion,
-                                       trvNewFlavor)
-                diff = newTrove.diff(oldTrove)[0]
-                newCs.newTrove(diff)
-            else:
-                # this really was marked as a removed trove.
-                # raise a TroveMissing exception
-                raise errors.TroveMissing(trvName,
-                                          version=trvNewVersion)
-
-        # we need to re-write the munged changeset for an
-        # old client
-        cs.merge(newCs)
-        # create a new temporary file for the munged changeset
-        (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                        suffix = '.tmp')
-        os.close(fd)
-        # now write out the munged changeset
-        size = cs.writeToFile(cspath,
-            versionOverride = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
-        return cspath, size
-
     def _createChangeSet(self, path, jobList, **kwargs):
         ret = self.repos.createChangeSet(jobList, **kwargs)
         (cs, trovesNeeded, filesNeeded, removedTroves) = ret
@@ -1590,8 +1489,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         allRemovedTroves = []
         (fd, retpath) = tempfile.mkstemp(dir = self.tmpPath,
                                          suffix = '.ccs-out')
-        url = os.path.join(self.urlBase(),
-                           "changeset?%s" % os.path.basename(retpath[:-4]))
+        #url = os.path.join(self.urlBase(),
+                           #"changeset?%s" % os.path.basename(retpath[:-4]))
+        # we use a local file for the parent class; this means this class
+        # won't work over the wire (but we never use it that way anyway)
         url = 'file://localhost/' + retpath
         os.close(fd)
 
@@ -1611,7 +1512,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # Big try-except to clean up files
         try:
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
-            csVersion = self._getChangeSetVersion(clientVersion)
 
             otherDetails, size = self._createChangeSet(retpath, chgSetList,
                                     recurse = recurse,

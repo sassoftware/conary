@@ -17,8 +17,22 @@ import base64, itertools, os, tempfile, urllib, xmlrpclib
 from conary import conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
-from conary.repository import transport, xmlshims
+from conary.repository import filecontainer, transport, xmlshims
 from conary.repository.netrepos import cacheset, netserver, calllog
+
+# A list of changeset versions we support
+# These are just shortcuts
+_CSVER0 = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
+_CSVER1 = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+_CSVER2 = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+# The first in the list is the one the current generation clients understand
+CHANGESET_VERSIONS = [ _CSVER2, _CSVER1, _CSVER0 ]
+# Precedence list of versions - the version specified as key can be generated
+# from the version specified as value
+CHANGESET_VERSIONS_PRECEDENCE = {
+    _CSVER0 : _CSVER1,
+    _CSVER1 : _CSVER2,
+}
 
 class ProxyClient(xmlrpclib.ServerProxy):
 
@@ -102,6 +116,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
     # a list of the protocol versions we understand. Make sure the first
     # one in the list is the lowest protocol version we support and the
     # last one is the current server protocol version.
+    #
+    # for thoughts on this process, see the IM log at the end of this file
     SERVER_VERSIONS = netserver.SERVER_VERSIONS
     publicCalls = netserver.NetworkRepositoryServer.publicCalls
 
@@ -185,7 +201,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
 class ChangesetFilter(BaseProxy):
 
-    SERVER_VERSIONS = [ 41, 42, 43 ]
+    forceGetCsVersion = None
 
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
@@ -206,6 +222,91 @@ class ChangesetFilter(BaseProxy):
                        absolute)
         return l
 
+    @staticmethod
+    def _getChangeSetVersion(clientVersion):
+        # Determine the changeset version based on the client version
+        # Add more params if necessary
+        if clientVersion < 38:
+            return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
+        elif clientVersion < 43:
+            return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+        # Add more changeset versions here as the currently newest client is
+        # replaced by a newer one
+        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+
+    def _convertChangeSet(self, csPath, size, destCsVersion, csVersion):
+        # Changeset is in the file csPath
+        # Changeset was fetched from the cache using key
+        # Convert it to destCsVersion
+        if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
+            return self._convertChangeSetV1V0(csPath, size, destCsVersion)
+        elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
+            return self._convertChangeSetV2V1(csPath, size, destCsVersion)
+        assert False, "Unknown versions"
+
+    def _convertChangeSetV2V1(self, cspath, size, destCsVersion):
+        (fd, newCsPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                        suffix = '.tmp')
+        os.close(fd)
+        delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
+
+        return newCsPath, size + delta
+
+    def _convertChangeSetV1V0(self, cspath, size, destCsVersion):
+        # check to make sure that this user has access to see all
+        # the troves included in a recursive changeset.
+        cs = changeset.ChangeSetFromFile(cspath)
+        newCs = changeset.ChangeSet()
+
+        for tcs in cs.iterNewTroveList():
+            if tcs.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
+
+            # Even though it's possible for (old) clients to request
+            # removed relative changesets recursively, the update
+            # code never does that. Raising an exception to make
+            # sure we know how the code behaves.
+            if not tcs.isAbsolute():
+                raise errors.InternalServerError(
+                    "Relative recursive changesets not supported "
+                    "for removed troves")
+            ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
+            trvName = tcs.getName()
+            trvNewVersion = tcs.getNewVersion()
+            trvNewFlavor = tcs.getNewFlavor()
+            if ti.flags.isMissing():
+                # this was a missing trove for which we
+                # synthesized a removed trove object. 
+                # The client would have a much easier time
+                # updating if we just made it a regular trove.
+                missingOldVersion = tcs.getOldVersion()
+                missingOldFlavor = tcs.getOldFlavor()
+                oldTrove = trove.Trove(trvName,
+                                       missingOldVersion,
+                                       missingOldFlavor)
+                newTrove = trove.Trove(trvName,
+                                       trvNewVersion,
+                                       trvNewFlavor)
+                diff = newTrove.diff(oldTrove)[0]
+                newCs.newTrove(diff)
+            else:
+                # this really was marked as a removed trove.
+                # raise a TroveMissing exception
+                raise errors.TroveMissing(trvName,
+                                          version=trvNewVersion)
+
+        # we need to re-write the munged changeset for an
+        # old client
+        cs.merge(newCs)
+        # create a new temporary file for the munged changeset
+        (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                        suffix = '.tmp')
+        os.close(fd)
+        # now write out the munged changeset
+        size = cs.writeToFile(cspath,
+            versionOverride = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
+        return cspath, size
+
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource):
         pathList = []
@@ -214,15 +315,33 @@ class ChangesetFilter(BaseProxy):
         allTrovesRemoved = []
         allSizes = []
 
-        csVersion = netserver.NetworkRepositoryServer._getChangeSetVersion(
-                                                                clientVersion)
+        if self.forceGetCsVersion is not None:
+            getCsVersion = self.forceGetCsVersion
+        else:
+            getCsVersion = clientVersion
+
+        neededCsVersion = self._getChangeSetVersion(clientVersion)
+        wireCsVersion = self._getChangeSetVersion(getCsVersion)
+
+        # Get the desired changeset version for this client
+        iterV = neededCsVersion
+        verPath = [iterV]
+        while 1:
+            if iterV not in CHANGESET_VERSIONS_PRECEDENCE:
+                # No way to move forward
+                break
+            # Move one edge in the DAG, try again
+            iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
+            verPath.append(iterV)
+
+        assert(verPath[-1] == wireCsVersion)
 
         for rawJob in chgSetList:
             job = self._cvtJobEntry(authToken, rawJob)
 
             cacheEntry = self.cache.getEntry(job, recurse, withFiles,
                                      withFileContents, excludeAutoSource,
-                                     csVersion)
+                                     neededCsVersion)
             path = None
 
             if cacheEntry is not None:
@@ -261,7 +380,7 @@ class ChangesetFilter(BaseProxy):
             if path is None:
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
                     caller.getChangeSet(
-                              clientVersion, [ rawJob ], recurse, withFiles,
+                              getCsVersion, [ rawJob ], recurse, withFiles,
                               withFileContents, excludeAutoSource)[1]
                 assert(len(sizes) == 1)
 
@@ -278,9 +397,40 @@ class ChangesetFilter(BaseProxy):
                 (key, path) = self.cache.addEntry(job, recurse, withFiles,
                                     withFileContents, excludeAutoSource,
                                     (trovesNeeded, filesNeeded, removedTroves,
-                                     sizes), size = size, csVersion = csVersion)
+                                     sizes), size = size,
+                                     csVersion = wireCsVersion)
 
                 os.rename(tmpPath, path)
+
+            # Now walk the precedence list backwards
+            oldV = wireCsVersion
+            for iterV in reversed(verPath[:-1]):
+                if oldV:
+                    # Convert the changeset - not the first time around
+                    path, size = self._convertChangeSet(path, size,
+                                                           iterV, oldV)
+                    sizes = [ size ]
+ 
+                oldV = iterV
+
+                if cacheEntry:
+                    # First entry already cached
+                    cacheEntry = None
+                    continue
+
+                # Cache it
+                (k, chpath) = self.cache.addEntry(job, recurse, withFiles,
+                                                  withFileContents,
+                                                  excludeAutoSource,
+                                                  (trovesNeeded,
+                                                   filesNeeded,
+                                                   removedTroves),
+                                                  size = size,
+                                                  csVersion = iterV)
+                # Rename the changeset file to the cache file
+                os.rename(path, chpath)
+                # Next reference changeset file is the cached one
+                path = chpath
 
             pathList.append((path, size))
             allTrovesNeeded += trovesNeeded
@@ -303,6 +453,8 @@ class ChangesetFilter(BaseProxy):
 
 class SimpleRepositoryFilter(ChangesetFilter):
 
+    forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
+
     def __init__(self, cfg, basicUrl, repos):
         if cfg.cacheDB:
             cache = cacheset.CacheSet(cfg.cacheDB, cfg.tmpDir,
@@ -314,6 +466,8 @@ class SimpleRepositoryFilter(ChangesetFilter):
         self.callFactory = RepositoryCallFactory(repos)
 
 class ProxyRepositoryServer(ChangesetFilter):
+
+    SERVER_VERSIONS = [ 41, 42, 43 ]
 
     def __init__(self, cfg, basicUrl):
         cache = cacheset.CacheSet(cfg.proxyDB, cfg.tmpDir, cfg.deadlockRetry)
@@ -412,3 +566,19 @@ class ProxyRepositoryError(Exception):
 
     def __init__(self, args):
         self.args = args
+
+# ewtroan: for the internal proxy, we support client version 38 but need to talk to a server which is at least version 41
+# ewtroan: for external proxy, we support client version 41 and need a server which is at least 41
+# ewtroan: and when I get a call, I need to know what version the server is, which I can't keep anywhere as state
+# ewtroan: but I can't very well tell a client version 38 to call back with server version 41
+# Gafton: hmm - is there a way to differentiate your internal/external state in the code ?
+# ewtroan: I'm going to split the classes
+# ***ewtroan copies some code around
+# Gafton: same basic class with different dressings?
+# ewtroan: I set the fullproxy to be versions 41-43
+# ewtroan: while the changeset caching advertises versions 38-43
+# ewtroan: it works because the internal proxy only talks to the internal repository, and those don't really need to explicitly negotiate
+# ewtroan: not a perfect model, but good enough
+# Gafton: okay, that makes sense
+# ewtroan: and I'll make the internal one override the protocol version to call into the bottom one with for getChangeSet() and for the external one use the protocol version the client asked for
+# ewtroan: which will all work fine with the autoconverstion of formats in the proxy
