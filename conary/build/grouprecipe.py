@@ -39,6 +39,7 @@ ADD_REASON_INCLUDED = 2 # added because it's in something else that was added
 ADD_REASON_ADDALL = 3   # added as part of an "addAll"
 ADD_REASON_REPLACE = 4  # added as part of a "replace" command.
 ADD_REASON_INCLUDED_GROUP = 5 # added because its in an included group
+ADD_REASON_COPIED = 6    # added because it was copied from another group
 
 ADDALL_NORECURSE = 0
 ADDALL_RECURSE   = 1
@@ -479,6 +480,109 @@ class GroupRecipe(_BaseGroupRecipe):
             componentList = [ componentList ]
         for group in self._getGroups(groupName):
             group.removeComponents(componentList)
+
+    def moveComponents(self, componentList, fromGroup, toGroup, byDefault=None):
+        """
+        NAME
+        ====
+
+        B{C{r.moveComponents()}} - Add components to one group, removing them
+        from the other in the process.
+
+        SYNOPSIS
+        ========
+
+        C{r.moveComponents(I{componentList}, I{fromGroup}, I{toGroup}, [I{byDefault}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.moveComponents} removes components from the fromGroup, and adds
+        those components to the toGroup.
+
+        PARAMETERS
+        ==========
+
+        The C{r.moveComponents()} command accepts the following parameters,
+        with default values shown in parentheses where there is one:
+
+        B{componentList} : A list of components which should be moved
+        from fromGroup to toGroup.  Example: ['devel', 'devellib']
+
+        B{fromGroup} : The name of the group to move the components from
+
+        B{toGroup} : The name of the group to move the components to
+
+        B{ByDefault} : (None) When specified, this ensures that all the 
+                       components that are added have the byDefault value
+                       specified (either True or False).  If not specified,
+                       the components get the byDefault value they had in the
+                       fromGroup.
+
+        EXAMPLES
+        ========
+
+        C{r.moveComponents(['devel', 'devellib'], 'group-core', 'group-devel')}
+
+        Uses C{r.moveComponents} to specify that those C{:devel} and
+        C{:devellib} components that exist in group-core should be 
+        removed from group-core and added to group-devel.
+        """
+        for group in self._getGroups(fromGroup):
+            group.moveComponents(self._getGroups(toGroup), componentList,
+                                 copy=False, byDefault=byDefault)
+
+    def copyComponents(self, componentList, fromGroupName, toGroupName,
+                       byDefault=None):
+        """
+        NAME
+        ====
+
+        B{C{r.copyComponents()}} - Add components to one group by looking 
+        copying them from the components in another group.
+
+        SYNOPSIS
+        ========
+
+        C{r.copyComponents(I{componentList}, I{fromGroup}, I{toGroup}, [I{byDefault}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.copyComponents} copies the listed component types from
+        the fromGroup to the toGroup.
+
+        PARAMETERS
+        ==========
+
+        The C{r.copyComponents()} command accepts the following parameters,
+        with default values shown in parentheses where there is one:
+
+        B{componentList} : A list of components which should be copied
+        from fromGroup to toGroup.  Example: ['devel', 'devellib']
+
+        B{fromGroup} : The name of the group to copy the components from
+
+        B{toGroup} : The name of the group to copy the components to
+
+        B{ByDefault} : (None) When specified, this ensures that all the 
+                       components that are added have the byDefault value
+                       specified (either True or False).  If not specified,
+                       the components get the byDefault value they had in the
+                       fromGroup.
+
+        EXAMPLES
+        ========
+
+        C{r.copyComponents(['devel', 'devellib'], 'group-core', 'group-devel')}
+
+        Uses C{r.copyComponents} to specify that those C{:devel} and
+        C{:devellib} components that exist in group-core should be added
+        to group-devel.
+        """
+        for group in self._getGroups(fromGroupName):
+            group.moveComponents(self._getGroups(toGroupName), componentList, 
+                                 copy=True, byDefault=byDefault)
 
     def setSearchPath(self, *path):
         """
@@ -1278,6 +1382,7 @@ class SingleGroup(object):
         self.addAllTroveList = []
         self.newGroupDifferenceList = []
         self.differenceSpecs = []
+        self.componentsToMove = []
 
         self.requires = deps.DependencySet()
 
@@ -1315,6 +1420,18 @@ class SingleGroup(object):
     def differenceUpdateNewGroup(self, newGroupName):
         self.newGroupDifferenceList.append(newGroupName)
 
+    def moveComponents(self, toGroups, componentList, copy=False, 
+                       byDefault = None):
+        if not isinstance(componentList, (list, tuple)):
+            componentList = [componentList]
+        finalComponentList = []
+        for component in componentList:
+            if component[0] == ':':
+                component = component[1:]
+            finalComponentList.append(component)
+        return self.componentsToMove.append((toGroups, finalComponentList,
+                                             copy, byDefault))
+
     def addSpec(self, name, versionStr = None, flavor = None, source = None,
                 byDefault = None, ref = None, components=None):
         self.addTroveList.append(((name, versionStr, flavor), source,
@@ -1347,6 +1464,26 @@ class SingleGroup(object):
 
     def getComponentsToRemove(self):
         return self.removeComponentList
+
+    def getComponentsToMove(self):
+        return self.componentsToMove
+
+    def getMoveComponentMap(self):
+        lst = [x for x in self.componentsToMove if not x[2]]
+        return self._getMoveComponentMap(lst)
+
+    def getCopyComponentMap(self):
+        lst = [x for x in self.componentsToMove if x[2]]
+        return self._getMoveComponentMap(lst)
+
+    def _getMoveComponentMap(self, movingComponents):
+        componentMap = {}
+        for (toGroupList, componentList, copy, byDefault) in movingComponents:
+            for component in componentList:
+                for toGroup in toGroupList:
+                    componentMap.setdefault(component, []).append((toGroup,
+                                                                   byDefault))
+        return componentMap
 
     def iterNewGroupDifferenceList(self):
         return iter(self.newGroupDifferenceList)
@@ -1511,6 +1648,8 @@ class SingleGroup(object):
             return "Included by adding all from %s=%s[%s]" % reason[1]
         elif reasonType == ADD_REASON_REPLACE:
             return "Included by replace of %s=%s[%s]" % reason[1]
+        elif reasonType == ADD_REASON_COPIED:
+            return "Included due to copy/move of components from %s" % reason[1]
         else:
             raise errors.InternalConaryError("Unknown inclusion reason")
 
@@ -1705,6 +1844,12 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
                 g.addEdge(childName, group.name)
             for childName in group.iterNewGroupDifferenceList():
                 g.addEdge(childName, group.name)
+            for (toGroupList, components, copy, byDefault) \
+                                                in group.getComponentsToMove():
+                for toGroup in toGroupList:
+                    # make sure this group is done before everything we're
+                    # copying to.
+                    g.addEdge(group.name, toGroup.name)
 
         cycles = [ x for x in g.getStronglyConnectedComponents() if len(x) > 1 ]
         if cycles:
@@ -1981,7 +2126,12 @@ def removeDifferences(group, differenceGroupList, differenceSpecs, troveMap,
 
 def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
     def _componentMatches(troveName, compList):
-        return ':' in troveName and troveName.split(':', 1)[1] in compList
+        if ':' not in troveName:
+            return False
+        comp = troveName.split(':', 1)[1]
+        if comp in compList:
+            return comp
+        return False
 
     # add explicit troves
     for (troveSpec, source, byDefault,
@@ -2071,7 +2221,10 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
     # add implicit troves
     # first from children of explicit troves.
     componentsToRemove = group.getComponentsToRemove()
-
+    copyComponentMap = group.getCopyComponentMap()
+    moveComponentMap = group.getMoveComponentMap()
+    componentsToCopy = dict((x, []) for x in copyComponentMap)
+    componentsToMove = dict((x, []) for x in moveComponentMap)
 
     for (troveTup, explicit,
          byDefault, components) in list(group.iterTroveListInfo()):
@@ -2099,6 +2252,18 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
                     childByDefault = byDefault
                 else:
                     childByDefault = False
+
+            comp = _componentMatches(childName, componentsToCopy)
+            if comp:
+                componentsToCopy[comp].append((childTup, childByDefault))
+
+            # lastly, we add the component as something to move,
+            # this will also remove this component at the same time.
+            comp = _componentMatches(childName, componentsToMove)
+            if comp:
+                componentsToMove[comp].append((childTup, childByDefault))
+                childByDefault = False
+
             reason = group.getReason(*troveTup)
             if reason[0] == ADD_REASON_ADDED:
                 reason = ADD_REASON_INCLUDED, troveTup
@@ -2202,12 +2367,29 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
                   " contain any byDefault True components" % (pkgTup))
         group.setTroveByDefault(byDefault=False, *pkgTup)
 
+    newExplicit = addCopiedComponents(group, componentsToMove, moveComponentMap)
+    newExplicit += addCopiedComponents(group, componentsToCopy,
+                                       copyComponentMap)
+    cache.cacheTroves(newExplicit)
     if unmatchedRemoveSpecs:
         log.warning(GroupUnmatchedRemoves(unmatchedRemoveSpecs, group))
 
     if unmatchedReplaceSpecs:
         log.warning(GroupUnmatchedReplaces(unmatchedReplaceSpecs, group))
     return unmatchedGlobalReplaceSpecs
+
+def addCopiedComponents(fromGroup, componentsToCopy, componentMap):
+    newExplicitTups = []
+    for component, groupList in componentMap.items():
+        for group, byDefaultSetting in groupList:
+            for troveTup, byDefault in componentsToCopy.get(component, []):
+                newExplicitTups.append(troveTup)
+                if byDefaultSetting is not None:
+                    byDefault = byDefaultSetting
+                group.addTrove(troveTup, explicit=True, byDefault=byDefault,
+                               components=[],
+                               reason=(ADD_REASON_COPIED, fromGroup.name))
+    return newExplicitTups
 
 def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
     # we only remove weak troves if either a) they are primary 
