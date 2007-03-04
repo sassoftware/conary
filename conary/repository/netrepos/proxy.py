@@ -345,6 +345,8 @@ class ChangesetFilter(BaseProxy):
             path = None
 
             if cacheEntry is not None:
+                import epdb
+                epdb.st()
                 path, (trovesNeeded, filesNeeded, removedTroves, sizes), \
                         size = cacheEntry
                 invalidate = False
@@ -354,19 +356,26 @@ class ChangesetFilter(BaseProxy):
                 troveList = []
                 cs = changeset.ChangeSetFromFile(path)
                 for trvCs in cs.iterNewTroveList():
+                    ti = trove.TroveInfo(trvCs.troveInfoDiff.freeze())
                     troveList.append(
                             ((trvCs.getName(), trvCs.getNewVersion(),
                               trvCs.getNewFlavor()),
-                              trvCs.getNewSigs().freeze()))
+                              trvCs.getNewSigs().freeze(),
+                              ti.flags.isMissing()))
 
                 fetchList = [ (x[0][0], self.fromVersion(x[0][1]),
                                self.fromFlavor(x[0][2]) ) for x in troveList ]
                 serverSigs = caller.getTroveInfo(
                               clientVersion, trove._TROVEINFO_TAG_SIGS,
                               fetchList)[1]
-                for (troveInfo, cachedSigs), (present, reposSigs) in \
+                for ((troveInfo, cachedSigs, cachedIsMissing),
+                            (present, reposSigs)) in \
                                     itertools.izip(troveList, serverSigs):
-                    if present < 1 or \
+                    if present < 1 and not isMissing:
+                        # if it's missing from the server, make sure it's
+                        # missing here too
+                        invalidate = True
+                    elif present >= 1 or \
                                 not cachedSigs or \
                                 cachedSigs != base64.decodestring(reposSigs):
                         invalidate = True
@@ -402,35 +411,35 @@ class ChangesetFilter(BaseProxy):
 
                 os.rename(tmpPath, path)
 
-            # Now walk the precedence list backwards
-            oldV = wireCsVersion
-            for iterV in reversed(verPath[:-1]):
-                if oldV:
-                    # Convert the changeset - not the first time around
-                    path, size = self._convertChangeSet(path, size,
-                                                           iterV, oldV)
-                    sizes = [ size ]
- 
-                oldV = iterV
+                # Now walk the precedence list backwards
+                oldV = wireCsVersion
+                for iterV in reversed(verPath[:-1]):
+                    if oldV:
+                        # Convert the changeset - not the first time around
+                        path, size = self._convertChangeSet(path, size,
+                                                               iterV, oldV)
+                        sizes = [ size ]
 
-                if cacheEntry:
-                    # First entry already cached
-                    cacheEntry = None
-                    continue
+                    oldV = iterV
 
-                # Cache it
-                (k, chpath) = self.cache.addEntry(job, recurse, withFiles,
-                                                  withFileContents,
-                                                  excludeAutoSource,
-                                                  (trovesNeeded,
-                                                   filesNeeded,
-                                                   removedTroves),
-                                                  size = size,
-                                                  csVersion = iterV)
-                # Rename the changeset file to the cache file
-                os.rename(path, chpath)
-                # Next reference changeset file is the cached one
-                path = chpath
+                    if cacheEntry:
+                        # First entry already cached
+                        cacheEntry = None
+                        continue
+
+                    # Cache it
+                    (k, chpath) = self.cache.addEntry(job, recurse, withFiles,
+                                                      withFileContents,
+                                                      excludeAutoSource,
+                                                      (trovesNeeded,
+                                                       filesNeeded,
+                                                       removedTroves, sizes),
+                                                      size = size,
+                                                      csVersion = iterV)
+                    # Rename the changeset file to the cache file
+                    os.rename(path, chpath)
+                    # Next reference changeset file is the cached one
+                    path = chpath
 
             pathList.append((path, size))
             allTrovesNeeded += trovesNeeded
@@ -447,6 +456,9 @@ class ChangesetFilter(BaseProxy):
             f.write("%s %d\n" % (path, size))
 
         f.close()
+
+        if clientVersion < 38:
+            return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
 
         return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
                       allTrovesRemoved)

@@ -33,7 +33,7 @@ from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
-from conary.repository.netrepos import cacheset, calllog
+from conary.repository.netrepos import calllog
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
@@ -177,12 +177,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.entitlementCheckURL = cfg.entitlementCheckURL
         self.readOnlyRepository = cfg.readOnlyRepository
 
-        if False and cfg.cacheDB:
-            self.cache = cacheset.CacheSet(cfg.cacheDB, self.tmpPath,
-                                           self.deadlockRetry)
-        else:
-            self.cache = cacheset.NullCacheSet(self.tmpPath)
-
         self.__delDB = False
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -205,7 +199,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # this is ugly, but for now it is the only way to break the
         # circular dep created by self.repos back to us
         self.repos.troveStore = self.repos.reposSet = None
-        self.cache = self.auth = None
+        self.auth = None
         try:
             if self.__delDB: self.db.close()
         except:
@@ -1501,14 +1495,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  list(set([x[2][0] for x in chgSetList])),
                  "recurse=%s withFiles=%s withFileContents=%s" % (
             recurse, withFiles, withFileContents))
-        # XXX all of these cache lookups should be a single operation through a
-        # temporary table
-        key = {
-            'recurse'   : recurse,
-            'withFiles' : withFiles,
-            'withFileContents' : withFileContents,
-            'excludeAutoSource' : excludeAutoSource,
-        }
+
+        authCheckFn = lambda n, v, f: \
+                self.auth.check(authToken, write = False,
+                                       trove = n, label = v.trailingLabel())
+
         # Big try-except to clean up files
         try:
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
@@ -1517,7 +1508,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                     recurse = recurse,
                                     withFiles = withFiles,
                                     withFileContents = withFileContents,
-                                    excludeAutoSource = excludeAutoSource)
+                                    excludeAutoSource = excludeAutoSource,
+                                    authCheck = authCheckFn)
 
             (trovesNeeded, filesNeeded, removedTroves) = otherDetails
 
@@ -1529,9 +1521,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             os.unlink(retpath)
             raise
 
-        if clientVersion < 38:
-            return url, sizes, newChgSetList, allFilesNeeded
-
+        # versions < 38 omit allRemoved troves, but the caching front end
+        # will omit that for us
         return url, sizes, newChgSetList, allFilesNeeded, \
                _cvtTroveList(allRemovedTroves)
 
@@ -1697,9 +1688,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, mirror = mirror)
-
-        for info in removedList:
-            self.cache.invalidateEntry(self.repos, *info)
 
 	if not self.commitAction:
 	    return True
@@ -2245,8 +2233,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             VALUES (?, ?, ?)
             """, (instanceId, trove._TROVEINFO_TAG_SIGS,
                   cu.binary(trv.troveInfo.sigs.freeze())))
-        self.cache.invalidateEntry(self.repos, trv.getName(), trv.getVersion(),
-                                   trv.getFlavor())
         return True
 
     @accessReadWrite
@@ -2531,8 +2517,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 (n,v,f),s = infoList[i]
                 invList.append((n,v,f))
         self.log(3, "updated signatures for", len(inserts+updates), "troves")
-        if len(invList):
-            self.cache.invalidateEntries(self.repos, invList)
         self.log(3, "invalidated cache for", len(invList), "troves")
         return len(inserts) + len(updates)
 
@@ -2831,9 +2815,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         return SERVER_VERSIONS
-
-    def cacheChangeSets(self):
-        return isinstance(self.cache, cacheset.CacheSet)
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args):

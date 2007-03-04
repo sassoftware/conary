@@ -231,7 +231,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return contents
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
-                        withFileContents = True, excludeAutoSource = False):
+                        withFileContents = True, excludeAutoSource = False,
+                        authCheck = None):
 	"""
 	troveList is a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
@@ -254,7 +255,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         # def createChangeSet begins here
 
-        troveWrapper = _TroveListWrapper(troveList, self.troveStore, withFiles)
+        troveWrapper = _TroveListWrapper(troveList, self.troveStore, withFiles,
+                                         authCheck = authCheck)
 
         for job in troveWrapper:
 	    ((troveName, (oldVersion, oldFlavor),
@@ -448,6 +450,18 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 class _TroveListWrapper:
     def _handleJob(self, job, recursed, idx):
         t = self.trvIterator.next()
+
+        if t is not None:
+            if self.withFiles:
+                t, streams = t
+            else:
+                streams = {}
+
+            if not self.authCheck(*t.getNameVersionFlavor()):
+                # If we don't have perms to see the trove, act like it doesn't
+                # exist
+                t = None
+
         if t is None:
             if recursed:
                 # synthesize a removed trove for this missing
@@ -458,16 +472,13 @@ class _TroveListWrapper:
                 t.computeSignatures()
                 if self.withFiles:
                     # synthesize empty filestreams
-                    t = t, {}
+                    t, streams = t, {}
             else:
                 # drain the iterator, in order to complete
                 # the sql queries
                 for x in self.trvIterator: pass
                 raise errors.TroveMissing(job[0], job[idx][0])
-        if self.withFiles:
-            t, streams = t
-        else:
-            streams = {}
+
         return t, streams
 
     def next(self):
@@ -522,10 +533,14 @@ class _TroveListWrapper:
     def append(self, item, recurse):
         self.new.append((item, recurse))
 
-    def __init__(self, l, troveStore, withFiles):
+    def __init__(self, l, troveStore, withFiles, authCheck = None):
         self.trvIterator = None
         self.new = [ (x, False) for x in l ]
         self.l = []
         self.troveStore = troveStore
         self.withFiles = withFiles
+        if authCheck is None:
+            self.authCheck = lambda *args: True
+        else:
+            self.authCheck = authCheck
 
