@@ -278,7 +278,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	return resp
 
     def do_PUT(self):
-        util.FOO=1
         contentLength = int(self.headers['Content-Length'])
         authToken = self.getAuth()
 

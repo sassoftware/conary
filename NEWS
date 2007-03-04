@@ -28,9 +28,10 @@ Changes in @NEW@:
       troves included within the specified group from the currently
       active group. (CNY-1380)
     * checking dependencies is now faster when building groups.
-    * When resolving dependencies in groups, conary will now search the 
+    * When resolving dependencies in groups, conary will now search the
       latest trove in every label in your label/search path before
       searching back in the history of that label. (CNY-1312)
+    * Added moveComponents and copyComponents to group syntax. (CNY-1231)
   
   o Server Changes:
     * Two new calls have been added to the server API -
