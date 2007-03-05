@@ -14,6 +14,8 @@ Changes in @NEW@:
       first before searching the histories of those labels.  This should make
       sure that conary prefers installing maintained troves over unmaintained 
       ones. (CNY-1312)
+    * The Conary client API now has a new call, iterRollbacksList(), iterating
+      over the rollback name and object. (CNY-1390)
 
   o Build Changes:
     * A list of rPath mirrors for source components has been added.
