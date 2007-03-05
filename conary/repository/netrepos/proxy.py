@@ -17,7 +17,7 @@ import base64, itertools, os, tempfile, urllib, xmlrpclib
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and the
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 41, 42 ]
+SERVER_VERSIONS = [ 41, 42, 43 ]
 
 from conary import conarycfg, trove
 from conary.lib import sha1helper, tracelog, util

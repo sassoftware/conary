@@ -26,6 +26,7 @@ from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims, filecontainer
+from conary.repository import filecontents
 from conary.repository.netrepos import fsrepos, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
@@ -42,18 +43,20 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
 
 # A list of changeset versions we support
 # These are just shortcuts
-_CSVER0 = filecontainer.FILE_CONTAINER_VERSION
+_CSVER0 = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
 _CSVER1 = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+_CSVER2 = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
 # The first in the list is the one the current generation clients understand
-CHANGESET_VERSIONS = [ _CSVER1, _CSVER0 ]
+CHANGESET_VERSIONS = [ _CSVER2, _CSVER1, _CSVER0 ]
 # Precedence list of versions - the version specified as key can be generated
 # from the version specified as value
 CHANGESET_VERSIONS_PRECEDENCE = {
     _CSVER0 : _CSVER1,
+    _CSVER1 : _CSVER2,
 }
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1421,10 +1424,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # Determine the changeset version based on the client version
         # Add more params if necessary
         if clientVersion < 38:
-            return CHANGESET_VERSIONS[-1]
+            return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
+        elif clientVersion < 43:
+            return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
         # Add more changeset versions here as the currently newest client is
         # replaced by a newer one
-        return CHANGESET_VERSIONS[0]
+        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
 
     def _convertChangeSet(self, csPath, size, destCsVersion, **key):
         # Changeset is in the file csPath
@@ -1434,18 +1439,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
             return self._convertChangeSetV1V0(csPath, size, destCsVersion,
                                               **key)
+        elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
+            return self._convertChangeSetV2V1(csPath, size, destCsVersion,
+                                              **key)
         assert False, "Unknown versions"
 
-    def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
-        recurse = key.get('recurse', False)
-        if not recurse:
-            return cspath, size
+    def _convertChangeSetV2V1(self, cspath, size, destCsVersion, **key):
+        (fd, newCsPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+                                        suffix = '.tmp')
+        os.close(fd)
+        delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
 
+        return newCsPath, size + delta
+
+    def _convertChangeSetV1V0(self, cspath, size, destCsVersion, **key):
         # check to make sure that this user has access to see all
         # the troves included in a recursive changeset.
         cs = changeset.ChangeSetFromFile(cspath)
         newCs = changeset.ChangeSet()
-        rewrite = False
 
         for tcs in cs.iterNewTroveList():
             if tcs.troveType() != trove.TROVE_TYPE_REMOVED:
@@ -1478,15 +1489,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                        trvNewFlavor)
                 diff = newTrove.diff(oldTrove)[0]
                 newCs.newTrove(diff)
-                rewrite = True
             else:
                 # this really was marked as a removed trove.
                 # raise a TroveMissing exception
                 raise errors.TroveMissing(trvName,
                                           version=trvNewVersion)
-        if not rewrite:
-            # No change
-            return cspath, size
 
         # we need to re-write the munged changeset for an
         # old client
@@ -1495,13 +1502,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
                                         suffix = '.tmp')
         os.close(fd)
-        # now make absolutely sure that the changeset file
-        # will be compatible with conary-1.0.  We know
-        # that there are no removed trove changesets becase
-        # we re-wrote them all.
-        cs.hasRemoved = False
         # now write out the munged changeset
-        size = cs.writeToFile(cspath)
+        size = cs.writeToFile(cspath,
+            versionOverride = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
         return cspath, size
 
     def _createChangeSet(self, jobEntry, **kwargs):
@@ -1728,7 +1731,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   troveList):
         troveList = [ self.toTroveTup(x) for x in troveList ]
 
-        if not self.auth.batchCheck(authToken, [(x[0], x[1]) for x in troveList]):
+        if False in self.auth.batchCheck(authToken, [(x[0], x[1]) for x in troveList]):
             raise errors.InsufficientPermission
         self.log(2, troveList, requiresList)
         requires = {}
@@ -1756,7 +1759,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 if oldVer:
                     yield (name, oldVer)
         # check newVer
-        if not self.auth.batchCheck(authToken, _fullVerList(verList),
+        if False in self.auth.batchCheck(authToken, _fullVerList(verList),
                                     write=True):
             raise errors.InsufficientPermission
 
@@ -2612,11 +2615,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.check(authToken, mirror=True):
             raise errors.InsufficientPermission
         # batch permission check for writing
-        if not self.auth.batchCheck(authToken, [(n,self.toVersion(v))
-                                                for (n,v,f), s in infoList],
-                                    write=True):
+        if False in self.auth.batchCheck(authToken, [
+            (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
             raise errors.InsufficientPermission
-
+        
         cu = self.db.cursor()
         updateCount = 0
 
@@ -2814,23 +2816,38 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
+        """
+        we return tuples (present, data) to aid netclient in making its decoding decisions
+        present values are:
+        -2 = insufficient permission
+        -1 = trovemissing
+        0  = valuemissing
+        1 = valueattached
+        """
         # infoType should be valid
         if infoType not in trove.TroveInfo.streamDict.keys():
             raise RepositoryError("Unknown trove infoType requested", infoType)
         self.log(2, infoType, troveList)
 
+        # by default we should mark all troves with insuficient permission
+        ## disabled for now until we deal with protocol compatibility issues
+        ## for insufficient permission
+        ##ret = [ (-2, '') ] * len(troveList)
+        ret = [ (-1, '') ] * len(troveList)
         # check permissions using the batch interface
-        if not self.auth.batchCheck(authToken, (
-            (x[0],self.toVersion(x[1])) for x in troveList)):
-            raise errors.InsufficientPermission
-        cu = self.db.cursor()
-        schema.resetTable(cu, "gtl")
-        for n, v, f in troveList:
-            cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
-                       (n, v, f), start_transaction=False)
-        # we'll need the min idx to account for differences in SQL backends
-        cu.execute("SELECT MIN(idx) from gtl")
-        minIdx = cu.fetchone()[0]
+        permList = self.auth.batchCheck(authToken, ((x[0],self.toVersion(x[1])) for x in troveList))
+        if True in permList:
+            cu = self.db.cursor()
+            schema.resetTable(cu, "gtl")
+        else: # we got no permissions, shortcircuit all of them as missing
+            return ret
+        for (n, v, f), (i, perm) in itertools.izip(troveList, enumerate(permList)):
+            # if we don't have permissions for this one, don't bother looking it up
+            if not perm:
+                continue
+            ret[i] = (-1,'') # next best thing is trive missing
+            cu.execute("insert into gtl(idx,name,version,flavor) values (?,?,?,?)",
+                       (i, n, v, f), start_transaction=False)
         # get the data doing a full scan of gtl
         cu.execute("""
         SELECT gtl.idx, TroveInfo.data
@@ -2846,16 +2863,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Instances.instanceId = TroveInfo.instanceId
             AND TroveInfo.infoType = ?
         """, infoType)
-        # by default we mark all troves as missing. The ones that are
-        # not missing will return a row in the above query
-        ret = [ (-1, '') ] * len(troveList)
-        # we return tuples (present, data) to aid netclient in making its decoding decisions
-        # present values are: -1=trovemissing, 0=valuemissing, 1=valueattached
-        for idx, data in cu:
-            i = idx - minIdx
+        for i, data in cu:
             if data is None:
-                ret[i] = (0, '')
+                ret[i] = (0, '') # value missing
                 continue
+            # else, we have a value we need to return
             ret[i] = (1, base64.encodestring(cu.frombinary(data)))
         return ret
 
@@ -2917,7 +2929,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Items on Instances.itemId = Items.itemId
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
-        where Instances.isPresent = 1
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
         ret = [ [] for x in range(len(troveInfoList)) ]
@@ -2976,7 +2987,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Versions on Nodes.versionId = Versions.versionId
             where Items.item = ?
               and Branches.branch like ?
-              and Instances.isPresent = 1
               %(flavor)s
             """ % d, args)
             for verStr, flavStr, pattern in cu:

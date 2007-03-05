@@ -1151,14 +1151,14 @@ class Database(SqlDbRepository):
                         stream = self.db.getFileStream(fileId)
                         newTrv.addFile(pathId, path, fileVersion, fileId)
                         localCs.addFile(None, fileId, stream)
-                        localCs.addFileContents(pathId,
+                        localCs.addFileContents(pathId, fileId,
                                 changeset.ChangedFileTypes.hldr,
                                 filecontents.FromString(""), False)
                     else:
                         fileId = f.fileId()
                         newTrv.addFile(pathId, path, fileVersion, fileId)
                         localCs.addFile(None, fileId, f.freeze())
-                        localCs.addFileContents(pathId,
+                        localCs.addFileContents(pathId, fileId,
                                 changeset.ChangedFileTypes.file,
                                 filecontents.FromFilesystem(fullPath), False)
 

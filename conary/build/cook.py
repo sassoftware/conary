@@ -715,7 +715,8 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
         contentList = repos.getFileContents([ (x[3], x[2]) for x in l ])
         for (pathId, path, version, fileId, isConfig), contents in \
                                                 itertools.izip(l, contentList):
-            changeSet.addFileContents(pathId, changeset.ChangedFileTypes.file, 
+            changeSet.addFileContents(pathId, fileId,
+                                      changeset.ChangedFileTypes.file,
                                       contents, isConfig)
 
     built = [ (fileset.getName(), fileset.getVersion().asString(), 

@@ -1384,5 +1384,5 @@ class DependencyDatabase(DependencyTables):
     def commit(self):
         self.db.commit()
 
-    def resolve(self, label, depSetList):
+    def resolve(self, label, depSetList, leavesOnly=False):
         return self.resolveToIds(list(depSetList))

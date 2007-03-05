@@ -350,8 +350,6 @@ def copyfile(sources, dest, verbose=True):
 	    log.info('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
-FOO=0
-
 def copyfileobj(source, dest, callback = None, digest = None,
                 abortCheck = None, bufSize = 128*1024, rateLimit = None,
                 sizeLimit = None):

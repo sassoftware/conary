@@ -83,22 +83,18 @@ class FromFilesystem(FileContents):
 
 class FromChangeSet(FileContents):
 
-    __slots__ = ( "cs", "pathId" )
+    __slots__ = ( "cs", "pathId", "fileId" )
 
     def copy(self):
         return self.__class__(self.cs, self.pathId)
 
     def get(self):
-	return self.cs.getFileContents(self.pathId)[1].get()
+	return self.cs.getFileContents(self.pathId, self.fileId)[1].get()
 
-    def __init__(self, cs, pathId):
+    def __init__(self, cs, pathId, fileId):
 	self.cs = cs
 	self.pathId = pathId
-
-class CompressedFromChangeSet(FromChangeSet):
-
-    def get(self):
-	return self.cs.getFileContents(self.pathId, compressed = True)[1].get()
+	self.fileId = fileId
 
 class FromString(FileContents):
 

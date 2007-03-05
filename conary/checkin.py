@@ -248,18 +248,20 @@ use cvc co %s=<branch> for the following branches:
 	    fileObj.restore(None, '/', fullPath, nameLookup=False)
 	else:
 	    # tracking the pathId separately from the fileObj lets
-	    # us sort the list of files by fileid
+	    # us sort the list of files by pathId,fileId (which is how
+            # changesets are ordered)
 	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((pathId, fileObj, '/', fullPath))
+		earlyRestore.append((pathId, fileId, fileObj, '/', fullPath))
 	    else:
-		lateRestore.append((pathId, fileObj, '/', fullPath))
+		lateRestore.append((pathId, fileId, fileObj, '/', fullPath))
 
     earlyRestore.sort()
     lateRestore.sort()
 
-    for pathId, fileObj, root, target in earlyRestore + lateRestore:
-	contents = cs.getFileContents(pathId)[1]
+    for pathId, fileId, fileObj, root, target in \
+                            itertools.chain(earlyRestore, lateRestore):
+	contents = cs.getFileContents(pathId, fileId)[1]
 	fileObj.restore(contents, root, target, nameLookup=False)
 
     conaryState.write(workDir + "/CONARY")
@@ -958,7 +960,7 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
 
             if (displayAutoSourceFiles or not f.flags.isAutoSource()) \
                     and f.hasContents and f.flags.isConfig():
-		(contType, contents) = changeSet.getFileContents(pathId)
+		(contType, contents) = changeSet.getFileContents(pathId, fileId)
                 lines = contents.get().readlines()
 
                 print '--- /dev/null'
@@ -997,7 +999,7 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
             print 'version'
 
 	if csInfo and files.contentsChanged(csInfo):
-	    (contType, contents) = changeSet.getFileContents(pathId)
+	    (contType, contents) = changeSet.getFileContents(pathId, fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
                                  %(path, oldTrove.getVersion().asString(),
