@@ -55,6 +55,8 @@ Changes in @NEW@:
     * Changesets in an update job can be downloaded in a step separate from
       the installation. Additionally, update jobs can be frozen and reapplied
       later. (CNY-1300)
+    * Public keys can now be retrieved from a directory, with each key stored
+      in a separate file. (CNY-1299)
 
 Changes in 1.1.17:
   o New Feature:
