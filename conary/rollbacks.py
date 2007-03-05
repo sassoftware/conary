@@ -19,13 +19,7 @@ from conary.lib import log, util
 from conary.local import database
 
 def listRollbacks(db, cfg):
-    # Generator for the rollback data
-    def _generator():
-        for rollbackName in reversed(db.getRollbackList()):
-            rb = db.getRollback(rollbackName)
-            yield (rollbackName, rb)
-
-    return formatRollbacks(cfg, _generator(), stream=sys.stdout)
+    return formatRollbacks(cfg, db.iterRollbacksList(), stream=sys.stdout)
 
 def verStr(cfg, version, flavor):
     ret = util.verFormat(cfg, version)

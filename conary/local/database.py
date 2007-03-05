@@ -1221,6 +1221,14 @@ class Database(SqlDbRepository):
 
 	return list
 
+    def iterRollbacksList(self):
+        """Generator for rollback data.
+        Returns a list of (rollbackName, rollback)
+        """
+        for rollbackName in reversed(self.getRollbackList()):
+            rb = self.getRollback(rollbackName)
+            yield (rollbackName, rb)
+
     def readRollbackStatus(self):
         try:
             f = open(self.rollbackStatus)

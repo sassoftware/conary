@@ -365,6 +365,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def getRepos(self):
         return self.repos
 
+    def iterRollbacksList(self):
+        """
+        Iterate over rollback list.
+        Yield (rollbackName, rollback)
+        """
+        return self.db.iterRollbacksList()
 
     def _checkChangeSetForLabelConflicts(self, cs):
         source = trovesource.ChangesetFilesTroveSource(None)
