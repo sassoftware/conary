@@ -244,6 +244,9 @@ configured incorrectly or the request you sent to the server was invalid.
 class ReadOnlyRepositoryError(RepositoryError):
     pass
 
+class RecursiveRelativeChangeSet(RepositoryError):
+    pass
+
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that
 # class back to the client.  The str() value of the exception will
@@ -269,4 +272,5 @@ simpleExceptions = (
     (InvalidName,                'InvalidName'),
     (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
     (ProxyError,                 'ProxyError'),
+    (RecursiveRelativeChangeSet, 'RecursiveRelativeChangeSet'),
     )

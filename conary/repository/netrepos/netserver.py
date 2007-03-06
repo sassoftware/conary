@@ -1557,7 +1557,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             for jobId, job in enumerate(chgSetList):
                 if not job[3]:
-                    raise RecursiveRelativeChangeset
+                    raise errors.RecursiveRelativeChangeSet
 
                 if job[0].startswith('group-'):
                     foundGroups.add(jobId)
