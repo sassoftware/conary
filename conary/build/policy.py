@@ -85,6 +85,30 @@ class Policy(action.RecipeAction):
     work only on contents of listed directories (C{invariantsubtrees}
     and C{subtrees}).
     @type recursive: boolean
+
+    @cvar filetree: where to look for files to which to apply the
+    policy: C{policy.DESTDIR}, the default, walks the files in the
+    C{destdir}, C{policy.BUILDDIR} walks the files in the build
+    directory, and C{policy.PACKAGE} iterates over the packaged
+    files rather than walking the destdir, which besides being
+    possibly faster also applies to files that are not on the
+    filesystem (like device nodes).
+
+    @cvar rootdir: The root of the tree to walk for files, normally
+    implied by the setting of filetree.
+
+    @cvar processUnmodified: allows special handling for derived
+    packages in order to make only appropriate changes in the
+    derived package.  C{True} causes C{doFile} to be called for
+    all files found, regardless of whether they are in the
+    parent version, and C{False} (default) causes C{doFile} to be called
+    only for files that are new or have changed timestamps.
+    Note that if C{filetree} is C{policy.PACKAGE}, unchanged
+    file contents will lead to unchanged timestamps.
+    This will probably change in the future to default to C{None}
+    (do not run the policy at all), with {True} and {False} keeping
+    their current meanings, in order to enable selectively applying
+    external policy to derived packages.
     """
     bucket = None
     invariantsubtrees = []
@@ -93,6 +117,7 @@ class Policy(action.RecipeAction):
     recursive = True
     filetree = DESTDIR
     rootdir = None
+    processUnmodified = False
 
     keywords = {
         'use': None,
@@ -338,7 +363,23 @@ class Policy(action.RecipeAction):
             return True
         return False
 
+    def mtimeChanged(self, path):
+        newPath = util.joinPaths(self.rootdir, path)
+        if not util.exists(newPath):
+            return True
+        try:
+            oldMtime = self.recipe._derivedFiles[path]
+            newMtime = os.lstat(newPath).st_mtime
+            return oldMtime != newMtime
+        except:
+            return True
+
     def policyInclusion(self, filespec):
+        if (self.processUnmodified is False
+            and filespec in self.recipe._derivedFiles
+            and not self.mtimeChanged(filespec)):
+            # policy has elected not to handle unchanged files
+            return False
 	if not self.inclusionFilters:
 	    # empty list is '.*'
 	    return True

@@ -1959,10 +1959,10 @@ class Link(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Link('mumble', 'passwd')}
+    C{r.Link('mumble', '%(bindir)s/passwd')}
 
     Demonstrates calling C{r.Link()} to create a hard link from the file
-    C{passwd} to the file C{mumble}.
+    C{%(bindir)s/passwd} to the file C{%(bindir)s/mumble}.
     """
     def do(self, macros):
 	d = macros['destdir']

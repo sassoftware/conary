@@ -18,7 +18,12 @@ from conary import files, trove
 from conary.build import buildpackage, filter, packagepolicy, policy
 from conary.deps import deps
 
+Config = packagepolicy.Config
+InitialContents = packagepolicy.InitialContents
+Transient = packagepolicy.Transient
+
 class ComponentSpec(packagepolicy.ComponentSpec):
+    processUnmodified = True
 
     requires = (
         ('PackageSpec', policy.REQUIRED_SUBSEQUENT),
@@ -38,6 +43,7 @@ class ComponentSpec(packagepolicy.ComponentSpec):
         packagepolicy.ComponentSpec.doProcess(self, recipe)
 
 class PackageSpec(packagepolicy.PackageSpec):
+    processUnmodified = True
 
     def doProcess(self, recipe):
         self.pathObjs = {}
@@ -61,6 +67,10 @@ class PackageSpec(packagepolicy.PackageSpec):
         component = self.recipe.autopkg.componentMap[path]
         pkgFile = self.recipe.autopkg.pathMap[path]
         fileObj = self.pathObjs[path]
+        # these three flags can be changed in policy
+        fileObj.flags.isConfig(False)
+        fileObj.flags.isInitialContents(False)
+        fileObj.flags.isTransient(False)
         pkgFile.inode.owner.set(fileObj.inode.owner())
         pkgFile.inode.group.set(fileObj.inode.group())
         pkgFile.tags.thaw(fileObj.tags.freeze())
@@ -96,6 +106,7 @@ class PackageSpec(packagepolicy.PackageSpec):
                 comp.provides.union(depSet - fileProvides)
 
 class Flavor(packagepolicy.Flavor):
+    processUnmodified = True
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -120,6 +131,7 @@ class Flavor(packagepolicy.Flavor):
             self.packageFlavor.union(f.flavor())
 
 class Requires(packagepolicy.Requires):
+    processUnmodified = True
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -134,6 +146,7 @@ class Requires(packagepolicy.Requires):
         self.unionDeps(path, pkg, f)
 
 class Provides(packagepolicy.Provides):
+    processUnmodified = True
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -155,6 +168,7 @@ class Provides(packagepolicy.Provides):
         self.unionDeps(path, pkg, f)
 
 class ComponentRequires(packagepolicy.ComponentRequires):
+    processUnmodified = True
 
     def do(self):
         packagepolicy.ComponentRequires.do(self)
@@ -188,3 +202,7 @@ ExcludeDirectories = packagepolicy.ExcludeDirectories
 MakeDevices = packagepolicy.MakeDevices
 Ownership = packagepolicy.Ownership
 setModes = packagepolicy.setModes
+LinkType = packagepolicy.LinkType
+LinkCount = packagepolicy.LinkCount
+reportMissingBuildRequires = packagepolicy.reportMissingBuildRequires
+reportErrors = packagepolicy.reportErrors

@@ -1,4 +1,4 @@
-# Copyright (c) 2006,2007 rPath, Inc.
+# Copyright (c) 2006-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -53,10 +53,22 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         for pathId, fileId, path, troveName in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
+            self._derivedFiles[path] = fileObj.inode.mtime()
 
             flavor -= fileObj.flavor()
             self._componentReqs[troveName] -= fileObj.requires()
             self._componentProvs[troveName] -= fileObj.requires()
+
+            # Config vs. InitialContents etc. might be change in derived pkg
+            # Set defaults here, and they can be overridden with
+            # "exceptions = " later
+            if fileObj.flags.isConfig():
+                self.Config(path)
+            elif fileObj.flags.isInitialContents():
+                self.InitialContents(path)
+            elif fileObj.flags.isTransient():
+                self.Transient(path)
+
 
             # we don't restore setuid/setgid bits into the filesystem
             if fileObj.inode.perms() & 06000 != 0:
@@ -223,6 +235,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self._addBuildAction('SetModes', build.SetModes)
         self._addBuildAction('MakeDirs', build.MakeDirs)
         self._addBuildAction('Install', build.Install)
+        self._addBuildAction('Link', build.Link)
 
         self._addSourceAction('addPatch', source.addPatch)
         self._addSourceAction('addSource', source.addSource)

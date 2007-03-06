@@ -34,6 +34,11 @@ Changes in @NEW@:
       latest trove in every label in your label/search path before
       searching back in the history of that label. (CNY-1312)
     * Added moveComponents and copyComponents to group syntax. (CNY-1231)
+    * Derived packages (experimental) can now change files between
+      Config, InitialContents, and Transient, and can set new files
+      to be any of those types. (CNY-1283)
+    * Derived packages (experimental) can now create hard links, including
+      adding new files to existing link groups. (CNY-1284)
   
   o Server Changes:
     * Two new calls have been added to the server API -

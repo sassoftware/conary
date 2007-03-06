@@ -183,6 +183,7 @@ class Config(policy.Policy):
     it would not be automatically marked as a configuration file otherwise.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         # for :config component, ComponentSpec must run after Config
         # Otherwise, this policy would follow PackageSpec and just set isConfig
@@ -561,6 +562,7 @@ class InitialContents(policy.Policy):
         ('Config', policy.REQUIRED_PRIOR),
     )
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
 
     # change inclusions to default to none, instead of all files
     keywords = policy.Policy.keywords.copy()
@@ -623,6 +625,7 @@ class Transient(policy.Policy):
     having transient contents.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Config', policy.REQUIRED_PRIOR),
@@ -873,6 +876,7 @@ class MakeDevices(policy.Policy):
     owner, and group are both the root user, and permissions are 0666.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Ownership', policy.REQUIRED_SUBSEQUENT),
@@ -914,6 +918,7 @@ class setModes(policy.Policy):
     and C{r.ParseManifest}
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('WarnWriteable', policy.REQUIRED_SUBSEQUENT),
@@ -953,7 +958,7 @@ class LinkType(policy.Policy):
     SYNOPSIS
     ========
 
-    C{LinkLinkType([I{filterexp}])}
+    C{r.LinkType([I{filterexp}])}
 
     DESCRIPTION
     ===========
@@ -968,6 +973,7 @@ class LinkType(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('Config', policy.REQUIRED_PRIOR),
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -1116,6 +1122,7 @@ class ExcludeDirectories(policy.Policy):
     directory will be included in the package.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Ownership', policy.REQUIRED_PRIOR),
@@ -1221,6 +1228,7 @@ class _UserGroup(policy.Policy):
         ('Requires', policy.REQUIRED_SUBSEQUENT),
     )
     filetree = policy.PACKAGE
+    processUnmodified = True
 
     def setUserGroupDep(self, path, info, depClass):
 	componentMap = self.recipe.autopkg.componentMap
