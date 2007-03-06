@@ -34,7 +34,7 @@ Changes in @NEW@:
       latest trove in every label in your label/search path before
       searching back in the history of that label. (CNY-1312)
     * Added moveComponents and copyComponents to group syntax. (CNY-1231)
-  
+
   o Server Changes:
     * Two new calls have been added to the server API -
       getTroveReferences and getTroveDescendants (CNY-1349)
@@ -59,6 +59,8 @@ Changes in @NEW@:
       later. (CNY-1300)
     * Public keys can now be retrieved from a directory, with each key stored
       in a separate file. (CNY-1299)
+    * Troves now track their direct parent they were cloned from, instead of
+      the source-of-all-clones. (CNY-1294)
 
 Changes in 1.1.17:
   o New Feature:
