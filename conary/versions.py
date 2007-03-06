@@ -611,12 +611,7 @@ class VersionSequence(AbstractVersion):
             for ver in self.versions:
                 self.hash ^= hash(ver)
 
-	return self.hash
-
-    def iterLabels(self):
-        for item in self.versions:
-            if isinstance(item, AbstractLabel):
-                yield item
+        return self.hash
 
     def iterRevisions(self):
         for item in self.versions:
