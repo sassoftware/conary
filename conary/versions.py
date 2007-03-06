@@ -745,7 +745,7 @@ class VersionSequence(AbstractVersion):
                         'cached.  Someone may already have a reference to '
                         'the cached object.')
         # assert not self.cached
-        if clearCache and self.timeStamps:
+        if clearCache and self.timeStamps():
             self._clearVersionCache()
 
         i = 0
