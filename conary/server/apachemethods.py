@@ -21,8 +21,8 @@ import xmlrpclib
 import zlib
 
 from conary.lib import log
-from conary.repository import changeset
-from conary.repository import errors
+from conary.repository import changeset, errors, netclient
+from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
 from conary.web.webauth import getAuth
 
@@ -200,6 +200,11 @@ def get(port, isSecure, repos, req):
         return httpHandler._methodHandler()
 
 def putFile(port, isSecure, repos, req):
+    if isinstance(repos, proxy.ProxyRepositoryServer):
+        contentLength = int(req.headers_in['Content-length'])
+        status = netclient.httpPutFile(req.unparsed_uri, req, contentLength)
+        return status
+
     if not isSecure and repos.forceSecure or '/' in req.args:
         return apache.HTTP_FORBIDDEN
 

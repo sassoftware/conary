@@ -17,9 +17,10 @@ import errno
 import itertools
 import os
 import shutil
+import xmlrpclib
 
 #conary
-from conary import files, trove, versions
+from conary import constants, files, trove, versions
 from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.callbacks import UpdateCallback
@@ -144,6 +145,258 @@ class UpdateJob:
     def getTransactionCounter(self):
         return self.transactionCounter
 
+    def setJobsChangesetList(self, csList):
+        del self.jobsCsList[:]
+        self.jobsCsList.extend(csList)
+
+    def getJobsChangesetList(self):
+        return self.jobsCsList
+
+    def getItemList(self):
+        return self._itemList
+
+    def setItemList(self, itemList):
+        self._itemList = itemList
+
+    def getKeywordArguments(self):
+        return self._kwargs
+
+    def setKeywordArguments(self, kwargs):
+        self._kwargs = kwargs
+
+    def freeze(self, frzdir):
+        # Require clean directory
+        assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
+        assert not os.listdir(frzdir), "Directory %s not empty" % frzdir
+
+        assert isinstance(self.troveSource, 
+            trovesource.ChangesetFilesTroveSource), "Unsupported %s" % self.troveSource
+
+        drep = {'dumpVersion' : self._dumpVersion}
+
+        drep['troveSource'] = self._freezeChangesetFilesTroveSource(
+                                                    self.troveSource, frzdir)
+        drep['jobs'] = list(self._freezeJobs(self.getJobs()))
+        drep['primaryJobs'] = list(self._freezeJobList(self.getPrimaryJobs()))
+        drep['critical'] = self.getCriticalJobs()
+        drep['transactionCounter'] = self.transactionCounter
+        drep['jobsCsList'] = self.jobsCsList
+        drep['itemList'] = self._freezeItemList()
+        drep['keywordArguments'] = self.getKeywordArguments()
+
+        jobfile = os.path.join(frzdir, "jobfile")
+        f = open(jobfile, "w+")
+        f.write(xmlrpclib.dumps((drep, )))
+
+        return drep
+
+    def thaw(self, frzdir):
+        jobfile = os.path.join(frzdir, "jobfile")
+        ((drep, ), _) = xmlrpclib.loads(open(jobfile).read())
+
+        if 'dumpVersion' not in drep or drep['dumpVersion'] > self._dumpVersion:
+            # We don't understand this format
+            raise errors.InternalConaryError("Unknown dump format")
+
+        # Need to keep a reference to the lazy cache, or else the changesets
+        # are invalid
+        self._lazyFileCache = self._thawChangesetFilesTroveSource(
+                                                        drep['troveSource'])
+
+        self.setJobs(list(self._thawJobs(drep['jobs'])))
+        self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
+        self.setJobsChangesetList(drep['jobsCsList'])
+        self.setItemList(self._thawItemList(drep['itemList']))
+        self.setKeywordArguments(drep['keywordArguments'])
+
+        self.setCriticalJobs(drep['critical'])
+        self.transactionCounter = drep['transactionCounter']
+
+    def _freezeJobs(self, jobs):
+        for jobList in jobs:
+            yield list(self._freezeJobList(jobList))
+
+    def _thawJobs(self, jobs):
+        for jobList in jobs:
+            yield list(self._thawJobList(jobList))
+
+    def _freezeJobList(self, jobList):
+        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
+            yield (trvName,
+                   (self._freezeRevision(oRev), self._freezeFlavor(oFlv)),
+                   (self._freezeRevision(rev), self._freezeFlavor(flv)),
+                   int(searchLocalRepo))
+
+    def _thawJobList(self, jobList):
+        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
+            yield (trvName,
+                   (self._thawRevision(oRev), self._thawFlavor(oFlv)),
+                   (self._thawRevision(rev), self._thawFlavor(flv)),
+                   bool(searchLocalRepo))
+
+    def _freezeRevision(self, rev):
+        if rev is None:
+            return ''
+        return rev.freeze()
+
+    def _thawRevision(self, rev):
+        if '' == rev:
+            return None
+        return versions.ThawVersion(rev)
+
+    def _freezeFlavor(self, flavor):
+        if flavor is None:
+            # Frozen flavors are either empty strings or start with a digit
+            return '*None*'
+        return flavor.freeze()
+
+    def _thawFlavor(self, flavor):
+        if '*None*' == flavor:
+            return None
+        return deps.ThawFlavor(flavor)
+
+    def _freezeChangesetFilesTroveSource(self, troveSource, frzdir):
+        assert isinstance(troveSource, trovesource.ChangesetFilesTroveSource)
+        frzrepr = {'type' : 'ChangesetFilesTroveSource'}
+        ccsdir = os.path.join(frzdir, 'changesets')
+        util.mkdirChain(ccsdir)
+        csList = []
+        # csMap is a hash from the object ID of the changeset to the position
+        # in csList (which is a file name)
+        csMap = {}
+        for i, cs in enumerate(troveSource.csList):
+            fname = os.path.join(ccsdir, "%03d.ccs" % i)
+            cs.writeToFile(fname)
+            csList.append(fname)
+            csMap[id(cs)] = i
+
+        frzrepr['changesets'] = csList
+
+        id2trvMap = []
+        trv2idMap = {}
+        for (i, (trvName, trvRev, trvFlavor)) in troveSource.idMap.iteritems():
+            id2trvMap.append( (trvName, 
+                               self._freezeRevision(trvRev),
+                               self._freezeFlavor(trvFlavor)) )
+            trv2idMap[(trvName, trvRev, trvFlavor)] = str(i)
+
+        # idMapLen is the length of the idMap hash. Because of the way we
+        # construct it, we know we can get the data from the beginning of 
+        # trv2idMap, so we can simply slice it
+        frzrepr['idMapLen'] = len(id2trvMap)
+
+        # Map trove IDs to changeset IDs
+        for field in 'troveCsMap', 'erasuresMap':
+            id2csMap = {}
+            troveCsMap = {}
+            for trv, cs in getattr(troveSource, field).iteritems():
+                if trv not in trv2idMap:
+                    trv2idMap[trv] = idx = str(len(id2trvMap))
+                    id2trvMap.append((trv[0],
+                                      self._freezeRevision(trv[1]),
+                                      self._freezeFlavor(trv[2])))
+                else:
+                    idx = trv2idMap[trv]
+                id2csMap[idx] = csMap[id(cs)]
+            frzrepr[field] = id2csMap
+
+        # XXX jobMap
+
+        providesMap = {}
+        for thawdep, trvList in troveSource.providesMap.iteritems():
+            providesMap[thawdep.freeze()] = [ int(trv2idMap[t])
+                                                for t in trvList ]
+        frzrepr['providesMap'] = providesMap
+
+        frzrepr['storeDeps'] = int(troveSource.storeDeps)
+        frzrepr['invalidated'] = int(troveSource.invalidated)
+
+        # The trove map (may be more than idMap)
+        # it's an array, values in the other trove-related maps are indices in
+        # this array
+        frzrepr['troveMap'] = id2trvMap
+
+        # Save the Conary version
+        frzrepr['conaryVersion'] = constants.version
+
+        # XXX rooted
+
+        return frzrepr
+
+    def _thawChangesetFilesTroveSource(self, frzrepr):
+        assert frzrepr.get('type') == 'ChangesetFilesTroveSource'
+
+        lazycache = util.LazyFileCache()
+        csList = frzrepr['changesets']
+        try:
+            csList = [ changeset.ChangeSetFromFile(lazycache.open(x)) 
+                       for x in csList ]
+        except IOError, e:
+            raise errors.InternalConaryError("Missing changeset file %s" % 
+                                             e.filename)
+
+        troveSource = self.getTroveSource()
+
+        idMapLen = frzrepr['idMapLen']
+
+        troveMap = [ (t[0], self._thawRevision(t[1]), self._thawFlavor(t[2])) 
+                    for t in frzrepr['troveMap'] ]
+
+
+        troveSource.csList.extend(csList)
+        # XMLRPC converts tuples to lists
+        troveSource.idMap.update(dict(enumerate(troveMap[:idMapLen])))
+
+        # Map trove IDs to changeset IDs
+        for field in 'troveCsMap', 'erasuresMap':
+            id2csMap = frzrepr[field]
+            realMap = {}
+            for trvId, csId in id2csMap.iteritems():
+                trvId = int(trvId)
+                realMap[troveMap[trvId]] = csList[csId]
+            getattr(troveSource, field).update(realMap)
+
+        # XXX jobMap
+
+        providesMap = {}
+        for frzdep, trvList in frzrepr['providesMap'].iteritems():
+            providesMap[deps.ThawDependencySet(frzdep)] = [
+                troveMap[trvId] for trvId in trvList ]
+        troveSource.providesMap.update(providesMap)
+
+        troveSource.storeDeps = bool(frzrepr['storeDeps'])
+        troveSource.invalidated = bool(frzrepr['invalidated'])
+
+        # XXX rooted
+
+        return lazycache
+
+    def __freezeVF(self, tup):
+        ver = tup[0]
+        if ver is None:
+            ver = ''
+        flv = tup[1]
+        if flv is None:
+            flv = '\0'
+        return (ver, flv)
+
+    def __thawVF(self, tup):
+        ver = tup[0]
+        if ver == '':
+            ver = None
+        flv = tup[1]
+        if flv == '\0':
+            flv = None
+        return (ver, flv)
+
+    def _freezeItemList(self):
+        return [ (t[0], self.__freezeVF(t[1]), self.__freezeVF(t[2]), int(t[3]))
+                 for t in self.getItemList() ]
+
+    def _thawItemList(self, frzrep):
+        return [ (t[0],self. __thawVF(t[1]), self.__thawVF(t[2]), bool(t[3]))
+                 for t in frzrep ]
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -151,9 +404,16 @@ class UpdateJob:
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
         self.criticalJobs = []
+        # Changesets with files - a parallel list to self.jobs
+        self.jobsCsList = []
 
         self.searchSource = searchSource
         self.transactionCounter = None
+        # Version of the serialized format we support
+        self._dumpVersion = 1
+        # The options that created this update job
+        self._itemList = []
+        self._kwargs = {}
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
@@ -891,14 +1151,14 @@ class Database(SqlDbRepository):
                         stream = self.db.getFileStream(fileId)
                         newTrv.addFile(pathId, path, fileVersion, fileId)
                         localCs.addFile(None, fileId, stream)
-                        localCs.addFileContents(pathId,
+                        localCs.addFileContents(pathId, fileId,
                                 changeset.ChangedFileTypes.hldr,
                                 filecontents.FromString(""), False)
                     else:
                         fileId = f.fileId()
                         newTrv.addFile(pathId, path, fileVersion, fileId)
                         localCs.addFile(None, fileId, f.freeze())
-                        localCs.addFileContents(pathId,
+                        localCs.addFileContents(pathId, fileId,
                                 changeset.ChangedFileTypes.file,
                                 filecontents.FromFilesystem(fullPath), False)
 
@@ -960,6 +1220,14 @@ class Database(SqlDbRepository):
 	    list.append("r.%d" % i)
 
 	return list
+
+    def iterRollbacksList(self):
+        """Generator for rollback data.
+        Returns a list of (rollbackName, rollback)
+        """
+        for rollbackName in reversed(self.getRollbackList()):
+            rb = self.getRollback(rollbackName)
+            yield (rollbackName, rb)
 
     def readRollbackStatus(self):
         try:

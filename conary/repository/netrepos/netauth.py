@@ -268,23 +268,29 @@ class NetworkAuthorization:
             authToken[2], int(bool(write)), int(bool(remove))),
                  troveTupList)
         checkDict = {}
+        # troveTupList can actually be an iterator, so we need to keep
+        # a list of the trove names we're dealing with
+        troveList = []
         # first check that we handle all the labels we're asked about
-        for (n, v) in troveTupList:
+        for i, (n, v) in enumerate(troveTupList):
             label = v.branch().label()
             if label.getHost() not in self.serverNameList:
                 raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
             l = checkDict.setdefault(label.asString(), set())
-            l.add(n)
+            troveList.append(n)
+            l.add(i)
+        # default to all failing
+        retlist = [ False ] * len(troveList)
         if not authToken[0]:
-            return False
+            return retlist
         # check groupIds. this is teh same as the self.check() function
         cu = self.db.cursor()
         try:
             groupIds = self.getAuthGroups(cu, authToken)
         except errors.InsufficientPermission:
-            return False
+            return retlist
         if not len(groupIds):
-            return False
+            return retlist
         # build the query statement for permissions check
         stmt = """
         select Items.item
@@ -310,13 +316,12 @@ class NetworkAuthorization:
         for label in checkDict.iterkeys():
             cu.execute(stmt, label)
             patterns = [ x[0] for x in cu ]
-            for trove in checkDict[label]:
+            for i in checkDict[label]:
                 for pattern in patterns:
-                    if self.checkTrove(pattern, trove):
+                    if self.checkTrove(pattern, troveList[i]):
+                        retlist[i] = True
                         break
-                else:
-                    return False
-        return True
+        return retlist
 
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False, remove = False):

@@ -1,6 +1,64 @@
 Changes in @NEW@:
-  o Build Changes
+  o Major Changes:
+    * Changesets are now indexed by pathId,fileId combination instead of
+      just pathId. This should eliminate the vast majority of conflicts
+      when creating groups containing multiple flavors of the same trove.
+      Old clients will be serverd old-format changesets by the repository,
+      and new clients continue to support old format changesets. Old and
+      new format changes can be merged into a single changeset (CNY-1314).
+
+  o Client Changes:
+    * conary rblist --flavors now properly displays trove flavors. (CNY-1255)
+    * When resolving dependencies when updating, conary will now search 
+      the latest versions of packages for every label in your installLabelPath
+      first before searching the histories of those labels.  This should make
+      sure that conary prefers installing maintained troves over unmaintained 
+      ones. (CNY-1312)
+    * The Conary client API now has a new call, iterRollbacksList(), iterating
+      over the rollback name and object. (CNY-1390)
+
+  o Build Changes:
     * A list of rPath mirrors for source components has been added.
+    * Group recipes now support a setSearchPath method.  This provides a way
+      to tell groups how to find and resolve packages by specifying a list
+      containing either packages or labels. (CNY-1316)
+    * The group addAll command supports "flatten" - a way to cause all troves
+      in all subgroups to be included directly in the top level group - 
+      flattening any structure created by intermediate groups.
+    * Groups now allow you to use the command "removeTrovesAlsoInGroup"
+      and "removeTrovesAlsoInNewGroup".  These commands subtract out the
+      troves included within the specified group from the currently
+      active group. (CNY-1380)
+    * checking dependencies is now faster when building groups.
+    * When resolving dependencies in groups, conary will now search the
+      latest trove in every label in your label/search path before
+      searching back in the history of that label. (CNY-1312)
+    * Added moveComponents and copyComponents to group syntax. (CNY-1231)
+  
+  o Server Changes:
+    * Two new calls have been added to the server API -
+      getTroveReferences and getTroveDescendants (CNY-1349)
+    * Proxy server proxies put calls now
+    * Cleaned up string compression code in changeset merging
+
+  o Bug Fixes:
+    * Fixed a bug where an invalid flavor at the command line would result
+      in a traceback. (CNY-1070)
+    * Added an exception to allow redirect recipe names to have any format -
+      including those usually reserved for group- and info- packages.
+    * Removed a harmful assert that kept trove source stacks from working w/o
+      installLabelPaths in some cases. (CNY-1351)
+    * The cfg.root item is always stored internally as an absolute path,
+      even if it is specified as a relative path. (CNY-1276)
+    * cvc now properly cleans up 000-permission files from the old build 
+      directory. (CNY-1359)
+
+  o Internal Changes:
+    * Changesets in an update job can be downloaded in a step separate from
+      the installation. Additionally, update jobs can be frozen and reapplied
+      later. (CNY-1300)
+    * Public keys can now be retrieved from a directory, with each key stored
+      in a separate file. (CNY-1299)
 
 Changes in 1.1.17:
   o New Feature:

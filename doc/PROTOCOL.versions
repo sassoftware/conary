@@ -1,0 +1,14 @@
+# this file documents the wire protocol changes for conary.
+
+Version 43:
+  - added getTroveReferences call.
+  - added getTroveDescendants call
+  - switched to fileId,pathId indexed changesets (changeset 2007022001)
+
+Version 42: Conary 1.1.17
+ - Client uses negotiated protocol version
+ - getFileContents has authOnly parameter
+
+
+Version 41: Conary 1.1.16
+ - Added getTroveInfo call [proxy requires at least this version]

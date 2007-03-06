@@ -17,7 +17,7 @@ import base64, itertools, os, tempfile, urllib, xmlrpclib
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and the
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 41, 42 ]
+SERVER_VERSIONS = [ 41, 42, 43 ]
 
 from conary import conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
@@ -52,7 +52,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         self.log(1, "proxy url=%s" % basicUrl)
         self.cache = cacheset.CacheSet(self.cfg.proxyDB, self.cfg.tmpDir,
                                        self.cfg.deadlockRetry)
-
+        util.mkdirChain(self.cfg.proxyContentsDir)
         self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
@@ -68,13 +68,7 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
 
-        url = rawUrl
-
-        # paste in the user/password info
-        s = url.split('/')
-        s[2] = ('%s:%s@' % (netclient.quote(authToken[0]),
-                            netclient.quote(authToken[1]))) + s[2]
-        url = '/'.join(s)
+        url = redirectUrl(authToken, rawUrl)
 
         if authToken[2] is not None:
             entitlement = authToken[2:4]
@@ -323,6 +317,15 @@ class ProxyRepositoryServer(xmlshims.NetworkConvertors):
             return False, (url, sizeList)
         finally:
             os.close(fd)
+
+def redirectUrl(authToken, url):
+    # return the url to use for the final server
+    s = url.split('/')
+    s[2] = ('%s:%s@' % (netclient.quote(authToken[0]),
+                        netclient.quote(authToken[1]))) + s[2]
+    url = '/'.join(s)
+
+    return url
 
 class ProxyRepositoryError(Exception):
 

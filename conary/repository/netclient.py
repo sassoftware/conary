@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -263,17 +263,14 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None,
                  entitlementDir=None, entitlements={}, callback=None,
-                 proxy=None):
+                 proxies=None):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
         self.entitlementDir = entitlementDir
         self.entitlements = entitlements
-        if proxy:
-            self.proxies = { 'http' : proxy, 'https' : proxy }
-        else:
-            self.proxies = None
+        self.proxies = proxies
 
     def __getPassword(self, host, user=None):
         user, pw = self.pwPrompt(host, user)
@@ -421,10 +418,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         self.downloadRateLimit = downloadRateLimit
         self.uploadRateLimit = uploadRateLimit
-        self.proxy = proxy
+
+        if proxy:
+            self.proxies = { 'http' : proxy, 'https' : proxy }
+        else:
+            self.proxies = {}
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir,
-                             entitlements, proxy = self.proxy)
+                             entitlements, proxies = self.proxies)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
@@ -891,6 +892,28 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if v == 0:
             raise errors.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
+
+    # added at protocol version 43
+    def getTroveReferences(self, serverName, troveInfoList):
+        if not troveInfoList:
+            return []
+        # if the server can't talk to us, don't traceback
+        if self.c[serverName].getProtocolVersion() < 43:
+            return []
+        ret = self.c[serverName].getTroveReferences(
+            [(n,self.fromVersion(v),self.fromFlavor(f)) for (n,v,f) in troveInfoList])
+        return [ [(n,self.toVersion(v),self.toFlavor(f)) for (n,v,f) in retl] for retl in ret ]
+
+    # added at protocol version 43
+    def getTroveDescendants(self, serverName, troveList):
+        if not troveList:
+            return []
+        # if the server can't talk to us, don't traceback
+        if self.c[serverName].getProtocolVersion() < 43:
+            return []
+        ret = self.c[serverName].getTroveDescendants(
+            [(n,self.fromBranch(b),self.fromFlavor(f)) for (n,b,f) in troveList])
+        return [ [(self.toVersion(v), self.toFlavor(f)) for (v,f) in retl] for retl in ret ]
 
     def hasTrove(self, name, version, flavor):
         return self.hasTroves([(name, version, flavor)])[name, version, flavor]
@@ -1431,14 +1454,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
                         fetchItems.append( (oldFileId, oldFileVersion, 
                                             oldFileObj) ) 
-                        needItems.append( (pathId, oldFileObj) ) 
+                        needItems.append( (pathId, None, oldFileObj) ) 
 
                     fetchItems.append( (newFileId, newFileVersion, newFileObj) )
-                    needItems.append( (pathId, newFileObj) )
+                    needItems.append( (pathId, newFileId, newFileObj) )
                     contentsNeeded += fetchItems
 
-
-                    fileJob += (needItems,)
+                    fileJob.extend([ needItems ])
 
             contentList = self.getFileContents(contentsNeeded, 
                                                tmpFile = outFile,
@@ -1447,24 +1469,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             i = 0
             for item in fileJob:
-                pathId = item[0][0]
-                fileObj = item[0][1]
+                pathId, fileId, fileObj = item[0]
                 contents = contentList[i]
                 i += 1
 
                 if len(item) == 1:
-                    internalCs.addFileContents(pathId, 
+                    internalCs.addFileContents(pathId, fileId,
                                    changeset.ChangedFileTypes.file, 
                                    contents, 
                                    fileObj.flags.isConfig())
                 else:
-                    newFileObj = item[1][1]
+                    fileId = item[1][1]
+                    newFileObj = item[1][2]
                     newContents = contentList[i]
                     i += 1
 
                     (contType, cont) = changeset.fileContentsDiff(fileObj, 
                                             contents, newFileObj, newContents)
-                    internalCs.addFileContents(pathId, contType,
+                    internalCs.addFileContents(pathId, fileId, contType,
                                                cont, True)
 
         if not cs and internalCs:
@@ -1527,9 +1549,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return cs
 
-    def resolveDependencies(self, label, depList):
+    def resolveDependencies(self, label, depList, leavesOnly=False):
         l = [ self.fromDepSet(x) for x in depList ]
-        d = self.c[label].getDepSuggestions(self.fromLabel(label), l)
+        if self.c[label].getProtocolVersion() < 43:
+            args = ()
+        else:
+            args = (leavesOnly,)
+
+        d = self.c[label].getDepSuggestions(self.fromLabel(label), l, *args)
         r = {}
         for (key, val) in d.iteritems():
             l = []
@@ -2052,16 +2079,45 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                           self.fromFlavor(trove.getNewFlavor())),
                          trove.isAbsolute()))
 
-
-
+        # XXX We don't check the version of the changeset we're committing,
+        # so we might do an unnecessary conversion. It won't hurt anything
+        # though.
         server = self.c[serverName]
+
         url = server.prepareChangeSet()
         if server.getProtocolVersion() >= 38:
             url = server.prepareChangeSet(jobs, mirror)
         else:
             url = server.prepareChangeSet()
 
-        self._putFile(url, fName, callback = callback)
+        if server.getProtocolVersion() <= 42:
+            (outFd, tmpName) = util.mkstemp()
+            os.close(outFd)
+            changeset._convertChangeSetV2V1(fName, tmpName)
+            autoUnlink = True
+            fName = tmpName
+        else:
+            autoUnlink = False
+
+        try:
+            inFile = open(fName)
+            size = os.fstat(inFile.fileno()).st_size
+
+            status = httpPutFile(url, inFile, size, callback = callback,
+                                 rateLimit = self.uploadRateLimit,
+                                 proxies = self.proxies)
+
+            # give a slightly more helpful message for 403
+            if status == 403:
+                raise errors.CommitError('Permission denied. Check username, '
+                                         'password, and https settings.')
+            # and a generic message for a non-OK status
+            if status != 200:
+                raise errors.CommitError('Error uploading to repository: '
+                                         '%s (%s)' %(r.status, r.reason))
+        finally:
+            if autoUnlink:
+                os.unlink(fName)
 
         if mirror:
             # avoid sending the mirror keyword unless we have to.
@@ -2071,47 +2127,41 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             server.commitChangeSet(url)
 
-    def _putFile(self, url, path, callback = None):
-        """
-        send a file to a url.  Takes a wrapper, which is an object
-        that has a callback() method which takes amount, total, rate
-        """
-        protocol, uri = urllib.splittype(url)
-        assert(protocol in ('http', 'https'))
-	(host, putPath) = url.split("/", 3)[2:4]
-        if protocol == 'http':
-            c = httplib.HTTPConnection(host)
-        else:
-            c = httplib.HTTPSConnection(host)
+def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = {}):
+    """
+    send a file to a url.  Takes a wrapper, which is an object
+    that has a callback() method which takes amount, total, rate
+    """
+    protocol, uri = urllib.splittype(url)
+    assert(protocol in ('http', 'https'))
 
-	f = open(path)
-        size = os.fstat(f.fileno()).st_size
-        BUFSIZE = 8192
+    proxy = proxies.get(protocol, url)
+    protocol, uri = urllib.splittype(proxy)
+    host = urllib.splithost(uri)[0]
 
-        callbackFn = None
-        if callback:
-            wrapper = callbacks.CallbackRateWrapper(callback,
-                                                    callback.sendingChangeset,
-                                                    size)
-            callbackFn = wrapper.callback
+    if protocol == 'http':
+        c = httplib.HTTPConnection(host)
+    else:
+        c = httplib.HTTPSConnection(host)
 
-	c.connect()
-        c.putrequest("PUT", url)
-        c.putheader('Content-length', str(size))
-        c.endheaders()
+    BUFSIZE = 8192
 
-        c.url = url
+    callbackFn = None
+    if callback:
+        wrapper = callbacks.CallbackRateWrapper(callback,
+                                                callback.sendingChangeset,
+                                                size)
+        callbackFn = wrapper.callback
 
-        util.copyfileobj(f, c, bufSize=BUFSIZE, callback=callbackFn,
-                         rateLimit = self.uploadRateLimit)
+    c.connect()
+    c.putrequest("PUT", url)
+    c.putheader('Content-length', str(size))
+    c.endheaders()
 
-	r = c.getresponse()
-        # give a slightly more helpful message for 403
-        if r.status == 403:
-            raise errors.CommitError('Permission denied. Check username, '
-                                     'password, and https settings.')
-        # and a generic message for a non-OK status
-        if r.status != 200:
-            raise errors.CommitError('Error uploading to repository: '
-                                     '%s (%s)' %(r.status, r.reason))
+    c.url = url
 
+    util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
+                     rateLimit = rateLimit, sizeLimit = size)
+
+    r = c.getresponse()
+    return r.status

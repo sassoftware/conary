@@ -261,7 +261,26 @@ class AbstractRepository(IdealRepository):
         @rtype: list of Stream objects or None
         """
         raise NotImplementedError
-    
+
+    def getTroveReferences(self, troveInfoList):
+        """
+        troveInfoList is a list of (name, version, flavor) tuples. For
+        each (name, version, flavor) specied, return a list of the troves
+        (groups and packages) which reference it (either strong or weak)
+        (the user must have permission to see the referencing trove, but
+        not the trove being referenced).
+        """
+
+    def getTroveDescendants(self, troveList):
+        """
+        troveList is a list of (name, branch, flavor) tuples. For each
+        item, return the full version and flavor of each trove named
+        Name which exists on a downstream branch from the branch
+        passed in and is of the specified flavor. If the flavor is not
+        specified, all matches should be returned. Only troves the
+        user has permission to view should be returned.
+        """
+
     ### File functions
 
     def __init__(self):
@@ -504,13 +523,14 @@ class ChangeSetJob:
  					 fileContents, restoreContents, 
                                          fileFlags.isConfig())
                 elif fileFlags.isConfig():
-                    tup = (pathId, contentInfo.sha1(), oldPath, oldfile, 
-                           troveName, oldTroveVersion, troveFlavor, newVersion, 
-                           fileId, oldVersion, oldFileId, restoreContents)
+                    tup = (pathId, fileId, contentInfo.sha1(), oldPath,
+                           oldfile, troveName, oldTroveVersion, troveFlavor,
+                           newVersion, fileId, oldVersion, oldFileId,
+                           restoreContents)
 		    configRestoreList.append(tup)
 		else:
-                    tup = (pathId, contentInfo.sha1(), newVersion, 
-			   restoreContents)
+                    tup = (pathId, fileId, contentInfo.sha1(), newVersion,
+                           restoreContents)
 		    normalRestoreList.append(tup)
 
 	    del newFileMap
@@ -519,11 +539,11 @@ class ChangeSetJob:
 	configRestoreList.sort()
 	normalRestoreList.sort()
 
-	for (pathId, sha1, oldPath, oldfile, troveName, oldTroveVersion,
-	     troveFlavor, newVersion, newFileId, oldVersion, 
+        for (pathId, newFileId, sha1, oldPath, oldfile, troveName,
+             oldTroveVersion, troveFlavor, newVersion, newFileId, oldVersion,
              oldFileId, restoreContents) in configRestoreList:
-            if cs.configFileIsDiff(pathId):
-                (contType, fileContents) = cs.getFileContents(pathId)
+            if cs.configFileIsDiff(pathId, newFileId):
+                (contType, fileContents) = cs.getFileContents(pathId, newFileId)
 
 		# the content for this file is in the form of a
 		# diff, which we need to apply against the file in
@@ -550,7 +570,7 @@ class ChangeSetJob:
             else:
                 # config files are not always available compressed (due
                 # to the config file cache)
-                fileContents = filecontents.FromChangeSet(cs, pathId)
+                fileContents = filecontents.FromChangeSet(cs, pathId, newFileId)
 
 	    self.addFileContents(sha1, newVersion, fileContents, 
                                  restoreContents, 1)
@@ -558,9 +578,10 @@ class ChangeSetJob:
         # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()
         ptrRestores = []
-	for (pathId, sha1, version, restoreContents) in normalRestoreList:
+        for (pathId, fileId, sha1, version, restoreContents) in \
+                                                    normalRestoreList:
             try:
-                (contType, fileContents) = cs.getFileContents(pathId,
+                (contType, fileContents) = cs.getFileContents(pathId, fileId,
                                                               compressed = True)
             except KeyError:
                 raise errors.IntegrityError

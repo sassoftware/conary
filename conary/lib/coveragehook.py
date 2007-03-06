@@ -66,7 +66,6 @@ def _install():
     _run(coverage)
     return
 
-
 def _saveState(signal, f):
     save()
     os._exit(1)
@@ -74,8 +73,7 @@ def _saveState(signal, f):
 def _run(coverage):
     signal.signal(signal.SIGUSR2, _saveState)
     atexit.register(coverage.the_coverage.save)
-    coverage.the_coverage.get_ready()
-    coverage.c.enable()
+    coverage.the_coverage.start()
 
 origOsFork = os.fork
 origOsExit = os._exit

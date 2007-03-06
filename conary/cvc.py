@@ -364,7 +364,8 @@ class CookCommand(CvcCommand):
         resume = None
         buildBranch = None
         if argSet.has_key('flavor'):
-            buildFlavor = deps.deps.parseFlavor(argSet['flavor'])
+            buildFlavor = deps.deps.parseFlavor(argSet['flavor'],
+                                                raiseError=True)
             cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor,
                                                        buildFlavor)
             del argSet['flavor']

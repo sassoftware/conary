@@ -17,6 +17,8 @@ from conary.deps import deps
 from conary.lib import graph
 from conary.local import schema
 
+from conary.repository.netrepos import versionops
+
 import itertools
 
 DEP_REASON_ORDER = 0
@@ -611,7 +613,11 @@ class DependencyChecker:
             """ % substTable
 
             if restrictor:
-                joinRestrict, whereRestrict = restrictor(restrictBy)
+                if restrictBy is None:
+                    restrictBy = ()
+                elif not isinstance(restrictBy, (tuple, list)):
+                    restrictBy = (restrictBy,)
+                joinRestrict, whereRestrict = restrictor(*restrictBy)
                 subselect += joinRestrict % substTable
 
             subselect += """ %(depClause)s """ % substTable
@@ -1112,7 +1118,7 @@ class DependencyTables:
                  SELECT distinct depId AS depId1 FROM Provides))
         """)
 
-    def _restrictResolveByLabel(self, label):
+    def _restrictResolveByLabel(self, label, leavesOnly=False):
         """ Restrict resolution by label
             We move this out so that other dependency algorithms
             can restrict resolution by other criteria.  Not exactly providing
@@ -1128,12 +1134,21 @@ class DependencyTables:
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
+        
         JOIN LabelMap ON
             LabelMap.itemId = Nodes.itemId AND
             LabelMap.branchId = Nodes.branchId
         JOIN Labels ON Labels.labelId = LabelMap.labelId """
-        # FIXME: avoid sprintf() here
         restrictWhere = """ WHERE Labels.label = '%s' """ % label
+        # FIXME: avoid sprintf() here
+        if leavesOnly:
+            restrictJoin += """
+                JOIN Latest ON (Instances.itemId = Latest.itemId
+                                AND Nodes.branchId = Latest.branchId
+                                AND Instances.flavorId = Latest.flavorId
+                                AND Instances.versionId = Latest.versionId
+                                AND Latest.latestType = %s)
+            """ % versionops.LATEST_TYPE_NORMAL
 
         return restrictJoin, restrictWhere
 
@@ -1176,7 +1191,7 @@ class DependencyTables:
         result.setdefault(depSet, []).append(value)
 
 
-    def resolve(self, label, depSetList, troveList=[]):
+    def resolve(self, label, depSetList, troveList=[], leavesOnly=False):
         """ Determine troves that provide the given dependencies,
             restricting by label and limiting to latest version for
             each (name, flavor) pair.
@@ -1232,10 +1247,10 @@ class DependencyTables:
             cu.execute("INSERT INTO tmpInstances "
                        "SELECT instanceId FROM tmpInstances2",
                        start_transaction=False)
-            restrictBy = None
+            restrictBy = ()
             restrictor = self._restrictResolveByTrove
         else:
-            restrictBy = label.asString()
+            restrictBy = (label.asString(), leavesOnly)
             restrictor = self._restrictResolveByLabel
 
         depList, cu = self._resolve(depSetList, selectTemplate,
@@ -1369,5 +1384,5 @@ class DependencyDatabase(DependencyTables):
     def commit(self):
         self.db.commit()
 
-    def resolve(self, label, depSetList):
+    def resolve(self, label, depSetList, leavesOnly=False):
         return self.resolveToIds(list(depSetList))
