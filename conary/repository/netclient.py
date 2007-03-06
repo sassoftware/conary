@@ -2084,7 +2084,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # though.
         server = self.c[serverName]
 
-        url = server.prepareChangeSet()
         if server.getProtocolVersion() >= 38:
             url = server.prepareChangeSet(jobs, mirror)
         else:
