@@ -460,7 +460,7 @@ class _TroveListWrapper:
             if not self.authCheck(*t.getNameVersionFlavor()):
                 # If we don't have perms to see the trove, act like it doesn't
                 # exist
-                t = None
+                t, streams = None, {}
 
         if t is None:
             if recursed:
@@ -470,9 +470,9 @@ class _TroveListWrapper:
                                 type=trove.TROVE_TYPE_REMOVED)
                 t.setIsMissing(True)
                 t.computeSignatures()
-                if self.withFiles:
-                    # synthesize empty filestreams
-                    t, streams = t, {}
+
+                # synthesize empty filestreams
+                streams = {}
             else:
                 # drain the iterator, in order to complete
                 # the sql queries

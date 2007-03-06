@@ -123,6 +123,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getFileContents',
                         'getTroveLatestVersion',
                         'getChangeSet',
+                        'getChangeSetFingerprints',
                         'getDepSuggestions',
                         'getDepSuggestionsByTroves',
                         'prepareChangeSet',
@@ -1334,7 +1335,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     try:
                         size = os.stat(filePath).st_size
                         sizeList.append(size)
-                        os.write(fd, "%s %d\n" % (filePath, size))
+                        # 0 means it's not a changeset
+                        # 1 means it is cached (don't erase it after sending)
+                        os.write(fd, "%s %d 0 1\n" % (filePath, size))
                     except OSError, e:
                         if e.errno != errno.ENOENT:
                             raise
@@ -1526,6 +1529,121 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return url, sizes, newChgSetList, allFilesNeeded, \
                _cvtTroveList(allRemovedTroves)
 
+
+    @accessReadOnly
+    def getChangeSetFingerprints(self, authToken, clientVersion, chgSetList,
+                    recurse, withFiles, withFileContents, excludeAutoSource):
+
+        def _troveFp(troveInfo, sig):
+            (present, sigBlock) = sig
+            if present >= 1:
+                return (base64.decodestring(sigBlock), )
+
+            return ("missing", ) + troveInfo
+
+        if recurse:
+            # Recursive changesets can only contain absolute changesets. We
+            # mark old groups (ones without weak references) as uncachable
+            # because they're expensive to flatten (and so old that it
+            # hardly matters).
+            cu = self.db.cursor()
+            schema.resetTable(cu, "gtl")
+
+            foundGroups = set()
+            foundWeak = set()
+            foundCollections = set()
+
+            newJobList = [ [] for x in range(len(chgSetList)) ]
+
+            for jobId, job in enumerate(chgSetList):
+                if not job[3]:
+                    raise RecursiveRelativeChangeset
+
+                if job[0].startswith('group-'):
+                    foundGroups.add(jobId)
+
+                newJobList[jobId].append(job)
+
+                cu.execute("""
+                    INSERT INTO gtl(idx, name, version, flavor)
+                    VALUES (?, ?, ?, ?)
+                """, jobId, job[0], job[2][0], job[2][1])
+
+            cu.execute("""SELECT
+                    gtl.idx, I_Items.item, I_Versions.version,
+                    I_Flavors.flavor, TroveTroves.flags
+                FROM gtl JOIN Items ON gtl.name = Items.item
+                JOIN Versions ON (gtl.version = Versions.version)
+                JOIN Flavors ON (gtl.flavor = Flavors.flavor)
+                JOIN Instances ON
+                    Items.itemId = Instances.itemId AND
+                    Versions.versionId = Instances.versionId AND
+                    Flavors.flavorId = Instances.flavorId
+                JOIN TroveTroves USING (instanceId)
+                JOIN Instances AS I_Instances ON
+                    TroveTroves.includedId = I_Instances.instanceId
+                JOIN Items AS I_Items ON
+                    I_Instances.itemId = I_Items.itemId
+                JOIN Versions AS I_Versions ON
+                    I_Instances.versionId = I_Versions.versionId
+                JOIN Flavors AS I_Flavors ON
+                    I_Instances.flavorId = I_Flavors.flavorId
+                ORDER BY
+                    I_Items.item, I_Versions.version, I_Flavors.flavor
+            """)
+
+            for (idx, name, version, flavor, flags) in cu:
+                newJobList[idx].append( (name, (None, None),
+                                               (version, flavor), True) )
+                if flags & schema.TROVE_TROVES_WEAKREF > 0:
+                    foundWeak.add(idx)
+                if not ':' in name and not name.startswith('fileset-'):
+                    foundCollections.add(idx)
+
+            for idx in ((foundGroups & foundCollections) - foundWeak):
+                # groups which contain collections but no weak refs
+                # are uncachable
+                newJobList[idx] = None
+
+            chgSetList = newJobList
+        else:
+            chgSetList = [ [ x ] for x in newJobList ]
+
+        sigItems = []
+
+        for fullJob in chgSetList:
+            for job in fullJob:
+                if job[1][0]:
+                    sigItems.append((job[0], job[1][0], job[1][1]))
+                sigItems.append((job[0], job[2][0], job[2][1]))
+
+        sigList = self.getTroveInfo(authToken, clientVersion,
+                                    trove._TROVEINFO_TAG_SIGS, sigItems)
+
+        # 0 is a version number for this signature block; changing this will
+        # invalidate all change set signatures downstream
+        header = "".join( ('0', "%d" % recurse, "%d" % withFiles,
+                    "%d" % withFileContents, "%d" % excludeAutoSource ) )
+        sigCount = 0
+        fingerprints = []
+        for fullJob in chgSetList:
+            if fullJob is None:
+                fingerprints.append('')
+                continue
+
+            fpList = [ header ]
+            for job in fullJob:
+                if job[1][0]:
+                    fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
+                    sigCount += 1
+
+                fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
+                sigCount += 1
+
+            fp = sha1helper.sha1String("\0".join(fpList))
+            fingerprints.append(sha1helper.sha1ToString(fp))
+
+        return fingerprints
 
     @accessReadOnly
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList,
@@ -2844,7 +2962,7 @@ class ServerConfig(ConfigFile):
     bugsEmailName           = (CfgString, 'Conary Repository Bugs')
     bugsEmailSubject        = (CfgString,
                                'Conary Repository Error Message')
-    cacheDB                 = dbstore.CfgDriver
+    changesetCacheDir       = CfgPath
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
@@ -2853,7 +2971,6 @@ class ServerConfig(ConfigFile):
     forceSSL                = CfgBool
     logFile                 = CfgPath
     proxyContentsDir        = CfgPath
-    proxyDB                 = dbstore.CfgDriver
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap

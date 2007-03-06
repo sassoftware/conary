@@ -12,13 +12,13 @@
 # full details.
 #
 
-import base64, itertools, os, tempfile, urllib, xmlrpclib
+import base64, cPickle, itertools, os, tempfile, urllib, xmlrpclib
 
 from conary import conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
-from conary.repository.netrepos import cacheset, netserver, calllog
+from conary.repository.netrepos import netserver, calllog
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -205,7 +205,7 @@ class ChangesetFilter(BaseProxy):
 
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
-        self.cache = cache
+        self.csCache = cache
 
     def _cvtJobEntry(self, authToken, jobEntry):
         (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
@@ -245,7 +245,7 @@ class ChangesetFilter(BaseProxy):
         assert False, "Unknown versions"
 
     def _convertChangeSetV2V1(self, cspath, size, destCsVersion):
-        (fd, newCsPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+        (fd, newCsPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                         suffix = '.tmp')
         os.close(fd)
         delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
@@ -299,7 +299,7 @@ class ChangesetFilter(BaseProxy):
         # old client
         cs.merge(newCs)
         # create a new temporary file for the munged changeset
-        (fd, cspath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+        (fd, cspath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                         suffix = '.tmp')
         os.close(fd)
         # now write out the munged changeset
@@ -309,6 +309,23 @@ class ChangesetFilter(BaseProxy):
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource):
+
+        def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
+            csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
+            util.mkdirChain(os.path.dirname(csPath))
+            outF = open(csPath + '.new', "w")
+            util.copyfileobj(inF, outF)
+            inF.close()
+            outF.close()
+
+            data = open(csPath + '.data', "w")
+            data.write(cPickle.dumps((returnVal, size)))
+            data.close()
+
+            os.rename(csPath + '.new', csPath)
+
+            return csPath
+
         pathList = []
         allTrovesNeeded = []
         allFilesNeeded = []
@@ -336,55 +353,41 @@ class ChangesetFilter(BaseProxy):
 
         assert(verPath[-1] == wireCsVersion)
 
-        for rawJob in chgSetList:
-            job = self._cvtJobEntry(authToken, rawJob)
+        fingerprints = [ '' ] * len(chgSetList)
+        if self.csCache:
+            try:
+                useAnon, fingerprints = caller.getChangeSetFingerprints(43,
+                        chgSetList, recurse, withFiles, withFileContents,
+                        excludeAutoSource)
+            except ProxyRepositoryError, e:
+                # old server; act like no fingerprints were returned
+                if e.args[0] == 'MethodNotSupported':
+                    pass
+                else:
+                    raise
 
-            cacheEntry = self.cache.getEntry(job, recurse, withFiles,
-                                     withFileContents, excludeAutoSource,
-                                     neededCsVersion)
+        for rawJob, fingerprint in itertools.izip(chgSetList, fingerprints):
             path = None
+            if fingerprint:
+                # empty fingerprint means "do not cache"
+                fullPrint = fingerprint + '-%d' % neededCsVersion
+                csPath = self.csCache.hashToPath(fullPrint)
+                if os.path.exists(csPath):
+                    # touch to refresh atime; try/except protects against race
+                    # with someone removing the entry during the time it took
+                    # you to read this comment
+                    try:
+                        fd = os.open(csPath, os.O_RDONLY)
+                    except:
+                        pass
 
-            if cacheEntry is not None:
-                import epdb
-                epdb.st()
-                path, (trovesNeeded, filesNeeded, removedTroves, sizes), \
-                        size = cacheEntry
-                invalidate = False
+                    data = open(csPath + '.data')
+                    (trovesNeeded, filesNeeded, removedTroves), size = \
+                        cPickle.loads(data.read())
+                    sizes = [ size ]
+                    data.close()
 
-                # revalidate the cache entries for both permissions and
-                # currency
-                troveList = []
-                cs = changeset.ChangeSetFromFile(path)
-                for trvCs in cs.iterNewTroveList():
-                    ti = trove.TroveInfo(trvCs.troveInfoDiff.freeze())
-                    troveList.append(
-                            ((trvCs.getName(), trvCs.getNewVersion(),
-                              trvCs.getNewFlavor()),
-                              trvCs.getNewSigs().freeze(),
-                              ti.flags.isMissing()))
-
-                fetchList = [ (x[0][0], self.fromVersion(x[0][1]),
-                               self.fromFlavor(x[0][2]) ) for x in troveList ]
-                serverSigs = caller.getTroveInfo(
-                              clientVersion, trove._TROVEINFO_TAG_SIGS,
-                              fetchList)[1]
-                for ((troveInfo, cachedSigs, cachedIsMissing),
-                            (present, reposSigs)) in \
-                                    itertools.izip(troveList, serverSigs):
-                    if present < 1 and not isMissing:
-                        # if it's missing from the server, make sure it's
-                        # missing here too
-                        invalidate = True
-                    elif present >= 1 or \
-                                not cachedSigs or \
-                                cachedSigs != base64.decodestring(reposSigs):
-                        invalidate = True
-                        break
-
-                if invalidate:
-                    self.cache.invalidateEntry(None, job[0], job[2][0],
-                                               job[2][1])
-                    path = None
+                    path = csPath
 
             if path is None:
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
@@ -392,54 +395,52 @@ class ChangesetFilter(BaseProxy):
                               getCsVersion, [ rawJob ], recurse, withFiles,
                               withFileContents, excludeAutoSource)[1]
                 assert(len(sizes) == 1)
+                size = sizes[0]
 
-                if url.startswith('file://localhost/'):
-                    tmpPath = url[17:]
-                    size = sizes[0]
+                if self.csCache:
+                    inF = urllib.urlopen(url)
+                    csPath =_addToCache(fingerprint, inF, wireCsVersion,
+                                (trovesNeeded, filesNeeded, removedTroves),
+                                size)
+                    if url.startswith('file://localhost/'):
+                        os.unlink(url[17:])
+                elif url.startswith('file://localhost/'):
+                    csPath = url[17:]
                 else:
-                    (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
-                                                     suffix = '.tmp')
-                    dest = os.fdopen(fd, "w")
-                    size = util.copyfileobj(urllib.urlopen(url), dest)
-                    dest.close()
+                    inF = urllib.urlopen(url)
+                    (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                                  suffix = '.ccs-out')
+                    outF = os.fdopen(fd, "w")
+                    size = util.copyfileobj(inF, outF)
+                    assert(size == sizes[0])
+                    inF.close()
+                    outF.close()
 
-                (key, path) = self.cache.addEntry(job, recurse, withFiles,
-                                    withFileContents, excludeAutoSource,
-                                    (trovesNeeded, filesNeeded, removedTroves,
-                                     sizes), size = size,
-                                     csVersion = wireCsVersion)
+                    csPath = tmpPath
 
-                os.rename(tmpPath, path)
+                # csPath points to a wire version of the changeset (possibly
+                # in the cache)
 
-                # Now walk the precedence list backwards
+                # Now walk the precedence list backwards for conversion
                 oldV = wireCsVersion
                 for iterV in reversed(verPath[:-1]):
-                    if oldV:
-                        # Convert the changeset - not the first time around
-                        path, size = self._convertChangeSet(path, size,
-                                                               iterV, oldV)
-                        sizes = [ size ]
+                    # Convert the changeset - not the first time around
+                    path, size = self._convertChangeSet(csPath, size,
+                                                        iterV, oldV)
+                    sizes = [ size ]
+
+                    if not self.csCache:
+                        # we're not caching; erase the old version
+                        os.unlink(csPath)
+                        csPath = path
+                    else:
+                        csPath = _addToCache(fingerprint, inF, iterV,
+                                (trovesNeeded, filesNeeded, removedTroves),
+                                size)
 
                     oldV = iterV
 
-                    if cacheEntry:
-                        # First entry already cached
-                        cacheEntry = None
-                        continue
-
-                    # Cache it
-                    (k, chpath) = self.cache.addEntry(job, recurse, withFiles,
-                                                      withFileContents,
-                                                      excludeAutoSource,
-                                                      (trovesNeeded,
-                                                       filesNeeded,
-                                                       removedTroves, sizes),
-                                                      size = size,
-                                                      csVersion = iterV)
-                    # Rename the changeset file to the cache file
-                    os.rename(path, chpath)
-                    # Next reference changeset file is the cached one
-                    path = chpath
+                path = csPath
 
             pathList.append((path, size))
             allTrovesNeeded += trovesNeeded
@@ -453,7 +454,14 @@ class ChangesetFilter(BaseProxy):
         f = os.fdopen(fd, 'w')
 
         for path, size in pathList:
-            f.write("%s %d\n" % (path, size))
+            if self.csCache:
+                cached = 1
+            else:
+                cached = 0
+
+            # the hard-coded 1 means it's a changeset and needs to be walked 
+            # looking for files to include by reference
+            f.write("%s %d 1 %d\n" % (path, size, cached))
 
         f.close()
 
@@ -468,13 +476,13 @@ class SimpleRepositoryFilter(ChangesetFilter):
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
 
     def __init__(self, cfg, basicUrl, repos):
-        if cfg.cacheDB:
-            cache = cacheset.CacheSet(cfg.cacheDB, cfg.tmpDir,
-                                      cfg.deadlockRetry)
+        if cfg.changesetCacheDir:
+            util.mkdirChain(cfg.changesetCacheDir)
+            csCache = datastore.DataStore(cfg.changesetCacheDir)
         else:
-            cache = cacheset.NullCacheSet(cfg.tmpDir)
+            csCache = None
 
-        ChangesetFilter.__init__(self, cfg, basicUrl, cache)
+        ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
         self.callFactory = RepositoryCallFactory(repos)
 
 class ProxyRepositoryServer(ChangesetFilter):
@@ -482,12 +490,14 @@ class ProxyRepositoryServer(ChangesetFilter):
     SERVER_VERSIONS = [ 41, 42, 43 ]
 
     def __init__(self, cfg, basicUrl):
-        cache = cacheset.CacheSet(cfg.proxyDB, cfg.tmpDir, cfg.deadlockRetry)
+        util.mkdirChain(cfg.changesetCacheDir)
+        csCache = datastore.DataStore(cfg.changesetCacheDir)
 
-        ChangesetFilter.__init__(self, cfg, basicUrl, cache)
+        util.mkdirChain(cfg.proxyContentsDir)
+        self.contents = datastore.DataStore(cfg.proxyContentsDir)
 
-        util.mkdirChain(self.cfg.proxyContentsDir)
-        self.contents = datastore.DataStore(self.cfg.proxyContentsDir)
+        ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
+
         self.callFactory = ProxyCallFactory()
 
     def getFileContents(self, caller, authToken, clientVersion, fileList,
@@ -557,7 +567,10 @@ class ProxyRepositoryServer(ChangesetFilter):
                 filePath = self.contents.hashToPath(fileId + '-c')
                 size = os.stat(filePath).st_size
                 sizeList.append(size)
-                os.write(fd, "%s %d\n" % (filePath, size))
+
+                # 0 means it's not a changeset
+                # 1 means it is cached (don't erase it after sending)
+                os.write(fd, "%s %d 0 1\n" % (filePath, size))
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])

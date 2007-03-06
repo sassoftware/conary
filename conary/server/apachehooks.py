@@ -130,12 +130,12 @@ def _handler(req):
         urlBase = "%%(protocol)s://%s:%%(port)d" % \
                         (req.server.server_hostname) + rest
 
-        if not cfg.repositoryDB and not cfg.proxyDB:
-            log.error("repositoryDB or proxyDB is required in %s" % 
+        if not cfg.repositoryDB and not cfg.proxyContentsDir:
+            log.error("repositoryDB or proxyContentsDir is required in %s" % 
                       req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
-        elif cfg.repositoryDB and cfg.proxyDB:
-            log.error("only one of repositoryDB or proxyDB may be specified "
+        elif cfg.repositoryDB and cfg.proxyContentsDir:
+            log.error("only one of repositoryDB or proxyContentsDir may be specified "
                       "in %s" % req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
 
@@ -153,7 +153,7 @@ def _handler(req):
         if cfg.closed:
             repositories[repName] = netserver.ClosedRepositoryServer(cfg)
             repositories[repName].forceSecure = False
-        elif cfg.proxyDB:
+        elif cfg.proxyContentsDir:
             repositories[repName] = proxy.ProxyRepositoryServer(cfg, urlBase)
             repositories[repName].forceSecure = False
         else:

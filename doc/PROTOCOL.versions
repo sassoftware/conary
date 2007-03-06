@@ -4,6 +4,9 @@ Version 43:
   - added getTroveReferences call.
   - added getTroveDescendants call
   - switched to fileId,pathId indexed changesets (changeset 2007022001)
+  - added getChangesetFingerprints call (not exposed in netclient)
+  - getTroveInfo now advertises troves as missing instead of raising
+    PermissionDenied
 
 Version 42: Conary 1.1.17
  - Client uses negotiated protocol version

@@ -153,10 +153,12 @@ def get(port, isSecure, repos, req):
             items = []
             totalSize = 0
             for l in f.readlines():
-                (path, size) = l.split()
+                (path, size, isChangeset, preserveFile) = l.split()
                 size = int(size)
+                isChangeset = int(isChangeset)
+                preserveFile = int(preserveFile)
                 totalSize += size
-                items.append((path, size))
+                items.append((path, size, isChangeset, preserveFile))
             f.close()
             del f
         else:
@@ -164,12 +166,12 @@ def get(port, isSecure, repos, req):
                 size = os.stat(localName).st_size;
             except OSError:
                 return apache.HTTP_NOT_FOUND
-            items = [ (localName, size) ]
+            items = [ (localName, size, 0, 0) ]
             totalSize = size
 
         req.content_type = "application/x-conary-change-set"
-        for (path, size) in items:
-            if path.endswith('.ccs-out'):
+        for (path, size, isChangeset, preserveFile) in items:
+            if isChangeset:
                 cs = FileContainer(open(path))
                 try:
                     cs.dump(req.write,
@@ -183,8 +185,7 @@ def get(port, isSecure, repos, req):
             else:
                 req.sendfile(path)
 
-            if path.startswith(repos.tmpPath) and \
-                    not(os.path.basename(path)[0:6].startswith('cache-')):
+            if not preserveFile:
                 os.unlink(path)
 
         return apache.OK

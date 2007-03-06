@@ -114,7 +114,7 @@ class DataStore(AbstractDataStore):
 
         outFileObj = os.fdopen(tmpFd, "w")
         contentSha1 = sha.new()
-        if precompressed:
+        if precompressed and integrityCheck:
             tee = Tee(fileObj, outFileObj)
             uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
             s = uncompObj.read(128 * 1024)

@@ -127,10 +127,12 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 items = []
                 totalSize = 0
                 for l in f.readlines():
-                    (path, size) = l.split()
+                    (path, size, isChangeset, preserveFile) = l.split()
                     size = int(size)
+                    isChangeset = int(isChangeset)
+                    preserveFile = int(preserveFile)
                     totalSize += size
-                    items.append((path, size))
+                    items.append((path, size, isChangeset, preserveFile))
                 f.close()
                 del f
             else:
@@ -139,7 +141,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 except OSError:
                     self.send_error(404)
                     return None
-                items = [ (localName, size) ]
+                items = [ (localName, size, 0, 0) ]
                 totalSize = size
 
             self.send_response(200)
@@ -147,8 +149,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(totalSize))
             self.end_headers()
 
-            for path, size in items:
-                if path.endswith('.ccs-out'):
+            for path, size, isChangeset, preserveFile in items:
+                if isChangeset:
                     cs = FileContainer(open(path))
                     cs.dump(self.wfile.write,
                             lambda name, tag, size, f, sizeCb:
@@ -156,12 +158,12 @@ class HttpRequests(SimpleHTTPRequestHandler):
                                                  sizeCb))
 
                     del cs
-                    if path.startswith(self.tmpDir) and \
-                         not(os.path.basename(path)[0:6].startswith('cache-')):
-                        os.unlink(path)
                 else:
                     f = open(path)
                     util.copyfileobj(f, self.wfile)
+
+                if not preserveFile:
+                    os.unlink(path)
         else:
             self.send_error(501)
 
@@ -281,7 +283,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         contentLength = int(self.headers['Content-Length'])
         authToken = self.getAuth()
 
-        if self.cfg.proxyDB:
+        if self.cfg.proxyContentsDir:
             status = netclient.httpPutFile(self.path, self.rfile, contentLength)
             self.send_response(status)
             return
@@ -360,10 +362,6 @@ class ServerConfig(netserver.ServerConfig):
 	self.read(path, exception=False)
 
     def check(self):
-        if self.cacheDB:
-            print >> sys.stderr, ("warning: cacheDB config option is ignored "
-                                  "by the standalone server")
-
         if self.closed:
             print >> sys.stderr, ("warning: closed config option is ignored "
                                   "by the standalone server")
@@ -475,7 +473,7 @@ def getServer():
         print "tmpDir cannot include symbolic links"
         sys.exit(1)
 
-    if cfg.proxyDB:
+    if cfg.proxyContentsDir:
         if len(otherArgs) > 1:
             usage()
 
