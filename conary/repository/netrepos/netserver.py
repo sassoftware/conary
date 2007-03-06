@@ -1607,7 +1607,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             chgSetList = newJobList
         else:
-            chgSetList = [ [ x ] for x in newJobList ]
+            chgSetList = [ [ x ] for x in chgSetList ]
 
         sigItems = []
 

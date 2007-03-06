@@ -535,7 +535,7 @@ class ProxyRepositoryServer(ChangesetFilter):
             (url, sizes) = caller.getFileContents(
                     clientVersion, neededFiles, False)[1]
 
-            (fd, tmpPath) = tempfile.mkstemp(dir = self.cache.tmpDir,
+            (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
             dest = os.fdopen(fd, "w+")
             size = util.copyfileobj(urllib.urlopen(url), dest)
@@ -556,6 +556,8 @@ class ProxyRepositoryServer(ChangesetFilter):
                                       integrityCheck = False)
                 totalSize -= size
                 start += size
+
+            assert(totalSize == 0)
 
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                       suffix = '.cf-out')

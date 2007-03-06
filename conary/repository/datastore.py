@@ -122,6 +122,8 @@ class DataStore(AbstractDataStore):
                 contentSha1.update(s)
                 s = uncompObj.read(128 * 1024)
             uncompObj.close()
+        elif precompressed:
+            util.copyfileobj(fileObj, outFileObj)
         else:
             dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
             util.copyfileobj(fileObj, dest, digest = contentSha1)
