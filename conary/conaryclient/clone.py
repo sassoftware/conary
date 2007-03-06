@@ -21,6 +21,7 @@ from conary.build.nextversion import nextVersion
 from conary.deps import deps
 from conary.lib import log
 from conary.repository import changeset
+from conary.repository import errors as neterrors
 
 V_LOADED = 0
 V_BREQ = 1
@@ -133,9 +134,7 @@ class ClientClone:
                 # version being cloned, we don't need to reclone the source
                 trv = self.repos.getTrove(name, cver, deps.Flavor(),
                     withFiles = False)
-                clonedFromVer = trv.troveInfo.clonedFrom()
-                if clonedFromVer and clonedFromVer in [version,
-                                allTroves[info].troveInfo.clonedFrom()]:
+                if self._isClonedFrom(trv, allTroves[info], callback):
                     # The latest version on the target branch was cloned 
                     # from the same trove the version being cloned was
                     # cloned from
@@ -217,8 +216,7 @@ class ClientClone:
                         # branch has the binaries but not the sources
                         trvcl = self.repos.getTrove(srctup[0], srctup[1],
                                                     srctup[2], withFiles=False)
-                    if clfrom and clfrom in [sourceVersion,
-                                        trvcl.troveInfo.clonedFrom()]:
+                    if self._sameTrove(trv, trvcl, callback):
                         newSourceVersion = trv.getVersion()
                     else:
                         log.error("Cannot find cloned source for %s=%s" %
@@ -236,7 +234,9 @@ class ClientClone:
                 cloneList, newBinaryVersion = \
                             _createBinaryVersions(versionMap, leafMap, 
                                                   self.repos, newSourceVersion, 
-                                                  infoList, allTroves, callback)
+                                                  infoList, allTroves, 
+                                                  self._isClonedFrom,
+                                                  callback)
                 versionMap.update(
                     dict((x, newBinaryVersion) for x in cloneList))
                 cloneJob += [ (x, newBinaryVersion) for x in cloneList ]
@@ -345,9 +345,9 @@ class ClientClone:
             newVersionHost = newVersion.getHost()
             sourceBranch = info[1].branch()
 
-            # if this is a clone of a clone, use the original clonedFrom value
-            # so that all clones refer back to the source-of-all-clones trove
-            if trv.troveInfo.clonedFrom() is None and trackClone:
+            # CNY-1294: we now only track the immediate parent of a clone, not
+            # the source-of-all-clones
+            if trackClone:
                 trv.troveInfo.clonedFrom.set(trv.getVersion())
 
             # clone the labelPath 
@@ -458,6 +458,156 @@ class ClientClone:
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
 
+    def _sameTrove(self, trv1, trv2, callback):
+        """
+        Return True if trv1 and trv2 are the same trove, modulo clonedFrom
+        This means we will recursively fetch the troves these troves were
+        cloned from.
+        """
+        # Simple cases first
+
+        # Troves have to have the same name
+        if trv1.getName() != trv2.getName():
+            return False
+
+        # Troves have to be the same flavor
+        if trv1.getFlavor() != trv2.getFlavor():
+            return False
+
+        if trv1.getVersion() == trv2.getVersion():
+            return True
+
+        trv1ClFrom = trv1.troveInfo.clonedFrom()
+        trv2ClFrom = trv2.troveInfo.clonedFrom()
+
+        if trv1ClFrom is None and trv2ClFrom is None:
+            # Neither was cloned, so they have to be different
+            return False
+
+        if trv1ClFrom == trv2ClFrom:
+            # Both cloned from the same trove, they are the same
+            return True
+
+        if trv2ClFrom == trv1.getVersion():
+            # trv2 cloned from trv1
+            return True
+
+        if trv1ClFrom == trv2.getVersion():
+            # trv1 cloned from trv2
+            return True
+
+        # The troves have to be related, either sibling or uphill
+        if not _isSiblingOrUphill(trv1.getVersion(), trv2.getVersion()):
+            return False
+
+        # Sanity check to prevent us from running into infinite loops if
+        # someone manufactures a trove with a clonedFrom that is not uphill or
+        # sibling
+        checks = [ (trv1, trv1ClFrom), (trv2, trv2ClFrom) ]
+        for trv, trvcl in checks:
+            ver = trv.getVersion()
+            if trvcl is None:
+                continue
+            if not _isUphill(trvcl, ver) and not _isSibling(trvcl, ver):
+                log.warning("Invalid trove %s=%s[%s]: not cloned uphill or "                                "sideways" % (trv.getName(), ver, trv.getFlavor()))
+
+        # Pick the next targets for comparison
+        if trv1ClFrom is None:
+            # Because of the test above, trv2ClFrom is not None
+            ver1, ver2 = trv1.getVersion(), trv2ClFrom
+
+            needed = [ ver2 ]
+            otherTrv = trv1
+        elif trv2ClFrom is None:
+            # Because of the test above, trv1ClFrom is not None
+            ver1, ver2 = trv1ClFrom, trv2.getVersion()
+            needed = [ ver1 ]
+            otherTrv = trv2
+        else:
+            # Need to fetch both
+            ver1, ver2 = trv1ClFrom, trv2ClFrom
+            needed = [ ver1, ver2 ]
+            otherTrv = None
+
+        # Need to be related
+        if not _isSiblingOrUphill(ver1, ver2):
+            return False
+
+        needed = [ (trv1.getName(), v, trv1.getFlavor()) for v in needed ]
+
+        try:
+            troves = self.repos.getTroves(needed, withFiles = False,
+                                          callback = callback)
+        except (neterrors.TroveMissing, neterrors.OpenError):
+            # Unable to fetch one of the troves - be on the safe side and
+            # reclone
+            return False
+
+        if otherTrv:
+            troves.append(otherTrv)
+        # Recurse
+        return self._sameTrove(troves[0], troves[1], callback)
+
+    def _isClonedFrom(self, trv1, trv2, callback):
+        "Return True if the first argument is a clone of the second"
+
+        trv1ClonedFrom = trv1.troveInfo.clonedFrom()
+        if trv1ClonedFrom is None:
+            # trv1 was not cloned from anything
+            return False
+
+        # Troves have to have the same name
+        if trv1.getName() != trv2.getName():
+            return False
+
+        # Troves have to be the same flavor
+        if trv1.getFlavor() != trv2.getFlavor():
+            return False
+
+        if trv1.getVersion() == trv2.getVersion():
+            # One can re-clone the same trove and get a different version
+            return False
+
+        # trv1 has to be uphill from (shorter than) trv2, or a sibling of trv1
+        if not _isUphill(trv2.getVersion(), trv1.getVersion()) and \
+           not _isSibling(trv1.getVersion(), trv2.getVersion()):
+            return False
+
+        # Compare trv1's clonedFrom with either trv2's clonedFrom or trv2's
+        # version. They have to be uphill or sibling.
+        trv2ClonedFrom = trv2.troveInfo.clonedFrom()
+        if trv2ClonedFrom:
+            otherVer = trv2ClonedFrom
+            otherTrv = None
+        else:
+            otherVer = trv2.getVersion()
+            otherTrv = trv2
+
+        if not _isSiblingOrUphill(trv1ClonedFrom, otherVer):
+            return False
+
+        # We will have to retrieve one or two troves and compare them for
+        # equality modulo clonedFrom. If trv2's clonedFrom is None, we compare
+        # trv1's clonedFrom with trv2, otherwise we compare the two clonedFrom
+        # versions
+        needed = [ (trv1.getName(), trv1ClonedFrom, trv1.getFlavor()) ]
+        if not otherTrv:
+            needed.append((trv1.getName(), otherVer, trv1.getFlavor()))
+
+        try:
+            troves = self.repos.getTroves(needed, withFiles = False,
+                                          callback = callback)
+        except (neterrors.TroveMissing, neterrors.OpenError):
+            # Unable to fetch one of the troves - be on the safe side and
+            # reclone
+            return False
+
+        if otherTrv:
+            troves.append(otherTrv)
+
+        return self._sameTrove(troves[0], troves[1], callback)
+
+
 # if updateBuildInfo is True, rewrite buildreqs and loadedTroves
 # info
 def _createSourceVersion(targetBranch, targetBranchVersionList, 
@@ -524,8 +674,17 @@ def _isSibling(ver, possibleSibling):
 
     return False
 
+def _isSiblingOrUphill(ver1, ver2):
+    """Returns True if ver1 and ver2 are siblings or one is uphill of the
+    other"""
+    branch1, branch2 = [], []
+    for l1, l2 in itertools.izip(ver1.iterLabels(), ver2.iterLabels()):
+        branch1.append(l1)
+        branch2.append(l2)
+    return branch1[:-1] == branch2[:-1]
+
 def _createBinaryVersions(versionMap, leafMap, repos, srcVersion,
-                          infoList, allTroves, callback):
+                          infoList, allTroves, isClonedFrom, callback):
     # this works on a single flavor at a time
     singleFlavor = list(set(x[2] for x in infoList))
     assert(len(singleFlavor) == 1)
@@ -578,11 +737,8 @@ def _createBinaryVersions(versionMap, leafMap, repos, srcVersion,
         trvcltup = infoMap[(name, singleFlavor)]
         trvcl = allTroves[trvcltup]
 
-        clfrom = trv.troveInfo.clonedFrom()
-        if not clfrom:
-            continue
-
-        if clfrom not in (trvcl.getVersion(), trvcl.troveInfo.clonedFrom()):
+        if not isClonedFrom(trv, trvcl, callback):
+            # Different trove
             continue
 
         # we might not need to reclone this one _if_ 
@@ -607,7 +763,7 @@ def _createBinaryVersions(versionMap, leafMap, repos, srcVersion,
             clonedVer = trv.getVersion()
 
         del infoMap[(name, singleFlavor)]
-        alreadyCloned.append((name, clfrom, singleFlavor))
+        alreadyCloned.append((name, trvcl.getVersion(), singleFlavor))
 
     if not infoMap:
         return ([], None)
