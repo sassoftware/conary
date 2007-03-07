@@ -39,6 +39,8 @@ Changes in @NEW@:
       to be any of those types. (CNY-1283)
     * Derived packages (experimental) can now create hard links, including
       adding new files to existing link groups. (CNY-1284)
+    * Derived packages (experimental) now inherit byDefault settings from
+      the parent (CNY-1401), but can override them in the child (CNY-1283).
 
   o Server Changes:
     * Two new calls have been added to the server API -

@@ -30,6 +30,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         delayedRestores = {}
         ptrMap = {}
+        byDefault = {}
 
         fileList = []
         linkGroups = {}
@@ -47,6 +48,12 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
             for pathId, path, fileId, version in trv.iterFileList():
                 if path != self.macros.buildlogpath:
                     fileList.append((pathId, fileId, path, name))
+
+            if trv.isCollection():
+                # gather up existing byDefault status
+                # from (component, byDefault) tuples
+                byDefault.update(dict(
+                    [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
 
         fileList.sort()
 
@@ -129,6 +136,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 util.createLink(destdir + initialPath, destdir + path)
 
         self.useFlags = flavor
+
+        self.setByDefaultOn(set(x for x in byDefault if byDefault[x]))
+        self.setByDefaultOff(set(x for x in byDefault if not byDefault[x]))
 
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):

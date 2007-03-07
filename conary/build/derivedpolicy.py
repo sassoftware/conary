@@ -198,6 +198,26 @@ class ComponentProvides(packagepolicy.ComponentProvides):
                 self.flags.update(dep.flags.keys())
         packagepolicy.ComponentProvides.do(self)
 
+
+class ByDefault(packagepolicy.ByDefault):
+    # Because this variant honors existing settings, overrides must
+    # be of the package:component variety.  ":component" will only
+    # work for components added in this derived package
+    def doProcess(self, recipe):
+        originalInclusions = recipe.byDefaultIncludeSet
+        originalExceptions = recipe.byDefaultExcludeSet
+        if not self.inclusions:
+            self.inclusions = []
+        if not self.exceptions:
+            self.exceptions = []
+        inclusions = set(originalInclusions.union(set(self.inclusions))
+             - set(self.exceptions).union(set(self.invariantexceptions)))
+        exceptions = set(originalExceptions.union(set(self.exceptions))
+             - set(self.inclusions))
+        recipe.setByDefaultOn(inclusions)
+        recipe.setByDefaultOff(exceptions)
+    
+
 ExcludeDirectories = packagepolicy.ExcludeDirectories
 MakeDevices = packagepolicy.MakeDevices
 Ownership = packagepolicy.Ownership
