@@ -42,8 +42,8 @@ Changes in @NEW@:
       be a tag handler or tag description, except by removing the file
       entirely), and add new tags to new and pre-existing files when
       TagSpec is called (but not remove existing tags from files). (CNY-1283)
-    * Derived packages (experimental) can now create hard links, including
-      adding new files to existing link groups. (CNY-1284)
+    * Derived packages (experimental) can now run nearly all build and
+      source actions. (CNY-1284)
     * Derived packages (experimental) now inherit byDefault settings from
       the parent (CNY-1401), but can override them in the child (CNY-1283).
 
