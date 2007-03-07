@@ -99,16 +99,13 @@ class Policy(action.RecipeAction):
 
     @cvar processUnmodified: allows special handling for derived
     packages in order to make only appropriate changes in the
-    derived package.  C{True} causes C{doFile} to be called for
+    derived package.  C{None} (default) disables the policy for
+    derived packages.  C{True} causes C{doFile} to be called for
     all files found, regardless of whether they are in the
-    parent version, and C{False} (default) causes C{doFile} to be called
+    parent version, and C{False} causes C{doFile} to be called
     only for files that are new or have changed timestamps.
     Note that if C{filetree} is C{policy.PACKAGE}, unchanged
     file contents will lead to unchanged timestamps.
-    This will probably change in the future to default to C{None}
-    (do not run the policy at all), with {True} and {False} keeping
-    their current meanings, in order to enable selectively applying
-    external policy to derived packages.
     """
     bucket = None
     invariantsubtrees = []
@@ -117,7 +114,7 @@ class Policy(action.RecipeAction):
     recursive = True
     filetree = DESTDIR
     rootdir = None
-    processUnmodified = False
+    processUnmodified = None
 
     keywords = {
         'use': None,
@@ -280,6 +277,12 @@ class Policy(action.RecipeAction):
         if self.rootdir:
             self.rootdir = self.rootdir % self.macros
 
+        if (hasattr(recipe, '_isDerived')
+            and recipe._isDerived == True
+            and self.processUnmodified is None):
+            # This policy does not handle derived packages
+            return
+
 	if hasattr(self.__class__, 'preProcess'):
 	    self.preProcess()
 
@@ -375,7 +378,9 @@ class Policy(action.RecipeAction):
             return True
 
     def policyInclusion(self, filespec):
-        if (self.processUnmodified is False
+        if (hasattr(self.recipe, '_isDerived')
+            and self.recipe._isDerived == True
+            and self.processUnmodified is False
             and filespec in self.recipe._derivedFiles
             and not self.mtimeChanged(filespec)):
             # policy has elected not to handle unchanged files

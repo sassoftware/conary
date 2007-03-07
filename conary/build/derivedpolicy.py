@@ -193,6 +193,7 @@ class ComponentRequires(packagepolicy.ComponentRequires):
             comp.requires -= removeDeps
 
 class ComponentProvides(packagepolicy.ComponentProvides):
+    processUnmodified = True
     def do(self):
         # pick up parent component flags
         for depSet in self.recipe._componentProvs.values():

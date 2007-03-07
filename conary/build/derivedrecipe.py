@@ -225,7 +225,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
     def loadPolicy(self):
         return _AbstractPackageRecipe.loadPolicy(self,
-                                policySet = set( [ 'WarnWriteable' ] ),
                                 internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},

@@ -397,6 +397,7 @@ class FixDirModes(policy.Policy):
     # This policy must be run first so that other policies can be
     # counted on to search the full directory tree.
     bucket = policy.DESTDIR_PREPARATION
+    processUnmodified = True
     requires = (
         ('setModes', policy.REQUIRED_SUBSEQUENT),
     )

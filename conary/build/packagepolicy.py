@@ -41,6 +41,7 @@ class _filterSpec(policy.Policy):
     are derived.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     def __init__(self, *args, **keywords):
 	self.extraFilters = []
 	policy.Policy.__init__(self, *args, **keywords)
@@ -65,6 +66,7 @@ class _addInfo(policy.Policy):
     requirements, and provision, to files.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -677,6 +679,7 @@ class TagDescription(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -714,6 +717,7 @@ class TagHandler(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -1022,6 +1026,7 @@ class LinkCount(policy.Policy):
     hardlinks.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -3084,6 +3089,7 @@ class reportMissingBuildRequires(policy.Policy):
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
+    processUnmodified = True
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
@@ -3109,6 +3115,7 @@ class reportErrors(policy.Policy):
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
+    processUnmodified = True
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
