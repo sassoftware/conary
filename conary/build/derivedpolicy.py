@@ -218,11 +218,25 @@ class ByDefault(packagepolicy.ByDefault):
         recipe.setByDefaultOff(exceptions)
     
 
+class TagSpec(packagepolicy.TagSpec):
+    # do not load the system-defined tags for derived packages
+    processUnmodified = True
+    def doProcess(self, recipe):
+	self.tagList = []
+        self.suggestBuildRequires = set()
+        self.db = None
+        self.fullReqs = set()
+        packagepolicy._addInfo.doProcess(self, recipe)
+
+
 ExcludeDirectories = packagepolicy.ExcludeDirectories
 MakeDevices = packagepolicy.MakeDevices
 Ownership = packagepolicy.Ownership
 UtilizeUser = packagepolicy.UtilizeUser
 UtilizeGroup = packagepolicy.UtilizeGroup
+TagDescription = packagepolicy.TagDescription
+TagHandler = packagepolicy.TagHandler
+
 setModes = packagepolicy.setModes
 LinkType = packagepolicy.LinkType
 LinkCount = packagepolicy.LinkCount

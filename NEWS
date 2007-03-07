@@ -37,7 +37,11 @@ Changes in @NEW@:
     * Derived packages (experimental) can now change files between
       Config, InitialContents, and Transient, and can set new files
       to be any of those types.  They can call UtilizeUser and
-      UtilizeGroup. (CNY-1283)
+      UtilizeGroup.  They can create new tag handlers and tag
+      description files (but not make a file from the parent no longer
+      be a tag handler or tag description, except by removing the file
+      entirely), and add new tags to new and pre-existing files when
+      TagSpec is called (but not remove existing tags from files). (CNY-1283)
     * Derived packages (experimental) can now create hard links, including
       adding new files to existing link groups. (CNY-1284)
     * Derived packages (experimental) now inherit byDefault settings from
