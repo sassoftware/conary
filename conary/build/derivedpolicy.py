@@ -221,6 +221,8 @@ class ByDefault(packagepolicy.ByDefault):
 ExcludeDirectories = packagepolicy.ExcludeDirectories
 MakeDevices = packagepolicy.MakeDevices
 Ownership = packagepolicy.Ownership
+UtilizeUser = packagepolicy.UtilizeUser
+UtilizeGroup = packagepolicy.UtilizeGroup
 setModes = packagepolicy.setModes
 LinkType = packagepolicy.LinkType
 LinkCount = packagepolicy.LinkCount
