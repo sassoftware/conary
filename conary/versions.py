@@ -1308,6 +1308,25 @@ class Branch(VersionSequence):
 	newlist = [ label ]
         return Branch(self.versions + newlist)
 
+    def createSibling(self, label):
+        """
+        Creates a branch that has all the same revision.
+
+        @param label: Trailing label of the new branch
+        @type label: AbstractLabel
+        @rtype: Branch
+        """
+        return Branch(self.versions[:-1] + [label])
+
+    def isSibling(self, other):
+        return self.versions[:-1] == other.versions[:-1]
+
+    def isAncestor(self, other):
+        import epdb
+        epdb.st()
+        return self.versions == other.versions[:len(self.versions)]
+
+
 def _parseVersionString(ver, frozen):
     """
     Converts a string representation of a version into a Revision
