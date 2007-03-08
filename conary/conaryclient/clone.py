@@ -44,11 +44,7 @@ class CloneJob(object):
         self.cloneJob.pop(troveTup, False)
 
     def target(self, troveTup, targetVersion):
-        oldBranch = troveTup[1].branch()
-        newBranch = targetVersion.branch()
-        if not (newBranch.isAncestor(oldBranch) or newBranch.isSibling(oldBranch)):
-            raise CloneError("clone only supports cloning troves to "
-                             "parent and sibling branches")
+
         self.cloneJob[troveTup] = targetVersion
 
     def iterTargetList(self):
@@ -82,6 +78,17 @@ class CurrentLeaves(object):
             return None
         troveList = self.branchMap[name, targetBranch, flavor]
         return sorted(troveList)[-1][1]
+
+    def hasAncestor(self, troveTup, targetBranch, repos):
+        newVersion = troveTup[1]
+        while (newVersion.isShadow() and not newVersion.isModifiedShadow()
+               and newVersion.branch() != targetBranch):
+            newVersion = newVersion.parentVersion()
+        if (newVersion.branch() == targetBranch and
+            repos.hasTrove(troveTup[0], newVersion, troveTup[2])):
+            return newVersion
+
+        return False
 
     def isAlreadyCloned(self, troveList, targetBranch):
         if not isinstance(troveList, list):
@@ -241,8 +248,13 @@ class CloneMap(object):
     def getBinaryTrovesBySource(self):
         return self.trovesBySource.items()
 
-    def target(self, troveTup, newVersion):
-        self.targetMap[troveTup] = newVersion
+    def target(self, troveTup, targetVersion):
+        oldBranch = troveTup[1].branch()
+        newBranch = targetVersion.branch()
+        if not (newBranch.isAncestor(oldBranch) or newBranch.isSibling(oldBranch)):
+            raise CloneError("clone only supports cloning troves to "
+                             "parent and sibling branches")
+        self.targetMap[troveTup] = targetVersion
 
     def getTargetVersion(self, troveTup):
         return self.targetMap.get(troveTup, None)
@@ -266,8 +278,7 @@ class CloneMap(object):
         if kind == V_REFTRV:
             # only rewrite trove info if we're cloning that trove.
             # otherwise, assume it's correct.
-            if troveTup in self.targetMap:
-                return True
+            return troveTup in self.targetMap
 
         if targetBranch == troveTup[1].branch():
             # this means that we're merely pushing this trove to tip
@@ -429,38 +440,41 @@ class ClientClone:
         return leafMap
 
     def _targetSources(self, cloneMap, cloneJob, leafMap, troveCache):
+        hasTroves = self.repos.hasTroves([x[0] for x in cloneMap.iterSourceTargetBranches()])
+        troveCache.getTroves([x[0] for x in hasTroves.items() if x[1])
         for sourceTup, targetBranch in cloneMap.iterSourceTargetBranches():
-            sourceTrove = troveCache.getTrove(sourceTup, withFiles=False)
-            newVersion = leafMap.isAlreadyCloned([sourceTrove], targetBranch)
-            if newVersion:
-                cloneMap.target(sourceTup, newVersion)
-                cloneJob.alreadyCloned(sourceTup)
-                continue
-            newVersion = leafMap.createSourceVersion(sourceTup, targetBranch)
-            cloneMap.target(sourceTup, newVersion)
-            if cloneMap.shouldClone(sourceTup):
-                cloneJob.target(sourceTup, newVersion)
-
-    def _checkNeededSources(self, cloneMap, cloneJob, leafMap):
-        for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
-            if cloneMap.getTargetVersion(sourceTup):
-                continue
-            sourceVersion = sourceTup[1]
-            targetBranch = cloneMap.getTargetBranch(sourceTup[1])
-            if targetBranch.isAncestor(sourceVersion.branch()):
-                newVersion = sourceVersion
-                while (newVersion.isShadow() and not newVersion.isModifiedShadow() 
-                       and newVersion.branch() != targetBranch):
-                    newVersion = newVersion.parentVersion()
-                if newVersion.branch() == targetBranch:
+            if hasTroves[sourceTup]:
+                sourceTrove = troveCache.getTrove(sourceTup, withFiles=False)
+                newVersion = leafMap.isAlreadyCloned([sourceTrove], targetBranch)
+                if newVersion:
                     cloneMap.target(sourceTup, newVersion)
+                    cloneJob.alreadyCloned(sourceTup)
+                elif cloneMap.shouldClone(sourceTup):
+                    newVersion = leafMap.createSourceVersion(sourceTup, targetBranch)
+                    cloneMap.target(sourceTup, newVersion)
+                    cloneJob.target(sourceTup, newVersion)
                 else:
-                    raise CloneIncomplete(('Cannot find source component'
-                                           ' needed for clone of binaries:\n%s',
-                                           '%s=%s[%s]' % x) for x in binaryList)
+                    newVersion = leafMap.hasAncestor(sourceTup, targetBranch, self.repos)
+                    if newVersion:
+                        cloneMap.target(sourceTup, newVersion)
+                        cloneJob.alreadyCloned(sourceTup)
+                    else:
+                        # should clone was false but the source trove exists - 
+                        # we could have done this clone.
+                        raise CloneError("Cannot find cloned source for %s=%s" \
+                                          % (sourceTup[0], sourceTup[1]))
+            else:
+                newVersion = leafMap.hasAncestor(sourceTup, targetBranch, self.repos)
+                if newVersion:
+                    cloneMap.target(sourceTup, newVersion)
+                    cloneJob.alreadyCloned(sourceTup)
+                else:
+                    # The source trove is not available to clone and either this is not
+                    # an uphill trove or the source is not available on the uphill label.
+                    raise CloneError("Cannot find required source %s on branch %s." \
+                                     % (sourceTup[0], targetBranch))
 
     def _targetBinaries(self, cloneMap, cloneJob, leafMap, troveCache):
-        self._checkNeededSources(cloneMap, cloneJob, leafMap)
         for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
             targetSourceVersion = cloneMap.getTargetVersion(sourceTup)
             targetBranch = targetSourceVersion.branch()
@@ -525,15 +539,18 @@ class ClientClone:
         for queryItem, (sourceTup, markList) in query.items():
             trv = troveCache.getTrove(sourceTup, withFiles=False)
             newVersion = leafMap.isAlreadyCloned(trv, queryItem[1])
+            if not newVersion:
+                newVersion = leafMap.hasAncestor(sourceTup, queryItem[1], self.repos)
             if newVersion:
                 cloneMap.target(sourceTup, newVersion)
                 del query[queryItem]
+
         if query:
             raise CloneIncomplete(query.values())
 
     def _buildChangeSet(self, cloneMap, cloneJob, leafMap, troveCache):
         allFilesNeeded = []
-        cs = changeset.ReadOnlyChangeSet()
+        cs = changeset.ChangeSet()
         allTroveList = [x[0] for x in cloneJob.iterTargetList()]
         allTroves = troveCache.getTroves(allTroveList, withFiles=True)
         for troveTup, newVersion in cloneJob.iterTargetList():
@@ -637,7 +654,6 @@ class ClientClone:
             (filecs, contentsHash) = changeset.fileChangeSet(pathId, None,
                                                              fileObj)
 
-            print "cs.addFile(%s)" % (sha1helper.sha1ToString(newFileId))
             cs.addFile(None, newFileId, filecs)
             if fileObj.hasContents:
                 contentsNeeded.append((newFileId, newFileVersion))
@@ -649,30 +665,10 @@ class ClientClone:
                 itertools.izip(pathIdsNeeded, contentsNeeded, contents, 
                                fileObjsNeeded):
 
-            print "cs.addFileContents(%s, %s)" % (
-                                        sha1helper.md5ToString(pathId),
-                                        sha1helper.sha1ToString(fileId))
             cs.addFileContents(pathId, fileId, changeset.ChangedFileTypes.file,
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
 
-
-def _isUphill(ver, uphill):
-    if not isinstance(uphill, versions.Branch):
-        uphillBranch = uphill.branch()
-    else:
-        uphillBranch = uphill
-
-    verBranch = ver.branch()
-    if uphillBranch == verBranch:
-        return True
-
-    while verBranch.hasParentBranch():
-        verBranch = verBranch.parentBranch()
-        if uphillBranch == verBranch:
-            return True
-
-    return False
 
 def _iterAllVersions(trv, rewriteTroveInfo=True):
     # return all versions which need rewriting except for file versions
@@ -752,7 +748,7 @@ class CloneIncomplete(CloneError):
 
     def __str__(self):
         l = []
-        for src, markList in self.needs.iteritems():
+        for src, markList in self.needs:
             for mark in markList:
                 what = "%s=%s[%s]" % (src[0], src[1].asString(), str(src[2]))
                 if mark[0] == V_LOADED:
