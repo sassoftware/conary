@@ -1542,8 +1542,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return ("missing", ) + troveInfo
 
         if recurse:
-            # Recursive changesets can only contain absolute changesets. We
-            # mark old groups (ones without weak references) as uncachable
+            # We mark old groups (ones without weak references) as uncachable
             # because they're expensive to flatten (and so old that it
             # hardly matters).
             cu = self.db.cursor()
@@ -1556,13 +1555,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             newJobList = [ [] for x in range(len(chgSetList)) ]
 
             for jobId, job in enumerate(chgSetList):
-                if not job[3]:
-                    raise errors.RecursiveRelativeChangeSet
-
                 if job[0].startswith('group-'):
                     foundGroups.add(jobId)
 
                 newJobList[jobId].append(job)
+
+                if job[1][0]:
+                    # Record the troves in the old trove this job is
+                    # relative to so if any of the old troves change
+                    # the fingerprints won't match.
+                    #
+                    # The weird math on jobId here avoids conflicts in that
+                    # row, which is a primary key. Seems easier than
+                    # declaring a new table.
+                    cu.execute("""
+                        INSERT INTO gtl(idx, name, version, flavor)
+                        VALUES (?, ?, ?, ?)
+                    """, -1 * (jobId + 1), job[0], job[1][0], job[1][1])
 
                 cu.execute("""
                     INSERT INTO gtl(idx, name, version, flavor)
@@ -1593,6 +1602,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             """)
 
             for (idx, name, version, flavor, flags) in cu:
+                idx = abs(idx) - 1
+
                 newJobList[idx].append( (name, (None, None),
                                                (version, flavor), True) )
                 if flags & schema.TROVE_TROVES_WEAKREF > 0:
@@ -1605,13 +1616,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 # are uncachable
                 newJobList[idx] = None
 
-            chgSetList = newJobList
+            newJobList = newJobList
         else:
-            chgSetList = [ [ x ] for x in chgSetList ]
+            newJobList = [ [ x ] for x in chgSetList ]
 
         sigItems = []
 
-        for fullJob in chgSetList:
+        for fullJob in newJobList:
             for job in fullJob:
                 if job[1][0]:
                     sigItems.append((job[0], job[1][0], job[1][1]))
@@ -1626,12 +1637,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     "%d" % withFileContents, "%d" % excludeAutoSource ) )
         sigCount = 0
         fingerprints = []
-        for fullJob in chgSetList:
+        for origJob, fullJob in itertools.izip(chgSetList, newJobList):
             if fullJob is None:
+                # uncachable job
                 fingerprints.append('')
                 continue
 
             fpList = [ header ]
+            fpList += [ origJob[0], str(origJob[1][0]), str(origJob[1][1]),
+                        origJob[2][0], origJob[2][1], "%d" % origJob[3] ]
             for job in fullJob:
                 if job[1][0]:
                     fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
