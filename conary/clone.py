@@ -24,7 +24,12 @@ from conary.deps import deps
 
 def displayCloneJob(cs):
     indent = '   '
-    for csTrove in cs.iterNewTroveList():
+    def _sortTroveNameKey(x):
+        name = x.getName()
+        return (not name.endswith(':source'), x.getNewFlavor(), name)
+    csTroves = sorted(cs.iterNewTroveList(), key=_sortTroveNameKey)
+
+    for csTrove in csTroves:
         newInfo = str(csTrove.getNewVersion())
         flavor = csTrove.getNewFlavor()
         if not flavor.isEmpty():
@@ -99,3 +104,47 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
     if not test:
         client.repos.commitChangeSet(cs, callback=callback)
+
+
+def _convertLabel(lblStr, template):
+    try:
+        if not lblStr:
+            return None
+        hostName = template.getHostname()
+        nameSpace = template.getNamespace()
+        tag = template.branch
+
+        if lblStr[0] == ':':
+            lblStr = '%s@%s%s' % (hostName, nameSpace, lblStr)
+        elif lblStr[0] == '@':
+            lblStr = '%s%s' % (hostName, lblStr)
+        elif lblStr[-1] == '@':
+            lblStr = '%s%s:%s' % (lblStr, nameSpace, tag)
+        return versions.Label(lblStr)
+    except Exception, msg:
+        raise errors.ParseError('Error parsing %r: %s' % (fromLabel, msg))
+
+def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
+                  info=False, message=None, test=False):
+    labelMap = {}
+    for fromLabel, toLabel in labelList:
+        fromLabel = _convertLabel(fromLabel, cfg.buildLabel)
+        toLabel = _convertLabel(toLabel, cfg.buildLabel)
+        labelMap[fromLabel] = toLabel
+
+    troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
+
+    client = ConaryClient(cfg)
+    searchSource = client.getSearchSource()
+    trovesToClone = searchSource.findTroves(troveSpecs)
+    trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
+    if not client.cfg.quiet:
+        callback = conaryclient.callbacks.CloneCallback(client.cfg, message)
+    else:
+        callback = callbacks.CloneCallback()
+
+    okay, cs = client.createSiblingCloneChangeSet(
+                                           labelMap, trovesToClone,
+                                           updateBuildInfo=updateBuildInfo,
+                                           infoOnly=info, callback=callback)
+
