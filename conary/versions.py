@@ -1322,8 +1322,6 @@ class Branch(VersionSequence):
         return self.versions[:-1] == other.versions[:-1]
 
     def isAncestor(self, other):
-        import epdb
-        epdb.st()
         return self.versions == other.versions[:len(self.versions)]
 
 
