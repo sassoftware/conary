@@ -20,6 +20,7 @@ from conary import versions
 from conary.build.nextversion import nextVersion
 from conary.deps import deps
 from conary.lib import log
+from conary.lib import sha1helper
 from conary.repository import changeset
 
 V_LOADED = 0
@@ -29,420 +30,614 @@ V_REFTRV = 2
 # don't change 
 DEFAULT_MESSAGE = 1
 
+class CloneJob(object):
+    def __init__(self, trackClone=True, infoOnly=False, callback=None):
+        self.cloneJob = {}
+        self.trackClone = trackClone
+        self.infoOnly = infoOnly
+        self.callback = callback
+
+    def add(self, troveTup):
+        self.cloneJob[troveTup] = None
+
+    def alreadyCloned(self, troveTup):
+        self.cloneJob.pop(troveTup, False)
+
+    def target(self, troveTup, targetVersion):
+        oldBranch = troveTup[1].branch()
+        newBranch = targetVersion.branch()
+        if not (newBranch.isAncestor(oldBranch) or newBranch.isSibling(oldBranch)):
+            raise CloneError("clone only supports cloning troves to "
+                             "parent and sibling branches")
+        self.cloneJob[troveTup] = targetVersion
+
+    def iterTargetList(self):
+        return self.cloneJob.iteritems()
+
+    def isEmpty(self):
+        return not self.cloneJob
+
+class CurrentLeaves(object):
+    # Then it could be passed into nextVersion.  Also,
+    # we could make all the individual calls and know that the results
+    # are cached from the large calls.
+    def __init__(self):
+        self.currentClonedFrom = {}
+        self.branchMap = {}
+
+    def addTrove(self, troveTup, clonedFrom=None):
+        name, version, flavor = troveTup
+        if clonedFrom is None:
+            clonedFrom = set([version])
+        else:
+            clonedFrom = set([clonedFrom, version])
+        self.currentClonedFrom[name, version.branch(), flavor] = \
+                                                    (version, clonedFrom)
+
+    def addLeafResults(self, branchMap):
+        self.branchMap = branchMap
+
+    def getLeafVersion(self, name, targetBranch, flavor):
+        if (name, targetBranch, flavor) not in self.branchMap:
+            return None
+        troveList = self.branchMap[name, targetBranch, flavor]
+        return sorted(troveList)[-1][1]
+
+    def isAlreadyCloned(self, troveList, targetBranch):
+        if not isinstance(troveList, list):
+            troveList = [troveList]
+        finalTargetVersion = None
+        for trove in troveList:
+            name, version, flavor = trove.getNameVersionFlavor()
+            targetInfo = name, targetBranch, flavor
+            if targetInfo not in self.currentClonedFrom:
+                return False
+            targetVersion, clonedFrom = self.currentClonedFrom[targetInfo]
+            if not (set([version, trove.troveInfo.clonedFrom()]) & clonedFrom):
+                # either the version we're thinking about cloning is 
+                # in the cloned from field or maybe we're both cloned
+                # from the same place.
+                return False
+
+            if targetVersion != finalTargetVersion:
+                if finalTargetVersion:
+                    # conflict on clone version.
+                    return False
+                finalTargetVersion = targetVersion
+        return finalTargetVersion
+
+    def createSourceVersion(self, sourceTup, targetBranch):
+        name, version, flavor = sourceTup
+        targetBranchVersionList = [x[1] for x in 
+                                   self.branchMap.get((name, targetBranch,   
+                                                      flavor), [])]
+
+        revision = version.trailingRevision().copy()
+        desiredVersion = targetBranch.createVersion(revision).copy()
+        # this could have too many .'s in it
+        if desiredVersion.shadowLength() < revision.shadowCount():
+            # this truncates the dotted version string
+            revision.getSourceCount().truncateShadowCount(
+                                        desiredVersion.shadowLength())
+            desiredVersion = targetBranch.createVersion(revision)
+
+        # the last shadow count is not allowed to be a 0
+        if [ x for x in revision.getSourceCount().iterCounts() ][-1] == 0:
+            desiredVersion.incrementSourceCount()
+
+        while desiredVersion in targetBranchVersionList:
+            desiredVersion.incrementSourceCount()
+
+        return desiredVersion
+
+    def createBinaryVersion(self, repos, binaryList, sourceVersion):
+        flavor = binaryList[0][2]
+        # FIXME we should be able to avoid these repos calls here.
+        return nextVersion(repos, None, [x[0] for x in binaryList], 
+                           sourceVersion, flavor)
+
+class TroveCache(object):
+    def __init__(self, repos):
+        self.troves = {True : {}, False : {}}
+        self.repos = repos
+
+    def add(self, trove):
+        self.troves[trove.getNameVersionFlavor()] = trove
+
+    def getTroves(self, troveTups, withFiles=True, callback=None):
+        theDict = self.troves[withFiles]
+        needed = [ x for x in troveTups if x not in theDict ]
+        troves = self.repos.getTroves(troveTups, withFiles=withFiles,
+                                      callback=callback)
+        self.troves.update(itertools.izip(needed, troves))
+        return [ self.troves[x] for x in troveTups]
+
+    def getTrove(self, troveTup, withFiles=True):
+        return self.getTroves([troveTup], withFiles=True)[0]
+
+class CloneMap(object):
+    def __init__(self, labelMap, primaryTroveList, fullRecurse=True, 
+                 cloneSources=True, updateBuildInfo=True):
+        self.primaryTroveList = primaryTroveList
+        self.labelMap = labelMap
+        self.targetMap = {}
+        self.trovesByTargetBranch = {}
+        self.trovesBySource = {}
+
+        self.cloneSources = cloneSources
+        self.fullRecurse = fullRecurse
+        self.updateBuildInfo = updateBuildInfo
+
+    def getPrimaryTroveList(self):
+        return self.primaryTroveList
+
+    def shouldClone(self, troveTup, sourceName=None):
+        name, version, flavor = troveTup
+        if name.endswith(':source') and self.cloneSources:
+            return True
+        if version.trailingLabel() not in self.labelMap:
+            return False
+        if self.fullRecurse:
+            return True
+        return self._matchesPrimaryTrove(troveTup, sourceName)
+
+    def _matchesPrimaryTrove(self, troveTup, sourceName):
+        name, version, flavor = troveTup
+        if name.endswith(':source'):
+            return (name, version, flavor) in self.primaryTroveList
+        if not sourceName:
+            sourceName = trv.getName().split(':')[0] + ':source'
+        sourcePackage = sourceName.split(':')[0]
+        parentPackage = (sourcePackage, version, flavor)
+        if parentPackage not in self.primaryTroveList:
+            return False
+        return True
+
+    def getTargetLabel(self, version):
+        sourceLabel = version.trailingLabel()
+        if sourceLabel in self.labelMap:
+            return self.labelMap[sourceLabel]
+        return self.labelMap.get(None, None)
+
+    def getTargetBranch(self, version):
+        targetLabel = self.getTargetLabel(version)
+        if targetLabel is None: 
+            return None
+        return version.branch().createSibling(targetLabel)
+
+    def addTrove(self, troveTup, sourceName=None):
+        name, version, flavor = troveTup
+        newBranch = self.getTargetBranch(troveTup[1])
+        if (name, newBranch, flavor) in self.trovesByTargetBranch:
+            if self.trovesByTargetBranch[name, newBranch, flavor] == version:
+                return
+            raise CloneError("Cannot clone multiple troves with name,"
+                             "flavor %s[%s] to branch %s" % (name, flavor, 
+                                                             newBranch))
+        self.trovesByTargetBranch[name, newBranch, flavor] = version
+        if name.endswith(':source'):
+            self.trovesBySource.setdefault((name, version, flavor), [])
+            return
+
+        noFlavor = deps.parseFlavor('')
+        sourceVersion = version.getSourceVersion(False)
+        sourceTup = (sourceName, sourceVersion, noFlavor)
+        self.trovesBySource.setdefault(sourceTup, []).append(troveTup)
+
+        self.trovesByTargetBranch[sourceName, newBranch, noFlavor] = sourceVersion
+
+    def iterSourceTargetBranches(self):
+        for (name, newBranch, flavor), version  \
+           in self.trovesByTargetBranch.iteritems():
+            if name.endswith(':source'):
+                yield (name, version, flavor), newBranch
+
+    def iterBinaryTargetBranches(self):
+        for (name, newBranch, flavor), version  \
+           in self.trovesByTargetBranch.iteritems():
+            if not name.endswith(':source'):
+                yield (name, version, flavor), newBranch
+
+    def getBinaryTrovesBySource(self):
+        return self.trovesBySource.items()
+
+    def target(self, troveTup, newVersion):
+        self.targetMap[troveTup] = newVersion
+
+    def getTargetVersion(self, troveTup):
+        return self.targetMap.get(troveTup, None)
+
+    def couldBePreClone(self, troveTup):
+        info = (troveTup[0], troveTup[1].branch(), troveTup[2])
+        if info in self.trovesByTargetBranch:
+            return True
+        return False
+
+    def fileNeedsRewrite(self, version):
+        targetBranch = self.getTargetBranch(version)
+        return targetBranch and version.branch() != targetBranch
+
+    def troveInfoNeedsRewrite(self, mark, troveTup):
+        targetBranch = self.getTargetBranch(troveTup[1])
+        kind = mark[0]
+        if not targetBranch:
+            return False
+
+        if kind == V_REFTRV:
+            # only rewrite trove info if we're cloning that trove.
+            # otherwise, assume it's correct.
+            if troveTup in self.targetMap:
+                return True
+
+        if targetBranch == troveTup[1].branch():
+            # this means that we're merely pushing this trove to tip
+            # on same branch
+            return False
+        return self.updateBuildInfo
+
+    def hasRewrite(self, troveTup):
+        return troveTup in self.targetMap
+
+class BranchCloneMap(CloneMap):
+    def __init__(self, branchMap, troveList, fullRecurse=True, 
+                 cloneSources=True):
+        CloneMap.__init__(self, {}, troveList, fullRecurse=fullRecurse,
+                          cloneSources=cloneSources)
+        self.branchMap = branchMap
+
+    def shouldClone(self, troveTup, sourceName=None):
+        if troveTup[0].endswith(':source') and self.cloneSources:
+            return True
+        if self.fullRecurse:
+            return True
+        return self._matchesPrimaryTrove(troveTup, sourceName)
+
+    def getTargetLabel(self, version):
+        return self.branchMap[version.branch()].trailingLabel()
+
+    def getTargetBranch(self, version):
+        sourceBranch = version.branch()
+        if sourceBranch in self.branchMap:
+            return self.branchMap[version.branch()]
+        return self.branchMap.get(None, None)
+
 class ClientClone:
 
-    def _getTroveClosure(self, troveList, callback, fullRecurse, cloneSources):
-
-        seen = set()
-        allTroveInfo = set()
-        allTroves = dict()
-        originalSources = set(troveList)
-        toClone = troveList
-        while toClone:
-            needed = []
-
-            for info in toClone:
-                if info[0].startswith("fileset"):
-                    raise CloneError, "File sets cannot be cloned"
-
-                if info not in seen:
-                    needed.append(info)
-                    seen.add(info)
-
-            troves = self.repos.getTroves(needed, withFiles = False, 
-                                          callback = callback)
-            newToClone = []
-            for info, trv in itertools.izip(needed, troves):
-                if not trv.getName().endswith(':source'):
-                    sourceName = trv.getSourceName()
-                    if not sourceName:
-                        sourceName = trv.getName().split(':')[0] + ':source'
-                    if ':' not in trv.getName() and not fullRecurse:
-                        sourcePackage = sourceName.split(':')[0]
-                        parentPackage = (sourcePackage, trv.getVersion(),
-                                         trv.getFlavor())
-                        if parentPackage not in originalSources:
-                            # if we're not recursing, we still want to 
-                            # clone this as long as the parent package is
-                            # the same (this works for groups as well as
-                            # for components)
-                            continue
-
-                    if cloneSources:
-                        sourceTup = (sourceName,
-                                     trv.getVersion().getSourceVersion(False),
-                                     deps.Flavor())
-                        newToClone.append(sourceTup)
-
-                allTroves[info] = trv
-                allTroveInfo.add(info)
-
-                newToClone.extend(trv.iterTroveList(strongRefs=True))
-
-            toClone = newToClone
-        return allTroves, allTroveInfo
-
-
-    def createCloneChangeSet(self, targetBranch, troveList = [],
+    def createCloneChangeSet(self, targetBranch, troveList,
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
                              infoOnly=False, fullRecurse=False,
-                             cloneSources=False, callback=None, trackClone=True):
+                             cloneSources=False, callback=None, 
+                             trackClone=True):
         if callback is None:
             callback = callbacks.CloneCallback()
         callback.determiningCloneTroves()
-
-        # get the transitive closure
-        allTroves, allTroveInfo = self._getTroveClosure(troveList, callback,
-            fullRecurse, cloneSources)
 
         # make sure there are no zeroed timeStamps - targetBranch may be
         # a user-supplied string
         targetBranch = targetBranch.copy()
         targetBranch.resetTimeStamps()
 
-        # split out the binary and sources
-        sourceTroveInfo = [ x for x in allTroveInfo 
-                                    if x[0].endswith(':source') ]
-        binaryTroveInfo = [ x for x in allTroveInfo 
-                                    if not x[0].endswith(':source') ]
+        cloneMap = BranchCloneMap({None:targetBranch}, troveList,
+                                    fullRecurse=fullRecurse,
+                                    cloneSources=cloneSources)
+        return self._createCloneChangeSet(cloneMap, updateBuildInfo,
+                                          message=message,
+                                          infoOnly=infoOnly, callback=callback,
+                                          trackClone=trackClone)
 
-        versionMap = {}        # maps existing info to the version which is
-                               # being cloned by this job, or where that version
-                               # has already been cloned to
-        leafMap = {}           # maps existing info to the info for the latest
-                               # version of that trove on the target branch
-        cloneJob = []          # (info, newVersion) tuples
+    def createSiblingCloneChangeSet(self, labelMap, troveList, 
+                                    updateBuildInfo=True, infoOnly=False,
+                                    callback=None):
+        cloneMap = CloneMap(labelMap, troveList)
+        return self._createCloneChangeSet(cloneMap, updateBuildInfo,
+                                    message=message,
+                                    infoOnly=infoOnly, callback=callback,
+                                    trackClone=trackClone)
 
+    def _createCloneChangeSet(self, cloneMap,
+                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
+                              infoOnly=False, callback=None, 
+                              trackClone=True):
+        if callback is None:
+            callback = callbacks.CloneCallback()
+        callback.determiningCloneTroves()
+        troveCache = TroveCache(self.repos)
+
+        cloneJob = CloneJob(trackClone=trackClone, infoOnly=infoOnly, 
+                            callback=callback)
+        self._determineTrovesToClone(cloneMap, cloneJob, troveCache, callback)
         callback.determiningTargets()
-        # start off by finding new version numbers for the sources
-        for info in sourceTroveInfo:
-            name, version = info[:2]
 
-            try:
-                currentVersionList = self.repos.getTroveVersionsByBranch(
-                    { name : { targetBranch : None } } )[name].keys()
-            except KeyError:
-                currentVersionList = []
-
-            if currentVersionList:
-                currentVersionList.sort()
-                cver = currentVersionList[-1]
-                leafMap[info] = (info[0], cver, info[2])
-
-                # if the latest version of the source trove was cloned from the
-                # version being cloned, we don't need to reclone the source
-                trv = self.repos.getTrove(name, cver, deps.Flavor(),
-                    withFiles = False)
-                clonedFromVer = trv.troveInfo.clonedFrom()
-                if clonedFromVer and clonedFromVer in [version,
-                                allTroves[info].troveInfo.clonedFrom()]:
-                    # The latest version on the target branch was cloned 
-                    # from the same trove the version being cloned was
-                    # cloned from
-                    # make sure None will not match None
-                    versionMap[info] = trv.getVersion()
-
-
-            if info not in versionMap:
-                versionMap[info] = _createSourceVersion(
-                            targetBranch, currentVersionList, version)
-
-                cloneJob.append((info, versionMap[info]))
-
-        # now go through the binaries; sort them into buckets based on the
-        # source trove each came from. we can't clone troves which came
-        # from multiple versions of the same source
-        trovesBySource = {}
-        for info in binaryTroveInfo:
-            trv = allTroves[info]
-            source = trv.getSourceName()
-            # old troves don't have source info
-            assert(source is not None)
-
-            l = trovesBySource.setdefault(trv.getSourceName(), 
-                                   (trv.getVersion().getSourceVersion(False), []))
-            if l[0] != trv.getVersion().getSourceVersion(False):
-                log.error("Clone operation needs multiple versions of %s"
-                            % trv.getSourceName())
-            l[1].append(info)
-            
-        # this could be parallelized -- may not be worth the effort though
-        for srcTroveName, (sourceVersion, infoList) in \
-                                            trovesBySource.iteritems():
-            newSourceVersion = versionMap.get(
-                    (srcTroveName, sourceVersion, deps.Flavor()), None)
-            if newSourceVersion is None:
-                # we're not cloning the source at the same time; try and find
-                # the source version which was used when the source was cloned
-                if targetBranch == sourceVersion.branch():
-                    newSourceVersion = sourceVersion
-                elif (sourceVersion.isShadow()
-                  and not sourceVersion.isModifiedShadow()
-                  and sourceVersion.parentVersion().branch() == targetBranch):
-                    newSourceVersion = sourceVersion.parentVersion()
-                else:
-                    try:
-                        currentVersionList = \
-                            self.repos.getTroveVersionsByBranch(
-                              { srcTroveName : { targetBranch : None } } ) \
-                                        [srcTroveName].keys()
-                    except KeyError:
-                        print "No versions of %s exist on branch %s." \
-                                    % (srcTroveName, targetBranch.asString()) 
-                        return False, None
-                    # Sort the list of versions retrieved from the existing
-                    # branch
-                    currentVersionList.sort()
-
-                    # We are trying to make sure that, if a source exists in
-                    # the target branch (while we are cloning binary only), we
-                    # match it with the source for the binaries in the
-                    # originating branch - it has to be either clonedFrom()
-                    # the one on the originating branch, or clonedFrom() the
-                    # same trove the source trove on the originating branch
-                    # was clonedFrom()
-
-                    # get the trove version for the latest trove on the branch
-                    # we try to clone on
-                    trv = self.repos.getTrove(srcTroveName, 
-                                     currentVersionList[-1],
-                                     deps.Flavor(), withFiles = False)
-
-                    clfrom = trv.troveInfo.clonedFrom()
-                    srctup = (srcTroveName, sourceVersion, deps.Flavor())
-                    if srctup in allTroves:
-                        trvcl = allTroves[trvtup]
-                    else:
-                        # This should not fail, it would mean the upstream
-                        # branch has the binaries but not the sources
-                        trvcl = self.repos.getTrove(srctup[0], srctup[1],
-                                                    srctup[2], withFiles=False)
-                    if clfrom and clfrom in [sourceVersion,
-                                        trvcl.troveInfo.clonedFrom()]:
-                        newSourceVersion = trv.getVersion()
-                    else:
-                        log.error("Cannot find cloned source for %s=%s" %
-                                    (srcTroveName, sourceVersion.asString()))
-                        return False, None
-                    del currentVersionList
-
-            # we know newSourceVersion is right at this point. now find the new
-            # binary version for each flavor
-            byFlavor = dict()
-            for info in infoList:
-                byFlavor.setdefault(info[2], []).append(info)
-
-            for flavor, infoList in byFlavor.iteritems():
-                cloneList, newBinaryVersion = \
-                            _createBinaryVersions(versionMap, leafMap, 
-                                                  self.repos, newSourceVersion, 
-                                                  infoList, allTroves, callback)
-                versionMap.update(
-                    dict((x, newBinaryVersion) for x in cloneList))
-                cloneJob += [ (x, newBinaryVersion) for x in cloneList ]
-                
-        # check versions
-        for info, newVersion in cloneJob:
-            if not _isUphill(info[1], newVersion) and \
-                        not _isSibling(info[1], newVersion):
-                log.error("clone only supports cloning troves to parent "
-                          "and sibling branches")
-                return False, None
-
-        if not cloneJob:
-            log.warning("Nothing to clone!")
+        leafMap = self._getExistingLeaves(cloneMap, troveCache)
+        self._targetSources(cloneMap, cloneJob, leafMap, troveCache)
+        self._targetBinaries(cloneMap, cloneJob, leafMap, troveCache)
+        if cloneJob.isEmpty():
+            log.warning('Nothing to clone!')
             return False, None
 
-        allTroves = self.repos.getTroves([ x[0] for x in cloneJob ])
-
-        self._searchExistingClones(targetBranch, cloneJob, allTroves,
-            allTroveInfo, updateBuildInfo, versionMap, fullRecurse, callback)
-
-
-        callback.rewritingFileVersions()
-
-        cs, newFilesNeeded = self._buildChangeSet(cloneJob, allTroves,
-            allTroveInfo, versionMap, leafMap, trackClone, updateBuildInfo,
-            targetBranch, fullRecurse, infoOnly, callback)
-        # Propagate empty response
+        self._checkNeedsFulfilled(cloneMap, cloneJob, leafMap, troveCache)
+        cs, newFilesNeeded = self._buildChangeSet(cloneMap, cloneJob, leafMap,
+                                                  troveCache)
         if cs is None:
             return False, None
-
         if infoOnly:
             return True, cs
-
         callback.gettingCloneData()
-
         self._addCloneFiles(cs, newFilesNeeded, callback)
         callback.done()
-
         return True, cs
 
-    def _searchExistingClones(self, targetBranch, cloneJob, allTroves,
-                              allTroveInfo, updateBuildInfo, versionMap,
-                              fullRecurse, callback):
-        needDict = {}
-        for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
-            _versionsNeeded(needDict, trv, info[1].branch(), targetBranch,
-                            updateBuildInfo, allTroveInfo, fullRecurse)
+    def _determineTrovesToClone(self, cloneMap, cloneJob, troveCache, callback):
+        seen = set()
+        toClone = cloneMap.getPrimaryTroveList()
+        while toClone:
+            needed = []
 
-        for version in versionMap:
-            if version in needDict:
-                del needDict[version]
+            for info in toClone:
+                if info[0].startswith("fileset"):
+                    raise CloneError("File sets cannot be cloned")
 
-        # needDict is indexed by all of the items which don't have versions
-        # to map to; we need to look at the target branch and see if there
-        # is something good to map to there
+                if info not in seen:
+                    needed.append(info)
+                    seen.add(info)
 
-        # *** BEGIN search for previously existing clones
-        q = {}
-        for info in needDict:
-            brDict = q.setdefault(info[0], {})
-            flList = brDict.setdefault(targetBranch, [])
-            flList.append(info[2])
-
-        currentVersions = self.repos.getTroveLeavesByBranch(q, 
-                                                            bestFlavor = True)
-        matches = []
-        for name, verDict in currentVersions.iteritems():
-            for version, flavorList in verDict.iteritems():
-                matches += [ (name, version, flavor) for flavor in flavorList ]
-        # matches is a (name, version, flavor) list of all the troves that
-        # could be previous clones of the trove we're cloning now.
-        trvs = self.repos.getTroves(matches, withFiles = False, 
-                                    callback = callback)
-        trvDict = dict(((info[0], info[2]), trv) for (info, trv) in
-                            itertools.izip(matches, trvs))
-        # troveDict is a (name, flavor) -> trove mapping of things that
-        # exist on the target branch
-
-        for info in needDict.keys():
-            trv = trvDict.get((info[0], info[2]), None)
-            if trv is None:
-                continue
-            if info[1] in (trv.getVersion(), trv.troveInfo.clonedFrom()):
-                versionMap[info] = trv.getVersion()
-                # There is a trove of the target label that has a clonedFrom()
-                # entry that points to the trove we're trying to clone now.
-                # This clone is a duplicate!
-                del needDict[info]
-        # *** END search for previously existing clones
-        _checkNeedsFulfilled(needDict)
-
-        assert(not needDict)
-
-    def _buildChangeSet(self, cloneJob, allTroves, allTroveInfo, versionMap,
-                        leafMap, trackClone, updateBuildInfo, targetBranch,
-                        fullRecurse, infoOnly, callback):
-        cs = changeset.ChangeSet()
-
-        allFilesNeeded = list()
-
-        for (info, newVersion), trv in itertools.izip(cloneJob, allTroves):
-            assert(newVersion == versionMap[(trv.getName(), trv.getVersion(),
-                                             trv.getFlavor())])
-
-            newVersionHost = newVersion.getHost()
-            sourceBranch = info[1].branch()
-
-            # if this is a clone of a clone, use the original clonedFrom value
-            # so that all clones refer back to the source-of-all-clones trove
-            if trv.troveInfo.clonedFrom() is None and trackClone:
-                trv.troveInfo.clonedFrom.set(trv.getVersion())
-
-            # clone the labelPath 
-            labelPath = list(trv.getLabelPath())
-            labelPath = _computeLabelPath(labelPath,
-                                          trv.getVersion().branch().label(),
-                                          newVersion.branch().label())
-            if labelPath:
-                trv.setLabelPath(labelPath)
-
-            trv.changeVersion(newVersion)
-
-
-            # look through files which aren't already on the right host for
-            # inclusion in the change set (this could include too many)
-            for (pathId, path, fileId, version) in trv.iterFileList():
-                if version.getHost() != newVersionHost:
-                    allFilesNeeded.append((pathId, fileId, version))
-
-            needsNewVersions = []
-            for (mark, src) in _iterAllVersions(trv, updateBuildInfo):
-                if _needsRewrite(sourceBranch, targetBranch, src, mark[0],
-                                 allTroveInfo, fullRecurse):
-                    _updateVersion(trv, mark, versionMap[src])
-
-            for (pathId, path, fileId, version) in trv.iterFileList():
-                if _needsRewrite(sourceBranch, targetBranch, 
-                                 (trv.getName(), version, None), None,
-                                 allTroveInfo, fullRecurse):
-                    needsNewVersions.append((pathId, path, fileId))
-
-            # need to be reversioned
-            if needsNewVersions:
-                if info in leafMap:
-                    oldTrv = self.repos.getTrove(withFiles = True, 
-                                                 *leafMap[info])
-                    fmap = dict(((x[0], x[2]), x[3]) for x in
-                                            oldTrv.iterFileList())
+            troves = troveCache.getTroves(needed, withFiles = False,
+                                          callback = callback)
+            newToClone = []
+            for info, trv in itertools.izip(needed, troves):
+                troveTup = trv.getNameVersionFlavor()
+                if troveTup[0].endswith(':source'):
+                    sourceName = None
                 else:
-                    fmap = {}
+                    sourceName = _getSourceName(trv)
+                if cloneMap.shouldClone(troveTup, sourceName):
+                    cloneMap.addTrove(troveTup, sourceName)
+                    cloneJob.add(troveTup)
+                newToClone.extend(trv.iterTroveList(strongRefs=True))
 
-                for (pathId, path, fileId) in needsNewVersions:
-                    ver = fmap.get((pathId, fileId), newVersion)
-                    trv.updateFile(pathId, path, ver, fileId)
+            toClone = newToClone
 
-            if trv.getName().endswith(':source') and not infoOnly:
-                try:
-                    cl = callback.getCloneChangeLog(trv)
-                except:
-                    log.error(str(cl))
-                    return None, None
+    def _getExistingLeaves(self, cloneMap, troveCache):
+        leafMap = CurrentLeaves()
+        query = []
+        for sourceTup, targetBranch in cloneMap.iterSourceTargetBranches():
+            query.append((sourceTup[0], targetBranch, sourceTup[2]))
 
-                if cl is None:
-                    log.error("no change log message was given"
-                              " for %s." % trv.getName())
-                    return None, None
-                trv.changeChangeLog(cl)
-            # reset the signatures, because all the versions have now
-            # changed, thus invalidating the old sha1 hash
-            trv.troveInfo.sigs.reset()
-            if not infoOnly: # not computing signatures will make sure this 
-                             # doesn't get committed
-                trv.computeSignatures()
+        for binTup, targetBranch in cloneMap.iterBinaryTargetBranches():
+            query.append((binTup[0], targetBranch, binTup[2]))
+        result = self.repos.findTroves(None, query,
+                                       defaultFlavor = deps.parseFlavor(''),
+                                       getLeaves=False, allowMissing=True)
+        if not result:
+            return leafMap
+        leafMap.addLeafResults(result)
+
+        possiblePreClones = []
+        for queryItem, tupList in result.iteritems():
+            tupList = [ x for x in tupList if x[2] == queryItem[2] ]
+            latest = sorted(tupList)[-1]
+            if cloneMap.couldBePreClone(latest):
+                possiblePreClones.append(latest)
+
+        if not possiblePreClones:
+            return leafMap
+
+        troves = troveCache.getTroves(possiblePreClones, withFiles=False)
+        for trove in troves:
+            leafMap.addTrove(trove.getNameVersionFlavor(), 
+                             trove.troveInfo.clonedFrom())
+        return leafMap
+
+    def _targetSources(self, cloneMap, cloneJob, leafMap, troveCache):
+        for sourceTup, targetBranch in cloneMap.iterSourceTargetBranches():
+            sourceTrove = troveCache.getTrove(sourceTup, withFiles=False)
+            newVersion = leafMap.isAlreadyCloned([sourceTrove], targetBranch)
+            if newVersion:
+                cloneMap.target(sourceTup, newVersion)
+                cloneJob.alreadyCloned(sourceTup)
+                continue
+            newVersion = leafMap.createSourceVersion(sourceTup, targetBranch)
+            cloneMap.target(sourceTup, newVersion)
+            if cloneMap.shouldClone(sourceTup):
+                cloneJob.target(sourceTup, newVersion)
+
+    def _checkNeededSources(self, cloneMap, cloneJob, leafMap):
+        for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
+            if cloneMap.getTargetVersion(sourceTup):
+                continue
+            sourceVersion = sourceTup[1]
+            targetBranch = cloneMap.getTargetBranch(sourceTup[1])
+            if targetBranch.isAncestor(sourceVersion.branch()):
+                newVersion = sourceVersion
+                while (newVersion.isShadow() and not newVersion.isModifiedShadow() 
+                       and newVersion.branch() != targetBranch):
+                    newVersion = newVersion.parentVersion()
+                if newVersion.branch() == targetBranch:
+                    cloneMap.target(sourceTup, newVersion)
+                else:
+                    raise CloneIncomplete(('Cannot find source component'
+                                           ' needed for clone of binaries:\n%s',
+                                           '%s=%s[%s]' % x) for x in binaryList)
+
+    def _targetBinaries(self, cloneMap, cloneJob, leafMap, troveCache):
+        self._checkNeededSources(cloneMap, cloneJob, leafMap)
+        for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
+            targetSourceVersion = cloneMap.getTargetVersion(sourceTup)
+            targetBranch = targetSourceVersion.branch()
+
+            byFlavor = {}
+            for binaryTup in binaryList:
+                byFlavor.setdefault(binaryTup[2], []).append(binaryTup)
+
+            for flavor, binaryList in byFlavor.iteritems():
+                # Binary list is a list of binaries all created from the
+                # same cook command.
+                binaryTroves = troveCache.getTroves(binaryList, withFiles=False)
+                newVersion = leafMap.isAlreadyCloned(binaryTroves,
+                                                     targetBranch)
+                if newVersion:
+                    for binaryTup in binaryList:
+                        cloneMap.target(binaryTup, newVersion)
+                        cloneJob.alreadyCloned(binaryTup)
+                else:
+                    newVersion = leafMap.createBinaryVersion(self.repos,
+                                                         binaryList,
+                                                         targetSourceVersion)
+                    for binaryTup in binaryList:
+                        cloneMap.target(binaryTup, newVersion)
+                        cloneJob.target(binaryTup, newVersion)
+
+    def _checkNeedsFulfilled(self, cloneMap, cloneJob, leafMap, troveCache):
+        query = {}
+        neededInfoTroveTups = {}
+
+        for troveTup, newVersion in cloneJob.iterTargetList():
+            for mark, src in _iterAllVersions(troveCache.getTrove(troveTup, withFiles=False)):
+                if (cloneMap.troveInfoNeedsRewrite(mark, src)
+                    and not cloneMap.hasRewrite(src)):
+                    # FIXME: this is slow.  Parallel
+                    neededInfoTroveTups.setdefault(src, []).append(mark)
+        neededTroves = troveCache.getTroves(neededInfoTroveTups, withFiles=False)
+        for trv, troveTup in itertools.izip(neededTroves, neededInfoTroveTups):
+            targetBranch = cloneMap.getTargetBranch(troveTup[1])
+            if leafMap.isAlreadyCloned(trv, targetBranch):
+                continue
+            marks = neededInfoTroveTups[troveTup]
+
+            queryItem = troveTup[0], targetBranch, troveTup[2]
+            if queryItem not in query:
+                query[queryItem] = troveTup, marks
+            query[queryItem][1].extend(marks)
+        results = self.repos.findTroves(None, query, None, bestFlavor=True, 
+                                        allowMissing=True)
+        matches = []
+        for queryItem, tupList in results.iteritems():
+            sourceTup = query[queryItem][0]
+            upstreamVersion = sourceTup[1].trailingRevision().getVersion()
+            for troveTup in tupList:
+                if (troveTup[1].trailingRevision().getVersion() == upstreamVersion
+                    and sourceTup[2] == troveTup[2]):
+                    matches.append(troveTup)
+        troves = troveCache.getTroves(matches, withFiles = False)
+        for trove in troves:
+            leafMap.addTrove(trove.getNameVersionFlavor(), 
+                             trove.troveInfo.clonedFrom())
+        for queryItem, (sourceTup, markList) in query.items():
+            trv = troveCache.getTrove(sourceTup, withFiles=False)
+            newVersion = leafMap.isAlreadyCloned(trv, queryItem[1])
+            if newVersion:
+                cloneMap.target(sourceTup, newVersion)
+                del query[queryItem]
+        if query:
+            raise CloneIncomplete(query.values())
+
+    def _buildChangeSet(self, cloneMap, cloneJob, leafMap, troveCache):
+        allFilesNeeded = []
+        cs = changeset.ReadOnlyChangeSet()
+        allTroveList = [x[0] for x in cloneJob.iterTargetList()]
+        allTroves = troveCache.getTroves(allTroveList, withFiles=True)
+        for troveTup, newVersion in cloneJob.iterTargetList():
+            trv = troveCache.getTrove(troveTup, withFiles=True)
+            newFilesNeeded = self._rewriteTrove(trv, newVersion, cloneMap, 
+                                                cloneJob, leafMap, troveCache)
+            if newFilesNeeded is None:
+                return None, None
+            allFilesNeeded.extend(newFilesNeeded)
             trvCs = trv.diff(None, absolute = True)[0]
             cs.newTrove(trvCs)
-
             if ":" not in trv.getName():
                 cs.addPrimaryTrove(trv.getName(), trv.getVersion(), 
                                    trv.getFlavor())
+        return cs, allFilesNeeded
 
-        # the set() removes duplicates
-        newFilesNeeded = []
-        for (pathId, newFileId, newFileVersion) in set(allFilesNeeded):
+    def _rewriteTrove(self, trv, newVersion, cloneMap, cloneJob, leafMap, troveCache):
+        filesNeeded = []
+        troveName, troveFlavor = trv.getName(), trv.getFlavor()
+        targetBranch = newVersion.branch()
 
-            fileHost = newFileVersion.getHost()
-            # XXX misa 20070215: newVersionHost set in the previous for loop
-            # and used here seems like a bug
-            if fileHost == newVersionHost:
-                # the file is already present in the repository
-                continue
+        needsNewVersions = []
+        # if this is a clone of a clone, use the original clonedFrom value
+        # so that all clones refer back to the source-of-all-clones trove
+        if trv.troveInfo.clonedFrom() is None and cloneJob.trackClone:
+            trv.troveInfo.clonedFrom.set(trv.getVersion())
 
-            newFilesNeeded.append((pathId, newFileId, newFileVersion))
+        # clone the labelPath 
+        labelPath = list(trv.getLabelPath())
+        labelPath = _computeLabelPath(labelPath,
+                                      trv.getVersion().branch().label(),
+                                      newVersion.branch().label())
+        if labelPath:
+            trv.setLabelPath(labelPath)
 
-        return cs, newFilesNeeded
+        trv.changeVersion(newVersion)
+
+        # look through files which aren't already on the right host for
+        # inclusion in the change set
+        newVersionHost = newVersion.trailingLabel().getHost()
+        for (pathId, path, fileId, version) in trv.iterFileList():
+            if version.getHost() != newVersionHost:
+                filesNeeded.append((pathId, fileId, version))
+
+        for mark, src in _iterAllVersions(trv):
+            if cloneMap.troveInfoNeedsRewrite(mark, src):
+                newVersion = cloneMap.getTargetVersion(src)
+                _updateVersion(trv, mark, newVersion)
+
+        for (pathId, path, fileId, version) in trv.iterFileList():
+            if cloneMap.fileNeedsRewrite(version):
+                needsNewVersions.append((pathId, path, fileId))
+
+        # need to be reversioned
+        if needsNewVersions:
+            leafVersion = leafMap.getLeafVersion(troveName, targetBranch, 
+                                                 troveFlavor)
+            if leafVersion:
+                # FIXME: parallelize this
+                oldTrv = troveCache.getTrove((troveName, leafVersion,
+                                              troveFlavor), withFiles = True)
+                # pathId, fileId -> fileVersion map
+                fileMap = dict(((x[0], x[2]), x[3]) for x in
+                                        oldTrv.iterFileList())
+            else:
+                fileMap = {}
+
+            for (pathId, path, fileId) in needsNewVersions:
+                ver = fileMap.get((pathId, fileId), newVersion)
+                trv.updateFile(pathId, path, ver, fileId)
+
+        if trv.getName().endswith(':source') and not cloneJob.infoOnly:
+            try:
+                cl = cloneJob.callback.getCloneChangeLog(trv)
+            except:
+                log.error(str(cl))
+                return None
+
+            if cl is None:
+                log.error("no change log message was given"
+                          " for %s." % trv.getName())
+                return None
+            trv.changeChangeLog(cl)
+        # reset the signatures, because all the versions have now
+        # changed, thus invalidating the old sha1 hash
+        trv.troveInfo.sigs.reset()
+        if not cloneJob.infoOnly: # not computing signatures will 
+                                  # make sure this doesn't get committed
+            trv.computeSignatures()
+
+        return filesNeeded
 
     def _addCloneFiles(self, cs, newFilesNeeded, callback):
+        newFilesNeeded.sort()
         fileObjs = self.repos.getFileVersions(newFilesNeeded)
         contentsNeeded = []
         pathIdsNeeded = []
         fileObjsNeeded = []
-        
         for ((pathId, newFileId, newFileVersion), fileObj) in \
                             itertools.izip(newFilesNeeded, fileObjs):
             (filecs, contentsHash) = changeset.fileChangeSet(pathId, None,
                                                              fileObj)
+
+            print "cs.addFile(%s)" % (sha1helper.sha1ToString(newFileId))
             cs.addFile(None, newFileId, filecs)
             if fileObj.hasContents:
                 contentsNeeded.append((newFileId, newFileVersion))
@@ -454,35 +649,13 @@ class ClientClone:
                 itertools.izip(pathIdsNeeded, contentsNeeded, contents, 
                                fileObjsNeeded):
 
+            print "cs.addFileContents(%s, %s)" % (
+                                        sha1helper.md5ToString(pathId),
+                                        sha1helper.sha1ToString(fileId))
             cs.addFileContents(pathId, fileId, changeset.ChangedFileTypes.file,
                                fileCont, cfgFile = fileObj.flags.isConfig(), 
                                compressed = False)
 
-# if updateBuildInfo is True, rewrite buildreqs and loadedTroves
-# info
-def _createSourceVersion(targetBranch, targetBranchVersionList, 
-                         sourceVersion):
-    # sort oldest to newest
-    revision = sourceVersion.trailingRevision().copy()
-
-    desiredVersion = targetBranch.createVersion(revision)
-    # this could have too many .'s in it
-    if desiredVersion.shadowLength() < revision.shadowCount():
-        # this truncates the dotted version string
-        revision.getSourceCount().truncateShadowCount(
-                                    desiredVersion.shadowLength())
-        desiredVersion = targetBranch.createVersion(revision)
-
-    # the last shadow count is not allowed to be a 0
-    if [ x for x in revision.getSourceCount().iterCounts() ][-1] == 0:
-        desiredVersion.incrementSourceCount()
-
-    versions.VersionFromString(desiredVersion.asString())
-
-    while desiredVersion in targetBranchVersionList:
-        desiredVersion.incrementSourceCount()
-
-    return desiredVersion
 
 def _isUphill(ver, uphill):
     if not isinstance(uphill, versions.Branch):
@@ -500,159 +673,6 @@ def _isUphill(ver, uphill):
             return True
 
     return False
-
-def _isSibling(ver, possibleSibling):
-    if isinstance(ver, versions.Version) and \
-       isinstance(possibleSibling, versions.Version):
-        verBranch = ver.branch()
-        sibBranch = possibleSibling.branch()
-    elif isinstance(ver, versions.Branch) and \
-         isinstance(possibleSibling, versions.Branch):
-        verBranch = ver
-        sibBranch = possibleSibling
-    else:
-        assert(0)
-
-    verHasParent = verBranch.hasParentBranch()
-    sibHasParent = sibBranch.hasParentBranch()
-
-    if verHasParent and sibHasParent:
-        return verBranch.parentBranch() == sibBranch.parentBranch()
-    elif not verHasParent and not sibHasParent:
-        # top level versions are always siblings
-        return True
-
-    return False
-
-def _createBinaryVersions(versionMap, leafMap, repos, srcVersion,
-                          infoList, allTroves, callback):
-    # this works on a single flavor at a time
-    singleFlavor = list(set(x[2] for x in infoList))
-    assert(len(singleFlavor) == 1)
-    singleFlavor = singleFlavor[0]
-
-    srcBranch = srcVersion.branch()
-
-    infoVersionMap = dict(((x[0], x[2]), x[1]) for x in infoList)
-
-    q = {}
-    for name, cloneSourceVersion, flavor in infoList:
-        q[name] = { srcBranch : [ flavor ] }
-
-    currentVersions = repos.getTroveLeavesByBranch(q, bestFlavor = True)
-    dupCheck = {}
-
-    for name, versionDict in currentVersions.iteritems():
-        lastVersion = versionDict.keys()[0]
-        assert(len(versionDict[lastVersion]) == 1)
-        if versionDict[lastVersion][0] != singleFlavor:
-            # This flavor doesn't exist on the branch
-            continue
-
-        leafMap[(name, infoVersionMap[name, singleFlavor], 
-                 singleFlavor)] = (name, lastVersion, singleFlavor)
-        if lastVersion.getSourceVersion(False) == srcVersion:
-            dupCheck[name] = lastVersion
-
-    trvs = repos.getTroves([ (name, version, singleFlavor) for
-                                name, version in dupCheck.iteritems() ],
-                           withFiles = False, callback = callback)
-
-    # version of infoList, keyed by name and flavor
-    # This is ok, because we will never have multiple versions here,
-    # getTroveLeavesByBranch will only get the latest for a (name, flavor)
-    infoMap = dict(((info[0], info[2]), info) for info in infoList)
-
-    clonedVer = None
-    alreadyCloned = []
-
-    for trv in trvs:
-        # XXX This assumes one does not clone multiple troves with the same
-        # (name, version) but different flavors
-        assert(trv.getFlavor() == singleFlavor)
-        name = trv.getName()
-
-        # Grab the trove we're cloning from
-        # This has to exist in infoMap, trvs is a subset of infoList
-        assert (name, singleFlavor) in infoMap
-        trvcltup = infoMap[(name, singleFlavor)]
-        trvcl = allTroves[trvcltup]
-
-        clfrom = trv.troveInfo.clonedFrom()
-        if not clfrom:
-            continue
-
-        if clfrom not in (trvcl.getVersion(), trvcl.troveInfo.clonedFrom()):
-            continue
-
-        # we might not need to reclone this one _if_ 
-        # everything else can end up with this same 
-        # version
-
-        if clonedVer:
-            # we have two+ troves that potentially don't need
-            # to be recloned - make sure they agree on what
-            # the target version should be
-
-            if clonedVer != trv.getVersion():
-                # they're not equal - only allow versions 
-                # to be equal to the latest version
-                if clonedVer < trv.getVersion():
-                    clonedVer = trv.getVersion()
-                    infoMap.update((dict(t[0], t[2]), t) for t in alreadyCloned)
-                    alreadyCloned = []
-                continue
-
-        else:
-            clonedVer = trv.getVersion()
-
-        del infoMap[(name, singleFlavor)]
-        alreadyCloned.append((name, clfrom, singleFlavor))
-
-    if not infoMap:
-        return ([], None)
-    infoList = infoMap.values()
-
-    buildVersion = nextVersion(repos, None,
-                        [ x[0] for x in infoList ], srcVersion, flavor)
-
-    if clonedVer and buildVersion != clonedVer:
-        # oops!  We have foo:runtime at build count 2, but the other
-        # binaries want to be at build count 3 
-        # FIXME: can we just assume that buildVersion > clonedVer
-        infoList.extend(alreadyCloned)
-        buildVersion = nextVersion(repos, None,
-                        [ x[0] for x in infoList ], srcVersion, flavor)
-    else:   
-        for info in alreadyCloned:
-            versionMap[info] = clonedVer
-        
-    return infoList, buildVersion
-
-def _needsRewrite(sourceBranch, targetBranch, infoToCheck, kind,
-                  allTroveInfo, fullRecurse):
-    name, verToCheck, flavor = infoToCheck
-
-    if kind == V_REFTRV:
-        # if fullRecurse is False then we don't want
-        # to pull in extra troves to clone automatically.
-        # otherwise, if this version is for a referenced trove, 
-        # we can be sure that trove is being cloned as well, and so we 
-        # always 
-        # need to rewrite its version.
-        if not fullRecurse and infoToCheck not in allTroveInfo:
-            return False
-        else:
-            return True
-
-    branchToCheck = verToCheck.branch()
-
-    if sourceBranch == targetBranch:
-        return False
-
-    # only rewrite things on the same branch as the source 
-    # we are retargeting.
-    return branchToCheck == sourceBranch
 
 def _iterAllVersions(trv, rewriteTroveInfo=True):
     # return all versions which need rewriting except for file versions
@@ -701,14 +721,6 @@ def _updateVersion(trv, mark, newVersion):
     else:
         assert(0)
 
-def _versionsNeeded(needDict, trv, sourceBranch, targetBranch,
-                    rewriteTroveInfo, allTroveInfo, fullRecurse):
-    for (mark, src) in _iterAllVersions(trv, rewriteTroveInfo):
-        if _needsRewrite(sourceBranch, targetBranch, src, mark[0],
-                         allTroveInfo, fullRecurse):
-            l = needDict.setdefault(src, [])
-            l.append(mark)
-
 def _computeLabelPath(labelPath, oldLabel, newLabel):
     if not labelPath:
         return labelPath
@@ -727,10 +739,11 @@ def _computeLabelPath(labelPath, oldLabel, newLabel):
         labelPath[oldLabelIdx] = newLabel
     return labelPath
 
-def _checkNeedsFulfilled(needs):
-    if not needs: return
-
-    raise CloneIncomplete(needs)
+def _getSourceName(trove):
+    sourceName = trove.getSourceName()
+    if sourceName is None:
+        sourceName = trove.getName().split(':')[0] + ':source'
+    return sourceName
 
 class CloneError(errors.ClientError):
     pass
