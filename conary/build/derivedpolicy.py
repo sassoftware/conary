@@ -188,7 +188,7 @@ class ComponentRequires(packagepolicy.ComponentRequires):
                 if ':' in name:
                     main = name.split(':', 1)[0]
                     if (main in mainSet and
-                        name not in components or not components[name]):
+                        (name not in components or not components[name])):
                         removeDeps.addDep(deps.TroveDependencies, dep)
 
             comp.requires -= removeDeps
