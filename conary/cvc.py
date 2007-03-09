@@ -246,11 +246,11 @@ class PromoteCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
-        args = args[1:]
+        args = args[2:]
         troveSpecs = []
         labelList = []
         for arg in args:
-            if '--' in args:
+            if '--' in arg:
                 labelList.append(arg.split('--', 1))
             else:
                 troveSpecs.append(arg)
@@ -262,11 +262,10 @@ class PromoteCommand(CvcCommand):
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        clone.promoteTroves(cfg, troveSpecs, labelList, not skipBuildInfo,
+        clone.promoteTroves(cfg, troveSpecs, labelList, 
+                            skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test)
 _register(PromoteCommand)
-
-
 
 
 class CommitCommand(CvcCommand):
