@@ -47,6 +47,9 @@ Changes in @NEW@:
       source actions. (CNY-1284)
     * Derived packages (experimental) now inherit byDefault settings from
       the parent (CNY-1401), but can override them in the child (CNY-1283).
+    * Derived packages (experimental) now handle multiple binary packages
+      built from a single source package, including overriding binary
+      package name assignment in the derived package. (CNY-1399)
 
   o Server Changes:
     * Two new calls have been added to the server API -

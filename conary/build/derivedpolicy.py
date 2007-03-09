@@ -53,6 +53,12 @@ class PackageSpec(packagepolicy.PackageSpec):
         for trvCs in self.recipe.cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
 
+            if not trv.isCollection():
+                regexs = [ re.escape(x[1]) for x in trv.iterFileList() ]
+                f = filter.Filter(regexs, self.recipe.macros,
+                                  name = trv.getName().split(':')[0])
+                self.derivedFilters.append(f)
+
             for (pathId, path, fileId, version) in trv.iterFileList():
                 fileCs = self.recipe.cs.getFileChange(None, fileId)
                 self.pathObjs[path] = files.ThawFile(fileCs, pathId)

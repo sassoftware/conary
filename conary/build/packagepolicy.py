@@ -472,6 +472,7 @@ class PackageSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
         self.configFiles = []
+        self.derivedFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
@@ -493,13 +494,19 @@ class PackageSpec(_filterSpec):
             # would have an effect only with exceptions listed, so no warning...
             self.inclusions = None
 
-	for (filteritem) in self.extraFilters:
-	    name = filteritem[0] % self.macros
-            if not trove.troveNameIsValid(name):
-                self.error('%s is not a valid package name', name)
+        # extras need to come before derived so that derived packages
+        # can change the package to which a file is assigned
+        for filteritem in itertools.chain(self.extraFilters,
+                                          self.derivedFilters):
+            if not isinstance(filteritem, filter.Filter):
+                name = filteritem[0] % self.macros
+                if not trove.troveNameIsValid(name):
+                    self.error('%s is not a valid package name', name)
 
-            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
-            self.pkgFilters.append(filter.Filter(*args, **kwargs))
+                args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+                self.pkgFilters.append(filter.Filter(*args, **kwargs))
+            else:
+                self.pkgFilters.append(filteritem)
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	self.pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
