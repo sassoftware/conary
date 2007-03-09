@@ -240,7 +240,7 @@ class GroupRecipe(_BaseGroupRecipe):
                                                         self.getSearchFlavor())
         else:
             return searchsource.createSearchSourceStack(None,
-                                                self.getLabelPath(),
+                                                [self.getLabelPath()],
                                                 self.getSearchFlavor(),
                                                 troveSource=self.troveSource)
 
