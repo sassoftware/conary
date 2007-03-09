@@ -210,9 +210,18 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         log.info('deriving from %s=%s[%s]', self.name, parentVersion,
                  parentFlavor)
 
-        self.cs = self.repos.createChangeSet(
-                [ (self.name, (None, None),
-                  (parentVersion, parentFlavor), True) ], recurse = True )
+        # Fetch all binaries built from this source
+        binaries = self.repos.getTrovesBySource(self.name + ':source',
+                parentVersion.getSourceVersion())
+
+        # Filter out older ones
+        binaries = [ x for x in binaries if x[1] == parentVersion ]
+
+        # Build trove spec
+        troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
+                        for x in binaries ]
+
+        self.cs = self.repos.createChangeSet(troveSpec, recurse = False)
         self.addLoadedTroves([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
             in self.cs.iterNewTroveList() ])
