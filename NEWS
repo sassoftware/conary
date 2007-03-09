@@ -16,6 +16,7 @@ Changes in @NEW@:
       ones. (CNY-1312)
     * The Conary client API now has a new call, iterRollbacksList(), iterating
       over the rollback name and object. (CNY-1390)
+    * Added --just-db to rollback command (CNY-1398)
 
   o Build Changes:
     * A list of rPath mirrors for source components has been added.

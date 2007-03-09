@@ -1262,7 +1262,8 @@ class Database(SqlDbRepository):
         return Rollback(dir, load = True)
 
     def applyRollbackList(self, repos, names, replaceFiles = False,
-                          callback = UpdateCallback(), tagScript = None):
+                          callback = UpdateCallback(), tagScript = None,
+                          justDatabase = False):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -1336,7 +1337,8 @@ class Database(SqlDbRepository):
                                              replaceFiles = replaceFiles,
                                              removeHints = removalHints,
                                              callback = callback,
-                                             tagScript = tagScript)
+                                             tagScript = tagScript,
+                                             justDatabase = justDatabase)
 
                     if not localCs.isEmpty():
                         itemCount += 1
@@ -1347,7 +1349,8 @@ class Database(SqlDbRepository):
                                              updateDatabase = False,
                                              replaceFiles = replaceFiles,
                                              callback = callback,
-                                             tagScript = tagScript)
+                                             tagScript = tagScript,
+                                             justDatabase = justDatabase)
 
                     rb.removeLast()
                 except CommitError, err:
