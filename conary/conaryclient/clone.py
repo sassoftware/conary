@@ -16,6 +16,7 @@ import itertools
 from conary import callbacks
 from conary import changelog
 from conary import errors
+from conary import trove
 from conary import versions
 from conary.build.nextversion import nextVersion
 from conary.deps import deps
@@ -144,18 +145,16 @@ class CurrentLeaves(object):
                            sourceVersion, flavor)
 
 class TroveCache(object):
-    def __init__(self, repos):
+    def __init__(self, repos, callback):
         self.troves = {True : {}, False : {}}
         self.repos = repos
+        self.callback = callback
 
-    def add(self, trove):
-        self.troves[trove.getNameVersionFlavor()] = trove
-
-    def getTroves(self, troveTups, withFiles=True, callback=None):
+    def getTroves(self, troveTups, withFiles=True):
         theDict = self.troves[withFiles]
         needed = [ x for x in troveTups if x not in theDict ]
         troves = self.repos.getTroves(troveTups, withFiles=withFiles,
-                                      callback=callback)
+                                      callback=self.callback)
         self.troves.update(itertools.izip(needed, troves))
         return [ self.troves[x] for x in troveTups]
 
@@ -170,6 +169,7 @@ class CloneMap(object):
         self.targetMap = {}
         self.trovesByTargetBranch = {}
         self.trovesBySource = {}
+        self.byDefaultMap = None
 
         self.cloneSources = cloneSources
         self.fullRecurse = fullRecurse
@@ -178,11 +178,25 @@ class CloneMap(object):
     def getPrimaryTroveList(self):
         return self.primaryTroveList
 
+    def getCloneTargetLabelsForLabel(self, label):
+        matches = set()
+        for troveTup, newVersion in self.targetMap.iteritems():
+            if troveTup[1].trailingLabel() == label:
+                matches.add(newVersion.trailingLabel())
+        return matches
+
+    def setByDefaultMap(self, map):
+        self.byDefaultMap = map
+
     def shouldClone(self, troveTup, sourceName=None):
         name, version, flavor = troveTup
+        if self.byDefaultMap is not None:
+            if troveTup not in self.byDefaultMap:
+                return False
         if name.endswith(':source') and self.cloneSources:
             return True
-        if version.trailingLabel() not in self.labelMap:
+        if (version.trailingLabel() not in self.labelMap
+            and None not in self.labelMap):
             return False
         if self.fullRecurse:
             return True
@@ -200,14 +214,12 @@ class CloneMap(object):
             return False
         return True
 
-    def getTargetLabel(self, version):
+    def getTargetBranch(self, version):
         sourceLabel = version.trailingLabel()
         if sourceLabel in self.labelMap:
-            return self.labelMap[sourceLabel]
-        return self.labelMap.get(None, None)
-
-    def getTargetBranch(self, version):
-        targetLabel = self.getTargetLabel(version)
+            targetLabel = self.labelMap[sourceLabel]
+        else:
+            targetLabel = self.labelMap.get(None, None)
         if targetLabel is None: 
             return None
         return version.branch().createSibling(targetLabel)
@@ -218,9 +230,9 @@ class CloneMap(object):
         if (name, newBranch, flavor) in self.trovesByTargetBranch:
             if self.trovesByTargetBranch[name, newBranch, flavor] == version:
                 return
-            raise CloneError("Cannot clone multiple troves with name,"
-                             "flavor %s[%s] to branch %s" % (name, flavor, 
-                                                             newBranch))
+            raise CloneError("Cannot clone multiple troves with same name and"
+                             " flavor to branch %s: %s[%s]" % (newBranch,
+                                                               name, flavor))
         self.trovesByTargetBranch[name, newBranch, flavor] = version
         if name.endswith(':source'):
             self.trovesBySource.setdefault((name, version, flavor), [])
@@ -229,8 +241,9 @@ class CloneMap(object):
         noFlavor = deps.parseFlavor('')
         sourceVersion = version.getSourceVersion(False)
         sourceTup = (sourceName, sourceVersion, noFlavor)
+        if self.byDefaultMap is not None:
+            self.byDefaultMap[sourceTup] = True
         self.trovesBySource.setdefault(sourceTup, []).append(troveTup)
-
         self.trovesByTargetBranch[sourceName, newBranch, noFlavor] = sourceVersion
 
     def iterSourceTargetBranches(self):
@@ -269,10 +282,22 @@ class CloneMap(object):
         targetBranch = self.getTargetBranch(version)
         return targetBranch and version.branch() != targetBranch
 
+    def troveInfoNeedsErase(self, mark, troveTup):
+        kind = mark[0]
+        if kind != V_REFTRV:
+            # we only erase trove references - all other types 
+            # just let remain with their old, uncloned values.
+            # This could change.
+            return False
+        return (self.byDefaultMap is not None 
+                and troveTup not in self.byDefaultMap)
+
     def troveInfoNeedsRewrite(self, mark, troveTup):
         targetBranch = self.getTargetBranch(troveTup[1])
         kind = mark[0]
         if not targetBranch:
+            return False
+        if self.byDefaultMap is not None and troveTup not in self.byDefaultMap:
             return False
 
         if kind == V_REFTRV:
@@ -290,21 +315,24 @@ class CloneMap(object):
         return troveTup in self.targetMap
 
 class BranchCloneMap(CloneMap):
-    def __init__(self, branchMap, troveList, fullRecurse=True, 
+    def __init__(self, branchMap, troveList, fullRecurse=True,
                  cloneSources=True):
         CloneMap.__init__(self, {}, troveList, fullRecurse=fullRecurse,
                           cloneSources=cloneSources)
         self.branchMap = branchMap
 
     def shouldClone(self, troveTup, sourceName=None):
+        # FIXME: this needs to share more with CloneMap.
+        name, version, flavor = troveTup
+        if self.byDefaultMap is not None:
+            if troveTup not in self.byDefaultMap:
+                return False
+
         if troveTup[0].endswith(':source') and self.cloneSources:
             return True
         if self.fullRecurse:
             return True
         return self._matchesPrimaryTrove(troveTup, sourceName)
-
-    def getTargetLabel(self, version):
-        return self.branchMap[version.branch()].trailingLabel()
 
     def getTargetBranch(self, version):
         sourceBranch = version.branch()
@@ -336,27 +364,32 @@ class ClientClone:
                                           infoOnly=infoOnly, callback=callback,
                                           trackClone=trackClone)
 
-    def createSiblingCloneChangeSet(self, labelMap, troveList, 
+    def createSiblingCloneChangeSet(self, labelMap, troveList,
                                     updateBuildInfo=True, infoOnly=False,
-                                    callback=None):
+                                    callback=None, message=DEFAULT_MESSAGE,
+                                    trackClone=True,
+                                    cloneOnlyByDefaultTroves=False):
         cloneMap = CloneMap(labelMap, troveList)
         return self._createCloneChangeSet(cloneMap, updateBuildInfo,
-                                    message=message,
-                                    infoOnly=infoOnly, callback=callback,
-                                    trackClone=trackClone)
+                            message=message,
+                            infoOnly=infoOnly, callback=callback,
+                            trackClone=trackClone,
+                            cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves)
 
     def _createCloneChangeSet(self, cloneMap,
                               updateBuildInfo=True, message=DEFAULT_MESSAGE,
                               infoOnly=False, callback=None, 
-                              trackClone=True):
+                              trackClone=True, cloneOnlyByDefaultTroves=False):
         if callback is None:
             callback = callbacks.CloneCallback()
         callback.determiningCloneTroves()
-        troveCache = TroveCache(self.repos)
+        troveCache = TroveCache(self.repos, callback)
 
-        cloneJob = CloneJob(trackClone=trackClone, infoOnly=infoOnly, 
+        cloneJob = CloneJob(trackClone=trackClone, infoOnly=infoOnly,
                             callback=callback)
-        self._determineTrovesToClone(cloneMap, cloneJob, troveCache, callback)
+        if cloneOnlyByDefaultTroves:
+            self._setByDefaultMap(cloneMap, troveCache)
+        self._determineTrovesToClone(cloneMap, cloneJob, troveCache)
         callback.determiningTargets()
 
         leafMap = self._getExistingLeaves(cloneMap, troveCache)
@@ -378,7 +411,19 @@ class ClientClone:
         callback.done()
         return True, cs
 
-    def _determineTrovesToClone(self, cloneMap, cloneJob, troveCache, callback):
+    def _setByDefaultMap(self, cloneMap, troveCache):
+        primaries = cloneMap.getPrimaryTroveList()
+        troves = troveCache.getTroves(primaries, withFiles = False)
+        byDefaultDict = dict.fromkeys(primaries, True)
+        for trove in troves:
+            # add all the troves that are byDefault True.
+            # byDefault False ones we don't need to have in the dict.
+            defaults = ((x[0], x[1]) for x in 
+                        trove.iterTroveListInfo() if x[1])
+            byDefaultDict.update(defaults)
+        cloneMap.setByDefaultMap(byDefaultDict)
+
+    def _determineTrovesToClone(self, cloneMap, cloneJob, troveCache):
         seen = set()
         toClone = cloneMap.getPrimaryTroveList()
         while toClone:
@@ -392,8 +437,7 @@ class ClientClone:
                     needed.append(info)
                     seen.add(info)
 
-            troves = troveCache.getTroves(needed, withFiles = False,
-                                          callback = callback)
+            troves = troveCache.getTroves(needed, withFiles = False)
             newToClone = []
             for info, trv in itertools.izip(needed, troves):
                 troveTup = trv.getNameVersionFlavor()
@@ -440,8 +484,9 @@ class ClientClone:
         return leafMap
 
     def _targetSources(self, cloneMap, cloneJob, leafMap, troveCache):
-        hasTroves = self.repos.hasTroves([x[0] for x in cloneMap.iterSourceTargetBranches()])
-        troveCache.getTroves([x[0] for x in hasTroves.items() if x[1])
+        hasTroves = self.repos.hasTroves(
+                            [x[0] for x in cloneMap.iterSourceTargetBranches()])
+        troveCache.getTroves([x[0] for x in hasTroves.items() if x[1]])
         for sourceTup, targetBranch in cloneMap.iterSourceTargetBranches():
             if hasTroves[sourceTup]:
                 sourceTrove = troveCache.getTrove(sourceTup, withFiles=False)
@@ -450,11 +495,13 @@ class ClientClone:
                     cloneMap.target(sourceTup, newVersion)
                     cloneJob.alreadyCloned(sourceTup)
                 elif cloneMap.shouldClone(sourceTup):
-                    newVersion = leafMap.createSourceVersion(sourceTup, targetBranch)
+                    newVersion = leafMap.createSourceVersion(sourceTup,
+                                                             targetBranch)
                     cloneMap.target(sourceTup, newVersion)
                     cloneJob.target(sourceTup, newVersion)
                 else:
-                    newVersion = leafMap.hasAncestor(sourceTup, targetBranch, self.repos)
+                    newVersion = leafMap.hasAncestor(sourceTup, targetBranch,
+                                                     self.repos)
                     if newVersion:
                         cloneMap.target(sourceTup, newVersion)
                         cloneJob.alreadyCloned(sourceTup)
@@ -469,8 +516,9 @@ class ClientClone:
                     cloneMap.target(sourceTup, newVersion)
                     cloneJob.alreadyCloned(sourceTup)
                 else:
-                    # The source trove is not available to clone and either this is not
-                    # an uphill trove or the source is not available on the uphill label.
+                    # The source trove is not available to clone and either 
+                    # this is not an uphill trove or the source is not 
+                    # available on the uphill label.
                     raise CloneError("Cannot find required source %s on branch %s." \
                                      % (sourceTup[0], targetBranch))
 
@@ -506,10 +554,10 @@ class ClientClone:
         neededInfoTroveTups = {}
 
         for troveTup, newVersion in cloneJob.iterTargetList():
-            for mark, src in _iterAllVersions(troveCache.getTrove(troveTup, withFiles=False)):
+            for mark, src in _iterAllVersions(
+                                troveCache.getTrove(troveTup, withFiles=False)):
                 if (cloneMap.troveInfoNeedsRewrite(mark, src)
                     and not cloneMap.hasRewrite(src)):
-                    # FIXME: this is slow.  Parallel
                     neededInfoTroveTups.setdefault(src, []).append(mark)
         neededTroves = troveCache.getTroves(neededInfoTroveTups, withFiles=False)
         for trv, troveTup in itertools.izip(neededTroves, neededInfoTroveTups):
@@ -560,14 +608,21 @@ class ClientClone:
             if newFilesNeeded is None:
                 return None, None
             allFilesNeeded.extend(newFilesNeeded)
+            # make sure we haven't deleted all the child troves from 
+            # a group.  This could happen, for example, if a group 
+            # contains all byDefault False components.
+            if trove.troveIsCollection(troveTup[0]):
+                if not list(trv.iterTroveList(strongRefs=True)):
+                    raise CloneError("Clone would result in empty collection %s=%s[%s]" % (troveTup))
             trvCs = trv.diff(None, absolute = True)[0]
             cs.newTrove(trvCs)
             if ":" not in trv.getName():
-                cs.addPrimaryTrove(trv.getName(), trv.getVersion(), 
+                cs.addPrimaryTrove(trv.getName(), trv.getVersion(),
                                    trv.getFlavor())
         return cs, allFilesNeeded
 
-    def _rewriteTrove(self, trv, newVersion, cloneMap, cloneJob, leafMap, troveCache):
+    def _rewriteTrove(self, trv, newVersion, cloneMap, 
+                      cloneJob, leafMap, troveCache):
         filesNeeded = []
         troveName, troveFlavor = trv.getName(), trv.getFlavor()
         targetBranch = newVersion.branch()
@@ -580,9 +635,9 @@ class ClientClone:
 
         # clone the labelPath 
         labelPath = list(trv.getLabelPath())
-        labelPath = _computeLabelPath(labelPath,
-                                      trv.getVersion().branch().label(),
-                                      newVersion.branch().label())
+        labelPathMap = [(x, cloneMap.getCloneTargetLabelsForLabel(x))
+                         for x in labelPath]
+        labelPath = _computeLabelPath(trv.getName(), labelPathMap)
         if labelPath:
             trv.setLabelPath(labelPath)
 
@@ -599,6 +654,8 @@ class ClientClone:
             if cloneMap.troveInfoNeedsRewrite(mark, src):
                 newVersion = cloneMap.getTargetVersion(src)
                 _updateVersion(trv, mark, newVersion)
+            elif cloneMap.troveInfoNeedsErase(mark, src):
+                _updateVersion(trv, mark, None)
 
         for (pathId, path, fileId, version) in trv.iterFileList():
             if cloneMap.fileNeedsRewrite(version):
@@ -696,44 +753,49 @@ def _iterAllVersions(trv, rewriteTroveInfo=True):
         yield ((V_REFTRV, troveInfo), troveInfo)
 
 def _updateVersion(trv, mark, newVersion):
+    """ 
+        Update version for some piece of troveInfo.  If newVersion is None, 
+        just erase this version.
+    """
     kind = mark[0]
 
     if kind == V_LOADED:
         trv.troveInfo.loadedTroves.remove(mark[1])
-        trv.troveInfo.loadedTroves.add(mark[1].name(), newVersion,
-                                       mark[1].flavor())
+        if newVersion:
+            trv.troveInfo.loadedTroves.add(mark[1].name(), newVersion,
+                                           mark[1].flavor())
     elif kind == V_BREQ:
         trv.troveInfo.buildReqs.remove(mark[1])
-        trv.troveInfo.buildReqs.add(mark[1].name(), newVersion,
-                                    mark[1].flavor())
+        if newVersion:
+            trv.troveInfo.buildReqs.add(mark[1].name(), newVersion,
+                                        mark[1].flavor())
     elif kind == V_REFTRV:
         (name, oldVersion, flavor) = mark[1]
-        byDefault = trv.includeTroveByDefault(name, oldVersion, flavor)
         isStrong = trv.isStrongReference(name, oldVersion, flavor)
+        byDefault = trv.includeTroveByDefault(name, oldVersion, flavor)
         trv.delTrove(name, oldVersion, flavor, False, 
                                                weakRef = not isStrong)
-        trv.addTrove(name, newVersion, flavor, byDefault = byDefault,
-                                               weakRef = not isStrong)
+        if newVersion:
+            trv.addTrove(name, newVersion, flavor, byDefault = byDefault,
+                                                   weakRef = not isStrong)
     else:
         assert(0)
 
-def _computeLabelPath(labelPath, oldLabel, newLabel):
-    if not labelPath:
-        return labelPath
-    if oldLabel not in labelPath:
-        return labelPath
-
-    oldLabelIdx = labelPath.index(oldLabel)
-    if newLabel in labelPath:
-        newLabelIdx = labelPath.index(newLabel)
-        if oldLabelIdx > newLabelIdx:
-            del labelPath[oldLabelIdx]
+def _computeLabelPath(name, labelPathMap):
+    newLabelPath = []
+    for label, newLabels in labelPathMap:
+        if len(newLabels) > 1:
+            raise CloneError("Multiple clone targets for label %s"
+                             " - cannot build labelPath for %s" % (label, name))
+        elif newLabels:
+            newLabel = newLabels.pop()
         else:
-            labelPath[oldLabelIdx] = newLabel
-            del labelPath[newLabelIdx]
-    else:
-        labelPath[oldLabelIdx] = newLabel
-    return labelPath
+            newLabel = label
+        if newLabel in newLabelPath:
+            # don't allow duplicates
+            continue
+        newLabelPath.append(newLabel)
+    return newLabelPath
 
 def _getSourceName(trove):
     sourceName = trove.getSourceName()
