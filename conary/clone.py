@@ -97,8 +97,11 @@ def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False):
     labelMap = {}
     for fromLabel, toLabel in labelList:
-        fromLabel = _convertLabel(fromLabel, cfg.buildLabel)
-        toLabel = _convertLabel(toLabel, fromLabel)
+        context = cfg.buildLabel
+        fromLabel = _convertLabel(fromLabel, context)
+        if fromLabel is not None:
+            context = fromLabel
+        toLabel = _convertLabel(toLabel, context)
         labelMap[fromLabel] = toLabel
 
     troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
