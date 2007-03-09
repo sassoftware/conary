@@ -1535,6 +1535,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     recurse, withFiles, withFileContents, excludeAutoSource):
 
         def _troveFp(troveInfo, sig):
+            if not sig:
+                return "otherrepo"
+
             (present, sigBlock) = sig
             if present >= 1:
                 return (base64.decodestring(sigBlock), )
@@ -1625,11 +1628,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for fullJob in newJobList:
             for job in fullJob:
                 if job[1][0]:
-                    sigItems.append((job[0], job[1][0], job[1][1]))
-                sigItems.append((job[0], job[2][0], job[2][1]))
+                    version = versions.VersionFromString(job[1][0])
+                    if version.trailingLabel().getHost() in self.serverNameList:
+                        sigItems.append((job[0], job[1][0], job[1][1]))
+                    else:
+                        sigItems.append(None)
 
-        sigList = self.getTroveInfo(authToken, clientVersion,
-                                    trove._TROVEINFO_TAG_SIGS, sigItems)
+                version = versions.VersionFromString(job[2][0])
+                if version.trailingLabel().getHost() in self.serverNameList:
+                    sigItems.append((job[0], job[2][0], job[2][1]))
+                else:
+                    sigItems.append(None)
+
+        pureSigList = self.getTroveInfo(authToken, clientVersion,
+                                        trove._TROVEINFO_TAG_SIGS,
+                                        [ x for x in sigItems if x ])
+        sigList = []
+        sigCount = 0
+        for item in sigItems:
+            if not item:
+                sigList.append(None)
+            else:
+                sigList.append(pureSigList[sigCount])
+                sigCount += 1
 
         # 0 is a version number for this signature block; changing this will
         # invalidate all change set signatures downstream
