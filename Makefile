@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 1.1.17
+export VERSION = 1.1.18
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
