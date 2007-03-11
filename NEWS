@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Added cvc promote command. (CNY-1304)
+    * Added interface (but no command line option) for performing
+      partial clones, where only some components out of a package
+      are cloned based on byDefault settings. (CNY-1389)
+
 Changes in 1.1.18:
   o Major Changes:
     * Changesets are now indexed by a pathId,fileId combination instead of

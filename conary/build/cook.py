@@ -191,6 +191,21 @@ def signAbsoluteChangeset(cs, fingerprint=None):
         cs.newTrove(newTroveCs)
     return cs
 
+def signAbsoluteChangesetByConfig(cs, cfg):
+    for troveCs in [ x for x in cs.iterNewTroveList() ]:
+        # instantiate each trove from the troveCs so we can generate
+        # the signature
+        t = trove.Trove(troveCs)
+        fingerprint = selectSignatureKey(cfg,
+                                         str(t.getVersion().trailingLabel()))
+        _signTrove(t, fingerprint)
+        # create a new troveCs that has the new signature included in it
+        newTroveCs = t.diff(None, absolute = 1)[0]
+        # replace the old troveCs with the new one in the changeset
+        cs.newTrove(newTroveCs)
+    return cs
+
+
 def getRecursiveRequirements(db, troveList, flavorPath):
     # gets the recursive requirements for the listed packages
     seen = set()

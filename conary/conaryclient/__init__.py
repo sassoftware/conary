@@ -22,6 +22,8 @@ from conary.lib import log, util
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import trovesource
+from conary.repository import searchsource
+from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
@@ -410,3 +412,10 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if not foundPrevious and troveConflict:
                 conflicts.append(troveConflict)
         return conflicts
+
+    def getSearchSource(self):
+        searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
+        return searchsource.NetworkSearchSource(self.getRepos(),
+                        self.cfg.installLabelPath,
+                        self.cfg.flavor, self.db,
+                        resolveSearchMethod=searchMethod)

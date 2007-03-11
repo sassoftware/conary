@@ -2460,6 +2460,9 @@ class TroveChangeSet(AbstractTroveChangeSet):
             self.oldSigs.thaw(oldSigs.freeze())
         self.newSigs.thaw(newSigs.freeze())
 
+    def __repr__(self):
+        return "conary.trove.TroveChangeSet('%s')" % self.name()
+
 class ThawTroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, buf):
