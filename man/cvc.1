@@ -242,6 +242,40 @@ into the shadow.
 If <revision> is specified, changes made to the upstream branch up to that 
 revision will be made.  Revision may be specified as either as the upstream version or the <upstream version>-<source count>.  For convenience when cutting and pasting, a full version is accepted, but the full version must be on correct parent branch.
 .TP
+.B promote [\fIpackage/groupname\fP[=\fIversion\fP][\fI<flavor>\fP]]+ [\fIfromLabel\fP--\fItoLabel\fP]+
+Clones (copies) a set of packages from one set of labels to another.
+
+If a group is specified, then the group will be searched through for packages that start on a fromLabel, and all such packages will be cloned to the matching
+toLabel.  If a package is specified and it matches a from label, then it will be cloned to the matching toLabel.
+
+Sources are always cloned with binaries.  
+
+
+Clones a trove from one repository to another. This is similar to shadowing in
+that it creates a new trove with information from another. However, unlike
+shadowing, cloning will not create a new label on the target branch and it is
+not possible to merge changes (see "merge" later in this document) with clone.
+The commit will appear to originate from the individual who last committed the
+trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
+name. See the \fBExamples\fP section for more information.
+.RS 4
+.B \-\-with-sources
+Automatically clone the source for every package you are cloning.  So, for example, if you are cloning package foo from /localhost@rpl:1 to /localhost@rpl:conary, foo:source would be cloned as well if necessary.  Note that 
+.TP
+.B \-\-info, \-i
+Determine the packages and groups that would be created by the clone and display that information, without actually cloning.
+.TP 4
+.B \-\-message MESSAGE
+Allows you to specify the message to be given for source components.  If several source components are being cloned at the same time, the same message will be used for all of them if specified here.
+.TP
+.B \-\-skip-build-info
+Normally, cvc tried to rewrite any build information stored with the trove, such as what build requirements were used to build it, from the source branch to the target branch if necessary.  If this is not possible, cvc will exit with an error.  If this flag is given, cvc does not try to rewrite build information.
+.TP
+.B \-\-test
+Go through the entire process of creating the clone changeset, but do not commit it to the repository.
+.RE
+.TP
+
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
 source directory.  It creates a diff between two versions of

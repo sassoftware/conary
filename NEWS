@@ -91,6 +91,10 @@ Changes in 1.1.17:
       for idle connections. (CNY-1045)
     * The error message produced by Conary when a progress callback
       method raises an unhandled exception has been improved.
+    * Added cvc promote command. (CNY-1304)
+    * Added interface (but no command line option) for performing
+      partial clones, where only some components out of a package
+      are cloned based on byDefault settings. (CNY-1389)
 
   o Build Changes:
     * cvc cook --show-buildreqs works properly now.  Thanks to Pavel
