@@ -231,10 +231,15 @@ class PromoteCommand(CvcCommand):
     commandGroup = 'Repository Access'
     hidden = True
     docs = { 'info'            : 'Do not perform promotion',
+
+             'skip-build-info' : ('Do not attempt to rewrite version'
+                                 ' information about how this trove was built'),
              'message'         : ('Use MESSAGE for the changelog entry for'
                                   ' all cloned sources'),
              'test'            : ('Runs through all the steps of committing'
-                                  ' but does not modify the repository')
+                                  ' but does not modify the repository'),
+             'with-sources'    : ('Ensure that any binaries that are being'
+                                 ' cloned also have a matching source component'),
            }
 
     def addParameters(self, argDef):
@@ -243,6 +248,7 @@ class PromoteCommand(CvcCommand):
         argDef["info"] = '-i', NO_PARAM
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
+        argDef["with-sources"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -262,9 +268,11 @@ class PromoteCommand(CvcCommand):
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        clone.promoteTroves(cfg, troveSpecs, labelList, 
+        cloneSources = argSet.pop("with-sources", False)
+        clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
-                            info = info, message = message, test = test)
+                            info = info, message = message, test = test,
+                            cloneSources=cloneSources)
 _register(PromoteCommand)
 
 
