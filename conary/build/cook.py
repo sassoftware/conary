@@ -568,9 +568,15 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     for recipeClass in recipeClasses:
         fullName = recipeClass.name
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
+        use.resetUsed()
+        use.clearLocalFlags()
         use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
+        use.setBuildFlagsFromFlavor(recipeClass.name, recipeClass._localFlavor)
         recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                                 buildFlavor, macros)
+
+        if recipeObj._trackedFlags is not None:
+            use.setUsed(recipeObj._trackedFlags)
         use.track(True)
         _callSetup(cfg, recipeObj)
         use.track(False)
@@ -1475,10 +1481,12 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     recipeClassDict = {}
     loaders = []
     for flavor in flavorList:
+        use.clearLocalFlags()
         if flavor is not None:
             buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
         else:
             buildFlavor = cfg.buildFlavor
+
 
         if name.endswith('.recipe') and os.path.isfile(name):
             if versionStr:
@@ -1593,8 +1601,9 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
     items = {}
     for idx, item in enumerate(args):
         (name, version, flavor) = parseTroveSpec(item)
-        l = items.setdefault((name, version), (idx, set()))
-        l[1].add(flavor)
+        l = items.setdefault((name, version), (idx, []))
+        if flavor not in l[1]:
+            l[1].append(flavor)
     finalItems = []
     items = sorted(items.iteritems(), key=lambda x: x[1][0])
 
