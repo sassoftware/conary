@@ -805,9 +805,6 @@ class PathIdsConflictError(ChangeSetKeyConflictError):
 
 class ReadOnlyChangeSet(ChangeSet):
 
-    def addFile(self, *args, **kw):
-        raise NotImplementedError
-
     def addFileContents(self, *args, **kw):
         raise NotImplementedError
 
