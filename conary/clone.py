@@ -93,8 +93,9 @@ def _convertLabel(lblStr, template):
         raise errors.ParseError('Error parsing %r: %s' % (lblStr, msg))
 
 def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
-                  info=False, message=None, test=False, 
-                  ignoreConflicts=False, cloneOnlyByDefaultTroves=False):
+                  info=False, message=None, test=False,
+                  ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
+                  cloneSources = False):
     labelMap = {}
     for fromLabel, toLabel in labelList:
         context = cfg.buildLabel
@@ -119,7 +120,8 @@ def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
                            labelMap, trovesToClone,
                            updateBuildInfo=not skipBuildInfo,
                            infoOnly=info, callback=callback,
-                           cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves)
+                           cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
+                           cloneSources=cloneSources)
     if not okay:
         return False
     return _finishClone(client, cfg, cs, callback, info=info,
