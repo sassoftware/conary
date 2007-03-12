@@ -228,9 +228,15 @@ class CacheSet:
             ret = _flavCache.get(frozenFlavor, False)
             if ret is not False:
                 return ret
-            cu.execute("select flavorId from Flavors where flavor=?",
-                       frozenFlavor)
-            ret = cu.fetchall()
+            if frozenFlavor == '':
+                # short circuit: the empty flavor is always flavorId 0
+                # cu.execute("select flavorId from Flavors where flavor is NULL")
+                ret = [[0]]
+            else:
+                cu.execute("select flavorId from Flavors where flavor=?",
+                           frozenFlavor)
+                ret = cu.fetchall()
+
             if not ret:
                 ret = None
             else:
