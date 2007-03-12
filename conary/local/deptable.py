@@ -17,8 +17,6 @@ from conary.deps import deps
 from conary.lib import graph
 from conary.local import schema
 
-from conary.repository.netrepos import versionops
-
 import itertools
 
 DEP_REASON_ORDER = 0
@@ -1142,6 +1140,9 @@ class DependencyTables:
         restrictWhere = """ WHERE Labels.label = '%s' """ % label
         # FIXME: avoid sprintf() here
         if leavesOnly:
+            # this call only makes sense from the server.
+            # limit the import to server-side only to avoid extra deps.
+            from conary.repository.netrepos import versionops
             restrictJoin += """
                 JOIN Latest ON (Instances.itemId = Latest.itemId
                                 AND Nodes.branchId = Latest.branchId
