@@ -1505,15 +1505,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 cs.addPrimaryTrove(*oldTroveSet[(name, version,flavor)])
 
-        if target and cs:
-            if cs.oldTroves or cs.newTroves:
-                os.unlink(target)
-                cs.writeToFile(target)
-
-            cs = None
-        elif target:
-            os.unlink(target)
-
         if missingFiles:
             mfs = []
             for mf in missingFiles:
@@ -1546,6 +1537,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 # Grab just the first file
                 mf = mfs[0]
                 raise errors.FileStreamMissing(mf[5])
+
+        if target and cs:
+            if cs.oldTroves or cs.newTroves:
+                os.unlink(target)
+                cs.writeToFile(target)
+
+            cs = None
+        elif target:
+            os.unlink(target)
+
+
 
 	return cs
 
