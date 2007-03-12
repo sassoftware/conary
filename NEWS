@@ -6,9 +6,12 @@ Changes in @NEW@:
       are cloned based on byDefault settings. (CNY-1389)
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
-      multipass group cooks will have the correct local flavor.  (CNY-1400)
+      multipass group cooks will have the correct local flavor. (CNY-1400)
     * Dep resolution in group cooks now also take advantage of the group 
       cache. (CNY-1386)
+    * Changesets for source troves with missing files (because the file is
+      missing from the upstream server or the upstream server is unavailable)
+      are properly written to changeset files. (CNY-1415)
 
 Changes in 1.1.18:
   o Major Changes:
