@@ -571,7 +571,11 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         use.resetUsed()
         use.clearLocalFlags()
         use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
-        use.setBuildFlagsFromFlavor(recipeClass.name, recipeClass._localFlavor)
+        if hasattr(recipeClass, '_localFlavor'):
+            # this will only be set if loadRecipe is used.  Allow for some
+            # other way (like our testsuite) to be used to load the recipe
+            use.setBuildFlagsFromFlavor(recipeClass.name,
+                                        recipeClass._localFlavor)
         recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                                 buildFlavor, macros)
 
