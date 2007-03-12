@@ -132,6 +132,9 @@ class OpenPGPKey:
         else:
             return -1
 
+class _KeyNotFound(KeyNotFound):
+    errorIsUncatchable = True
+
 class OpenPGPKeyCache:
     """
     Base class for a key cache
@@ -283,7 +286,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
                 '--keyring', os.path.basename(self.pubRing),
                 '--batch', '--no-permission-warning',
                 ]
-    def _getGPGExtraArgs(self, source, keyId):
+    def _getGPGExtraArgs(self, source, keyId, warn=True):
         """Returns extra arguments to pass to GPG, and an optional stream to
         be used as standard input"""
         return [
@@ -324,7 +327,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         # regardless of the command line options admonishing it not to.
         devnull = open(os.devnull, "w")
         gpgArgs = self._getGPGCommonArgs(pubRingPath)
-        extraArgs, stdin = self._getGPGExtraArgs(source, keyId)
+        extraArgs, stdin = self._getGPGExtraArgs(source, keyId, warn=warn)
         gpgArgs.extend(extraArgs)
         try:
             p = subprocess.Popen(gpgArgs,
@@ -372,7 +375,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         # cannot be found
         try:
             self.findOpenPGPKey(keySource, keyId, warn=warn)
-        except KeyNotFound:
+        except _KeyNotFound:
             return False
 
         # decide if we found the key or not.
@@ -402,10 +405,10 @@ class DiskKeyCacheCallback(KeyCacheCallback):
         """For the disk case, this is a no-op"""
         return source
 
-    def _getGPGExtraArgs(self, source, keyId):
+    def _getGPGExtraArgs(self, source, keyId, warn=True):
         keyFile = os.path.join(self.dirSource, "%s.asc" % keyId.lower())
         if not os.access(keyFile, os.R_OK):
-            raise KeyNotFound(keyId)
+            raise _KeyNotFound(keyId)
         return ["--import", keyFile], None
 
     def __init__(self, dirSource, pubRing=''):
@@ -422,12 +425,12 @@ class KeyringCacheCallback(KeyCacheCallback):
         """For the keyring case, this is a no-op"""
         return source
 
-    def _getGPGExtraArgs(self, source, keyId):
+    def _getGPGExtraArgs(self, source, keyId, warn=True):
         # Use gpg to fetch the key from a keyring
 
         if not os.access(self.srcKeyring, os.R_OK):
             # Keyring doesn't exist
-            raise KeyNotFound(keyId)
+            raise _KeyNotFound(keyId)
 
         cmd = [self.gpgBin,
                "--no-default-keyring",
@@ -446,17 +449,17 @@ class KeyringCacheCallback(KeyCacheCallback):
                                 'is required to import keys into the '
                                 'conary public keyring.  Use "conary '
                                 'update gnupg" to install gpg.')
-            raise KeyNotFound(keyId)
+            raise _KeyNotFound(keyId)
         except Exception, e:
             if warn:
                 log.warning('Error while executing gpg: %s' % e)
-            raise KeyNotFound(keyId)
+            raise _KeyNotFound(keyId)
         stdout, stderr = p.communicate()
         if p.returncode != 0:
-            raise KeyNotFound(keyId)
+            raise _KeyNotFound(keyId)
 
         if not stdout.startswith('-' * 5 + "BEGIN"):
-            raise KeyNotFound(keyId)
+            raise _KeyNotFound(keyId)
 
         # Redirect stdout to a temporary file
         fd, tempf = tempfile.mkstemp()
