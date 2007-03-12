@@ -7,6 +7,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
       multipass group cooks will have the correct local flavor.  (CNY-1400)
+    * Dep resolution in group cooks now also take advantage of the group 
+      cache. (CNY-1386)
 
 Changes in 1.1.18:
   o Major Changes:
