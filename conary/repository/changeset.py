@@ -805,6 +805,9 @@ class PathIdsConflictError(ChangeSetKeyConflictError):
 
 class ReadOnlyChangeSet(ChangeSet):
 
+    def addFileContents(self, *args, **kw):
+        raise NotImplementedError
+
     def fileQueueCmp(a, b):
         if a[1][0] == "1" and b[1][0] == "0":
             return -1

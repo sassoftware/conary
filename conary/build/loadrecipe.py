@@ -269,6 +269,7 @@ class RecipeLoader:
             self.recipe._trackedFlags = use.getUsed()
             if buildFlavor is not None:
                 self.recipe._buildFlavor = buildFlavor
+            self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
         else:
             # we'll get this if the recipe file is empty 
             raise builderrors.RecipeFileError(
