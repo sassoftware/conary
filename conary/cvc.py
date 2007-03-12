@@ -223,6 +223,57 @@ class CloneCommand(CvcCommand):
                          test = test, fullRecurse = fullRecurse)
 _register(CloneCommand)
 
+class PromoteCommand(CvcCommand):
+
+    commands = ['promote']
+    paramHelp = '<trove>[=<version>][[flavor]]+ <label>--<label>+'
+    help = 'Copy troves from one label to another in a repository'
+    commandGroup = 'Repository Access'
+    hidden = True
+    docs = { 'info'            : 'Do not perform promotion',
+
+             'skip-build-info' : ('Do not attempt to rewrite version'
+                                 ' information about how this trove was built'),
+             'message'         : ('Use MESSAGE for the changelog entry for'
+                                  ' all cloned sources'),
+             'test'            : ('Runs through all the steps of committing'
+                                  ' but does not modify the repository'),
+             'with-sources'    : ('Ensure that any binaries that are being'
+                                 ' cloned also have a matching source component'),
+           }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["skip-build-info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
+        argDef["message"] = '-m', ONE_PARAM
+        argDef["test"] = NO_PARAM
+        argDef["with-sources"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[2:]
+        troveSpecs = []
+        labelList = []
+        for arg in args:
+            if '--' in arg:
+                labelList.append(arg.split('--', 1))
+            else:
+                troveSpecs.append(arg)
+        if not labelList or not troveSpecs:
+            return self.usage()
+
+        from conary import clone
+        skipBuildInfo = argSet.pop('skip-build-info', False)
+        info = argSet.pop('info', False)
+        message = argSet.pop("message", None)
+        test = argSet.pop("test", False)
+        cloneSources = argSet.pop("with-sources", False)
+        clone.promoteTroves(cfg, troveSpecs, labelList,
+                            skipBuildInfo=skipBuildInfo,
+                            info = info, message = message, test = test,
+                            cloneSources=cloneSources)
+_register(PromoteCommand)
 
 
 class CommitCommand(CvcCommand):

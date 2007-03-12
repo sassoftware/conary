@@ -724,6 +724,8 @@ def clearFlags():
     LocalFlags._clear()
     PackageFlags._clear()
 
+def clearLocalFlags():
+    LocalFlags._clear()
 
 def track(value=True):
     Arch._trackUsed(value)
@@ -748,6 +750,9 @@ def usedFlagsToFlavor(recipeName):
 
 def allFlagsToFlavor(recipeName):
     return createFlavor(recipeName, iterAll())
+
+def localFlagsToFlavor(recipeName):
+    return createFlavor(recipeName, LocalFlags._iterAll())
 
 def createFlavor(recipeName, *flagIterables):
     """ create a dependency set consisting of all of the flags in the 

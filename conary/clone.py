@@ -18,13 +18,18 @@ from conary import errors
 from conary import versions
 from conary import conaryclient
 from conary.conaryclient import ConaryClient, cmdline
-from conary.build.cook import signAbsoluteChangeset
+from conary.build.cook import signAbsoluteChangesetByConfig
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 
 def displayCloneJob(cs):
     indent = '   '
-    for csTrove in cs.iterNewTroveList():
+    def _sortTroveNameKey(x):
+        name = x.getName()
+        return (not name.endswith(':source'), x.getNewFlavor(), name)
+    csTroves = sorted(cs.iterNewTroveList(), key=_sortTroveNameKey)
+
+    for csTrove in csTroves:
         newInfo = str(csTrove.getNewVersion())
         flavor = csTrove.getNewFlavor()
         if not flavor.isEmpty():
@@ -66,7 +71,65 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                                            cloneSources=cloneSources)
     if not okay:
         return
+    return _finishClone(client, cfg, cs, callback, info=info,
+                        test=test, ignoreConflicts=ignoreConflicts)
 
+def _convertLabel(lblStr, template):
+    try:
+        if not lblStr:
+            return None
+        hostName = template.getHost()
+        nameSpace = template.getNamespace()
+        tag = template.branch
+
+        if lblStr[0] == ':':
+            lblStr = '%s@%s%s' % (hostName, nameSpace, lblStr)
+        elif lblStr[0] == '@':
+            lblStr = '%s%s' % (hostName, lblStr)
+        elif lblStr[-1] == '@':
+            lblStr = '%s%s:%s' % (lblStr, nameSpace, tag)
+        return versions.Label(lblStr)
+    except Exception, msg:
+        raise errors.ParseError('Error parsing %r: %s' % (lblStr, msg))
+
+def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
+                  info=False, message=None, test=False,
+                  ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
+                  cloneSources = False):
+    labelMap = {}
+    for fromLabel, toLabel in labelList:
+        context = cfg.buildLabel
+        fromLabel = _convertLabel(fromLabel, context)
+        if fromLabel is not None:
+            context = fromLabel
+        toLabel = _convertLabel(toLabel, context)
+        labelMap[fromLabel] = toLabel
+
+    troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
+
+    client = ConaryClient(cfg)
+    searchSource = client.getSearchSource()
+    trovesToClone = searchSource.findTroves(troveSpecs)
+    trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
+    if not client.cfg.quiet:
+        callback = conaryclient.callbacks.CloneCallback(client.cfg, message)
+    else:
+        callback = callbacks.CloneCallback()
+
+    okay, cs = client.createSiblingCloneChangeSet(
+                           labelMap, trovesToClone,
+                           updateBuildInfo=not skipBuildInfo,
+                           infoOnly=info, callback=callback,
+                           cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
+                           cloneSources=cloneSources)
+    if not okay:
+        return False
+    return _finishClone(client, cfg, cs, callback, info=info,
+                        test=test, ignoreConflicts=ignoreConflicts)
+
+def _finishClone(client, cfg, cs, callback, info=False, test=False, 
+                 ignoreConflicts=False):
+    repos = client.repos
     if cfg.interactive or info:
         print 'The following clones will be created:'
         displayCloneJob(cs)
@@ -94,8 +157,10 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
         if not okay:
             return
 
-    sigKey = selectSignatureKey(cfg, str(targetBranch.label()))
-    signAbsoluteChangeset(cs, sigKey)
+    signAbsoluteChangesetByConfig(cs, cfg)
 
     if not test:
-        client.repos.commitChangeSet(cs, callback=callback)
+        repos.commitChangeSet(cs, callback=callback)
+        return cs
+
+
