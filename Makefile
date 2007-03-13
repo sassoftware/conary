@@ -90,7 +90,13 @@ ccs: dist
                                         conary-$(VERSION)/conary.recipe;
 	sed -i 's,r.addArchive(.*),r.addArchive("conary-$(VERSION).tar.bz2"),' \
                                         conary-$(VERSION)/conary.recipe;
+	# Assume conary tip always has the patches required to build from the
+	# recipe: filter out non-sqlite patches (the sqlite patch spans across
+	# two lines)
+	sed -i 's,r.addPatch(.*),,' conary-$(VERSION)/conary.recipe;
 	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
+	# This is just to prime the cache for the cook from a recipe
+	bin/cvc cook --prep conary=conary.rpath.com@rpl:devel
 	bin/cvc cook conary-$(VERSION)/conary.recipe
 	rm -rf conary-$(VERSION)
 
