@@ -86,6 +86,8 @@ ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
 	sed -i 's,version = ".*",version = "$(VERSION)",' \
                                         conary-$(VERSION)/conary.recipe;
+	sed -i 's,version = '.*',version = "$(VERSION)",' \
+                                        conary-$(VERSION)/conary.recipe;
 	sed -i 's,r.addArchive(.*),r.addArchive("conary-$(VERSION).tar.bz2"),' \
                                         conary-$(VERSION)/conary.recipe;
 	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
