@@ -164,7 +164,14 @@ class UpdateJob:
     def setKeywordArguments(self, kwargs):
         self._kwargs = kwargs
 
-    def freeze(self, frzdir):
+    def freeze(self, frzdir, withChangesetReferences=True):
+        """If withChangesetReferences is False, instances of ChangeSetFromFile
+        that are part of this update job will be re-frozen as changeset files
+        in the freeze directory.
+        If withChangesetReferences is True, only references to files (file
+        paths) that were used to create the ChangeSetFromFile will be stored.
+        Any other type of changeset will be frozen to a changeset file."""
+
         # Require clean directory
         assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
         assert not os.listdir(frzdir), "Directory %s not empty" % frzdir
@@ -175,7 +182,7 @@ class UpdateJob:
         drep = {'dumpVersion' : self._dumpVersion}
 
         drep['troveSource'] = self._freezeChangesetFilesTroveSource(
-                                                    self.troveSource, frzdir)
+                        self.troveSource, frzdir, withChangesetReferences)
         drep['jobs'] = list(self._freezeJobs(self.getJobs()))
         drep['primaryJobs'] = list(self._freezeJobList(self.getPrimaryJobs()))
         drep['critical'] = self.getCriticalJobs()
@@ -183,6 +190,9 @@ class UpdateJob:
         drep['jobsCsList'] = self.jobsCsList
         drep['itemList'] = self._freezeItemList()
         drep['keywordArguments'] = self.getKeywordArguments()
+
+        # Save the Conary version
+        drep['conaryVersion'] = constants.version
 
         jobfile = os.path.join(frzdir, "jobfile")
         f = open(jobfile, "w+")
@@ -201,7 +211,7 @@ class UpdateJob:
         # Need to keep a reference to the lazy cache, or else the changesets
         # are invalid
         self._lazyFileCache = self._thawChangesetFilesTroveSource(
-                                                        drep['troveSource'])
+                                                        drep.get('troveSource'))
 
         self.setJobs(list(self._thawJobs(drep['jobs'])))
         self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
@@ -255,119 +265,40 @@ class UpdateJob:
             return None
         return deps.ThawFlavor(flavor)
 
-    def _freezeChangesetFilesTroveSource(self, troveSource, frzdir):
+    def _freezeChangesetFilesTroveSource(self, troveSource, frzdir,
+                                        withChangesetReferences=True):
         assert isinstance(troveSource, trovesource.ChangesetFilesTroveSource)
         frzrepr = {'type' : 'ChangesetFilesTroveSource'}
         ccsdir = os.path.join(frzdir, 'changesets')
         util.mkdirChain(ccsdir)
         csList = []
-        # csMap is a hash from the object ID of the changeset to the position
-        # in csList (which is a file name)
-        csMap = {}
-        for i, cs in enumerate(troveSource.csList):
-            fname = os.path.join(ccsdir, "%03d.ccs" % i)
-            cs.writeToFile(fname)
-            csList.append(fname)
-            csMap[id(cs)] = i
+        itersrc = itertools.izip(troveSource.csList, troveSource.csFileNameList)
+        for i, (cs, (csFileName, includesFileContents)) in enumerate(itersrc):
+            if withChangesetReferences and csFileName:
+                fname = csFileName
+            else:
+                fname = os.path.join(ccsdir, "%03d.ccs" % i)
+                cs.writeToFile(fname)
+
+            csList.append((fname, int(includesFileContents)))
 
         frzrepr['changesets'] = csList
-
-        id2trvMap = []
-        trv2idMap = {}
-        for (i, (trvName, trvRev, trvFlavor)) in troveSource.idMap.iteritems():
-            id2trvMap.append( (trvName, 
-                               self._freezeRevision(trvRev),
-                               self._freezeFlavor(trvFlavor)) )
-            trv2idMap[(trvName, trvRev, trvFlavor)] = str(i)
-
-        # idMapLen is the length of the idMap hash. Because of the way we
-        # construct it, we know we can get the data from the beginning of 
-        # trv2idMap, so we can simply slice it
-        frzrepr['idMapLen'] = len(id2trvMap)
-
-        # Map trove IDs to changeset IDs
-        for field in 'troveCsMap', 'erasuresMap':
-            id2csMap = {}
-            troveCsMap = {}
-            for trv, cs in getattr(troveSource, field).iteritems():
-                if trv not in trv2idMap:
-                    trv2idMap[trv] = idx = str(len(id2trvMap))
-                    id2trvMap.append((trv[0],
-                                      self._freezeRevision(trv[1]),
-                                      self._freezeFlavor(trv[2])))
-                else:
-                    idx = trv2idMap[trv]
-                id2csMap[idx] = csMap[id(cs)]
-            frzrepr[field] = id2csMap
-
-        # XXX jobMap
-
-        providesMap = {}
-        for thawdep, trvList in troveSource.providesMap.iteritems():
-            providesMap[thawdep.freeze()] = [ int(trv2idMap[t])
-                                                for t in trvList ]
-        frzrepr['providesMap'] = providesMap
-
-        frzrepr['storeDeps'] = int(troveSource.storeDeps)
-        frzrepr['invalidated'] = int(troveSource.invalidated)
-
-        # The trove map (may be more than idMap)
-        # it's an array, values in the other trove-related maps are indices in
-        # this array
-        frzrepr['troveMap'] = id2trvMap
-
-        # Save the Conary version
-        frzrepr['conaryVersion'] = constants.version
-
-        # XXX rooted
 
         return frzrepr
 
     def _thawChangesetFilesTroveSource(self, frzrepr):
         assert frzrepr.get('type') == 'ChangesetFilesTroveSource'
 
+        troveSource = self.getTroveSource()
         lazycache = util.LazyFileCache()
         csList = frzrepr['changesets']
         try:
-            csList = [ changeset.ChangeSetFromFile(lazycache.open(x)) 
-                       for x in csList ]
+            for (csFileName, includesFileContents) in csList:
+                cs = changeset.ChangeSetFromFile(lazycache.open(csFileName))
+                troveSource.addChangeSet(cs, bool(includesFileContents))
         except IOError, e:
             raise errors.InternalConaryError("Missing changeset file %s" % 
                                              e.filename)
-
-        troveSource = self.getTroveSource()
-
-        idMapLen = frzrepr['idMapLen']
-
-        troveMap = [ (t[0], self._thawRevision(t[1]), self._thawFlavor(t[2])) 
-                    for t in frzrepr['troveMap'] ]
-
-
-        troveSource.csList.extend(csList)
-        # XMLRPC converts tuples to lists
-        troveSource.idMap.update(dict(enumerate(troveMap[:idMapLen])))
-
-        # Map trove IDs to changeset IDs
-        for field in 'troveCsMap', 'erasuresMap':
-            id2csMap = frzrepr[field]
-            realMap = {}
-            for trvId, csId in id2csMap.iteritems():
-                trvId = int(trvId)
-                realMap[troveMap[trvId]] = csList[csId]
-            getattr(troveSource, field).update(realMap)
-
-        # XXX jobMap
-
-        providesMap = {}
-        for frzdep, trvList in frzrepr['providesMap'].iteritems():
-            providesMap[deps.ThawDependencySet(frzdep)] = [
-                troveMap[trvId] for trvId in trvList ]
-        troveSource.providesMap.update(providesMap)
-
-        troveSource.storeDeps = bool(frzrepr['storeDeps'])
-        troveSource.invalidated = bool(frzrepr['invalidated'])
-
-        # XXX rooted
 
         return lazycache
 

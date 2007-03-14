@@ -567,6 +567,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.idMap = {}
         self.storeDeps = storeDeps
 
+        # Parallel list to csList: file names for the changesets
+        # Format is (filename, includesFileContents)
+        self.csFileNameList = []
+
         if storeDeps:
             self.depDb = deptable.DependencyDatabase()
 
@@ -625,6 +629,11 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                                 (cs, includesFileContents)
 
         self.csList.append(cs)
+        # Save file name too
+        fileName = None
+        if hasattr(cs, 'fileName'):
+            fileName = cs.fileName
+        self.csFileNameList.append((fileName, includesFileContents))
 
     def reset(self):
         for cs in self.csList:
@@ -1133,14 +1142,12 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
 
         results = {}
 
-        someRequireLabel = not self.isSearchAsDatabase()
-
         for source in self.sources[:-1]:
             # FIXME: it should be possible to reuse the trove finder
             # but the bestFlavr and getLeaves data changes per source
             # and is passed into several TroveFinder sub objects.  
             # TroveFinder should be cleaned up
-            if someRequireLabel and source._allowNoLabel:
+            if source._allowNoLabel:
                 sourceLabelPath = None
                 sourceDefaultFlavor = None
             else:
@@ -1178,10 +1185,12 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
 
         source = self.sources[-1]
 
-        if someRequireLabel and source._allowNoLabel:
+        if source._allowNoLabel:
             sourceLabelPath = None
+            sourceDefaultFlavor = None
         else:
             sourceLabelPath = labelPath
+            sourceDefaultFlavor = defaultFlavor
         if source.searchableByType():
             sourceTroveTypes = troveTypes
         else:
@@ -1192,8 +1201,8 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
             sourceGetLeaves = source._getLeavesOnly
 
 
-        troveFinder = findtrove.TroveFinder(source, labelPath,
-                                        defaultFlavor, acrossLabels,
+        troveFinder = findtrove.TroveFinder(source, sourceLabelPath,
+                                        sourceDefaultFlavor, acrossLabels,
                                         acrossFlavors, affinityDatabase,
                                         allowNoLabel=source._allowNoLabel,
                                         bestFlavor=sourceBestFlavor,
