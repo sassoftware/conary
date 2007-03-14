@@ -567,6 +567,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.idMap = {}
         self.storeDeps = storeDeps
 
+        # Parallel list to csList: file names for the changesets
+        # Format is (filename, includesFileContents)
+        self.csFileNameList = []
+
         if storeDeps:
             self.depDb = deptable.DependencyDatabase()
 
@@ -625,6 +629,11 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                                 (cs, includesFileContents)
 
         self.csList.append(cs)
+        # Save file name too
+        fileName = None
+        if hasattr(cs, 'fileName'):
+            fileName = cs.fileName
+        self.csFileNameList.append((fileName, includesFileContents))
 
     def reset(self):
         for cs in self.csList:
