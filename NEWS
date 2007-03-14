@@ -15,6 +15,8 @@ Changes in @NEW@:
     * Changesets for source troves with missing files (because the file is
       missing from the upstream server or the upstream server is unavailable)
       are properly written to changeset files. (CNY-1415)
+    * Derived packages (experimental) now correctly handle multiple
+      architectures built from the same source. (CNY-1423)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
