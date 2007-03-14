@@ -1149,9 +1149,6 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         return correction
 
     def _mergeConfigs(self, otherCs):
-        if self.configCache:
-            import epdb
-            epdb.st('f')
         for key, f in otherCs.configCache.iteritems():
             if not self.configCache.has_key(key):
                 self.configCache[key] = f
