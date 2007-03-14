@@ -115,8 +115,8 @@ class ClientClone:
                             infoOnly=infoOnly)
 
 
-        chooser = BranchCloneChooser({None:targetBranch}, troveList,
-                                      cloneOptions)
+        branchMap = dict((x[1].branch(), targetBranch) for x in troveList)
+        chooser = BranchCloneChooser(branchMap, troveList, cloneOptions)
         return self._createCloneChangeSet(chooser, cloneOptions)
 
     def createSiblingCloneChangeSet(self, labelMap, troveList,
@@ -413,7 +413,6 @@ class ClientClone:
         neededInfoTroveTups = {}
 
         _logMe("Checking needs are fulfilled for %s troves" % (len(troveTups)))
-        # you'd think we'd already have these guys, but I guess not.
         troveCache.getTroves(troveTups, withFiles=False)
         for troveTup in troveTups:
             trv = troveCache.getTrove(troveTup, withFiles=False)
