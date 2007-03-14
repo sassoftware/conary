@@ -435,7 +435,7 @@ class ChangesetFilter(BaseProxy):
                         os.unlink(csPath)
                         csPath = path
                     else:
-                        csPath = _addToCache(fingerprint, inF, iterV,
+                        csPath = _addToCache(fingerprint, open(path), iterV,
                                 (trovesNeeded, filesNeeded, removedTroves),
                                 size)
 
