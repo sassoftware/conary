@@ -42,7 +42,7 @@ use_files =	alternatives	\
 		tcl		\
 		tcpwrappers	\
 		tk		\
-                vmware          \
+		vmware          \
 		X		\
 		xen		\
 		xfce
