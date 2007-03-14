@@ -22,6 +22,8 @@ Changes in @NEW@:
       startup). changesetCacheDir should now be used instead, and tmpwatch
       now needs to be run on that directory as well as the tmpDir set in the
       configuration (CNY-1387)
+    * Properly commits changesets where multiple troves reference the same
+      (pathId,fileId) key (CNY-1414)
 
 Changes in 1.1.18:
   o Major Changes:

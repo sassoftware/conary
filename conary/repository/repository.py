@@ -539,6 +539,8 @@ class ChangeSetJob:
 	configRestoreList.sort()
 	normalRestoreList.sort()
 
+        # config files are cached, so we don't have to worry about not
+        # restoring the same fileId/pathId twice
         for (pathId, newFileId, sha1, oldPath, oldfile, troveName,
              oldTroveVersion, troveFlavor, newVersion, newFileId, oldVersion,
              oldFileId, restoreContents) in configRestoreList:
@@ -578,8 +580,14 @@ class ChangeSetJob:
         # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()
         ptrRestores = []
+        lastRestore = None         # restore each pathId,fileId combo once
         for (pathId, fileId, sha1, version, restoreContents) in \
                                                     normalRestoreList:
+            if (pathId, fileId) == lastRestore:
+                continue
+
+            lastRestore = (pathId, fileId)
+
             try:
                 (contType, fileContents) = cs.getFileContents(pathId, fileId,
                                                               compressed = True)
