@@ -1,19 +1,38 @@
 Changes in @NEW@:
+  o Client Changes:
+    * Added cvc promote command. (CNY-1304)
+    * Added interface (but no command line option) for performing
+      partial clones, where only some components out of a package
+      are cloned based on byDefault settings. (CNY-1389)
+  o Bug Fixes:
+    * Local flags are now cleared after each group cook, meaning that
+      multipass group cooks will have the correct local flavor. (CNY-1400)
+    * Dep resolution in group cooks now also take advantage of the group 
+      cache. (CNY-1386)
+    * Changesets for source troves with missing files (because the file is
+      missing from the upstream server or the upstream server is unavailable)
+      are properly written to changeset files. (CNY-1415)
+
+Changes in 1.1.18:
   o Major Changes:
-    * Changesets are now indexed by pathId,fileId combination instead of
-      just pathId. This should eliminate the vast majority of conflicts
+    * Changesets are now indexed by a pathId,fileId combination instead of
+      just by pathId. This should eliminate the vast majority of conflicts
       when creating groups containing multiple flavors of the same trove.
-      Old clients will be serverd old-format changesets by the repository,
+      Old clients will be served old-format changesets by the repository,
       and new clients continue to support old format changesets. Old and
       new format changes can be merged into a single changeset (CNY-1314).
 
   o Client Changes:
-    * conary rblist --flavors now properly displays trove flavors. (CNY-1255)
-    * When resolving dependencies when updating, conary will now search 
+    * The conary rblist --flavors command now properly displays trove
+      flavors. (CNY-1255)
+    * When resolving dependencies while updating, conary will now search 
       the latest versions of packages for every label in your installLabelPath
       first before searching the histories of those labels.  This should make
       sure that conary prefers installing maintained troves over unmaintained 
       ones. (CNY-1312)
+    * The Conary client API now has a new call, iterRollbacksList(), iterating
+      over the rollback name and object. (CNY-1390)
+    * Added the --just-db argument to the conary rollback command. (CNY-1398)
 
   o Build Changes:
     * A list of rPath mirrors for source components has been added.
@@ -23,21 +42,36 @@ Changes in @NEW@:
     * The group addAll command supports "flatten" - a way to cause all troves
       in all subgroups to be included directly in the top level group - 
       flattening any structure created by intermediate groups.
-    * Groups now allow you to use the command "removeTrovesAlsoInGroup"
+    * Groups now allow you to use the commands "removeTrovesAlsoInGroup"
       and "removeTrovesAlsoInNewGroup".  These commands subtract out the
       troves included within the specified group from the currently
       active group. (CNY-1380)
-    * checking dependencies is now faster when building groups.
+    * Checking dependencies is now faster when building groups.
     * When resolving dependencies in groups, conary will now search the
       latest trove in every label in your label/search path before
       searching back in the history of that label. (CNY-1312)
     * Added moveComponents and copyComponents to group syntax. (CNY-1231)
-  
+    * Derived packages (experimental) can now change files between
+      Config, InitialContents, and Transient, and can set new files
+      to be any of those types.  They can call UtilizeUser and
+      UtilizeGroup.  They can create new tag handlers and tag
+      description files (but not make a file from the parent no longer
+      be a tag handler or tag description, except by removing the file
+      entirely), and add new tags to new and pre-existing files when
+      TagSpec is called (but not remove existing tags from files). (CNY-1283)
+    * Derived packages (experimental) can now run nearly all build and
+      source actions. (CNY-1284)
+    * Derived packages (experimental) now inherit byDefault settings from
+      the parent (CNY-1401), but can override them in the child (CNY-1283).
+    * Derived packages (experimental) now handle multiple binary packages
+      built from a single source package, including overriding binary
+      package name assignment in the derived package. (CNY-1399)
+
   o Server Changes:
     * Two new calls have been added to the server API -
-      getTroveReferences and getTroveDescendants (CNY-1349)
-    * Proxy server proxies put calls now
-    * Cleaned up string compression code in changeset merging
+      getTroveReferences and getTroveDescendants. (CNY-1349)
+    * The proxy server proxies "put" calls now.
+    * Cleaned up string compression code in changeset merging.
 
   o Bug Fixes:
     * Fixed a bug where an invalid flavor at the command line would result
@@ -55,6 +89,13 @@ Changes in @NEW@:
     * Changesets in an update job can be downloaded in a step separate from
       the installation. Additionally, update jobs can be frozen and reapplied
       later. (CNY-1300)
+    * UpdateJob objects are now versioned for a specific state of the Conary
+      database, and can be applied only if the state of the database has not
+      changed. (CNY-1300)
+    * Public keys can now be retrieved from a directory, with each key stored
+      in a separate file. (CNY-1299)
+    * Troves now track their direct parent they were cloned from, instead of
+      the source-of-all-clones. (CNY-1294)
 
 Changes in 1.1.17:
   o New Feature:
@@ -148,9 +189,6 @@ Changes in 1.1.17:
       frozen stream of the newer object. Unknown elements are preserved
       through merges into old object as long as the old object has not
       been locally modified.
-    * UpdateJob objects are now versioned for a specific state of the Conary
-      database, and can only be applied if the state of the database has not
-      changed. (CNY-1300)
 
   o Bug Fixes:
     * Conary now displays a useful error message when it is unable to

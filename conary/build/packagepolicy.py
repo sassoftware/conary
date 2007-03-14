@@ -41,6 +41,7 @@ class _filterSpec(policy.Policy):
     are derived.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     def __init__(self, *args, **keywords):
 	self.extraFilters = []
 	policy.Policy.__init__(self, *args, **keywords)
@@ -65,6 +66,7 @@ class _addInfo(policy.Policy):
     requirements, and provision, to files.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -183,6 +185,7 @@ class Config(policy.Policy):
     it would not be automatically marked as a configuration file otherwise.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         # for :config component, ComponentSpec must run after Config
         # Otherwise, this policy would follow PackageSpec and just set isConfig
@@ -469,6 +472,7 @@ class PackageSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
         self.configFiles = []
+        self.derivedFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
@@ -490,13 +494,19 @@ class PackageSpec(_filterSpec):
             # would have an effect only with exceptions listed, so no warning...
             self.inclusions = None
 
-	for (filteritem) in self.extraFilters:
-	    name = filteritem[0] % self.macros
-            if not trove.troveNameIsValid(name):
-                self.error('%s is not a valid package name', name)
+        # extras need to come before derived so that derived packages
+        # can change the package to which a file is assigned
+        for filteritem in itertools.chain(self.extraFilters,
+                                          self.derivedFilters):
+            if not isinstance(filteritem, filter.Filter):
+                name = filteritem[0] % self.macros
+                if not trove.troveNameIsValid(name):
+                    self.error('%s is not a valid package name', name)
 
-            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
-            self.pkgFilters.append(filter.Filter(*args, **kwargs))
+                args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+                self.pkgFilters.append(filter.Filter(*args, **kwargs))
+            else:
+                self.pkgFilters.append(filteritem)
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	self.pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
@@ -561,6 +571,7 @@ class InitialContents(policy.Policy):
         ('Config', policy.REQUIRED_PRIOR),
     )
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
 
     # change inclusions to default to none, instead of all files
     keywords = policy.Policy.keywords.copy()
@@ -623,6 +634,7 @@ class Transient(policy.Policy):
     having transient contents.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Config', policy.REQUIRED_PRIOR),
@@ -674,6 +686,7 @@ class TagDescription(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -711,6 +724,7 @@ class TagHandler(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -787,7 +801,7 @@ class TagSpec(_addInfo):
         if tag not in tags:
             self.info('%s: %s', name, path)
             tags.set(tag)
-            if tagFile:
+            if tagFile and self.db:
                 for trove in self.db.iterTrovesByPath(tagFile.tagFile):
                     troveName = trove.getName()
                     if troveName not in self.fullReqs:
@@ -873,6 +887,7 @@ class MakeDevices(policy.Policy):
     owner, and group are both the root user, and permissions are 0666.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Ownership', policy.REQUIRED_SUBSEQUENT),
@@ -914,6 +929,7 @@ class setModes(policy.Policy):
     and C{r.ParseManifest}
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('WarnWriteable', policy.REQUIRED_SUBSEQUENT),
@@ -953,7 +969,7 @@ class LinkType(policy.Policy):
     SYNOPSIS
     ========
 
-    C{LinkLinkType([I{filterexp}])}
+    C{r.LinkType([I{filterexp}])}
 
     DESCRIPTION
     ===========
@@ -968,6 +984,7 @@ class LinkType(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('Config', policy.REQUIRED_PRIOR),
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -1016,6 +1033,7 @@ class LinkCount(policy.Policy):
     hardlinks.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -1116,6 +1134,7 @@ class ExcludeDirectories(policy.Policy):
     directory will be included in the package.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Ownership', policy.REQUIRED_PRIOR),
@@ -1221,6 +1240,7 @@ class _UserGroup(policy.Policy):
         ('Requires', policy.REQUIRED_SUBSEQUENT),
     )
     filetree = policy.PACKAGE
+    processUnmodified = True
 
     def setUserGroupDep(self, path, info, depClass):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3076,6 +3096,7 @@ class reportMissingBuildRequires(policy.Policy):
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
+    processUnmodified = True
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
@@ -3101,6 +3122,7 @@ class reportErrors(policy.Policy):
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
+    processUnmodified = True
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):

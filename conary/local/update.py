@@ -300,6 +300,9 @@ class FilesystemJob:
             return -1
         elif a[0] > b[0]:
             return 1
+        elif not a[1] or not b[1]:
+            # just ptrId's are being used
+            return 0
         elif a[1] < b[1]:
             return -1
         elif a[1] > b[1]:

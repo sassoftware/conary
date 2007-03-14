@@ -611,12 +611,7 @@ class VersionSequence(AbstractVersion):
             for ver in self.versions:
                 self.hash ^= hash(ver)
 
-	return self.hash
-
-    def iterLabels(self):
-        for item in self.versions:
-            if isinstance(item, AbstractLabel):
-                yield item
+        return self.hash
 
     def iterRevisions(self):
         for item in self.versions:
@@ -750,7 +745,7 @@ class VersionSequence(AbstractVersion):
                         'cached.  Someone may already have a reference to '
                         'the cached object.')
         # assert not self.cached
-        if clearCache and self.timeStamps:
+        if clearCache and self.timeStamps():
             self._clearVersionCache()
 
         i = 0
@@ -1307,6 +1302,23 @@ class Branch(VersionSequence):
 
 	newlist = [ label ]
         return Branch(self.versions + newlist)
+
+    def createSibling(self, label):
+        """
+        Creates a branch that has all the same revision.
+
+        @param label: Trailing label of the new branch
+        @type label: AbstractLabel
+        @rtype: Branch
+        """
+        return Branch(self.versions[:-1] + [label])
+
+    def isSibling(self, other):
+        return self.versions[:-1] == other.versions[:-1]
+
+    def isAncestor(self, other):
+        return self.versions == other.versions[:len(self.versions)]
+
 
 def _parseVersionString(ver, frozen):
     """

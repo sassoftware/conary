@@ -28,7 +28,7 @@ from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
 from conary.local import database
-from conary.repository import trovesource, searchsource
+from conary.repository import changeset, trovesource, searchsource
 from conary import trove
 from conary import versions
 
@@ -240,7 +240,7 @@ class GroupRecipe(_BaseGroupRecipe):
                                                         self.getSearchFlavor())
         else:
             return searchsource.createSearchSourceStack(None,
-                                                self.getLabelPath(),
+                                                [self.getLabelPath()],
                                                 self.getSearchFlavor(),
                                                 troveSource=self.troveSource)
 
@@ -1715,6 +1715,9 @@ class TroveCacheWrapper(object):
         self.repos = cache.repos
         self.cache = cache
 
+    def __getattr__(self, key):
+        return getattr(self.repos, key)
+
     def getDepsForTroveList(self, troveList):
         return [ (x.getProvides(), x.getRequires())
                  for x in self.getTroves(troveList) ]
@@ -1729,6 +1732,51 @@ class TroveCacheWrapper(object):
     def getTrove(self, troveTup, *args, **kw):
         self.cache.cacheTroves([troveTup])
         return self.cache[troveTup]
+
+    def hasTroves(self, troveList):
+        d = {}
+        needed = []
+        for troveTup in troveList:
+            if troveTup in self.cache:
+                d[troveTup] = True
+            else:
+                needed.append(troveTup)
+        if needed:
+            d.update(self.repos.hasTroves(needed))
+        return d
+
+    def createChangeSet(self, jobList, withFiles = True, withFileContents=True,
+                        excludeAutoSource = False, recurse = True,
+                        primaryTroveList = None, callback = None):
+        if withFiles or withFileContents:
+            raise RuntimeError("Cannot use TroveCache wrapper for files or "
+                               " file contents")
+        if excludeAutoSource:
+            raise RuntimeError("Cannot use TroveCache wapper"
+                               " for excludeAutoSource")
+        needed = []
+        troves = []
+        for job in jobList:
+            if job[1][0]:
+                raise RuntimeError("Cannot use TroveWrapper cache for relative"
+                                   " jobs")
+            if job[3] and recurse:
+                raise RuntimeError("Cannot use TroveWrapper cache for recursive"
+                                   " jobs")
+            troveTup = job[0], job[2][0], job[2][1]
+            if troveTup in self.cache:
+                troves.append(self.cache[troveTup])
+            else:
+                needed.append(troveTup)
+        if needed:
+            troves.extend(self.cache.getTroves(needed))
+        cs = changeset.ChangeSet()
+        for trove in troves:
+            troveCs = trove.diff(None, absolute = True)[0]
+            cs.newTrove(troveCs)
+        if primaryTroveList:
+            cs.setPrimaryTroveList(primaryTroveList)
+        return cs
 
 class TroveCache(dict):
     """ Simple cache for relevant information about troves needed for
@@ -2580,11 +2628,16 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
     if resetVerbosity:
         log.setVerbosity(log.DEBUG)
-    updJob, suggMap = client.updateChangeSet(troves, recurse = False,
-                                             resolveDeps = True,
-                                             test = True,
-                                             checkPathConflicts=False,
+    oldRepos = client.getRepos()
+    client.setRepos(TroveCacheWrapper(cache))
+    try:
+        updJob, suggMap = client.updateChangeSet(troves, recurse = False,
+                                                 resolveDeps = True,
+                                                 test = True,
+                                                 checkPathConflicts=False,
                                  resolveSource=resolveSource.getResolveMethod())
+    finally:
+        client.setRepos(oldRepos)
 
     if resetVerbosity:
         log.setVerbosity(log.LOWLEVEL)

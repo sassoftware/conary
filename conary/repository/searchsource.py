@@ -190,7 +190,7 @@ class SearchSourceStack(trovesource.SourceStack):
         """
         troveSpecs = list(troveSpecs)
         results = {}
-        for source in self.sources[:1]:
+        for source in self.sources[:-1]:
             foundTroves = source.findTroves(troveSpecs, allowMissing=True)
             newTroveSpecs = []
             for troveSpec in troveSpecs:

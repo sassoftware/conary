@@ -15,10 +15,17 @@
 import re, os
 
 from conary import files, trove
-from conary.build import buildpackage, filter, packagepolicy, policy
+from conary.build import buildpackage, destdirpolicy, filter, packagepolicy, policy
 from conary.deps import deps
 
+FixDirModes = destdirpolicy.FixDirModes
+
+Config = packagepolicy.Config
+InitialContents = packagepolicy.InitialContents
+Transient = packagepolicy.Transient
+
 class ComponentSpec(packagepolicy.ComponentSpec):
+    processUnmodified = True
 
     requires = (
         ('PackageSpec', policy.REQUIRED_SUBSEQUENT),
@@ -38,12 +45,19 @@ class ComponentSpec(packagepolicy.ComponentSpec):
         packagepolicy.ComponentSpec.doProcess(self, recipe)
 
 class PackageSpec(packagepolicy.PackageSpec):
+    processUnmodified = True
 
     def doProcess(self, recipe):
         self.pathObjs = {}
 
         for trvCs in self.recipe.cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
+
+            if not trv.isCollection():
+                regexs = [ re.escape(x[1]) for x in trv.iterFileList() ]
+                f = filter.Filter(regexs, self.recipe.macros,
+                                  name = trv.getName().split(':')[0])
+                self.derivedFilters.append(f)
 
             for (pathId, path, fileId, version) in trv.iterFileList():
                 fileCs = self.recipe.cs.getFileChange(None, fileId)
@@ -61,6 +75,10 @@ class PackageSpec(packagepolicy.PackageSpec):
         component = self.recipe.autopkg.componentMap[path]
         pkgFile = self.recipe.autopkg.pathMap[path]
         fileObj = self.pathObjs[path]
+        # these three flags can be changed in policy
+        fileObj.flags.isConfig(False)
+        fileObj.flags.isInitialContents(False)
+        fileObj.flags.isTransient(False)
         pkgFile.inode.owner.set(fileObj.inode.owner())
         pkgFile.inode.group.set(fileObj.inode.group())
         pkgFile.tags.thaw(fileObj.tags.freeze())
@@ -96,6 +114,7 @@ class PackageSpec(packagepolicy.PackageSpec):
                 comp.provides.union(depSet - fileProvides)
 
 class Flavor(packagepolicy.Flavor):
+    processUnmodified = True
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -120,6 +139,7 @@ class Flavor(packagepolicy.Flavor):
             self.packageFlavor.union(f.flavor())
 
 class Requires(packagepolicy.Requires):
+    processUnmodified = True
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -134,6 +154,7 @@ class Requires(packagepolicy.Requires):
         self.unionDeps(path, pkg, f)
 
 class Provides(packagepolicy.Provides):
+    processUnmodified = True
 
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -155,6 +176,7 @@ class Provides(packagepolicy.Provides):
         self.unionDeps(path, pkg, f)
 
 class ComponentRequires(packagepolicy.ComponentRequires):
+    processUnmodified = True
 
     def do(self):
         packagepolicy.ComponentRequires.do(self)
@@ -164,19 +186,21 @@ class ComponentRequires(packagepolicy.ComponentRequires):
         # inherited some during PackageSpec
         components = self.recipe.autopkg.components
         packageMap = self.recipe.autopkg.packageMap
+        mainSet = set([main.name for main in packageMap])
         for comp in components.values():
             removeDeps = deps.DependencySet()
             for dep in comp.requires.iterDepsByClass(deps.TroveDependencies):
                 name = dep.getName()[0]
                 if ':' in name:
                     main = name.split(':', 1)[0]
-                    if (main in packageMap and
-                        name not in components or not components[name]):
+                    if (main in mainSet and
+                        (name not in components or not components[name])):
                         removeDeps.addDep(deps.TroveDependencies, dep)
 
             comp.requires -= removeDeps
 
 class ComponentProvides(packagepolicy.ComponentProvides):
+    processUnmodified = True
     def do(self):
         # pick up parent component flags
         for depSet in self.recipe._componentProvs.values():
@@ -184,7 +208,47 @@ class ComponentProvides(packagepolicy.ComponentProvides):
                 self.flags.update(dep.flags.keys())
         packagepolicy.ComponentProvides.do(self)
 
+
+class ByDefault(packagepolicy.ByDefault):
+    # Because this variant honors existing settings, overrides must
+    # be of the package:component variety.  ":component" will only
+    # work for components added in this derived package
+    def doProcess(self, recipe):
+        originalInclusions = recipe.byDefaultIncludeSet
+        originalExceptions = recipe.byDefaultExcludeSet
+        if not self.inclusions:
+            self.inclusions = []
+        if not self.exceptions:
+            self.exceptions = []
+        inclusions = set(originalInclusions.union(set(self.inclusions))
+             - set(self.exceptions).union(set(self.invariantexceptions)))
+        exceptions = set(originalExceptions.union(set(self.exceptions))
+             - set(self.inclusions))
+        recipe.setByDefaultOn(inclusions)
+        recipe.setByDefaultOff(exceptions)
+    
+
+class TagSpec(packagepolicy.TagSpec):
+    # do not load the system-defined tags for derived packages
+    processUnmodified = True
+    def doProcess(self, recipe):
+	self.tagList = []
+        self.suggestBuildRequires = set()
+        self.db = None
+        self.fullReqs = set()
+        packagepolicy._addInfo.doProcess(self, recipe)
+
+
 ExcludeDirectories = packagepolicy.ExcludeDirectories
 MakeDevices = packagepolicy.MakeDevices
 Ownership = packagepolicy.Ownership
+UtilizeUser = packagepolicy.UtilizeUser
+UtilizeGroup = packagepolicy.UtilizeGroup
+TagDescription = packagepolicy.TagDescription
+TagHandler = packagepolicy.TagHandler
+
 setModes = packagepolicy.setModes
+LinkType = packagepolicy.LinkType
+LinkCount = packagepolicy.LinkCount
+reportMissingBuildRequires = packagepolicy.reportMissingBuildRequires
+reportErrors = packagepolicy.reportErrors

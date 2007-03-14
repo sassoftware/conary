@@ -1,4 +1,4 @@
-# Copyright (c) 2006,2007 rPath, Inc.
+# Copyright (c) 2006-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -30,6 +30,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         delayedRestores = {}
         ptrMap = {}
+        byDefault = {}
 
         fileList = []
         linkGroups = {}
@@ -48,15 +49,33 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 if path != self.macros.buildlogpath:
                     fileList.append((pathId, fileId, path, name))
 
+            if trv.isCollection():
+                # gather up existing byDefault status
+                # from (component, byDefault) tuples
+                byDefault.update(dict(
+                    [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
+
         fileList.sort()
 
         for pathId, fileId, path, troveName in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
+            self._derivedFiles[path] = fileObj.inode.mtime()
 
             flavor -= fileObj.flavor()
             self._componentReqs[troveName] -= fileObj.requires()
             self._componentProvs[troveName] -= fileObj.requires()
+
+            # Config vs. InitialContents etc. might be change in derived pkg
+            # Set defaults here, and they can be overridden with
+            # "exceptions = " later
+            if fileObj.flags.isConfig():
+                self.Config(path)
+            elif fileObj.flags.isInitialContents():
+                self.InitialContents(path)
+            elif fileObj.flags.isTransient():
+                self.Transient(path)
+
 
             # we don't restore setuid/setgid bits into the filesystem
             if fileObj.inode.perms() & 06000 != 0:
@@ -117,6 +136,9 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 util.createLink(destdir + initialPath, destdir + path)
 
         self.useFlags = flavor
+
+        self.setByDefaultOn(set(x for x in byDefault if byDefault[x]))
+        self.setByDefaultOff(set(x for x in byDefault if not byDefault[x]))
 
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):
@@ -188,9 +210,18 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         log.info('deriving from %s=%s[%s]', self.name, parentVersion,
                  parentFlavor)
 
-        self.cs = self.repos.createChangeSet(
-                [ (self.name, (None, None),
-                  (parentVersion, parentFlavor), True) ], recurse = True )
+        # Fetch all binaries built from this source
+        binaries = self.repos.getTrovesBySource(self.name + ':source',
+                parentVersion.getSourceVersion())
+
+        # Filter out older ones
+        binaries = [ x for x in binaries if x[1] == parentVersion ]
+
+        # Build trove spec
+        troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
+                        for x in binaries ]
+
+        self.cs = self.repos.createChangeSet(troveSpec, recurse = False)
         self.addLoadedTroves([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
             in self.cs.iterNewTroveList() ])
@@ -203,7 +234,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
     def loadPolicy(self):
         return _AbstractPackageRecipe.loadPolicy(self,
-                                policySet = set( [ 'WarnWriteable' ] ),
                                 internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
@@ -217,12 +247,39 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         self.repos = laReposCache.repos
 
+        self._addBuildAction('Ant', build.Ant)
+        self._addBuildAction('Automake', build.Automake)
+        self._addBuildAction('ClassPath', build.ClassPath)
+        self._addBuildAction('CompilePython', build.CompilePython)
+        self._addBuildAction('Configure', build.Configure)
+        self._addBuildAction('ConsoleHelper', build.ConsoleHelper)
+        self._addBuildAction('Copy', build.Copy)
         self._addBuildAction('Create', build.Create)
+        self._addBuildAction('Desktopfile', build.Desktopfile)
+        self._addBuildAction('Doc', build.Doc)
+        self._addBuildAction('Environment', build.Environment)
+        self._addBuildAction('Install', build.Install)
+        self._addBuildAction('JavaCompile', build.JavaCompile)
+        self._addBuildAction('JavaDoc', build.JavaDoc)
+        self._addBuildAction('Link', build.Link)
+        self._addBuildAction('Make', build.Make)
+        self._addBuildAction('MakeDirs', build.MakeDirs)
+        self._addBuildAction('MakeInstall', build.MakeInstall)
+        self._addBuildAction('MakeParallelSubdir', build.MakeParallelSubdir)
+        self._addBuildAction('MakePathsInstall', build.MakePathsInstall)
+        self._addBuildAction('ManualConfigure', build.ManualConfigure)
+        self._addBuildAction('Move', build.Move)
+        self._addBuildAction('PythonSetup', build.PythonSetup)
         self._addBuildAction('Remove', build.Remove)
         self._addBuildAction('Replace', build.Replace)
+        self._addBuildAction('Run', build.Run)
         self._addBuildAction('SetModes', build.SetModes)
-        self._addBuildAction('MakeDirs', build.MakeDirs)
-        self._addBuildAction('Install', build.Install)
+        self._addBuildAction('SGMLCatalogEntry', build.SGMLCatalogEntry)
+        self._addBuildAction('Symlink', build.Symlink)
+        self._addBuildAction('XInetdService', build.XInetdService)
+        self._addBuildAction('XMLCatalogEntry', build.XMLCatalogEntry)
 
+        self._addSourceAction('addArchive', source.addArchive)
+        self._addSourceAction('addAction', source.addAction)
         self._addSourceAction('addPatch', source.addPatch)
         self._addSourceAction('addSource', source.addSource)

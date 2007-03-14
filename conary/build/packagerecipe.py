@@ -781,6 +781,7 @@ class _AbstractPackageRecipe(Recipe):
         self._policyMap = {}
         self._componentReqs = {}
         self._componentProvs = {}
+        self._derivedFiles = {} # used only for derived packages
         self._includeSuperClassBuildReqs()
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
