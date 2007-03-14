@@ -343,13 +343,14 @@ class ChangesetFilter(BaseProxy):
         # Get the desired changeset version for this client
         iterV = neededCsVersion
         verPath = [iterV]
-        while 1:
-            if iterV not in CHANGESET_VERSIONS_PRECEDENCE:
-                # No way to move forward
-                break
-            # Move one edge in the DAG, try again
-            iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
-            verPath.append(iterV)
+        if neededCsVersion != wireCsVersion:
+            while 1:
+                if iterV not in CHANGESET_VERSIONS_PRECEDENCE:
+                    # No way to move forward
+                    break
+                # Move one edge in the DAG, try again
+                iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
+                verPath.append(iterV)
 
         assert(verPath[-1] == wireCsVersion)
 
