@@ -88,20 +88,20 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
         d = {}
     nextVersions = []
     for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
-        pkgNames = set([x.split(':')[-1] for x in troveNames])
         if not isinstance(troveFlavors, (list, tuple, set)):
             troveFlavors = set([troveFlavors])
         else:
             troveFlavors = set(troveFlavors)
-        newVersion = _nextVersionFromQuery(d, db, pkgNames, sourceVersion,
+        newVersion = _nextVersionFromQuery(d, db, troveNames, sourceVersion,
                                            troveFlavors, 
                                            alwaysBumpCount=alwaysBumpCount)
         nextVersions.append(newVersion)
     return nextVersions
 
-def _nextVersionFromQuery(query, db, pkgNames, sourceVersion,
+def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
                           troveFlavorSet, targetLabel=None,
                           alwaysBumpCount=False):
+    pkgNames = set([x.split(':')[-1] for x in troveNames])
     latest = None
     relVersions = []
     for pkgName in pkgNames:
@@ -156,7 +156,8 @@ def nextLocalVersion(db, troveNames, latest, troveFlavorSet):
     # bump the build count on this label
 
     # search for both pkgs and their components
-    pkgNames = set([x.split(':')[0] for x in troveNames] + troveNames)
+    pkgNames = set([x.split(':')[0] for x in troveNames])
+    pkgNames.update(troveNames)
 
     query = dict.fromkeys(troveNames, {latest.branch() : None })
     results = db.getTroveLeavesByBranch(query)
