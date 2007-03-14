@@ -27,6 +27,10 @@ Changes in @NEW@:
     * Properly commits changesets where multiple troves reference the same
       (pathId,fileId) key (CNY-1414)
 
+  o Build Changes:
+    * The vmware flavor has been defined, representing whether the
+      software is intended to be running as a vmware guest. (CNY-1421)
+
 Changes in 1.1.18:
   o Major Changes:
     * Changesets are now indexed by a pathId,fileId combination instead of
