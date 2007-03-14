@@ -17,6 +17,8 @@ Changes in @NEW@:
       are properly written to changeset files. (CNY-1415)
     * Derived packages (experimental) now correctly handle multiple
       architectures built from the same source. (CNY-1423)
+    * loadInstalled now always works even if you have multiple versions of 
+      a package installed from multiple branches.
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with

@@ -377,7 +377,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                          "Picking latest: \n       %s\n\n"
                          "Not using:\n      %s"
                           %(component,
-                            ', '.join(x.asString() for x in sorted(labelPath)),
+                           ', '.join(x.asString() for x in labelPath),
                             '%s=%s' % pkgs[0][:2],
                             '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
         else:
@@ -479,6 +479,20 @@ def loadInstalled(troveSpec, label=None):
     callerGlobals = sys._getframe(1).f_globals
     _loadRecipe(troveSpec, label, callerGlobals, True)
 
+def _pickLatest(component, troves, labelPath=None):
+    troves.sort(reverse=True)
+    err = "source component %s has multiple versions" % component
+    if labelPath:
+        err += " on labelPath %s:" % ', '.join(x.asString() for x in labelPath)
+    else:
+        err += ':'
+    err += ("\nPicking latest:\n      %s\n\n"
+            "Not using:\n      %s\n"
+              %('%s=%s' % troves[0][:2],
+                '\n       '.join('%s=%s' % x[:2] for x in troves[1:])))
+    log.warning(err)
+    return troves[0]
+
 
 def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     """ See docs for loadInstalledPackage and loadSuperClass.  """
@@ -497,9 +511,10 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             if len(troves) > 1:
                 troves = getBestLoadRecipeChoices(labelPath, troves)
                 if len(troves) > 1:
-                    raise builderrors.RecipeFileError(
-                                    'Multiple troves could match loadInstalled'
-                                    ' request %s: %s' %(troveSpec, troves))
+                    # sort by timeStamp even though they're across
+                    # branches.  This will give us _some_ result to move
+                    # forward with, which is better than blowing up.
+                    troves = [_pickLatest(name, troves, labelPath)]
             if troves:
                 return troves[0][1].getSourceVersion(), troves[0][2]
         except errors.TroveNotFound:
@@ -510,9 +525,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             troves = db.findTrove(None, (name, versionStr, flavor))
             troves = getBestLoadRecipeChoices(None, troves)
             if len(troves) > 1:
-                raise RuntimeError, (
-                                'Multiple troves could match loadRecipe' 
-                                ' request for %s' % name)
+                troves = [_pickLatest(name, troves)]
             if troves:
                 return troves[0][1].getSourceVersion(), troves[0][2]
         except errors.TroveNotFound:
