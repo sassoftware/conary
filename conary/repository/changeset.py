@@ -237,6 +237,16 @@ class ChangeSet(streams.StreamSet):
     def addFileContents(self, pathId, fileId, contType, contents, cfgFile,
                         compressed = False):
         key = makeKey(pathId, fileId)
+        if key in self.configCache or key in self.fileContents:
+            if key in self.configCache:
+                otherContType = self.configCache[key]
+            else:
+                otherContType = self.fileContents[key]
+
+            if (contType == ChangedFileTypes.diff or
+                 otherContType == ChangedFileTypes.diff):
+                raise ChangeSetKeyConflictError(key)
+
 	if cfgFile:
             assert(not compressed)
 	    self.configCache[key] = (contType, contents, compressed)
@@ -820,7 +830,12 @@ class ReadOnlyChangeSet(ChangeSet):
             if len(a[0]) == 16:
                 raise PathIdsConflictError(a[0])
             else:
-                raise ChangeSetKeyConflictError(a[0])
+                # this is an actual conflict if one of the files is a diff
+                # (other file types conflicts are okay; replacing contents
+                # with a ptr is okay, as is the opposite)
+                if (a[2:] == ChangedFileTypes.diff[4:] or
+                    b[2:] == ChangedFileTypes.diff[4:]):
+                    raise ChangeSetKeyConflictError(a[0])
         else:
             return 1
 
@@ -1111,8 +1126,13 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         next = self._nextFile()
         correction = 0
+        last = None
         while next:
             name, tagInfo, f, otherCsf = next
+            if last == name:
+                next = self._nextFile()
+                continue
+            last = name
 
             if tagInfo[2:] == ChangedFileTypes.refr[4:]:
                 path = f.read()
@@ -1129,14 +1149,17 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         return correction
 
     def _mergeConfigs(self, otherCs):
+        if self.configCache:
+            import epdb
+            epdb.st('f')
         for key, f in otherCs.configCache.iteritems():
             if not self.configCache.has_key(key):
                 self.configCache[key] = f
-            if self.configCache[key] != f:
-                if len(key) == 16:
-                    raise PathIdsConflictError(key)
-                else:
-                    raise ChangeSetKeyConflictError(key)
+            elif len(key) == 16:
+                raise PathIdsConflictError(key)
+            elif (self.configCache[key][0] == ChangedFileTypes.diff or
+                  f[0] == ChangedFileTypes.diff):
+                raise ChangeSetKeyConflictError(key)
 
     def _mergeReadOnly(self, otherCs):
         assert(not self.lastCsf)

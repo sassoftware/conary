@@ -349,6 +349,7 @@ class FilesystemJob:
         delayedRestores = []
         ptrTargets = {}
 
+        # this sorting ensures /dir/file is removed before /dir
         paths = self.removes.keys()
         paths.sort()
         paths.reverse()
@@ -388,6 +389,7 @@ class FilesystemJob:
 
         restoreIndex = 0
         j = 0
+        lastRestored = (None, None, None)
         while restoreIndex < len(restores):
             (pathId, fileId, fileObj, target, override, msg) = \
                                                 restores[restoreIndex]
@@ -444,8 +446,14 @@ class FilesystemJob:
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
                         continue
                 else:
-                    contType, contents = self.changeSet.getFileContents(
-                                                            pathId, fileId)
+                    if lastRestored[0:2] == (pathId, fileId):
+                        # we share contents with another path
+                        contType = changeset.ChangedFileTypes.file
+                        contents = filecontents.FromFilesystem(lastRestored[2])
+                    else:
+                        contType, contents = self.changeSet.getFileContents(
+                                                                pathId, fileId)
+
                     assert(contType != changeset.ChangedFileTypes.diff)
                     # PTR types are restored later
                     if contType == changeset.ChangedFileTypes.ptr:
@@ -494,6 +502,7 @@ class FilesystemJob:
 
 	    restoreFile(fileObj, contents, self.root, target, journal,
                         opJournal)
+            lastRestored = (pathId, fileId, target)
 	    log.debug(msg, target)
 
             if fileObj.hasContents and fileObj.linkGroup():

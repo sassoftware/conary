@@ -4,6 +4,8 @@ Changes in @NEW@:
     * Added interface (but no command line option) for performing
       partial clones, where only some components out of a package
       are cloned based on byDefault settings. (CNY-1389)
+    * Allow merging and installing of changesets with compatible (non-diff)
+      sharing of (pathId,fileId) combinations (CNY-1253)
 
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
