@@ -62,16 +62,54 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
                                            troveTypes = repos.TROVE_QUERY_ALL)
     else:
         d = {}
+    return _nextVersionFromQuery(d, db, pkgNames, sourceVersion,
+                                 troveFlavorSet, targetLabel=targetLabel,
+                                 alwaysBumpCount=alwaysBumpCount)
 
+
+def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
+    # search for all the packages that are being created by this cook -
+    # we take the max of all of these versions as our latest.
+    query = {}
+    if repos:
+        for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
+            if sourceVersion.isOnLocalHost():
+                continue
+            pkgNames = set([x.split(':')[-1] for x in troveNames])
+            for pkgName in pkgNames:
+                if pkgName not in query:
+                    query[pkgName] = {}
+                query[pkgName][sourceVersion.getBinaryVersion().branch()] = None
+
+    if repos and not sourceVersion.isOnLocalHost():
+        d = repos.getTroveVersionsByBranch(query,
+                                           troveTypes = repos.TROVE_QUERY_ALL)
+    else:
+        d = {}
+    nextVersions = []
+    for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
+        pkgNames = set([x.split(':')[-1] for x in troveNames])
+        if not isinstance(troveFlavors, (list, tuple, set)):
+            troveFlavors = set([troveFlavors])
+        else:
+            troveFlavors = set(troveFlavors)
+        newVersion = _nextVersionFromQuery(d, db, pkgNames, sourceVersion,
+                                           troveFlavors, 
+                                           alwaysBumpCount=alwaysBumpCount)
+        nextVersions.append(newVersion)
+    return nextVersions
+
+def _nextVersionFromQuery(query, db, pkgNames, sourceVersion,
+                          troveFlavorSet, targetLabel=None,
+                          alwaysBumpCount=False):
     latest = None
-
     relVersions = []
     for pkgName in pkgNames:
-        if pkgName in d:
-            for version in d[pkgName]:
+        if pkgName in query:
+            for version in query[pkgName]:
                 if (not version.isBranchedBinary()
                     and version.getSourceVersion() == sourceVersion):
-                    relVersions.append((version, d[pkgName][version]))
+                    relVersions.append((version, query[pkgName][version]))
     del pkgName
 
     if relVersions:
@@ -111,7 +149,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         return nextLocalVersion(db, troveNames, latest, troveFlavorSet)
     else:
         return latest
-        
+
 def nextLocalVersion(db, troveNames, latest, troveFlavorSet):
     # if we've branched on to a local label, we check
     # the database for installed versions to see if we need to
