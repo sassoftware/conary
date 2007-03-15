@@ -95,9 +95,7 @@ class FileContainer:
 	self.next = self.contentsStart
 
     def close(self):
-        if self.file is not None:
-            self.file.close()
-            self.file = None
+        self.file = None
     
     def addFile(self, fileName, contents, tableData, precompressed = False):
 	assert(isinstance(contents, filecontents.FileContents))
