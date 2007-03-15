@@ -25,6 +25,39 @@ class RedirectRule(object):
     __slots__ = [ 'destName', 'branchStr', 'sourceFlavor', 'targetFlavor',
                   'skipTargetMatching' ]
 
+    def findAvailableTargetFlavors(self, repos):
+        if self.branchStr is None:
+            # redirect to nothing
+            return set()
+
+        if self.branchStr[0] == '/':
+            branch = versions.VersionFromString(self.branchStr)
+            if not isinstance(branch, versions.Branch):
+                raise builderrors.RecipeFileError, \
+                    "Redirects must specify branches or labels, " \
+                    "not versions"
+
+            matches = repos.getTroveLeavesByBranch(
+                            { self.destName : { branch : None } })
+        else:
+            label = versions.Label(self.branchStr)
+            matches = repos.getTroveLeavesByLabel(
+                            { self.destName : { label : None } })
+            # check for label multiplicity
+            if matches:
+                branches = set(x.branch() for x in matches[self.destName])
+                if len(branches) > 1:
+                    raise builderrors.RecipeFileError, \
+                        "Label %s matched multiple branches." % str(label)
+
+        targetFlavors = set()
+        # Get the flavors and branch available on the target
+        for version, flavorList in matches.get(self.destName, {}).iteritems():
+            targetFlavors.update((version, x) for x in flavorList)
+
+        return targetFlavors
+
+
     def copy(self):
         return RedirectRule(self.destName, self.branchStr, self.sourceFlavor,
                             self.targetFlavor, self.skipTargetMatching)
@@ -150,38 +183,6 @@ class RedirectRecipe(Recipe):
 
         return targetRules
 
-    def _findAvailableTargetFlavors(self, destName, branchStr):
-        if branchStr is None:
-            # redirect to nothing
-            return set()
-
-        if branchStr[0] == '/':
-            branch = versions.VersionFromString(branchStr)
-            if not isinstance(branch, versions.Branch):
-                raise builderrors.RecipeFileError, \
-                    "Redirects must specify branches or labels, " \
-                    "not versions"
-
-            matches = self.repos.getTroveLeavesByBranch(
-                            { destName : { branch : None } })
-        else:
-            label = versions.Label(branchStr)
-            matches = self.repos.getTroveLeavesByLabel(
-                            { destName : { label : None } })
-            # check for label multiplicity
-            if matches:
-                branches = set(x.branch() for x in matches[destName])
-                if len(branches) > 1:
-                    raise builderrors.RecipeFileError, \
-                        "Label %s matched multiple branches." % str(label)
-
-        targetFlavors = set()
-        # Get the flavors and branch available on the target
-        for version, flavorList in matches.get(destName, {}).iteritems():
-            targetFlavors.update((version, x) for x in flavorList)
-
-        return targetFlavors
-
     def findTroves(self):
         sourceTroveMatches = self._findSourceTroves()
         trvCsDict = self._getSourceTroves(sourceTroveMatches)
@@ -207,9 +208,7 @@ class RedirectRecipe(Recipe):
             additionalNames = set()
             for rule in targetRules:
                 # get all of the flavors this rule specifies redirecting to
-                targetFlavors = \
-                    self._findAvailableTargetFlavors(rule.destName,
-                                                     rule.branchStr)
+                targetFlavors = rule.findAvailableTargetFlavors(self.repos)
 
                 if (rule.branchStr and not targetFlavors
                                    and rule.destName in self.rules):
