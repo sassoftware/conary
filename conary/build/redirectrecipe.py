@@ -57,9 +57,9 @@ class RedirectRule(object):
 
         return targetFlavors
 
-    def copy(self):
-        return RedirectRule(self.destName, self.branchStr, self.sourceFlavor,
-                            self.targetFlavor, self.skipTargetMatching)
+    def __str__(self):
+        return "%s[%s] -> %s=%s[%s]" % (self.sourceName, self.sourceFlavor,
+                self.destName, self.branchStr, self.targetFlavor)
 
     def __init__(self, sourceName = None, destName = None, branchStr = None,
                  sourceFlavor = None, targetFlavor = None,
@@ -169,14 +169,6 @@ class RedirectRecipe(Recipe):
         # a package we alrady built reuse the rule which we used for that 
         # package
         targetRules = rules.get(name, None)
-        if targetRules is None and ':' in name:
-            pkgName, compName = name.split(':')
-            targetRules = rules.get(pkgName, None)
-            if targetRules is not None:
-                targetRules = [ x.copy() for x in targetRules ]
-                for rule in targetRules:
-                    rule.destName = rule.destName + ':' + compName
-
         if targetRules is None:
             raise builderrors.RecipeFileError, \
                 "Cannot find redirection for trove %s" % name
