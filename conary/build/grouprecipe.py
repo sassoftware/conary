@@ -538,8 +538,8 @@ class GroupRecipe(_BaseGroupRecipe):
         NAME
         ====
 
-        B{C{r.copyComponents()}} - Add components to one group by looking 
-        copying them from the components in another group.
+        B{C{r.copyComponents()}} - Add components to one group by copying them
+        from the components in another group.
 
         SYNOPSIS
         ========
