@@ -379,6 +379,7 @@ class ChangesetFilter(BaseProxy):
                     # you to read this comment
                     try:
                         fd = os.open(csPath, os.O_RDONLY)
+                        os.close(fd)
                     except:
                         pass
 
