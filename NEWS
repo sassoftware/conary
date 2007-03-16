@@ -15,6 +15,10 @@ Changes in @NEW@:
     * Changesets for source troves with missing files (because the file is
       missing from the upstream server or the upstream server is unavailable)
       are properly written to changeset files. (CNY-1415)
+    * Derived packages (experimental) now correctly handle multiple
+      architectures built from the same source. (CNY-1423)
+    * loadInstalled now always works even if you have multiple versions of 
+      a package installed from multiple branches.
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
@@ -28,6 +32,8 @@ Changes in @NEW@:
       (pathId,fileId) key (CNY-1414)
 
   o Build Changes:
+    * The vmware flavor has been defined, representing whether the
+      software is intended to be running as a vmware guest. (CNY-1421)
     * Refactored the redirect build code and fixed bugs related to building
       flavored redirects (CNY-727)
 

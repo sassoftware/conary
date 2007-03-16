@@ -1149,9 +1149,6 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         return correction
 
     def _mergeConfigs(self, otherCs):
-        if self.configCache:
-            import epdb
-            epdb.st('f')
         for key, f in otherCs.configCache.iteritems():
             if not self.configCache.has_key(key):
                 self.configCache[key] = f
@@ -1254,6 +1251,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 class ChangeSetFromFile(ReadOnlyChangeSet):
 
     def __init__(self, fileName, skipValidate = 1):
+        self.fileName = None
         try:
             if type(fileName) is str:
                 try:
@@ -1267,8 +1265,13 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                 except IOError, err:
                     raise filecontainer.BadContainer(
                                 "File %s is not a valid conary changeset: %s" % (fileName, err))
+                self.fileName = fileName
             else:
                 csf = filecontainer.FileContainer(fileName)
+                if hasattr(fileName, 'path'):
+                    # Instance of LazyFile, or some other file object that 
+                    # provides a path
+                    self.fileName = fileName.path
 
             (name, tagInfo, control) = csf.getNextFile()
             assert(name == "CONARYCHANGESET")

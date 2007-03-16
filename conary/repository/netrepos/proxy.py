@@ -379,6 +379,7 @@ class ChangesetFilter(BaseProxy):
                     # you to read this comment
                     try:
                         fd = os.open(csPath, os.O_RDONLY)
+                        os.close(fd)
                     except:
                         pass
 
@@ -435,7 +436,7 @@ class ChangesetFilter(BaseProxy):
                         os.unlink(csPath)
                         csPath = path
                     else:
-                        csPath = _addToCache(fingerprint, inF, iterV,
+                        csPath = _addToCache(fingerprint, open(path), iterV,
                                 (trovesNeeded, filesNeeded, removedTroves),
                                 size)
 

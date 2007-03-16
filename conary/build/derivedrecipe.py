@@ -215,7 +215,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 parentVersion.getSourceVersion())
 
         # Filter out older ones
-        binaries = [ x for x in binaries if x[1] == parentVersion ]
+        binaries = [ x for x in binaries \
+                        if (x[1], x[2]) == (parentVersion, parentFlavor) ]
 
         # Build trove spec
         troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
