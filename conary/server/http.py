@@ -71,8 +71,8 @@ class HttpHandler(WebHandler):
 
         # see the comment about remote repositories in the checkAuth decorator
         self.isRemoteRepository = False
-        self.repServer = repServer
-        self.troveStore = repServer.troveStore
+        self.repServer = repServer.callFactory.repos
+        self.troveStore = self.repServer.troveStore
 
         self._protocol = protocol
         self._port = port
