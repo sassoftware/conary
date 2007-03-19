@@ -154,21 +154,17 @@ class BaseProxy(xmlshims.NetworkConvertors):
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
                                                authToken)
 
-        if hasattr(self, methodname):
-            # handled internally
-            method = self.__getattribute__(methodname)
-
-            if self.callLog:
-                self.callLog.log(remoteIp, authToken, methodname, args)
-
-            try:
-                anon, r = method(caller, authToken, *args)
-            except ProxyRepositoryError, e:
-                return (False, True, e.args)
-
-            return (anon, False, r)
-
         try:
+            if hasattr(self, methodname):
+                # handled internally
+                method = self.__getattribute__(methodname)
+
+                if self.callLog:
+                    self.callLog.log(remoteIp, authToken, methodname, args)
+
+                anon, r = method(caller, authToken, *args)
+                return (anon, False, r)
+
             r = caller.callByName(methodname, *args)
         except ProxyRepositoryError, e:
             return (False, True, e.args)
@@ -292,8 +288,8 @@ class ChangesetFilter(BaseProxy):
             else:
                 # this really was marked as a removed trove.
                 # raise a TroveMissing exception
-                raise errors.TroveMissing(trvName,
-                                          version=trvNewVersion)
+                raise ProxyRepositoryError(("TroveMissing", trvName,
+                    self.fromVersion(trvNewVersion)))
 
         # we need to re-write the munged changeset for an
         # old client

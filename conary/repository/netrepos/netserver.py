@@ -316,16 +316,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                  exception = e)
 
         if isinstance(e, errors.TroveMissing):
-	    if not e.troveName:
-		return (False, True, ("TroveMissing", "", ""))
-	    elif not e.version:
-		return (False, True, ("TroveMissing", e.troveName, ""))
-	    else:
-                if isinstance(e.version, str):
-                    return (False, True,
-                            ("TroveMissing", e.troveName, e.version))
-		return (False, True, ("TroveMissing", e.troveName,
-			self.fromVersion(e.version)))
+            trvName = e.troveName
+            trvVersion = e.version
+            if not trvName:
+                trvName = trvVersion = ""
+            elif not trvVersion:
+                trvVersion = ""
+            else:
+                if not isinstance(e.version, str):
+                    trvVersion = self.fromVersion(trvVersion)
+            return (False, True, ("TroveMissing", trvName, trvVersion))
         elif isinstance(e, errors.FileContentsNotFound):
             return (False, True, ('FileContentsNotFound',
                            self.fromFileId(e.fileId),
