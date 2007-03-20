@@ -284,7 +284,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         authToken = self.getAuth()
 
         if self.cfg.proxyContentsDir:
-            status = netclient.httpPutFile(self.path, self.rfile, contentLength)
+            status, reason = netclient.httpPutFile(self.path, self.rfile, contentLength)
             self.send_response(status)
             return
 

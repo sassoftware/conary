@@ -2104,9 +2104,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             inFile = open(fName)
             size = os.fstat(inFile.fileno()).st_size
 
-            status = httpPutFile(url, inFile, size, callback = callback,
-                                 rateLimit = self.uploadRateLimit,
-                                 proxies = self.proxies)
+            status, reason = httpPutFile(url, inFile, size, callback = callback,
+                                         rateLimit = self.uploadRateLimit,
+                                         proxies = self.proxies)
 
             # give a slightly more helpful message for 403
             if status == 403:
@@ -2115,7 +2115,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # and a generic message for a non-OK status
             if status != 200:
                 raise errors.CommitError('Error uploading to repository: '
-                                         '%s (%s)' %(r.status, r.reason))
+                                         '%s (%s)' %(status, reason))
         finally:
             if autoUnlink:
                 os.unlink(fName)
@@ -2165,4 +2165,4 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = 
                      rateLimit = rateLimit, sizeLimit = size)
 
     r = c.getresponse()
-    return r.status
+    return r.status, r.reason

@@ -203,7 +203,7 @@ def get(port, isSecure, repos, req):
 def putFile(port, isSecure, repos, req):
     if isinstance(repos, proxy.ProxyRepositoryServer):
         contentLength = int(req.headers_in['Content-length'])
-        status = netclient.httpPutFile(req.unparsed_uri, req, contentLength)
+        status, reason = netclient.httpPutFile(req.unparsed_uri, req, contentLength)
         return status
 
     if not isSecure and repos.forceSecure or '/' in req.args:
