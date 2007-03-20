@@ -16,6 +16,7 @@ Implements troves (packages, components, etc.) for the repository
 """
 
 import itertools
+import re
 import struct
 
 from conary import changelog
@@ -1971,6 +1972,11 @@ class Trove(streams.StreamSet):
             if name.count(':') > 1:
                 raise TroveError, \
                             'More than one ":" is not allowed in a trove name'
+
+            if not re.match('^[_A-Za-z0-9+\.\-]+$', name):
+                raise TroveError, \
+                            "Illegal characters in trove name '%s'" % name
+
             assert(flavor is not None)
             self.name.set(name)
             self.version.set(version)

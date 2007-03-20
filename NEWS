@@ -19,6 +19,7 @@ Changes in @NEW@:
       architectures built from the same source. (CNY-1423)
     * loadInstalled now always works even if you have multiple versions of 
       a package installed from multiple branches.
+    * Trove names are now checked for legal characters (CNY-1358)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
