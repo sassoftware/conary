@@ -1973,7 +1973,7 @@ class Trove(streams.StreamSet):
                 raise TroveError, \
                             'More than one ":" is not allowed in a trove name'
 
-            if not re.match('^[_A-Za-z0-9+\.\-]+$', name):
+            if not re.match('^[_A-Za-z0-9+\.\-:]+$', name):
                 raise TroveError, \
                             "Illegal characters in trove name '%s'" % name
 
