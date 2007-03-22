@@ -535,6 +535,7 @@ class ProxyRepositoryServer(ChangesetFilter):
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
+            os.unlink(tmpPath)
             dest = os.fdopen(fd, "w+")
             size = util.copyfileobj(urllib.urlopen(url), dest)
             dest.seek(0)
@@ -556,6 +557,8 @@ class ProxyRepositoryServer(ChangesetFilter):
                 start += size
 
             assert(totalSize == 0)
+            # this closes the underlying fd opened by mkstemp for us
+            dest.close()
 
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                       suffix = '.cf-out')
