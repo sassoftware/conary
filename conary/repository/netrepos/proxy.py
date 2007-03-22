@@ -395,7 +395,7 @@ class ChangesetFilter(BaseProxy):
                 assert(len(sizes) == 1)
                 size = sizes[0]
 
-                if self.csCache:
+                if fingerprint and self.csCache:
                     inF = urllib.urlopen(url)
                     csPath =_addToCache(fingerprint, inF, wireCsVersion,
                                 (trovesNeeded, filesNeeded, removedTroves),
@@ -427,7 +427,7 @@ class ChangesetFilter(BaseProxy):
                                                         iterV, oldV)
                     sizes = [ size ]
 
-                    if not self.csCache:
+                    if not fingerprint or not self.csCache:
                         # we're not caching; erase the old version
                         os.unlink(csPath)
                         csPath = path
