@@ -2742,8 +2742,9 @@ conary erase '%s=%s[%s]'
             localRollbacks=localRollbacks, autoPinList=autoPinList,
             keepJournal=keepJournal)
 
-        if len(allJobs) == 1:
+        if len(allJobs) == 1 and len(jobsCsList) != 1:
             # this handles change sets which include change set files
+            # if we have the job already downloaded, skip this
             self.updateCallback.setChangesetHunk(0, 0)
             newCs = self._createCs(self.repos, self.db, allJobs[0], uJob, 
                               standalone = True)
