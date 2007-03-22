@@ -422,7 +422,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if proxy:
             self.proxies = { 'http' : proxy, 'https' : proxy }
         else:
-            self.proxies = {}
+            self.proxies = None
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir,
                              entitlements, proxies = self.proxies)
@@ -1183,7 +1183,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            inF = urllib.urlopen(url)
+            inF = urllib.urlopen(url, proxies = self.proxies)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -1763,7 +1763,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             (url, sizes) = self.c[server].getFileContents(fileList)
             assert(len(sizes) == len(fileList))
 
-            inF = urllib.urlopen(url)
+            inF = urllib.urlopen(url, proxies = self.proxies)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -2128,7 +2128,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             server.commitChangeSet(url)
 
-def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = {}):
+def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = None):
     """
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
@@ -2136,7 +2136,11 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = 
     protocol, uri = urllib.splittype(url)
     assert(protocol in ('http', 'https'))
 
-    proxy = proxies.get(protocol, url)
+    if proxies is None:
+        proxy = os.environ.get('%s_proxy' % protocol, url)
+    else:
+        proxy = proxies.get(protocol, url)
+
     protocol, uri = urllib.splittype(proxy)
     host = urllib.splithost(uri)[0]
 
