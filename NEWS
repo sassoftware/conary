@@ -6,6 +6,10 @@ Changes in @NEW@:
       are cloned based on byDefault settings. (CNY-1389)
     * Allow merging and installing of changesets with compatible (non-diff)
       sharing of (pathId,fileId) combinations (CNY-1253)
+    * Proxy configuration parameter will now work for standard http proxies,
+      not only conary proxies. It only proxies conary requests however; for
+      full http proxying use the http_proxy environment variable.
+    * Commit should work through a standard http proxy now
 
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
