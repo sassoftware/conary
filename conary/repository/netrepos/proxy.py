@@ -308,17 +308,25 @@ class ChangesetFilter(BaseProxy):
 
         def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
             csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
-            util.mkdirChain(os.path.dirname(csPath))
-            outF = open(csPath + '.new', "w")
+            csDir = os.path.dirname(csPath)
+            util.mkdirChain(csDir)
+            (fd, csTmpPath) = tempfile.mkstemp(dir = csDir,
+                                               suffix = '.ccs-new')
+            outF = os.fdopen(fd, "w")
             util.copyfileobj(inF, outF)
             inF.close()
+            # closes the underlying fd opened by mkstemp
             outF.close()
 
-            data = open(csPath + '.data', "w")
+            (fd, dataTmpPath) = tempfile.mkstemp(dir = csDir,
+                                                 suffix = '.data-new')
+            data = os.fdopen(fd, 'w')
             data.write(cPickle.dumps((returnVal, size)))
+            # closes the underlying fd
             data.close()
 
-            os.rename(csPath + '.new', csPath)
+            os.rename(csTmpPath, csPath)
+            os.rename(dataTmpPath, csPath + '.data')
 
             return csPath
 
