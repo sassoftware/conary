@@ -31,7 +31,7 @@ from conary.lib import openpgpkey
 from conary.streams import ByteStream
 from conary.streams import DependenciesStream, FlavorsStream
 from conary.streams import FrozenVersionStream
-from conary.streams import SMALL, LARGE
+from conary.streams import SMALL, LARGE, DYNAMIC
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
@@ -302,6 +302,15 @@ class DigitalSignatures(streams.AbsoluteStreamCollection):
         for signature in self.getStreams(_DIGSIGS_DIGSIGNATURE):
             yield signature.get()
 
+    def __iter__(self):
+        return self.iter()
+
+    def sign(self, message, keyId):
+        keyCache = openpgpkey.getKeyCache()
+        key = keyCache.getPrivateKey(keyId)
+        sig = key.signString(message)
+        self.add(sig)
+
     # this function is for convenience. It reduces code duplication in
     # netclient and netauth (since I need to pass the frozen form thru
     # xmlrpc)
@@ -489,6 +498,137 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
 
         return new
 
+_VERSIONED_DIGITAL_SIGNATURES_VERSION = 0
+_VERSIONED_DIGITAL_SIGNATURES_MESSAGE = 1
+_VERSIONED_DIGITAL_SIGNATURES_DIGSIGS = 2
+
+class VersionedDigitalSignatures(streams.StreamSet):
+    streamDict = {
+        _VERSIONED_DIGITAL_SIGNATURES_VERSION:
+                (SMALL, streams.ByteStream,    'version'   ),
+        _VERSIONED_DIGITAL_SIGNATURES_MESSAGE:
+                (SMALL, streams.StringStream,  'message'   ),
+        _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS:
+                (SMALL, DigitalSignatures,     'signatures'),
+    }
+
+class VersionedSignaturesSet(streams.StreamCollection):
+    streamDict = { 1 : VersionedDigitalSignatures }
+
+    def sign(self, message, keyId, version=0):
+        for vds in self.getStreams(1):
+            if version == vds.version():
+                if message != vds.message():
+                    raise RuntimeError('inconsistant digital signature messages')
+                vds.signatures.sign(message, keyId)
+                return
+        vds = VersionedDigitalSignatures()
+        vds.version.set(version)
+        vds.message.set(message)
+        vds.signatures.sign(message, keyId)
+        self.addStream(1, vds)
+
+    def __iter__(self):
+        for item in self.getStreams(1):
+            yield item
+
+# FIXME: this should be a dynamically extendable stream.  StreamSet is a
+# little too rigid.
+_METADATA_ITEM_TAG_ID = 0
+_METADATA_ITEM_TAG_SHORTDESC = 1
+_METADATA_ITEM_TAG_LONGDESC = 2
+_METADATA_ITEM_TAG_LICENSES = 3
+_METADATA_ITEM_TAG_CRYPTO = 4
+_METADATA_ITEM_TAG_URL = 5
+_METADATA_ITEM_TAG_CATEGORIES = 6
+_METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
+_METADATA_ITEM_TAG_SIGNATURES = 8
+
+class MetadataItem(streams.StreamSet):
+    streamDict = {
+        _METADATA_ITEM_TAG_ID:
+                (DYNAMIC, streams.StringStream,   'id'           ),
+        _METADATA_ITEM_TAG_SHORTDESC:
+                (DYNAMIC, streams.StringStream,   'shortDesc'    ),
+        _METADATA_ITEM_TAG_LONGDESC:
+                (DYNAMIC, streams.StringStream,   'longDesc'     ),
+        _METADATA_ITEM_TAG_LICENSES:
+                (DYNAMIC, streams.StringsStream,  'licenses'     ),
+        _METADATA_ITEM_TAG_CRYPTO:
+                (DYNAMIC, streams.StringsStream,  'crypto'       ),
+        _METADATA_ITEM_TAG_URL:
+                (DYNAMIC, streams.StringStream,   'url'          ),
+        _METADATA_ITEM_TAG_CATEGORIES:
+                (DYNAMIC, streams.StringsStream,  'categories'   ),
+        _METADATA_ITEM_TAG_BIBLIOGRAPHY:
+                (DYNAMIC, streams.StringsStream,  'bibliography' ),
+        _METADATA_ITEM_TAG_SIGNATURES:
+                (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
+        }
+
+    def _digest(self, version=0):
+        if version == 0:
+            # version 0 of the message digest
+            frz = streams.StreamSet.freeze(self,
+                                           skipSet = { 'id' : True,
+                                                       'signatures': True })
+            return sha1helper.sha1String(frz)
+        raise RuntimeError('unsupported version')
+
+    def _updateId(self):
+        self.id.set(self._digest(0))
+
+    def addDigitalSignature(self, keyId):
+        self._updateId()
+        self.signatures.sign(self.id(), keyId)
+
+    def verifyDigitalSignatures(self, serverName=None):
+        keyCache = openpgpkey.getKeyCache()
+        missingKeys = []
+        badFingerprints = []
+        for signatures in self.signatures:
+            # verify that recomputing the digest for this version
+            # of the signature matches the stored version
+            if self._digest(signatures.version()) != signatures.message():
+                raise DigitalSignatureVerificationError(
+                    'metadata checksum does not match stored value')
+            message = signatures.message()
+            for signature in signatures.signatures:
+                try:
+                    key = keyCache.getPublicKey(signature[0],
+                                                serverName=serverName,
+                                                warn=False)
+                except KeyNotFound:
+                    missingKeys.append(signature[0])
+                    continue
+                lev = key.verifyString(message, signature)
+                if lev == -1:
+                    badFingerprints.append(key.getFingerprint())
+        return missingKeys, badFingerprints
+
+    def freeze(self, *args, **kw):
+        self._updateId()
+        return streams.StreamSet.freeze(self, *args, **kw)
+
+class Metadata(streams.StreamCollection):
+    streamDict = { 1: MetadataItem }
+
+    def add(self, item):
+        self.addStream(1, item)
+
+    def __iter__(self):
+        for item in self.getStreams(1):
+            yield item
+
+    def verifyDigitalSignatures(self, serverName=None):
+        missingKeys = []
+        badFingerprints = []
+        for item in self:
+            rc = item.verifyDigitalSignatures(serverName=serverName)
+            missingKeys.extend(rc[0])
+            badFingerprints.extend(rc[1])
+        return missingKeys, badFingerprints
+
 _STREAM_TRV_NAME            = 0
 _STREAM_TRV_VERSION         = 1
 _STREAM_TRV_FLAVOR          = 2
@@ -499,9 +639,10 @@ _STREAM_TRV_REQUIRES        = 6
 _STREAM_TRV_STRONG_TROVES   = 7
 _STREAM_TRV_FILES           = 8
 _STREAM_TRV_TYPE            = 9
-_STREAM_TRV_SIGS            = 10
+_STREAM_TRV_SIGS            = 10 # unused
 _STREAM_TRV_WEAK_TROVES     = 11
 _STREAM_TRV_REDIRECTS       = 12
+_STREAM_TRV_METADATA        = 13
 
 TROVE_TYPE_NORMAL          = 0
 TROVE_TYPE_REDIRECT        = 1
@@ -546,6 +687,8 @@ class Trove(streams.StreamSet):
                     (SMALL, ByteStream,                  "type"         ),
         _STREAM_TRV_REDIRECTS     :
                     (SMALL, TroveRedirectList,           "redirects"    ),
+        _STREAM_TRV_METADATA      :
+                    (LARGE, Metadata,                    "metadata"     ),
     }
     ignoreUnknown = False
 
@@ -554,7 +697,7 @@ class Trove(streams.StreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "strongTroves", "weakTroves",
-                  "idMap", "type", "redirects" ]
+                  "idMap", "type", "redirects", 'metadata' ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -564,7 +707,8 @@ class Trove(streams.StreamSet):
                                         skipSet = { 'sigs' : True,
                                                     'versionStrings' : True,
                                                     'incomplete' : True,
-                                                    'pathHashes' : True })
+                                                    'pathHashes' : True,
+                                                    'metadata': True })
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         """
         Computes a new signature for this trove and stores it.
@@ -577,10 +721,7 @@ class Trove(streams.StreamSet):
         assert(skipIntegrityChecks or not sha1_orig or 
                sha1_orig == self.troveInfo.sigs.sha1())
 
-        keyCache = openpgpkey.getKeyCache()
-        key = keyCache.getPrivateKey(keyId)
-        sig = key.signString(self.troveInfo.sigs.sha1())
-        self.troveInfo.sigs.digitalSigs.add(sig)
+        self.troveInfo.sigs.digitalSigs.sign(self.troveInfo.sigs.sha1(), keyId)
 
     def addPrecomputedDigitalSignature(self, sig):
         """
@@ -657,6 +798,13 @@ class Trove(streams.StreamSet):
             if lev == -1:
                 badFingerprints.append(key.getFingerprint())
             maxTrust = max(lev,maxTrust)
+
+        # verify metadata.  Pass in the server name so it can
+        # find additional fingerprints
+        rc = self.metadata.verifyDigitalSignatures(serverName=serverName)
+        metaMissingKeys, metaBadSigs = rc
+        missingKeys.extend(metaMissingKeys)
+        badFingerprints.extend(metaBadSigs)
 
         if missingKeys and threshold > 0:
             from conary.lib import log
