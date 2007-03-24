@@ -211,12 +211,19 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                  parentFlavor)
 
         # Fetch all binaries built from this source
-        binaries = self.repos.getTrovesBySource(self.name + ':source',
-                parentVersion.getSourceVersion())
+        #
+        # This (esp the _setBuildCount(None) bit) is ugly. We can't
+        # use getSourceVersion() here, because it undoes shadows. Instead
+        # turn the parentVersion we have into a source version by segging
+        # the build count to None.
+        v = parentVersion.copy()
+        v.trailingRevision()._setBuildCount(None)
+        binaries = self.repos.getTrovesBySource(self.name + ':source', v)
 
         # Filter out older ones
         binaries = [ x for x in binaries \
-                        if (x[1], x[2]) == (parentVersion, parentFlavor) ]
+                        if (x[1], x[2]) == (parentVersion,
+                                            parentFlavor) ]
 
         # Build trove spec
         troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
