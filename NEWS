@@ -37,6 +37,7 @@ Changes in @NEW@:
       same time (CNY-1443)
     * Fixed a bug in the CfgQuotedLineList display function (does not affect
       conary directly)
+    * Flavored items in a job list are now correctly frozen. (CNY-1479)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
