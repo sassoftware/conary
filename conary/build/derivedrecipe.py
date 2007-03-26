@@ -214,7 +214,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         #
         # This (esp the _setBuildCount(None) bit) is ugly. We can't
         # use getSourceVersion() here, because it undoes shadows. Instead
-        # turn the parentVersion we have into a source version by segging
+        # turn the parentVersion we have into a source version by setting
         # the build count to None.
         v = parentVersion.copy()
         v.trailingRevision()._setBuildCount(None)
