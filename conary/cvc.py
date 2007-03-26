@@ -425,6 +425,15 @@ class CookCommand(CvcCommand):
             cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor,
                                                        buildFlavor)
             del argSet['flavor']
+
+        if argSet.has_key('macros'):
+            f = open(argSet['macros'])
+            for row in f:
+                cfg.configLine('macros ' + row.strip())
+            f.close()
+            del f
+            del argSet['macros']
+
         if argSet.has_key('macro'):
             for macro in argSet['macro']:
                 cfg.configLine('macros ' + macro)
@@ -470,13 +479,6 @@ class CookCommand(CvcCommand):
         if argSet.has_key('debug-exceptions'):
             del argSet['debug-exceptions']
             cfg.debugRecipeExceptions = True
-        if argSet.has_key('macros'):
-            f = open(argSet['macros'])
-            for row in f:
-                cfg.configLine('macros ' + row.strip())
-            f.close()
-            del f
-            del argSet['macros']
 
         crossCompile = argSet.pop('cross', None)
         if crossCompile:   
