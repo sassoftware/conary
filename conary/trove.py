@@ -305,10 +305,10 @@ class DigitalSignatures(streams.AbsoluteStreamCollection):
     def __iter__(self):
         return self.iter()
 
-    def sign(self, message, keyId):
+    def sign(self, digest, keyId):
         keyCache = openpgpkey.getKeyCache()
         key = keyCache.getPrivateKey(keyId)
-        sig = key.signString(message)
+        sig = key.signString(digest)
         self.add(sig)
 
     # this function is for convenience. It reduces code duplication in
@@ -321,15 +321,15 @@ class DigitalSignatures(streams.AbsoluteStreamCollection):
         raise KeyNotFound('Signature by key: %s does not exist' %keyId)
 
 _VERSIONED_DIGITAL_SIGNATURES_VERSION = 0
-_VERSIONED_DIGITAL_SIGNATURES_MESSAGE = 1
+_VERSIONED_DIGITAL_SIGNATURES_DIGEST   = 1
 _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS = 2
 
 class VersionedDigitalSignatures(streams.StreamSet):
     streamDict = {
         _VERSIONED_DIGITAL_SIGNATURES_VERSION:
                 (SMALL, streams.ByteStream,    'version'   ),
-        _VERSIONED_DIGITAL_SIGNATURES_MESSAGE:
-                (SMALL, streams.StringStream,  'message'   ),
+        _VERSIONED_DIGITAL_SIGNATURES_DIGEST:
+                (SMALL, streams.StringStream,  'digest'   ),
         _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS:
                 (SMALL, DigitalSignatures,     'signatures'),
     }
@@ -337,17 +337,23 @@ class VersionedDigitalSignatures(streams.StreamSet):
 class VersionedSignaturesSet(streams.StreamCollection):
     streamDict = { 1 : VersionedDigitalSignatures }
 
-    def sign(self, message, keyId, version=0):
+    def sign(self, digest, keyId, version=0):
         for vds in self.getStreams(1):
             if version == vds.version():
-                if message != vds.message():
-                    raise RuntimeError('inconsistant digital signature messages')
-                vds.signatures.sign(message, keyId)
+                if digest != vds.digest():
+                    raise RuntimeError('inconsistant digital signature digest')
+                vds.signatures.sign(digest, keyId)
                 return
         vds = VersionedDigitalSignatures()
         vds.version.set(version)
-        vds.message.set(message)
-        vds.signatures.sign(message, keyId)
+        vds.digest.set(digest)
+        vds.signatures.sign(digest, keyId)
+        self.addStream(1, vds)
+
+    def addDigest(self, digest, version = 0):
+        vds = VersionedDigitalSignatures()
+        vds.version.set(version)
+        vds.digest.set(digest)
         self.addStream(1, vds)
 
     def __iter__(self):
@@ -360,6 +366,7 @@ _TROVESIG_VSIG   = 2
 
 _TROVESIG_VER_CLASSIC = 0
 _TROVESIG_VER_NEW     = 1
+_TROVESIG_VER_ALL = [ 0 ]
 
 class TroveSignatures(streams.StreamSet):
     """
@@ -374,7 +381,7 @@ class TroveSignatures(streams.StreamSet):
     streamDict = {
         _TROVESIG_SHA1      : ( SMALL, streams.AbsoluteSha1Stream, 'sha1'   ),
         _TROVESIG_DIGSIG    : ( LARGE, DigitalSignatures,          'digitalSigs' ),
-        _TROVESIG_VSIG      : ( LARGE, VersionedDigitalSignatures, 'vSigs' ),
+        _TROVESIG_VSIG      : ( LARGE, VersionedSignaturesSet,     'vSigs' ),
     }
 
     # this code needs to be called any time we're making a derived
@@ -383,25 +390,55 @@ class TroveSignatures(streams.StreamSet):
     def reset(self):
         self.digitalSigs = DigitalSignatures()
         self.sha1 = streams.AbsoluteSha1Stream()
+        self.vSigs = VersionedSignaturesSet()
 
     def freeze(self, skipSet = {}):
         return streams.StreamSet.freeze(self, skipSet = skipSet)
+
+    def computeDigest(self, sigVersion, message):
+        if sigVersion == _TROVESIG_VER_CLASSIC:
+            self.sha1.compute(message)
+            return
+
+        if sigVersion == _TROVESIG_VER_NEW:
+            digest = streams.Sha256Stream()
+            digest.compute(message)
+        else:
+            raise NotImplementedError
+
+        for versionedBlock in self.vSigs:
+            if versionedBlock.version() != sigVersion():
+                continue
+
+            versionedBlock.digest.set(digest())
+            return
+
+        self.vSigs.addDigest(digest(), version = sigVersion)
 
     def __iter__(self):
         """
         Iterates over all signatures in this block. Signatures are returned as
         (version, digest, signature) tuples. Each digest is also returned as
-        (digest, None) before any signatures for that digest.
+        (digest, None) before any signatures for that digest. The digests
+        are returned as digets stream objects.
         """
-        yield (_TROVESIG_VER_CLASSIC, self.sha1(), None)
+        yield (_TROVESIG_VER_CLASSIC, self.sha1, None)
 
-        for sig in digitalSigs:
-            yield (_TROVESIG_VER_CLASSIC, self.sha1(), sig)
+        for sig in self.digitalSigs:
+            yield (_TROVESIG_VER_CLASSIC, self.sha1, sig)
 
         for versionedBlock in self.vSigs:
-            yield (versionedBlock.version(), versionedBlock.message(), None)
+            yield (versionedBlock.version(), versionedBlock.digest(), None)
             for sig in versionBlock.signatures:
-                yield (versionedBlock.version(), versionedBlock.message(), None)
+                ver = versionedBlock.version()
+                if ver == _TROVESIG_VER_NEW:
+                    digest = streams.Sha256Stream()
+                else:
+                    raise NotImplementedError
+
+                digest.set(versionedBlock.digest())
+
+                yield (versionedBlock.version(), digest, None)
 
 _TROVE_FLAG_ISCOLLECTION = 1 << 0
 _TROVE_FLAG_ISDERIVED    = 1 << 1
@@ -597,7 +634,7 @@ class MetadataItem(streams.StreamSet):
 
     def _digest(self, version=0):
         if version == 0:
-            # version 0 of the message digest
+            # version 0 of the digest
             frz = streams.StreamSet.freeze(self,
                                            skipSet = { 'id' : True,
                                                        'signatures': True })
@@ -618,10 +655,10 @@ class MetadataItem(streams.StreamSet):
         for signatures in self.signatures:
             # verify that recomputing the digest for this version
             # of the signature matches the stored version
-            if self._digest(signatures.version()) != signatures.message():
+            if self._digest(signatures.version()) != signatures.digest():
                 raise DigitalSignatureVerificationError(
                     'metadata checksum does not match stored value')
-            message = signatures.message()
+            digest = signatures.digest()
             for signature in signatures.signatures:
                 try:
                     key = keyCache.getPublicKey(signature[0],
@@ -630,7 +667,7 @@ class MetadataItem(streams.StreamSet):
                 except KeyNotFound:
                     missingKeys.append(signature[0])
                     continue
-                lev = key.verifyString(message, signature)
+                lev = key.verifyString(digest, signature)
                 if lev == -1:
                     badFingerprints.append(key.getFingerprint())
         return missingKeys, badFingerprints
@@ -731,13 +768,17 @@ class Trove(streams.StreamSet):
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
 
-    def _sigString(self):
-        return streams.StreamSet.freeze(self,
-                                        skipSet = { 'sigs' : True,
-                                                    'versionStrings' : True,
-                                                    'incomplete' : True,
-                                                    'pathHashes' : True,
-                                                    'metadata': True })
+    def _sigString(self, version):
+        if version == _TROVESIG_VER_CLASSIC:
+            return streams.StreamSet.freeze(self,
+                                            skipSet = { 'sigs' : True,
+                                                        'versionStrings' : True,
+                                                        'incomplete' : True,
+                                                        'pathHashes' : True,
+                                                        'metadata': True })
+
+        raise NotImplementedError
+
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         """
         Computes a new signature for this trove and stores it.
@@ -760,10 +801,7 @@ class Trove(streams.StreamSet):
         @param sig: Signature to add
         @type sig: DigitalSignature
         """
-        sha1_orig = self.troveInfo.sigs.sha1()
-        sha1_new = self.computeDigests()
-        if sha1_orig:
-            assert(sha1_orig == sha1_new)
+        assert(self.verifyDigests)
 
         signature = DigitalSignature()
         signature.set(sig)
@@ -806,10 +844,7 @@ class Trove(streams.StreamSet):
         missingKeys = []
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
-        sha1_orig = self.troveInfo.sigs.sha1()
-        sha1_new = self.computeDigests(store=False)
-        if sha1_orig:
-            assert(sha1_orig == sha1_new)
+        assert(self.verifyDigests())
 
         if keyCache is None:
             keyCache = openpgpkey.getKeyCache()
@@ -862,25 +897,26 @@ class Trove(streams.StreamSet):
         @type store: boolean
         @rtype: string
         """
-        s = self._sigString()
-        sha1 = sha1helper.sha1String(s)
-
-        if store:
-            self.troveInfo.sigs.sha1.set(sha1)
-
-        return sha1
+        for sigVersion in _TROVESIG_VER_ALL:
+            s = self._sigString(version = sigVersion)
+            self.troveInfo.sigs.computeDigest(sigVersion, s)
 
     def verifyDigests(self):
         """
-        Verifies the sha1 signature of this trove.
+        Verifies the digests trove.
 
         @rtype: boolean
         """
 
-        s = self._sigString()
-        sha1 = sha1helper.sha1String(s)
+        lastSigVersion = None
+        for (sigVersion, sigDigest, signature) in self.troveInfo.sigs:
+            if lastSigVersion != sigVersion:
+                lastSigVersion = sigVersion
+                s = self._sigString(sigVersion)
+                if not sigDigest.verify(s):
+                    return False
 
-        return sha1 == self.troveInfo.sigs.sha1()
+        return True
 
     def copy(self, classOverride = None):
         if not classOverride:
@@ -2716,10 +2752,10 @@ class DigitalSignatureVerificationError(TroveError):
     # it instead of burying it
     errorIsUncatchable = True
     def __str__(self):
-        return self.message
+        return self.digest
 
-    def __init__(self, message):
-        self.message = message
+    def __init__(self, digest):
+        self.digest = digest
 
 class TroveIntegrityError(TroveError):
     """

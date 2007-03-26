@@ -130,8 +130,8 @@ class Sha1Stream(StringStream):
     def compute(self, message):
         self.set(sha1helper.sha1String(message))
 
-    def verify(self, digest):
-        return self() == sha1helper.sha1FromString(digest)
+    def verify(self, message):
+        return self() == sha1helper.sha1String(message)
 
     def setFromString(self, hexdigest):
         StringStream.set(self, sha1helper.sha1FromString(hexdigest))
@@ -165,7 +165,7 @@ class Sha256Stream(StringStream):
         self.set(sha1helper.sha256String(message))
 
     def verify(self, digest):
-        return self() == sha1helper.sha256FromString(digest)
+        return self() == sha1helper.sha256String(message)
 
     def setFromString(self, hexdigest):
         StringStream.set(self, sha1helper.sha256FromString(hexdigest))
