@@ -31,7 +31,8 @@ DEP_CLASS_PYTHON        = 11
 DEP_CLASS_PERL          = 12
 DEP_CLASS_RUBY          = 13
 DEP_CLASS_PHP           = 14
-DEP_CLASS_SENTINEL      = 15
+DEP_CLASS_TARGET_IS     = 15
+DEP_CLASS_SENTINEL      = 16
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -619,6 +620,16 @@ class InstructionSetDependency(DependencyClass):
     flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(InstructionSetDependency)
 
+class TargetInstructionSetDependency(DependencyClass):
+
+    tag = DEP_CLASS_TARGET_IS
+    tagName = "target"
+    justOne = False
+    depClass = Dependency
+    allowParseDep = False
+    flags = DEP_CLASS_HAS_FLAGS
+_registerDepClass(TargetInstructionSetDependency)
+
 class OldSonameDependencies(DependencyClass):
 
     tag = DEP_CLASS_OLD_SONAME
@@ -731,7 +742,7 @@ class TroveDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
-    depFormat = 'IDENT(?::IDENT)?' # trove[:comp] 
+    depFormat = 'WORD(?::IDENT)?' # trove[:comp] 
 
 _registerDepClass(TroveDependencies)
 
@@ -1197,23 +1208,26 @@ def formatFlavor(flavor):
 
     classes = flavor.getDepClasses()
     insSet = list(flavor.iterDepsByClass(InstructionSetDependency))
+    targetSet = list(flavor.iterDepsByClass(TargetInstructionSetDependency))
     useFlags = list(flavor.iterDepsByClass(UseDependency))
 
     if insSet:
         insSet = _singleClass(insSet)
+    if targetSet:
+        targetSet = _singleClass(targetSet)
 
     if useFlags:
         # strip the use() bit
         useFlags = _singleClass(useFlags)[4:-1]
 
-    if insSet and useFlags:
-        return "%s is: %s" % (useFlags, insSet)
-    elif insSet:
-        return "is: %s" % insSet
-    elif useFlags:
-        return useFlags
-
-    return ""
+    flavors = []
+    if useFlags:
+        flavors.append(useFlags)
+    if insSet:
+        flavors.append('is: %s' % insSet)
+    if targetSet:
+        flavors.append('target: %s' % targetSet)
+    return ' '.join(flavors)
 
 def parseFlavor(s, mergeBase = None, raiseError = False):
     # return a Flavor dep set for the string passed. format is
@@ -1255,16 +1269,14 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
     if groups[3]:
         # groups[3] is base instruction set, groups[4] is the flags, and
         # groups[5] is the next instruction set
+        # groups[6] is a side effect of the matching groups, but isn't used
+        # for anything
 
         # set up the loop for the next pass
-        insGroups = groups[3:]
-        while insGroups[0]:
-            # group 0 is the base, group[1] is the flags, and group[2] is
-            # the next instruction set clause
-            baseInsSet = insGroups[0]
-
-            if insGroups[1]:
-                insSetFlags = insGroups[1].split(",")
+        baseInsSet, insSetFlags, nextGroup, _, _ = groups[3:8]
+        while baseInsSet:
+            if insSetFlags:
+                insSetFlags = insSetFlags.split(",")
                 for i, flag in enumerate(insSetFlags):
                     insSetFlags[i] = _fixup(flag)
             else:
@@ -1273,18 +1285,46 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
             set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
                                                             insSetFlags))
 
-            if not insGroups[2]:
+            if not nextGroup:
                 break
 
-            match = archGroupRegexp.match(insGroups[2])
+            match = archGroupRegexp.match(nextGroup)
             # this had to match, or flavorRegexp wouldn't have
             assert(match)
-            insGroups = match.groups()
+            baseInsSet, insSetFlags, nextGroup, _, _ = match.groups()
 
     elif groups[2]:
         # mark that the user specified "is:" without any instruction set
         # by adding a placeholder instruction set dep class here. 
         set.addEmptyDepClass(InstructionSetDependency)
+
+    # 8 is target: 9 is target architecture.  10 is target flags
+    # 11 is the next instruction set.  12 is just a side effect.
+    if groups[9]:
+        baseInsSet, insSetFlags, nextGroup = groups[9], groups[10], groups[11]
+        while baseInsSet:
+            if insSetFlags:
+                insSetFlags = insSetFlags.split(",")
+                for i, flag in enumerate(insSetFlags):
+                    insSetFlags[i] = _fixup(flag)
+            else:
+                insSetFlags = []
+
+            set.addDep(TargetInstructionSetDependency, Dependency(baseInsSet,
+                                                                  insSetFlags))
+            if not nextGroup:
+                break
+
+            match = archGroupRegexp.match(nextGroup)
+            # this had to match, or flavorRegexp wouldn't have
+            assert(match)
+            baseInsSet, insSetFlags, nextGroup, _, _ = match.groups()
+    elif groups[8]:
+        # mark that the user specified "target:" without any instruction set
+        # by adding a placeholder instruction set dep class here. 
+        set.addEmptyDepClass(TargetInstructionSetDependency)
+
+
 
     if groups[1]:
         useFlags = groups[1].split(",")
@@ -1387,8 +1427,8 @@ ident = '(?:[0-9A-Za-z_-]+)'
 flag = '(?:~?!?IDENT)'
 useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
 archFlags = '\(( *FLAG(?: *, *FLAG)*)\)'
-archClause = '(?:(IDENT)(?:ARCHFLAGS)?)?'
-archGroup = '(?:ARCHCLAUSE(?:  *(ARCHCLAUSE))*)'
+archClause = ' *(?:(IDENT)(?:ARCHFLAGS)?)?'
+archGroup = '(?:ARCHCLAUSE(?:((?:  *ARCHCLAUSE)*))?)'
 useClause = '(USEFLAG *(?:, *USEFLAG)*)?'
 
 
@@ -1397,7 +1437,7 @@ depName = r'(?:[^ (]+)' # anything except for a space or an opening paren
 depClause = depName + depFlags
 depRegexpStr = r'(IDENT): *(DEPCLAUSE) *'
 
-flavorRegexpStr = '^(use:)? *(?:USECLAUSE)? *(?:(is:) *ARCHGROUP)?$'
+flavorRegexpStr = '^(use:)? *(?:USECLAUSE)? *(?:(is:) *ARCHGROUP)? *(?:(target:) *ARCHGROUP)?$'
 
 flavorRegexpStr = flavorRegexpStr.replace('ARCHGROUP', archGroup)
 flavorRegexpStr = flavorRegexpStr.replace('ARCHCLAUSE', archClause)
