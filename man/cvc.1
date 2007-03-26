@@ -256,11 +256,11 @@ that it creates a new trove with information from another. However, unlike
 shadowing, cloning will not create a new label on the target branch and it is
 not possible to merge changes (see "merge" later in this document) with clone.
 The commit will appear to originate from the individual who last committed the
-trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
-name. See the \fBExamples\fP section for more information.
-.RS 4
+trove being cloned.
+.TP 4
 .B \-\-all-flavors
 Clone all flavors for the latest versions of the specified troves.
+.TP 4
 .B \-\-without-sources
 Do not automatically clone the source for every package you are cloning.  This 
 can be useful, for example, if the package you are cloning is a shadowed binary and the source is only available on the parent branch.
