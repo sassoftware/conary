@@ -346,7 +346,7 @@ class CfgQuotedLineList(CfgLineList):
             displayOptions = {}
         if value:
             yield "'" + "' '".join(
-                    self.valueType.format(x, displayOptions) for x in value) + "'"
+                    [self.valueType.format(x, displayOptions) for x in value]) + "'"
 
 class CfgList(CfgType):
 
