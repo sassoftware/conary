@@ -429,6 +429,9 @@ class CookCommand(CvcCommand):
         if argSet.has_key('macros'):
             f = open(argSet['macros'])
             for row in f:
+                row = row.strip()
+                if not row or row[0] == '#':
+                    continue
                 cfg.configLine('macros ' + row.strip())
             f.close()
             del f
