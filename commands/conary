@@ -373,8 +373,8 @@ class RollbackCommand(ConaryCommand):
         kwargs['callback'] = updatecmd.UpdateCallback(cfg)
         if argSet or len(otherArgs) != 3: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
-        args = [db, cfg] + otherArgs[2:]
-        rollbacks.apply(db, cfg, otherArgs[2], **kwargs)
+        client = conaryclient.ConaryClient(cfg)
+        client.applyRollback(otherArgs[2], **kwargs)
 _register(RollbackCommand)
 
 

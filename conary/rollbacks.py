@@ -14,7 +14,6 @@
 
 import sys
 
-from conary import conaryclient
 from conary.lib import log, util
 from conary.local import database
 
@@ -75,7 +74,14 @@ def formatRollbacks(cfg, rollbacks, stream=None):
         w_('\n')
 
 def apply(db, cfg, rollbackSpec, **kwargs):
+    import warnings
+    warnings.warn("rollbacks.apply is deprecated, use the client's "
+                    "applyRollback call", DeprecationWarning)
+    from conary import conaryclient
     client = conaryclient.ConaryClient(cfg)
+    return applyRollback(client, rollbackSpec, **kwargs)
+
+def applyRollback(client, rollbackSpec, **kwargs):
     client.checkWriteableRoot()
 
     log.syslog.command()
@@ -83,8 +89,8 @@ def apply(db, cfg, rollbackSpec, **kwargs):
     defaults = { 'replaceFiles': False }
     defaults.update(kwargs)
 
-    db.readRollbackStatus()
-    rollbackList = db.getRollbackList()
+    client.db.readRollbackStatus()
+    rollbackList = client.db.getRollbackList()
 
     if rollbackSpec.startswith('r.'):
         try:
@@ -115,10 +121,10 @@ def apply(db, cfg, rollbackSpec, **kwargs):
         rollbacks.reverse()
 
     try:
-	db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
+        client.db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
     except database.RollbackError, e:
-	log.error("%s", e)
-	return 1
+        log.error("%s", e)
+        return 1
 
     log.syslog.commandComplete()
 

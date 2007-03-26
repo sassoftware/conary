@@ -16,7 +16,7 @@ import os
 import pickle
 
 #conary imports
-from conary import conarycfg, metadata, trove
+from conary import conarycfg, metadata, rollbacks, trove
 from conary.conaryclient import clone, resolve, update
 from conary.lib import log, util
 from conary.local import database
@@ -388,3 +388,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                         self.cfg.installLabelPath,
                         flavor, self.db,
                         resolveSearchMethod=searchMethod)
+
+    def applyRollback(self, rollbackSpec, **kwargs):
+        return rollbacks.applyRollback(self, rollbackSpec, **kwargs)
