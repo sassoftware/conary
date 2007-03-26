@@ -35,6 +35,8 @@ Changes in @NEW@:
       example, when different flavors of a binary were cooked from different
       source versions and all flavors to be cloned to the new label at teh 
       same time (CNY-1443)
+    * Fixed a bug in the CfgQuotedLineList display function (does not affect
+      conary directly)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
