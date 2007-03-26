@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Version 44:
+  - added support for decoding "chunked" Transfer-encoding requests
+    from clients
 
 Version 43:
   - added getTroveReferences call.

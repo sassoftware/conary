@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2104,9 +2104,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             inFile = open(fName)
             size = os.fstat(inFile.fileno()).st_size
 
+            # use chunked transfer encoding to work around servers that do not
+            # handle Content-length of > 2 GiB
+            chunked = False
+            if 1 or size > (2 * 1024 * 1024 * 1024):
+                # protocol version 44 introduces the ability to decode chunked
+                # PUTs
+                if server.getProtocolVersion() < 44:
+                    raise errors.CommitError('The changeset being uploaded is '
+                                             'too large for the server to '
+                                             'handle.')
+                chunked = True
+
             status, reason = httpPutFile(url, inFile, size, callback = callback,
                                          rateLimit = self.uploadRateLimit,
-                                         proxies = self.proxies)
+                                         proxies = self.proxies,
+                                         chunked = chunked)
 
             # give a slightly more helpful message for 403
             if status == 403:
@@ -2128,7 +2141,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             server.commitChangeSet(url)
 
-def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = None):
+def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
+                proxies = None, chunked=False):
     """
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
@@ -2160,13 +2174,38 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None, proxies = 
 
     c.connect()
     c.putrequest("PUT", url)
-    c.putheader('Content-length', str(size))
-    c.endheaders()
-
     c.url = url
 
-    util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
-                     rateLimit = rateLimit, sizeLimit = size)
+    if chunked:
+        c.putheader('Transfer-Encoding', 'chunked')
+        c.endheaders()
+
+        # keep track of the total amount of data sent so that the
+        # callback passed in to copyfileobj can report progress correctly
+        total = 0
+        while size:
+            # send in 256k chunks
+            chunk = 262144
+            if chunk > size:
+                chunk = size
+            # first send the hex-encoded size
+            c.send('%x\r\n' %chunk)
+            # then the chunk of data
+            util.copyfileobj(inFile, c, bufSize=chunk, callback=callbackFn,
+                             rateLimit = rateLimit, sizeLimit = chunk,
+                             total=total)
+            # send \r\n after the chunked data
+            c.send("\r\n")
+            total =+ chunk
+            size -= chunk
+        # terminate the chunked encoding
+        c.send('0\r\n\r\n')
+    else:
+        c.putheader('Content-length', str(size))
+        c.endheaders()
+
+        util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
+                         rateLimit = rateLimit, sizeLimit = size)
 
     r = c.getresponse()
     return r.status, r.reason

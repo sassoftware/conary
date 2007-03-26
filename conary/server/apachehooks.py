@@ -147,7 +147,7 @@ def _handler(req):
                 log.error("serverName is required in %s" % req.filename)
                 return apache.HTTP_INTERNAL_SERVER_ERROR
 
-        if os.path.realpath(cfg.tmpDir) == cfg.tmpDir:
+        if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
             log.error("tmpDir cannot include symbolic links")
 
         if cfg.closed:
