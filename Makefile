@@ -96,8 +96,8 @@ ccs: dist
 	sed -i 's,r.addPatch(.*),,' conary-$(VERSION)/conary.recipe;
 	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
 	# This is just to prime the cache for the cook from a recipe
-	bin/cvc cook --prep conary=conary.rpath.com@rpl:devel
-	bin/cvc cook conary-$(VERSION)/conary.recipe
+	bin/cvc cook --build-label conary.rpath.com@rpl:devel --prep conary=conary.rpath.com@rpl:devel
+	bin/cvc cook --build-label conary.rpath.com@rpl:devel conary-$(VERSION)/conary.recipe
 	rm -rf conary-$(VERSION)
 
 include Make.rules
