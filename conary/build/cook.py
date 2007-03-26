@@ -171,7 +171,7 @@ def _signTrove(trv, fingerprint):
         trv.addDigitalSignature(fingerprint)
     else:
         # if no fingerprint, just add sha1s
-        trv.computeSignatures()
+        trv.computeDigests()
 
 def signAbsoluteChangeset(cs, fingerprint=None):
     # adds signatures or at least sha1s (if fingerprint is None)

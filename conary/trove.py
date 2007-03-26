@@ -320,14 +320,61 @@ class DigitalSignatures(streams.AbsoluteStreamCollection):
                 return sig
         raise KeyNotFound('Signature by key: %s does not exist' %keyId)
 
+_VERSIONED_DIGITAL_SIGNATURES_VERSION = 0
+_VERSIONED_DIGITAL_SIGNATURES_MESSAGE = 1
+_VERSIONED_DIGITAL_SIGNATURES_DIGSIGS = 2
+
+class VersionedDigitalSignatures(streams.StreamSet):
+    streamDict = {
+        _VERSIONED_DIGITAL_SIGNATURES_VERSION:
+                (SMALL, streams.ByteStream,    'version'   ),
+        _VERSIONED_DIGITAL_SIGNATURES_MESSAGE:
+                (SMALL, streams.StringStream,  'message'   ),
+        _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS:
+                (SMALL, DigitalSignatures,     'signatures'),
+    }
+
+class VersionedSignaturesSet(streams.StreamCollection):
+    streamDict = { 1 : VersionedDigitalSignatures }
+
+    def sign(self, message, keyId, version=0):
+        for vds in self.getStreams(1):
+            if version == vds.version():
+                if message != vds.message():
+                    raise RuntimeError('inconsistant digital signature messages')
+                vds.signatures.sign(message, keyId)
+                return
+        vds = VersionedDigitalSignatures()
+        vds.version.set(version)
+        vds.message.set(message)
+        vds.signatures.sign(message, keyId)
+        self.addStream(1, vds)
+
+    def __iter__(self):
+        for item in self.getStreams(1):
+            yield item
+
 _TROVESIG_SHA1   = 0
 _TROVESIG_DIGSIG = 1
+_TROVESIG_VSIG   = 2
+
+_TROVESIG_VER_CLASSIC = 0
+_TROVESIG_VER_NEW     = 1
 
 class TroveSignatures(streams.StreamSet):
+    """
+    sha1 and digitalSigs are "classic" signatures; they include information
+    included with conary < 1.1.19. vSigs are versioned digital signatures,
+    which allows multiple signing schemes. The "classic" signatures are
+    considered version 0, and this object hides the different storage method
+    for those signatures.
+    """
+
     ignoreUnknown = True
     streamDict = {
         _TROVESIG_SHA1      : ( SMALL, streams.AbsoluteSha1Stream, 'sha1'   ),
-        _TROVESIG_DIGSIG    : ( LARGE, DigitalSignatures,     'digitalSigs' ),
+        _TROVESIG_DIGSIG    : ( LARGE, DigitalSignatures,          'digitalSigs' ),
+        _TROVESIG_VSIG      : ( LARGE, VersionedDigitalSignatures, 'vSigs' ),
     }
 
     # this code needs to be called any time we're making a derived
@@ -339,6 +386,22 @@ class TroveSignatures(streams.StreamSet):
 
     def freeze(self, skipSet = {}):
         return streams.StreamSet.freeze(self, skipSet = skipSet)
+
+    def __iter__(self):
+        """
+        Iterates over all signatures in this block. Signatures are returned as
+        (version, digest, signature) tuples. Each digest is also returned as
+        (digest, None) before any signatures for that digest.
+        """
+        yield (_TROVESIG_VER_CLASSIC, self.sha1(), None)
+
+        for sig in digitalSigs:
+            yield (_TROVESIG_VER_CLASSIC, self.sha1(), sig)
+
+        for versionedBlock in self.vSigs:
+            yield (versionedBlock.version(), versionedBlock.message(), None)
+            for sig in versionBlock.signatures:
+                yield (versionedBlock.version(), versionedBlock.message(), None)
 
 _TROVE_FLAG_ISCOLLECTION = 1 << 0
 _TROVE_FLAG_ISDERIVED    = 1 << 1
@@ -497,40 +560,6 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
             new[key] = val
 
         return new
-
-_VERSIONED_DIGITAL_SIGNATURES_VERSION = 0
-_VERSIONED_DIGITAL_SIGNATURES_MESSAGE = 1
-_VERSIONED_DIGITAL_SIGNATURES_DIGSIGS = 2
-
-class VersionedDigitalSignatures(streams.StreamSet):
-    streamDict = {
-        _VERSIONED_DIGITAL_SIGNATURES_VERSION:
-                (SMALL, streams.ByteStream,    'version'   ),
-        _VERSIONED_DIGITAL_SIGNATURES_MESSAGE:
-                (SMALL, streams.StringStream,  'message'   ),
-        _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS:
-                (SMALL, DigitalSignatures,     'signatures'),
-    }
-
-class VersionedSignaturesSet(streams.StreamCollection):
-    streamDict = { 1 : VersionedDigitalSignatures }
-
-    def sign(self, message, keyId, version=0):
-        for vds in self.getStreams(1):
-            if version == vds.version():
-                if message != vds.message():
-                    raise RuntimeError('inconsistant digital signature messages')
-                vds.signatures.sign(message, keyId)
-                return
-        vds = VersionedDigitalSignatures()
-        vds.version.set(version)
-        vds.message.set(message)
-        vds.signatures.sign(message, keyId)
-        self.addStream(1, vds)
-
-    def __iter__(self):
-        for item in self.getStreams(1):
-            yield item
 
 # FIXME: this should be a dynamically extendable stream.  StreamSet is a
 # little too rigid.
@@ -717,7 +746,7 @@ class Trove(streams.StreamSet):
         @type keyId: str
         """
         sha1_orig = self.troveInfo.sigs.sha1()
-        self.computeSignatures()
+        self.computeDigests()
         assert(skipIntegrityChecks or not sha1_orig or 
                sha1_orig == self.troveInfo.sigs.sha1())
 
@@ -732,7 +761,7 @@ class Trove(streams.StreamSet):
         @type sig: DigitalSignature
         """
         sha1_orig = self.troveInfo.sigs.sha1()
-        sha1_new = self.computeSignatures()
+        sha1_new = self.computeDigests()
         if sha1_orig:
             assert(sha1_orig == sha1_new)
 
@@ -778,7 +807,7 @@ class Trove(streams.StreamSet):
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
         sha1_orig = self.troveInfo.sigs.sha1()
-        sha1_new = self.computeSignatures(store=False)
+        sha1_new = self.computeDigests(store=False)
         if sha1_orig:
             assert(sha1_orig == sha1_new)
 
@@ -821,10 +850,10 @@ class Trove(streams.StreamSet):
                             % self.getName())
         return maxTrust, missingKeys
 
-    def invalidateSignatures(self):
+    def invalidateDigests(self):
         self.troveInfo.sigs.reset()
 
-    def computeSignatures(self, store = True):
+    def computeDigests(self, store = True):
         """
         Recomputes the sha1 signature of this trove.
 
@@ -841,7 +870,7 @@ class Trove(streams.StreamSet):
 
         return sha1
 
-    def verifySignatures(self):
+    def verifyDigests(self):
         """
         Verifies the sha1 signature of this trove.
 
@@ -1154,7 +1183,7 @@ class Trove(streams.StreamSet):
         elif not skipIntegrityChecks:
             # if we have a sha1 in our troveinfo, verify it
             if self.troveInfo.sigs.sha1():
-                if not self.verifySignatures():
+                if not self.verifyDigests():
                     raise TroveIntegrityError(self.getName(), self.getVersion(),
                                               self.getFlavor())
             else:

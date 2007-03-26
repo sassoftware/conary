@@ -554,8 +554,8 @@ def commit(repos, cfg, message, callback=None, test=False):
             return
 
     newState.changeChangeLog(cl)
-    newState.invalidateSignatures()
-    newState.computeSignatures()
+    newState.invalidateDigests()
+    newState.computeDigests()
     signatureKey = selectSignatureKey(cfg,
                                       newState.getBranch().label().asString())
     if signatureKey is not None:
@@ -1272,7 +1272,7 @@ def markRemoved(cfg, repos, troveSpec):
     for (name, version, flavor) in trvList:
         trv = trove.Trove(name, version, flavor,
                           type = trove.TROVE_TYPE_REMOVED)
-        trv.computeSignatures()
+        trv.computeDigests()
         signatureKey = selectSignatureKey(cfg,
                                           version.trailingLabel().asString())
         if signatureKey is not None:

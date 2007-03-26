@@ -1842,8 +1842,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     # compute new signatures -- the old ones are invalid because of
     # the version change
-    newTrove.invalidateSignatures()
-    newTrove.computeSignatures()
+    newTrove.invalidateDigests()
+    newTrove.computeDigests()
 
     (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove, absolute = srcTrove is None)
 
@@ -1939,8 +1939,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                 
         if changed:
             newTrove.changeVersion(newVersion)
-            newTrove.invalidateSignatures()
-            newTrove.computeSignatures()
+            newTrove.invalidateDigests()
+            newTrove.computeDigests()
             trvCs = newTrove.diff(curTrove)[0]
             returnList[i] = (True, newTrove)
             changeSet.newTrove(trvCs)
