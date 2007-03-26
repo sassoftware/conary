@@ -471,11 +471,9 @@ class CookCommand(CvcCommand):
             del argSet['debug-exceptions']
             cfg.debugRecipeExceptions = True
         if argSet.has_key('macros'):
-            argSet['macros']
             f = open(argSet['macros'])
-            # XXX sick hack
-            macroSrc = "macros =" + f.read()
-            exec macroSrc
+            for row in f:
+                cfg.configLine('macros ' + row.strip())
             f.close()
             del f
             del argSet['macros']
