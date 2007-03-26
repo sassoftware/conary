@@ -366,7 +366,7 @@ _TROVESIG_VSIG   = 2
 
 _TROVESIG_VER_CLASSIC = 0
 _TROVESIG_VER_NEW     = 1
-_TROVESIG_VER_ALL = [ 0 ]
+_TROVESIG_VER_ALL = [ 0, 1 ]
 
 class TroveSignatures(streams.StreamSet):
     """
@@ -407,7 +407,7 @@ class TroveSignatures(streams.StreamSet):
             raise NotImplementedError
 
         for versionedBlock in self.vSigs:
-            if versionedBlock.version() != sigVersion():
+            if versionedBlock.version() != sigVersion:
                 continue
 
             versionedBlock.digest.set(digest())
@@ -428,16 +428,18 @@ class TroveSignatures(streams.StreamSet):
             yield (_TROVESIG_VER_CLASSIC, self.sha1, sig)
 
         for versionedBlock in self.vSigs:
-            yield (versionedBlock.version(), versionedBlock.digest(), None)
-            for sig in versionBlock.signatures:
-                ver = versionedBlock.version()
-                if ver == _TROVESIG_VER_NEW:
-                    digest = streams.Sha256Stream()
-                else:
-                    raise NotImplementedError
+            ver = versionedBlock.version()
+            if ver == _TROVESIG_VER_NEW:
+                digest = streams.Sha256Stream()
+            else:
+                # Ignore digest types we don't know about.
+                continue
 
-                digest.set(versionedBlock.digest())
+            digest.set(versionedBlock.digest())
 
+            yield (versionedBlock.version(), digest, None)
+
+            for sig in versionedBlock.signatures:
                 yield (versionedBlock.version(), digest, None)
 
 _TROVE_FLAG_ISCOLLECTION = 1 << 0
@@ -775,6 +777,12 @@ class Trove(streams.StreamSet):
                                                         'versionStrings' : True,
                                                         'incomplete' : True,
                                                         'pathHashes' : True,
+                                                        'metadata': True })
+        elif version == _TROVESIG_VER_NEW:
+            return streams.StreamSet.freeze(self,
+                                            skipSet = { 'sigs' : True,
+                                                        'versionStrings' : True,
+                                                        'incomplete' : True,
                                                         'metadata': True })
 
         raise NotImplementedError

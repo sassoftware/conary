@@ -164,7 +164,7 @@ class Sha256Stream(StringStream):
     def compute(self, message):
         self.set(sha1helper.sha256String(message))
 
-    def verify(self, digest):
+    def verify(self, message):
         return self() == sha1helper.sha256String(message)
 
     def setFromString(self, hexdigest):
