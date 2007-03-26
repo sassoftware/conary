@@ -104,12 +104,27 @@ def post(port, isSecure, repos, req):
 def get(port, isSecure, repos, req):
     def _writeNestedFile(req, name, tag, size, f, sizeCb):
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
+            # this is a reference to a compressed file in the contents store
             path = f.read()
             size = os.stat(path).st_size
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
             sizeCb(size, tag)
-            req.sendfile(path)
+            # FIXME: apache 2.0 can't sendfile() a file > 2 GiB.
+            # we'll have to send the data ourselves
+            if size > 2147483648:
+                f = open(path, 'r')
+                # 2 MB buffer
+                bufsize = 2 * 1024 * 1024
+                while 1:
+                    s = f.read(bufsize)
+                    if not s:
+                        break
+                    req.write(s)
+            else:
+                # otherwise we can use the handy sendfile method
+                req.sendfile(path)
         else:
+            # this is data from the changeset itself
             sizeCb(size, tag)
             req.write(f.read())
 
@@ -214,12 +229,24 @@ def putFile(port, isSecure, repos, req):
     if size != 0:
 	return apache.HTTP_UNAUTHORIZED
 
+    retcode = apache.OK
     f = open(path, "w+")
-    s = req.read(BUFFER)
-    while s:
-	f.write(s)
-	s = req.read(BUFFER)
+    try:
+        try:
+            s = req.read(BUFFER)
+            while s:
+                f.write(s)
+                s = req.read(BUFFER)
+        except Exception, e:
+            # for some reason, this is a different instance of the
+            # apache.SERVER_RETURN class than we have available from
+            # mod_python, so we can't catch only the SERVER_RETURN
+            # exception
+            if 'SERVER_RETURN' in str(e.__class__):
+                retcode = e.args[0]
+            else:
+                raise
+    finally:
+        f.close()
 
-    f.close()
-
-    return apache.OK
+    return retcode

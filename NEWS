@@ -14,6 +14,9 @@ Changes in @NEW@:
       latest version of the listed troves. (CNY-1440)
     * Made --with-sources the default for cvc promote, adding the new flag
       --without-sources.  --with-sources will still work.
+    * Due to limitations in Apache 2.0, the Conary client will now use
+      HTTP/1.1 "chunked" Transfer-encoding when committing changesets
+      larger than 2 GiB.
     * The Conary client API exposes a new call, applyRollback. (CNY-1455).
 
   o Bug Fixes:

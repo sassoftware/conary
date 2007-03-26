@@ -352,7 +352,7 @@ def copyfile(sources, dest, verbose=True):
 
 def copyfileobj(source, dest, callback = None, digest = None,
                 abortCheck = None, bufSize = 128*1024, rateLimit = None,
-                sizeLimit = None):
+                sizeLimit = None, total=0):
     if hasattr(dest, 'send'):
         write = dest.send
     else:
@@ -371,7 +371,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
     starttime = time.time()
 
-    total = 0
+    copied = 0
 
     if abortCheck:
         sourceFd = source.fileno()
@@ -379,8 +379,8 @@ def copyfileobj(source, dest, callback = None, digest = None,
         sourceFd = None
 
     while True:
-        if sizeLimit and (sizeLimit -total < bufSize):
-            bufSize = sizeLimit - total
+        if sizeLimit and (sizeLimit - copied < bufSize):
+            bufSize = sizeLimit - copied
 
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time
@@ -395,26 +395,27 @@ def copyfileobj(source, dest, callback = None, digest = None,
             break
 
         total += len(buf)
+        copied += len(buf)
         write(buf)
 
         now = time.time()
         if now == starttime:
             rate = 0 # don't bother limiting download until now > starttime.
         else:
-            rate = total / ((now - starttime)) 
+            rate = copied / ((now - starttime)) 
 
         if callback:
             callback(total, rate)
 
-        if total == sizeLimit:
+        if copied == sizeLimit:
             break
 
         if rateLimit > 0 and rate > rateLimit:
-            time.sleep((total / rateLimit) - (total / rate))
+            time.sleep((copied / rateLimit) - (copied / rate))
 
         if digest: digest.update(buf)
 
-    return total
+    return copied
 
 def rename(sources, dest):
     for source in braceGlob(sources):

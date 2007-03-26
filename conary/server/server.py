@@ -280,7 +280,17 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	return resp
 
     def do_PUT(self):
-        contentLength = int(self.headers['Content-Length'])
+        chunked = False
+        if 'Transfer-encoding' in self.headers:
+            contentLength = 0
+            chunked = True
+        elif 'Content-Length' in self.headers:
+            chunked = False
+            contentLength = int(self.headers['Content-Length'])
+        else:
+            # send 411: Length Required
+            self.send_error(411)
+
         authToken = self.getAuth()
 
         if self.cfg.proxyContentsDir:
@@ -288,26 +298,32 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_response(status)
             return
 
-	path = self.path.split("?")[-1]
+        path = self.path.split("?")[-1]
 
         if '/' in path:
-	    self.send_error(403)
+            self.send_error(403)
 
-	path = self.tmpDir + '/' + path + "-in"
+        path = self.tmpDir + '/' + path + "-in"
 
-	size = os.stat(path).st_size
-	if size != 0:
-	    self.send_error(410)
-	    return
+        size = os.stat(path).st_size
+        if size != 0:
+            self.send_error(410)
+            return
 
-	out = open(path, "w")
-
-	while contentLength:
-	    s = self.rfile.read(contentLength)
-	    contentLength -= len(s)
-	    out.write(s)
-
-	self.send_response(200)
+        out = open(path, "w")
+        if chunked:
+            while 1:
+                chunk = self.rfile.readline()
+                chunkSize = int(chunk, 16)
+                # chunksize of 0 means we're done
+                if chunkSize == 0:
+                    break
+                util.copyfileobj(self.rfile, out, sizeLimit=chunkSize)
+                # read the \r\n after the chunk we just copied
+                self.rfile.readline()
+        else:
+            util.copyfileobj(self.rfile, out, sizeLimit=contentLength)
+        self.send_response(200)
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     publicCalls = set(tuple(NetworkRepositoryServer.publicCalls) + ('reset',))
