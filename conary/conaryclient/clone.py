@@ -269,6 +269,8 @@ class ClientClone:
         possiblePreClones = []
         for queryItem, tupList in result.iteritems():
             tupList = [ x for x in tupList if x[2] == queryItem[2] ]
+            if not tupList:
+                continue
             latest = sorted(tupList)[-1]
             if cloneMap.couldBePreClone(latest):
                 possiblePreClones.append(latest)
@@ -378,6 +380,10 @@ class ClientClone:
         versionsToGet = []
         for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
             targetSourceVersion = cloneMap.getTargetVersion(sourceTup)
+            if targetSourceVersion is None:
+                raise InternalConaryError(
+                             "Cannot find cloned source for %s=%s" \
+                                  % (sourceTup[0], sourceTup[1]))
             targetBranch = targetSourceVersion.branch()
 
             byFlavor = {}
@@ -787,12 +793,13 @@ class CloneChooser(object):
         if self.byDefaultMap is not None:
             if troveTup not in self.byDefaultMap:
                 return False
-        if name.endswith(':source') and self.options.cloneSources:
-            return True
         if (version.trailingLabel() not in self.labelMap
             and None not in self.labelMap):
             return False
-        if self.options.fullRecurse:
+        if name.endswith(':source'):
+            if self.options.cloneSources:
+                return True
+        elif self.options.fullRecurse:
             return True
         return self._matchesPrimaryTrove(troveTup, sourceName)
 
@@ -863,9 +870,10 @@ class BranchCloneChooser(CloneChooser):
             if troveTup not in self.byDefaultMap:
                 return False
 
-        if troveTup[0].endswith(':source') and self.options.cloneSources:
-            return True
-        if self.options.fullRecurse:
+        if troveTup[0].endswith(':source'):
+            if self.options.cloneSources:
+                return True
+        elif self.options.fullRecurse:
             return True
         return self._matchesPrimaryTrove(troveTup, sourceName)
 
@@ -888,9 +896,17 @@ class CloneMap(object):
         if (name, targetBranch, flavor) in self.trovesByTargetBranch:
             if self.trovesByTargetBranch[name, targetBranch, flavor] == version:
                 return
-            raise CloneError("Cannot clone multiple troves with same name and"
-                             " flavor to branch %s: %s[%s]" % (targetBranch,
-                                                               name, flavor))
+            otherVersion = self.trovesByTargetBranch[name, targetBranch, flavor]
+            if not flavor.isEmpty():
+                troveSpec = '%s[%s]' % (name, flavor)
+            else:
+                troveSpec = name
+            raise CloneError("Cannot clone multiple versions of %s"
+                             " to branch %s at the same time.  Attempted to"
+                             " clone versions %s and %s" % (troveSpec,
+                                                            targetBranch,
+                                                            otherVersion,
+                                                            version))
         self.trovesByTargetBranch[name, targetBranch, flavor] = version
         if name.endswith(':source'):
             self.trovesBySource.setdefault((name, version, flavor), [])
@@ -899,9 +915,9 @@ class CloneMap(object):
         noFlavor = deps.parseFlavor('')
         sourceVersion = version.getSourceVersion(False)
         sourceTup = (sourceName, sourceVersion, noFlavor)
-        self.trovesBySource.setdefault(sourceTup, []).append(troveTup)
+        self.addTrove(sourceTup, targetBranch)
+        self.trovesBySource[sourceTup].append(troveTup)
         self.sourcesByTrove[troveTup] = sourceTup
-        self.trovesByTargetBranch[sourceName, targetBranch, noFlavor] = sourceVersion
 
     def iterSourceTargetBranches(self):
         for (name, targetBranch, flavor), version  \

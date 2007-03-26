@@ -238,8 +238,9 @@ class PromoteCommand(CvcCommand):
                                   ' all cloned sources'),
              'test'            : ('Runs through all the steps of committing'
                                   ' but does not modify the repository'),
-             'with-sources'    : ('Ensure that any binaries that are being'
-                                 ' cloned also have a matching source component'),
+             'without-sources'    : (VERBOSE_HELP,
+                                     'Do not clone sources for the binaries'
+                                     'being cloned')
            }
 
     def addParameters(self, argDef):
@@ -248,6 +249,8 @@ class PromoteCommand(CvcCommand):
         argDef["info"] = '-i', NO_PARAM
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
+        argDef["all-flavors"] = NO_PARAM
+        argDef["without-sources"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
@@ -268,11 +271,13 @@ class PromoteCommand(CvcCommand):
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        cloneSources = argSet.pop("with-sources", False)
+        allFlavors = argSet.pop("all-flavors", False)
+        cloneSources = not argSet.pop("without-sources", False)
+        argSet.pop("with-sources", False)
         clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test,
-                            cloneSources=cloneSources)
+                            cloneSources=cloneSources, allFlavors=allFlavors)
 _register(PromoteCommand)
 
 

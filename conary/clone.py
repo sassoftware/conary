@@ -95,7 +95,7 @@ def _convertLabel(lblStr, template):
 def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
-                  cloneSources = False):
+                  cloneSources = False, allFlavors = False, client=None):
     labelMap = {}
     for fromLabel, toLabel in labelList:
         context = cfg.buildLabel
@@ -107,10 +107,25 @@ def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
 
     troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
 
+    if allFlavors:
+        cfg.flavor = []
     client = ConaryClient(cfg)
     searchSource = client.getSearchSource()
-    trovesToClone = searchSource.findTroves(troveSpecs)
-    trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
+    results = searchSource.findTroves(troveSpecs,
+                                      bestFlavor=not allFlavors)
+    if allFlavors:
+        trovesToClone = []
+        # we only clone the latest version for all troves.
+        # bestFlavor=False resturns the leaves for all flavors, so 
+        # we may need to cut some out.
+        for troveSpec, troveTups in results.items():
+            latest = max([x[1] for x in troveTups])
+            troveTups = [ x for x in troveTups if x[1] == latest ]
+            trovesToClone.extend(troveTups)
+    else:
+        trovesToClone = itertools.chain(*results.itervalues())
+    trovesToClone = list(set(trovesToClone))
+
     if not client.cfg.quiet:
         callback = conaryclient.callbacks.CloneCallback(client.cfg, message)
     else:

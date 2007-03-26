@@ -10,6 +10,10 @@ Changes in @NEW@:
       not only conary proxies. It only proxies conary requests however; for
       full http proxying use the http_proxy environment variable.
     * Commit should work through a standard http proxy now
+    * Added --all-flavors option for cvc promote to promote all flavors of the
+      latest version of the listed troves. (CNY-1440)
+    * Made --with-sources the default for cvc promote, adding the new flag
+      --without-sources.  --with-sources will still work.
 
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
@@ -26,6 +30,11 @@ Changes in @NEW@:
     * Trove names are now checked for legal characters. (CNY-1358)
     * A minor bug related to file uploads on the error codepath was fixed.
       (CNY-1442)
+    * A bug in cvc promote that caused it to fail when the source components
+      added due to --with-sources were in conflict.  This could happen, for
+      example, when different flavors of a binary were cooked from different
+      source versions and all flavors to be cloned to the new label at teh 
+      same time (CNY-1443)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
