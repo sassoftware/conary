@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -530,7 +530,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.c[label].addAccessGroup(groupName)
 
     def addDigitalSignature(self, name, version, flavor, digsig):
-        if self.c[version].getProtocolVersion() < 44:
+        if self.c[version].getProtocolVersion() < 45:
             raise InvalidServerVersion, "Cannot sign troves on Conary " \
                     "repositories older than 1.1.20"
 

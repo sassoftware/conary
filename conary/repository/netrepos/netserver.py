@@ -43,7 +43,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45 ]
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -2306,7 +2306,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
-        if clientVersion < 44:
+        if clientVersion < 45:
             raise InvalidClientVersion, "Conary client >= 1.1.20 required" \
                     "for signing"
 
