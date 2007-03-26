@@ -6,6 +6,14 @@ Changes in @NEW@:
       are cloned based on byDefault settings. (CNY-1389)
     * Allow merging and installing of changesets with compatible (non-diff)
       sharing of (pathId,fileId) combinations (CNY-1253)
+    * Proxy configuration parameter will now work for standard http proxies,
+      not only conary proxies. It only proxies conary requests however; for
+      full http proxying use the http_proxy environment variable.
+    * Commit should work through a standard http proxy now
+    * Added --all-flavors option for cvc promote to promote all flavors of the
+      latest version of the listed troves. (CNY-1440)
+    * Made --with-sources the default for cvc promote, adding the new flag
+      --without-sources.  --with-sources will still work.
 
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
@@ -22,6 +30,13 @@ Changes in @NEW@:
     * Trove names are now checked for legal characters. (CNY-1358)
     * A minor bug related to file uploads on the error codepath was fixed.
       (CNY-1442)
+    * A bug in cvc promote that caused it to fail when the source components
+      added due to --with-sources were in conflict.  This could happen, for
+      example, when different flavors of a binary were cooked from different
+      source versions and all flavors to be cloned to the new label at teh 
+      same time (CNY-1443)
+    * Fixed a bug in the CfgQuotedLineList display function (does not affect
+      conary directly)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
@@ -39,6 +54,13 @@ Changes in @NEW@:
       software is intended to be running as a vmware guest. (CNY-1421)
     * Refactored the redirect build code and fixed bugs related to building
       flavored redirects (CNY-727)
+    * Added capability the loadrecipe code to allow the loadInstalled
+      and loadSuperClass troves to used to be passed in explicitly,
+      overriding the search mechanism, via the overrideLoad parameter
+    * If there's a conflict when loading installed troves, the latest trove
+      will be picked.
+    * loadInstall will now search the installLabelPath for troves to load
+      when it cannot find them any other way.
 
 Changes in 1.1.18:
   o Major Changes:

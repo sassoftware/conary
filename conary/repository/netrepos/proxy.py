@@ -308,17 +308,25 @@ class ChangesetFilter(BaseProxy):
 
         def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
             csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
-            util.mkdirChain(os.path.dirname(csPath))
-            outF = open(csPath + '.new', "w")
+            csDir = os.path.dirname(csPath)
+            util.mkdirChain(csDir)
+            (fd, csTmpPath) = tempfile.mkstemp(dir = csDir,
+                                               suffix = '.ccs-new')
+            outF = os.fdopen(fd, "w")
             util.copyfileobj(inF, outF)
             inF.close()
+            # closes the underlying fd opened by mkstemp
             outF.close()
 
-            data = open(csPath + '.data', "w")
+            (fd, dataTmpPath) = tempfile.mkstemp(dir = csDir,
+                                                 suffix = '.data-new')
+            data = os.fdopen(fd, 'w')
             data.write(cPickle.dumps((returnVal, size)))
+            # closes the underlying fd
             data.close()
 
-            os.rename(csPath + '.new', csPath)
+            os.rename(csTmpPath, csPath)
+            os.rename(dataTmpPath, csPath + '.data')
 
             return csPath
 
@@ -365,7 +373,11 @@ class ChangesetFilter(BaseProxy):
 
         for rawJob, fingerprint in itertools.izip(chgSetList, fingerprints):
             path = None
+            # if we have both a cs fingerprint and a cache, then we will
+            # cache the cs for this job
+            cachable = bool(fingerprint and self.csCache)
             if fingerprint:
+                # look up the changeset in the cache
                 # empty fingerprint means "do not cache"
                 fullPrint = fingerprint + '-%d' % neededCsVersion
                 csPath = self.csCache.hashToPath(fullPrint)
@@ -388,6 +400,7 @@ class ChangesetFilter(BaseProxy):
                     path = csPath
 
             if path is None:
+                # the changeset isn't in the cache.  create it
                 url, sizes, trovesNeeded, filesNeeded, removedTroves = \
                     caller.getChangeSet(
                               getCsVersion, [ rawJob ], recurse, withFiles,
@@ -395,7 +408,7 @@ class ChangesetFilter(BaseProxy):
                 assert(len(sizes) == 1)
                 size = sizes[0]
 
-                if fingerprint and self.csCache:
+                if cachable:
                     inF = urllib.urlopen(url)
                     csPath =_addToCache(fingerprint, inF, wireCsVersion,
                                 (trovesNeeded, filesNeeded, removedTroves),
@@ -427,7 +440,7 @@ class ChangesetFilter(BaseProxy):
                                                         iterV, oldV)
                     sizes = [ size ]
 
-                    if not fingerprint or not self.csCache:
+                    if not cachable:
                         # we're not caching; erase the old version
                         os.unlink(csPath)
                         csPath = path
@@ -440,7 +453,8 @@ class ChangesetFilter(BaseProxy):
 
                 path = csPath
 
-            pathList.append((path, size))
+            # make a note if this path has been stored in the cache or not
+            pathList.append((path, size, cachable))
             allTrovesNeeded += trovesNeeded
             allFilesNeeded += filesNeeded
             allTrovesRemoved += removedTroves
@@ -451,12 +465,7 @@ class ChangesetFilter(BaseProxy):
                            "changeset?%s" % os.path.basename(path[:-4]))
         f = os.fdopen(fd, 'w')
 
-        for path, size in pathList:
-            if self.csCache:
-                cached = 1
-            else:
-                cached = 0
-
+        for path, size, cached in pathList:
             # the hard-coded 1 means it's a changeset and needs to be walked 
             # looking for files to include by reference
             f.write("%s %d 1 %d\n" % (path, size, cached))
@@ -535,6 +544,7 @@ class ProxyRepositoryServer(ChangesetFilter):
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
+            os.unlink(tmpPath)
             dest = os.fdopen(fd, "w+")
             size = util.copyfileobj(urllib.urlopen(url), dest)
             dest.seek(0)
@@ -556,6 +566,8 @@ class ProxyRepositoryServer(ChangesetFilter):
                 start += size
 
             assert(totalSize == 0)
+            # this closes the underlying fd opened by mkstemp for us
+            dest.close()
 
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                       suffix = '.cf-out')

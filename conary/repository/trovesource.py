@@ -325,24 +325,9 @@ class SearchableTroveSource(AbstractTroveSource):
             if not versionQuery:
                 allTroves[name] = troves[name]
                 continue
-            versionResults = {}
-            for version in troves[name].iterkeys():
-                if versionType == _GTL_VERSION_TYPE_LABEL:
-                    theLabel = version.branch().label()
-                    if theLabel not in versionQuery:
-                        continue
-                    versionResults.setdefault(theLabel, []).append(version)
-                elif versionType == _GTL_VERSION_TYPE_BRANCH:
-                    theBranch = version.branch()
-                    if theBranch not in versionQuery:
-                        continue
-                    versionResults.setdefault(theBranch, []).append(version)
-                elif versionType == _GTL_VERSION_TYPE_VERSION:
-                    if version not in versionQuery:
-                        continue
-                    versionResults.setdefault(version, []).append(version)
-                else:
-                    assert(False)
+            versionResults = self._filterByVersionQuery(versionType,
+                                                        troves[name].keys(), 
+                                                        versionQuery)
 
             for queryKey, versionList in versionResults.iteritems():
                 if latestFilter == _GET_TROVE_VERY_LATEST:
@@ -401,6 +386,27 @@ class SearchableTroveSource(AbstractTroveSource):
                                     and flavorFilter == _GET_TROVE_BEST_FLAVOR):
                                     break
         return allTroves
+
+    def _filterByVersionQuery(self, versionType, versionList, versionQuery):
+        versionResults = {}
+        for version in versionList:
+            if versionType == _GTL_VERSION_TYPE_LABEL:
+                theLabel = version.branch().label()
+                if theLabel not in versionQuery:
+                    continue
+                versionResults.setdefault(theLabel, []).append(version)
+            elif versionType == _GTL_VERSION_TYPE_BRANCH:
+                theBranch = version.branch()
+                if theBranch not in versionQuery:
+                    continue
+                versionResults.setdefault(theBranch, []).append(version)
+            elif versionType == _GTL_VERSION_TYPE_VERSION:
+                if version not in versionQuery:
+                    continue
+                versionResults.setdefault(version, []).append(version)
+            else:
+                assert(False)
+        return versionResults
 
     def getTroveLeavesByLabel(self, troveSpecs, bestFlavor=True,
                             troveTypes=TROVE_QUERY_PRESENT):
@@ -1017,6 +1023,24 @@ class SourceStack(object):
     def iterSources(self):
         for source in self.sources:
             yield source
+
+    def getFileContents(self, fileList, *args, **kw):
+        results = [ None for x in fileList ]
+        map = dict((x[0], x[0]) for x in enumerate(fileList))
+        for source in self.sources:
+            if not hasattr(source, 'getFileContents'):
+                continue
+            newMap = []
+            results = source.getFileContents(fileList, *args, **kw)
+            for curIdx, result in enumerate(results):
+                if result is None:
+                    newMap.append((len(newMap), map[curIdx]))
+                else:
+                    results[map[curIdx]] = result
+            if not newMap:
+                break
+            map = dict(newMap)
+        return results
 
     def copy(self):
         return self.__class__(*self.sources)

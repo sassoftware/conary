@@ -378,9 +378,13 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                 conflicts.append(troveConflict)
         return conflicts
 
-    def getSearchSource(self):
+    def getSearchSource(self, flavor=0):
+        # a flavor of None is common in some cases so we use 0
+        # as our "unset" case.
+        if flavor is 0:
+            flavor = self.cfg.flavor
         searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
         return searchsource.NetworkSearchSource(self.getRepos(),
                         self.cfg.installLabelPath,
-                        self.cfg.flavor, self.db,
+                        flavor, self.db,
                         resolveSearchMethod=searchMethod)

@@ -1050,6 +1050,12 @@ class Version(VersionSequence):
         """ Returns True if this version is a shadow of another trove """
         return self.branch().isShadow()
 
+    def isUnmodifiedShadow(self):
+        """
+            Returns True if this version is a shadow that has not been modified
+        """
+        return self.isShadow() and not self.isModifiedShadow()
+
     def isModifiedShadow(self):
         """ Returns True if this version is a shadow that has been modified
         """
