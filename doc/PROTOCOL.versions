@@ -1,5 +1,10 @@
 # this file documents the wire protocol changes for conary.
 
+Version 44:
+  - addDigitalSignature takes a VersionedSignatureSet object. This call
+    is incompatible between versions 43 and 44 of the protocol (though this
+    could be addressed, to a limited extent).
+
 Version 43:
   - added getTroveReferences call.
   - added getTroveDescendants call

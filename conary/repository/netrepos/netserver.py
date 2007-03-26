@@ -43,7 +43,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -2306,6 +2306,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
+        if clientVersion < 44:
+            raise InvalidClientVersion, "Conary client >= 1.1.20 required" \
+                    "for signing"
+
         version = self.toVersion(version)
 	if not self.auth.check(authToken, write = True, trove = name,
                                label = version.branch().label()):
@@ -2313,12 +2317,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         flavor = self.toFlavor(flavor)
         self.log(2, name, version, flavor)
 
-        signature = DigitalSignature()
-        signature.thaw(base64.b64decode(encSig))
-        sig = signature.get()
+        sigs = trove.VersionedSignaturesSet(base64.b64decode(encSig))
+
+        # get the key being used; they should all be the same of course
+        fingerprint = None
+        for sigBlock in sigs:
+            for sig in sigBlock.signatures:
+                if fingerprint is None:
+                    fingerprint = sig[0]
+                elif fingerprint != sig[0]:
+                    raise errors.IncompatibleKey('Multiple keys in signature')
+
         # ensure repo knows this key
         keyCache = self.repos.troveStore.keyTable.keyCache
-        pubKey = keyCache.getPublicKey(sig[0])
+        pubKey = keyCache.getPublicKey(fingerprint)
 
         if pubKey.isRevoked():
             raise errors.IncompatibleKey('Key %s has been revoked. '
@@ -2354,16 +2366,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # now we should have the proper locks
         trv = self.repos.getTrove(name, version, flavor)
-        #need to verify this key hasn't signed this trove already
-        try:
-            trv.getDigitalSignature(sig[0])
-            foundSig = 1
-        except KeyNotFound:
-            foundSig = 0
-        if foundSig:
-            raise errors.AlreadySignedError("Trove already signed by key")
 
-        trv.addPrecomputedDigitalSignature(sig)
+        # don't add exactly the same set of sigs again
+        try:
+            existingSigs = trv.getDigitalSignature(fingerprint)
+
+            if existingSigs == sigs:
+                raise errors.AlreadySignedError("Trove already signed by key")
+        except KeyNotFound:
+            pass
+
+        trv.addPrecomputedDigitalSignature(sigs)
         # verify the new signature is actually good
         trv.verifyDigitalSignatures(keyCache = keyCache)
 

@@ -334,27 +334,34 @@ class VersionedDigitalSignatures(streams.StreamSet):
                 (SMALL, DigitalSignatures,     'signatures'),
     }
 
+    def addPrecomputed(self, sig):
+        self.signatures.add(sig)
+
 class VersionedSignaturesSet(streams.StreamCollection):
     streamDict = { 1 : VersionedDigitalSignatures }
 
-    def sign(self, digest, keyId, version=0):
+    def sign(self, keyId, version=0):
         for vds in self.getStreams(1):
             if version == vds.version():
-                if digest != vds.digest():
-                    raise RuntimeError('inconsistant digital signature digest')
+                digest = vds.digest()
                 vds.signatures.sign(digest, keyId)
                 return
-        vds = VersionedDigitalSignatures()
-        vds.version.set(version)
-        vds.digest.set(digest)
-        vds.signatures.sign(digest, keyId)
-        self.addStream(1, vds)
+
+        raise KeyNotFound
 
     def addDigest(self, digest, version = 0):
         vds = VersionedDigitalSignatures()
         vds.version.set(version)
         vds.digest.set(digest)
         self.addStream(1, vds)
+
+    def addPrecomputedSignature(self, sig, version = 0):
+        for vds in self.getStreams(1):
+            if version == vds.version():
+                vds.addPrecomputed(sig)
+                return
+
+        raise KeyNotFound
 
     def __iter__(self):
         for item in self.getStreams(1):
@@ -415,6 +422,33 @@ class TroveSignatures(streams.StreamSet):
 
         self.vSigs.addDigest(digest(), version = sigVersion)
 
+    def sign(self, keyId):
+        """
+        Ensure every digest has been signed by the given keyId. If signatures
+        are missing, they are generated. Existing signatures are not validated.
+        """
+
+        self.digitalSigs.sign(self.sha1(), keyId)
+
+        versionList = set()
+        signedVersions = set()
+        for versionedBlock in self.vSigs:
+            versionList.add(versionedBlock.version())
+            for sig in versionedBlock.signatures:
+                if sig[0].endswith(keyId):
+                    signedVersions.add(versionedBlock.version())
+                    break
+
+        for sigVersion in (versionList - signedVersions):
+            self.vSigs.sign(keyId, version = sigVersion)
+
+    def addPrecomputedSignature(self, sigVersion, sig):
+        if sigVersion == _TROVESIG_VER_CLASSIC:
+            self.digitalSigs.add(sig)
+            return
+
+        self.vSigs.addPrecomputedSignature(sig, version = sigVersion)
+
     def __iter__(self):
         """
         Iterates over all signatures in this block. Signatures are returned as
@@ -440,7 +474,7 @@ class TroveSignatures(streams.StreamSet):
             yield (versionedBlock.version(), digest, None)
 
             for sig in versionedBlock.signatures:
-                yield (versionedBlock.version(), digest, None)
+                yield (versionedBlock.version(), digest, sig)
 
 _TROVE_FLAG_ISCOLLECTION = 1 << 0
 _TROVE_FLAG_ISDERIVED    = 1 << 1
@@ -789,7 +823,8 @@ class Trove(streams.StreamSet):
 
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
         """
-        Computes a new signature for this trove and stores it.
+        Signs all of the available digests for this trove and stores those
+        signatures.
 
         @param keyId: ID of the key use for signing
         @type keyId: str
@@ -799,32 +834,60 @@ class Trove(streams.StreamSet):
         assert(skipIntegrityChecks or not sha1_orig or 
                sha1_orig == self.troveInfo.sigs.sha1())
 
-        self.troveInfo.sigs.digitalSigs.sign(self.troveInfo.sigs.sha1(), keyId)
+        self.troveInfo.sigs.sign(keyId)
 
-    def addPrecomputedDigitalSignature(self, sig):
+    def addPrecomputedDigitalSignature(self, newSigs):
         """
-        Adds a previously computed signature. This allows signatures to be
-        added to troves.
+        Adds a previously computed signatures, allowing signatures to be
+        added to troves. All digests must have already been computed.
 
         @param sig: Signature to add
-        @type sig: DigitalSignature
+        @type sig: VersionedDigitalSignatureSet
         """
-        assert(self.verifyDigests)
+        assert(self.verifyDigests())
 
-        signature = DigitalSignature()
-        signature.set(sig)
-        self.troveInfo.sigs.digitalSigs.addStream(_DIGSIGS_DIGSIGNATURE, 
-                                                  signature)
+        providedSigs = set()
+        versionDigests = {}
+        for sigBlock in newSigs:
+            for sig in sigBlock.signatures:
+                providedSigs.add((sigBlock.version(), sigBlock.digest(), sig))
+
+        for version, digest, sig in self.troveInfo.sigs:
+            versionDigests[version] = digest
+            providedSigs.discard((version, digest, sig))
+
+        for version, digest, sig in providedSigs:
+            if version in versionDigests:
+                if digest != versionDigests[version]():
+                    # XXX
+                    raise RuntimeError('inconsistant digital signature digest')
+            else:
+                raise RuntimeError('missing digest for version %d' % version)
+
+            self.troveInfo.sigs.addPrecomputedSignature(version, sig)
 
     def getDigitalSignature(self, keyId):
         """
-        Returns the signature created by the key whose keyId is passed.
+        Returns the signature created by the key whose keyId is passed. The
+        signature is returned as a VersionedSignaturesSet object
+        containing only the signatures for the specified keyId.
 
         @param keyId: Id for the key whose signature is returns
         @type keyId: str
         @rtype: DigitalSignature
         """
-        return self.troveInfo.sigs.digitalSigs.getSignature(keyId)
+        sigs = VersionedSignaturesSet()
+        found = False
+        for version, digest, sig in self.troveInfo.sigs:
+            if sig and keyId == sig[0]:
+                sigs.addDigest(digest(), version = version)
+                sigs.addPrecomputedSignature(sig, version = version)
+                found = True
+
+        if not found:
+            raise KeyNotFound('Signature by key: %s does not exist' %keyId)
+
+        return sigs
 
     def verifyDigitalSignatures(self, threshold = 0, keyCache = None):
         """
@@ -856,7 +919,12 @@ class Trove(streams.StreamSet):
 
         if keyCache is None:
             keyCache = openpgpkey.getKeyCache()
-        for signature in self.troveInfo.sigs.digitalSigs.iter():
+
+        for version, digest, signature in self.troveInfo.sigs:
+            if not signature:
+                # this doesn't validate the digests
+                continue
+
             try:
                 key = keyCache.getPublicKey(signature[0],
                                             serverName=serverName,
@@ -866,7 +934,7 @@ class Trove(streams.StreamSet):
             except KeyNotFound:
                 missingKeys.append(signature[0])
                 continue
-            lev = key.verifyString(self.troveInfo.sigs.sha1(), signature)
+            lev = key.verifyString(digest(), signature)
             if lev == -1:
                 badFingerprints.append(key.getFingerprint())
             maxTrust = max(lev,maxTrust)
