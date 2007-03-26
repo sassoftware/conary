@@ -14,6 +14,7 @@ Changes in @NEW@:
       latest version of the listed troves. (CNY-1440)
     * Made --with-sources the default for cvc promote, adding the new flag
       --without-sources.  --with-sources will still work.
+    * The Conary client API exposes a new call, applyRollback. (CNY-1455).
 
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
