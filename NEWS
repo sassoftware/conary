@@ -38,6 +38,8 @@ Changes in @NEW@:
     * Fixed a bug in the CfgQuotedLineList display function (does not affect
       conary directly)
     * Flavored items in a job list are now correctly frozen. (CNY-1479)
+    * cvc cook --macros works as expected now, by defining a macro (as passed
+      in on the command line with --macro) per line. (CNY-1062)
 
   o Server Changes:
     * The repository cache was completely reworked. This fixed problems with
