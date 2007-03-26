@@ -309,6 +309,8 @@ class UpdateJob:
         flv = tup[1]
         if flv is None:
             flv = '\0'
+        else:
+            flv = str(flv)
         return (ver, flv)
 
     def __thawVF(self, tup):
@@ -318,6 +320,8 @@ class UpdateJob:
         flv = tup[1]
         if flv == '\0':
             flv = None
+        else:
+            flv = deps.ThawFlavor(flv)
         return (ver, flv)
 
     def _freezeItemList(self):
