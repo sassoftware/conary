@@ -469,7 +469,7 @@ class _TroveListWrapper:
                 t = trove.Trove(job[0], job[idx][0], job[idx][1],
                                 type=trove.TROVE_TYPE_REMOVED)
                 t.setIsMissing(True)
-                t.computeSignatures()
+                t.computeDigests()
 
                 # synthesize empty filestreams
                 streams = {}

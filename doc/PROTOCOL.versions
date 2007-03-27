@@ -1,7 +1,11 @@
 # this file documents the wire protocol changes for conary.
+Version 45:
+  - addDigitalSignature takes a VersionedSignatureSet object. This call
+    is incompatible between versions 43 and 44 of the protocol (though this
+    could be addressed, to a limited extent).
+
 Version 44:
   - added support for decoding "chunked" Transfer-encoding requests
-    from clients
 
 Version 43:
   - added getTroveReferences call.
