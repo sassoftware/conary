@@ -347,7 +347,7 @@ class VersionedSignaturesSet(streams.StreamCollection):
                 vds.signatures.sign(digest, keyId)
                 return
 
-        raise KeyNotFound
+        raise KeyError(version)
 
     def addDigest(self, digest, version = 0):
         vds = VersionedDigitalSignatures()
@@ -690,7 +690,8 @@ class MetadataItem(streams.StreamSet):
 
     def addDigitalSignature(self, keyId):
         self._updateId()
-        self.signatures.sign(self.id(), keyId)
+        self.signatures.addDigest(self.id(), 0)
+        self.signatures.sign(keyId, 0)
 
     def verifyDigitalSignatures(self, serverName=None):
         keyCache = openpgpkey.getKeyCache()
