@@ -517,6 +517,13 @@ _TROVEINFO_TAG_LABEL_PATH     = 11
 _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
+_TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
+# troveinfo above here is signed in v0 signatures; below here is signed
+# in v1 signatures as well
+
+def _getTroveInfoSigExclusions(streamDict):
+    return [ streamDef[2] for tag, streamDef in streamDict.items()
+                if tag > _TROVEINFO_ORIGINAL_SIG ]
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -538,6 +545,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   )
     }
 
+    v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
@@ -750,6 +758,10 @@ TROVE_TYPE_NORMAL          = 0
 TROVE_TYPE_REDIRECT        = 1
 TROVE_TYPE_REMOVED         = 2
 
+def _mergeTroveInfoSigExclusions(skipSet, streamDict):
+    skipSet.update(dict( [ (x, True) for x in
+        streamDict[_STREAM_TRV_TROVEINFO][1].v0SignatureExclusions ] ) )
+
 class Trove(streams.StreamSet):
     """
     Troves are groups of files and other troves, which are included by
@@ -794,6 +806,10 @@ class Trove(streams.StreamSet):
     }
     ignoreUnknown = False
 
+    v0SkipSet = { 'sigs' : True, 'versionStrings' : True, 'incomplete' : True,
+                  'pathHashes' : True, 'metadata': True }
+    _mergeTroveInfoSigExclusions(v0SkipSet, streamDict)
+
     # the memory savings from slots isn't all that interesting here, but it
     # makes sure we don't add data to troves and forget to make it part
     # of the stream
@@ -806,12 +822,7 @@ class Trove(streams.StreamSet):
 
     def _sigString(self, version):
         if version == _TROVESIG_VER_CLASSIC:
-            return streams.StreamSet.freeze(self,
-                                            skipSet = { 'sigs' : True,
-                                                        'versionStrings' : True,
-                                                        'incomplete' : True,
-                                                        'pathHashes' : True,
-                                                        'metadata': True })
+            return streams.StreamSet.freeze(self, self.v0SkipSet)
         elif version == _TROVESIG_VER_NEW:
             return streams.StreamSet.freeze(self,
                                             skipSet = { 'sigs' : True,
