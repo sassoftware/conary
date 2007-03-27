@@ -600,8 +600,8 @@ static int StreamSet_Init(PyObject * o, PyObject * args,
         return -1;
     }
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *) o->ob_type,
-					  "_streamDict");
+    /* This looks in the class itself, not in the object or in parent classes */
+    ssd = (void *) PyDict_GetItemString(o->ob_type->tp_dict, "_streamDict");
 
     if (!ssd) {
 	PyObject *sd;
