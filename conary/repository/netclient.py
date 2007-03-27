@@ -2107,7 +2107,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # use chunked transfer encoding to work around servers that do not
             # handle Content-length of > 2 GiB
             chunked = False
-            if 1 or size > (2 * 1024 * 1024 * 1024):
+            if size > (2 * 1024 * 1024 * 1024):
                 # protocol version 44 introduces the ability to decode chunked
                 # PUTs
                 if server.getProtocolVersion() < 44:
