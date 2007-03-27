@@ -15,7 +15,7 @@
 Implements troves (packages, components, etc.) for the repository
 """
 
-import itertools
+import itertools, os
 import re
 import struct
 
@@ -518,6 +518,7 @@ _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
 _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
+_TROVEINFO_TAG_DIR_HASHES     = 15
 # troveinfo above here is signed in v0 signatures; below here is signed
 # in v1 signatures as well
 
@@ -542,7 +543,8 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_LABEL_PATH    : (SMALL, LabelPath,            'labelPath'   ),
         _TROVEINFO_TAG_POLICY_PROV   : (LARGE, PolicyProviders,      'policyProviders'),
         _TROVEINFO_TAG_TROVEVERSION  : (SMALL, streams.IntStream,    'troveVersion'   ),
-        _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   )
+        _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   ),
+        _TROVEINFO_TAG_DIR_HASHES    : (LARGE, PathHashes,           'dirHashes'    ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1062,7 +1064,10 @@ class Trove(streams.StreamSet):
 	self.idMap[pathId] = (path, fileId, version)
 
     def computePathHashes(self):
+        self.troveInfo.pathHashes.clear()
+        self.troveInfo.dirHashes.clear()
         for path, fileId, version in self.idMap.itervalues():
+            self.troveInfo.dirHashes.addPath(os.path.dirname(path))
             self.troveInfo.pathHashes.addPath(path)
 
     # pathId is the only thing that must be here; the other fields could
