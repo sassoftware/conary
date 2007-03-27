@@ -519,7 +519,7 @@ _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
 
 class TroveInfo(streams.StreamSet):
-    ignoreUnknown = True
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVEINFO_TAG_SIZE          : (SMALL, streams.LongLongStream,'size'        ),
         _TROVEINFO_TAG_SOURCENAME    : (SMALL, streams.StringStream,  'sourceName'  ),
