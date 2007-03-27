@@ -158,6 +158,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 
     def __init__(self, cfg, basicUrl, db = None):
+        # FIXME: remove after deprecation period
+        if cfg.cacheDB:
+            import warnings
+            warnings.warn('cacheDB is deprecated.  changesetCacheDir '
+                          'should be used instead.  defaulting to %s/cscache '
+                          'for changesetCacheDir' %cfg.tmpDir,
+                          DeprecationWarning)
+            cfg.configLine('changesetCacheDir %s/cscache' %cfg.tmpDir)
+
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
@@ -2994,9 +3003,9 @@ class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
     bugsToEmail             = CfgString
     bugsFromEmail           = CfgString
-    bugsEmailName           = (CfgString, 'Conary Repository Bugs')
-    bugsEmailSubject        = (CfgString,
-                               'Conary Repository Error Message')
+    bugsEmailName           = (CfgString, 'Conary Repository')
+    bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
+    cacheDB                 = dbstore.CfgDriver
     changesetCacheDir       = CfgPath
     closed                  = CfgString
     commitAction            = CfgString
