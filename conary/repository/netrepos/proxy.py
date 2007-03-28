@@ -556,6 +556,9 @@ class ProxyRepositoryServer(ChangesetFilter):
             # now get the contents we don't have cached
             (url, sizes) = caller.getFileContents(
                     clientVersion, neededFiles, False)[1]
+            # insure that the size is an integer -- protocol version
+            # 44 returns a string to avoid XML-RPC marshal limits
+            sizes = [ int(x) for x in sizes ]
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
