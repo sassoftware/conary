@@ -613,7 +613,7 @@ class ProxyRepositoryServer(ChangesetFilter):
                             ('InvalidClientVersion',
                              'This version of Conary does not support '
                              'downloading file contents larger than 2 '
-                             'GiB.  Please install a new Conary client.')
+                             'GiB.  Please install a new Conary client.'))
             return False, (url, sizeList)
         finally:
             os.close(fd)
