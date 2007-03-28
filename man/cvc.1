@@ -70,8 +70,9 @@ modify, and cook source components:
 Build a package.  If \fB\-\-prep\fP is specified, the source code is
 unpacked, but is not built. If \fB\-\-download\fP is specified, the source code
 is downloaded into your lookaside, but is not unpacked or built. If
-\fB\-\-macros\fP is specified, it names a file containing macro definitions to
-apply to the recipe macro set.  
+\fB\-\-macros\fP is specified, it names a file (containing one macro
+definition per line) to apply to the recipe macro set. Macro files can also
+contain comments starting with "#" and blank lines.
 .IP
 If \fB\-\-resume <linenums>\fP is specified, 
 conary will cook the specified line numbers of the recipe.  The format of
@@ -107,7 +108,9 @@ config option.
 .IP
 The \-\-macro option assigns the given string value to <macro>.  
 The value given overrides any attempt to reset the value later in the 
-recipe.  The macro and its boolean value must be enclosed in quotes.
+recipe.  The macro and its boolean value must be enclosed in quotes. Macros
+defined using \-\-macro override macros defined in a file specified by
+\-\-macros.
 .IP 
 The \-\-no-clean option does not clean up the build directories
 after the build is complete, even if the build is successful.
