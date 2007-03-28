@@ -406,7 +406,7 @@ class ChangesetFilter(BaseProxy):
                               getCsVersion, [ rawJob ], recurse, withFiles,
                               withFileContents, excludeAutoSource)[1]
                 assert(len(sizes) == 1)
-                # insure that the size is an integer -- protocol version
+                # ensure that the size is an integer -- protocol version
                 # 44 returns a string to avoid XML-RPC marshal limits
                 sizes = [ int(x) for x in sizes ]
                 size = sizes[0]
