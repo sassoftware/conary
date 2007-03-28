@@ -1765,6 +1765,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if callback:
                 callback.requestingFileContents()
             (url, sizes) = self.c[server].getFileContents(fileList)
+            # protocol version 44 and later return sizes as strings rather
+            # than ints to avoid 2 GiB limits
+            sizes = [ int(x) for x in sizes ]
             assert(len(sizes) == len(fileList))
 
             inF = urllib.urlopen(url, proxies = self.proxies)
