@@ -1358,6 +1358,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])
+            # client versions >= 44 use strings instead of ints for size
+            # because xmlrpclib can't marshal ints > 2GiB
+            if clientVersion >= 44:
+                sizeList = [ str(x) for x in sizeList ]
+            else:
+                for size in sizeList:
+                    if size >= 0x80000000:
+                        raise errors.InvalidClientVersion(
+                            'This version of Conary does not support '
+                            'downloading file contents larger than 2 '
+                            'GiB.  Please install a new Conary '
+                            'client.')
             return url, sizeList
         finally:
             os.close(fd)
@@ -1532,6 +1544,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         except:
             os.unlink(retpath)
             raise
+
+        # client versions >= 44 use strings instead of ints for size
+        # because xmlrpclib can't marshal ints > 2GiB
+        if clientVersion >= 44:
+            sizes = [ str(x) for x in sizes ]
+        else:
+            for size in sizes:
+                if size >= 0x80000000:
+                    raise errors.InvalidClientVersion(
+                        'This version of Conary does not support downloading '
+                        'changesets larger than 2 GiB.  Please install a new '
+                        'Conary client.')
 
         # versions < 38 omit allRemoved troves, but the caching front end
         # will omit that for us

@@ -38,6 +38,20 @@ Changes in 1.1.19:
       directories. (CNY-1387)
     * The repository now properly commits changesets where multiple
       troves reference the same (pathId,fileId) key. (CNY-1414)
+    * The standalone server can now decode "Transfer-encoding:
+      chunked" PUT requests from clients.
+    * Apache based repository servers now send changeset file contents
+      using the "req.write()" method instead of the "req.sendfile()"
+      method when file contents are larger than 2 GiB.  This works
+      around limitations in Apache 2.0.
+    * The list of changeset sizes returned by the getChangeSet
+      repository method is now returned as a list of strings instead
+      of a list of integers.  XML-RPC integers can only hold values
+      less than 2147483648 (a signed integer).
+    * A Conary repository will now raise an exception if a client
+      requests a changeset that is larger than 2 GiB in total size and
+      does not support the new version 44 protocol required to work
+      around this limitation.
 
   o Build Changes:
     * A "vmware" flavor has been added to the default set of flavors.

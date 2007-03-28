@@ -2,6 +2,9 @@
 Version 44:
   - added support for decoding "chunked" Transfer-encoding requests
     from clients
+  - added support for obtaining sizes of changesets > 2 GiB via the
+    getChangeSet() and getFileContents() calls. The sizes are now
+    returned as strings instead of ints.
 
 Version 43:
   - added getTroveReferences call.

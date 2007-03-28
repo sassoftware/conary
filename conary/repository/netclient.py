@@ -1177,6 +1177,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 (url, sizes, extraTroveList,
                  extraFileList, removedTroveList) = l
+            # ensure that sizes are integers.  protocol version 44 and
+            # later sends them as strings instead of ints due to the 2
+            # GiB limitation
+            sizes = [ int(x) for x in sizes ]
             server.setAbortCheck(None)
 
             chgSetList += _cvtTroveList(extraTroveList)
@@ -2107,7 +2111,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # use chunked transfer encoding to work around servers that do not
             # handle Content-length of > 2 GiB
             chunked = False
-            if size > (2 * 1024 * 1024 * 1024):
+            if size >= 0x80000000:
                 # protocol version 44 introduces the ability to decode chunked
                 # PUTs
                 if server.getProtocolVersion() < 44:
