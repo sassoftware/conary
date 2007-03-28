@@ -482,10 +482,10 @@ class ChangesetFilter(BaseProxy):
         else:
             for size in allSizes:
                 if size >= 0x80000000:
-                    raise errors.InvalidClientVersion(
+                    raise ProxyRepositoryError(('InvalidClientVersion',
                         'This version of Conary does not support downloading '
                         'changesets larger than 2 GiB.  Please install a new '
-                        'Conary client.')
+                        'Conary client.'))
 
         if clientVersion < 38:
             return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
@@ -609,11 +609,11 @@ class ProxyRepositoryServer(ChangesetFilter):
             else:
                 for size in sizeList:
                     if size >= 0x80000000:
-                        raise errors.InvalidClientVersion(
-                            'This version of Conary does not support '
-                            'downloading file contents larger than 2 '
-                            'GiB.  Please install a new Conary '
-                            'client.')
+                        raise ProxyRepositoryError(
+                            ('InvalidClientVersion',
+                             'This version of Conary does not support '
+                             'downloading file contents larger than 2 '
+                             'GiB.  Please install a new Conary client.')
             return False, (url, sizeList)
         finally:
             os.close(fd)
