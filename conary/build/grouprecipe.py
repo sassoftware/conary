@@ -225,6 +225,9 @@ class GroupRecipe(_BaseGroupRecipe):
         self.replaceSpecs = []
         self.resolveTroveSpecs = []
 
+        self.preInstallScripts = {}
+        self.postInstallScripts = {}
+
         _BaseGroupRecipe.__init__(self)
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,
@@ -1268,6 +1271,28 @@ class GroupRecipe(_BaseGroupRecipe):
 	LabelPaths 'myproject.rpath.org@rpl:1' and 'conary.rpath.com@rpl:1'.
         """
         self.labelPath = [ versions.Label(x) for x in path ]
+
+    def _addScript(self, contents, groupName, scriptDict):
+        if groupName is None:
+            groupName = self.name
+
+        if groupName not in self.groups:
+            raise RecipeFileError, 'Group %s not defined' % groupName
+
+        if contents is None:
+            raise RecipeFileError('script contents required for group %s'
+                                        % groupName)
+        elif groupName in self.postInstallScripts:
+            raise RecipeFileError('script already set for group %s'
+                                        % groupName)
+
+        scriptDict[groupName] = contents
+
+    def addPostInstallScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.postInstallScripts)
+
+    def addPreInstallScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.preInstallScripts)
 
     def getLabelPath(self):
         return self.labelPath

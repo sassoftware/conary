@@ -627,6 +627,16 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
 
+            import epdb
+            epdb.st()
+            if groupName in recipeObj.postInstallScripts:
+                grpTrv.troveInfo.scripts.postInstall.script.set(
+                        recipeObj.postInstallScripts[groupName])
+
+            if groupName in recipeObj.preInstallScripts:
+                grpTrv.troveInfo.scripts.preInstall.script.set(
+                        recipeObj.preInstallScripts[groupName])
+
             for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,
                                 weakRef=not explicit, *troveTup)

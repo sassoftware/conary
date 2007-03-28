@@ -519,12 +519,33 @@ _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
 _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 _TROVEINFO_TAG_DIR_HASHES     = 15
+_TROVEINFO_TAG_SCRIPTS        = 16
 # troveinfo above here is signed in v0 signatures; below here is signed
 # in v1 signatures as well
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
                 if tag > _TROVEINFO_ORIGINAL_SIG ]
+
+_TROVESCRIPT_SCRIPT        = 0
+_TROVESCRIPT_ROLLBACKFENCE = 1
+
+class TroveScript(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVESCRIPT_SCRIPT         : (LARGE, streams.StringStream, 'script' ),
+        _TROVESCRIPT_ROLLBACKFENCE  : (SMALL, streams.ByteStream,   'rollbackFence' ),
+    }
+
+_TROVESCRIPTS_PREINSTALL  = 0
+_TROVESCRIPTS_POSTINSTALL = 1
+
+class TroveScripts(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVESCRIPTS_PREINSTALL    : (LARGE, TroveScript, 'preInstall'  ),
+        _TROVESCRIPTS_POSTINSTALL   : (LARGE, TroveScript, 'postInstall' ),
+    }
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -535,7 +556,6 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CONARYVER     : (SMALL, streams.StringStream, 'conaryVersion'),
         _TROVEINFO_TAG_BUILDDEPS     : (LARGE, BuildDependencies,    'buildReqs'    ),
         _TROVEINFO_TAG_LOADEDTROVES  : (LARGE, LoadedTroves,         'loadedTroves' ),
-        #_TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,       'installBucket'),
         _TROVEINFO_TAG_FLAGS         : (SMALL, TroveFlagsStream,     'flags'        ),
         _TROVEINFO_TAG_CLONEDFROM    : (SMALL, StringVersionStream,  'clonedFrom'   ),
         _TROVEINFO_TAG_SIGS          : (LARGE, TroveSignatures,      'sigs'         ),
@@ -545,6 +565,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_TROVEVERSION  : (SMALL, streams.IntStream,    'troveVersion'   ),
         _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   ),
         _TROVEINFO_TAG_DIR_HASHES    : (LARGE, PathHashes,           'dirHashes'    ),
+        _TROVEINFO_TAG_SCRIPTS       : (LARGE, TroveScripts,         'scripts'    ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
