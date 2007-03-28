@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.19:
   o Client Changes:
     * Added cvc promote command. (CNY-1304)
     * Added interface (but no command line option) for performing
