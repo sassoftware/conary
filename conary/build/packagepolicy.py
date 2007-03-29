@@ -1642,113 +1642,13 @@ class ComponentProvides(policy.Policy):
 
 
 
-def _getmonodis(macros, recipe, path):
-    # For bootstrapping purposes, prefer the just-built version if
-    # it exists
-    if os.access('%(destdir)s/%(monodis)s' %macros, os.X_OK):
-        return ('MONO_PATH=%(destdir)s%(prefix)s/lib'
-                ' LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
-                ' %(destdir)s/%(monodis)s' %macros)
-    elif os.access('%(monodis)s' %macros, os.X_OK):
-        return '%(monodis)s' %macros
-    else:
-        recipe.warn('%s not available for dependency discovery'
-                    ' for path %s' %(macros.monodis, path))
-    return None
-
-
-def _getperlincpath(perl):
-    """
-    Fetch the perl @INC path, and sort longest first for removing
-    prefixes from perl files that are provided.
-    """
-    if not perl:
-        return []
-    p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
-    perlIncPath = p.readlines()
-    # make sure that the command completed successfully
-    rc = p.close()
-    perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
-    return perlIncPath
-
-def _getperl(macros, recipe):
-    """
-    Find the preferred instance of perl to use, including setting
-    any environment variables necessary to use that perl.
-    Returns string for running it, and a separate string, if necessary,
-    for adding to @INC.
-    """
-    perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
-    # not %(bindir)s so that package modifications do not affect
-    # the search for system perl
-    perlPath = '/usr/bin/perl'
-
-    def _perlDestInc(destdir, perlDestInc):
-        return ' '.join(['-I' + destdir + x for x in perlDestInc])
-
-    if os.access(perlDestPath, os.X_OK):
-        # must use packaged perl if it exists
-        m = recipe.magic[perlPath]
-        if m and 'RPATH' in m.contents and m.contents['RPATH']:
-            # we need to prepend the destdir to each element of the RPATH
-            # in order to run perl in the destdir
-            perl = ''.join((
-                'export LD_LIBRARY_PATH=',
-                ':'.join([macros.destdir+x
-                          for x in m.contents['RPATH'].split(':')]),
-                ';',
-                perlDestPath
-            ))
-            perlDestInc = _getperlincpath(perl)
-            perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
-            return [perl, perlDestInc]
-        else:
-            # perl that does not need rpath?
-            perlDestInc = _getperlincpath(perlDestPath)
-            perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
-            return [perlDestPath, perlDestInc]
-    elif os.access(perlPath, os.X_OK):
-        # system perl if no packaged perl, needs no @INC mangling
-        return [perlPath, '']
-
-    # must be no perl at all
-    return ['', '']
-
-
-def _getpython(macros):
-    """
-    Returns the preferred instance of python to use.
-    """
-    pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
-    # not %(bindir)s so that package modifications do not affect
-    # the search for system python
-    pythonPath = '/usr/bin/python'
-
-    if os.access(pythonDestPath, os.X_OK):
-        return pythonDestPath
-    elif os.access(pythonPath, os.X_OK):
-        return pythonPath
-    # No python?  How is cvc running at all?
-    return None
-
-
-def _stripDestDir(pathList, destdir):
-    destDirLen = len(destdir)
-    pathElementList = []
-    for pathElement in pathList:
-        if pathElement.startswith(destdir):
-            pathElementList.append(pathElement[destDirLen:])
-        else:
-            pathElementList.append(pathElement)
-    return pathElementList
-
-
 class _dependency(policy.Policy):
     """
     Internal class for shared code between Provides and Requires
     """
 
     def preProcess(self):
+        self.db = None
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
         # interpolate macros, using canonical path form with no trailing /
@@ -1899,6 +1799,144 @@ class _dependency(policy.Policy):
             m = self.recipe.magic[contentsPath]
             contentsPath = macros.destdir + contentsPath
         return m, contentsPath[len(macros.destdir):]
+
+    def _getDb(self):
+        if self.db is None:
+            self.db = database.Database(self.recipe.cfg.root,
+                                        self.recipe.cfg.dbPath)
+        return self.db
+
+    def _enforceProvidedPath(self, path, fileType='interpreter',
+                             unmanagedError=False):
+        db = self._getDb()
+        troveNames = [ x.getName() for x in db.iterTrovesByPath(path) ]
+        if not troveNames:
+            talk = {True: self.error, False: self.warn}[unmanagedError]
+            talk('%s file %s not managed by conary' %(fileType, path))
+            return None
+        troveName = troveNames[0]
+
+        # prefer corresponding :devel to :devellib if it exists
+        if troveName.endswith(':devellib'):
+            troveSpec = (
+                troveName.replace(':devellib', ':devel'),
+                None, None
+            )
+            results = db.findTroves(None, [troveSpec],
+                                         allowMissing = True)
+            if troveSpec in results:
+                troveName = results[troveSpec][0][0]
+
+        if troveName not in self.recipe._getTransitiveBuildRequiresNames():
+            self.recipe.reportMissingBuildRequires(troveName)
+
+        return troveName
+
+
+    def _getmonodis(self, macros, path):
+        # For bootstrapping purposes, prefer the just-built version if
+        # it exists
+        monodis = '%(monodis)s' %macros
+        if os.access('%(destdir)s/%(monodis)s' %macros, os.X_OK):
+            return ('MONO_PATH=%(destdir)s%(prefix)s/lib'
+                    ' LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
+                    ' %(destdir)s/%(monodis)s' %macros)
+        elif os.access(monodis, os.X_OK):
+            # Enforce the build requirement, since it is not in the package
+            self._enforceProvidedPath(monodis)
+            return monodis
+        else:
+            self.warn('%s not available for dependency discovery'
+                      ' for path %s' %(monodis, path))
+        return None
+
+
+    def _getperlincpath(self, perl):
+        """
+        Fetch the perl @INC path, and sort longest first for removing
+        prefixes from perl files that are provided.
+        """
+        if not perl:
+            return []
+        p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
+        perlIncPath = p.readlines()
+        # make sure that the command completed successfully
+        rc = p.close()
+        perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
+        return perlIncPath
+
+    def _getperl(self, macros, recipe):
+        """
+        Find the preferred instance of perl to use, including setting
+        any environment variables necessary to use that perl.
+        Returns string for running it, and a separate string, if necessary,
+        for adding to @INC.
+        """
+        perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
+        # not %(bindir)s so that package modifications do not affect
+        # the search for system perl
+        perlPath = '/usr/bin/perl'
+
+        def _perlDestInc(destdir, perlDestInc):
+            return ' '.join(['-I' + destdir + x for x in perlDestInc])
+
+        if os.access(perlDestPath, os.X_OK):
+            # must use packaged perl if it exists
+            m = recipe.magic[perlPath]
+            if m and 'RPATH' in m.contents and m.contents['RPATH']:
+                # we need to prepend the destdir to each element of the RPATH
+                # in order to run perl in the destdir
+                perl = ''.join((
+                    'export LD_LIBRARY_PATH=',
+                    ':'.join([macros.destdir+x
+                              for x in m.contents['RPATH'].split(':')]),
+                    ';',
+                    perlDestPath
+                ))
+                perlDestInc = self._getperlincpath(perl)
+                perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
+                return [perl, perlDestInc]
+            else:
+                # perl that does not need rpath?
+                perlDestInc = self._getperlincpath(perlDestPath)
+                perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
+                return [perlDestPath, perlDestInc]
+        elif os.access(perlPath, os.X_OK):
+            # system perl if no packaged perl, needs no @INC mangling
+            self._enforceProvidedPath(perlPath)
+            return [perlPath, '']
+
+        # must be no perl at all
+        return ['', '']
+
+
+    def _getpython(self, macros):
+        """
+        Returns the preferred instance of python to use.
+        """
+        pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
+        # not %(bindir)s so that package modifications do not affect
+        # the search for system python
+        pythonPath = '/usr/bin/python'
+
+        if os.access(pythonDestPath, os.X_OK):
+            return pythonDestPath
+        elif os.access(pythonPath, os.X_OK):
+            self._enforceProvidedPath(pythonPath)
+            return pythonPath
+        # No python?  How is cvc running at all?
+        return None
+
+
+    def _stripDestDir(self, pathList, destdir):
+        destDirLen = len(destdir)
+        pathElementList = []
+        for pathElement in pathList:
+            if pathElement.startswith(destdir):
+                pathElementList.append(pathElement[destDirLen:])
+            else:
+                pathElementList.append(pathElement)
+        return pathElementList
 
 
 
@@ -2123,7 +2161,7 @@ class Provides(_dependency):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = _getpython(self.macros)
+        pythonPath = self._getpython(self.macros)
         # conary is a python program...
         assert(pythonPath)
 
@@ -2135,7 +2173,7 @@ class Provides(_dependency):
                 r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
                 %pythonPath).read().split('\0')
                 if x)
-            systemPaths = set(_stripDestDir(systemPaths, destdir))
+            systemPaths = set(self._stripDestDir(systemPaths, destdir))
 
             # determine created destdir site-packages, and add them to
             # the list of acceptable provide paths
@@ -2143,7 +2181,7 @@ class Provides(_dependency):
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
             site.addsitepackages(None)
-            systemPaths.update(_stripDestDir(sys.path, destdir))
+            systemPaths.update(self._stripDestDir(sys.path, destdir))
 
             # later, we will need to truncate paths using longest path first
             self.sysPath = sorted(systemPaths, key=len, reverse=True)
@@ -2159,8 +2197,8 @@ class Provides(_dependency):
         if self.perlIncPath is not None:
             return
 
-        perl = _getperl(self.recipe.macros, self.recipe)[0]
-        self.perlIncPath = _getperlincpath(perl)
+        perl = self._getperl(self.recipe.macros, self.recipe)[0]
+        self.perlIncPath = self._getperlincpath(perl)
         self.perlIncPath.sort(key=len, reverse=True)
 
     def _addPythonProvides(self, path, m, pkg, macros):
@@ -2222,7 +2260,7 @@ class Provides(_dependency):
             return
         fullpath = macros.destdir + path
         if not self.monodisPath:
-            self.monodisPath = _getmonodis(macros, self, path)
+            self.monodisPath = self._getmonodis(macros, path)
             if not self.monodisPath:
                 return
         p = util.popen('%s --assembly %s' %(
@@ -2466,7 +2504,6 @@ class Requires(_addInfo, _dependency):
 
     def preProcess(self):
         macros = self.macros
-        self.db = None
         self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
         # anything that any buildreqs have caused to go into ld.so.conf
@@ -2531,7 +2568,7 @@ class Requires(_addInfo, _dependency):
 
         if self._isCIL(m):
             if not self.monodisPath:
-                self.monodisPath = _getmonodis(macros, self, path)
+                self.monodisPath = self._getmonodis(macros, path)
                 if not self.monodisPath:
                     return
             p = util.popen('%s --assemblyref %s' %(
@@ -2663,7 +2700,7 @@ class Requires(_addInfo, _dependency):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = _getpython(self.macros)
+        pythonPath = self._getpython(self.macros)
         # conary is a python program...
         assert(pythonPath)
 
@@ -2689,7 +2726,7 @@ class Requires(_addInfo, _dependency):
             sysPathForModuleFinder = list(systemPaths)
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath = sorted(set(_stripDestDir(systemPaths, destdir)),
+            self.sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
                                   key=len, reverse=True)
 
         finally:
@@ -2767,7 +2804,7 @@ class Requires(_addInfo, _dependency):
             return
 
         macros = self.recipe.macros
-        self.perlPath, self.perlIncPath = _getperl(macros, self.recipe)
+        self.perlPath, self.perlIncPath = self._getperl(macros, self.recipe)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
@@ -2830,9 +2867,6 @@ class Requires(_addInfo, _dependency):
 
         return reqlist
 
-    def _initializeDb(self):
-        self.db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
-        
     def _addPkgConfigRequirements(self, path, fullpath, pkg, macros):
         # parse pkgconfig file
         variables = {}
@@ -2895,31 +2929,12 @@ class Requires(_addInfo, _dependency):
                 self._addRequirement(path, troveName, [], pkg,
                                      deps.TroveDependencies)
             else:
-                if not self.db:
-                    self._initializeDb()
-                # find requirement on system
-                troveNames = [ x.getName() for x in 
-                               self.db.iterTrovesByPath(fileRequired) ]
-                if not troveNames:
-                    self.error('pkg-config file %s not managed by conary',
-                               fileRequired)
-                if len(troveNames) > 1:
-                    self.error('pkg-config file %s owned by more than one trove',
-                               fileRequired)
-                troveName = troveNames[0]
-                if troveName.endswith(':devellib'):
-                    # prefer corresponding :devel to :devellib
-                    # if it exists
-                    troveSpec = (
-                        troveName.replace(':devellib', ':devel'),
-                        None, None
-                    )
-                    results = self.db.findTroves(None, [troveSpec],
-                                                 allowMissing = True)
-                    if troveSpec in results:
-                        troveName = results[troveSpec][0][0]
-                self._addRequirement(path, troveName, [], pkg,
-                                     deps.TroveDependencies)
+                troveName = self._enforceProvidedPath(fileRequired,
+                                                      fileType='pkg-config',
+                                                      unmanagedError=True)
+                if troveName:
+                    self._addRequirement(path, troveName, [], pkg,
+                                         deps.TroveDependencies)
 
 
 

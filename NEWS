@@ -1,81 +1,135 @@
 Changes in the Metadata tree:
+  o Client Changes:
+    * Hashes of the directories a trove places files in is now build
+      (CNY-857)
+
   o Bug Fixes:
     * StreamSet objects didn't work with inheritance because the C
       implementation treated an internal variable as inheritable when it should
       have been treated as a class variable
 
 Changes in @NEW@:
+  o Build Changes:
+    * When Conary calls an external program (python, perl, monodis)
+      to determine file dependencies and that program is not a part
+      of the package being built, it will warn if that external
+      program is not provided by the build requirements. (CNY-1492)
+    * addPatch()'s optional argument "extraArgs" will now do the right thing
+      if passed a single string instead of a tuple or list. 
+
+  o Internal Changes:
+    * The conary.lib.elf module can now be built against libelf
+      version 0.8.0 or later as well as the libelf implementation
+      provided by elfutils.  libelf can be downloaded from
+      http://www.mr511.de/software/ (CNY-1501)
+
+Changes in 1.1.19:
   o Client Changes:
-    * Added cvc promote command. (CNY-1304)
-    * Added interface (but no command line option) for performing
-      partial clones, where only some components out of a package
-      are cloned based on byDefault settings. (CNY-1389)
-    * Allow merging and installing of changesets with compatible (non-diff)
-      sharing of (pathId,fileId) combinations (CNY-1253)
-    * Proxy configuration parameter will now work for standard http proxies,
-      not only conary proxies. It only proxies conary requests however; for
-      full http proxying use the http_proxy environment variable.
-    * Commit should work through a standard http proxy now
-    * Added --all-flavors option for cvc promote to promote all flavors of the
-      latest version of the listed troves. (CNY-1440)
-    * Made --with-sources the default for cvc promote, adding the new flag
-      --without-sources.  --with-sources will still work.
+    * A new "cvc promote" command has been added. "cvc promote" is a
+      special type of cloning based on group structure.  For more
+      information on promote, see the JIRA issue until documentation
+      on the wiki is updated.  (CNY-1304)
+    * An "--all-flavors" option has been added to "cvc promote" which
+      promotes all flavors of the latest version of the listed
+      troves. (CNY-1440)
+    * A programmatic interface for performing partial clones, where
+      only some components out of a package are cloned based on
+      byDefault settings, has been added. (CNY-1389)
+    * Conary changesets can now deal with changesets that contain
+      package components that share identical file contents, pathId,
+      and fileId combinations. (CNY-1253)
+    * The "proxy" configuration parameter will now work for standard
+      http proxies such as Squid.  Previously the "proxy"
+      configuration parameter could only specify a Conary repository
+      proxy.  Environments that require all HTTP and HTTPS traffic
+      pass through a proxy must continue to use they "http_proxy"
+      environment variable, as the "proxy" configuration variable is
+      only used for Conary repository calls.  Source downloads in cvc,
+      for example, will only use the http_proxy environment variable.
     * Due to limitations in Apache 2.0, the Conary client will now use
       HTTP/1.1 "chunked" Transfer-encoding when committing changesets
       larger than 2 GiB.
     * The Conary client API exposes a new call, applyRollback. (CNY-1455).
-    * Hashes of the directories a trove places files in is now build
-      (CNY-857)
+    * An "applyRollback()" method has been added to the ConaryClient
+      class. (CNY-1455)
+
+  o Server Changes:
+    * The repository cache has been completely reworked. This fixes
+      problems with authorization and the cache, and has the side
+      benefit of unifying the proxy code for the repository and the
+      proxy. The cacheDB repository configuration parameter is
+      obsolete and will cause a warning on startup. changesetCacheDir
+      should now be used instead, and tmpwatch should be configured to
+      clean up both the changesetCacheDir and tmpDir
+      directories. (CNY-1387)
+    * The repository now properly commits changesets where multiple
+      troves reference the same (pathId,fileId) key. (CNY-1414)
+    * The standalone server can now decode "Transfer-encoding:
+      chunked" PUT requests from clients.
+    * Apache based repository servers now send changeset file contents
+      using the "req.write()" method instead of the "req.sendfile()"
+      method when file contents are larger than 2 GiB.  This works
+      around limitations in Apache 2.0.
+    * The list of sizes returned by the getChangeSet() and
+      getFileContents() repository methods are now returned as a list
+      of strings instead of a list of integers.  XML-RPC integers can
+      only hold values less than 2147483648 (a signed integer).
+    * A Conary repository will now raise an exception if a client
+      requests a changeset that is larger than 2 GiB in total size or
+      file contents larger than 2 GiB in size and does not support the
+      new version 44 protocol required to work around this limitation.
+
+  o Build Changes:
+    * A "vmware" flavor has been added to the default set of flavors.
+      A trove with a vmware flavor should be intended to run as a
+      VMware guest. (CNY-1421)
+    * If there's a conflict when loading installed troves, the latest
+      trove will be picked.
+    * The loadInstalled() recipe function will now search the
+      installLabelPath for troves to load when it cannot find them any
+      other way.
+    * A "overrideLoad" keyword parameter has been added to the
+      loadInstalled() and loadSuperClass() recipe functions.  This can
+      be used to override the default search mechanism.
 
   o Bug Fixes:
     * Local flags are now cleared after each group cook, meaning that
-      multipass group cooks will have the correct local flavor. (CNY-1400)
-    * Dep resolution in group cooks now also take advantage of the group 
-      cache. (CNY-1386)
-    * Changesets for source troves with missing files (because the file is
-      missing from the upstream server or the upstream server is unavailable)
-      are properly written to changeset files. (CNY-1415)
-    * Derived packages (experimental) now correctly handle multiple
-      architectures built from the same source. (CNY-1423)
-    * loadInstalled now always works even if you have multiple versions of 
-      a package installed from multiple branches.
+      multipass group cooks will have the correct local
+      flavor. (CNY-1400)
+    * Dependency resolution in group cooks now also take advantage of
+      the group cache. (CNY-1386)
+    * Changesets for source troves with missing files (because the
+      file is missing from the upstream server or the upstream server
+      is unavailable) are now properly written to changeset
+      files. (CNY-1415)
+    * Derived packages, which are still experimental, now correctly
+      handle multiple architectures built from the same
+      source. (CNY-1423)
+    * The loadInstalled() recipe function now always works even if you
+      have multiple versions of a package installed from multiple
+      branches.
     * Trove names are now checked for legal characters. (CNY-1358)
-    * A minor bug related to file uploads on the error codepath was fixed.
-      (CNY-1442)
-    * A bug in cvc promote that caused it to fail when the source components
-      added due to --with-sources were in conflict.  This could happen, for
-      example, when different flavors of a binary were cooked from different
-      source versions and all flavors to be cloned to the new label at teh 
-      same time (CNY-1443)
-    * Fixed a bug in the CfgQuotedLineList display function (does not affect
-      conary directly)
-    * Flavored items in a job list are now correctly frozen. (CNY-1479)
-    * cvc cook --macros works as expected now, by defining a macro (as passed
-      in on the command line with --macro) per line. (CNY-1062)
-
-  o Server Changes:
-    * The repository cache was completely reworked. This fixed problems with
-      authorization and the cache, and had the side benefits of unifying
-      the proxy code for the repository and the proxy. The cacheDB repository
-      configuration parameter is obsolete (and will cause an error on
-      startup). changesetCacheDir should now be used instead, and tmpwatch
-      now needs to be run on that directory as well as the tmpDir set in the
-      configuration (CNY-1387)
-    * Properly commits changesets where multiple troves reference the same
-      (pathId,fileId) key (CNY-1414)
-
-  o Build Changes:
-    * The vmware flavor has been defined, representing whether the
-      software is intended to be running as a vmware guest. (CNY-1421)
-    * Refactored the redirect build code and fixed bugs related to building
-      flavored redirects (CNY-727)
-    * Added capability the loadrecipe code to allow the loadInstalled
-      and loadSuperClass troves to used to be passed in explicitly,
-      overriding the search mechanism, via the overrideLoad parameter
-    * If there's a conflict when loading installed troves, the latest trove
-      will be picked.
-    * loadInstall will now search the installLabelPath for troves to load
-      when it cannot find them any other way.
+    * A minor bug related to file uploads on the error codepath was
+      fixed.  (CNY-1442)
+    * A bug in "cvc promote" that caused it to fail when the source
+      components added due to --with-sources were in conflict.  This
+      could happen, for example, when different flavors of a binary
+      were cooked from different source versions and all flavors to be
+      cloned to the new label at the same time (CNY-1443)
+    * A bug in the CfgQuotedLineList class' display function has been
+      fixed.
+    * Flavored items in a job list are now correctly frozen when
+      writing out an update job. (CNY-1479)
+    * A default UpdateCallback() is set if an update callback hasn't
+      been specified when invoking the applyUpdate() method of
+      ConaryClient. (CNY-1497)
+    * "cvc cook --macros" works as expected now, by defining a macro (as
+      passed in on the command line with --macro) per line. (CNY-1062)
+    * Committing to a Conary repository when using a standard HTTP
+      proxy functions properly.  A change in 1.1.18 introduced this
+      incompatibility.
+    * The redirect build code has been refactored.  Bugs related to
+      building flavored redirects have been fixed. (CNY-727)
 
 Changes in 1.1.18:
   o Major Changes:
