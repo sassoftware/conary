@@ -399,8 +399,11 @@ class TroveSignatures(streams.StreamSet):
         self.sha1 = streams.AbsoluteSha1Stream()
         self.vSigs = VersionedSignaturesSet()
 
-    def freeze(self, skipSet = {}):
-        return streams.StreamSet.freeze(self, skipSet = skipSet)
+    # this parameter order has to match what's used in streamset.c
+    def freeze(self, skipSet = {}, freezeKnown = True, freezeUnknown = True):
+        return streams.StreamSet.freeze(self, skipSet = skipSet,
+                                        freezeKnown = freezeKnown,
+                                        freezeUnknown = freezeUnknown)
 
     def computeDigest(self, sigVersion, message):
         if sigVersion == _TROVESIG_VER_CLASSIC:
@@ -846,13 +849,15 @@ class Trove(streams.StreamSet):
 
     def _sigString(self, version):
         if version == _TROVESIG_VER_CLASSIC:
-            return streams.StreamSet.freeze(self, self.v0SkipSet)
+            return streams.StreamSet.freeze(self, self.v0SkipSet,
+                                            freezeUnknown = False)
         elif version == _TROVESIG_VER_NEW:
             return streams.StreamSet.freeze(self,
                                             skipSet = { 'sigs' : True,
                                                         'versionStrings' : True,
                                                         'incomplete' : True,
-                                                        'metadata': True })
+                                                        'metadata': True },
+                                            freezeUnknown = True)
 
         raise NotImplementedError
 
@@ -1025,6 +1030,8 @@ class Trove(streams.StreamSet):
                 lastSigVersion = sigVersion
                 s = self._sigString(sigVersion)
                 if not sigDigest.verify(s):
+                    import epdb
+                    epdb.st('f')
                     return False
 
         return True
@@ -1301,7 +1308,12 @@ class Trove(streams.StreamSet):
         for info in trvCs.getRedirects().iter():
             self.redirects.addRedirectObject(info)
 
-        if not trvCs.getOldVersion():
+        if trvCs.getFrozenTroveInfo():
+            incomplete = (self.troveInfo.incomplete() and 1) or 0
+            self.troveInfo = TroveInfo(trvCs.getFrozenTroveInfo())
+            # incomplete needs to be handled manually
+            self.troveInfo.incomplete.set(incomplete)
+        elif not trvCs.getOldVersion():
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
             self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
@@ -1505,6 +1517,8 @@ class Trove(streams.StreamSet):
 				      absolute = absolute,
                                       type = self.type(),
                                       troveInfoDiff = self.troveInfo.freeze())
+
+        chgSet.setTroveInfo(self.troveInfo)
 
 	# dependency and flavor information is always included in total;
 	# this lets us do dependency checking w/o having to load troves
@@ -2484,6 +2498,7 @@ _STREAM_TCS_OLD_SIGS                = 15
 _STREAM_TCS_NEW_SIGS                = 16
 _STREAM_TCS_WEAK_TROVE_CHANGES      = 17
 _STREAM_TCS_REDIRECTS               = 18
+_STREAM_TCS_ABSOLUTE_TROVEINFO      = 19
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -2512,6 +2527,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_OLD_SIGS    : (LARGE, TroveSignatures,      "oldSigs"    ),
         _STREAM_TCS_NEW_SIGS    : (LARGE, TroveSignatures,      "newSigs"    ),
         _STREAM_TCS_REDIRECTS   : (LARGE, TroveRedirectList,    "redirects"  ),
+        _STREAM_TCS_ABSOLUTE_TROVEINFO
+                                : (LARGE, streams.StringStream,
+                                                        "absoluteTroveInfo"  ),
     }
 
     ignoreUnknown = True
@@ -2541,6 +2559,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getTroveInfoDiff(self):
         return self.troveInfoDiff()
+
+    def getFrozenTroveInfo(self):
+        return self.absoluteTroveInfo()
+
+    def setTroveInfo(self, ti):
+        self.absoluteTroveInfo.set((ti.freeze()))
 
     def getChangeLog(self):
 	return self.changeLog
