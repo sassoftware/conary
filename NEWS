@@ -9,7 +9,7 @@ Changes in @NEW@:
     * The conary.lib.elf module can now be built against libelf
       version 0.8.0 or later as well as the libelf implementation
       provided by elfutils.  libelf can be downloaded from
-      http://www.mr511.de/software/
+      http://www.mr511.de/software/ (CNY-1501)
 
 Changes in 1.1.19:
   o Client Changes:
