@@ -2481,8 +2481,20 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
                          "permissions for chroot()", troveCs.getName())
         return 0
     else:
+        stdoutPipe = os.pipe()
+        stderrPipe = os.pipe()
+
         pid = os.fork()
+
         if pid == 0:
+            os.close(0)
+            os.close(stdoutPipe[0])
+            os.close(stderrPipe[0])
+            os.dup2(stdoutPipe[1], 1)
+            os.dup2(stderrPipe[1], 2)
+            os.close(stdoutPipe[1])
+            os.close(stderrPipe[1])
+
             if root != '/':
                 assert(root[0] == '/')
                 try:
@@ -2493,11 +2505,38 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
             os.execve(scriptName, [ scriptName ], environ)
             os._exit(1)
 
+        os.close(stdoutPipe[1])
+        os.close(stderrPipe[1])
+
+        stdoutReader = util.LineReader(stdoutPipe[0])
+        stderrReader = util.LineReader(stderrPipe[0])
+        poller = select.poll()
+        poller.register(stdoutPipe[0], select.POLLIN)
+        poller.register(stderrPipe[0], select.POLLIN)
+
+        count = 2
+        while count:
+            fds = [ x[0] for x in poller.poll() ]
+            for (fd, reader, isError) in (
+                        (stdoutPipe[0], stdoutReader, False),
+                        (stderrPipe[0], stderrReader, True) ):
+                if fd not in fds: continue
+                lines = reader.readlines()
+
+                if lines == None:
+                    poller.unregister(fd)
+                    count -= 1
+                else:
+                    # XXX has to be replaced with the script name
+                    for line in lines:
+                        callback.scriptOutput("XXX", line)
+
         (id, status) = os.waitpid(pid, 0)
         os.unlink(scriptName)
 
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-            rc = 1
+            rc = os.WEXITSTATUS(status)
+            callback.scriptFailure("XXX", rc)
         else:
             rc = 0
 
