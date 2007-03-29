@@ -334,11 +334,11 @@ class UpdateJob:
         return [ (t[0],self. __thawVF(t[1]), self.__thawVF(t[2]), bool(t[3]))
                  for t in frzrep ]
 
-    def getInvalidateRollbacks(self):
-        return self._invalidateRollbackStack
-
-    def updateInvalidateRollbacks(self, flag):
+    def invalidateRollbacks(self, flag):
         self._invalidateRollbackStack = bool(flag)
+
+    def updateInvalidateRollbacks(self):
+        return self._invalidateRollbackStack
 
     def __init__(self, db, searchSource = None):
         self.jobs = []
