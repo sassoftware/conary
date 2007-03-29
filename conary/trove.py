@@ -505,6 +505,108 @@ class TroveFlagsStream(streams.ByteStream):
 
 	return (self() and self() & flag)
 
+
+# FIXME: this should be a dynamically extendable stream.  StreamSet is a
+# little too rigid.
+_METADATA_ITEM_TAG_ID = 0
+_METADATA_ITEM_TAG_SHORTDESC = 1
+_METADATA_ITEM_TAG_LONGDESC = 2
+_METADATA_ITEM_TAG_LICENSES = 3
+_METADATA_ITEM_TAG_CRYPTO = 4
+_METADATA_ITEM_TAG_URL = 5
+_METADATA_ITEM_TAG_CATEGORIES = 6
+_METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
+_METADATA_ITEM_TAG_SIGNATURES = 8
+_METADATA_ITEM_TAG_NOTES = 9
+
+class MetadataItem(streams.StreamSet):
+    streamDict = {
+        _METADATA_ITEM_TAG_ID:
+                (DYNAMIC, streams.StringStream,   'id'           ),
+        _METADATA_ITEM_TAG_SHORTDESC:
+                (DYNAMIC, streams.StringStream,   'shortDesc'    ),
+        _METADATA_ITEM_TAG_LONGDESC:
+                (DYNAMIC, streams.StringStream,   'longDesc'     ),
+        _METADATA_ITEM_TAG_LICENSES:
+                (DYNAMIC, streams.StringsStream,  'licenses'     ),
+        _METADATA_ITEM_TAG_CRYPTO:
+                (DYNAMIC, streams.StringsStream,  'crypto'       ),
+        _METADATA_ITEM_TAG_URL:
+                (DYNAMIC, streams.StringStream,   'url'          ),
+        _METADATA_ITEM_TAG_CATEGORIES:
+                (DYNAMIC, streams.StringsStream,  'categories'   ),
+        _METADATA_ITEM_TAG_BIBLIOGRAPHY:
+                (DYNAMIC, streams.StringsStream,  'bibliography' ),
+        _METADATA_ITEM_TAG_SIGNATURES:
+                (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
+        _METADATA_ITEM_TAG_NOTES:
+                (DYNAMIC, streams.StringsStream,  'notes'        ),
+        }
+
+    def _digest(self, version=0):
+        if version == 0:
+            # version 0 of the digest
+            frz = streams.StreamSet.freeze(self,
+                                           skipSet = { 'id' : True,
+                                                       'signatures': True })
+            return sha1helper.sha1String(frz)
+        raise RuntimeError('unsupported version')
+
+    def _updateId(self):
+        self.id.set(self._digest(0))
+
+    def addDigitalSignature(self, keyId):
+        self._updateId()
+        self.signatures.addDigest(self.id(), 0)
+        self.signatures.sign(keyId, 0)
+
+    def verifyDigitalSignatures(self, serverName=None):
+        keyCache = openpgpkey.getKeyCache()
+        missingKeys = []
+        badFingerprints = []
+        for signatures in self.signatures:
+            # verify that recomputing the digest for this version
+            # of the signature matches the stored version
+            if self._digest(signatures.version()) != signatures.digest():
+                raise DigitalSignatureVerificationError(
+                    'metadata checksum does not match stored value')
+            digest = signatures.digest()
+            for signature in signatures.signatures:
+                try:
+                    key = keyCache.getPublicKey(signature[0],
+                                                serverName=serverName,
+                                                warn=False)
+                except KeyNotFound:
+                    missingKeys.append(signature[0])
+                    continue
+                lev = key.verifyString(digest, signature)
+                if lev == -1:
+                    badFingerprints.append(key.getFingerprint())
+        return missingKeys, badFingerprints
+
+    def freeze(self, *args, **kw):
+        self._updateId()
+        return streams.StreamSet.freeze(self, *args, **kw)
+
+class Metadata(streams.StreamCollection):
+    streamDict = { 1: MetadataItem }
+
+    def add(self, item):
+        self.addStream(1, item)
+
+    def __iter__(self):
+        for item in self.getStreams(1):
+            yield item
+
+    def verifyDigitalSignatures(self, serverName=None):
+        missingKeys = []
+        badFingerprints = []
+        for item in self:
+            rc = item.verifyDigitalSignatures(serverName=serverName)
+            missingKeys.extend(rc[0])
+            badFingerprints.extend(rc[1])
+        return missingKeys, badFingerprints
+
 _TROVEINFO_TAG_SIZE           =  0
 _TROVEINFO_TAG_SOURCENAME     =  1
 _TROVEINFO_TAG_BUILDTIME      =  2
@@ -523,12 +625,13 @@ _TROVEINFO_TAG_INCOMPLETE     = 14
 _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
+_TROVEINFO_TAG_METADATA       = 17
 # troveinfo above here is signed in v0 signatures; below here is signed
 # in v1 signatures as well
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
-                if tag > _TROVEINFO_ORIGINAL_SIG ]
+             if tag > _TROVEINFO_ORIGINAL_SIG ]
 
 _TROVESCRIPT_SCRIPT        = 0
 _TROVESCRIPT_ROLLBACKFENCE = 1
@@ -569,6 +672,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   ),
         _TROVEINFO_TAG_DIR_HASHES    : (LARGE, PathHashes,           'dirHashes'    ),
         _TROVEINFO_TAG_SCRIPTS       : (LARGE, TroveScripts,         'scripts'    ),
+        _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -668,104 +772,6 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
 
         return new
 
-# FIXME: this should be a dynamically extendable stream.  StreamSet is a
-# little too rigid.
-_METADATA_ITEM_TAG_ID = 0
-_METADATA_ITEM_TAG_SHORTDESC = 1
-_METADATA_ITEM_TAG_LONGDESC = 2
-_METADATA_ITEM_TAG_LICENSES = 3
-_METADATA_ITEM_TAG_CRYPTO = 4
-_METADATA_ITEM_TAG_URL = 5
-_METADATA_ITEM_TAG_CATEGORIES = 6
-_METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
-_METADATA_ITEM_TAG_SIGNATURES = 8
-
-class MetadataItem(streams.StreamSet):
-    streamDict = {
-        _METADATA_ITEM_TAG_ID:
-                (DYNAMIC, streams.StringStream,   'id'           ),
-        _METADATA_ITEM_TAG_SHORTDESC:
-                (DYNAMIC, streams.StringStream,   'shortDesc'    ),
-        _METADATA_ITEM_TAG_LONGDESC:
-                (DYNAMIC, streams.StringStream,   'longDesc'     ),
-        _METADATA_ITEM_TAG_LICENSES:
-                (DYNAMIC, streams.StringsStream,  'licenses'     ),
-        _METADATA_ITEM_TAG_CRYPTO:
-                (DYNAMIC, streams.StringsStream,  'crypto'       ),
-        _METADATA_ITEM_TAG_URL:
-                (DYNAMIC, streams.StringStream,   'url'          ),
-        _METADATA_ITEM_TAG_CATEGORIES:
-                (DYNAMIC, streams.StringsStream,  'categories'   ),
-        _METADATA_ITEM_TAG_BIBLIOGRAPHY:
-                (DYNAMIC, streams.StringsStream,  'bibliography' ),
-        _METADATA_ITEM_TAG_SIGNATURES:
-                (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
-        }
-
-    def _digest(self, version=0):
-        if version == 0:
-            # version 0 of the digest
-            frz = streams.StreamSet.freeze(self,
-                                           skipSet = { 'id' : True,
-                                                       'signatures': True })
-            return sha1helper.sha1String(frz)
-        raise RuntimeError('unsupported version')
-
-    def _updateId(self):
-        self.id.set(self._digest(0))
-
-    def addDigitalSignature(self, keyId):
-        self._updateId()
-        self.signatures.addDigest(self.id(), 0)
-        self.signatures.sign(keyId, 0)
-
-    def verifyDigitalSignatures(self, serverName=None):
-        keyCache = openpgpkey.getKeyCache()
-        missingKeys = []
-        badFingerprints = []
-        for signatures in self.signatures:
-            # verify that recomputing the digest for this version
-            # of the signature matches the stored version
-            if self._digest(signatures.version()) != signatures.digest():
-                raise DigitalSignatureVerificationError(
-                    'metadata checksum does not match stored value')
-            digest = signatures.digest()
-            for signature in signatures.signatures:
-                try:
-                    key = keyCache.getPublicKey(signature[0],
-                                                serverName=serverName,
-                                                warn=False)
-                except KeyNotFound:
-                    missingKeys.append(signature[0])
-                    continue
-                lev = key.verifyString(digest, signature)
-                if lev == -1:
-                    badFingerprints.append(key.getFingerprint())
-        return missingKeys, badFingerprints
-
-    def freeze(self, *args, **kw):
-        self._updateId()
-        return streams.StreamSet.freeze(self, *args, **kw)
-
-class Metadata(streams.StreamCollection):
-    streamDict = { 1: MetadataItem }
-
-    def add(self, item):
-        self.addStream(1, item)
-
-    def __iter__(self):
-        for item in self.getStreams(1):
-            yield item
-
-    def verifyDigitalSignatures(self, serverName=None):
-        missingKeys = []
-        badFingerprints = []
-        for item in self:
-            rc = item.verifyDigitalSignatures(serverName=serverName)
-            missingKeys.extend(rc[0])
-            badFingerprints.extend(rc[1])
-        return missingKeys, badFingerprints
-
 _STREAM_TRV_NAME            = 0
 _STREAM_TRV_VERSION         = 1
 _STREAM_TRV_FLAVOR          = 2
@@ -779,7 +785,6 @@ _STREAM_TRV_TYPE            = 9
 _STREAM_TRV_SIGS            = 10 # unused
 _STREAM_TRV_WEAK_TROVES     = 11
 _STREAM_TRV_REDIRECTS       = 12
-_STREAM_TRV_METADATA        = 13
 
 TROVE_TYPE_NORMAL          = 0
 TROVE_TYPE_REDIRECT        = 1
@@ -828,13 +833,11 @@ class Trove(streams.StreamSet):
                     (SMALL, ByteStream,                  "type"         ),
         _STREAM_TRV_REDIRECTS     :
                     (SMALL, TroveRedirectList,           "redirects"    ),
-        _STREAM_TRV_METADATA      :
-                    (LARGE, Metadata,                    "metadata"     ),
     }
     ignoreUnknown = False
 
     v0SkipSet = { 'sigs' : True, 'versionStrings' : True, 'incomplete' : True,
-                  'pathHashes' : True, 'metadata': True }
+                  'pathHashes' : True }
     _mergeTroveInfoSigExclusions(v0SkipSet, streamDict)
 
     # the memory savings from slots isn't all that interesting here, but it
@@ -842,7 +845,7 @@ class Trove(streams.StreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "strongTroves", "weakTroves",
-                  "idMap", "type", "redirects", 'metadata' ]
+                  "idMap", "type", "redirects" ]
 
     def __repr__(self):
         return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
@@ -981,7 +984,7 @@ class Trove(streams.StreamSet):
 
         # verify metadata.  Pass in the server name so it can
         # find additional fingerprints
-        rc = self.metadata.verifyDigitalSignatures(serverName=serverName)
+        rc = self.troveInfo.metadata.verifyDigitalSignatures(serverName=serverName)
         metaMissingKeys, metaBadSigs = rc
         missingKeys.extend(metaMissingKeys)
         badFingerprints.extend(metaBadSigs)
