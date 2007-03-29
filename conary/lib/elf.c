@@ -522,11 +522,6 @@ static PyObject *doGetRPATH(Elf * elf) {
     char * buf;
     int entries, i;
 
-    if (!gelf_getehdr(elf, &ehdr)) {
-	PyErr_SetString(ElfError, "failed to get ELF header");
-	return NULL;
-    }
-
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
 	    PyErr_SetString(ElfError, "error getting section header");
@@ -536,6 +531,11 @@ static PyObject *doGetRPATH(Elf * elf) {
 	/* skip any section that isn't DYNAMIC */
 	if (shdr.sh_type != SHT_DYNAMIC) {
 	    continue;
+	}
+
+	if (!gelf_getehdr(elf, &ehdr)) {
+	    PyErr_SetString(ElfError, "failed to get ELF header");
+	    return NULL;
 	}
 
 	name = elf_strptr(elf, ehdr.e_shstrndx, shdr.sh_name);
