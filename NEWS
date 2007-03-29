@@ -5,7 +5,7 @@ Changes in @NEW@:
       of the package being built, it will warn if that external
       program is not provided by the build requirements. (CNY-1492)
     * addPatch()'s optional argument "extraArgs" will now do the right thing
-      passed a single string instead of a tuple or list. 
+      if passed a single string instead of a tuple or list. 
 
   o Internal Changes:
     * The conary.lib.elf module can now be built against libelf
