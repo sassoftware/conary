@@ -111,7 +111,7 @@ def get(port, isSecure, repos, req):
             sizeCb(size, tag)
             # FIXME: apache 2.0 can't sendfile() a file > 2 GiB.
             # we'll have to send the data ourselves
-            if size > 2147483648:
+            if size >= 0x80000000:
                 f = open(path, 'r')
                 # 2 MB buffer
                 bufsize = 2 * 1024 * 1024

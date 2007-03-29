@@ -406,6 +406,9 @@ class ChangesetFilter(BaseProxy):
                               getCsVersion, [ rawJob ], recurse, withFiles,
                               withFileContents, excludeAutoSource)[1]
                 assert(len(sizes) == 1)
+                # ensure that the size is an integer -- protocol version
+                # 44 returns a string to avoid XML-RPC marshal limits
+                sizes = [ int(x) for x in sizes ]
                 size = sizes[0]
 
                 if cachable:
@@ -472,6 +475,18 @@ class ChangesetFilter(BaseProxy):
 
         f.close()
 
+        # client versions >= 44 use strings instead of ints for size
+        # because xmlrpclib can't marshal ints > 2GiB
+        if clientVersion >= 44:
+            allSizes = [ str(x) for x in allSizes ]
+        else:
+            for size in allSizes:
+                if size >= 0x80000000:
+                    raise ProxyRepositoryError(('InvalidClientVersion',
+                        'This version of Conary does not support downloading '
+                        'changesets larger than 2 GiB.  Please install a new '
+                        'Conary client.'))
+
         if clientVersion < 38:
             return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
 
@@ -494,7 +509,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 41, 42, 43 ]
+    SERVER_VERSIONS = [ 41, 42, 43, 44 ]
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)
@@ -541,6 +556,9 @@ class ProxyRepositoryServer(ChangesetFilter):
             # now get the contents we don't have cached
             (url, sizes) = caller.getFileContents(
                     clientVersion, neededFiles, False)[1]
+            # insure that the size is an integer -- protocol version
+            # 44 returns a string to avoid XML-RPC marshal limits
+            sizes = [ int(x) for x in sizes ]
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
@@ -586,6 +604,19 @@ class ProxyRepositoryServer(ChangesetFilter):
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])
+
+            # client versions >= 44 use strings instead of ints for size
+            # because xmlrpclib can't marshal ints > 2GiB
+            if clientVersion >= 44:
+                sizeList = [ str(x) for x in sizeList ]
+            else:
+                for size in sizeList:
+                    if size >= 0x80000000:
+                        raise ProxyRepositoryError(
+                            ('InvalidClientVersion',
+                             'This version of Conary does not support '
+                             'downloading file contents larger than 2 '
+                             'GiB.  Please install a new Conary client.'))
             return False, (url, sizeList)
         finally:
             os.close(fd)

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -639,7 +639,7 @@ _TROVESCRIPT_ROLLBACKFENCE = 1
 class TroveScript(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
-        _TROVESCRIPT_SCRIPT         : (LARGE, streams.StringStream, 'script' ),
+        _TROVESCRIPT_SCRIPT         : (DYNAMIC, streams.StringStream, 'script' ),
         _TROVESCRIPT_ROLLBACKFENCE  : (SMALL, streams.ByteStream,   'rollbackFence' ),
     }
 
@@ -649,8 +649,8 @@ _TROVESCRIPTS_POSTINSTALL = 1
 class TroveScripts(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
-        _TROVESCRIPTS_PREINSTALL    : (LARGE, TroveScript, 'preInstall'  ),
-        _TROVESCRIPTS_POSTINSTALL   : (LARGE, TroveScript, 'postInstall' ),
+        _TROVESCRIPTS_PREINSTALL    : (DYNAMIC, TroveScript, 'preInstall'  ),
+        _TROVESCRIPTS_POSTINSTALL   : (DYNAMIC, TroveScript, 'postInstall' ),
     }
 
 class TroveInfo(streams.StreamSet):
@@ -671,7 +671,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_TROVEVERSION  : (SMALL, streams.IntStream,    'troveVersion'   ),
         _TROVEINFO_TAG_INCOMPLETE    : (SMALL, streams.ByteStream,   'incomplete'   ),
         _TROVEINFO_TAG_DIR_HASHES    : (LARGE, PathHashes,           'dirHashes'    ),
-        _TROVEINFO_TAG_SCRIPTS       : (LARGE, TroveScripts,         'scripts'    ),
+        _TROVEINFO_TAG_SCRIPTS       : (DYNAMIC, TroveScripts,       'scripts'    ),
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
     }
 

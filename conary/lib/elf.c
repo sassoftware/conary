@@ -36,7 +36,6 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 		     PyObject * provList) {
     Elf_Scn * sect = NULL;
     GElf_Shdr shdr;
-    size_t shstrndx;
     char * name;
     int entries;
     GElf_Dyn sym;
@@ -49,7 +48,7 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
     int i, j;
     int idx, listIdx;
     char * libName;
-    char * verdBase;
+    char * verdBase = NULL;
     char * abi;
     char * ident;
     size_t identSize;
@@ -147,14 +146,18 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
     PyDict_SetItem(reqList, Py_BuildValue("ss(ss)", "abi", class, abi, insSet),
 		   Py_None);
 
+    if (!gelf_getehdr(elf, &ehdr)) {
+	PyErr_SetString(ElfError, "failed to get ELF header");
+	return 1;
+    }
+
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
 	    PyErr_SetString(ElfError, "error getting section header!");
 	    return 1;
 	}
 
-	elf_getshstrndx (elf, &shstrndx);
-	name = elf_strptr (elf, shstrndx, shdr.sh_name);
+	name = elf_strptr (elf, ehdr.e_shstrndx, shdr.sh_name);
 
 	if (shdr.sh_type == SHT_NOBITS || name == NULL) {
 	    /* this section has no data, skip it */
@@ -193,25 +196,18 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 
 	    i = shdr.sh_info;
 	    idx = 0;
-	    while (i--) {
-		if (!gelf_getverneed(data, idx, &verneed)) {
-		    PyErr_SetString(ElfError,
-				    "failed to get version need info");
-		    return 1;
-		}
 
+	    while (i--) {
+		memcpy(&verneed, (char *) data->d_buf + idx,
+		       sizeof(GElf_Verneed));
 		libName = elf_strptr(elf, shdr.sh_link, verneed.vn_file);
 
 		listIdx = idx + verneed.vn_aux;
 		j = verneed.vn_cnt;
 		while (j--) {
 		    PyObject *val;
-		    if (!gelf_getvernaux(data, listIdx, &veritem)) {
-			PyErr_SetString(ElfError,
-				        "failed to get version item");
-			return 1;
-		    }
-
+		    memcpy(&veritem, data->d_buf + listIdx,
+			   sizeof(GElf_Vernaux));
 		    val = Py_BuildValue("ss(s)", "soname", libName,
 					elf_strptr(elf, shdr.sh_link,
 						   veritem.vna_name));
@@ -234,18 +230,11 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 	    i = shdr.sh_info;
 	    idx = 0;
 	    while (i--) {
-		if (!gelf_getverdef(data, idx, &verdef)) {
-		    PyErr_SetString(ElfError,
-				    "failed to get version def info");
-		    return 1;
-		}
-
+		memcpy(&verdef, (char *) data->d_buf + idx,
+		       sizeof(GElf_Verdef));
 		listIdx = idx + verdef.vd_aux;
-		if (!gelf_getverdaux(data, listIdx, &verdefItem)) {
-		    PyErr_SetString(ElfError,
-				    "failed to get version def item");
-		    return 1;
-		}
+		memcpy(&verdefItem, (char *) data->d_buf + listIdx,
+		       sizeof(GElf_Verdaux));
 
 		if (verdef.vd_flags & VER_FLG_BASE) {
 		    verdBase = elf_strptr(elf, shdr.sh_link, 
@@ -262,11 +251,8 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 		listIdx += verdefItem.vda_next;
 		j = verdef.vd_cnt - 1;
 		while (j--) {
-		    if (!gelf_getverdaux(data, listIdx, &verdefItem)) {
-			PyErr_SetString(ElfError,
-				        "failed to get version def item");
-			return 1;
-		    }
+		    memcpy(&verdefItem, (char *) data->d_buf + listIdx,
+			   sizeof(GElf_Verdaux));
 
 		    listIdx += verdefItem.vda_next;
 		}
@@ -392,15 +378,15 @@ static PyObject * stripped(PyObject *self, PyObject *args) {
 
 static int doHasDebug(Elf * elf) {
     Elf_Scn * sect = NULL;
+    GElf_Ehdr ehdr;
     GElf_Shdr shdr;
-    size_t shstrndx;
     char * name;
-    
-    if (-1 == elf_getshstrndx (elf, &shstrndx)) {
-	PyErr_SetString(ElfError, "error getting string table index!");
-	return -1;
+
+    if (!gelf_getehdr(elf, &ehdr)) {
+	PyErr_SetString(ElfError, "failed to get ELF header");
+	return 1;
     }
-    
+
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
 	    PyErr_SetString(ElfError, "error getting section header!");
@@ -413,7 +399,7 @@ static int doHasDebug(Elf * elf) {
 		return 1;
 	    }
 
-	    name = elf_strptr (elf, shstrndx, shdr.sh_name);
+	    name = elf_strptr (elf, ehdr.e_shstrndx, shdr.sh_name);
 	    if (!strncmp(name, ".debug", 6)) {
 		return 1;
 	    }
@@ -529,8 +515,8 @@ static PyObject *doGetRPATH(Elf * elf) {
     Elf_Scn * sect = NULL;
     Elf_Data * data;
     GElf_Dyn sym;
+    GElf_Ehdr ehdr;
     GElf_Shdr shdr;
-    size_t shstrndx;
     char * name;
     char * runpath = NULL;
     char * buf;
@@ -547,19 +533,19 @@ static PyObject *doGetRPATH(Elf * elf) {
 	    continue;
 	}
 
-	if (-1 == elf_getshstrndx(elf, &shstrndx)) {
-	    PyErr_SetString(ElfError, "error getting string table index");
+	if (!gelf_getehdr(elf, &ehdr)) {
+	    PyErr_SetString(ElfError, "failed to get ELF header");
 	    return NULL;
 	}
 
-	name = elf_strptr(elf, shstrndx, shdr.sh_name);
+	name = elf_strptr(elf, ehdr.e_shstrndx, shdr.sh_name);
 	if (NULL == name) {
 	    PyErr_SetString(ElfError, "error getting section name");
 	    return NULL;
 	}
-
 	/* strange. a DYNAMIC section that isn't named .dynamic.
 	   better skip it */
+
 	if (strcmp(name, ".dynamic"))
 	    continue;
 

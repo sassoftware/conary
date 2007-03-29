@@ -983,6 +983,8 @@ class Database(SqlDbRepository):
         del newErrs, dbConflicts
 
         if errList:
+            # make sure we release the lock on the database
+            self.db.rollback()
             raise CommitError, ('applying update would cause errors:\n' + 
                                 '\n\n'.join(str(x) for x in errList))
         if test:

@@ -587,7 +587,10 @@ class addPatch(_Source):
             if self.backup:
                 patchArgs.extend(['-b', '-z', self.backup])
             if self.extraArgs:
-                patchArgs.extend(self.extraArgs)
+                if isinstance(self.extraArgs, str):
+                    patchArgs.append(self.extraArgs)
+                else:
+                    patchArgs.extend(self.extraArgs)
 
             fd, path = tempfile.mkstemp()
             os.unlink(path)
