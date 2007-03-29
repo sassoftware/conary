@@ -1038,6 +1038,8 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
 	self.commit()
 
+        fsJob.runPostScripts(tagScript)
+
     def removeFiles(self, pathList):
 
         def _doRemove(self, rb, pathList):

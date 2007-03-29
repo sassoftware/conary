@@ -696,10 +696,10 @@ class FilesystemJob:
             self.callback.runningPostTagHandlers()
 	    tagCommands.run(tagScript, self.root)
 
-        self.runScripts(self.postScripts)
-
-    def runScripts(self, scripts):
-        print "SHOULD RUN", scripts
+    def runPostScripts(self, tagScript):
+        for (troveCs, script) in self.postScripts:
+            runTroveScript(troveCs, script, tagScript, '/tmp', self.root,
+                            self.callback, isPre = False)
 
     def getErrorList(self):
 	return self.errors
@@ -897,9 +897,13 @@ class FilesystemJob:
             removalList = []
 
         # queue up postinstall scripts
-        if troveCs.troveInfo.scripts.postInstall.script():
-            self.postScripts.append(
-                    trvCs.troveInfo.scripts.postInstall.script())
+        if troveCs.getOldVersion():
+            s = troveCs.getPostUpdateScript()
+        else:
+            s = troveCs.getPostInstallScript()
+
+        if s is not None:
+            self.postScripts.append((troveCs, s))
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -1538,7 +1542,7 @@ class FilesystemJob:
 	self.tagUpdates = {}
 	self.tagRemoves = {}
         self.linkGroups = {}
-        self.postScripts = {}
+        self.postScripts = []
 	self.db = db
         self.pathRemovedCache = (None, None, None)
         if callback is None:
@@ -2440,3 +2444,62 @@ def silentlyReplace(newF, oldF):
         return True
 
     return False
+
+def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
+                   isPre = False):
+    environ = { 'PATH' : '/usr/bin:/usr/sbin:/bin:/sbin' }
+
+    environ['CONARY_NEW_NAME'] = troveCs.getName()
+    environ['CONARY_NEW_VERSION'] = str(troveCs.getNewVersion())
+    environ['CONARY_NEW_FLAVOR'] = str(troveCs.getNewFlavor())
+    if troveCs.getOldVersion():
+        environ['CONARY_OLD_VERSION'] = str(troveCs.getOldVersion())
+        environ['CONARY_OLD_FLAVOR'] = str(troveCs.getOldFlavor())
+
+    scriptFd, scriptName = tempfile.mkstemp(suffix = '.trvscript',
+                                            dir = tmpDir)
+    os.chmod(scriptName, 0700)
+    os.write(scriptFd, script)
+    os.close(scriptFd)
+
+    if tagScript is not None:
+        f = open(tagScript, "a", 0600)
+        if isPre:
+            f.write('# ')
+        for env, value in environ.iteritems():
+            f.write("%s='%s' " % (env, value))
+        f.write(scriptName)
+        f.write("\n")
+        if isPre:
+            f.write('# ')
+        f.write("rm %s\n" % scriptName)
+        f.close()
+
+        rc = 0
+    elif root != '/' and os.getpid():
+        callback.warning("Not running script for %s due to insufficient "
+                         "permissions for chroot()", troveCs.getName())
+        return 0
+    else:
+        pid = os.fork()
+        if pid == 0:
+            if root != '/':
+                assert(root[0] == '/')
+                try:
+                    os.chroot(root)
+                except:
+                    os._exit(1)
+
+            os.execve(scriptName, [ scriptName ], environ)
+            os._exit(1)
+
+        (id, status) = os.waitpid(pid, 0)
+        os.unlink(scriptName)
+
+        if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+            rc = 1
+        else:
+            rc = 0
+
+    return rc
+

@@ -2565,6 +2565,25 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getFrozenTroveInfo(self):
         return self.absoluteTroveInfo()
 
+    def _getScript(self, kind):
+        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
+                                       self.absoluteTroveInfo())
+        if scriptStream is None:
+            return None
+
+        # this is horrib, but it's just looking up the script we're looking
+        # for as a string
+        return scriptStream.__getattribute__(scriptStream.streamDict[kind][2]).script()
+
+    def getPostInstallScript(self):
+        return self._getScript(_TROVESCRIPTS_POSTINSTALL)
+
+    def getPostUpdateScript(self):
+        return self._getScript(_TROVESCRIPTS_POSTUPDATE)
+
+    def getPreUpdateScript(self):
+        return self._getScript(_TROVESCRIPTS_PREUPDATE)
+
     def setTroveInfo(self, ti):
         self.absoluteTroveInfo.set((ti.freeze()))
 
