@@ -1174,6 +1174,13 @@ class Database(SqlDbRepository):
             rb = self.getRollback(rollbackName)
             yield (rollbackName, rb)
 
+    def invalidateRollbacks(self):
+        """Invalidate the rollback stack."""
+        # Works nicely for the very beginning
+        # (when firstRollback, lastRollback) = (0, -1)
+        self.firstRollback = self.lastRollback + 1
+        self.writeRollbackStatus()
+
     def readRollbackStatus(self):
         try:
             f = open(self.rollbackStatus)
