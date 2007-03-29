@@ -190,6 +190,7 @@ class UpdateJob:
         drep['jobsCsList'] = self.jobsCsList
         drep['itemList'] = self._freezeItemList()
         drep['keywordArguments'] = self.getKeywordArguments()
+        drep['invalidateRollbackStack'] = int(self._invalidateRollbackStack)
 
         # Save the Conary version
         drep['conaryVersion'] = constants.version
@@ -221,6 +222,7 @@ class UpdateJob:
 
         self.setCriticalJobs(drep['critical'])
         self.transactionCounter = drep['transactionCounter']
+        self._invalidateRollbackStack = bool(drep.get('invalidateRollbackStack'))
 
     def _freezeJobs(self, jobs):
         for jobList in jobs:
@@ -332,6 +334,12 @@ class UpdateJob:
         return [ (t[0],self. __thawVF(t[1]), self.__thawVF(t[2]), bool(t[3]))
                  for t in frzrep ]
 
+    def invalidateRollbacks(self, flag):
+        self._invalidateRollbackStack = bool(flag)
+
+    def updateInvalidateRollbacks(self):
+        return self._invalidateRollbackStack
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -349,6 +357,8 @@ class UpdateJob:
         # The options that created this update job
         self._itemList = []
         self._kwargs = {}
+        # Applying this update job invalidates the rollback stack
+        self._invalidateRollbackStack = False
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
@@ -973,6 +983,8 @@ class Database(SqlDbRepository):
         del newErrs, dbConflicts
 
         if errList:
+            # make sure we release the lock on the database
+            self.db.rollback()
             raise CommitError, ('applying update would cause errors:\n' + 
                                 '\n\n'.join(str(x) for x in errList))
         if test:
@@ -1165,6 +1177,13 @@ class Database(SqlDbRepository):
         for rollbackName in reversed(self.getRollbackList()):
             rb = self.getRollback(rollbackName)
             yield (rollbackName, rb)
+
+    def invalidateRollbacks(self):
+        """Invalidate the rollback stack."""
+        # Works nicely for the very beginning
+        # (when firstRollback, lastRollback) = (0, -1)
+        self.firstRollback = self.lastRollback + 1
+        self.writeRollbackStatus()
 
     def readRollbackStatus(self):
         try:

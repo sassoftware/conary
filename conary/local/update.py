@@ -2457,7 +2457,7 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
         environ['CONARY_OLD_FLAVOR'] = str(troveCs.getOldFlavor())
 
     scriptFd, scriptName = tempfile.mkstemp(suffix = '.trvscript',
-                                            dir = tmpDir)
+                                            dir = root + tmpDir)
     os.chmod(scriptName, 0700)
     os.write(scriptFd, script)
     os.close(scriptFd)
@@ -2476,7 +2476,7 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
         f.close()
 
         rc = 0
-    elif root != '/' and os.getpid():
+    elif root != '/' and os.getuid():
         callback.warning("Not running script for %s due to insufficient "
                          "permissions for chroot()", troveCs.getName())
         return 0
