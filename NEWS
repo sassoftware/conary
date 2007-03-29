@@ -6,8 +6,10 @@ Changes in @NEW@:
       program is not provided by the build requirements. (CNY-1492)
 
   o Internal Changes:
-    * The conary.lib.elf module can now be built against GNU libelf as
-      well as the libelf implementation provided by elfutils.
+    * The conary.lib.elf module can now be built against libelf
+      version 0.8.0 or later as well as the libelf implementation
+      provided by elfutils.  libelf can be downloaded from
+      http://www.mr511.de/software/
 
 Changes in 1.1.19:
   o Client Changes:
