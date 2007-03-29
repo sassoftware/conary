@@ -231,7 +231,7 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 	    idx = 0;
 	    while (i--) {
 		memcpy(&verdef, (char *) data->d_buf + idx,
-		       sizeof(GElf_Verneed));
+		       sizeof(GElf_Verdef));
 		listIdx = idx + verdef.vd_aux;
 		memcpy(&verdefItem, (char *) data->d_buf + listIdx,
 		       sizeof(GElf_Verdaux));
