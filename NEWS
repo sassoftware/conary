@@ -5,6 +5,10 @@ Changes in @NEW@:
       of the package being built, it will warn if that external
       program is not provided by the build requirements. (CNY-1492)
 
+  o Internal Changes:
+    * The conary.lib.elf module can now be built against GNU libelf as
+      well as the libelf implementation provided by elfutils.
+
 Changes in 1.1.19:
   o Client Changes:
     * A new "cvc promote" command has been added. "cvc promote" is a
