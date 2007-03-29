@@ -1,7 +1,7 @@
 Changes in the Metadata tree:
   o Client Changes:
-    * Hashes of the directories a trove places files in is now build
-      (CNY-857)
+    * Hashes of the directories a trove places files in is now built
+      and stored in troveInfo.  (CNY-857)
 
   o Bug Fixes:
     * StreamSet objects didn't work with inheritance because the C
