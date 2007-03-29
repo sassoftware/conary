@@ -34,7 +34,7 @@ staticforward PyTypeObject StreamSetDefType;
 /* Object definitions                    */
 
 struct tagInfo {
-    int tag;
+    unsigned int tag;
     int size;
     PyObject * name;
     PyObject * type;
@@ -50,7 +50,7 @@ typedef struct {
     PyObject_HEAD;
     int unknownCount;
     struct unknownTags {
-        int tag;
+        unsigned int tag;
         int sizeType;
         PyObject * data;
     } * unknownTags;
@@ -221,7 +221,8 @@ static inline int addTag(char** buf, int tag, int valSize, int valLen) {
     return len;
 }
 
-static inline void getTag(char** buf, int *tag, int *valSize, int *valLen) {
+static inline void getTag(char** buf, unsigned int *tag, int *valSize,
+                          int *valLen) {
     char *chptr = *buf;
     char b;
 
@@ -459,7 +460,8 @@ static PyObject * StreamSet_Find(PyObject * objClass, PyObject * args) {
     char * data;
     int dataLen;
     char * chptr, * end;
-    int targetStreamId, streamId, size, sizeType;
+    int targetStreamId, size, sizeType;
+    unsigned int streamId;
     int ssdIdx;
     StreamSetDefObject * ssd;
 
@@ -556,7 +558,13 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
         }
 
 	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
-	vals[i] = PyObject_CallMethod(attr, "freeze", "O", skipSet);
+        if (PyObject_IsInstance((PyObject *) attr,
+                                (PyObject *) &allStreams[STREAM_SET].pyType)) {
+            vals[i] = PyObject_CallMethod(attr, "freeze", "OOO", skipSet,
+                                          freezeKnown, freezeUnknown);
+        } else {
+            vals[i] = PyObject_CallMethod(attr, "freeze", "O", skipSet);
+        }
 	Py_DECREF(attr);
 
 	if (!vals[i]) {
@@ -707,7 +715,7 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
     int size, i, sizeType;
     PyObject * attr, * ro;
     int ignoreUnknown = -1;
-    int streamId;
+    unsigned int streamId;
     StreamSetObject * sset = (StreamSetObject *) self;
 
     end = data + dataLen;
@@ -781,7 +789,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     char * end, * chptr, * streamData;
     int i;
     int size, sizeType;
-    int streamId;
+    unsigned int streamId;
     PyObject * attr, * baseAttr, * ro;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "z#O!|O", kwlist, 
