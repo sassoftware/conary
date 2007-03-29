@@ -193,6 +193,16 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
         self.out.write('[%s] %s\n' % (tag, msg))
 
+    @locked
+    def scriptOutput(self, typ, msg):
+        self._message('')
+        self.out.write("[%s] %s" % (typ, msg))
+
+    @locked
+    def scriptFailure(self, typ, errcode):
+        self._message('')
+        self.out.write("[%s] %s" % (typ, errcode))
+
     def __init__(self, cfg=None):
         callbacks.UpdateCallback.__init__(self)
         if cfg:
