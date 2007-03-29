@@ -696,6 +696,11 @@ class FilesystemJob:
             self.callback.runningPostTagHandlers()
 	    tagCommands.run(tagScript, self.root)
 
+        self.runScripts(self.postScripts)
+
+    def runScripts(self, scripts):
+        print "SHOULD RUN", scripts
+
     def getErrorList(self):
 	return self.errors
 
@@ -890,6 +895,11 @@ class FilesystemJob:
         removalList = removalHints.get(newTroveInfo, [])
         if removalList is None:
             removalList = []
+
+        # queue up postinstall scripts
+        if troveCs.troveInfo.scripts.postInstall.script():
+            self.postScripts.append(
+                    trvCs.troveInfo.scripts.postInstall.script())
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -1528,6 +1538,7 @@ class FilesystemJob:
 	self.tagUpdates = {}
 	self.tagRemoves = {}
         self.linkGroups = {}
+        self.postScripts = {}
 	self.db = db
         self.pathRemovedCache = (None, None, None)
         if callback is None:

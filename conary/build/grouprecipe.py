@@ -225,8 +225,9 @@ class GroupRecipe(_BaseGroupRecipe):
         self.replaceSpecs = []
         self.resolveTroveSpecs = []
 
-        self.preInstallScripts = {}
+        self.preUpdateScripts = {}
         self.postInstallScripts = {}
+        self.postUpdateScripts = {}
 
         _BaseGroupRecipe.__init__(self)
         group = self.createGroup(self.name, depCheck = self.depCheck,
@@ -1272,7 +1273,8 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         self.labelPath = [ versions.Label(x) for x in path ]
 
-    def _addScript(self, contents, groupName, scriptDict):
+    def _addScript(self, contents, groupName, scriptDict,
+                   invalidateRollbacks = False):
         if groupName is None:
             groupName = self.name
 
@@ -1282,17 +1284,22 @@ class GroupRecipe(_BaseGroupRecipe):
         if contents is None:
             raise RecipeFileError('script contents required for group %s'
                                         % groupName)
-        elif groupName in self.postInstallScripts:
+        elif groupName in scriptDict:
             raise RecipeFileError('script already set for group %s'
                                         % groupName)
 
-        scriptDict[groupName] = contents
+        scriptDict[groupName] = (contents, invalidateRollbacks)
 
     def addPostInstallScript(self, contents = None, groupName = None):
         self._addScript(contents, groupName, self.postInstallScripts)
 
-    def addPreInstallScript(self, contents = None, groupName = None):
-        self._addScript(contents, groupName, self.preInstallScripts)
+    def addPostUpdateScript(self, contents = None, groupName = None,
+                            invalidateRollbacks = True):
+        self._addScript(contents, groupName, self.postUpdateScripts,
+                        invalidateRollbacks = invalidateRollbacks)
+
+    def addPreUpdateScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.preUpdateScripts)
 
     def getLabelPath(self):
         return self.labelPath

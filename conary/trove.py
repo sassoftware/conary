@@ -540,14 +540,16 @@ class TroveScript(streams.StreamSet):
         _TROVESCRIPT_ROLLBACKFENCE  : (SMALL, streams.ByteStream,   'rollbackFence' ),
     }
 
-_TROVESCRIPTS_PREINSTALL  = 0
+_TROVESCRIPTS_PREUPDATE   = 0
 _TROVESCRIPTS_POSTINSTALL = 1
+_TROVESCRIPTS_POSTUPDATE  = 2
 
 class TroveScripts(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
-        _TROVESCRIPTS_PREINSTALL    : (LARGE, TroveScript, 'preInstall'  ),
+        _TROVESCRIPTS_PREUPDATE     : (LARGE, TroveScript, 'preUpdate'  ),
         _TROVESCRIPTS_POSTINSTALL   : (LARGE, TroveScript, 'postInstall' ),
+        _TROVESCRIPTS_POSTUPDATE    : (LARGE, TroveScript, 'postUpdate' ),
     }
 
 class TroveInfo(streams.StreamSet):
