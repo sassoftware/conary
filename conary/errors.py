@@ -103,7 +103,7 @@ class DatabaseLockedError(DatabaseError):
                 "but you don't have write permission to the database.")
 
 class ShadowRedirect(ConaryError):
-    """User attempted to create a shadow (or branch, but branch's aren't
+    """User attempted to create a shadow (or branch, but branches aren't
        really supported anymore) or a redirect"""
 
     def __str__(self):
