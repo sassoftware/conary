@@ -702,9 +702,9 @@ class FilesystemJob:
                 scriptId = "%s postupdate" % troveCs.getName()
             else:
                 scriptId = "%s postinstall" % troveCs.getName()
-            runTroveScript(troveCs, script, tagScript, '/tmp', self.root,
-                            self.callback, isPre = False,
-                            scriptId = scriptId)
+            runTroveScript(troveCs.getJob(), script, tagScript, '/tmp',
+                           self.root, self.callback, isPre = False,
+                           scriptId = scriptId)
 
     def getInvalidateRollbacks(self):
         return self.invalidateRollbacks
@@ -2455,16 +2455,17 @@ def silentlyReplace(newF, oldF):
 
     return False
 
-def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
+def runTroveScript(job, script, tagScript, tmpDir, root, callback,
                    isPre = False, scriptId = "unknown script"):
     environ = { 'PATH' : '/usr/bin:/usr/sbin:/bin:/sbin' }
 
-    environ['CONARY_NEW_NAME'] = troveCs.getName()
-    environ['CONARY_NEW_VERSION'] = str(troveCs.getNewVersion())
-    environ['CONARY_NEW_FLAVOR'] = str(troveCs.getNewFlavor())
-    if troveCs.getOldVersion():
-        environ['CONARY_OLD_VERSION'] = str(troveCs.getOldVersion())
-        environ['CONARY_OLD_FLAVOR'] = str(troveCs.getOldFlavor())
+    name = job[0]
+    environ['CONARY_NEW_NAME'] = name
+    environ['CONARY_NEW_VERSION'] = str(job[2][0])
+    environ['CONARY_NEW_FLAVOR'] = str(job[2][1])
+    if job[1][0] is not None:
+        environ['CONARY_OLD_VERSION'] = str(job[1][0])
+        environ['CONARY_OLD_FLAVOR'] = str(job[1][1])
 
     scriptFd, scriptName = tempfile.mkstemp(suffix = '.trvscript',
                                             dir = root + tmpDir)
@@ -2488,7 +2489,7 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
         rc = 0
     elif root != '/' and os.getuid():
         callback.warning("Not running script for %s due to insufficient "
-                         "permissions for chroot()", troveCs.getName())
+                         "permissions for chroot()", name)
         return 0
     else:
         stdoutPipe = os.pipe()
