@@ -2572,11 +2572,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
         scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
                                        self.absoluteTroveInfo())
         if scriptStream is None:
-            return None
+            return None, False
 
-        # this is horrid, but it's just looking up the script we're looking
-        # for as a string
-        return scriptStream.__getattribute__(scriptStream.streamDict[kind][2]).script()
+        # this is horrid, but it's just looking up the script stream we're
+        # looking for
+        script = scriptStream.__getattribute__(scriptStream.streamDict[kind][2])
+        return script.script(), script.rollbackFence()
 
     def _getRollbackFence(self, kind):
         scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,

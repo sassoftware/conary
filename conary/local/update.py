@@ -701,6 +701,9 @@ class FilesystemJob:
             runTroveScript(troveCs, script, tagScript, '/tmp', self.root,
                             self.callback, isPre = False)
 
+    def getInvalidateRollbacks(self):
+        return self.invalidateRollbacks
+
     def getErrorList(self):
 	return self.errors
 
@@ -898,11 +901,12 @@ class FilesystemJob:
 
         # queue up postinstall scripts
         if troveCs.getOldVersion():
-            s = troveCs.getPostUpdateScript()
+            s, rbInv = troveCs.getPostUpdateScript()
         else:
-            s = troveCs.getPostInstallScript()
+            s, rbInv = troveCs.getPostInstallScript()
 
         if s:
+            self.invalidateRollbacks = self.invalidateRollbacks or rbInv
             self.postScripts.append((troveCs, s))
 
         # Create new files. If the files we are about to create already
@@ -1543,6 +1547,7 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
         self.postScripts = []
+        self.invalidateRollbacks = False
 	self.db = db
         self.pathRemovedCache = (None, None, None)
         if callback is None:

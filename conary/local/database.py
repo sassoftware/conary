@@ -1051,6 +1051,9 @@ class Database(SqlDbRepository):
 	self.commit()
 
         if not isRollback:
+            if fsJob.getInvalidateRollbacks():
+                self.invalidateRollbacks()
+
             fsJob.runPostScripts(tagScript)
 
     def removeFiles(self, pathList):
