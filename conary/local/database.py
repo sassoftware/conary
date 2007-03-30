@@ -1050,7 +1050,8 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
 	self.commit()
 
-        fsJob.runPostScripts(tagScript)
+        if not isRollback:
+            fsJob.runPostScripts(tagScript)
 
     def removeFiles(self, pathList):
 
