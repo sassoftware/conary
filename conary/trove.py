@@ -2632,6 +2632,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getNewNameVersionFlavor(self):
         return self.name(), self.newVersion(), self.newFlavor()
 
+    def getJob(self):
+        return (self.name(), (self.oldVersion(), self.oldFlavor()),
+                             (self.newVersion(), self.newFlavor()),
+                self.isAbsolute())
+
     def __cmp__(self, other):
         first = self.name()
         second = other.name()

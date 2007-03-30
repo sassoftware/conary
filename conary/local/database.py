@@ -1079,6 +1079,22 @@ class Database(SqlDbRepository):
 
             fsJob.runPostScripts(tagScript)
 
+    def runPreScripts(self, uJob, callback, tagScript = None, 
+                      isRollback = False, tmpDir = '/tmp'):
+        if isRollback:
+           return
+
+        for job, script in uJob.iterJobPreScripts():
+            scriptId = "%s preupdate" % job[0]
+            rc = update.runTroveScript(job, script, tagScript, tmpDir,
+                                       self.root, callback, isPre = True,
+                                       scriptId = scriptId)
+            if rc:
+                return False
+
+        return True
+
+
     def removeFiles(self, pathList):
 
         def _doRemove(self, rb, pathList):
