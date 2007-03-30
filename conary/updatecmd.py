@@ -194,12 +194,12 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.out.write('[%s] %s\n' % (tag, msg))
 
     @locked
-    def scriptOutput(self, typ, msg):
+    def troveScriptOutput(self, typ, msg):
         self._message('')
         self.out.write("[%s] %s" % (typ, msg))
 
     @locked
-    def scriptFailure(self, typ, errcode):
+    def troveScriptFailure(self, typ, errcode):
         self._message('')
         self.out.write("[%s] %s" % (typ, errcode))
 
