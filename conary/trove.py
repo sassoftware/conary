@@ -2574,9 +2574,18 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if scriptStream is None:
             return None
 
-        # this is horrib, but it's just looking up the script we're looking
+        # this is horrid, but it's just looking up the script we're looking
         # for as a string
         return scriptStream.__getattribute__(scriptStream.streamDict[kind][2]).script()
+
+    def _getRollbackFence(self, kind):
+        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
+                                       self.absoluteTroveInfo())
+        if scriptStream is None:
+            return None
+
+        # this is horrid as well
+        return scriptStream.__getattribute__(scriptStream.streamDict[kind][2]).rollbackFence()
 
     def getPostInstallScript(self):
         return self._getScript(_TROVESCRIPTS_POSTINSTALL)
@@ -2586,6 +2595,13 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getPreUpdateScript(self):
         return self._getScript(_TROVESCRIPTS_PREUPDATE)
+
+    def isRollbackFence(self, update = False):
+        if update:
+            return (self._getRollbackFence(_TROVESCRIPTS_POSTUPDATE) or
+                    self._getRollbackFence(_TROVESCRIPTS_PREUPDATE))
+        else:
+            return self._getRollbackFence(_TROVESCRIPTS_POSTINSTALL)
 
     def setTroveInfo(self, ti):
         self.absoluteTroveInfo.set((ti.freeze()))

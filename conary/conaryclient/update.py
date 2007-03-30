@@ -1666,6 +1666,7 @@ conary erase '%s=%s[%s]'
 
         removedTroves = list()
         missingTroves = list()
+        rollbackFence = False
         ts = uJob.getTroveSource()
         for job in newJob:
             if job[2][0] is None:
@@ -1679,6 +1680,11 @@ conary erase '%s=%s[%s]'
                     missingTroves.append(job)
                 else:
                     removedTroves.append(job)
+
+            rollbackFence = rollbackFence or \
+                troveCs.isRollbackFence(update = (job[1][0] is not None) )
+
+        uJob.setInvalidateRollbacksFlag(rollbackFence)
 
         if removedTroves or missingTroves:
             removed = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
@@ -1946,6 +1952,18 @@ conary erase '%s=%s[%s]'
 
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         uJob.getTroveSource().addChangeSet(cs)
+
+        rollbackFence = None
+        for job in finalJobs:
+            if job[2][0] is None:
+                continue
+
+            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            rollbackFence = rollbackFence or \
+                    troveCs.isRollbackFence(update = (job[1][0] is not None))
+
+        uJob.setInvalidateRollbacksFlag(rollbackFence)
+
         return finalJobs
 
     def getUpdateItemList(self):

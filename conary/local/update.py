@@ -902,7 +902,7 @@ class FilesystemJob:
         else:
             s = troveCs.getPostInstallScript()
 
-        if s is not None:
+        if s:
             self.postScripts.append((troveCs, s))
 
         # Create new files. If the files we are about to create already
