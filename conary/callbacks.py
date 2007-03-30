@@ -200,6 +200,15 @@ class UpdateCallback(ChangesetCallback):
         """
         print "[%s] %s" % (typ, msg)
 
+    def scriptStarted(self, typ):
+        """Called when the script starts to execute"""
+        pass
+
+    def scriptFinished(self, typ):
+        """Called upon a successful execution of the script.
+        If the script failed, scriptFailure is called instead"""
+        pass
+
     def scriptFailure(self, typ, errcode):
         """Called if the script execution fails"""
         print "[%s] %s" % (typ, errcode)
