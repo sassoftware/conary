@@ -797,8 +797,8 @@ class Database(SqlDbRepository):
 
         self.db.begin()
 
-	for trove in cs.iterNewTroveList():
-	    if trove.getName().endswith(":source"):
+	for trv in cs.iterNewTroveList():
+	    if trv.getName().endswith(":source"):
                 raise SourceComponentInstall
 
 	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
@@ -813,19 +813,19 @@ class Database(SqlDbRepository):
 	    flavor = newTrove.getOldFlavor()
 	    if self.hasTroveByName(name) and old:
 		ver = old.createShadow(versions.LocalLabel())
-		trove = dbCache.getTrove(name, old, flavor, pristine = False)
+		trv = dbCache.getTrove(name, old, flavor, pristine = False)
 		origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
-		assert(trove)
-		troveList.append((trove, origTrove, ver, 
+		assert(trv)
+		troveList.append((trv, origTrove, ver, 
                                   flags & update.MISSINGFILESOKAY))
 
         for (name, version, flavor) in cs.getOldTroveList():
             rollbackVersion = version.createShadow(versions.RollbackLabel())
-            trove = dbCache.getTrove(name, version, flavor, pristine = False)
+            trv = dbCache.getTrove(name, version, flavor, pristine = False)
             origTrove = dbCache.getTrove(name, version, flavor, 
                                          pristine = True)
-            assert(trove)
-            troveList.append((trove, origTrove, rollbackVersion, 
+            assert(trv)
+            troveList.append((trv, origTrove, rollbackVersion, 
                               update.MISSINGFILESOKAY))
 
         callback.creatingRollback()
