@@ -240,7 +240,7 @@ class PromoteCommand(CvcCommand):
                                   ' but does not modify the repository'),
              'without-sources'    : (VERBOSE_HELP,
                                      'Do not clone sources for the binaries'
-                                     'being cloned')
+                                     ' being cloned')
            }
 
     def addParameters(self, argDef):
