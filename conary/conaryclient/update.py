@@ -1684,6 +1684,12 @@ conary erase '%s=%s[%s]'
             rollbackFence = rollbackFence or \
                 troveCs.isRollbackFence(update = (job[1][0] is not None) )
 
+            if job[1][0] is not None:
+                # it's an update; check for preupdate scripts
+                preScript, isFence = troveCs.getPreUpdateScript()
+                if preScript:
+                    uJob.addJobPreScript(job, preScript)
+
         uJob.setInvalidateRollbacksFlag(rollbackFence)
 
         if removedTroves or missingTroves:
@@ -1950,17 +1956,29 @@ conary erase '%s=%s[%s]'
             if not reposChangeSetList:
                 raise NoNewTrovesError
 
+        troveSource = uJob.getTroveSource()
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
-        uJob.getTroveSource().addChangeSet(cs)
+        troveSource.addChangeSet(cs)
 
         rollbackFence = None
+        # XXX this is horrible; we probablt have everything we need already,
+        # I just don't know how to find it
+        infoCs = troveSource.createChangeSet(finalJobs, withFiles = False)
+        assert(not infoCs[1])
+        infoCs = infoCs[0]
         for job in finalJobs:
             if job[2][0] is None:
                 continue
 
-            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            troveCs = infoCs.getNewTroveVersion(job[0], job[2][0], job[2][1])
             rollbackFence = rollbackFence or \
                     troveCs.isRollbackFence(update = (job[1][0] is not None))
+
+            if job[1][0] is not None:
+                # it's an update; check for preupdate scripts
+                preScript, isFence = troveCs.getPreUpdateScript()
+                if preScript:
+                    uJob.addJobPreScript(job, preScript)
 
         uJob.setInvalidateRollbacksFlag(rollbackFence)
 
@@ -2755,6 +2773,12 @@ conary erase '%s=%s[%s]'
         jobsCsList = uJob.getJobsChangesetList()
 
         self._validateJob(list(itertools.chain(*allJobs)))
+
+        # run preinstall scripts
+        if not self.db.runPreScripts(uJob, callback = callback,
+                                     tagScript = tagScript,
+                                     tmpDir = self.cfg.tmpDir):
+            raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
         kwargs = dict(

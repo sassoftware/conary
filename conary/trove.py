@@ -1336,10 +1336,7 @@ class Trove(streams.StreamSet):
             self.redirects.addRedirectObject(info)
 
         if trvCs.getFrozenTroveInfo():
-            incomplete = (self.troveInfo.incomplete() and 1) or 0
             self.troveInfo = TroveInfo(trvCs.getFrozenTroveInfo())
-            # incomplete needs to be handled manually
-            self.troveInfo.incomplete.set(incomplete)
         elif not trvCs.getOldVersion():
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
@@ -2650,6 +2647,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getNewNameVersionFlavor(self):
         return self.name(), self.newVersion(), self.newFlavor()
+
+    def getJob(self):
+        return (self.name(), (self.oldVersion(), self.oldFlavor()),
+                             (self.newVersion(), self.newFlavor()),
+                self.isAbsolute())
 
     def __cmp__(self, other):
         first = self.name()
