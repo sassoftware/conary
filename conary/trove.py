@@ -549,15 +549,21 @@ class MetadataItem(streams.StreamSet):
             frz = streams.StreamSet.freeze(self,
                                            skipSet = { 'id' : True,
                                                        'signatures': True })
-            return sha1helper.sha1String(frz)
+            digest = streams.Sha256Stream()
+            digest.compute(frz)
+            return digest()
         raise RuntimeError('unsupported version')
 
     def _updateId(self):
-        self.id.set(self._digest(0))
+        frz = streams.StreamSet.freeze(self,
+                                       skipSet = { 'id' : True,
+                                                   'signatures': True })
+        digest = streams.Sha1Stream()
+        digest.compute(frz)
+        self.id.set(digest())
 
     def addDigitalSignature(self, keyId):
-        self._updateId()
-        self.signatures.addDigest(self.id(), 0)
+        self.signatures.addDigest(self._digest(0), 0)
         self.signatures.sign(keyId, 0)
 
     def verifyDigitalSignatures(self, serverName=None):
