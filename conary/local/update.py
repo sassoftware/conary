@@ -2496,6 +2496,7 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
             os.close(stderrPipe[1])
 
             if root != '/':
+                scriptName = scriptName[len(root):]
                 assert(root[0] == '/')
                 try:
                     os.chroot(root)
