@@ -1065,8 +1065,6 @@ class Trove(streams.StreamSet):
                 lastSigVersion = sigVersion
                 s = self._sigString(sigVersion)
                 if not sigDigest.verify(s):
-                    import epdb
-                    epdb.st('f')
                     return False
 
         return True
@@ -1343,12 +1341,25 @@ class Trove(streams.StreamSet):
         for info in trvCs.getRedirects().iter():
             self.redirects.addRedirectObject(info)
 
+        twmInfo = None
+        if trvCs.getOldVersion():
+            twmInfo = TroveInfo()
+            twmInfo.thaw(self.troveInfo.freeze())
+            twmInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
+
         if trvCs.getFrozenTroveInfo():
+            # We cannot trust the absolute trove info representation since the
+            # incomplete flag is dynamic (the old trove's flag can be set now
+            # even if it wasn't originally). Use the relative data (which may
+            # set it or not).
             self.troveInfo = TroveInfo(trvCs.getFrozenTroveInfo())
+            # Use the ignore flag from the three-way merge
+            if twmInfo:
+                self.troveInfo.incomplete.set(twmInfo.incomplete())
         elif not trvCs.getOldVersion():
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
-            self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
+            self.troveInfo = twmInfo
 
         # We can't be incomplete after a merge. If we were, it means
         # we merged something incomplete against something complete
