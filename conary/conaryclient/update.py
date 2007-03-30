@@ -1684,6 +1684,12 @@ conary erase '%s=%s[%s]'
             rollbackFence = rollbackFence or \
                 troveCs.isRollbackFence(update = (job[1][0] is not None) )
 
+            if job[1][0] is not None:
+                # it's an update; check for preupdate scripts
+                preScript, isFence = troveCs.getPreUpdateScript()
+                if preScript:
+                    uJob.addJobPreScript(job, preScript)
+
         uJob.setInvalidateRollbacksFlag(rollbackFence)
 
         if removedTroves or missingTroves:
@@ -1967,6 +1973,12 @@ conary erase '%s=%s[%s]'
             troveCs = infoCs.getNewTroveVersion(job[0], job[2][0], job[2][1])
             rollbackFence = rollbackFence or \
                     troveCs.isRollbackFence(update = (job[1][0] is not None))
+
+            if job[1][0] is not None:
+                # it's an update; check for preupdate scripts
+                preScript, isFence = troveCs.getPreUpdateScript()
+                if preScript:
+                    uJob.addJobPreScript(job, preScript)
 
         uJob.setInvalidateRollbacksFlag(rollbackFence)
 
@@ -2761,6 +2773,12 @@ conary erase '%s=%s[%s]'
         jobsCsList = uJob.getJobsChangesetList()
 
         self._validateJob(list(itertools.chain(*allJobs)))
+
+        # run preinstall scripts
+        if not self.db.runPreScripts(uJob, callback = callback,
+                                     tagScript = tagScript,
+                                     tmpDir = self.cfg.tmpDir):
+            raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
         kwargs = dict(
