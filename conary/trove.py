@@ -280,9 +280,13 @@ class DigitalSignature(streams.StreamSet):
         index = 1
         mpiList = []
         for i in range(0,numMPIs):
-            lengthMPI = ((ord(data[index]) * 256) +
-                         (ord(data[index + 1]) + 7)) / 8 + 2
-            mpiList.append(self._mpiToLong(data[index:index + lengthMPI]))
+            try:
+                lengthMPI = ((ord(data[index]) * 256) +
+                             (ord(data[index + 1]) + 7)) / 8 + 2
+                mpiList.append(self._mpiToLong(data[index:index + lengthMPI]))
+            except IndexError:
+                # handle truncated signature data by setting this MPI to 0
+                mpiList.append(0L)
             index += lengthMPI
         return (self.fingerprint(), self.timestamp(), tuple(mpiList))
 
