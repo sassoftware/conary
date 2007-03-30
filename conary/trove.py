@@ -349,12 +349,16 @@ class VersionedSignaturesSet(streams.StreamCollection):
 
         raise KeyError(version)
 
-    def getDigest(self, version = 0):
+    def getSignatures(self, version = 0):
         for vds in self.getStreams(1):
             if version == vds.version():
-                digest = vds.digest()
-                return digest
+                return vds
+        return None
 
+    def getDigest(self, version = 0):
+        sigs = self.getSignatures(version)
+        if sigs:
+            return sigs.digest()
         return None
 
     def addDigest(self, digest, version = 0):
