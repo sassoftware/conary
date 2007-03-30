@@ -698,8 +698,13 @@ class FilesystemJob:
 
     def runPostScripts(self, tagScript):
         for (troveCs, script) in self.postScripts:
+            if troveCs.getOldVersion():
+                scriptId = "%s postupdate" % troveCs.getName()
+            else:
+                scriptId = "%s postinstall" % troveCs.getName()
             runTroveScript(troveCs, script, tagScript, '/tmp', self.root,
-                            self.callback, isPre = False)
+                            self.callback, isPre = False,
+                            scriptId = scriptId)
 
     def getInvalidateRollbacks(self):
         return self.invalidateRollbacks
@@ -2451,7 +2456,7 @@ def silentlyReplace(newF, oldF):
     return False
 
 def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
-                   isPre = False):
+                   isPre = False, scriptId = "unknown script"):
     environ = { 'PATH' : '/usr/bin:/usr/sbin:/bin:/sbin' }
 
     environ['CONARY_NEW_NAME'] = troveCs.getName()
@@ -2533,16 +2538,15 @@ def runTroveScript(troveCs, script, tagScript, tmpDir, root, callback,
                     poller.unregister(fd)
                     count -= 1
                 else:
-                    # XXX has to be replaced with the script name
                     for line in lines:
-                        callback.scriptOutput("XXX", line)
+                        callback.scriptOutput(scriptId, line)
 
         (id, status) = os.waitpid(pid, 0)
         os.unlink(scriptName)
 
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
             rc = os.WEXITSTATUS(status)
-            callback.scriptFailure("XXX", rc)
+            callback.scriptFailure(scriptId, rc)
         else:
             rc = 0
 
