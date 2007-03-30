@@ -2775,7 +2775,7 @@ conary erase '%s=%s[%s]'
         self._validateJob(list(itertools.chain(*allJobs)))
 
         # run preinstall scripts
-        if not self.db.runPreScripts(uJob, callback = callback,
+        if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
                                      tagScript = tagScript,
                                      tmpDir = self.cfg.tmpDir):
             raise UpdateError('error: preupdate script failed')
