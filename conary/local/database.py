@@ -191,6 +191,7 @@ class UpdateJob:
         drep['itemList'] = self._freezeItemList()
         drep['keywordArguments'] = self.getKeywordArguments()
         drep['invalidateRollbackStack'] = int(self._invalidateRollbackStack)
+        drep['jobPreScripts'] = list(self._freezeJobPreScripts())
 
         # Save the Conary version
         drep['conaryVersion'] = constants.version
@@ -222,7 +223,10 @@ class UpdateJob:
 
         self.setCriticalJobs(drep['critical'])
         self.transactionCounter = drep['transactionCounter']
-        self._invalidateRollbackStack = bool(drep.get('invalidateRollbackStack'))
+        self._invalidateRollbackStack = bool(
+                                        drep.get('invalidateRollbackStack'))
+        self._jobPreScripts = self._thawJobPreScripts(
+            list(drep.get('jobPreScripts', [])))
 
     def _freezeJobs(self, jobs):
         for jobList in jobs:
@@ -266,6 +270,16 @@ class UpdateJob:
         if '*None*' == flavor:
             return None
         return deps.ThawFlavor(flavor)
+
+    def _freezeJobPreScripts(self):
+        # Freeze the job and the string together
+        return itertools.izip(self._freezeJobList(x[0]
+                                    for x in self._jobPreScripts),
+                              (x[1] for x in self._jobPreScripts))
+
+    def _thawJobPreScripts(self, frzrepr):
+        return itertools.izip(self._thawJobList(x[0] for x in frzrepr),
+                              (x[1] for x in frzrepr))
 
     def _freezeChangesetFilesTroveSource(self, troveSource, frzdir,
                                         withChangesetReferences=True):
@@ -340,6 +354,13 @@ class UpdateJob:
     def updateInvalidatesRollbacks(self):
         return self._invalidateRollbackStack
 
+    def addJobPreScript(self, job, script):
+        self._jobPreScripts.append((job, script))
+
+    def iterJobPreScripts(self):
+            for i in self._jobPreScripts:
+                yield i
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -359,6 +380,8 @@ class UpdateJob:
         self._kwargs = {}
         # Applying this update job invalidates the rollback stack
         self._invalidateRollbackStack = False
+        # List of pre scripts to run for a particular job. This is ordered.
+        self._jobPreScripts = []
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
