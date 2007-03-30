@@ -2514,7 +2514,11 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
                 except:
                     os._exit(1)
 
-            os.execve(scriptName, [ scriptName ], environ)
+            try:
+                os.execve(scriptName, [ scriptName ], environ)
+            except e:
+                os.write(2, str(e) + '\n')
+
             os._exit(1)
 
         os.close(stdoutPipe[1])
