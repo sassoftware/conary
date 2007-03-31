@@ -673,9 +673,10 @@ class TroveScript(streams.StreamSet):
         _TROVESCRIPT_ROLLBACKFENCE  : (SMALL, streams.ByteStream,   'rollbackFence' ),
     }
 
-_TROVESCRIPTS_PREUPDATE   = 0
-_TROVESCRIPTS_POSTINSTALL = 1
-_TROVESCRIPTS_POSTUPDATE  = 2
+_TROVESCRIPTS_PREUPDATE    = 0
+_TROVESCRIPTS_POSTINSTALL  = 1
+_TROVESCRIPTS_POSTUPDATE   = 2
+_TROVESCRIPTS_POSTROLLBACK = 3
 
 class TroveScripts(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -683,6 +684,7 @@ class TroveScripts(streams.StreamSet):
         _TROVESCRIPTS_PREUPDATE     : (DYNAMIC, TroveScript, 'preUpdate'  ),
         _TROVESCRIPTS_POSTINSTALL   : (DYNAMIC, TroveScript, 'postInstall' ),
         _TROVESCRIPTS_POSTUPDATE    : (DYNAMIC, TroveScript, 'postUpdate' ),
+        _TROVESCRIPTS_POSTROLLBACK  : (DYNAMIC, TroveScript, 'postRollback' ),
     }
 
 class TroveInfo(streams.StreamSet):
@@ -2634,6 +2636,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getPreUpdateScript(self):
         return self._getScript(_TROVESCRIPTS_PREUPDATE)
+
+    def getPostRollbackScript(self):
+        return self._getScript(_TROVESCRIPTS_POSTROLLBACK)
 
     def isRollbackFence(self, update = False):
         if update:

@@ -227,6 +227,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
         self.preUpdateScripts = {}
         self.postInstallScripts = {}
+        self.postRollbackScripts = {}
         self.postUpdateScripts = {}
 
         _BaseGroupRecipe.__init__(self)
@@ -1292,6 +1293,9 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def addPostInstallScript(self, contents = None, groupName = None):
         self._addScript(contents, groupName, self.postInstallScripts)
+
+    def addPostRollbackScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.postRollbackScripts)
 
     def addPostUpdateScript(self, contents = None, groupName = None,
                             invalidateRollbacks = True):

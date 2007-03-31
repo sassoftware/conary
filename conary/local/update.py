@@ -49,6 +49,9 @@ IGNOREUGIDS = 1 << 2
 MISSINGFILESOKAY = 1 << 3
 IGNOREINITIALCONTENTS = 1 << 4
 
+ROLLBACK_PHASE_REPOS = 1
+ROLLBACK_PHASE_LOCAL = 2
+
 class FilesystemJob:
     """
     Represents a set of actions which need to be applied to the filesystem.
@@ -696,12 +699,15 @@ class FilesystemJob:
             self.callback.runningPostTagHandlers()
 	    tagCommands.run(tagScript, self.root)
 
-    def runPostScripts(self, tagScript):
+    def runPostScripts(self, tagScript, isRollback):
         for (troveCs, script) in self.postScripts:
-            if troveCs.getOldVersion():
+            if isRollback:
+                scriptId = "%s postrollback" % troveCs.getName()
+            elif troveCs.getOldVersion():
                 scriptId = "%s postupdate" % troveCs.getName()
             else:
                 scriptId = "%s postinstall" % troveCs.getName()
+
             runTroveScript(troveCs.getJob(), script, tagScript, '/tmp',
                            self.root, self.callback, isPre = False,
                            scriptId = scriptId)
@@ -905,7 +911,14 @@ class FilesystemJob:
             removalList = []
 
         # queue up postinstall scripts
-        if troveCs.getOldVersion():
+        if self.rollbackPhase == ROLLBACK_PHASE_REPOS:
+            if baseTrove:
+                s = baseTrove.troveInfo.scripts.postRollback.script()
+                rbInv = baseTrove.troveInfo.scripts.postRollback.rollbackFence()
+            else:
+                s = None
+                rbInv = False
+        elif troveCs.getOldVersion():
             s, rbInv = troveCs.getPostUpdateScript()
         else:
             s, rbInv = troveCs.getPostInstallScript()
@@ -1514,7 +1527,8 @@ class FilesystemJob:
         return pathsMoved
 
     def __init__(self, db, changeSet, fsTroveDict, root, filePriorityPath,
-                 callback = None, flags = MERGE, removeHints = {}):
+                 callback = None, flags = MERGE, removeHints = {},
+                 rollbackPhase = None, deferredScripts = None):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
@@ -1536,6 +1550,9 @@ class FilesystemJob:
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
+        @param rollbackPhase: What part of a rollback is this (None for
+        normal installs)
+	@type rollbackPhase: int
 	"""
 	self.renames = []
 	self.restores = {}
@@ -1553,6 +1570,7 @@ class FilesystemJob:
         self.linkGroups = {}
         self.postScripts = []
         self.invalidateRollbacks = False
+        self.rollbackPhase = rollbackPhase
 	self.db = db
         self.pathRemovedCache = (None, None, None)
         if callback is None:

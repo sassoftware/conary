@@ -627,23 +627,18 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
 
-            if groupName in recipeObj.postInstallScripts:
-                grpTrv.troveInfo.scripts.postInstall.script.set(
-                        recipeObj.postInstallScripts[groupName][0])
-                grpTrv.troveInfo.scripts.postInstall.rollbackFence.set(
-                        recipeObj.postInstallScripts[groupName][1])
-
-            if groupName in recipeObj.postUpdateScripts:
-                grpTrv.troveInfo.scripts.postUpdate.script.set(
-                        recipeObj.postUpdateScripts[groupName][0])
-                grpTrv.troveInfo.scripts.postUpdate.rollbackFence.set(
-                        recipeObj.postUpdateScripts[groupName][1])
-
-            if groupName in recipeObj.preUpdateScripts:
-                grpTrv.troveInfo.scripts.preUpdate.script.set(
-                        recipeObj.preUpdateScripts[groupName][0])
-                grpTrv.troveInfo.scripts.preUpdate.rollbackFence.set(
-                        recipeObj.preUpdateScripts[groupName][1])
+            for (recipeScripts, troveScripts) in \
+                    [ (recipeObj.postInstallScripts,
+                            grpTrv.troveInfo.scripts.postInstall),
+                      (recipeObj.postRollbackScripts,
+                            grpTrv.troveInfo.scripts.postRollback),
+                      (recipeObj.postUpdateScripts,
+                            grpTrv.troveInfo.scripts.postUpdate),
+                      (recipeObj.preUpdateScripts,
+                            grpTrv.troveInfo.scripts.preUpdate) ]:
+                if groupName in recipeScripts:
+                    troveScripts.script.set(recipeScripts[groupName][0])
+                    troveScripts.rollbackFence.set(recipeScripts[groupName][1])
 
             for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,

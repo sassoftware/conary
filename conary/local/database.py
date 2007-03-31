@@ -777,13 +777,14 @@ class Database(SqlDbRepository):
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
     def commitChangeSet(self, cs, uJob,
-                        isRollback = False, updateDatabase = True,
+                        rollbackPhase = None, updateDatabase = True,
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
                         removeHints = {}, filePriorityPath = None,
                         autoPinList = RegularExpressionList(),
-                        keepJournal = False):
+                        keepJournal = False, deferPostScripts = False,
+                        deferredScripts = None):
 	assert(not cs.isAbsolute())
 
         if filePriorityPath is None:
@@ -792,7 +793,7 @@ class Database(SqlDbRepository):
         flags = 0
         if replaceFiles:
             flags |= update.REPLACEFILES
-        if isRollback:
+        if rollbackPhase:
             flags |= update.MISSINGFILESOKAY | update.IGNOREINITIALCONTENTS
 
         self.db.begin()
@@ -842,7 +843,7 @@ class Database(SqlDbRepository):
 	for (changed, fsTrove) in retList:
 	    fsTroveDict[(fsTrove.getName(), fsTrove.getVersion())] = fsTrove
 
-	if not isRollback:
+	if rollbackPhase is None:
             reposRollback = cs.makeRollback(dbCache, configFiles = True,
                                redirectionRollbacks = (not localRollbacks))
             flags |= update.MERGE
@@ -850,9 +851,11 @@ class Database(SqlDbRepository):
         fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root,
                                      filePriorityPath, flags = flags,
                                      callback = callback,
-                                     removeHints = removeHints)
+                                     removeHints = removeHints,
+                                     rollbackPhase = rollbackPhase,
+                                     deferredScripts = deferredScripts)
 
-        if not isRollback:
+        if rollbackPhase is None:
             removeRollback = fsJob.createRemoveRollback()
 
             # We now have two rollbacks we need to merge together, localRollback
@@ -929,7 +932,7 @@ class Database(SqlDbRepository):
 	# XXX we have to do this before files get removed from the database,
 	# which is a bit unfortunate since this rollback isn't actually
 	# valid until a bit later
-	if not isRollback and not test:
+	if (rollbackPhase is None) and not test:
             rollback = uJob.getRollback()
             if rollback is None:
                 rollback = self.createRollback()
@@ -966,7 +969,7 @@ class Database(SqlDbRepository):
                 localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
                     filePriorityPath,
-                    allowIncomplete = isRollback, 
+                    allowIncomplete = (rollbackPhase is not None),
                     pathRemovedCheck = fsJob.pathRemoved,
                     replaceFiles = replaceFiles)
             except DatabasePathConflicts, e:
@@ -1073,11 +1076,13 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
 	self.commit()
 
-        if not isRollback:
-            if fsJob.getInvalidateRollbacks():
-                self.invalidateRollbacks()
+        if fsJob.getInvalidateRollbacks():
+            self.invalidateRollbacks()
 
-            fsJob.runPostScripts(tagScript)
+        if rollbackPhase is not None:
+            return fsJob
+
+        fsJob.runPostScripts(tagScript, rollbackPhase)
 
     def runPreScripts(self, uJob, callback, tagScript = None, 
                       isRollback = False, tmpDir = '/tmp'):
@@ -1331,8 +1336,10 @@ class Database(SqlDbRepository):
                         itemCount += 1
                         callback.setUpdateHunk(itemCount, totalCount)
                         callback.setUpdateJob(reposCs.getJobSet())
-                        self.commitChangeSet(reposCs, UpdateJob(None),
-                                             isRollback = True,
+                        fsJob = self.commitChangeSet(
+                                             reposCs, UpdateJob(None),
+                                             rollbackPhase =
+                                                update.ROLLBACK_PHASE_REPOS,
                                              replaceFiles = replaceFiles,
                                              removeHints = removalHints,
                                              callback = callback,
@@ -1344,12 +1351,18 @@ class Database(SqlDbRepository):
                         callback.setUpdateHunk(itemCount, totalCount)
                         callback.setUpdateJob(localCs.getJobSet())
                         self.commitChangeSet(localCs, UpdateJob(None),
-                                             isRollback = True,
-                                             updateDatabase = False,
-                                             replaceFiles = replaceFiles,
-                                             callback = callback,
-                                             tagScript = tagScript,
-                                             justDatabase = justDatabase)
+                                     rollbackPhase =
+                                            update.ROLLBACK_PHASE_LOCAL,
+                                     updateDatabase = False,
+                                     replaceFiles = replaceFiles,
+                                     callback = callback,
+                                     tagScript = tagScript,
+                                     justDatabase = justDatabase)
+
+                    # Because of the two phase update for rollbacks, we
+                    # run postscripts by hand instead of commitChangeSet
+                    # doing it automatically
+                    fsJob.runPostScripts(tagScript, True)
 
                     rb.removeLast()
                 except CommitError, err:
