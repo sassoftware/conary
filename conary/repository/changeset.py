@@ -415,6 +415,7 @@ class ChangeSet(streams.StreamSet):
 
             invertedTrove.setRequires(trv.getRequires())
             invertedTrove.setProvides(trv.getProvides())
+            invertedTrove.setTroveInfo(trv.troveInfo)
 
 	    for (name, list) in troveCs.iterChangedTroves():
 		for (oper, version, flavor, byDef) in list:
