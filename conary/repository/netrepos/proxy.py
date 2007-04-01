@@ -277,13 +277,17 @@ class ChangesetFilter(BaseProxy):
                 # updating if we just made it a regular trove.
                 missingOldVersion = tcs.getOldVersion()
                 missingOldFlavor = tcs.getOldFlavor()
-                oldTrove = trove.Trove(trvName,
-                                       missingOldVersion,
-                                       missingOldFlavor)
+                if missingOldVersion is None:
+                    oldTrove = None
+                else:
+                    oldTrove = trove.Trove(trvName,
+                                           missingOldVersion,
+                                           missingOldFlavor)
+
                 newTrove = trove.Trove(trvName,
                                        trvNewVersion,
                                        trvNewFlavor)
-                diff = newTrove.diff(oldTrove)[0]
+                diff = newTrove.diff(oldTrove, absolute = tcs.isAbsolute())[0]
                 newCs.newTrove(diff)
             else:
                 # this really was marked as a removed trove.
