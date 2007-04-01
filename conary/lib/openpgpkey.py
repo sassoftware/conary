@@ -85,7 +85,7 @@ class OpenPGPKey:
         # We /dev/random instead of /dev/urandom. This was not a mistake;
         # we want the most random data available. use os module to ensure
         # reads are unbuffered.
-        randFD = os.open('/dev/random', os.O_RDONLY)
+        randFD = os.open('/dev/urandom', os.O_RDONLY)
         b = self._bitLen(q)/8 + 1
         r = 0L
         while r < 2:

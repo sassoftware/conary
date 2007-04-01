@@ -824,10 +824,10 @@ class MigrateTo_15(SchemaMigration):
         # check the signature
         trv = repos.getTrove(name, versions.VersionFromString(version),
                              deps.ThawFlavor(flavor))
-        if trv.verifySignatures():
+        if trv.verifyDigests():
             return
         logMe(3, "updating trove sigs: %s %s %s" % (name, version, flavor))
-        trv.computeSignatures()
+        trv.computeDigests()
         cu.execute("delete from TroveInfo where instanceId = ? "
                    "and infoType = ?", (instanceId, trove._TROVEINFO_TAG_SIGS))
         cu.execute("insert into TroveInfo (instanceId, infoType, data) "

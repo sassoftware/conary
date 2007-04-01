@@ -1,3 +1,13 @@
+Changes in the Metadata tree:
+  o Client Changes:
+    * Hashes of the directories a trove places files in is now built
+      and stored in troveInfo.  (CNY-857)
+
+  o Bug Fixes:
+    * StreamSet objects didn't work with inheritance because the C
+      implementation treated an internal variable as inheritable when it should
+      have been treated as a class variable
+
 Changes in @NEW@:
   o Build Changes:
     * When Conary calls an external program (python, perl, monodis)
@@ -38,7 +48,7 @@ Changes in 1.1.19:
       for example, will only use the http_proxy environment variable.
     * Due to limitations in Apache 2.0, the Conary client will now use
       HTTP/1.1 "chunked" Transfer-encoding when committing changesets
-      larger than 2 GiB. (CNY-1478)
+      larger than 2 GiB.
     * An "applyRollback()" method has been added to the ConaryClient
       class. (CNY-1455)
 
