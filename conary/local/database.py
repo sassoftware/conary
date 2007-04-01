@@ -651,6 +651,8 @@ class Database(SqlDbRepository):
     # to instantiate a full trove object to do anything... 
     # FilesystemRepository has the same problem
 
+    ROLLBACK_PHASE_LOCAL = update.ROLLBACK_PHASE_LOCAL
+
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
 	return SqlDbRepository.iterFilesInTrove(self, troveName, version,
@@ -1332,6 +1334,7 @@ class Database(SqlDbRepository):
                     l.extend(trvCs.getOldFileList())
 
                 try:
+                    fsJob = None
                     if not reposCs.isEmpty():
                         itemCount += 1
                         callback.setUpdateHunk(itemCount, totalCount)
@@ -1359,10 +1362,11 @@ class Database(SqlDbRepository):
                                      tagScript = tagScript,
                                      justDatabase = justDatabase)
 
-                    # Because of the two phase update for rollbacks, we
-                    # run postscripts by hand instead of commitChangeSet
-                    # doing it automatically
-                    fsJob.runPostScripts(tagScript, True)
+                    if fsJob:
+                        # Because of the two phase update for rollbacks, we
+                        # run postscripts by hand instead of commitChangeSet
+                        # doing it automatically
+                        fsJob.runPostScripts(tagScript, True)
 
                     rb.removeLast()
                 except CommitError, err:
