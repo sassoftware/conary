@@ -14,12 +14,106 @@
 #
 #
 
+import fcntl
 import itertools
+import optparse
 import os
+import sys
 
+from conary.conaryclient import callbacks as clientCallbacks
 from conary import conarycfg, callbacks, trove
 from conary.lib import cfg, util, log
-from conary.repository import errors, changeset
+from conary.repository import errors, changeset, netclient
+
+class OptionError(Exception):
+    def __init__(self, errcode, errmsg, *args):
+        self.errcode = errcode
+        self.errmsg = errmsg
+        Exception.__init__(self, *args)
+
+def parseArgs(argv):
+    parser = optparse.OptionParser(version = '%prog 0.1')
+    parser.add_option("--config-file", dest = "configFile",
+                      help = "configuration file", metavar = "FILE")
+    parser.add_option("--full-sig-sync", dest = "syncSigs",
+                      action = "store_true", default = False,
+                      help = "replace all of the trove signatures on "
+                             "the target repository")
+    parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
+                      default = False,
+                      help = "ignore the last-mirrored timestamp in the "
+                             "target repository")
+    parser.add_option("--test", dest = "test", action = "store_true",
+                      default = False,
+                      help = "skip commiting changes to the target repository")
+    parser.add_option("-v", "--verbose", dest = "verbose",
+                      action = "store_true", default = False,
+                      help = "display information on what is going on")
+
+    (options, args) = parser.parse_args(argv)
+
+    if options.configFile is None:
+        raise OptionError(1, 'a mirror configuration must be provided')
+    elif args:
+        raise OptionError(1, 'unexpected arguments: %s' % " ".join(args))
+
+    return options
+
+class VerboseChangesetCallback(clientCallbacks.ChangesetCallback):
+    def done(self):
+        self._message('\r')
+
+def Main(argv=sys.argv[1:]):
+    try:
+        options = parseArgs(argv)
+    except OptionError, e:
+        sys.stderr.write(e.errmsg)
+        sys.stderr.write("\n")
+        return e.errcode
+
+    cfg =MirrorConfiguration()
+    cfg.read(options.configFile, exception = True)
+    callback = callbacks.ChangesetCallback()
+
+    if options.verbose:
+        log.setVerbosity(log.DEBUG)
+        callback = VerboseChangesetCallback()
+
+    if cfg.lockFile:
+        try:
+            log.debug('checking for lock file')
+            lock = open(cfg.lockFile, 'w')
+            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except IOError:
+            log.debug('lock held by another process, exiting')
+            sys.exit(0)
+
+
+    # We need two repos clients, one for the server and one for the client. Since
+    # they have the same name (the repositorymap gets us to the right hosts).
+    sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
+                              cfg.source.user,
+                              uploadRateLimit = cfg.uploadRateLimit,
+                              downloadRateLimit = cfg.downloadRateLimit,
+                              entitlementDir = cfg.entitlementDirectory)
+
+    targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
+                              cfg.target.user,
+                              uploadRateLimit = cfg.uploadRateLimit,
+                              downloadRateLimit = cfg.downloadRateLimit,
+                              entitlementDir = cfg.entitlementDirectory)
+
+    # we pass in the sync flag only the first time around, because after
+    # that we need the targetRepos mark to advance accordingly after being
+    # reset to -1
+    count = mirrorRepository(sourceRepos, targetRepos, cfg,
+                             test = options.test, sync = options.sync,
+                             syncSigs = options.syncSigs,
+                             callback = callback)
+    while count:
+        count = mirrorRepository(sourceRepos, targetRepos, cfg,
+                                 test = options.test, callback = callback)
+
 
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap

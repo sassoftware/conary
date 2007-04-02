@@ -1214,6 +1214,7 @@ class Database(SqlDbRepository):
 	os.rename(newStatus, self.rollbackStatus)
 
     def getRollbackList(self):
+        self._ensureReadableRollbackStack()
 	list = []
 	for i in range(self.firstRollback, self.lastRollback + 1):
 	    list.append("r.%d" % i)
@@ -1249,11 +1250,17 @@ class Database(SqlDbRepository):
             else:
                 raise
 
+    def _ensureReadableRollbackStack(self):
+        if (self.firstRollback, self.lastRollback) == (None, None):
+            raise ConaryError("Unable to open rollback directory")
+
     def hasRollback(self, name):
 	try:
 	    num = int(name[2:])
 	except ValueError:
 	    return False
+
+        self._ensureReadableRollbackStack()
 
 	if (num >= self.firstRollback and num <= self.lastRollback):
 	    return True
