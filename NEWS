@@ -16,6 +16,8 @@ Changes in @NEW@:
   o Bug fixes:
     * Shadows that point back to a label that is already uphill are now
       issuing a proper error message. (CNY-847)
+    * Running the rblist command of conary as non-root produces a proper
+      error message. (CNY-1453)
 
 Changes in 1.1.19:
   o Client Changes:
