@@ -22,7 +22,7 @@ import time
 import weakref
 
 #conary
-from conary.errors import ParseError
+from conary.errors import ParseError, VersionStringError
 from conary.lib import log
 
 staticLabelTable = {}
@@ -1176,7 +1176,10 @@ class Version(VersionSequence):
 	@rtype: Version
 	"""
 	assert(isinstance(label, AbstractLabel))
-        assert(self.versions[-2] != label)
+        if label in self.versions:
+            raise VersionStringError(
+                "Shadowing %s to %s would create a circular reference" % 
+                    (self.asString(), label.asString()))
 
         newRelease = self.versions[-1].copy()
 	newRelease.timeStamp = time.time()

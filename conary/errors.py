@@ -49,6 +49,10 @@ class ParseError(ConaryError):
     """Base class for errors parsing input"""
     pass
 
+class VersionStringError(ConaryError):
+    """Base class for other version string specific error"""
+    pass
+
 class DatabaseError(ConaryError):
     """ Base class for errors communicating with the local database. """
     pass
