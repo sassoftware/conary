@@ -13,11 +13,13 @@ Changes in @NEW@:
       provided by elfutils.  libelf can be downloaded from
       http://www.mr511.de/software/ (CNY-1501)
 
-  o Bug fixes:
+  o Bug Fixes:
     * Shadows that point back to a label that is already uphill are now
       issuing a proper error message. (CNY-847)
     * Running the rblist command of conary as non-root produces a proper
       error message. (CNY-1453)
+    * Badly-formatted parentVersion strings in derived packages
+      (experimental) no longer cause a stacktrace.
 
 Changes in 1.1.19:
   o Client Changes:
