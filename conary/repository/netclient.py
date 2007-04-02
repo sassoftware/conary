@@ -2076,7 +2076,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if tagId <= trove._TROVEINFO_TAG_DIR_HASHES:
                 newOnlySkipSet[trove.TroveInfo.streamDict[tagId][2]] = \
                                                         True
-
         jobs = []
 	for trvCs in chgSet.iterNewTroveList():
             # See if there is anything which needs new trove info handling

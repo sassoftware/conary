@@ -478,7 +478,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     elif askInteractive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
-    if migrate and interative:
+    if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'
                ' specified.')
 
