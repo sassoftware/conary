@@ -131,6 +131,7 @@ class ChangesetCallback(Callback):
         """This callback gets called if missing files were detected in the
         upstream server
         @param missingFiles: a list of tuples:
+          (troveName, troveVersion, troveFlavor, pathId, path, fileId, version)
         """
         return False
 
