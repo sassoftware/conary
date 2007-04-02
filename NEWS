@@ -1,4 +1,14 @@
 Changes in the Metadata tree:
+  o Major Changes:
+    * Support for versioned trove signatures has been added (CNY-1477)
+    * Version 1 signatures have been added which are sha256 based and
+      include signatures of unknown troveInfo segments (CNY-1186)
+    * Unknown troveInfo segments are stored in both the repository and
+      local database and restored properly (CNY-1186)
+    * Groups can now include scripts which are automatically run before
+      an install, after an install, after an update, and after a rollback
+      (CNY-1461)
+
   o Client Changes:
     * Hashes of the directories a trove places files in is now built
       and stored in troveInfo.  (CNY-857)
