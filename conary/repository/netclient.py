@@ -2073,7 +2073,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         newOnlySkipSet = {}
         for tagId in trove.TroveInfo.streamDict:
-            if tagId <= trove._TROVEINFO_ORIGINAL_SIG:
+            if tagId <= trove._TROVEINFO_TAG_DIR_HASHES:
                 newOnlySkipSet[trove.TroveInfo.streamDict[tagId][2]] = \
                                                         True
 
