@@ -20,6 +20,10 @@ Changes in @NEW@:
       error message. (CNY-1453)
     * Badly-formatted parentVersion strings in derived packages
       (experimental) no longer cause a stacktrace.
+    * When installing into a subdirectory, not running tag scripts,
+      and not using the normal job ordering, Conary previously could
+      fail to look up user names in packages installed before the
+      glibc package. (CNY-1515)
 
 Changes in 1.1.19:
   o Client Changes:
