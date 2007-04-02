@@ -13,6 +13,10 @@ Changes in @NEW@:
       provided by elfutils.  libelf can be downloaded from
       http://www.mr511.de/software/ (CNY-1501)
 
+  o Bug fixes:
+    * Shadows that point back to a label that is already uphill are now
+      issuing a proper error message. (CNY-847)
+
 Changes in 1.1.19:
   o Client Changes:
     * A new "cvc promote" command has been added. "cvc promote" is a
