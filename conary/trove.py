@@ -653,11 +653,12 @@ _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
 _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
+# troveinfo above here is signed in v0 signatures; below here is signed
+# in v1 signatures as well
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
 _TROVEINFO_TAG_METADATA       = 17
-# troveinfo above here is signed in v0 signatures; below here is signed
-# in v1 signatures as well
+_TROVEINFO_TAG_LAST           = 17
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()

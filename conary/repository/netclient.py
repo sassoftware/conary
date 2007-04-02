@@ -2066,34 +2066,54 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	serverName = None
         if chgSet.isEmpty():
             raise errors.CommitError('Attempted to commit an empty changeset')
-            
+
+        # new-style TroveInfo means support for versioned signatures and
+        # storing unknown TroveInfo
+        needsNewTroveInfo = False
+
+        newOnlySkipSet = {}
+        for tagId in trove.TroveInfo.streamDict:
+            if tagId <= trove._TROVEINFO_ORIGINAL_SIG:
+                newOnlySkipSet[trove.TroveInfo.streamDict[tagId][2]] = \
+                                                        True
+
         jobs = []
-	for trove in chgSet.iterNewTroveList():
-	    v = trove.getOldVersion()
+	for trvCs in chgSet.iterNewTroveList():
+            # See if there is anything which needs new trove info handling
+            # to commit
+            troveInfo = trove.TroveInfo(trvCs.getFrozenTroveInfo())
+            if troveInfo.freeze(skipSet = newOnlySkipSet):
+                needsNewTroveInfo = True
+
+	    v = trvCs.getOldVersion()
 	    if v:
 		if serverName is None:
 		    serverName = v.getHost()
 		assert(serverName == v.getHost())
                 oldVer = self.fromVersion(v)
-                oldFlavor = self.fromFlavor(trove.getOldFlavor())
+                oldFlavor = self.fromFlavor(trvCs.getOldFlavor())
             else:
                 oldVer = ''
                 oldFlavor = ''
 
-	    v = trove.getNewVersion()
+	    v = trvCs.getNewVersion()
 	    if serverName is None:
 		serverName = v.getHost()
 	    assert(serverName == v.getHost())
 
-            jobs.append((trove.getName(), (oldVer, oldFlavor),
-                         (self.fromVersion(trove.getNewVersion()),
-                          self.fromFlavor(trove.getNewFlavor())),
-                         trove.isAbsolute()))
+            jobs.append((trvCs.getName(), (oldVer, oldFlavor),
+                         (self.fromVersion(trvCs.getNewVersion()),
+                          self.fromFlavor(trvCs.getNewFlavor())),
+                         trvCs.isAbsolute()))
 
         # XXX We don't check the version of the changeset we're committing,
         # so we might do an unnecessary conversion. It won't hurt anything
         # though.
         server = self.c[serverName]
+
+        if needsNewTroveInfo and server.getProtocolVersion() < 45:
+            raise errors.CommitError('The changeset being committed needs '
+                                     'a newer repository server.')
 
         if server.getProtocolVersion() >= 38:
             url = server.prepareChangeSet(jobs, mirror)
