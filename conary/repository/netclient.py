@@ -2069,7 +2069,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         # new-style TroveInfo means support for versioned signatures and
         # storing unknown TroveInfo
-        needsNewTroveInfo = False
+        minProtocolRequired = CLIENT_VERSIONS[0]
 
         newOnlySkipSet = {}
         for tagId in trove.TroveInfo.streamDict:
@@ -2082,7 +2082,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # to commit
             troveInfo = trove.TroveInfo(trvCs.getFrozenTroveInfo())
             if troveInfo.freeze(skipSet = newOnlySkipSet):
-                needsNewTroveInfo = True
+                minProtocolRequired = max(minProtocolRequired, 45)
+
+            # Removals of groups requires new servers. It's true of redirects
+            # too, but I can't tell if this is a redirect or not so the
+            # server failure will have to do :-(
+            if (trvCs.getName().startswith('group-') and
+                        not trvCs.getNewVersion()):
+                minProtocolRequired = max(minProtocolRequired, 45)
 
 	    v = trvCs.getOldVersion()
 	    if v:
@@ -2110,7 +2117,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # though.
         server = self.c[serverName]
 
-        if needsNewTroveInfo and server.getProtocolVersion() < 45:
+        if server.getProtocolVersion() < minProtocolRequired:
             raise errors.CommitError('The changeset being committed needs '
                                      'a newer repository server.')
 
