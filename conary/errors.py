@@ -49,6 +49,10 @@ class ParseError(ConaryError):
     """Base class for errors parsing input"""
     pass
 
+class VersionStringError(ConaryError):
+    """Base class for other version string specific error"""
+    pass
+
 class DatabaseError(ConaryError):
     """ Base class for errors communicating with the local database. """
     pass
@@ -103,7 +107,7 @@ class DatabaseLockedError(DatabaseError):
                 "but you don't have write permission to the database.")
 
 class ShadowRedirect(ConaryError):
-    """User attempted to create a shadow (or branch, but branch's aren't
+    """User attempted to create a shadow (or branch, but branches aren't
        really supported anymore) or a redirect"""
 
     def __str__(self):

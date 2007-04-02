@@ -48,12 +48,23 @@ cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs)
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
              stringstream.c cstreams.h filename_wrapper.c Makefile
+libelf = $(shell \
+if [ -x /usr/bin/pkg-config -a -d /usr/include/libelf-lgpl ]; then \
+    pkg-config --cflags --libs libelf; \
+elif [ -d /usr/include/libelf-lgpl ]; then \
+    echo "-I/usr/include/libelf-lgpl -lelf-lgpl"; \
+else \
+    echo -lelf; \
+fi)
 
 
 all: $(python_modules) $(wrapper_libs)
 
+elf.o: elf.c
+	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
+
 elfmodule.so: $(elfmodule_objs)
-	$(CC) -shared -o $@ $< -lelf
+	$(CC) -shared -o $@ $< $(libelf)
 
 miscmodule.so: $(miscmodule_objs)
 	$(CC) -shared -o $@ $<

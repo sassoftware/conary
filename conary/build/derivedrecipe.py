@@ -147,8 +147,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 parentRevision = versions.Revision(self.parentVersion)
             except conaryerrors.ParseError, e:
                 raise builderrors.RecipeFileError(
-                            'Cannot parse parentVersion %s: %s',
-                                    self.parentRevision, str(e))
+                            'Cannot parse parentVersion %s: %s' % \
+                                    (self.parentVersion, str(e)))
         else:
             parentRevision = None
 

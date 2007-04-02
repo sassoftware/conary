@@ -2728,6 +2728,9 @@ conary erase '%s=%s[%s]'
                           "deprecated, use setUpdateCallback() instead")
             self.setUpdateCallback(callback)
 
+        if self.updateCallback is None:
+            self.setUpdateCallback(UpdateCallback())
+
         # def applyUpdate -- body begins here
 
         allJobs = uJob.getJobs()
