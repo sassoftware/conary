@@ -865,6 +865,20 @@ def setupTempTables(db):
         db.createIndex("tmpFilePrefixes", "tmpFilePrefixesPrefixIdx", "prefix",
                        check = False)
 
+    if "tmpRemovals" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE
+        tmpRemovals(
+            instanceId      INTEGER,
+            itemId          INTEGER,
+            versionId       INTEGER,
+            flavorId        INTEGER,
+            branchId        INTEGER
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpRemovals"] = True
+        db.createIndex("tmpRemovals", "tmpRemovalsInstances", "instanceId",
+                       check = False)
+
     db.commit()
 
 def resetTable(cu, name):
