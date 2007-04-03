@@ -31,6 +31,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   # file options
                   ls = False, lsl = False, ids = False, sha1s = False, 
                   tags = False, fileDeps = False, fileVersions = False,
+                  fileFlavors = False,
                   # collection options
                   showTroves = False, recurse = None, showAllTroves = False,
                   weakRefs = False, showTroveFlags = False,
@@ -110,7 +111,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                          baseFlavors = cfg.flavor)
 
     dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
-                        fileDeps=fileDeps, fileVersions=fileVersions)
+                        fileDeps=fileDeps, fileVersions=fileVersions,
+                        fileFlavors=fileFlavors)
 
 
     recurseOne = showTroves or showAllTroves or weakRefs or showTroveFlags
@@ -120,7 +122,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
         # level explicitly and we specified troves (so everything won't 
         # show up at the top level anyway), guess at whether to recurse
         recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps, 
-                           fileVersions)
+                           fileVersions, fileFlavors)
 
     displayHeaders = alwaysDisplayHeaders or showTroveFlags 
 

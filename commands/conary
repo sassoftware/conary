@@ -386,6 +386,8 @@ class _AbstractQueryCommand(ConaryCommand):
                                ' of this trove'),
             'deps'          : 'Display trove dependencies',
             'file-deps'     : 'Display dependencies for individual files',
+            'file-flavors'  : (VERBOSE_HELP,
+                               'Display flavors for individual files'),
             'file-versions' : (VERBOSE_HELP, 'Display file versions'),
             'ids'           : (VERBOSE_HELP,
                                'Display path and file ids for files'),
@@ -426,6 +428,7 @@ class _AbstractQueryCommand(ConaryCommand):
         d["lsl"] = NO_PARAM
         d["tags"] = NO_PARAM
         d["file-deps"] = NO_PARAM
+        d["file-flavors"] = NO_PARAM
         d["file-versions"] = NO_PARAM
         d["sha1s"] = NO_PARAM
         argDef['File Display'] = d
@@ -471,6 +474,7 @@ class QueryCommand(_AbstractQueryCommand):
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
@@ -574,6 +578,7 @@ class RepQueryCommand(_AbstractQueryCommand):
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
@@ -640,6 +645,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),

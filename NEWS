@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Client Changes:
+    * Added a --file-flavors option to conary q, rq, and scs (CNY-1507).
+
   o Build Changes:
     * When Conary calls an external program (python, perl, monodis)
       to determine file dependencies and that program is not a part
