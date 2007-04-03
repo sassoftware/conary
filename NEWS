@@ -29,6 +29,8 @@ Changes in @NEW@:
       and not using the normal job ordering, Conary previously could
       fail to look up user names in packages installed before the
       glibc package. (CNY-1515)
+    * Don't depend on the lookaside repos cache being defined for
+      derived package recipe object initialization. (CNY-1509)
 
 Changes in 1.1.19:
   o Client Changes:
