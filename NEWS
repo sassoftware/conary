@@ -3,7 +3,7 @@ Changes in @NEW@:
     * Added a --file-flavors option to conary q, rq, and scs (CNY-1507).
     * Added the ability to promote using branches, and to promote to siblings
       of parents.  For example, you can now promote from /A//B to /C without
-      first cloning uphill to B. (CNY-1513)
+      first cloning uphill to A. (CNY-1513)
   o Build Changes:
     * When Conary calls an external program (python, perl, monodis)
       to determine file dependencies and that program is not a part
