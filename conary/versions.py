@@ -779,6 +779,10 @@ class VersionSequence(AbstractVersion):
             if isinstance(item, Label):
                 yield item
 
+    def depth(self):
+        count = 0
+        return len([x for x in self.versions if isinstance(x, Label)])
+
     def getHost(self):
         """
         Returns the host name from the youngest label in this
