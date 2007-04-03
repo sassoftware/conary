@@ -616,7 +616,7 @@ class ClientClone:
         trv.troveInfo.sigs.reset()
         if not infoOnly: # not computing signatures will 
                          # make sure this doesn't get committed
-            trv.computeSignatures()
+            trv.computeDigests()
 
         return filesNeeded
 

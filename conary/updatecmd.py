@@ -193,6 +193,16 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
         self.out.write('[%s] %s\n' % (tag, msg))
 
+    @locked
+    def troveScriptOutput(self, typ, msg):
+        self._message('')
+        self.out.write("[%s] %s" % (typ, msg))
+
+    @locked
+    def troveScriptFailure(self, typ, errcode):
+        self._message('')
+        self.out.write("[%s] %s" % (typ, errcode))
+
     def __init__(self, cfg=None):
         callbacks.UpdateCallback.__init__(self)
         if cfg:
@@ -286,7 +296,8 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                                syncUpdate = False, updateOnly = False,
                                migrate = False, keepRequired = False,
                                removeNotByDefault = False, restartInfo = None,
-                               applyCriticalOnly = False, keepJournal = False):
+                               applyCriticalOnly = False, keepJournal = False,
+                               forceMigrate = False):
     if not callback:
         callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
     else:
@@ -350,7 +361,7 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                   installMissing = installMissing,
                   migrate = migrate, restartChangeSets = restartChangeSets,
                   applyCriticalOnly = applyCriticalOnly,
-                  keepJournal = keepJournal)
+                  keepJournal = keepJournal, forceMigrate = migrate)
     # Clean up after ourselves
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
@@ -372,7 +383,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   installMissing = False, migrate = False,
                                   restartChangeSets = None,
                                   applyCriticalOnly = False,
-                                  keepJournal = False):
+                                  keepJournal = False, forceMigrate = False):
 
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
@@ -380,7 +391,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     if not info:
         client.checkWriteableRoot()
 
-    if migrate and not info and not cfg.interactive:
+    if migrate and not info and not cfg.interactive and not forceMigrate:
         print ('Migrate must be run with --interactive'
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
@@ -467,7 +478,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     elif askInteractive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
-    if migrate:
+    if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'
                ' specified.')
 

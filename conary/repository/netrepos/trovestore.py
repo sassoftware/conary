@@ -950,9 +950,12 @@ class TroveStore:
         return self.db.rollback()
 
     def _removeTrove(self, name, version, flavor, markOnly = False):
-        if name.startswith('group-') and not name.endswith(':source'):
-            raise errors.CommitError('Marking a group as removed is not implemented')
+        #if name.startswith('group-') and not name.endswith(':source'):
+            #raise errors.CommitError('Marking a group as removed is not implemented')
         cu = self.db.cursor()
+
+        schema.resetTable(cu, 'tmpRemovals')
+
         cu.execute("""
                 SELECT instanceId, itemId, Instances.versionId,
                        Instances.flavorId, troveType FROM Instances
@@ -972,11 +975,17 @@ class TroveStore:
         except StopIteration:
             raise errors.TroveMissing(name, version)
 
-        assert(troveType == trove.TROVE_TYPE_NORMAL)
+        assert(troveType == trove.TROVE_TYPE_NORMAL or
+               troveType == trove.TROVE_TYPE_REDIRECT)
 
         cu.execute("SELECT nodeId, branchId FROM Nodes "
                    "WHERE itemId = ? AND versionId = ?", itemId, versionId)
         nodeId, branchId = cu.next()
+
+        # tmpRemovals drives the removal of most of the shared tables
+        cu.execute("INSERT INTO tmpRemovals (itemId, versionId, flavorId, "
+                                            "branchId) "
+                   "VALUES (?, ?, ?, ?)", itemId, versionId, flavorId, branchId)
 
         # remove all dependencies which are used only by this instanceId
         cu.execute("""
@@ -1012,11 +1021,6 @@ class TroveStore:
         # Remove from TroveInfo
         cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
 
-        # Remove from TroveTroves. XXX If there are troves which are referenced
-        # only here and are not otherwise present on the system, we ought to
-        # erase those as well.
-        cu.execute("DELETE FROM TroveTroves WHERE instanceId = ?", instanceId)
-
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
@@ -1049,99 +1053,163 @@ class TroveStore:
             if cu.next()[0] == 0:
                 filesToRemove.append(sha1)
 
+        # Look for troves which this trove references which aren't present
+        # on this repository (if they are present, we shouldn't remove them)
+        # and aren't referenced by anything else
+        cu.execute("""
+            INSERT INTO tmpRemovals (instanceId, itemId, versionId, flavorId,
+                                     branchId)
+            SELECT Instances.instanceId, Instances.itemId, Instances.versionId,
+                                         Instances.flavorId, Nodes.branchId
+                FROM TroveTroves JOIN Instances ON
+                    TroveTroves.includedId = Instances.instanceId
+                JOIN Nodes ON
+                    Instances.itemId = Nodes.itemId AND
+                    Instances.versionId = Nodes.versionId
+                LEFT OUTER JOIN TroveTroves AS Other ON
+                    Instances.instanceId = Other.includedId AND
+                    Other.instanceId != ?
+                WHERE
+                    TroveTroves.instanceId = ? AND
+                    Instances.isPresent = 0 AND
+                    Other.includedId IS NULL
+        """, instanceId, instanceId)
+
+        cu.execute("""
+            INSERT INTO tmpRemovals (itemId, flavorId, branchId)
+            SELECT TroveRedirects.itemId, TroveRedirects.flavorId,
+                                          TroveRedirects.branchId
+                FROM TroveRedirects WHERE
+                    TroveRedirects.instanceId = ?
+        """, instanceId)
+
+        cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
+        cu.execute("DELETE FROM TroveRedirects WHERE instanceId=?", instanceId)
+        cu.execute("DELETE FROM Instances WHERE instanceId IN "
+                        "(SELECT instanceId FROM tmpRemovals)")
         if markOnly:
             # We don't actually remove anything here; we just mark the trove
             # as removed instead
             cu.execute("UPDATE Instances SET troveType=? WHERE instanceId=?",
                        trove.TROVE_TYPE_REMOVED, instanceId)
             self.versionOps.updateLatest(itemId, branchId, flavorId)
-            return filesToRemove
+        else:
+            cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
-        cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
+        # look for troves referenced by this one
 
         # Was this the only Instance for the node?
-        cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
-                   "AND versionId = ? AND instanceId != ?", 
-                   (itemId, versionId, instanceId))
-        lastInstanceOfNode = (cu.next()[0] == 0)
+        cu.execute("""
+            DELETE FROM Changelogs WHERE Changelogs.nodeId IN (
+                SELECT Nodes.nodeId FROM tmpRemovals JOIN Nodes
+                        USING (itemId, versionId)
+                    LEFT OUTER JOIN Instances
+                        USING (itemId, versionId)
+                    WHERE
+                        Instances.itemId IS NULL)
+        """)
 
-        if lastInstanceOfNode:
-            # Remove any changelog
-            cu.execute("DELETE FROM ChangeLogs WHERE nodeId = ?", nodeId)
-
-            # Remove the node itself
-            cu.execute("DELETE FROM Nodes WHERE nodeId = ?", nodeId)
+        cu.execute("""
+            DELETE FROM Nodes WHERE Nodes.nodeId IN (
+                SELECT Nodes.nodeId FROM tmpRemovals JOIN Nodes
+                        USING (itemId, versionId)
+                    LEFT OUTER JOIN Instances
+                        USING (itemId, versionId)
+                    WHERE
+                        Instances.itemId IS NULL)
+        """)
 
         # Now update the latest table
         self.versionOps.updateLatest(itemId, branchId, flavorId)
 
-        # is this flavor needed anymore?
-        cu.execute("SELECT COUNT(*) FROM Latest WHERE flavorId = ?",
-                   flavorId)
-        count = cu.next()[0]
-        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE flavorId = ?",
-                   flavorId)
-        count += cu.next()[0]
-        if count == 0:
-            cu.execute("DELETE FROM Flavors WHERE flavorId = ?", flavorId)
-            cu.execute("DELETE FROM FlavorMap WHERE flavorId = ?",
-                       flavorId)
+        # Delete flavors which are no longer needed
+        cu.execute("""
+            DELETE FROM Flavors WHERE flavorId IN (
+                SELECT tmpRemovals.flavorId FROM tmpRemovals
+                    LEFT OUTER JOIN Latest ON
+                        tmpRemovals.flavorId = Latest.flavorId
+                    LEFT OUTER JOIN TroveRedirects ON
+                        tmpRemovals.flavorId = TroveRedirects.flavorId
+                    WHERE
+                        Latest.flavorId IS NULL AND
+                        TroveRedirects.flavorId IS NULL)
+        """)
+        cu.execute("""
+            DELETE FROM FlavorMap WHERE flavorId IN (
+                SELECT tmpRemovals.flavorId FROM tmpRemovals
+                    LEFT OUTER JOIN Flavors USING (flavorId)
+                    WHERE
+                        Flavors.flavorId IS NULL)
+        """)
 
         # do we need the labelmap entry anymore?
         cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? AND "
                    "branchId = ?", itemId, branchId)
         count = cu.next()[0]
 
-        if not count:
-            cu.execute("SELECT labelId FROM LabelMap WHERE itemid = ? AND "
-                       "branchId = ?", itemId, branchId)
-            labelId = cu.next()[0]
-            cu.execute("DELETE FROM LabelMap WHERE itemid = ? AND "
-                       "branchId = ?", itemId, branchId)
+        # XXX This stinks, but to fix it we need a proper index column
+        # on LabelMap.
+        cu.execute("""
+            SELECT itemId, branchId FROM tmpRemovals
+                    LEFT OUTER JOIN Nodes USING (itemId, branchId)
+                    WHERE
+                        Nodes.itemId IS NULL
+        """)
+        for rmItemId, rmBranchId in cu.fetchall():
+            cu.execute("DELETE FROM LabelMap WHERE itemId=? AND branchId=?",
+                       rmItemId, rmBranchId)
 
-            # do we need this branchId anymore?
-            cu.execute("SELECT COUNT(*) FROM LabelMap WHERE branchId = ?",
-                       branchId)
-            count = cu.next()[0]
-            cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE branchId = ?",
-                       branchId)
-            count += cu.next()[0]
+        # do we need these branchIds anymore?
+        cu.execute("""
+            DELETE FROM Branches WHERE branchId IN (
+                SELECT tmpRemovals.branchId FROM tmpRemovals
+                    LEFT OUTER JOIN LabelMap ON
+                        tmpRemovals.branchId = LabelMap.branchId
+                    LEFT OUTER JOIN TroveRedirects ON
+                        tmpRemovals.branchId = TroveRedirects.branchId
+                    WHERE
+                        LabelMap.branchId IS NULL AND
+                        TroveRedirects.branchId IS NULL)
+        """)
 
-            if not count:
-                cu.execute("DELETE FROM Branches WHERE branchId = ?", branchId)
+        # XXX It would be nice to narrow this down based on tmpRemovals, but
+        # in reality the labels table never gets that big.
+        cu.execute("""
+            DELETE FROM Labels WHERE labelId IN (
+                SELECT labelId FROM Labels
+                    LEFT OUTER JOIN LabelMap USING (labelId)
+                    WHERE
+                        LabelMap.labelId IS NULL AND
+                        Labels.labelId != 0)
+        """)
 
-            # do we need this labelId anymore?
-            cu.execute("SELECT COUNT(*) FROM LabelMap WHERE labelId = ?",
-                       labelId)
-            count = cu.next()[0]
+        # do we need these branchIds anymore?
+        cu.execute("""
+            DELETE FROM Versions WHERE versionId IN (
+                SELECT tmpRemovals.versionId FROM tmpRemovals
+                    LEFT OUTER JOIN Instances ON
+                        tmpRemovals.versionId = Instances.versionId
+                    LEFT OUTER JOIN TroveFiles ON
+                        tmpRemovals.versionId = TroveFiles.versionId
+                    WHERE
+                        Instances.versionId IS NULL AND
+                        TroveFiles.versionId IS NULL)
+        """)
 
-            if not count:
-                cu.execute("DELETE FROM Labels WHERE labelId = ?", labelId)
-
-        # do we need this versionId any longer?
-        cu.execute("SELECT COUNT(*) FROM Instances WHERE versionId = ? "
-                   "LIMIT 1", versionId)
-        count = cu.next()[0]
-        cu.execute("SELECT COUNT(*) FROM TroveFiles WHERE versionId = ? "
-                   "LIMIT 1", versionId)
-        count += cu.next()[0]
-
-        if not count:
-            cu.execute("DELETE FROM Versions WHERE versionId = ?", versionId)
-
-        # do we need this itemId any longer?
-        cu.execute("SELECT COUNT(*) FROM Instances WHERE itemId = ? "
-                   "LIMIT 1", itemId)
-        count = cu.next()[0]
-        cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? "
-                   "LIMIT 1", itemId)
-        count += cu.next()[0]
-        cu.execute("SELECT COUNT(*) FROM TroveRedirects WHERE itemId = ? "
-                   "LIMIT 1", itemId)
-        count += cu.next()[0]
-
-        if not count:
-            cu.execute("DELETE FROM Items WHERE itemId = ?", itemId)
+        cu.execute("""
+            DELETE FROM Items WHERE itemId IN (
+                SELECT tmpRemovals.itemId FROM tmpRemovals
+                    LEFT OUTER JOIN Instances ON
+                        tmpRemovals.itemId = Instances.itemId
+                    LEFT OUTER JOIN Nodes ON
+                        tmpRemovals.itemId = Nodes.itemId
+                    LEFT OUTER JOIN TroveRedirects ON
+                        tmpRemovals.itemId = TroveRedirects.itemId
+                    WHERE
+                        Instances.itemId IS NULL AND
+                        Nodes.itemId IS NULL AND
+                        TroveRedirects.itemId IS NULL)
+        """)
 
         # XXX what about metadata?
 
