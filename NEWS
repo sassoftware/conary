@@ -17,6 +17,9 @@ Changes in @NEW@:
       version 0.8.0 or later as well as the libelf implementation
       provided by elfutils.  libelf can be downloaded from
       http://www.mr511.de/software/ (CNY-1501)
+    * The Conary client API has a new method disconnectRepos() that allows
+      one to cut access to the networked repositories. A RepositoryError
+      exception is raised if network access is attempted. (CNY-1474)
 
   o Bug Fixes:
     * Shadows that point back to a label that is already uphill are now
