@@ -98,15 +98,15 @@ class TroveStore:
         return itemId
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
-                      troveType, isPresent = True):
+                      troveType, isPresent = instances.INSTANCE_PRESENT_NORMAL):
  	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
                                          clonedFromId,
 					 troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
-        if isPresent:
-	    self.instances.setPresent(theId, 1)
+        if isPresent != instances.INSTANCE_PRESENT_MISSING:
+	    self.instances.setPresent(theId, isPresent)
             self.items.setTroveFlag(itemId, 1)
  	return theId
 
@@ -214,7 +214,8 @@ class TroveStore:
         cu = self.db.cursor()
         cu.execute("SELECT DISTINCT Items.item as item "
                    " FROM Instances JOIN Items USING(itemId) "
-                   " WHERE Instances.isPresent=1 ORDER BY item");
+                   " WHERE Instances.isPresent = ? ORDER BY item",
+                   INSTANCES_PRESENT_NORMAL);
 
         for (item,) in cu:
             yield item
@@ -322,9 +323,8 @@ class TroveStore:
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
-					     troveFlavorId, clonedFromId,
-                                             trv.getType(),
-                                             isPresent = True)
+                         troveFlavorId, clonedFromId, trv.getType(),
+                         isPresent = instances.INSTANCE_PRESENT_NORMAL)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
@@ -465,9 +465,8 @@ class TroveStore:
                                                 updateLatest = False)
 
             instanceId = self.getInstanceId(itemId, versionId, flavorId,
-                                            clonedFromId,
-                                            trv.isRedirect(),
-                                            isPresent = False)
+                                clonedFromId, trv.isRedirect(),
+                                isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""
         INSERT INTO TroveTroves (instanceId, includedId, flags)

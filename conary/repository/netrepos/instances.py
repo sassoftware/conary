@@ -12,6 +12,10 @@
 # full details.
 #
 
+INSTANCE_PRESENT_MISSING = 0
+INSTANCE_PRESENT_NORMAL  = 1
+INSTANCE_PRESENT_HIDDEN  = 2
+
 class InstanceTable:
     """
     Generic table for assigning id's to a 3-tuple of IDs.
@@ -20,12 +24,7 @@ class InstanceTable:
         self.db = db
 
     def addId(self, itemId, versionId, flavorId, clonedFromId,
-              troveType, isPresent = True):
-	if isPresent:
-	    isPresent = 1
-	else:
-	    isPresent = 0
-
+              troveType, isPresent = INSTANCE_PRESENT_NORMAL):
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances "
                    "(itemId, versionId, flavorId, clonedFromId, troveType, isPresent) "
