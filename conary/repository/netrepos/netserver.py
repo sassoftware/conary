@@ -27,7 +27,7 @@ from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims, filecontainer
 from conary.repository import filecontents
-from conary.repository.netrepos import fsrepos, trovestore
+from conary.repository.netrepos import fsrepos, instances, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
@@ -849,7 +849,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 JOIN Instances AS Domain ON
                     Items.itemId = Domain.itemId AND
                     Domain.troveType %s AND
-                    Domain.isPresent=1""" % s
+                    Domain.isPresent=%d""" % \
+                        (s, instances.INSTANCE_PRESENT_NORMAL)
             coreQdict["domain"] += """
             JOIN Nodes ON
                 Domain.itemId = Nodes.itemId AND
@@ -2176,9 +2177,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            ) as UP ON
                            ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
                         WHERE
-                            Instances.isPresent = 1
+                            Instances.isPresent = ?
                     """ % ",".join("%d" % x for x in userGroupIds)
-        cu.execute(query)
+        cu.execute(query, instances.INSTANCE_PRESENT_NORMAL)
 
         for row, name, pattern in cu:
             if results[row]: continue
@@ -2241,12 +2242,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         JOIN Flavors ON
                             (Instances.flavorId = Flavors.flavorId)
                         WHERE
-                            Instances.isPresent = 1 
+                            Instances.isPresent = ?
                             AND Labels.label = ?
                         ORDER BY
                             Nodes.finalTimestamp DESC
                     """ % ",".join("%d" % x for x in userGroupIds)
-        cu.execute(query, label)
+        cu.execute(query, instances.INSTANCE_PRESENT_NORMAL, label)
 
         if all:
             results = [[] for x in pathList]
@@ -2597,12 +2598,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Versions ON Instances.versionId = Versions.versionId
         JOIN Flavors ON Instances.flavorId = flavors.flavorId
         WHERE Instances.changed <= ?
-          AND Instances.isPresent = 1
+          AND Instances.isPresent = ?
           AND TroveInfo.changed >= ?
           AND TroveInfo.infoType = ?
         ORDER BY TroveInfo.changed
         """ % (",".join("%d" % x for x in userGroupIds), )
-        cu.execute(query, (mark, mark, trove._TROVEINFO_TAG_SIGS))
+        cu.execute(query, (mark, mark, instances.INSTANCE_PRESENT_NORMAL,
+                           trove._TROVEINFO_TAG_SIGS))
 
         l = set()
         for pattern, name, version, flavor, mark in cu:
@@ -2758,11 +2760,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         FROM (
            SELECT COUNT(instanceId) AS c
            FROM Instances
-           WHERE Instances.isPresent = 1
+           WHERE Instances.isPresent = ?
              AND Instances.changed >= ?
            GROUP BY changed
            HAVING COUNT(instanceId) > 1
-        ) AS lims""", mark)
+        ) AS lims""", instances.INSTANCE_PRESENT_HIDDEN, mark)
         lim = cu.fetchall()[0][0]
         if lim is None or lim < 1000:
             lim = 1000 # for safety and efficiency
@@ -2806,10 +2808,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Versions ON Versions.versionId = Instances.versionId
         JOIN Flavors ON Flavors.flavorId = Instances.flavorId
         WHERE Instances.changed >= ?
-          AND Instances.isPresent = 1
+          AND Instances.isPresent = ?
         ORDER BY Instances.changed
         LIMIT %d
-        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
+        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount,
+               instances.INSTANCE_PRESENT_HIDDEN)
 
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
