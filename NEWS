@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.20:
   o Major Changes:
     * Groups can now include scripts which are automatically run
       before an install, after an install, after an update, and after
