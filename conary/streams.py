@@ -21,7 +21,8 @@ from conary import versions
 
 from conary.deps import deps
 
-from conary.lib import cstreams, misc
+from conary.lib import cstreams, misc, sha1helper
+
 IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
@@ -126,11 +127,14 @@ class Sha1Stream(StringStream):
 	assert(len(val) in self.allowedSize)
         StringStream.set(self, val)
 
-    def setFromString(self, val):
-	s = struct.pack("!5I", int(val[ 0: 8], 16), 
-			       int(val[ 8:16], 16), int(val[16:24], 16), 
-			       int(val[24:32], 16), int(val[32:40], 16))
-        StringStream.set(self, s)
+    def compute(self, message):
+        self.set(sha1helper.sha1String(message))
+
+    def verify(self, message):
+        return self() == sha1helper.sha1String(message)
+
+    def setFromString(self, hexdigest):
+        StringStream.set(self, sha1helper.sha1FromString(hexdigest))
 
 class AbsoluteSha1Stream(Sha1Stream):
     """
@@ -143,6 +147,28 @@ class AbsoluteSha1Stream(Sha1Stream):
     def diff(self, them):
         # always return ourself, since this is an absolute stream
         return self.freeze()
+
+class Sha256Stream(StringStream):
+    allowedSize = (32,)
+    def freeze(self, skipSet = None):
+	assert(len(self()) in self.allowedSize)
+	return StringStream.freeze(self, skipSet = skipSet)
+
+    def twm(self, diff, base):
+        raise NotImplementedError
+
+    def set(self, val):
+	assert(len(val) in self.allowedSize)
+        StringStream.set(self, val)
+
+    def compute(self, message):
+        self.set(sha1helper.sha256String(message))
+
+    def verify(self, message):
+        return self() == sha1helper.sha256String(message)
+
+    def setFromString(self, hexdigest):
+        StringStream.set(self, sha1helper.sha256FromString(hexdigest))
 
 class FrozenVersionStream(InfoStream):
 

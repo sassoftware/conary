@@ -1,3 +1,23 @@
+Changes in the Metadata tree:
+  o Major Changes:
+    * Support for versioned trove signatures has been added (CNY-1477)
+    * Version 1 signatures have been added which are sha256 based and
+      include signatures of unknown troveInfo segments (CNY-1186)
+    * Unknown troveInfo segments are stored in both the repository and
+      local database and restored properly (CNY-1186)
+    * Groups can now include scripts which are automatically run before
+      an install, after an install, after an update, and after a rollback
+      (CNY-1461)
+
+  o Client Changes:
+    * Hashes of the directories a trove places files in is now built
+      and stored in troveInfo.  (CNY-857)
+
+  o Bug Fixes:
+    * StreamSet objects didn't work with inheritance because the C
+      implementation treated an internal variable as inheritable when it should
+      have been treated as a class variable
+
 Changes in @NEW@:
   o Client Changes:
     * Added a --file-flavors option to conary q, rq, and scs (CNY-1507).
@@ -62,7 +82,7 @@ Changes in 1.1.19:
       for example, will only use the http_proxy environment variable.
     * Due to limitations in Apache 2.0, the Conary client will now use
       HTTP/1.1 "chunked" Transfer-encoding when committing changesets
-      larger than 2 GiB. (CNY-1478)
+      larger than 2 GiB.
     * An "applyRollback()" method has been added to the ConaryClient
       class. (CNY-1455)
 

@@ -171,7 +171,7 @@ def _signTrove(trv, fingerprint):
         trv.addDigitalSignature(fingerprint)
     else:
         # if no fingerprint, just add sha1s
-        trv.computeSignatures()
+        trv.computeDigests()
 
 def signAbsoluteChangeset(cs, fingerprint=None):
     # adds signatures or at least sha1s (if fingerprint is None)
@@ -626,6 +626,19 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setConaryVersion(constants.version)
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
+
+            for (recipeScripts, troveScripts) in \
+                    [ (recipeObj.postInstallScripts,
+                            grpTrv.troveInfo.scripts.postInstall),
+                      (recipeObj.postRollbackScripts,
+                            grpTrv.troveInfo.scripts.postRollback),
+                      (recipeObj.postUpdateScripts,
+                            grpTrv.troveInfo.scripts.postUpdate),
+                      (recipeObj.preUpdateScripts,
+                            grpTrv.troveInfo.scripts.preUpdate) ]:
+                if groupName in recipeScripts:
+                    troveScripts.script.set(recipeScripts[groupName][0])
+                    troveScripts.rollbackFence.set(recipeScripts[groupName][1])
 
             for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,

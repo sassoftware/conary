@@ -225,6 +225,11 @@ class GroupRecipe(_BaseGroupRecipe):
         self.replaceSpecs = []
         self.resolveTroveSpecs = []
 
+        self.preUpdateScripts = {}
+        self.postInstallScripts = {}
+        self.postRollbackScripts = {}
+        self.postUpdateScripts = {}
+
         _BaseGroupRecipe.__init__(self)
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,
@@ -1268,6 +1273,37 @@ class GroupRecipe(_BaseGroupRecipe):
 	LabelPaths 'myproject.rpath.org@rpl:1' and 'conary.rpath.com@rpl:1'.
         """
         self.labelPath = [ versions.Label(x) for x in path ]
+
+    def _addScript(self, contents, groupName, scriptDict,
+                   invalidateRollbacks = False):
+        if groupName is None:
+            groupName = self.name
+
+        if groupName not in self.groups:
+            raise RecipeFileError, 'Group %s not defined' % groupName
+
+        if contents is None:
+            raise RecipeFileError('script contents required for group %s'
+                                        % groupName)
+        elif groupName in scriptDict:
+            raise RecipeFileError('script already set for group %s'
+                                        % groupName)
+
+        scriptDict[groupName] = (contents, invalidateRollbacks)
+
+    def addPostInstallScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.postInstallScripts)
+
+    def addPostRollbackScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.postRollbackScripts)
+
+    def addPostUpdateScript(self, contents = None, groupName = None,
+                            invalidateRollbacks = True):
+        self._addScript(contents, groupName, self.postUpdateScripts,
+                        invalidateRollbacks = invalidateRollbacks)
+
+    def addPreUpdateScript(self, contents = None, groupName = None):
+        self._addScript(contents, groupName, self.preUpdateScripts)
 
     def getLabelPath(self):
         return self.labelPath

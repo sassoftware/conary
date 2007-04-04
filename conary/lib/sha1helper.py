@@ -17,6 +17,7 @@ import md5
 import os
 import stat
 import struct
+from Crypto.Hash import SHA256
 
 def sha1FileBin(path):
     oldmode = None
@@ -43,11 +44,6 @@ def sha1String(buf):
     m.update(buf)
     return m.digest()
 
-def md5String(buf):
-    m = md5.new()
-    m.update(buf)
-    return m.digest()
-
 def sha1ToString(buf):
     assert(len(buf) == 20)
     return "%08x%08x%08x%08x%08x" % struct.unpack("!5I", buf)
@@ -57,6 +53,28 @@ def sha1FromString(val):
     return struct.pack("!5I", int(val[ 0: 8], 16), 
 			int(val[ 8:16], 16), int(val[16:24], 16), 
 			int(val[24:32], 16), int(val[32:40], 16))
+
+def sha256String(buf):
+    m = SHA256.new()
+    m.update(buf)
+    return m.digest()
+
+def sha256ToString(buf):
+    assert(len(buf) == 32)
+    return "%08x%08x%08x%08x%08x%08x%08x%08x" % struct.unpack("!8I", buf)
+
+def sha256FromString(val):
+    assert(len(val) == 64)
+    return struct.pack("!8I", int(val[ 0: 8], 16),
+                        int(val[ 8:16], 16), int(val[16:24], 16),
+                        int(val[24:32], 16), int(val[32:40], 16),
+                        int(val[40:48], 16), int(val[48:56], 16),
+                        int(val[56:64], 16) )
+
+def md5String(buf):
+    m = md5.new()
+    m.update(buf)
+    return m.digest()
 
 def md5ToString(buf):
     assert(len(buf) == 16)
