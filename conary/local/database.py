@@ -322,6 +322,8 @@ class UpdateJob:
         ver = tup[0]
         if ver is None:
             ver = ''
+        else:
+            ver = ver.asString()
         flv = tup[1]
         if flv is None:
             flv = '\0'
@@ -333,6 +335,8 @@ class UpdateJob:
         ver = tup[0]
         if ver == '':
             ver = None
+        else:
+            ver = versions.VersionFromString(ver)
         flv = tup[1]
         if flv == '\0':
             flv = None
