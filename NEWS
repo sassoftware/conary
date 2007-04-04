@@ -3,11 +3,12 @@ Changes in 1.1.20:
     * Groups can now include scripts which are automatically run
       before an install, after an install, after an update, and after
       a rollback.  Documentation on how to add these scripts to groups
-      will be posted to wiki.rpath.com shortly.  These scripts are not
-      inherently reversible (unlike tag handlers), therefore if a post
-      update script is executed the rollback stack will be reset.  The
-      rollback information is still in the rollback directory, but
-      "conary rollback" will no longer be able to access them.
+      will be posted to wiki.rpath.com shortly.  Unlike tag handlers,
+      these scripts are not inherently reversible; therefore if a post
+      update script is executed, the rollback stack will be reset.  The
+      rollback information is still stored in the rollback directory,
+      but the "conary rollback" and "conary rblist" commands will no
+      longer be able to access the previous rollbacks.
 
       Only Conary repositories running version 1.1.20 or later can
       store these scripts.  If the repository is not running the
