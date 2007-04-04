@@ -470,6 +470,9 @@ static PyObject * StreamSet_Find(PyObject * objClass, PyObject * args) {
         return NULL;
 
     ssd = (void *) PyObject_GetAttrString((PyObject *) objClass, "_streamDict");
+    if (ssd == NULL) {
+	return NULL;
+    }
 
     /* find the target stream from our stream definition */
     for (ssdIdx = 0; ssdIdx < ssd->tagCount; ssdIdx++)
