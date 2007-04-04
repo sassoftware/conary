@@ -2,7 +2,7 @@ Changes in @NEW@:
   o Major Changes:
     * Groups can now include scripts which are automatically run
       before an install, after an install, after an update, and after
-      a rollback.  Only Conary repositories running version 1.1.19 or
+      a rollback.  Only Conary repositories running version 1.1.20 or
       later can store these scripts.  If the repository is not running
       the minimum required version, a "changeset being committed needs
       a newer repository server" error will be produced.  If an older
