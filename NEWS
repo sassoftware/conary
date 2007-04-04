@@ -1,58 +1,64 @@
 Changes in @NEW@:
   o Major Changes:
-    * Support for versioned trove signatures has been added (CNY-1477)
-    * Version 1 signatures have been added which are sha256 based and
-      include signatures of unknown troveInfo segments. (CNY-1186)
+    * Groups can now include scripts which are automatically run
+      before an install, after an install, after an update, and after
+      a rollback. (CNY-1461)
+    * Support for versioned trove signatures has been added. (CNY-1477)
+    * Version 1 signatures have been added which use a SHA256 digest
+      that includes the frozen form of unknown troveInfo
+      segments. (CNY-1186)
     * Unknown troveInfo segments are stored in both the repository and
       local database and restored properly. (CNY-1186)
-    * Groups can now include scripts which are automatically run before
-      an install, after an install, after an update, and after a rollback.
-      (CNY-1461)
 
   o Client Changes:
     * Hashes of the directories in which a trove places files are now
       computed and stored in troveInfo. (CNY-857)
-    * Added a --file-flavors option to conary q, rq, and scs. (CNY-1507).
-    * Added the ability to promote using branches, and to promote to siblings
-      of parents.  For example, you can now promote from /A//B to /C without
-      first cloning uphill to A. (CNY-1513)
+    * A --file-flavors option has been added to "conary query/q",
+      "conary repquery/rq", and "conary showcs/scs". (CNY-1507)
+    * The ability to promote using branches and to promote to siblings
+      of parents has been added.  For example, you can now promote
+      from /A//B to /C without first cloning uphill to A. (CNY-1513)
 
   o Build Changes:
-    * When Conary calls an external program (python, perl, monodis)
-      to determine file dependencies and that program is not a part
-      of the package being built, it will warn if that external
-      program is not provided by the build requirements. (CNY-1492)
-    * addPatch()'s optional argument "extraArgs" will now do the right thing
-      if passed a single string instead of a tuple or list. 
+    * When Conary calls an external program (python, perl, monodis) to
+      determine file dependencies and that program is not a part of
+      the package being built, it will warn if that external program
+      is not provided by a component in build requirements. (CNY-1492)
 
   o Internal Changes:
     * The conary.lib.elf module can now be built against libelf
       version 0.8.0 or later as well as the libelf implementation
       provided by elfutils.  libelf can be downloaded from
       http://www.mr511.de/software/ (CNY-1501)
-    * The Conary client API has a new method disconnectRepos() that allows
-      one to cut access to the networked repositories. A RepositoryError
-      exception is raised if network access is attempted. (CNY-1474)
+    * The Conary client API has a new method disconnectRepos() that
+      allows one to cut access to the networked repositories.  A
+      RepositoryError exception is raised if network access is
+      attempted. (CNY-1474)
 
   o Bug Fixes:
     * StreamSet objects didn't work with inheritance because the C
       implementation treated an internal variable as inheritable when
       it should have been treated as a class variable.
-    * Shadows that point back to a label that is already uphill are now
-      issuing a proper error message. (CNY-847)
-    * Running the rblist command of conary as non-root produces a proper
-      error message. (CNY-1453)
+    * Attempting to create a shadowed Version object that reference a
+      label that is already uphill are now issues a proper error
+      message. (CNY-847)
+    * Running the "conary rblist" command as non-root now produces a
+      proper error message. (CNY-1453)
     * Badly-formatted parentVersion strings in derived packages
       (experimental) no longer cause a stacktrace.
-    * When installing into a subdirectory, not running tag scripts,
-      and not using the normal job ordering, Conary previously could
-      fail to look up user names in packages installed before the
-      glibc package. (CNY-1515)
-    * Don't depend on the lookaside repos cache being defined for
-      derived package recipe object initialization. (CNY-1509)
-    * Don't proxy when the host you're accessing is localhost
-      (even if it's being accessed by some other name).
-    * A bug in the freezing of update jobs was fixed. (CNY-1521)
+    * Previous versions of Conary would fail to find the UID or GID of
+      a newly created user if "--root" was specified on the command
+      line and C library components had not yet been installed.
+      Conary would erroneously fall back to using UID 0 or GID 0
+      (root) instead.  (CNY-1515)
+    * A traceback that occurred when a lookaside repository cache has
+      not been defined when initializing a derived package recipe
+      object has been fixed. (CNY-1509)
+    * The Conary network repository client no longer attempts to use a
+      proxy if the repository is residing on the local machine.
+    * A bug in the freezing of update jobs has been fixed. (CNY-1521)
+    * r.addPatch()'s optional argument "extraArgs" will now do the right
+      thing if passed a single string instead of a tuple or list.
 
 Changes in 1.1.19:
   o Client Changes:
