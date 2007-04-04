@@ -43,7 +43,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46 ]
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -127,6 +127,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getDepSuggestions',
                         'getDepSuggestionsByTroves',
                         'prepareChangeSet',
+                        'presentHiddenTroves',
                         'commitChangeSet',
                         'getFileVersions',
                         'getFileVersion',
@@ -277,9 +278,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 except sqlerrors.DatabaseLocked:
                     raise
                 except errors.InsufficientPermission, e:
-                    if authToken[0] is not None:
-                        # When we get InsufficientPermission w/ a user/password, retry
-                        # the operation as anonymous
+                    if methodname != 'commitChangeSet' and \
+                                authToken[0] is not None:
+                        # When we get InsufficientPermission w/ a
+                        # user/password, retry the operation as anonymous,
+                        # unless this was a commitChangeSet call, in which
+                        # case the underlying changeset to commit has been
+                        # erased already!
                         r = method(('anonymous', 'anonymous', None, None), *args)
                         self.db.commit()
                         if self.callLog:
@@ -1757,8 +1762,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return result
 
-    def _checkCommitPermissions(self, authToken, verList, mirror):
-        if mirror and not self.auth.check(authToken, mirror=mirror):
+    def _checkCommitPermissions(self, authToken, verList, mirror, hidden):
+        if (mirror or hidden) and \
+                    not self.auth.check(authToken, mirror=(mirror or hidden)):
             raise errors.InsufficientPermission
         # verList items are (name, oldVer, newVer). e check both
         # combinations in one step
@@ -1788,7 +1794,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if jobList:
             self._checkCommitPermissions(authToken, _convertJobList(jobList),
-                                         mirror)
+                                         mirror, False)
 
         self.log(2, authToken[0])
   	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
@@ -1798,7 +1804,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
 
     @accessReadWrite
-    def commitChangeSet(self, authToken, clientVersion, url, mirror = False):
+    def presentHiddenTroves(self, authToken, clientVersion):
+        if not self.auth.check(authToken, mirror = True):
+            raise errors.InsufficientPermission
+
+        self.repos.troveStore.presentHiddenTroves()
+
+        return ''
+
+    @accessReadWrite
+    def commitChangeSet(self, authToken, clientVersion, url, mirror = False,
+                        hidden = False):
         base = util.normurl(self.urlBase())
         url = util.normurl(url)
         if not url.startswith(base):
@@ -1823,7 +1839,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # need to catch the DatabaseLocked errors here and retry
             # the commit ourselves
             try:
-                ret = self._commitChangeSet(authToken, cs, mirror)
+                ret = self._commitChangeSet(authToken, cs, mirror, hidden)
             except sqlerrors.DatabaseLocked, e:
                 # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d: %s", attempt, str(e.args))
@@ -1846,13 +1862,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.CommitError("DeadlockError", e.args)
         raise
 
-    def _commitChangeSet(self, authToken, cs, mirror = False):
+    def _commitChangeSet(self, authToken, cs, mirror = False, hidden = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
 
         verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
                     for x in cs.iterNewTroveList())
-        self._checkCommitPermissions(authToken, verList, mirror)
+        self._checkCommitPermissions(authToken, verList, mirror, hidden)
 
         items = {}
         removedList = []
@@ -1865,7 +1881,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             removedList.append(troveCs.getNewNameVersionFlavor())
             (name, version, flavor) = troveCs.getNewNameVersionFlavor()
 
-            if not self.auth.check(authToken, mirror = mirror, remove = True,
+            if not self.auth.check(authToken, mirror = (mirror or hidden),
+                                   remove = True,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
@@ -1874,7 +1891,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-	self.repos.commitChangeSet(cs, mirror = mirror)
+	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden)
 
 	if not self.commitAction:
 	    return True
@@ -2132,7 +2149,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ids
 
     @accessReadOnly
-    def hasTroves(self, authToken, clientVersion, troveList):
+    def hasTroves(self, authToken, clientVersion, troveList, hidden = False):
         # returns False for troves the user doesn't have permission to view
         cu = self.db.cursor()
         schema.resetTable(cu, 'hasTrovesTmp')
@@ -2144,6 +2161,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavor = item[2]
             cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
                        "VALUES (?, ?, ?, ?)", row, item[0], item[1], flavor)
+
+        if hidden:
+            hiddenClause = ("OR (Instances.isPresent = %d AND UP.canWrite = 1)"
+                        % instances.INSTANCE_PRESENT_HIDDEN)
+        else:
+            hiddenClause = ""
 
         results = [ False ] * len(troveList)
 
@@ -2168,7 +2191,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         JOIN (SELECT
                                Permissions.labelId as labelId,
                                PerItems.item as permittedTrove,
-                               Permissions.permissionId as aclId
+                               Permissions.permissionId as aclId,
+                               Permissions.canWrite as canWrite,
+                               Permissions.admin as admin
                            FROM
                                Permissions
                                join Items as PerItems using (itemId)
@@ -2177,8 +2202,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            ) as UP ON
                            ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
                         WHERE
-                            Instances.isPresent = ?
-                    """ % ",".join("%d" % x for x in userGroupIds)
+                            (Instances.isPresent = ?)
+                            %s
+                    """ % \
+                (",".join("%d" % x for x in userGroupIds), hiddenClause)
         cu.execute(query, instances.INSTANCE_PRESENT_NORMAL)
 
         for row, name, pattern in cu:

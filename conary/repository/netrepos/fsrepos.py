@@ -121,8 +121,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)
 
-    def addTrove(self, pkg):
-	return self.troveStore.addTrove(pkg)
+    def addTrove(self, pkg, hidden = False):
+	return self.troveStore.addTrove(pkg, hidden = hidden)
 
     def addTroveDone(self, pkg):
 	self.troveStore.addTroveDone(pkg)
@@ -157,7 +157,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def commitChangeSet(self, cs, mirror=False):
+    def commitChangeSet(self, cs, mirror=False, hidden=False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -178,7 +178,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             FilesystemChangeSetJob(self, cs, self.serverNameList,
                                    resetTimestamps = not mirror,
                                    callback=callback,
-                                   mirror = mirror)
+                                   mirror = mirror,
+                                   hidden = hidden)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()

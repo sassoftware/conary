@@ -31,7 +31,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     to the old version of things.
     """
 
-    def addTrove(self, oldTroveSpec, trove):
+    def addTrove(self, oldTroveSpec, trove, hidden = False):
+        assert(not hidden)
         info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
 	return (info, self.repos.addTrove(trove, pin = pin))

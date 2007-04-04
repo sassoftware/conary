@@ -1,3 +1,10 @@
+* Add hidden flag to commitChangeSet() and hasTroves(), which allows
+  mirror users to commit troves which will never be displayed to users.
+  The presentHiddenTroves() call makes all hidden troves visible. Bumped
+  protocol version to 46.
+* Fixed bug in commitChangeSet which gave a "file not found" error on commit
+  when the user had insufficient permission for the commit operation.
+
 Changes in the Metadata tree:
   o Major Changes:
     * Support for versioned trove signatures has been added (CNY-1477)

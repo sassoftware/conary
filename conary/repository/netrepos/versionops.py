@@ -15,7 +15,7 @@
 from conary import trove, versions
 from conary.dbstore import idtable
 from conary.repository.errors import DuplicateBranch
-from conary.repository.netrepos import items
+from conary.repository.netrepos import instances, items
 
 LATEST_TYPE_ANY     = 0         # redirects, removed, and normal
 LATEST_TYPE_PRESENT = 1         # redirects and normal
@@ -94,11 +94,12 @@ class LatestTable:
                     Nodes.itemId = ? AND
                     Nodes.branchId = ? AND
                     flavorId = ? AND
-                    isPresent = 1
+                    isPresent = ?
                     %s
                 ORDER BY finalTimestamp DESC
                 LIMIT 1
-        """ % troveTypeFilter, itemId, branchId, flavorId)
+        """ % troveTypeFilter, itemId, branchId, flavorId,
+              instances.INSTANCE_PRESENT_NORMAL)
 
         try:
             latestVersionId, troveType = cu.next()
