@@ -127,6 +127,59 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
 /* ------------------------------------- */
 /* StreamSet Implementation              */
 
+static StreamSetDefObject * StreamSet_GetSSD(PyTypeObject *o) {
+    /* returns a borrowed reference to the ssd */
+    PyObject *sd;
+    int rc;
+    PyObject *arg;
+    StreamSetDefObject * ssd;
+    
+    /* This looks in the class itself, not in the object or in parent classes */
+    ssd = (void *) PyDict_GetItemString(o->tp_dict, "_streamDict");
+    if (ssd) {
+	if (ssd->ob_type != &StreamSetDefType) {
+	    PyErr_SetString(PyExc_TypeError,
+			    "_streamDict attribute must be a "
+			    "cstreams.StreamSetDef");
+	    return NULL;
+	}
+	return (StreamSetDefObject *) ssd;
+    }
+    /* no ssd yet -- let's create it */
+    /* clear the old error */
+    PyErr_Clear();
+
+    sd = PyObject_GetAttrString((PyObject *) o, "streamDict");
+    if (!sd) {
+	char *buf;
+	int len = 50 + strlen(o->tp_name);
+	buf = malloc(len);
+	if (buf == NULL) {
+	    PyErr_NoMemory();
+	    return NULL;
+	}
+	len = snprintf(buf, len,
+		       "%s class is missing the streamDict class variable",
+		       o->tp_name);
+	PyErr_SetString(PyExc_ValueError, buf);
+	free(buf);
+	return NULL;
+    }
+
+    ssd = (void *) PyObject_New(StreamSetDefObject, &StreamSetDefType);
+    if (NULL == ssd)
+	return NULL;
+    arg = PyTuple_New(1);
+    PyTuple_SetItem(arg, 0, sd);
+    rc = StreamSetDef_Init((PyObject *) ssd, arg, NULL);
+    Py_DECREF(arg);
+    if (-1 == rc)
+	return NULL;
+    PyObject_SetAttrString((PyObject *) o, "_streamDict",
+			   (PyObject *) ssd);
+    return (StreamSetDefObject *) ssd;
+}
+
 static int _StreamSet_doCmp(PyObject * self, PyObject * other,
 			    PyObject * skipSet) {
     StreamSetDefObject * ssd;
@@ -135,8 +188,10 @@ static int _StreamSet_doCmp(PyObject * self, PyObject * other,
 
     if (self->ob_type != other->ob_type) return 1;
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *)self->ob_type,
-					  "_streamDict");
+    ssd = StreamSet_GetSSD(self->ob_type);
+    if (ssd == NULL) {
+	return -1;
+    }
 
     for (i = 0; i < ssd->tagCount; i++) {
 	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) 
@@ -385,8 +440,10 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
         return NULL;
     }
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *) self->ob_type,
-					  "_streamDict");
+    ssd = StreamSet_GetSSD(self->ob_type);
+    if (ssd == NULL) {
+	return NULL;
+    }
 
     len = sizeof(PyObject *) * ssd->tagCount;
     if (len < ALLOCA_CUTOFF) {
@@ -469,7 +526,7 @@ static PyObject * StreamSet_Find(PyObject * objClass, PyObject * args) {
                           &data, &dataLen))
         return NULL;
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *) objClass, "_streamDict");
+    ssd = StreamSet_GetSSD((PyTypeObject *) objClass);
     if (ssd == NULL) {
 	return NULL;
     }
@@ -541,9 +598,11 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
     if (freezeKnown == Py_False && freezeUnknown == Py_False)
         return PyString_FromString("");
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *) self->ob_type,
-					  "_streamDict");
-
+    ssd = StreamSet_GetSSD(self->ob_type);
+    if (ssd == NULL) {
+	return NULL;
+    }
+    
     len = sizeof(PyObject *) * ssd->tagCount;
     if (len < ALLOCA_CUTOFF) {
 	useAlloca = 1;
@@ -611,49 +670,9 @@ static int StreamSet_Init(PyObject * o, PyObject * args,
         return -1;
     }
 
-    /* This looks in the class itself, not in the object or in parent classes */
-    ssd = (void *) PyDict_GetItemString(o->ob_type->tp_dict, "_streamDict");
-
-    if (!ssd) {
-	PyObject *sd;
-	int rc;
-	PyObject *arg;
-
-	/* clear the old error */
-	PyErr_Clear();
-	sd = PyObject_GetAttrString((PyObject *) o->ob_type, "streamDict");
-	if (!sd) {
-	    char *buf;
-	    int len = 50 + strlen(self->ob_type->tp_name);
-	    buf = malloc(len);
-	    if (buf == NULL) {
-		PyErr_NoMemory();
-		return -1;
-	    }
-	    len = snprintf(buf, len,
-			   "%s class is missing the streamDict class variable",
-			   o->ob_type->tp_name);
-	    PyErr_SetString(PyExc_ValueError, buf);
-	    free(buf);
-	    return -1;
-	}
-
-	ssd = (void *) PyObject_New(StreamSetDefObject, &StreamSetDefType);
-	if (NULL == ssd)
-	    return -1;
-	arg = PyTuple_New(1);
-	PyTuple_SetItem(arg, 0, sd);
-	rc = StreamSetDef_Init((PyObject *) ssd, arg, NULL);
-	Py_DECREF(arg);
-	if (-1 == rc)
-	    return -1;
-	PyObject_SetAttrString((PyObject *) o->ob_type, "_streamDict",
-			       (PyObject *) ssd);
-    } else if (ssd->ob_type != &StreamSetDefType) {
-        PyErr_SetString(PyExc_TypeError, 
-			"_streamDict attribute must be a cstreams.StreamSetDef");
+    ssd = StreamSet_GetSSD(o->ob_type);
+    if (!ssd)
 	return -1;
-    }
 
     self->unknownCount = 0;
     self->unknownTags = NULL;
@@ -702,8 +721,10 @@ static PyObject * StreamSet_Thaw(PyObject * o, PyObject * args) {
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen))
         return NULL;
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *) o->ob_type,
-					  "_streamDict");
+    ssd = StreamSet_GetSSD(o->ob_type);
+    if (ssd == NULL) {
+	return NULL;
+    }
 
     if (Thaw_raw(o, ssd, data, dataLen, 0))
 	return NULL;
@@ -810,8 +831,10 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
         return Py_False;
     }
 
-    ssd = (void *) PyObject_GetAttrString((PyObject *) self->ob_type,
-					  "_streamDict");
+    ssd = StreamSet_GetSSD(self->ob_type);
+    if (ssd == NULL) {
+	return NULL;
+    }
     end = diff + diffLen;
     chptr = diff;
     while (chptr < end) {
