@@ -2,7 +2,15 @@ Changes in @NEW@:
   o Major Changes:
     * Groups can now include scripts which are automatically run
       before an install, after an install, after an update, and after
-      a rollback. (CNY-1461)
+      a rollback.  Only Conary repositories running version 1.1.19 or
+      later can store these scripts.  If the repository is not running
+      the minimum required version, a "changeset being committed needs
+      a newer repository server" error will be produced.  If an older
+      version of Conary downloads a group that has a script associated
+      with it, the scripts will be silently ignored.  Future versions
+      of Conary may add a "Requires: trove: conary(group-scripts)"
+      dependency to groups that have scripts associated with
+      them. (CNY-1461)
     * Support for versioned trove signatures has been added. (CNY-1477)
     * Version 1 signatures have been added which use a SHA256 digest
       that includes the frozen form of unknown troveInfo
