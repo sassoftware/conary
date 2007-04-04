@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -530,9 +530,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.c[label].addAccessGroup(groupName)
 
     def addDigitalSignature(self, name, version, flavor, digsig):
-        signature = trove.DigitalSignature()
-        signature.set(digsig)
-        encSig = base64.b64encode(signature.freeze())
+        if self.c[version].getProtocolVersion() < 45:
+            raise InvalidServerVersion, "Cannot sign troves on Conary " \
+                    "repositories older than 1.1.20"
+
+        encSig = base64.b64encode(digsig.freeze())
         self.c[version].addDigitalSignature(name, self.fromVersion(version),
                                             self.fromFlavor(flavor),
                                             encSig)
@@ -2064,34 +2066,60 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	serverName = None
         if chgSet.isEmpty():
             raise errors.CommitError('Attempted to commit an empty changeset')
-            
+
+        # new-style TroveInfo means support for versioned signatures and
+        # storing unknown TroveInfo
+        minProtocolRequired = CLIENT_VERSIONS[0]
+
+        newOnlySkipSet = {}
+        for tagId in trove.TroveInfo.streamDict:
+            if tagId <= trove._TROVEINFO_TAG_DIR_HASHES:
+                newOnlySkipSet[trove.TroveInfo.streamDict[tagId][2]] = \
+                                                        True
         jobs = []
-	for trove in chgSet.iterNewTroveList():
-	    v = trove.getOldVersion()
+	for trvCs in chgSet.iterNewTroveList():
+            # See if there is anything which needs new trove info handling
+            # to commit
+            troveInfo = trove.TroveInfo(trvCs.getFrozenTroveInfo())
+            if troveInfo.freeze(skipSet = newOnlySkipSet):
+                minProtocolRequired = max(minProtocolRequired, 45)
+
+            # Removals of groups requires new servers. It's true of redirects
+            # too, but I can't tell if this is a redirect or not so the
+            # server failure will have to do :-(
+            if (trvCs.getName().startswith('group-') and
+                        not trvCs.getNewVersion()):
+                minProtocolRequired = max(minProtocolRequired, 45)
+
+	    v = trvCs.getOldVersion()
 	    if v:
 		if serverName is None:
 		    serverName = v.getHost()
 		assert(serverName == v.getHost())
                 oldVer = self.fromVersion(v)
-                oldFlavor = self.fromFlavor(trove.getOldFlavor())
+                oldFlavor = self.fromFlavor(trvCs.getOldFlavor())
             else:
                 oldVer = ''
                 oldFlavor = ''
 
-	    v = trove.getNewVersion()
+	    v = trvCs.getNewVersion()
 	    if serverName is None:
 		serverName = v.getHost()
 	    assert(serverName == v.getHost())
 
-            jobs.append((trove.getName(), (oldVer, oldFlavor),
-                         (self.fromVersion(trove.getNewVersion()),
-                          self.fromFlavor(trove.getNewFlavor())),
-                         trove.isAbsolute()))
+            jobs.append((trvCs.getName(), (oldVer, oldFlavor),
+                         (self.fromVersion(trvCs.getNewVersion()),
+                          self.fromFlavor(trvCs.getNewFlavor())),
+                         trvCs.isAbsolute()))
 
         # XXX We don't check the version of the changeset we're committing,
         # so we might do an unnecessary conversion. It won't hurt anything
         # though.
         server = self.c[serverName]
+
+        if server.getProtocolVersion() < minProtocolRequired:
+            raise errors.CommitError('The changeset being committed needs '
+                                     'a newer repository server.')
 
         if server.getProtocolVersion() >= 38:
             url = server.prepareChangeSet(jobs, mirror)

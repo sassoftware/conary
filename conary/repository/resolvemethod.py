@@ -27,7 +27,7 @@ class DepResolutionMethod(object):
         self.db = db
         if flavor is None and cfg:
             flavor = self.cfg.flavor
-        if not isinstance(flavor, list):
+        if isinstance(flavor, deps.Flavor):
             flavor = [flavor]
         self.flavor = flavor
 
@@ -132,7 +132,7 @@ class DepResolutionMethod(object):
         # 3. pick the best flavor out of the remaining
 
 
-        if not installFlavor.isEmpty():
+        if installFlavor is not None and not installFlavor.isEmpty():
             flavoredList = []
             for troveTup in troveTups:
                 f = installFlavor.copy()

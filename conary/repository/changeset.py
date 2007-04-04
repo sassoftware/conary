@@ -415,6 +415,7 @@ class ChangeSet(streams.StreamSet):
 
             invertedTrove.setRequires(trv.getRequires())
             invertedTrove.setProvides(trv.getProvides())
+            invertedTrove.setTroveInfo(trv.troveInfo)
 
 	    for (name, list) in troveCs.iterChangedTroves():
 		for (oper, version, flavor, byDef) in list:
@@ -662,8 +663,8 @@ class ChangeSet(streams.StreamSet):
             newTrv.applyChangeSet(troveCs)
 
             newTrv.changeVersion(newVer)
-            newTrv.invalidateSignatures()
-            newTrv.computeSignatures()
+            newTrv.invalidateDigests()
+            newTrv.computeDigests()
 
             assert(not troveVersions.has_key(name))
             troveVersions[(name, troveCs.getNewFlavor())] = \
@@ -683,8 +684,8 @@ class ChangeSet(streams.StreamSet):
                                 weakRef = (not isStrong))
 
             # throw away sigs and recompute the hash
-            newTrv.invalidateSignatures()
-            newTrv.computeSignatures()
+            newTrv.invalidateDigests()
+            newTrv.computeDigests()
 
             self.delNewTrove(troveCs.getName(), troveCs.getNewVersion(),
                              troveCs.getNewFlavor())

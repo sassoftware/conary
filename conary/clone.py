@@ -74,10 +74,19 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
     return _finishClone(client, cfg, cs, callback, info=info,
                         test=test, ignoreConflicts=ignoreConflicts)
 
-def _convertLabel(lblStr, template):
+def _convertLabelOrBranch(lblStr, template):
     try:
         if not lblStr:
             return None
+        if lblStr[0] == '/':
+            v = versions.VersionFromString(lblStr)
+            if isinstance(v, versions.Branch):
+                return v
+            # Some day we could lift this restriction if its useful.
+            raise errors.ParseError('Cannot specify version to promote'
+                                    ' - must specify branch or label')
+
+
         hostName = template.getHost()
         nameSpace = template.getNamespace()
         tag = template.branch
@@ -92,18 +101,21 @@ def _convertLabel(lblStr, template):
     except Exception, msg:
         raise errors.ParseError('Error parsing %r: %s' % (lblStr, msg))
 
-def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
+def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
                   cloneSources = False, allFlavors = False, client=None):
-    labelMap = {}
-    for fromLabel, toLabel in labelList:
+    targetMap = {}
+    for fromLoc, toLoc in targetList:
         context = cfg.buildLabel
-        fromLabel = _convertLabel(fromLabel, context)
-        if fromLabel is not None:
-            context = fromLabel
-        toLabel = _convertLabel(toLabel, context)
-        labelMap[fromLabel] = toLabel
+        fromLoc = _convertLabelOrBranch(fromLoc, context)
+        if fromLoc is not None:
+            if isinstance(fromLoc, versions.Branch):
+                context = fromLoc.trailingLabel()
+            else:
+                context = fromLoc
+        toLoc = _convertLabelOrBranch(toLoc, context)
+        targetMap[fromLoc] = toLoc
 
     troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
 
@@ -132,7 +144,7 @@ def promoteTroves(cfg, troveSpecs, labelList, skipBuildInfo=False,
         callback = callbacks.CloneCallback()
 
     okay, cs = client.createSiblingCloneChangeSet(
-                           labelMap, trovesToClone,
+                           targetMap, trovesToClone,
                            updateBuildInfo=not skipBuildInfo,
                            infoOnly=info, callback=callback,
                            cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
