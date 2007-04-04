@@ -261,14 +261,18 @@ class Transport(xmlrpclib.Transport):
 	self.verbose = verbose
 
 	realhost = getrealhost(host)
-        if realhost == 'localhost':
+        targetIP = socket.gethostbyname(realhost)
+        hostIP = socket.gethostbyname(socket.gethostname())
+        localIP = '127.0.0.1'
+        if targetIP in (hostIP, localIP):
             # don't proxy localhost unless the proxy is running on
             # localhost as well
             proxyHost = None
+            proxyIP = None
             if self.proxies and 'http' in self.proxies:
                 proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
-
-            if proxyHost != 'localhost':
+                proxyIP = socket.gethostbyname(proxyHost)
+            if proxyIP not in (localIP, hostIP):
                 opener = XMLOpener({})
             else:
                 opener = XMLOpener(self.proxies)

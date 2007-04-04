@@ -34,6 +34,8 @@ Changes in @NEW@:
       glibc package. (CNY-1515)
     * Don't depend on the lookaside repos cache being defined for
       derived package recipe object initialization. (CNY-1509)
+    * Don't proxy when the host you're accessing is localhost
+      (even if it's being accessed by some other name)
 
 Changes in 1.1.19:
   o Client Changes:
