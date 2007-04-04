@@ -56,6 +56,7 @@ Changes in @NEW@:
       derived package recipe object initialization. (CNY-1509)
     * Don't proxy when the host you're accessing is localhost
       (even if it's being accessed by some other name)
+    * A bug in the freezing of update jobs was fixed. (CNY-1521)
 
 Changes in 1.1.19:
   o Client Changes:
