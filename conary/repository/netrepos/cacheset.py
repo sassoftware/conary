@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,33 +12,9 @@
 # full details.
 #
 
-python_files = __init__.py	\
-		cacheset.py	\
-		calllog.py	\
-		cltable.py	\
-		flavors.py	\
-		fsrepos.py	\
-		__init__.py	\
-		instances.py	\
-		items.py	\
-		keytable.py	\
-                netauth.py      \
-		netserver.py	\
-		proxy.py \
-		troveinfo.py	\
-		trovestore.py	\
-		versionops.py
+# this is a stub for old code that trys to instantiate a CacheSet
+# object
 
-extra_dist = Makefile
-dist_files = $(python_files) $(extra_dist)
-
-all: default-all
-
-install: pyfiles-install
-
-dist: default-dist
-
-clean: default-clean
-
-include ../../../Make.rules
-
+class CacheSet:
+    def __init__(self, *args, **kw):
+        pass
