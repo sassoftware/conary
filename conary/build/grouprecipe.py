@@ -2830,3 +2830,87 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
             return conflicts
         else:
             callback.done()
+
+
+def findSourcesForGroup(repos, recipeObj, callback=None):
+    """
+    Method to find all the sources contained in the group.
+    """
+    def _sourceSpec(troveSpec, source=None):
+        if source:
+            source = source.split(':')[0] + ':source'
+        else:
+            source = troveSpec[0].split(':')[0] + ':source'
+        troveSpec = (source, troveSpec[1], None)
+        return troveSpec
+
+    def _addFlavors(refSource, sourceSpec, flavor, flavorMap):
+        flavorMap.setdefault(refSource, {})
+        flavorMap[refSource].setdefault(sourceSpec, set()).add(flavor)
+
+    if callback is None:
+        callback = callbacks.CookCallback()
+
+    labelPath = recipeObj.getLabelPath()
+    searchFlavor = recipeObj.getSearchFlavor()
+
+    toFind = {}
+    flavorMap = {}
+    groupList = list(recipeObj.iterGroupList())
+
+    for group in groupList:
+        for (troveSpec, source, byDefault,
+             refSource, components) in group.iterAddSpecs():
+            flavorMap.setdefault(refSource, {})
+
+            sourceSpec = _sourceSpec(troveSpec, source)
+            toFind.setdefault(refSource, set()).add(sourceSpec)
+            _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)
+
+        for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
+            sourceSpec = _sourceSpec(troveSpec)
+            toFind.setdefault(ref, set()).add(sourceSpec)
+
+        for (troveSpec, ref), _ in group.iterReplaceSpecs():
+            sourceSpec = _sourceSpec(troveSpec)
+            flavorMap.setdefault(sourceSpec, []).append(troveSpec[2])
+            toFind.setdefault(ref, set()).add(sourceSpec)
+
+    results = {}
+
+    callback.findingTroves(len(list(chain(*toFind.itervalues()))))
+    for troveSource, troveSpecs in toFind.iteritems():
+        if troveSource is None:
+            source = repos
+            myLabelPath = labelPath
+            mySearchFlavor = searchFlavor
+        elif isinstance(troveSource, tuple):
+            source = repos
+            myLabelPath = troveSource
+            mySearchFlavor = searchFlavor
+        else:
+            source = troveSource
+            troveSource.findSources(repos,  labelPath, searchFlavor),
+            myLabelPath = None
+            mySearchFlavor = None
+        try:
+            # just drop missing troves.  They are probably packages
+            # created from another source, and if they didn't include a
+            # "source" line to point us to the right place, then they 
+            # should be including the original package anyway.
+            results[troveSource] = source.findTroves(myLabelPath,
+                                                     toFind[troveSource],
+                                                     mySearchFlavor,
+                                                     allowMissing=True)
+        except errors.TroveNotFound, e:
+            raise CookError, str(e)
+
+
+    finalResults = []
+    for troveSource, specMap in results.iteritems():
+        for troveSpec, tupList in specMap.iteritems():
+            flavors = flavorMap[troveSource][troveSpec]
+            for troveTup in tupList:
+                finalResults.extend((troveTup[0], troveTup[1], x)
+                                     for x in flavors)
+    return finalResults
