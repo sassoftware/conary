@@ -222,7 +222,7 @@ def getrealhost(host):
     """ Slice off username/passwd and portnum """
     atpoint = host.find('@') + 1
     colpoint = host.rfind(':')
-    if colpoint == -1:
+    if colpoint == -1 or colpoint < atpoint:
 	return host[atpoint:]
     else:
 	return host[atpoint:colpoint]
@@ -261,6 +261,8 @@ class Transport(xmlrpclib.Transport):
 	self.verbose = verbose
 
 	realhost = getrealhost(host)
+        # XXX: bug: what happens when we can't resolve here?
+        #      client will probably freak out
         targetIP = socket.gethostbyname(realhost)
         hostIP = socket.gethostbyname(socket.gethostname())
         localIP = '127.0.0.1'
