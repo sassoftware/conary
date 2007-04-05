@@ -976,6 +976,7 @@ class TroveStore:
         cu = self.db.cursor()
 
         schema.resetTable(cu, 'tmpRemovals')
+        schema.resetTable(cu, 'tmpInstances')
 
         cu.execute("""
                 SELECT instanceId, itemId, Instances.versionId,
@@ -1119,26 +1120,25 @@ class TroveStore:
 
         # look for troves referenced by this one
 
-        # Was this the only Instance for the node?
-        cu.execute("""
-            DELETE FROM Changelogs WHERE Changelogs.nodeId IN (
+        cu.execute("""INSERT INTO tmpInstances
                 SELECT Nodes.nodeId FROM tmpRemovals JOIN Nodes
                         USING (itemId, versionId)
                     LEFT OUTER JOIN Instances
                         USING (itemId, versionId)
                     WHERE
-                        Instances.itemId IS NULL)
+                        Instances.itemId IS NULL
+        """)
+
+        # Was this the only Instance for the node?
+        cu.execute("""
+            DELETE FROM Changelogs WHERE Changelogs.nodeId IN (
+                SELECT * FROM tmpInstances)
         """)
 
         cu.execute("""
             DELETE FROM Nodes WHERE Nodes.nodeId IN (
-                SELECT Nodes.nodeId FROM tmpRemovals JOIN Nodes
-                        USING (itemId, versionId)
-                    LEFT OUTER JOIN Instances
-                        USING (itemId, versionId)
-                    WHERE
-                        Instances.itemId IS NULL)
-        """)
+                SELECT * FROM tmpInstances)
+       """)
 
         # Now update the latest table
         self.versionOps.updateLatest(itemId, branchId, flavorId)
@@ -1195,13 +1195,17 @@ class TroveStore:
 
         # XXX It would be nice to narrow this down based on tmpRemovals, but
         # in reality the labels table never gets that big.
+        schema.resetTable(cu, 'tmpInstances')
+        cu.execute("""INSERT INTO tmpInstances
+             SELECT labelId FROM Labels
+                LEFT OUTER JOIN LabelMap USING (labelId)
+                WHERE
+                    LabelMap.labelId IS NULL AND
+                    Labels.labelId != 0
+        """)
+
         cu.execute("""
-            DELETE FROM Labels WHERE labelId IN (
-                SELECT labelId FROM Labels
-                    LEFT OUTER JOIN LabelMap USING (labelId)
-                    WHERE
-                        LabelMap.labelId IS NULL AND
-                        Labels.labelId != 0)
+            DELETE FROM Labels WHERE labelId IN (SELECT * from tmpInstances)
         """)
 
         # do we need these branchIds anymore?

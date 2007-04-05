@@ -322,6 +322,10 @@ class UpdateJob:
         ver = tup[0]
         if ver is None:
             ver = ''
+        elif not isinstance(ver, str):
+            # Make it a list (tuple would be better but XMLRPC will convert it
+            # to a list anyway)
+            ver = [ver.__class__.__name__, ver.asString()]
         flv = tup[1]
         if flv is None:
             flv = '\0'
@@ -333,6 +337,12 @@ class UpdateJob:
         ver = tup[0]
         if ver == '':
             ver = None
+        elif isinstance(ver, type([])):
+            if ver[0] == 'Version':
+                ver = versions.VersionFromString(ver[1])
+            else:
+                # This is not really something we know how to thaw.
+                ver = ver[1]
         flv = tup[1]
         if flv == '\0':
             flv = None

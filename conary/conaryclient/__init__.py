@@ -16,7 +16,7 @@ import os
 import pickle
 
 #conary imports
-from conary import conarycfg, metadata, rollbacks, trove
+from conary import conarycfg, errors, metadata, rollbacks, trove
 from conary.conaryclient import clone, resolve, update
 from conary.lib import log, util
 from conary.local import database
@@ -120,6 +120,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def setRepos(self, repos):
         self.repos = repos
 
+    def disconnectRepos(self):
+        self.repos = None
+
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
         md = {}
@@ -146,6 +149,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         # if the cache missed any, grab from the repos
         if not cacheOnly and troveList:
+            if self.repos is None:
+                raise errors.RepositoryError("Repository not available")
             md.update(self.repos.getMetadata(troveList, label))
             if md and cacheFile:
                 try:
@@ -264,6 +269,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         withFiles and withFileContents are the same as for the underlying
         repository call.
         """
+        if self.repos is None:
+            raise errors.RepositoryError("Repository not available")
         (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
                 excludeList = excludeList, callback = callback)
@@ -299,6 +306,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @type callback: callbacks.UpdateCallback
         """
 
+        if self.repos is None:
+            raise errors.RepositoryError("Repository not available")
         (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
                 excludeList = excludeList, callback = callback)
@@ -327,6 +336,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @param version: a conary client version object, L{versions.Version}
         @param flavor: a conary client flavor object, L{deps.deps.Flavor}
         """        
+        if self.repos is None:
+            raise errors.RepositoryError("Repository not available")
         return self.repos.getConaryUrl(version, flavor)
 
     def getRepos(self):

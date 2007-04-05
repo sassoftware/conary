@@ -142,6 +142,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
     def unpackSources(self, builddir, destdir, resume=None,
                       downloadOnly=False):
+
+        repos = self.laReposCache.repos
         if self.parentVersion:
             try:
                 parentRevision = versions.Revision(self.parentVersion)
@@ -169,14 +171,14 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         if parentRevision:
             parentVersion = parentBranch.createVersion(parentRevision)
 
-            d = self.repos.getTroveVersionFlavors({ self.name :
+            d = repos.getTroveVersionFlavors({ self.name :
                                 { parentVersion : [ None ] } } )
             if self.name not in d:
                 raise builderrors.RecipeFileError(
                         'Version %s of %s not found'
                                     % (parentVersion, self.name) )
         else:
-            d = self.repos.getTroveLeavesByBranch(
+            d = repos.getTroveLeavesByBranch(
                     { self.name : { parentBranch : [ None ] } } )
 
             if not d[self.name]:
@@ -218,7 +220,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         # the build count to None.
         v = parentVersion.copy()
         v.trailingRevision()._setBuildCount(None)
-        binaries = self.repos.getTrovesBySource(self.name + ':source', v)
+        binaries = repos.getTrovesBySource(self.name + ':source', v)
 
         # Filter out older ones
         binaries = [ x for x in binaries \
@@ -229,7 +231,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
                         for x in binaries ]
 
-        self.cs = self.repos.createChangeSet(troveSpec, recurse = False)
+        self.cs = repos.createChangeSet(troveSpec, recurse = False)
         self.addLoadedTroves([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
             in self.cs.iterNewTroveList() ])
@@ -252,8 +254,6 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                                         lightInstance = lightInstance)
 
         log.info('Warning: Derived packages are experimental and subject to change')
-
-        self.repos = laReposCache.repos
 
         self._addBuildAction('Ant', build.Ant)
         self._addBuildAction('Automake', build.Automake)

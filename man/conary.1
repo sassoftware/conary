@@ -360,6 +360,9 @@ All file display options imply --recurse.  All extended file display options imp
 .B \-\-file-deps
 Displays the individual provides and requires for each file.  If a file has no dependencies, no information will be displayed.
 .TP
+.B \-\-file-flavors
+Displays the flavor for each file listed.
+.TP
 .B \-\-file-versions
 Displays the version of each file listed.
 .TP
@@ -515,7 +518,7 @@ installed version of the group being migrated (often group-os or group-dist).
 .B sync [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Update the children of \fItrovename\fP so that the versions of the child
 troves match the version specified by the parent trove.
-By default, the the specified trove itself is updated first, and
+By default, the specified trove itself is updated first, and
 then children are synced to the new trove.
 
 Arguments include
@@ -529,7 +532,7 @@ themselves are not touched.
 .TP
 .B \-\-full
 Erase packages and components that are children of the specified troves and 
-would not be installed if the the specified troves were being installed for the first time.  For example, :debuginfo components are not installed by default.
+would not be installed if the specified troves were being installed for the first time.  For example, :debuginfo components are not installed by default.
 If you used this option when syncing a package and you had its :debuginfo 
 component installed, that component would get erased.
 .TP 4

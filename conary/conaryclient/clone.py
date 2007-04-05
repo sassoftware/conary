@@ -94,38 +94,24 @@ class ClientClone:
                              infoOnly=False, fullRecurse=False,
                              cloneSources=False, callback=None, 
                              trackClone=True):
-        """
-        """
-        if callback is None:
-            callback = callbacks.CloneCallback()
-        callback.determiningCloneTroves()
+        targetMap = dict((x[1].branch(), targetBranch) for x in troveList)
+        return self.createTargetedCloneChangeSet(targetMap,
+                                               troveList,
+                                               fullRecurse=fullRecurse,
+                                               cloneSources=cloneSources,
+                                               trackClone=trackClone,
+                                               callback=callback,
+                                               message=message,
+                                               updateBuildInfo=updateBuildInfo,
+                                               infoOnly=infoOnly)
 
-        # make sure there are no zeroed timeStamps - targetBranch may be
-        # a user-supplied string
-        targetBranch = targetBranch.copy()
-        targetBranch.resetTimeStamps()
-
-        cloneOptions = CloneOptions(
-                            fullRecurse=fullRecurse,
-                            cloneSources=cloneSources,
-                            trackClone=trackClone,
-                            callback=callback,
-                            message=message,
-                            updateBuildInfo=updateBuildInfo,
-                            infoOnly=infoOnly)
-
-
-        branchMap = dict((x[1].branch(), targetBranch) for x in troveList)
-        chooser = BranchCloneChooser(branchMap, troveList, cloneOptions)
-        return self._createCloneChangeSet(chooser, cloneOptions)
-
-    def createSiblingCloneChangeSet(self, labelMap, troveList,
-                                    updateBuildInfo=True, infoOnly=False,
-                                    callback=None, message=DEFAULT_MESSAGE,
-                                    trackClone=True,
-                                    cloneOnlyByDefaultTroves=False,
-                                    cloneSources=True):
-        cloneOptions = CloneOptions(fullRecurse=True,
+    def createTargetedCloneChangeSet(self, targetMap, troveList,
+                                     updateBuildInfo=True, infoOnly=False,
+                                     callback=None, message=DEFAULT_MESSAGE,
+                                     trackClone=True, fullRecurse=True,
+                                     cloneOnlyByDefaultTroves=False,
+                                     cloneSources=True):
+        cloneOptions = CloneOptions(fullRecurse=fullRecurse,
                             cloneSources=cloneSources,
                             trackClone=trackClone,
                             callback=callback,
@@ -133,8 +119,10 @@ class ClientClone:
                             cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
                             updateBuildInfo=updateBuildInfo,
                             infoOnly=infoOnly)
-        chooser = CloneChooser(labelMap, troveList, cloneOptions)
+        chooser = CloneChooser(targetMap, troveList, cloneOptions)
         return self._createCloneChangeSet(chooser, cloneOptions)
+    # bw compatibility
+    createSiblingCloneChangeSet = createTargetedCloneChangeSet
 
     def _createCloneChangeSet(self, chooser, cloneOptions):
         callback = cloneOptions.callback
@@ -543,14 +531,15 @@ class ClientClone:
     def _rewriteTrove(self, trv, newVersion, chooser, cloneMap,
                       cloneJob, leafMap, troveCache):
         filesNeeded = []
-        troveName, troveFlavor = trv.getName(), trv.getFlavor()
+        troveName, troveVersion, troveFlavor = trv.getNameVersionFlavor()
+        troveBranch = troveVersion.branch()
         targetBranch = newVersion.branch()
 
         needsNewVersions = []
         # if this is a clone of a clone, use the original clonedFrom value
         # so that all clones refer back to the source-of-all-clones trove
         if cloneJob.options.trackClone:
-            trv.troveInfo.clonedFrom.set(trv.getVersion())
+            trv.troveInfo.clonedFrom.set(troveVersion)
 
         # clone the labelPath
         labelPath = list(trv.getLabelPath())
@@ -565,6 +554,7 @@ class ClientClone:
         # look through files which aren't already on the right host for
         # inclusion in the change set
         newVersionHost = newVersion.trailingLabel().getHost()
+        newBranch = newVersion.branch()
         for (pathId, path, fileId, version) in trv.iterFileList():
             if version.getHost() != newVersionHost:
                 filesNeeded.append((pathId, fileId, version))
@@ -577,7 +567,7 @@ class ClientClone:
                 _updateVersion(trv, mark, None)
 
         for (pathId, path, fileId, version) in trv.iterFileList():
-            if chooser.fileNeedsRewrite(version):
+            if chooser.fileNeedsRewrite(troveBranch, targetBranch, version):
                 needsNewVersions.append((pathId, path, fileId))
 
         # need to be reversioned
@@ -763,9 +753,20 @@ class TroveCache(object):
         return self.getTroves([troveTup], withFiles=withFiles)[0]
 
 class CloneChooser(object):
-    def __init__(self, labelMap, primaryTroveList, cloneOptions):
+    def __init__(self, targetMap, primaryTroveList, cloneOptions):
+        # make sure there are no zeroed timeStamps - branches may be
+        # user-supplied string
+        newMap = {}
+        for key, value in targetMap.iteritems():
+            if isinstance(key, versions.Branch):
+                key = key.copy()
+                key.resetTimeStamps()
+            if isinstance(value, versions.Branch):
+                value = value.copy()
+                value.resetTimeStamps()
+            newMap[key] = value
         self.primaryTroveList = primaryTroveList
-        self.labelMap = labelMap
+        self.targetMap = newMap
         self.byDefaultMap = None
         self.options = cloneOptions
 
@@ -793,8 +794,9 @@ class CloneChooser(object):
         if self.byDefaultMap is not None:
             if troveTup not in self.byDefaultMap:
                 return False
-        if (version.trailingLabel() not in self.labelMap
-            and None not in self.labelMap):
+        if (version.branch() not in self.targetMap and
+            version.trailingLabel() not in self.targetMap
+            and None not in self.targetMap):
             return False
         if name.endswith(':source'):
             if self.options.cloneSources:
@@ -817,13 +819,21 @@ class CloneChooser(object):
 
     def getTargetBranch(self, version):
         sourceLabel = version.trailingLabel()
-        if sourceLabel in self.labelMap:
-            targetLabel = self.labelMap[sourceLabel]
+        sourceBranch = version.branch()
+        if sourceBranch in self.targetMap:
+            target = self.targetMap[sourceBranch]
+        elif sourceLabel in self.targetMap:
+            target = self.targetMap[sourceLabel]
         else:
-            targetLabel = self.labelMap.get(None, None)
-        if targetLabel is None: 
+            target = self.targetMap.get(None, None)
+        if target is None:
             return None
-        return version.branch().createSibling(targetLabel)
+
+        if isinstance(target, versions.Label):
+            return sourceBranch.createSibling(target)
+        elif isinstance(target, versions.Branch):
+            return target
+        assert(0)
 
     def troveInfoNeedsRewrite(self, mark, troveTup):
         targetBranch = self.getTargetBranch(troveTup[1])
@@ -844,9 +854,17 @@ class CloneChooser(object):
             return False
         return self.options.updateBuildInfo
 
-    def fileNeedsRewrite(self, version):
-        targetBranch = self.getTargetBranch(version)
-        return targetBranch and version.branch() != targetBranch
+    def fileNeedsRewrite(self, troveBranch, targetBranch, fileVersion):
+        if fileVersion.depth() == targetBranch.depth():
+            # if the file is on /A and we're cloning to /C, then that needs
+            # to be rewritten.  If we're on /C already, no rewriting necessary
+            return fileVersion.branch() != targetBranch
+        # if the fileVersion is at some level that's deeper than
+        # the target branch - say, the file is on /A//B and the clone
+        # is being made to /A, then the file must be rewritten.
+        # If, instead, the file on /A and the clone is being made to 
+        # /A//B, then the file is ok.
+        return fileVersion.depth() > targetBranch.depth()
 
     def troveInfoNeedsErase(self, mark, troveTup):
         kind = mark[0]
@@ -857,32 +875,6 @@ class CloneChooser(object):
             return False
         return (self.byDefaultMap is not None 
                 and troveTup not in self.byDefaultMap)
-
-class BranchCloneChooser(CloneChooser):
-    def __init__(self, branchMap, troveList, cloneOptions):
-        CloneChooser.__init__(self, {}, troveList, cloneOptions)
-        self.branchMap = branchMap
-
-    def shouldClone(self, troveTup, sourceName=None):
-        # FIXME: this needs to share more with CloneMap.
-        name, version, flavor = troveTup
-        if self.byDefaultMap is not None:
-            if troveTup not in self.byDefaultMap:
-                return False
-
-        if troveTup[0].endswith(':source'):
-            if self.options.cloneSources:
-                return True
-        elif self.options.fullRecurse:
-            return True
-        return self._matchesPrimaryTrove(troveTup, sourceName)
-
-    def getTargetBranch(self, version):
-        sourceBranch = version.branch()
-        if sourceBranch in self.branchMap:
-            return self.branchMap[version.branch()]
-        return self.branchMap.get(None, None)
-
 
 class CloneMap(object):
     def __init__(self):
@@ -947,10 +939,13 @@ class CloneMap(object):
     def target(self, troveTup, targetVersion):
         oldBranch = troveTup[1].branch()
         targetBranch = targetVersion.branch()
-        if not (targetBranch.isAncestor(oldBranch) 
+        while targetBranch.depth() < oldBranch.depth():
+            oldBranch = oldBranch.parentBranch()
+        if not (targetBranch == oldBranch
                 or targetBranch.isSibling(oldBranch)):
-            raise CloneError("clone only supports cloning troves to "
-                             "parent and sibling branches")
+            raise CloneError("clone only supports cloning troves to sibling "
+                             "branches, parents, and siblings of parent"
+                             " branches")
         self.targetMap[troveTup] = targetVersion
 
     def getTargetVersion(self, troveTup):

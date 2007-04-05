@@ -806,6 +806,10 @@ class UserGroupIdCache:
 	self.name = name
 	self.nameCache = { 'root' : 0 }
 	self.idCache = { 0 : 'root' }
+        # Make sure that the resolver is initialized outside the chroot
+        # (if any) so that the correct configuration and libraries are
+        # loaded. (CNY-1515)
+        nameLookupFn('root')
 	
 userCache = UserGroupIdCache('user', pwd.getpwnam, pwd.getpwuid)
 groupCache = UserGroupIdCache('group', grp.getgrnam, grp.getgrgid)

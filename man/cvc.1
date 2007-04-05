@@ -245,14 +245,8 @@ into the shadow.
 If <revision> is specified, changes made to the upstream branch up to that 
 revision will be made.  Revision may be specified as either as the upstream version or the <upstream version>-<source count>.  For convenience when cutting and pasting, a full version is accepted, but the full version must be on correct parent branch.
 .TP
-.B promote [\fIpackage/groupname\fP[=\fIversion\fP][\fI<flavor>\fP]]+ [\fIfromLabel\fP--\fItoLabel\fP]+
+.B promote [\fIpackage/groupname\fP[=\fIversion\fP][\fI<flavor>\fP]]+ [\fIfromLoc\fP--\fItoLoc\fP]+
 Clones (copies) a set of packages from one set of labels to another.
-
-If a group is specified, then the group will be searched through for packages that start on a fromLabel, and all such packages will be cloned to the matching
-toLabel.  If a package is specified and it matches a from label, then it will be cloned to the matching toLabel.
-
-Sources are always cloned with binaries.  
-
 
 Clones a trove from one repository to another. This is similar to shadowing in
 that it creates a new trove with information from another. However, unlike
@@ -260,6 +254,21 @@ shadowing, cloning will not create a new label on the target branch and it is
 not possible to merge changes (see "merge" later in this document) with clone.
 The commit will appear to originate from the individual who last committed the
 trove being cloned.
+
+fromLoc and toLoc and be one of the following forms:
+<branch> - /conary.rpath.com@rpl:devel//1, e.g.
+<label> - conary.rpath.com@rpl:devel, e.g.
+<partial label> - @rpl:devel, :devel, e.g.
+
+If the partial label is used, the missing parts of the label are filled in 
+as follows: fromLoc uses the current buildLabel to fill in its missing components.  ToLoc uses the fromLoc to fill in the missing parts.  So, for example, if the buildLabel were conary.rpath.com@rpl:1, then :1--:2 would promot troves from conary.rpath.com@rpl:1 to conary.rpath.com@rpl:2, where raa.rpath.org@rpl:branch--@fl:1 would promote troves from raa.rpath.org@rpl:branch to raa.rpath.org@fl:1.
+
+If a group is specified, then the group will be searched through for packages that start on a fromLoc, and all such packages will be cloned to the matching
+toLoc.  If a package is specified and it matches a from label, then it will be cloned to the matching toLoc.
+
+Sources are always cloned with binaries.
+
+There are limits to the promotes one can make - one can clone between siblings - from /A//B to /A//C, for example, or uphill to parents - from /A//B to /A, or to siblings of parents - from /A//B/C to /A//D, or from /A//B//C to /D. One cannot clone from branch /A//B to /C//D, because there is no relationship between the parents of these two branches, /A != /C.  All promotes other than sibling promotes must be specified via branches.
 .TP 4
 .B \-\-all-flavors
 Clone all flavors for the latest versions of the specified troves.

@@ -39,8 +39,9 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                      info = False, digSigs = False, deps = False,
                      showBuildReqs = False, all = False,
                      # file options
-                     ls = False, lsl = False, ids = False, sha1s = False, 
+                     ls = False, lsl = False, ids = False, sha1s = False,
                      tags = False, fileDeps = False, fileVersions = False,
+                     fileFlavors = False,
                      # collection options
                      showTroves = False, recurse = None, showAllTroves = False,
                      weakRefs = False, showTroveFlags = False,
@@ -89,14 +90,15 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                              fullVersions=cfg.fullVersions, 
                              )
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
-                            fileDeps=fileDeps, fileVersions=fileVersions)
+                            fileDeps=fileDeps, fileVersions=fileVersions,
+                            fileFlavors=fileFlavors)
 
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:
             # if we didn't explicitly set recurse and we're not recursing one
             # level explicitly 
             recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
-                               fileVersions)
+                               fileVersions, fileFlavors)
 
         dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = showAllTroves,
@@ -127,7 +129,8 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
 
 
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
-                            fileDeps=fileDeps, fileVersions=fileVersions)
+                            fileDeps=fileDeps, fileVersions=fileVersions,
+                            fileFlavors=fileFlavors)
 
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:
@@ -135,7 +138,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
             # level explicitly and we specified troves (so everything won't 
             # show up at the top level anyway), guess at whether to recurse
             recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
-                               fileVersions)
+                               fileVersions, fileFlavors)
 
         dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = showAllTroves,

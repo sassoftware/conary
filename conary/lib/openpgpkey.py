@@ -82,9 +82,8 @@ class OpenPGPKey:
         return r
 
     def _getRelPrime(self, q):
-        # We /dev/random instead of /dev/urandom. This was not a mistake;
-        # we want the most random data available. use os module to ensure
-        # reads are unbuffered.
+        # Use os module to ensure reads are unbuffered so as not to
+        # artifically deflate entropy
         randFD = os.open('/dev/urandom', os.O_RDONLY)
         b = self._bitLen(q)/8 + 1
         r = 0L
