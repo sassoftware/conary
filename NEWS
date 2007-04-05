@@ -1,3 +1,19 @@
+Changes in @NEW@:
+  o Internal Changes:
+    * StreamSet operations in C now use a common StreamSet_GetSSD()
+      function which creates the _streamDict object if it does not yet
+      exist.  This fixes crashes in rare cases where a
+      StreamSet.find() class method is used before any instances of
+      that StreamSet have been created. (CNY-1524)
+
+  o Repository Changes:
+    * Add hidden flag to commitChangeSet() and hasTroves(), which allows
+      mirror users to commit troves which will never be displayed to users.
+      The presentHiddenTroves() call makes all hidden troves visible. Bumped
+      protocol version to 46.
+    * Fixed bug in commitChangeSet which gave a "file not found" error on commit
+      when the user had insufficient permission for the commit operation.
+
 Changes in 1.1.20:
   o Major Changes:
     * Groups can now include scripts which are automatically run

@@ -540,14 +540,18 @@ class ProxyRepositoryServer(ChangesetFilter):
             fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
             if self.contents.hasFile(fileId + '-c'):
                 path = self.contents.hashToPath(fileId + '-c')
+                pathfd = None
                 try:
-                    # touch the file; we don't want it to be removed
-                    # by a cleanup job when we need it
-                    os.open(path, os.O_RDONLY)
-                    hasFiles.append((encFileId, encVersion))
-                    continue
-                except OSError:
-                    pass
+                    try:
+                        # touch the file; we don't want it to be removed
+                        # by a cleanup job when we need it
+                        pathfd = os.open(path, os.O_RDONLY)
+                        hasFiles.append((encFileId, encVersion))
+                        continue
+                    except OSError:
+                        pass
+                finally:
+                    if pathfd: os.close(pathfd)
 
             neededFiles.append((encFileId, encVersion))
 

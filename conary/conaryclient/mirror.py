@@ -141,7 +141,7 @@ def filterAlreadyPresent(repos, troveList):
     # possible that something new got committed with the same mark we
     # last updated to, so we have to look again at all of the troves in the
     # source repository with the last mark which made it into our target.
-    present = repos.hasTroves([ x[1] for x in troveList ])
+    present = repos.hasTroves([ x[1] for x in troveList ], mirror = True)
     filteredList = [ x for x in troveList if not present[x[1]] ]
 
     return filteredList
