@@ -2788,7 +2788,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         FROM (
            SELECT COUNT(instanceId) AS c
            FROM Instances
-           WHERE Instances.isPresent = ?
+           WHERE Instances.isPresent != ?
              AND Instances.changed >= ?
            GROUP BY changed
            HAVING COUNT(instanceId) > 1
@@ -2836,14 +2836,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Versions ON Versions.versionId = Instances.versionId
         JOIN Flavors ON Flavors.flavorId = Instances.flavorId
         WHERE Instances.changed >= ?
-          AND Instances.isPresent = ?
+          AND Instances.isPresent != ?
         ORDER BY Instances.changed
         LIMIT %d
-        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount,
-               instances.INSTANCE_PRESENT_HIDDEN)
+        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
 
-        cu.execute(query, mark)
-        self.log(4, "executing query", query, mark)
+        cu.execute(query, (mark, instances.INSTANCE_PRESENT_HIDDEN))
+        self.log(4, "executing query", query, mark, instances.INSTANCE_PRESENT_HIDDEN)
         l = set()
 
         for pattern, name, version, flavor, timeStamps, mark, troveType in cu:
