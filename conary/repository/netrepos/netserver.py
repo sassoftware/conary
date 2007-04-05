@@ -2404,7 +2404,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         try:
             existingSigs = trv.getDigitalSignature(fingerprint)
 
-            if existingSigs == sigs:
+            if (set(x.version() for x in existingSigs) ==
+                set(x.version() for x in sigs)):
                 raise errors.AlreadySignedError("Trove already signed by key")
         except KeyNotFound:
             pass
