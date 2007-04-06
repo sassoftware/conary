@@ -395,7 +395,7 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
 	unsigned long long lval;
-	if (!PyLong_Check(pval)) {
+	if (!PyLong_Check(pval) && !PyInt_Check(pval)) {
 	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
 	}
@@ -417,9 +417,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
 
-        if (frozenLen != 4) {
+        if (frozenLen && frozenLen != 4) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen int stream must be 4 bytes long");
+                    "Frozen int stream must be 4 bytes long or empty");
             return 0;
         }
 
@@ -430,9 +430,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
 
-        if (frozenLen != 2) {
+        if (frozenLen && frozenLen != 2) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen short stream must be 2 bytes long");
+                    "Frozen short stream must be 2 bytes long or empty");
             return 0;
         }
 
@@ -443,9 +443,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     } else if (STREAM_CHECK(self, BYTE_STREAM)) {
         ByteStreamObject * o = (void *) self;
 
-        if (frozenLen != 1) {
+        if (frozenLen && frozenLen != 1) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen byte stream must be 1 byte long");
+			    "Frozen byte stream must be 1 byte long or empty");
             return 0;
         }
 
@@ -456,9 +456,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
 
-        if (frozenLen != 8) {
+        if (frozenLen && frozenLen != 8) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen long long stream must be 8 byte long");
+                    "Frozen long long stream must be 8 bytes long or empty");
             return 0;
         }
 
