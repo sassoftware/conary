@@ -399,7 +399,10 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
 	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
 	}
-	lval = PyLong_AsUnsignedLongLong(pval);
+	if (PyLong_Check(pval))
+	    lval = PyLong_AsUnsignedLongLong(pval);
+	else
+	    lval = PyInt_AsLong(pval);
         o->val = lval;
     } else {
         PyErr_SetString(PyExc_TypeError, "invalid type");
