@@ -359,12 +359,15 @@ def _updateTroves(cfg, applyList, **kwargs):
     applyKwargs['localRollbacks'] = cfg.localRollbacks
     applyKwargs['autoPinList'] = cfg.pinTroves
 
-
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
     migrate = kwargs.get('migrate', False)
     forceMigrate = kwargs.pop('forceMigrate', False)
-    restartInfo = kwargs.pop('restartInfo', None)
+    restartInfo = kwargs.get('restartInfo', None)
+
+    # Initialize the critical update set
+    applyCriticalOnly = kwargs.get('applyCriticalOnly', False)
+    kwargs['criticalUpdateInfo'] = CriticalUpdateInfo(applyCriticalOnly)
 
     info = applyKwargs.pop('info', False)
 

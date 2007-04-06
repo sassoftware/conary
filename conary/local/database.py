@@ -371,7 +371,7 @@ class UpdateJob:
             for i in self._jobPreScripts:
                 yield i
 
-    def splitCriticalJob(self):
+    def splitCriticalJobs(self):
         criticalJobs = self.getCriticalJobs()
         if not criticalJobs:
             return [], self.getJobs()
