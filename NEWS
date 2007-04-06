@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.21:
   o Repository Changes:
     * A "hidden" keyword argument has been added to the
       commitChangeSet() and hasTroves() method.  This allows mirror
