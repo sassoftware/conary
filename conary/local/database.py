@@ -371,6 +371,28 @@ class UpdateJob:
             for i in self._jobPreScripts:
                 yield i
 
+    def splitCriticalJob(self):
+        criticalJobs = self.getCriticalJobs()
+        if not criticalJobs:
+            return [], self.getJobs()
+        jobs = self.getJobs()
+        firstCritical = criticalJobs[0]
+        criticalJobs = jobs[:firstCritical + 1]
+        remainingJobs = jobs[firstCritical + 1:]
+        return criticalJobs, remainingJobs
+
+    def loadCriticalJobsOnly(self):
+        """Loads the critical jobs and returns the remaining jobs to be
+        performed"""
+        criticalJobs, remainingJobs = self.splitCriticalJobs()
+        if not criticalJobs:
+            # No critical jobs, so nothing remaining
+            return []
+        self.setJobs(criticalJobs)
+        # This update job no longer has critical update jobs
+        self.setCriticalJobs([])
+        return remainingJobs
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
