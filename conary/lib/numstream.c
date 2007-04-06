@@ -368,44 +368,33 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
 	Py_INCREF(Py_None);
 	return Py_None;
     }
-    if (STREAM_CHECK(self, INT_STREAM)) {
-        IntStreamObject * o = (void *) self;
-	if (!PyInt_Check(pval)) {
+    if (STREAM_CHECK(self, INT_STREAM)
+	|| STREAM_CHECK(self, SHORT_STREAM)
+	|| STREAM_CHECK(self, BYTE_STREAM)) {
+	PyObject *ival;
+	if (!PyNumber_Check(pval)) {
 	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
 	}
-	val = PyInt_AsLong(pval);
-        o->val = val;
-    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
-        ShortStreamObject * o = (void *) self;
-	if (!PyInt_Check(pval)) {
-	    PyErr_SetString(PyExc_TypeError, "invalid type");
-	    return NULL;
-	}
-	val = PyInt_AsLong(pval);
-        o->val = val;
-    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
-        ByteStreamObject * o = (void *) self;
-	if (!PyInt_Check(pval)) {
-	    PyErr_SetString(PyExc_TypeError, "invalid type");
-	    return NULL;
-	}
-	val = PyInt_AsLong(pval);
-        o->val = val;
+	ival = PyNumber_Int(pval);
+	val = PyInt_AsLong(ival);
+	NUMERICSTREAM_SET(self, val);
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
 	unsigned long long lval;
-	if (!PyLong_Check(pval) && !PyInt_Check(pval)) {
+	if (!PyLong_Check(pval) && !PyNumber_Check(pval)) {
 	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
 	}
 	if (PyLong_Check(pval))
 	    lval = PyLong_AsUnsignedLongLong(pval);
-	else
-	    lval = PyInt_AsLong(pval);
+	else {
+	    PyObject *ival = PyNumber_Int(pval);
+	    lval = PyInt_AsLong(ival);
+	}
         o->val = lval;
     } else {
-        PyErr_SetString(PyExc_TypeError, "invalid type");
+        PyErr_SetString(PyExc_TypeError, "unknown numeric stream type");
         return NULL;
     }
 
