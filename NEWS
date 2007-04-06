@@ -4,6 +4,12 @@ Changes in @NEW@:
       update set and restart before applying the rest of the updates,
       two new API calls have been added: createUpdateJob and
       applyUpdateJob. (CNY-1454)
+  o Bug Fixes:
+    * Fixed a bug in proxy code that would cause conary to use https through
+      the proxy when http was desired (CNY-1530)
+    * Fixed a bug in clone/promote relating to cloning when there are flavors
+      on the clone label that are superset of the current flavor, but the 
+      current flavor doesn't exist. (RMK-415)
 
 Changes in 1.1.21:
   o Repository Changes:

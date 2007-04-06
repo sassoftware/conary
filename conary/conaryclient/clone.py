@@ -990,8 +990,11 @@ class LeafMap(object):
     def getLeafVersion(self, name, targetBranch, flavor):
         if (name, targetBranch, flavor) not in self.branchMap:
             return None
-        troveList = self.branchMap[name, targetBranch, flavor]
-        return sorted(troveList)[-1][1]
+        troveList = [ x for x in self.branchMap[name, targetBranch, flavor] 
+                      if x[2] == flavor ]
+        if troveList:
+            return sorted(troveList)[-1][1]
+        return None
 
     def hasAncestor(self, troveTup, targetBranch, repos):
         newVersion = troveTup[1]
