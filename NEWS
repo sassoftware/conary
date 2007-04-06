@@ -1,10 +1,34 @@
-Changes in @NEW@:
+Changes in 1.1.21:
+  o Repository Changes:
+    * A "hidden" keyword argument has been added to the
+      commitChangeSet() and hasTroves() method.  This allows mirror
+      users to commit troves which will never be displayed to users.
+      The presentHiddenTroves() call makes all hidden troves
+      visible.  The XML-RPC protocol version is now 46.
+
   o Internal Changes:
     * StreamSet operations in C now use a common StreamSet_GetSSD()
       function which creates the _streamDict object if it does not yet
       exist.  This fixes crashes in rare cases where a
       StreamSet.find() class method is used before any instances of
       that StreamSet have been created. (CNY-1524)
+    * Numeric StreamSet types can now have values set to None (which
+      indicates that there is no value set at all).  Additionally, if
+      passed an empty string to the thaw() method, the value is set to
+      None. (CNY-1366)
+
+  o Bug Fixes:
+    * A bug in commitChangeSet() which returned a "file not found"
+      error when the user had insufficient permission for the commit
+      operation has been fixed.
+    * A bug that caused Conary to raise an unhandled exception when
+      updating a trove that has missing TroveInfo data in the local
+      database.  When new types are added to TroveInfo, older versions
+      of Conary omit the new data from the database.  Once a version
+      of Conary is used that understands the new data types, the
+      missing data is restored to the previously incomplete trove.
+    * Handling user permissions when committing under certain 
+      circumstances against a Conary 1.1.20 was fixed. (CNY-1488)
 
 Changes in 1.1.20:
   o Major Changes:

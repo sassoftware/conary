@@ -49,10 +49,12 @@ generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(py
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
              stringstream.c cstreams.h filename_wrapper.c Makefile
 libelf = $(shell \
-if [ -x /usr/bin/pkg-config -a -d /usr/include/libelf-lgpl ]; then \
+if [ -x /usr/bin/pkg-config ] && /usr/bin/pkg-config --exists libelf; then \
     pkg-config --cflags --libs libelf; \
 elif [ -d /usr/include/libelf-lgpl ]; then \
     echo "-I/usr/include/libelf-lgpl -lelf-lgpl"; \
+elif [ -d ${SYSROOT}/usr/include/libelf-lgpl ]; then \
+    echo "-I${SYSROOT}/usr/include/libelf-lgpl -lelf-lgpl"; \
 else \
     echo -lelf; \
 fi)

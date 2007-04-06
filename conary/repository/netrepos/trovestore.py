@@ -98,15 +98,15 @@ class TroveStore:
         return itemId
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
-                      troveType, isPresent = True):
+                      troveType, isPresent = instances.INSTANCE_PRESENT_NORMAL):
  	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
                                          clonedFromId,
 					 troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
-        if isPresent:
-	    self.instances.setPresent(theId, 1)
+        if isPresent != instances.INSTANCE_PRESENT_MISSING:
+	    self.instances.setPresent(theId, isPresent)
             self.items.setTroveFlag(itemId, 1)
  	return theId
 
@@ -214,22 +214,38 @@ class TroveStore:
         cu = self.db.cursor()
         cu.execute("SELECT DISTINCT Items.item as item "
                    " FROM Instances JOIN Items USING(itemId) "
-                   " WHERE Instances.isPresent=1 ORDER BY item");
+                   " WHERE Instances.isPresent = ? ORDER BY item",
+                   INSTANCES_PRESENT_NORMAL);
 
         for (item,) in cu:
             yield item
 
-    def addTrove(self, trv):
+    def presentHiddenTroves(self):
+        cu = self.db.cursor()
+
+        cu.execute("""
+            SELECT Instances.instanceId, Instances.itemId,
+                   Nodes.branchId, Instances.flavorId
+                FROM Instances JOIN Nodes USING (itemId, versionId)
+                WHERE isPresent = ?
+        """, instances.INSTANCE_PRESENT_HIDDEN)
+
+        for (instanceId, itemId, branchId, flavorId) in cu.fetchall():
+            cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=?",
+                       instances.INSTANCE_PRESENT_NORMAL, instanceId)
+            self.versionOps.updateLatest(itemId, branchId, flavorId)
+
+    def addTrove(self, trv, hidden = False):
 	cu = self.db.cursor()
 
         schema.resetTable(cu, 'NewFiles')
         schema.resetTable(cu, 'NeededFlavors')
         schema.resetTable(cu, 'newTroveTroves')
 
-	return (cu, trv)
+	return (cu, trv, hidden)
 
     def addTroveDone(self, troveInfo):
-	(cu, trv) = troveInfo
+	(cu, trv, hidden) = troveInfo
 
         self.log(3, trv)
 
@@ -321,10 +337,14 @@ class TroveStore:
 
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
+        if hidden:
+            presence = instances.INSTANCE_PRESENT_HIDDEN
+        else:
+            presence = instances.INSTANCE_PRESENT_NORMAL
+
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
-					     troveFlavorId, clonedFromId,
-                                             trv.getType(),
-                                             isPresent = True)
+                         troveFlavorId, clonedFromId, trv.getType(),
+                         isPresent = presence)
         assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
@@ -465,9 +485,8 @@ class TroveStore:
                                                 updateLatest = False)
 
             instanceId = self.getInstanceId(itemId, versionId, flavorId,
-                                            clonedFromId,
-                                            trv.isRedirect(),
-                                            isPresent = False)
+                                clonedFromId, trv.isRedirect(),
+                                isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""
         INSERT INTO TroveTroves (instanceId, includedId, flags)
@@ -594,7 +613,8 @@ class TroveStore:
         md["language"] = language
         return metadata.Metadata(md)
 
-    def hasTrove(self, troveName, troveVersion = None, troveFlavor = None):
+    def hasTrove(self, troveName, troveVersion = None, troveFlavor = None,
+                 hidden = False):
         self.log(3, troveName, troveVersion, troveFlavor)
 
 	if not troveVersion:
@@ -657,9 +677,10 @@ class TroveStore:
                                 I.flavorId = flavors.flavorId AND
                                 I.itemId = Nodes.itemId AND
                                 I.versionId = Nodes.versionId AND
-                                I.isPresent = 1
+                                I.isPresent = ?
                             ORDER BY
-                                gtl.idx""" % self.db.keywords)
+                                gtl.idx""" % self.db.keywords,
+                        instances.INSTANCE_PRESENT_NORMAL)
 
         troveIdList = [ x for x in cu ]
 

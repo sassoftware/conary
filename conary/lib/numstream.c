@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005 rPath, Inc.
+ * Copyright (c) 2005-2007 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -352,34 +352,49 @@ static int NumericStream_Init(PyObject * self, PyObject * args,
 }
 
 static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
+    PyObject *pval;
     int val;
     NumericStreamObject * o = (void *) self;
 
     o->isNone = 0;
 
-    if (STREAM_CHECK(self, INT_STREAM)) {
-        IntStreamObject * o = (void *) self;
-	if (!PyArg_ParseTuple(args, "i", &val))
+    if (!PyArg_ParseTuple(args, "O", &pval))
+	return NULL;
+
+    if (pval == Py_None) {
+	Py_DECREF(pval);
+	NUMERICSTREAM_SET(self, 0);
+	o->isNone = 1;
+	Py_INCREF(Py_None);
+	return Py_None;
+    }
+    if (STREAM_CHECK(self, INT_STREAM)
+	|| STREAM_CHECK(self, SHORT_STREAM)
+	|| STREAM_CHECK(self, BYTE_STREAM)) {
+	PyObject *ival;
+	if (!PyNumber_Check(pval)) {
+	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
-        o->val = val;
-    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
-        ShortStreamObject * o = (void *) self;
-	if (!PyArg_ParseTuple(args, "i", &val))
-	    return NULL;
-        o->val = val;
-    } else if (STREAM_CHECK(self, BYTE_STREAM)) {
-        ByteStreamObject * o = (void *) self;
-	if (!PyArg_ParseTuple(args, "i", &val))
-	    return NULL;
-        o->val = val;
+	}
+	ival = PyNumber_Int(pval);
+	val = PyInt_AsLong(ival);
+	NUMERICSTREAM_SET(self, val);
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
 	unsigned long long lval;
-	if (!PyArg_ParseTuple(args, "K", &lval))
+	if (!PyLong_Check(pval) && !PyNumber_Check(pval)) {
+	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
+	}
+	if (PyLong_Check(pval))
+	    lval = PyLong_AsUnsignedLongLong(pval);
+	else {
+	    PyObject *ival = PyNumber_Int(pval);
+	    lval = PyInt_AsLong(ival);
+	}
         o->val = lval;
     } else {
-        PyErr_SetString(PyExc_TypeError, "invalid type");
+        PyErr_SetString(PyExc_TypeError, "unknown numeric stream type");
         return NULL;
     }
 
@@ -394,9 +409,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
 
-        if (frozenLen != 4) {
+        if (frozenLen && frozenLen != 4) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen int stream must be 4 bytes long");
+                    "Frozen int stream must be 4 bytes long or empty");
             return 0;
         }
 
@@ -407,9 +422,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
 
-        if (frozenLen != 2) {
+        if (frozenLen && frozenLen != 2) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen short stream must be 2 bytes long");
+                    "Frozen short stream must be 2 bytes long or empty");
             return 0;
         }
 
@@ -420,9 +435,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     } else if (STREAM_CHECK(self, BYTE_STREAM)) {
         ByteStreamObject * o = (void *) self;
 
-        if (frozenLen != 1) {
+        if (frozenLen && frozenLen != 1) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen byte stream must be 1 byte long");
+			    "Frozen byte stream must be 1 byte long or empty");
             return 0;
         }
 
@@ -433,9 +448,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
 
-        if (frozenLen != 8) {
+        if (frozenLen && frozenLen != 8) {
             PyErr_SetString(PyExc_ValueError,
-                    "Frozen long long stream must be 8 byte long");
+                    "Frozen long long stream must be 8 bytes long or empty");
             return 0;
         }
 

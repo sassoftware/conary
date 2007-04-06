@@ -1,4 +1,9 @@
 # this file documents the wire protocol changes for conary.
+Version 46:
+  - Added hidden flag to commitChangeSet and hasTroves call (only allowed for
+    users with mirror or write permissions, respectively) and the
+    presentHiddenTroves() call which requires write permissions
+
 Version 45:
   - addDigitalSignature takes a VersionedSignatureSet object. This call
     is incompatible between versions 43 and 44 of the protocol (though this
