@@ -658,7 +658,11 @@ _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
 _TROVEINFO_TAG_METADATA       = 17
-_TROVEINFO_TAG_LAST           = 17
+_TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through a fix for
+                                    # incompleteness. only used on the client, and left
+                                    # out of frozen forms normally (since it should always
+                                    # be None)
+_TROVEINFO_TAG_LAST           = 18
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -708,6 +712,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_DIR_HASHES    : (LARGE, PathHashes,           'dirHashes'    ),
         _TROVEINFO_TAG_SCRIPTS       : (DYNAMIC, TroveScripts,       'scripts'    ),
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
+        _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -894,7 +899,8 @@ class Trove(streams.StreamSet):
                                             skipSet = { 'sigs' : True,
                                                         'versionStrings' : True,
                                                         'incomplete' : True,
-                                                        'metadata': True },
+                                                        'metadata': True,
+                                                        'completeFixup' : True },
                                             freezeUnknown = True)
 
         raise NotImplementedError
@@ -1345,10 +1351,7 @@ class Trove(streams.StreamSet):
             self.redirects.addRedirectObject(info)
 
         twmInfo = None
-        if trvCs.getOldVersion():
-            twmInfo = TroveInfo()
-            twmInfo.thaw(self.troveInfo.freeze())
-            twmInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
+        incomplete = (self.troveInfo.incomplete() and 1) or 0
 
         if trvCs.getFrozenTroveInfo():
             # We cannot trust the absolute trove info representation since the
@@ -1356,13 +1359,16 @@ class Trove(streams.StreamSet):
             # even if it wasn't originally). Use the relative data (which may
             # set it or not).
             self.troveInfo = TroveInfo(trvCs.getFrozenTroveInfo())
-            # Use the ignore flag from the three-way merge
-            if twmInfo:
-                self.troveInfo.incomplete.set(twmInfo.incomplete())
+            if not self.troveInfo.incomplete():
+                self.troveInfo.incomplete.set(incomplete)
         elif not trvCs.getOldVersion():
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
             self.troveInfo = twmInfo
+
+        if self.troveInfo.completeFixup():
+            self.troveInfo.incomplete.set(0)
+            self.troveInfo.completeFixup.set(None)
 
         # We can't be incomplete after a merge. If we were, it means
         # we merged something incomplete against something complete

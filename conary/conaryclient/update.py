@@ -2278,7 +2278,8 @@ conary erase '%s=%s[%s]'
             newCs = changeset.ChangeSet()
             for newT, oldT in itertools.izip(newTroves, oldTroves):
                 oldT.troveInfo.incomplete.set(1)
-                newT.troveInfo.incomplete.set(0)
+                newT.troveInfo.incomplete.set(1)
+                newT.troveInfo.completeFixup.set(1)
                 newCs.newTrove(newT.diff(oldT)[0])
 
             cs.merge(newCs)

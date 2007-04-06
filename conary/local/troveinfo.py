@@ -20,6 +20,9 @@ class TroveInfoTable:
     def addInfo(self, cu, trove, idNum):
         # c = True if the trove is a component
         n = trove.getName()
+        # complete fixup is internal to a single client run; it should never be stored
+        # anywhere
+        assert(trove.troveInfo.completeFixup() is None)
         c = ':' in n and not n.endswith(':source')
         for (tag, (size, streamType, name)) in trove.troveInfo.streamDict.iteritems():
             frz = trove.troveInfo.__getattribute__(name).freeze()
