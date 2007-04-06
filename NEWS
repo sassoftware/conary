@@ -27,6 +27,8 @@ Changes in 1.1.21:
       of Conary omit the new data from the database.  Once a version
       of Conary is used that understands the new data types, the
       missing data is restored to the previously incomplete trove.
+    * Handling user permissions when committing under certain 
+      circumstances against a Conary 1.1.20 was fixed. (CNY-1488)
 
 Changes in 1.1.20:
   o Major Changes:
