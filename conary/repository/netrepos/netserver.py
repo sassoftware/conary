@@ -2631,7 +2631,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND TroveInfo.infoType = ?
         ORDER BY TroveInfo.changed
         """ % (",".join("%d" % x for x in userGroupIds), )
-        cu.execute(query, (mark, mark, instances.INSTANCE_PRESENT_NORMAL,
+        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark,
                            trove._TROVEINFO_TAG_SIGS))
 
         l = set()
