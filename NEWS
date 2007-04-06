@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Client Changes:
+    * To take advantage of Conary's ability to apply the critical
+      update set and restart before applying the rest of the updates,
+      two new API calls have been added: createUpdateJob and
+      applyUpdateJob. (CNY-1454)
+
 Changes in 1.1.21:
   o Repository Changes:
     * A "hidden" keyword argument has been added to the
