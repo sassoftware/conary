@@ -1350,7 +1350,6 @@ class Trove(streams.StreamSet):
         for info in trvCs.getRedirects().iter():
             self.redirects.addRedirectObject(info)
 
-        twmInfo = None
         incomplete = (self.troveInfo.incomplete() and 1) or 0
 
         if trvCs.getFrozenTroveInfo():
@@ -1364,7 +1363,7 @@ class Trove(streams.StreamSet):
         elif not trvCs.getOldVersion():
             self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
-            self.troveInfo = twmInfo
+            self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
 
         if self.troveInfo.completeFixup():
             self.troveInfo.incomplete.set(0)
