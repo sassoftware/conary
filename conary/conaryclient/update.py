@@ -2304,6 +2304,7 @@ conary erase '%s=%s[%s]'
         criticalUpdateInfo = kwargs.setdefault('criticalUpdateInfo',
             CriticalUpdateInfo(applyCriticalOnly))
         syncChildren = kwargs.get('syncChildren', False)
+        recurse = kwargs.get('recurse', False)
 
         restartChangeSets = []
         restartInfo = kwargs.pop('restartInfo', None)
@@ -2321,6 +2322,7 @@ conary erase '%s=%s[%s]'
                             'cannot specify erases/relative updates with sync')
 
         kwargs['syncChildren'] = syncChildren
+        kwargs['recurse'] = recurse
 
         # Add information from the stored update job, if available
         for cs in restartChangeSets:
@@ -2341,15 +2343,14 @@ conary erase '%s=%s[%s]'
 
     def applyUpdateJob(self, updJob, **kwargs):
         # Apply the update job, return restart information if available
-        if updJob.getCriticalJobs():
-            remainingJobs = updJob.loadCriticalJobsOnly()
+        remainingJobs = updJob.loadCriticalJobsOnly()
 
         # XXX May have to use a callback for this
         log.syslog.command()
         self.applyUpdate(updJob, **kwargs)
         log.syslog.commandComplete()
 
-        if updJob.getCriticalJobs():
+        if remainingJobs:
             # FIXME: write the updJob.getTroveSource() changeset(s) to disk
             # write the job set to disk
             # Restart conary telling it to use those changesets and jobset
