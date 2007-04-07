@@ -2304,6 +2304,7 @@ conary erase '%s=%s[%s]'
         criticalUpdateInfo = kwargs.setdefault('criticalUpdateInfo',
             CriticalUpdateInfo(applyCriticalOnly))
         syncChildren = kwargs.get('syncChildren', False)
+        recurse = kwargs.get('recurse', False)
 
         restartChangeSets = []
         restartInfo = kwargs.pop('restartInfo', None)
@@ -2321,6 +2322,7 @@ conary erase '%s=%s[%s]'
                             'cannot specify erases/relative updates with sync')
 
         kwargs['syncChildren'] = syncChildren
+        kwargs['recurse'] = recurse
 
         # Add information from the stored update job, if available
         for cs in restartChangeSets:
