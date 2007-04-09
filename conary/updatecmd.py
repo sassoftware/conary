@@ -542,7 +542,7 @@ def updateAll(cfg, **kwargs):
     restartInfo = kwargs.get('restartInfo', None)
     migrate = kwargs.pop('migrate', False)
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
-    kwargs['callback'] = UpdateCallback()
+    kwargs['callback'] = UpdateCallback(cfg)
 
     client = conaryclient.ConaryClient(cfg)
     if restartInfo:
