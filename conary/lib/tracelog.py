@@ -238,9 +238,9 @@ class CfgTraceLog(cfg.CfgType):
             raise cfgtypes.ParseError("log level and path expected")
         try:
             s = (int(s[0]), cfgtypes.Path(s[1]))
-        except:
+        except Exception, e:
             raise cfgtypes.ParseError(
-                "log level (integer) and path (string) expected")
+                "log level (integer) and path (string) expected\n%s" % (e,))
         return s
     def format(self, val, displayOptions = None):
         return "%s %s" % val
