@@ -10,6 +10,7 @@ Changes in @NEW@:
     * Fixed a bug in clone/promote relating to cloning when there are flavors
       on the clone label that are superset of the current flavor, but the 
       current flavor doesn't exist. (RMK-415)
+    * Fixed a bug related to the multithreaded Conary client. (CNY-1450)
 
 Changes in 1.1.21:
   o Repository Changes:
