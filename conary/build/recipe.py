@@ -90,5 +90,5 @@ class Recipe:
     def validate(self):
         pass
 
-
-
+    def isCrossCompileTool(self):
+        return False

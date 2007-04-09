@@ -238,6 +238,13 @@ class GroupRecipe(_BaseGroupRecipe):
                          byDefault = True)
         self._setDefaultGroup(group)
 
+    def _findSources(repos, callback=None):
+        """
+            Method used to find all of the source components that would
+            need to be built to build this group, including their flavor.
+        """
+        return findSourcesForGroup(repos, self, callback)
+
     def _getSearchSource(self):
         if isinstance(self.defaultSource, (list, tuple)):
             return searchsource.createSearchSourceStack(self.searchSource,
