@@ -365,7 +365,9 @@ class _AbstractPackageRecipe(Recipe):
             if missingReqs:
                 err = ("Could not find the following troves "
                        "needed to cook this recipe:\n"
-                       "%s\n" % '\n'.join(sorted(missingReqs)))
+                       "%s" % '\n'.join(sorted(missingReqs)))
+                if missingCrossReqs:
+                    err += '\n'
             else:
                 err = ''
             if missingCrossReqs:
