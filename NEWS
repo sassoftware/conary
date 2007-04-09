@@ -1,3 +1,11 @@
+  o Client Changes:
+    * Proxy configuration parameter is now of the form 'proxy protocol url'
+      (i.e. 'proxy http http://proxy.some.com'), and allows separate proxies
+      to be configured for http and https. If old 'proxy url' form is used,
+      separate proxies are configured for http and https rather than a
+      single proxy being using for both protocols. Users who need the old
+      behavior should set explicit configure the same proxy for both protocols.
+
 Changes in 1.1.21:
   o Repository Changes:
     * A "hidden" keyword argument has been added to the
