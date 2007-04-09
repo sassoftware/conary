@@ -37,8 +37,12 @@ class Macros(dict):
         return dict.__getitem__(self, key)
             
     def update(self, other):
-        for key, item in other.iteritems():
-            self[key] = item
+        if isinstance(other, dict):
+            for key, item in other.iteritems():
+                self[key] = item
+        else:
+            for key, item in other:
+                self[key] = item
 
     def setCallback(self, name, callback):
         """ Add a callback to a particular macros.  When that macro is 
@@ -124,8 +128,9 @@ class Macros(dict):
     
     def copy(self, shadow=True):
 	# shadow saves initial copying cost for a higher search cost
+        if not shadow:
+            return Macros([(x, self._get(x)) for x in dict.__iter__(self)])
 	return Macros(self, shadow)
-
     
     # occasionally it may be desirable to switch from shadowing
     # to a flattened representation
@@ -153,6 +158,10 @@ class Macros(dict):
     def iteritems(self):
         for key in self.__iter__():
             yield (key, self[key])
+
+    def itermacros(self):
+        for key in self.__iter__():
+            yield (key, self._get(key))
 
     def keys(self):
         return [ x for x in self.__iter__() ]
