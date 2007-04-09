@@ -14,7 +14,7 @@
 import os
 import itertools
 import sys
-import thread
+import threading
 import urllib2
 
 from conary import callbacks
@@ -36,17 +36,25 @@ from conaryclient.cmdline import parseTroveSpec
 class CriticalUpdateInfo(conaryclient.CriticalUpdateInfo):
     criticalTroveRegexps = ['conary:.*']
 
+def locked(method):
+    # this decorator used to be defined in UpdateCallback
+    # The problem is you cannot subclass UpdateCallback and use the decorator
+    # because python complains it is an unbound function.
+    # And you can't define it as @staticmethod either, it would break the
+    # decorated functions.
+    # Somewhat related (staticmethod objects not callable) topic:
+    # http://mail.python.org/pipermail/python-dev/2006-March/061948.html
+
+    def wrapper(self, *args, **kwargs):
+        self.lock.acquire()
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self.lock.release()
+
+    return wrapper
+
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
-
-    def locked(method):
-        def wrapper(self, *args, **kwargs):
-            self.lock.acquire()
-            try:
-                return method(self, *args, **kwargs)
-            finally:
-                self.lock.release()
-
-        return wrapper
 
     def done(self):
         self._message('')
@@ -54,8 +62,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def _message(self, text):
         callbacks.LineOutput._message(self, text)
 
-    @locked
     def update(self):
+        # This method is not thread safe - you have to call it when you hold
+        # the lock
         t = ""
 
         if self.updateText:
@@ -81,10 +90,12 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
         self._message(t)
 
+    @locked
     def updateMsg(self, text):
         self.updateText = text
         self.update()
 
+    @locked
     def csMsg(self, text):
         self.csText = text
         self.update()
@@ -100,9 +111,13 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
         self.updateText = None
 
+    @locked
     def _downloading(self, msg, got, rate, need):
+        # This function acquires a lock just because it looks at self.csHunk
+        # and self.updateText directly. Otherwise, self.csMsg will acquire the
+        # lock (which is now reentrant)
         if got == need:
-            self.csText = None
+            self.csMsg(None)
         elif need != 0:
             if self.csHunk[1] < 2 or not self.updateText:
                 self.csMsg("%s %dKB (%d%%) of %dKB at %dKB/sec"
@@ -113,8 +128,6 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                               (got/1024, (got*100)/need, need/1024, rate/1024)))
         else: # no idea how much we need, just keep on counting...
             self.csMsg("%s (got %dKB at %dKB/s so far)" % (msg, got/1024, rate/1024))
-
-        self.update()
 
     def downloadingFileContents(self, got, need):
         self._downloading('Downloading files for changeset', got, self.rate, need)
@@ -141,7 +154,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateMsg("Preparing update (%d of %d)" % 
 		      (troveNum, troveCount))
 
+    @locked
     def restoreFiles(self, size, totalSize):
+        # Locked, because we modify self.restored
         if totalSize != 0:
             self.restored += size
             self.updateMsg("Writing %dk of %dk (%d%%)" 
@@ -166,9 +181,11 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def committingTransaction(self):
         self.updateMsg("Committing database transaction")
 
+    @locked
     def setChangesetHunk(self, num, total):
         self.csHunk = (num, total)
 
+    @locked
     def setUpdateHunk(self, num, total):
         self.restored = 0
         self.updateHunk = (num, total)
@@ -211,7 +228,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateHunk = (0, 0)
         self.csText = None
         self.updateText = None
-        self.lock = thread.allocate_lock()
+        self.lock = threading.RLock()
 
         if cfg:
             fullVersions = cfg.fullVersions
