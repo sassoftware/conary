@@ -21,7 +21,7 @@ import tempfile
 import time
 
 from conary import files, trove, versions
-from conary.conarycfg import CfgRepoMap
+from conary.conarycfg import CfgProxy, CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
@@ -3081,6 +3081,7 @@ class ServerConfig(ConfigFile):
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     logFile                 = CfgPath
+    proxy                   = (CfgProxy, None)
     proxyContentsDir        = CfgPath
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver

@@ -66,7 +66,7 @@ class ProxyCaller:
 class ProxyCallFactory:
 
     @staticmethod
-    def createCaller(protocol, port, rawUrl, authToken):
+    def createCaller(protocol, port, rawUrl, proxies, authToken):
         url = redirectUrl(authToken, rawUrl)
 
         if authToken[2] is not None:
@@ -75,7 +75,8 @@ class ProxyCallFactory:
             entitlement = None
 
         transporter = transport.Transport(https = url.startswith('https:'),
-                                          entitlement = entitlement)
+                                          entitlement = entitlement,
+                                          proxies = proxies)
 
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
@@ -108,7 +109,7 @@ class RepositoryCallFactory:
     def __init__(self, repos):
         self.repos = repos
 
-    def createCaller(self, protocol, port, rawUrl, authToken):
+    def createCaller(self, protocol, port, rawUrl, proxies, authToken):
         return RepositoryCaller(protocol, port, authToken, self.repos)
 
 class BaseProxy(xmlshims.NetworkConvertors):
@@ -126,6 +127,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.basicUrl = basicUrl
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
+        if cfg.proxy:
+            self.proxies = cfg.proxy
+        else:
+            self.proxies = None
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -152,7 +157,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
-                                               authToken)
+                                               self.proxies, authToken)
 
         try:
             if hasattr(self, methodname):
@@ -416,7 +421,7 @@ class ChangesetFilter(BaseProxy):
                 size = sizes[0]
 
                 if cachable:
-                    inF = urllib.urlopen(url)
+                    inF = urllib.urlopen(url, proxies = self.proxies)
                     csPath =_addToCache(fingerprint, inF, wireCsVersion,
                                 (trovesNeeded, filesNeeded, removedTroves),
                                 size)
@@ -425,7 +430,7 @@ class ChangesetFilter(BaseProxy):
                 elif url.startswith('file://localhost/'):
                     csPath = url[17:]
                 else:
-                    inF = urllib.urlopen(url)
+                    inF = urllib.urlopen(url, proxies = self.proxies)
                     (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                   suffix = '.ccs-out')
                     outF = os.fdopen(fd, "w")
@@ -572,7 +577,9 @@ class ProxyRepositoryServer(ChangesetFilter):
                                              suffix = '.tmp')
             os.unlink(tmpPath)
             dest = os.fdopen(fd, "w+")
-            size = util.copyfileobj(urllib.urlopen(url), dest)
+            inUrl = urllib.urlopen(url, proxies = self.proxies)
+            size = util.copyfileobj(inUrl, dest)
+            inUrl.close()
             dest.seek(0)
 
             totalSize = sum(sizes)

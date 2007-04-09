@@ -226,25 +226,6 @@ class CfgLabelList(list):
 
         return cmp(firstIdx, secondIdx)
 
-class CfgProxy(CfgType):
-
-    def __init__(self):
-        self.proxies = { 'http' : None, 'https' : None }
-
-    def parseString(self, val):
-        if not val:
-            self.proxies = { 'http' : None, 'https' : None }
-
-        items = val.split()
-        if len(items) == 1:
-            protocol, rest = items[0].split(':')
-            self.proxies['http'] = 'http:' + items[1]
-            self.proxies['https'] = 'https:' + items[1]
-        elif items[0] not in ( 'http', 'https'):
-            raise ParseError("Only http and https proxies are supported")
-        else:
-            self.proxies[items[0]] = items[1]
-
 class ProxyEntry(CfgType):
 
     def parseString(self, str):
@@ -265,7 +246,7 @@ class CfgProxy(CfgDict):
         elif not len(l):
             raise ParseError("Arguments required for proxy configuration")
         elif len(l) == 1:
-            protocol, rest = str.split(':')
+            protocol, rest = str.split(':', 1)
             rc = CfgDict.parseString(self, 'http http:' + rest)
             rc.update(CfgDict.parseString(self, 'https https:' + rest))
         elif l[0] not in ('http', 'https'):

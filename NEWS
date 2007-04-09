@@ -5,6 +5,13 @@
       separate proxies are configured for http and https rather than a
       single proxy being using for both protocols. Users who need the old
       behavior should set explicit configure the same proxy for both protocols.
+  o Proxy Changes:
+    * The proxy can now be configured to use an http proxy for all outgoing
+      requests. The 'proxy' configuration item is supported in a manner
+      identical to the client.
+    * Removed standalone servers (unused) ability to act as both a proxy
+      and a standalone server; this removes the standalone proxies dependence
+      on the X-Conary-Servername header.
 
 Changes in 1.1.21:
   o Repository Changes:
