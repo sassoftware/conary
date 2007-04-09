@@ -352,8 +352,9 @@ def _updateTroves(cfg, applyList, **kwargs):
                         keepJournal = False,
     )
     applyKwargs = {}
-    for k, v in applyDefaults.iteritems():
-        applyKwargs[k] = kwargs.pop(k, v)
+    for k in applyDefaults:
+        if k in kwargs:
+            applyKwargs[k] = kwargs.pop(k)
     callback = kwargs.pop('callback')
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
@@ -548,13 +549,9 @@ def updateAll(cfg, **kwargs):
     if restartInfo:
         updateItems = []
         applyList = None
-        recurse = False
     else:
         updateItems = client.fullUpdateItemList()
         applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
-        recurse = True
-
-    kwargs['recurse'] = recurse
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
