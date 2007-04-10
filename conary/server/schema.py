@@ -21,7 +21,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = sqllib.DBversion(15,0)
+VERSION = sqllib.DBversion(15, 1)
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -64,7 +64,7 @@ def createInstances(db):
                    "changed, instanceId")
     db.createIndex("Instances", "InstancesClonedFromIdx",
                    "clonedFromId, instanceId")
-    if createTrigger(db, "Instances", pinned = True):
+    if createTrigger(db, "Instances"):
         commit = True
 
     if commit:

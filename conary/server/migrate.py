@@ -349,8 +349,11 @@ class MigrateTo_15(SchemaMigration):
         return True
     # migrate to 15.1
     def migrate1(self):
-        return False
-
+        # drop the pinned index on Instances and recreate it as not-pinned
+        self.db.dropTrigger("Instances", "UPDATE")
+        ret = schema.createTrigger(self.db, "Instances")
+        return ret
+    
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]
