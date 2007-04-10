@@ -54,6 +54,8 @@ class CaselessDict(dict):
         return dict.__getitem__(self, self.__l(key))[1]
     def __setitem__(self, key, value):
         dict.__setitem__(self, self.__l(key), (key, value))
+    def __delitem__(self, key):
+        dict.__delitem__(self, self.__l(key))
     def has_key(self, key):
         return dict.has_key(self, self.__l(key))
 
