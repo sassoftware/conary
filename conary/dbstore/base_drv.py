@@ -432,7 +432,7 @@ class BaseDatabase:
             c.execute("select * from DatabaseVersion")
             ret = c.fetchone()
             if len(ret) == 1: # old style, one number
-                c.execute("drop database DatabaseVersion")
+                c.execute("drop table DatabaseVersion")
                 crtVersion = 0 # mark for re-creation
         # do not allow "going back"
         assert (version >= crtVersion)
