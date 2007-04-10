@@ -29,6 +29,12 @@ class SchemaMigration(migration.SchemaMigration):
         logMe(1, msg)
         self.msg = msg
 
+# dummy migration class that maintains compatbility with schema version13
+class MigrateTo_13(SchemaMigration):
+    Version = 13
+    def migrate(self):
+        return self.Version
+
 # schema versions lower than 13 are not supported for migration through this pathway
 class MigrateTo_14(SchemaMigration):
     Version = 14
@@ -379,7 +385,7 @@ def _getMigration(major):
 # entry point that migrates the schema
 def migrateSchema(db, major=True):
     version = db.getVersion()
-    assert(version > 13) # minimum version we support
+    assert(version >= 13) # minimum version we support
     if version > schema.VERSION:
         return version # noop, should not have been called.
     logMe(2, "migrating from version", version)
