@@ -333,7 +333,7 @@ class BaseDatabase:
     def dropTrigger(self, table, onAction):
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
-        if name in self.triggers:
+        if name not in self.triggers:
             return False
         cu = self.dbh.cursor()
         cu.execute("DROP TRIGGER %s" % name)
