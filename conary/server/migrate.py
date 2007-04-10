@@ -112,7 +112,7 @@ class MigrateTo_14(SchemaMigration):
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = (15,1)
+    Version = (15, 2)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -352,7 +352,22 @@ class MigrateTo_15(SchemaMigration):
         # drop the pinned index on Instances and recreate it as not-pinned
         self.db.dropTrigger("Instances", "UPDATE")
         ret = schema.createTrigger(self.db, "Instances")
+        self.db.loadSchema()
         return ret
+    # migrate to 15.2
+    def migrate2(self):
+        # create a primary key for labelmap
+        cu = self.db.cursor()
+        cu.execute("create table OldLabelMap as select * from LabelMap")
+        cu.execute("drop table LabelMap")
+        self.db.loadSchema()
+        schema.createLabelMap(self.db)
+        cu.execute("insert into LabelMap (itemId, labelId, branchId) "
+                   "select itemId, labelId, branchId from OldLabelMap ")
+        cu.execute("drop table OldLabelMap")
+        self.db.loadSchema()
+        return True
+                      
     
 def _getMigration(major):
     try:

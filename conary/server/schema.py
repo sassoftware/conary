@@ -21,7 +21,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = sqllib.DBversion(15, 1)
+VERSION = sqllib.DBversion(15, 2)
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -642,9 +642,11 @@ def createLabelMap(db):
     if "LabelMap" not in db.tables:
         cu.execute("""
         CREATE TABLE LabelMap(
+            labelmapId      %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT LabelMap_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -659,6 +661,8 @@ def createLabelMap(db):
         commit = True
     db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
+    if createTrigger(db, "LabelMap"):
+        commit = True
     if commit:
         db.commit()
         db.loadSchema()
