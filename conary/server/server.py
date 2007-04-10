@@ -524,7 +524,7 @@ def getServer():
             userName = argSet.pop('add-user')
             if argSet:
                 usage()
-            sys.exit(addUser(HttpRequests.netRepos, userName, admin = admin,
+            sys.exit(addUser(netRepos, userName, admin = admin,
                              mirror = mirror))
         elif argSet.pop('analyze', False):
             if argSet:
