@@ -1641,7 +1641,7 @@ class ComponentProvides(policy.Policy):
         else:
             flags = []
         if self.recipe.isCrossCompileTool():
-            flags.append(('target_%s' % self.macros.target,
+            flags.append(('target-%s' % self.macros.target,
                           deps.FLAG_SENSE_REQUIRED))
 
         for component in self.recipe.autopkg.components.values():
