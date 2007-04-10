@@ -661,7 +661,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def _getDb(self):
         if not self._db:
-            self._initDb()
+            try:
+                self._initDb()
+            except sqldb.sqlerrors.DatabaseError, e:
+                raise errors.ConaryError("Database error: %s" % (e, ))
         return self._db
 
     db = property(_getDb)

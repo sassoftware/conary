@@ -356,10 +356,12 @@ class DBFlavorMap(idtable.IdMapping):
 
 
 class Database:
+    timeout = 30000
     def __init__(self, path):
         self.db = None
         try:
-            self.db = dbstore.connect(path, driver = "sqlite", timeout=30000)
+            self.db = dbstore.connect(path, driver = "sqlite",
+                                      timeout=self.timeout)
             self.schemaVersion = self.db.getVersion()
         except sqlerrors.DatabaseLocked:
             raise errors.DatabaseLockedError

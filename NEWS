@@ -10,7 +10,11 @@ Changes in @NEW@:
     * Fixed a bug in clone/promote relating to cloning when there are flavors
       on the clone label that are superset of the current flavor, but the 
       current flavor doesn't exist. (RMK-415)
-    * Fixed a bug related to the multithreaded Conary client. (CNY-1450)
+    * Fixed a race condition related to the multithreaded Conary client,
+      where one thread could modify an unprotected variable assumed
+      immutable by a different thread.  (CNY-1450)
+    * If the database is locked, Conary will no longer display a stack
+      trace, but an error message. (CNY-1292)
 
 Changes in 1.1.21:
   o Repository Changes:
