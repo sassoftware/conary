@@ -18,6 +18,8 @@ Changes in @NEW@:
       immutable by a different thread.  (CNY-1450)
     * If the database is locked, Conary will no longer display a stack
       trace, but an error message. (CNY-1292)
+    * The Conary library uses a built-in difflib if the system's difflib
+      is not patched for recursion. (CNY-1377)
 
 Changes in 1.1.21:
   o Repository Changes:
