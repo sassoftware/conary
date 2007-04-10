@@ -57,13 +57,11 @@ def createInstances(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Instances"] = []
         commit = True
-    db.createIndex("Instances", "InstancesIdx",
-                   "itemId, versionId, flavorId",
+    db.createIndex("Instances", "InstancesIdx", "itemId,versionId,flavorId",
                    unique = True)
-    db.createIndex("Instances", "InstancesChangedIdx",
-                   "changed, instanceId")
-    db.createIndex("Instances", "InstancesClonedFromIdx",
-                   "clonedFromId, instanceId")
+    db.createIndex("Instances", "InstancesChangedIdx", "changed,instanceId")
+    db.createIndex("Instances", "InstancesClonedFromIdx", "clonedFromId,instanceId")
+    db.createIndex("Instances", "InstancesPresentIdx", "isPresent,instanceId")
     if createTrigger(db, "Instances"):
         commit = True
 
@@ -205,6 +203,7 @@ def createLatest(db):
     db.createIndex("Latest", "LatestCheckIdx",
                    "itemId, branchId, flavorId, latestType",
                    unique = True)
+    db.createIndex("Latest", "LatestChangedIdx", "changed, latestType")
     if createTrigger(db, "Latest"):
         commit = True
 
