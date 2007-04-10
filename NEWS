@@ -4,6 +4,9 @@ Changes in @NEW@:
       update set and restart before applying the rest of the updates,
       two new API calls have been added: createUpdateJob and
       applyUpdateJob. (CNY-1454)
+  o Build Changes:
+    * Conary has tools in place through a new cross flag and a new "target"
+      flavor to support better defining of cross compiling builds.  (CNY-1003)
   o Bug Fixes:
     * Fixed a bug in proxy code that would cause conary to use https through
       the proxy when http was desired (CNY-1530)
