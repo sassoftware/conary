@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -405,27 +405,45 @@ class BaseDatabase:
         # schema might not be loaded, so we have to try: except: here
         # instead of looking at the self.tables
         try:
-            c.execute("select max(version) as version from DatabaseVersion")
+            c.execute("select * from DatabaseVersion")
         except sqlerrors.InvalidTable, e:
-            self.version = 0
-            return 0
+            self.version = sqllib.DBversion(0,0)
+            return self.version
         else:
-            self.version = c.fetchone()[0]
+            ret = c.fetchone_dict()
+            # keep compatibility with old style table versioning
+            if ret.has_key("version"):
+                self.version = sqllib.DBversion(ret["version"])
+            else:
+                self.version = sqllib.DBversion(ret["major"], ret["minor"])
         return self.version
 
     def setVersion(self, version):
         assert(self.dbh)
+        if isinstance(version, int):
+            version = sqllib.DBversion(version)
+        elif isinstance(version, tuple):
+            version = sqllib.DBversion(*version)
+        assert (isinstance(version, sqllib.DBversion))
         c = self.cursor()
         crtVersion = self.getVersion()
+        # test if we have the old style database version and update
+        if crtVersion > 0 and crtVersion.minor == 0:
+            c.execute("select * from DatabaseVersion")
+            ret = c.fetchone()
+            if len(ret) == 1: # old style, one number
+                c.execute("drop database DatabaseVersion")
+                crtVersion = 0 # mark for re-creation
         # do not allow "going back"
         assert (version >= crtVersion)
         if crtVersion == 0: # indicates table is not there
-            c.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
-            c.execute("INSERT INTO DatabaseVersion (version) VALUES (?)",
-                      version)
+            c.execute("CREATE TABLE DatabaseVersion (major INTEGER, minor INTEGER)")
+            c.execute("INSERT INTO DatabaseVersion (major, minor) VALUES (?,?)",
+                      (version.major, version.minor))
             self.commit()
             return version
-        c.execute("UPDATE DatabaseVersion SET version = ?", version)
+        c.execute("UPDATE DatabaseVersion SET major = ?, minor = ?",
+                  (version.major, version.minor))
         self.commit()
         return version
 

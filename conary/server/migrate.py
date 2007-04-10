@@ -13,7 +13,7 @@
 import sys
 
 from conary import files, trove, versions
-from conary.dbstore import migration, sqlerrors
+from conary.dbstore import migration, sqlerrors, sqllib
 from conary.lib.tracelog import logMe
 from conary.deps import deps
 from conary.repository.netrepos import versionops, trovestore
@@ -25,7 +25,7 @@ class SchemaMigration(migration.SchemaMigration):
         if msg is None:
             msg = self.msg
         if msg == "":
-            msg = "Finished migration to schema version %d" % (self.Version,)
+            msg = "Finished migration to schema version %s" % (self.Version,)
         logMe(1, msg)
         self.msg = msg
 
@@ -109,11 +109,10 @@ class MigrateTo_14(SchemaMigration):
         logMe(2, "Updating Instances table...")
         self.db.renameColumn("Instances", "isRedirect", "troveType")
         self.db.loadSchema()
-
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = 15
+    Version = (15,1)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -352,10 +351,36 @@ class MigrateTo_15(SchemaMigration):
     def migrate1(self):
         return False
 
-# entrry point that migrates the schema
-def migrateSchema(db, version):
-    # instantiate and call appropriate migration objects in succession.
-    while version and version < schema.VERSION:
-        version = (lambda x, d=sys.modules[__name__].__dict__:
-                   d['MigrateTo_' + str(x + 1)])(version)(db)()
+def _getMigration(major):
+    try:
+        ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]
+    except KeyError:
+        return None
+    return ret
+
+# entry point that migrates the schema
+def migrateSchema(db, major=True):
+    version = db.getVersion()
+    assert(version > 13) # minimum version we support
+    if version > schema.VERSION:
+        return version # noop, should not have been called.
+    logMe(2, "migrating from version", version)
+    # first, we need to make sure that for the current major we're up
+    # to the latest minor
+    migrateFunc = _getMigration(version.major)
+    if migrateFunc is None:
+        raise sqlerrors.SchemaVersionError(
+            "Could not find migration code that deals with repository "
+            "schema %s" % version, version)
+    # migrate all the way to the latest minor for the current major
+    migrateFunc(db)(major=False)
+    version = db.getVersion()
+    # migrate to the latest major
+    if not major:
+        return version
+    while version.major < schema.VERSION.major:
+        migrateFunc = _getMigration(version.major+1)
+        newVersion = migrateFunc(db)(major=major)
+        assert(newVersion.major == version.major+1)
+        version = newVersion
     return version
