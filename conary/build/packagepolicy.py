@@ -1533,6 +1533,9 @@ class ComponentRequires(policy.Policy):
             self.depMap.update(d)
 
     def do(self):
+        flags = []
+        if self.recipe.isCrossCompileTool():
+            flags.append((_getTargetDepFlag(self.macros), deps.FLAG_SENSE_REQUIRED))
         components = self.recipe.autopkg.components
         for packageName in [x.name for x in self.recipe.autopkg.packageMap]:
             if packageName in self.overridesMap:
@@ -1558,7 +1561,8 @@ class ComponentRequires(policy.Policy):
                         # to attach to files.
                         ds = deps.DependencySet()
                         depClass = deps.TroveDependencies
-                        ds.addDep(depClass, deps.Dependency(reqName))
+
+                        ds.addDep(depClass, deps.Dependency(reqName, flags))
                         p = components[wantName]
                         p.requires.union(ds)
 
@@ -1636,11 +1640,17 @@ class ComponentProvides(policy.Policy):
                       for x in self.flags ]
         else:
             flags = []
+        if self.recipe.isCrossCompileTool():
+            flags.append(('target-%s' % self.macros.target,
+                          deps.FLAG_SENSE_REQUIRED))
+
         for component in self.recipe.autopkg.components.values():
             component.provides.addDep(deps.TroveDependencies,
                 deps.Dependency(component.name, flags))
 
 
+def _getTargetDepFlag(macros):
+    return 'target-%s' % macros.target
 
 class _dependency(policy.Policy):
     """
@@ -1692,7 +1702,8 @@ class _dependency(policy.Policy):
             f.inode.perms() & 0111 and m and m.name == 'script'
             and 'interpreter' in m.contents
             and '/bin/perl' in m.contents['interpreter'])
-        
+
+
     def _createELFDepSet(self, m, elfinfo, recipe=None, basedir=None,
                          soname=None, soflags=None,
                          libPathMap={}, getRPATH=None):

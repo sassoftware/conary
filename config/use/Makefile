@@ -16,6 +16,7 @@ use_files =	alternatives	\
 		bootstrap	\
 		builddocs	\
 		buildtests	\
+		cross		\
 		desktop		\
 		dietlibc	\
 		dom0		\

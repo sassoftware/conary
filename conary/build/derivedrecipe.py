@@ -200,8 +200,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         if bestFlavor[0] == -1:
             raise builderrors.RecipeFileError(
-                    'No flavors of %s=%s found for build flavor %s',
-                    self.name, parentVersion, self.cfg.buildFlavor)
+                    'No flavors of %s=%s found for build flavor %s' %
+                    (self.name, parentVersion, self.cfg.buildFlavor))
         elif len(bestFlavor[1]) > 1:
             raise builderrors.RecipeFileError(
                     'Multiple flavors of %s=%s match build flavor %s',

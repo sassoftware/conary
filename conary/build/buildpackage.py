@@ -49,9 +49,17 @@ def _getUseFlavor(recipe):
     Returns a deps.Flavor instance that represents the Use flags
     that have been used.
     """
-    return use.createFlavor(recipe.name, use.Use._iterUsed(), 
-                                         recipe.Flags._iterUsed(), 
-                                         use.Arch._iterUsed())
+    f = use.createFlavor(recipe.name, use.Use._iterUsed(),
+                         recipe.Flags._iterUsed(),
+                         use.Arch._iterUsed(), 
+                         targetDep=recipe.isCrossCompileTool())
+    if recipe.isCrossCompileTool():
+        # there's no guarantee that a cross compiler tool will mention
+        # anything in its flavor to automatically add the target flavor.
+        # We have to do it manually.
+        f.union(recipe.targetFlavor)
+    return f
+
 class BuildComponent(dict):
 
     def addFile(self, path, realPath):

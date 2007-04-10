@@ -539,11 +539,11 @@ class MajorArch(CollectionWithFlag):
                 continue
             self[subArch]._set()
 
-    def _toDependency(self):
+    def _toDependency(self, depType=deps.InstructionSetDependency):
         set = deps.Flavor()
         sense = self._getDepSense()
         dep = deps.Dependency(self._name, [])
-        set.addDep(deps.InstructionSetDependency, dep)
+        set.addDep(depType, dep)
         return set
 
     def _trackUsed(self, value=True):
@@ -576,7 +576,7 @@ class SubArch(Flag):
             currentArch = self._parent._parent.getCurrentArch()
             currentArch._setUsed()
 
-    def _toDependency(self):
+    def _toDependency(self, depType=deps.InstructionSetDependency):
         """ Creates a Flavor dep set with the subarch in it.
             Also includes any subsumed subarches if the 
             value of this subarch is true
@@ -590,7 +590,7 @@ class SubArch(Flag):
             depFlags.extend((parent[x]._name, sense) \
                                       for x in self._subsumes)
         dep = deps.Dependency(parent._name, depFlags)
-        set.addDep(deps.InstructionSetDependency, dep)
+        set.addDep(depType, dep)
         return set
         
 ####################### USE STUFF HERE ###########################
@@ -754,13 +754,18 @@ def allFlagsToFlavor(recipeName):
 def localFlagsToFlavor(recipeName):
     return createFlavor(recipeName, LocalFlags._iterAll())
 
-def createFlavor(recipeName, *flagIterables):
+def createFlavor(recipeName, *flagIterables, **kw):
     """ create a dependency set consisting of all of the flags in the 
         given flagIterables.  Note that is a broad category that includes
         lists, iterators, etc. RecipeName is the recipe which local flags
         should be relative to, can be set to None if there are definitely
         no local flags in the flagIterables.
     """
+    targetDep = kw.pop('targetDep', False)
+    if targetDep:
+        depType = deps.TargetInstructionSetDependency
+    else:
+        depType = deps.InstructionSetDependency
     majArch = None
     archFlags = {}
     subsumed = {}
@@ -771,9 +776,9 @@ def createFlavor(recipeName, *flagIterables):
         if flagType == MajorArch:
             if not flag._get():
                 continue
-            set.union(flag._toDependency())
+            set.union(flag._toDependency(depType=depType))
         elif flagType ==  SubArch:
-            set.union(flag._toDependency())
+            set.union(flag._toDependency(depType=depType))
         elif flagType == UseFlag:
             set.union(flag._toDependency())
         elif flagType == LocalFlag:
