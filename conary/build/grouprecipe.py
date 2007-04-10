@@ -1275,7 +1275,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self.labelPath = [ versions.Label(x) for x in path ]
 
     def _addScript(self, contents, groupName, scriptDict,
-                   invalidateRollbacks = False):
+                   invalidateRollbacks = False, fromClass = None):
         if groupName is None:
             groupName = self.name
 
@@ -1289,21 +1289,39 @@ class GroupRecipe(_BaseGroupRecipe):
             raise RecipeFileError('script already set for group %s'
                                         % groupName)
 
-        scriptDict[groupName] = (contents, invalidateRollbacks)
+        if type(fromClass) == int:
+            fromClass = [ fromClass ]
 
-    def addPostInstallScript(self, contents = None, groupName = None):
-        self._addScript(contents, groupName, self.postInstallScripts)
+        scriptDict[groupName] = (contents, invalidateRollbacks, fromClass)
 
-    def addPostRollbackScript(self, contents = None, groupName = None):
-        self._addScript(contents, groupName, self.postRollbackScripts)
+    def addPostInstallScript(self, contents = None, groupName = None,
+                             fromClass = None):
+        self._addScript(contents, groupName, self.postInstallScripts,
+                        fromClass = fromClass)
+
+    def addPostRollbackScript(self, contents = None, groupName = None,
+                              toClass = None):
+        self._addScript(contents, groupName, self.postRollbackScripts,
+                        fromClass = toClass)
 
     def addPostUpdateScript(self, contents = None, groupName = None,
-                            invalidateRollbacks = True):
+                            invalidateRollbacks = True, fromClass = None):
         self._addScript(contents, groupName, self.postUpdateScripts,
-                        invalidateRollbacks = invalidateRollbacks)
+                        invalidateRollbacks = invalidateRollbacks,
+                        fromClass = fromClass)
 
-    def addPreUpdateScript(self, contents = None, groupName = None):
-        self._addScript(contents, groupName, self.preUpdateScripts)
+    def addPreUpdateScript(self, contents = None, groupName = None,
+                           fromClass = None):
+        self._addScript(contents, groupName, self.preUpdateScripts,
+                        fromClass = fromClass)
+
+    def setCompatibilityClass(self, theClass, groupName = None):
+        if groupName is None:
+            group = self.defaultGroup
+        else:
+            group = self._getGroup(groupName)
+
+        group.setCompatibilityClass(theClass)
 
     def getLabelPath(self):
         return self.labelPath
@@ -1419,8 +1437,8 @@ class SingleGroup(object):
         self.newGroupDifferenceList = []
         self.differenceSpecs = []
         self.componentsToMove = []
-
         self.requires = deps.DependencySet()
+        self.compatibilityClass = None
 
         self.troves = {}
         self.reasons = {}
@@ -1645,6 +1663,9 @@ class SingleGroup(object):
 
     def getSize(self):
         return self.size
+
+    def setCompatibilityClass(self, theClass):
+        self.compatibilityClass = theClass
 
     def iterTroveList(self, strongRefs=False, weakRefs=False):
         if not (strongRefs or weakRefs):
