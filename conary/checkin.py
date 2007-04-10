@@ -17,7 +17,6 @@ checking in changes; checking out the latest version; displaying logs
 and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
-import difflib
 import errno
 import fnmatch
 import itertools
@@ -45,6 +44,7 @@ from conary.build.cook import signAbsoluteChangeset
 from conary.build import cook
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
+from conary.lib import fixeddifflib
 from conary.lib import log
 from conary.lib import magic
 from conary.lib import util
@@ -687,7 +687,7 @@ def annotate(repos, filename):
     # newest version.
     lineMap = {} 
                  
-    s = difflib.SequenceMatcher(None)
+    s = fixeddifflib.SequenceMatcher(None)
     newV = newTrove = newLines = newFileV = newContact = None
     
     verList = [ v for v in branchVerList[branch] if not v.isAfter(curVersion) ]
@@ -723,7 +723,7 @@ def annotate(repos, filename):
                 for i in xrange(0, len(newLines)):
                     if lineMap.get(i, None) is not None:
                         assert(newLines[i] == finalLines[lineMap[i]][0])
-                # use difflib SequenceMatcher to 
+                # use fixeddifflib SequenceMatcher to 
                 # find lines that are shared between old and new files
                 s.set_seqs(oldLines, newLines)
                 blocks = s.get_matching_blocks()
