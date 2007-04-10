@@ -963,22 +963,22 @@ def loadSchema(db, major=False):
     # test if  the repo schema is newer than what we understand
     # (by major schema number)
     if version.major > VERSION.major:
-        raise sqlerrors.SchemaVersionError(
-            "The repository schema version is newer and incompatible with "
-            "this code base. You need to update conary code to a version "
-            "that undersand repo schema %s" % version, version)
+        raise sqlerrors.SchemaVersionError("""
+        The repository schema version is newer and incompatible with
+        this code base. You need to update conary code to a version
+        that undersand repo schema %s""" % version, version)
     # is the repo schema too old? we only support migrations from schema 13 on
     if version < 13:
-        raise sqlerrors.SchemaVersionError(
-            "Repository schemas from Conary versions older than 1.0 are not "
-            "supported. Contact rPath for help converting your repository to "
-            "a supported version.", version)
+        raise sqlerrors.SchemaVersionError("""
+        Repository schemas from Conary versions older than 1.0 are not
+        supported. Contact rPath for help converting your repository to
+        a supported version.""", version)
     # now we need to perform a schema migration
     if version.major < VERSION.major and not major:
-        raise sqlerrors.SchemaVersionError(
-            "Repository schema needs to have a major schema update performed. "
-            "Please run server.py with --migrate option to run this conary "
-            "repository codebase.", version, VERSION)
+        raise sqlerrors.SchemaVersionError("""
+        Repository schema needs to have a major schema update performed.
+        Please run server.py with --migrate option to perform this upgrade.
+        """, version, VERSION)
     # avoid a recursive import by importing just what we need
     from conary.server import migrate
     version = migrate.migrateSchema(db, major=major)
