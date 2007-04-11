@@ -364,8 +364,9 @@ class UpdateJob:
     def updateInvalidatesRollbacks(self):
         return self._invalidateRollbackStack
 
-    def addJobPreScript(self, job, script):
-        self._jobPreScripts.append((job, script))
+    def addJobPreScript(self, job, script, oldCompatClass, newCompatClass):
+        self._jobPreScripts.append((job, script, oldCompatClass,
+                                    newCompatClass))
 
     def iterJobPreScripts(self):
             for i in self._jobPreScripts:
@@ -1103,11 +1104,14 @@ class Database(SqlDbRepository):
         if isRollback or justDatabase:
            return True
 
-        for job, script in uJob.iterJobPreScripts():
+        for (job, script, oldCompatClass, newCompatClass) in \
+                                                uJob.iterJobPreScripts():
             scriptId = "%s preupdate" % job[0]
             rc = update.runTroveScript(job, script, tagScript, tmpDir,
                                        self.root, callback, isPre = True,
-                                       scriptId = scriptId)
+                                       scriptId = scriptId,
+                                       oldCompatClass = oldCompatClass,
+                                       newCompatClass = newCompatClass)
             if rc:
                 return False
 

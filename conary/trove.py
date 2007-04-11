@@ -2305,7 +2305,11 @@ class Trove(streams.StreamSet):
         self.troveInfo.compatibilityClass.set(theClass)
 
     def getCompatibilityClass(self):
-        return self.troveInfo.compatibilityClass()
+        c = self.troveInfo.compatibilityClass()
+        if c is None:
+            return 0
+
+        return c
 
     def getSourceName(self):
         return self.troveInfo.sourceName()
@@ -2675,6 +2679,18 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getPostRollbackScript(self):
         return self._getScript(_TROVESCRIPTS_POSTROLLBACK)
 
+    def getNewCompatibilityClass(self):
+        c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
+                                         self.absoluteTroveInfo())
+        if c is None:
+            # no compatibility class has been set for this trove; treat that
+            # as compatibility class 0
+            c = 0
+        else:
+            c = c()
+
+        return c
+
     def isRollbackFence(self, oldCompatibilityClass = None, update = False):
         """
         oldCompatibilityClass of None means we don't use compatibility
@@ -2683,14 +2699,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if oldCompatibilityClass is None:
             return False
 
-        thisCompatClass = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
-                                         self.absoluteTroveInfo())
-        if thisCompatClass is None:
-            # no compatibility class has been set for this trove; treat that
-            # as compatibility class 0
-            thisCompatClass = 0 
-        else:
-            thisCompatClass = thisCompatClass()
+        thisCompatClass = self.getNewCompatibilityClass()
 
         # if both old a new have the same compatibility class, there is no
         # fence

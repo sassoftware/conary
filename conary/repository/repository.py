@@ -402,8 +402,6 @@ class ChangeSetJob:
                               oldTroveFlavor)
 
                 oldCompatClass = newTrove.getCompatibilityClass()
-                if oldCompatClass is None:
-                    oldCompatClass = 0
 
                 if csTrove.isRollbackFence(
                                    oldCompatibilityClass = oldCompatClass,

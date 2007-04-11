@@ -1789,7 +1789,7 @@ order by
 
         cu = self.db.cursor()
         cu.execute("""
-            SELECT * FROM Instances
+            SELECT data FROM Instances
                     JOIN Versions USING (versionId)
                     JOIN Flavors ON Instances.flavorId = Flavors.flavorId
                     LEFT OUTER JOIN TroveInfo ON

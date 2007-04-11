@@ -1687,7 +1687,8 @@ conary erase '%s=%s[%s]'
                 # it's an update; check for preupdate scripts
                 preScript = troveCs.getPreUpdateScript()
                 if preScript:
-                    uJob.addJobPreScript(job, preScript)
+                    uJob.addJobPreScript(job, preScript, oldCompatClass,
+                                         troveCs.getNewCompatibilityClass())
             else:
                 oldCompatClass = None
 
