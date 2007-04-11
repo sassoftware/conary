@@ -211,11 +211,19 @@ def migrate_table(t):
         pgsql.commit()
         return i
 
-    def copyBulk(t, src):
-        pgsql.dbh.bulkload(t, (rowvals(funcs, row) for row in src), fields)
-        pgsql.commit()
+    def copyBulk(t, src, batch=10000):
+        i = 0
+        while i <= count:
+            pgsql.dbh.bulkload(t, itertools.islice(src, batch), fields)
+            i = i + batch
+            pgsql.commit()
+            sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
+            sys.stdout.flush()
         dst.execute("select count(*) from %s" %(t,))
-        return dst.fetchall()[0][0]
+        ret = dst.fetchall()[0][0]
+        sys.stdout.write("\r%s: %s" % (t, timings(ret, count, t1)))
+        sys.stdout.flush()
+        return ret
 
     src.execute("SELECT * FROM %s" % t)
     t1 = time.time()
