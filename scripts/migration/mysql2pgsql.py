@@ -233,6 +233,7 @@ def migrate_table(t):
             sys.stdout.flush()
             ret = copyBulk(t, src)
         else:
+            print "WARNING: not using bulk load, update your python-pgsql bindings!"
             ret = copy1by1(t, src)
         assert (ret == count), "Inserted %d rows != source count %d rows" % (ret, count)
     except Exception, e:
