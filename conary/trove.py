@@ -697,7 +697,7 @@ class TroveScriptCompatibilityCollection(streams.StreamCollection):
         return ( x[1] for x in self.iterAll() )
 
 _TROVESCRIPT_SCRIPT        = 0
-_TROVESCRIPT_ROLLBACKFENCE = 1
+#_TROVESCRIPT_ROLLBACKFENCE = 1   Supported in 1.1.21; never used
 _TROVESCRIPT_CONVERSIONS   = 2
 
 class TroveScript(streams.StreamSet):
@@ -705,8 +705,6 @@ class TroveScript(streams.StreamSet):
     streamDict = {
         _TROVESCRIPT_SCRIPT        : (DYNAMIC, streams.StringStream,
                                                         'script' ),
-        _TROVESCRIPT_ROLLBACKFENCE : (SMALL, streams.ByteStream,
-                                                        'rollbackFence' ),
         _TROVESCRIPT_CONVERSIONS   : (DYNAMIC, TroveScriptCompatibilityCollection,
                                                         'conversions' ),
     }
@@ -2658,12 +2656,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
         scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
                                        self.absoluteTroveInfo())
         if scriptStream is None:
-            return None, False
+            return None
 
         # this is horrid, but it's just looking up the script stream we're
         # looking for
         script = scriptStream.__getattribute__(scriptStream.streamDict[kind][2])
-        return script.script(), script.rollbackFence()
+        return script.script()
 
     def getPostInstallScript(self):
         return self._getScript(_TROVESCRIPTS_POSTINSTALL)
@@ -2682,31 +2680,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
         oldCompatibilityClass of None means we don't use compatibility
         class checks to restruct rollbacks.
         """
-        def _isRollbackFence(scriptStream, kind):
-            # this is horrid as well
-            scriptInfo = scriptStream.__getattribute__(
-                                scriptStream.streamDict[kind][2])
-
-            if scriptInfo.rollbackFence():
-                return True
-
-            return False
-
-        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
-                                       self.absoluteTroveInfo())
-        if scriptStream:
-            # this checks for rollback fencing based on the absolute boolean
-            if update:
-                fence = (_isRollbackFence(scriptStream,
-                                          _TROVESCRIPTS_POSTUPDATE) or
-                         _isRollbackFence(scriptStream,
-                                          _TROVESCRIPTS_PREUPDATE))
-            else:
-                fence = _isRollbackFence(scriptStream,
-                                         _TROVESCRIPTS_POSTINSTALL)
-
-            if fence: return True
-
         if oldCompatibilityClass is None:
             return False
 
@@ -2723,6 +2696,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
         # fence
         if oldCompatibilityClass == thisCompatClass:
             return False
+
+        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
+                                       self.absoluteTroveInfo())
 
         if scriptStream is None or not scriptStream.postRollback.script():
             # there is no rollback script; use a strict compatibility class

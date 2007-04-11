@@ -712,9 +712,6 @@ class FilesystemJob:
                            self.root, self.callback, isPre = False,
                            scriptId = scriptId)
 
-    def getInvalidateRollbacks(self):
-        return self.invalidateRollbacks
-
     def getErrorList(self):
 	return self.errors
 
@@ -914,17 +911,14 @@ class FilesystemJob:
         if self.rollbackPhase == ROLLBACK_PHASE_REPOS:
             if baseTrove:
                 s = baseTrove.troveInfo.scripts.postRollback.script()
-                rbInv = baseTrove.troveInfo.scripts.postRollback.rollbackFence()
             else:
                 s = None
-                rbInv = False
         elif troveCs.getOldVersion():
-            s, rbInv = troveCs.getPostUpdateScript()
+            s = troveCs.getPostUpdateScript()
         else:
-            s, rbInv = troveCs.getPostInstallScript()
+            s = troveCs.getPostInstallScript()
 
         if s:
-            self.invalidateRollbacks = self.invalidateRollbacks or rbInv
             self.postScripts.append((troveCs, s))
 
         # Create new files. If the files we are about to create already
@@ -1569,7 +1563,6 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
         self.postScripts = []
-        self.invalidateRollbacks = False
         self.rollbackPhase = rollbackPhase
 	self.db = db
         self.pathRemovedCache = (None, None, None)

@@ -640,7 +640,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                       (recipeObj.preUpdateScripts, False,
                             grpTrv.troveInfo.scripts.preUpdate) ]:
                 if groupName in recipeScripts:
-                    scriptClassList = recipeScripts[groupName][2]
+                    scriptClassList = recipeScripts[groupName][1]
                     # rollback scripts move from this class to another
                     # while normal scripts move from another class to this
                     if scriptClassList is not None and compatClass is None:
@@ -655,7 +655,6 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                             [ (x, compatClass) for x in scriptClassList ])
 
                     troveScripts.script.set(recipeScripts[groupName][0])
-                    troveScripts.rollbackFence.set(recipeScripts[groupName][1])
 
             for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,

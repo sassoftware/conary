@@ -1685,7 +1685,7 @@ conary erase '%s=%s[%s]'
                 oldCompatClass = self.db.getTroveCompatibilityClass(
                         job[0], job[1][0], job[1][1])
                 # it's an update; check for preupdate scripts
-                preScript, isFence = troveCs.getPreUpdateScript()
+                preScript = troveCs.getPreUpdateScript()
                 if preScript:
                     uJob.addJobPreScript(job, preScript)
             else:
@@ -1981,7 +1981,7 @@ conary erase '%s=%s[%s]'
                 # it's an update; check for preupdate scripts
                 oldCompatClass = self.db.getTroveCompatibilityClass(
                         job[0], job[1][0], job[1][1])
-                preScript, isFence = troveCs.getPreUpdateScript()
+                preScript = troveCs.getPreUpdateScript()
                 if preScript:
                     uJob.addJobPreScript(job, preScript)
             else:
@@ -2789,6 +2789,7 @@ conary erase '%s=%s[%s]'
         # run preinstall scripts
         if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
                                      tagScript = tagScript,
+                                     justDatabase = justDatabase,
                                      tmpDir = self.cfg.tmpDir):
             raise UpdateError('error: preupdate script failed')
 

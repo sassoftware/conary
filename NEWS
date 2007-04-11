@@ -6,7 +6,8 @@
       stack is invalidated unless the group also contains postRollback script
       which can rollback to the version being updated. Postrollback scripts
       can now be defined with a list of compatibility versions they are able
-      to roll back to.
+      to roll back to. Old invalidateRollback parameter for some group
+      scripts is no longer supported.
   o Client Changes:
     * Proxy configuration parameter is now of the form 'proxy protocol url'
       (i.e. 'proxy http http://proxy.some.com'), and allows separate proxies
@@ -14,6 +15,7 @@
       separate proxies are configured for http and https rather than a
       single proxy being using for both protocols. Users who need the old
       behavior should set explicit configure the same proxy for both protocols.
+    * --just-db no longer runs group scripts
   o Proxy Changes:
     * The proxy can now be configured to use an http proxy for all outgoing
       requests. The 'proxy' configuration item is supported in a manner

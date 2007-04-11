@@ -1274,8 +1274,7 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         self.labelPath = [ versions.Label(x) for x in path ]
 
-    def _addScript(self, contents, groupName, scriptDict,
-                   invalidateRollbacks = False, fromClass = None):
+    def _addScript(self, contents, groupName, scriptDict, fromClass = None):
         if groupName is None:
             groupName = self.name
 
@@ -1292,30 +1291,168 @@ class GroupRecipe(_BaseGroupRecipe):
         if type(fromClass) == int:
             fromClass = [ fromClass ]
 
-        scriptDict[groupName] = (contents, invalidateRollbacks, fromClass)
+        scriptDict[groupName] = (contents, fromClass)
 
-    def addPostInstallScript(self, contents = None, groupName = None,
-                             fromClass = None):
-        self._addScript(contents, groupName, self.postInstallScripts,
-                        fromClass = fromClass)
+    def addPostInstallScript(self, contents = None, groupName = None):
+        """
+        NAME
+        ====
+
+        B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
+
+        SYNOPSIS
+        ========
+
+        C{r.addPostInstallScript(I{contents}, I{groupName}}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.addPostInstallScript} command specifies the post install script
+        for a group. This script is run after the group has been installed
+        for the first time (not when the group is being upgraded from a
+        previously installed version to version defining the script).
+
+        PARAMETERS
+        ==========
+
+        The C{r.addPostInstallScript()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{contents} : (None) The contents of the script
+        B{groupName} : (None) The name of the group to add the script to
+        """
+        self._addScript(contents, groupName, self.postInstallScripts)
 
     def addPostRollbackScript(self, contents = None, groupName = None,
                               toClass = None):
+        """
+        NAME
+        ====
+
+        B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
+
+        SYNOPSIS
+        ========
+
+        C{r.addPostRollbackScript(I{contents}, I{groupName}}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.addPostRollbackScript} command specifies the post rollback
+        script for a group. This script is run after the group defining the
+        script has been rolled back to a previous version of the group.
+
+        PARAMETERS
+        ==========
+
+        The C{r.addPostRollbackScript()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{contents} : (None) The contents of the script
+        B{groupName} : (None) The name of the group to add the script to
+        B{toClass} : (None) The trove compatibility classes this script
+        is able to support rollbacks to. This may be a single integer
+        or a list of integers.
+        """
         self._addScript(contents, groupName, self.postRollbackScripts,
                         fromClass = toClass)
 
     def addPostUpdateScript(self, contents = None, groupName = None,
-                            invalidateRollbacks = True, fromClass = None):
+                            fromClass = None):
+        """
+        NAME
+        ====
+
+        B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
+
+        SYNOPSIS
+        ========
+
+        C{r.addPostUpdateScript(I{contents}, I{groupName}}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.addPostUpdateScript} command specifies the post update script
+        for a group. This script is run after the group has been updated from
+        a previously-installed version to the version defining the script.
+
+        PARAMETERS
+        ==========
+
+        The C{r.addPostUpdateScript()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{contents} : (None) The contents of the script
+        B{groupName} : (None) The name of the group to add the script to
+        """
         self._addScript(contents, groupName, self.postUpdateScripts,
-                        invalidateRollbacks = invalidateRollbacks,
                         fromClass = fromClass)
 
     def addPreUpdateScript(self, contents = None, groupName = None,
                            fromClass = None):
+        """
+        NAME
+        ====
+
+        B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
+
+        SYNOPSIS
+        ========
+
+        C{r.addPreUpdateScript(I{contents}, I{groupName}}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.addPreUpdateScript} command specifies the pre update script
+        for a group. This script is run before the group is updated from
+        a previously-installed version to the version defining the script.
+
+        PARAMETERS
+        ==========
+
+        The C{r.addPreUpdateScript()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{contents} : (None) The contents of the script
+        B{groupName} : (None) The name of the group to add the script to
+        """
         self._addScript(contents, groupName, self.preUpdateScripts,
                         fromClass = fromClass)
 
     def setCompatibilityClass(self, theClass, groupName = None):
+        """
+        NAME
+        ====
+
+        B{C{r.setCompatibilityClass()}} - Specify the compatibility class
+        for this trove.
+
+        SYNOPSIS
+        ========
+
+        C{r.setCompatibilityClass(I{class})}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.setCompatibilityClass} command specifies the compatibility
+        class for this trove. When a trove is updated from one compatibility
+        class to another, the rollback stack is invalidated unless the
+        newly-installed trove provides a postRollback script which supports
+        the old trove's compatibility class.
+
+        PARAMETERS
+        ==========
+
+        The C{r.setCompatibilityClass()} command accepts the following 
+        parameters.
+
+        B{theClass} : The compatibility class for this trove.
+        """
         if groupName is None:
             group = self.defaultGroup
         else:
