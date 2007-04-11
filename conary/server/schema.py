@@ -14,14 +14,14 @@
 
 import sys
 
-from conary.dbstore import sqlerrors, idtable
+from conary.dbstore import sqlerrors, sqllib, idtable
 from conary.lib.tracelog import logMe
 from conary.local.schema import createDependencies, setupTempDepTables
 
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = 15
+VERSION = sqllib.DBversion(15, 2)
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -57,14 +57,12 @@ def createInstances(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Instances"] = []
         commit = True
-    db.createIndex("Instances", "InstancesIdx",
-                   "itemId, versionId, flavorId",
+    db.createIndex("Instances", "InstancesIdx", "itemId,versionId,flavorId",
                    unique = True)
-    db.createIndex("Instances", "InstancesChangedIdx",
-                   "changed, instanceId")
-    db.createIndex("Instances", "InstancesClonedFromIdx",
-                   "clonedFromId, instanceId")
-    if createTrigger(db, "Instances", pinned = True):
+    db.createIndex("Instances", "InstancesChangedIdx", "changed,instanceId")
+    db.createIndex("Instances", "InstancesClonedFromIdx", "clonedFromId,instanceId")
+    db.createIndex("Instances", "InstancesPresentIdx", "isPresent,instanceId")
+    if createTrigger(db, "Instances"):
         commit = True
 
     if commit:
@@ -205,6 +203,7 @@ def createLatest(db):
     db.createIndex("Latest", "LatestCheckIdx",
                    "itemId, branchId, flavorId, latestType",
                    unique = True)
+    db.createIndex("Latest", "LatestChangedIdx", "changed, latestType")
     if createTrigger(db, "Latest"):
         commit = True
 
@@ -642,9 +641,11 @@ def createLabelMap(db):
     if "LabelMap" not in db.tables:
         cu.execute("""
         CREATE TABLE LabelMap(
+            labelmapId      %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT LabelMap_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -659,6 +660,8 @@ def createLabelMap(db):
         commit = True
     db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
+    if createTrigger(db, "LabelMap"):
+        commit = True
     if commit:
         db.commit()
         db.loadSchema()
@@ -907,45 +910,6 @@ def createSchema(db):
     createMetadata(db)
     createMirrorTracking(db)
 
-# run through the schema creation and migration (if required)
-def loadSchema(db):
-    global VERSION
-    version = db.getVersion()
-
-    logMe(1, "current =", version, "required =", VERSION)
-    # load the current schema object list
-    db.loadSchema()
-
-    if version != 0 and version < 13:
-        raise sqlerrors.SchemaVersionError(
-            "Repository schemas from Conary versions older than 1.0 are not "
-            "supported. Contact rPath for help converting your repository to "
-            "a supported version.")
-
-    if version and version < VERSION:
-        # avoid a recursive import by importing just what we need
-        from conary.server import migrate
-        version = migrate.migrateSchema(db, version)
-
-    if version:
-        db.loadSchema()
-    # run through the schema creation to create any missing objects
-    createSchema(db)
-    if version > 0 and version != VERSION:
-        # schema creation/conversion failed. SHOULD NOT HAPPEN!
-        raise sqlerrors.SchemaVersionError("""
-        Schema migration process has failed to bring the database
-        schema version up to date. Please report this error at
-        http://bugs.rpath.com/.
-
-        Current schema version is %s; Required schema version is %s.
-        """ % (version, VERSION))
-    db.loadSchema()
-
-    if version != VERSION:
-        return db.setVersion(VERSION)
-
-    return VERSION
 
 # this should only check for the proper schema version. This function
 # is called usually from the multithreaded setup, so schema operations
@@ -953,23 +917,96 @@ def loadSchema(db):
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
-    logMe(2, VERSION, version)
-    if version == VERSION:
-        return version
+    logMe(2, "current =", version, "required =", VERSION)
 
-    if version > VERSION:
+    # test for no version
+    if version == 0:
+        raise sqlerrors.SchemaVersionError("""
+        Your database schema is not initalized or it is too old.  Please
+        run the standalone server with the --migrate argument to
+        upgrade/initialize the database schema for the Conary Repository.
+        
+        Current schema version is %s; Required schema version is %s.
+        """ % (version, VERSION), version)
+
+    # the major versions must match
+    if version.major != VERSION.major:
+        raise sqlerrors.SchemaVersionError("""
+        This code schema version does not match the Conary repository
+        database schema that you are running.
+
+        Current schema version is %s; Required schema version is %s.
+        """ % (version, VERSION), version)
+        
+    # next, the minor version of the repo must be at least what we need
+    if version.minor < VERSION.minor:
         raise sqlerrors.SchemaVersionError("""
         This code version is too old for the Conary repository
-        database schema that you are running. you need to upgrade the
+        database schema that you are running. You need to upgrade the
         conary repository code base to a more recent version.
 
         Current schema version is %s; Required schema version is %s.
+        """ % (version, VERSION), version)
+    return version
+
+# run through the schema creation and migration (if required)
+def loadSchema(db, major=False):
+    global VERSION
+    try:
+        version =  checkVersion(db)
+        needMigrate = False
+    except sqlerrors.SchemaVersionError, e:
+        version = e.args[0]
+        needMigrate = True
+    logMe(1, "current =", version, "required =", VERSION)
+    # load the current schema object list
+    db.loadSchema()
+
+    # expedite the initial repo creation
+    if version == 0:
+        createSchema(db)
+        loadSchema(db)
+        return db.setVersion(VERSION)
+    if version == VERSION:
+        return version
+    if version.major == VERSION.major and version.minor >= VERSION.minor:
+        # repo schema is newer, but compatible
+        logMe(1, "warning: repo schema version %s is newer than required %s" %(
+            version, VERSION))
+        return version
+    # test if  the repo schema is newer than what we understand
+    # (by major schema number)
+    if version.major > VERSION.major:
+        raise sqlerrors.SchemaVersionError("""
+        The repository schema version is newer and incompatible with
+        this code base. You need to update conary code to a version
+        that undersand repo schema %s""" % version, version)
+    # is the repo schema too old? we only support migrations from schema 13 on
+    if version < 13:
+        raise sqlerrors.SchemaVersionError("""
+        Repository schemas from Conary versions older than 1.0 are not
+        supported. Contact rPath for help converting your repository to
+        a supported version.""", version)
+    # now we need to perform a schema migration
+    if version.major < VERSION.major and not major:
+        raise sqlerrors.SchemaVersionError("""
+        Repository schema needs to have a major schema update performed.
+        Please run server.py with --migrate option to perform this upgrade.
+        """, version, VERSION)
+    # avoid a recursive import by importing just what we need
+    from conary.server import migrate
+    version = migrate.migrateSchema(db, major=major)
+    db.loadSchema()
+    # run through the schema creation to create any missing objects
+    createSchema(db)
+    if version > 0 and version != VERSION:
+        # schema creation/conversion failed. SHOULD NOT HAPPEN!
+        raise sqlerrors.SchemaVersionError("""
+        Schema migration process has failed to bring the database
+        schema version up to date. Please report this error at
+        http://issues.rpath.com/.
+
+        Current schema version is %s; Required schema version is %s.
         """ % (version, VERSION))
-
-    raise sqlerrors.SchemaVersionError("""
-    Your database schema is not initalized or it is too old.  Please
-    run the standalone server with the --migrate argument to
-    upgrade/initialize the database schema for the Conary Repository.
-
-    Current schema version is %s; Required schema version is %s.
-    """ % (version, VERSION))
+    db.loadSchema()
+    return VERSION

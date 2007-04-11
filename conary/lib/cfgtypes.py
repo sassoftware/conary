@@ -111,6 +111,8 @@ CfgString = CfgType
 
 _pathCache = {}
 def Path(str):
+    if str in ["stdin", "stdout", "stderr"]:
+        return _Path(str)
     if str not in _pathCache:
         if '~' not in str and '$' not in str and str[0] == '/':
             p = _Path(str)

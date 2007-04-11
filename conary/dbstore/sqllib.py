@@ -15,6 +15,28 @@
 # Various stuff used by the dbstore drivers
 import time
 
+# class to aid in comparing database versions
+class DBversion:
+    def __init__(self, major, minor=0):
+        self.major = major
+        self.minor = minor
+        
+    def __cmp__(self, other):
+        if isinstance(other, int):
+            if self.major == other:
+                return cmp(self.minor, 0)
+            return cmp(self.major, other)
+        elif isinstance(other, tuple):
+            assert(len(other) == 2)
+            return cmp(self.major, other[0]) or cmp(self.minor, other[1])
+        elif isinstance(other, self.__class__):
+            return cmp(self.major, other.major) or cmp(self.minor, other.minor)
+        raise RuntimeError("incompatible type compare for DBversion",
+                           [(self.major, self.minor), other])
+    def __str__(self):
+        return "DBversion(%d,%d)" % (self.major, self.minor)
+    __repr__ = __str__
+
 # a case-insensitive key dict
 class CaselessDict(dict):
     def __init__(self, d=None):
@@ -32,6 +54,8 @@ class CaselessDict(dict):
         return dict.__getitem__(self, self.__l(key))[1]
     def __setitem__(self, key, value):
         dict.__setitem__(self, self.__l(key), (key, value))
+    def __delitem__(self, key):
+        dict.__delitem__(self, self.__l(key))
     def has_key(self, key):
         return dict.has_key(self, self.__l(key))
 
