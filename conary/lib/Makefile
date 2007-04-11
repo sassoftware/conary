@@ -21,6 +21,7 @@ python_files=	    __init__.py		\
 		    debugger.py		\
 		    erlcompleter.py	\
 		    epdb.py     	\
+		    fixeddifflib.py	\
 		    fixedglob.py	\
 		    fixedthreading.py	\
 		    graph.py		\
