@@ -11,6 +11,9 @@ Changes in @NEW@:
   o Build Changes:
     * Conary has tools in place through a new cross flag and a new "target"
       flavor to support better defining of cross compiling builds.  (CNY-1003)
+  o Server Changes:
+    * repository schema now understands the concept of minor and major
+      schema revisions (CNY-811)
   o Bug Fixes:
     * Fixed a bug in proxy code that would cause conary to use https through
       the proxy when http was desired (CNY-1530)
@@ -24,6 +27,8 @@ Changes in @NEW@:
       trace, but an error message. (CNY-1292)
     * The Conary library uses a built-in difflib if the system's difflib
       is not patched for recursion. (CNY-1377)
+    * mirroring troves marked as removed from repsoitories running on 
+      mysql has been fixed (CNY-1193)
 
 Changes in 1.1.21:
   o Repository Changes:
