@@ -275,13 +275,14 @@ def verify_table(t, quick=False):
 # PROGRAM MAIN LOOP
 for t in tList:
     migrate_table(t)
-    verify_table(t)
+    #verify_table(t)
 
 # and now create the indexes
 dst = pgsql.cursor()
 for stmt in getIndexes("postgresql"):
     print stmt
     dst.execute(stmt)
+pgsql.dbh.execute("VACUUM ANALYZE")
 pgsql.setVersion(VERSION)
 pgsql.commit()
 
