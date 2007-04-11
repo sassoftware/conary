@@ -4,6 +4,10 @@ Changes in @NEW@:
       update set and restart before applying the rest of the updates,
       two new API calls have been added: createUpdateJob and
       applyUpdateJob. (CNY-1454)
+    * A new argument, --no-restart, has been added to conary. This
+      has to be used in conjunction with --root and allows one to skip
+      the restarts after applying critical updates when installing in
+      a chroot. (CNY-1458)
   o Build Changes:
     * Conary has tools in place through a new cross flag and a new "target"
       flavor to support better defining of cross compiling builds.  (CNY-1003)
