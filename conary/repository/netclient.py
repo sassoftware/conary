@@ -273,6 +273,8 @@ class ServerCache:
         self.proxies = proxies
 
     def __getPassword(self, host, user=None):
+        if not self.pwPrompt:
+            return None, None
         user, pw = self.pwPrompt(host, user)
         if user is None or pw is None:
             return None, None
