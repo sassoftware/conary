@@ -700,6 +700,9 @@ class _UpdateCommand(ConaryCommand):
                            'Do not attempt to solve dependency problems'),
         'no-conflict-check' : (VERBOSE_HELP,
                                'Ignore potential path conflicts'),
+        'no-restart'    : (VERBOSE_HELP,
+                           'Do not restart after applying a critical update. '
+                           'Requires --root'),
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found',
         'resolve'       : 'Add troves to update to solve dependency problems',
@@ -724,6 +727,7 @@ class _UpdateCommand(ConaryCommand):
         d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
+        d["no-restart"] = NO_PARAM
         d["no-conflict-check"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["replace-files"] = NO_PARAM
@@ -750,6 +754,11 @@ class _UpdateCommand(ConaryCommand):
         if argSet.has_key('resolve'):
             cfg.autoResolve = True
             del argSet['resolve']
+
+        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if noRestart and cfg.root == '/':
+            raise conary.errors.ConaryError(
+                "--no-restart has to be used with --root")
 
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
@@ -814,7 +823,9 @@ class EraseCommand(_UpdateCommand):
     def addParameters(self, argDef):
         # rename Update Options to Erase Options (CNY-1090)
         _UpdateCommand.addParameters(self, argDef)
-        argDef['Erase Options'] = argDef.pop('Update Options')
+        d = argDef['Erase Options'] = argDef.pop('Update Options')
+        # --no-restart doesn't make sense in the erase context
+        del d['no-restart']
 
 _register(EraseCommand)
 
@@ -873,6 +884,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
+        argDef["no-restart"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
@@ -881,6 +893,11 @@ class UpdateAllCommand(_UpdateCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
+
+        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if noRestart and cfg.root == '/':
+            raise conary.errors.ConaryError(
+                "--no-restart has to be used with --root")
 
         if argSet.has_key('info'):
             kwargs['info'] = True

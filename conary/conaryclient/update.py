@@ -2341,7 +2341,14 @@ conary erase '%s=%s[%s]'
 
     def applyUpdateJob(self, updJob, **kwargs):
         # Apply the update job, return restart information if available
-        remainingJobs = updJob.loadCriticalJobsOnly()
+        noRestart = kwargs.pop('noRestart', False)
+        if noRestart:
+            # Apply everything
+            remainingJobs = []
+        else:
+            # Load just the critical jobs (or everything if no critical jobs
+            # are present)
+            remainingJobs = updJob.loadCriticalJobsOnly()
 
         # XXX May have to use a callback for this
         log.syslog.command()

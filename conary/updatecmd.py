@@ -367,6 +367,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                         justDatabase = False,
                         info = False,
                         keepJournal = False,
+                        noRestart = False,
     )
     applyKwargs = {}
     for k in applyDefaults:
@@ -376,6 +377,8 @@ def _updateTroves(cfg, applyList, **kwargs):
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
     applyKwargs['autoPinList'] = cfg.pinTroves
+
+    noRestart = applyKwargs.get('noRestart', False)
 
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
@@ -471,7 +474,7 @@ def _updateTroves(cfg, applyList, **kwargs):
         if not okay:
             return
 
-    if updJob.getCriticalJobs():
+    if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
 
     restartDir = client.applyUpdateJob(updJob, **applyKwargs)
