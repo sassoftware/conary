@@ -19,7 +19,7 @@ import imp
 import inspect
 import sys
 
-from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
+from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, _sourceHelper
 from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
 
@@ -76,14 +76,6 @@ class _policyUpdater:
         self.theobject = theobject
     def __call__(self, *args, **keywords):
 	self.theobject.updateArgs(*args, **keywords)
-
-class _sourceHelper:
-    def __init__(self, theclass, recipe):
-        self.theclass = theclass
-	self.recipe = recipe
-    def __call__(self, *args, **keywords):
-        self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
-
 
 def clearBuildReqs(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
@@ -450,9 +442,6 @@ class _AbstractPackageRecipe(Recipe):
     def _addBuildAction(self, name, item):
         self.externalMethods[name] = _recipeHelper(self._build, self, item)
 
-    def _addSourceAction(self, name, item):
-        self.externalMethods[name] = _sourceHelper(item, self)
-
     def doProcess(self, policyBucket):
 	for post in self._policies[policyBucket]:
             sys.stdout.write('Running policy: %s\r' %post.__class__.__name__)
@@ -535,30 +524,6 @@ class _AbstractPackageRecipe(Recipe):
         if value is not None:
             self._tty = value
         return self._tty
-
-    def __getattr__(self, name):
-	"""
-	Allows us to dynamically suck in namespace of other modules
-	with modifications.
-	 - The public namespace of the build module is accessible,
-	   and build objects are created and put on the build list
-	   automatically when they are referenced.
-	 - The public namespaces of the policy modules are accessible;
-	   policy objects already on their respective lists are returned,
-	   policy objects not on their respective lists are added to
-	   the end of their respective lists like build objects are
-	   added to the build list.
-	"""
-        if not name.startswith('_'):
-            externalMethod = self.externalMethods.get(name, None)
-            if externalMethod is not None:
-                return externalMethod
-
-            if self._lightInstance:
-                return _ignoreCall
-
-        # we don't get here if name is in __dict__, so it must not be defined
-        raise AttributeError, name
 
     def __delattr__(self, name):
 	"""
@@ -767,14 +732,9 @@ class _AbstractPackageRecipe(Recipe):
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        Recipe.__init__(self)
-	self._sources = []
+        Recipe.__init__(self, lightInstance = lightInstance)
 	self._build = []
         self.buildinfo = False
-        # lightInstance for only instantiating, not running (such as checkin)
-        self._lightInstance = lightInstance
-
-        self.externalMethods = {}
 
         self._policyPathMap = {}
         self._policies = {}
