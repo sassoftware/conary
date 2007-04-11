@@ -236,6 +236,7 @@ class MigrateTo_15(SchemaMigration):
 
     def fixRedirects(self, cu, repos):
         logMe(2, "removing dep provisions from redirects...")
+        self.db.loadSchema()
         # remove dependency provisions from redirects -- the conary 1.0
         # branch would set redirects to provide their own names. this doesn't
         # clean up the dependency table; that would only matter on a trove
@@ -245,6 +246,8 @@ class MigrateTo_15(SchemaMigration):
                    "(select instanceId from instances "
                    "where troveType=? and isPresent=1)",
                    trove.TROVE_TYPE_REDIRECT)
+        # need to make sure TroveRedirects is defined...
+        schema.createTroves(self.db)
         # loop over redirects...
         cu.execute("select instanceId from instances "
                    "where troveType=? and isPresent=1",
@@ -310,12 +313,14 @@ class MigrateTo_15(SchemaMigration):
         logMe(2, 'Recreating indexes... (this could take a while)')
         cu.execute("drop table tmpDups")
         cu.execute("drop table tmpDupPath")
+        self.db.loadSchema()
         schema.createTroves(self.db)
         logMe(2, 'Indexes created.')
 
     # drop the unused views
     def dropViews(self):
         logMe(2, "dropping unused views")
+        self.db.loadSchema()
         cu = self.db.cursor()
         for v in ["UsersView", "NodesView", "InstancesView", "LatestView"]:
             if v in self.db.views:
@@ -346,7 +351,6 @@ class MigrateTo_15(SchemaMigration):
         cu = self.db.cursor()
         # needed for signature recalculation
         repos = trovestore.TroveStore(self.db)
-
         self.dropViews()
         self.fixRedirects(cu, repos)
         self.fixDuplicatePaths(cu, repos)
