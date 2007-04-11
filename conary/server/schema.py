@@ -965,7 +965,7 @@ def loadSchema(db, major=False):
     # expedite the initial repo creation
     if version == 0:
         createSchema(db)
-        loadSchema(db)
+        db.loadSchema()
         return db.setVersion(VERSION)
     if version == VERSION:
         return version
