@@ -349,6 +349,16 @@ class _AbstractPackageRecipe(Recipe):
                     self.buildReqMap = {}
                     self.ignoreDeps = True
                     return
+            elif not os.path.exists(self.macros.sysroot):
+                err = ("cross requirements needed but sysroot (%s) does not exist" % (self.macros.sysroot))
+                if raiseError:
+                    raise errors.RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
+
             else:
                 crossDb = database.Database(self.macros.sysroot, cfg.dbPath)
         time = sourceVersion.timeStamps()[-1]
