@@ -1,4 +1,4 @@
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,7 +16,7 @@ from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, sqllib
 from conary.lib.tracelog import logMe
 from conary.deps import deps
-from conary.repository.netrepos import versionops, trovestore
+from conary.repository.netrepos import versionops, trovestore, flavors
 from conary.server import schema
 
 # SCHEMA Migration
@@ -118,7 +118,7 @@ class MigrateTo_14(SchemaMigration):
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 2)
+    Version = (15,3)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -377,8 +377,20 @@ class MigrateTo_15(SchemaMigration):
         cu.execute("drop table OldLabelMap")
         self.db.loadSchema()
         return True
-                      
-    
+    # migrate to 15.3
+    def migrate3(self):
+        # need to rebuild flavormap
+        cu = self.db.cursor()
+        cu.execute("drop table FlavorMap")
+        self.db.loadSchema()
+        schema.createFlavors(self.db)
+        cu.execute("select flavorId, flavor from Flavors")
+        flavTable = flavors.Flavors(self.db)
+        for (flavorId, flavorStr) in cu.fetchall():
+            flavor = deps.ThawFlavor(flavorStr)
+            flavTable.createFlavorMap(flavorId, flavor, cu)
+        return True
+
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]
