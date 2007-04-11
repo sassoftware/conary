@@ -1781,7 +1781,35 @@ order by
 
         return r
 
+    def getTroveCompatibilityClass(self, name, version, flavor):
+        if flavor is None or flavor.isEmpty():
+            flavorClause = "IS NULL"
+        else:
+            flavorClause = "= '%s'" % flavor.freeze()
 
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT * FROM Instances
+                    JOIN Versions USING (versionId)
+                    JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+                    LEFT OUTER JOIN TroveInfo ON
+                        Instances.instanceId = TroveInfo.instanceId AND
+                        TroveInfo.infoType = ?
+                    WHERE
+                        Instances.troveName = ? AND
+                        Versions.version = ? AND
+                        Flavors.flavor %s
+        """ % flavorClause, trove._TROVEINFO_TAG_COMPAT_CLASS,
+                            name, str(version))
+        l = cu.fetchall()
+        if not l:
+            # no match for the instance
+            raise KeyError
+        elif l[0][0] is None:
+            # instance match, but no entry in TroveInfo
+            return 0
+
+        return streams.ShortStream(l[0][0])
 
     def findRemovedByName(self, name):
         """

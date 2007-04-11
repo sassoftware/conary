@@ -1396,6 +1396,9 @@ class Database(SqlDbRepository):
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
 
+    def getTroveCompatibilityClass(self, name, version, flavor):
+        return self.db.getTroveCompatibilityClass(name, version, flavor)
+
     def iterFindPathReferences(self, path, justPresent = False):
         return self.db.iterFindPathReferences(path, justPresent = justPresent)
 

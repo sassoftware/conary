@@ -1,3 +1,12 @@
+  o Major Changes:
+    * Group troves can now declare an (integer) compatibility class which is
+      used to automatically invalidate rollbacks (existing groups are
+      considered to be in compatibility class zero). When a group is upgraded
+      to a new group which has a different compatibility class, the rollback
+      stack is invalidated unless the group also contains postRollback script
+      which can rollback to the version being updated. Postrollback scripts
+      can now be defined with a list of compatibility versions they are able
+      to roll back to.
   o Client Changes:
     * Proxy configuration parameter is now of the form 'proxy protocol url'
       (i.e. 'proxy http http://proxy.some.com'), and allows separate proxies
