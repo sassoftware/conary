@@ -412,7 +412,9 @@ class BaseDatabase:
         else:
             ret = c.fetchone_dict()
             # keep compatibility with old style table versioning
-            if ret.has_key("version"):
+            if ret is None:
+                self.version = sqllib.DBversion(0,0)
+            elif ret.has_key("version"):
                 self.version = sqllib.DBversion(ret["version"])
             else:
                 self.version = sqllib.DBversion(ret["major"], ret["minor"])
