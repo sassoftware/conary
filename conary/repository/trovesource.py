@@ -585,6 +585,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             self.addChangeSet(cs, includesFileContents=includesFileContents)
 
     def addChangeSet(self, cs, includesFileContents = False):
+        if cs.isEmpty():
+            return
         relative = []
 
         if not self.idMap:
