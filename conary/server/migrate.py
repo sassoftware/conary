@@ -94,7 +94,7 @@ class MigrateTo_14(SchemaMigration):
         self.cu.execute("DROP TABLE EntitlementGroups")
 
         self.db.loadSchema()
-        schema.createUsers(self.db)
+        schema.createEntitlements(self.db)
 
         self.cu.execute("INSERT INTO EntitlementGroups (entGroup, entGroupId) "
                         "SELECT entGroup, entGroupId FROM EntitlementGroups2")
@@ -118,7 +118,7 @@ class MigrateTo_14(SchemaMigration):
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 2)
+    Version = (15, 3)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -377,8 +377,21 @@ class MigrateTo_15(SchemaMigration):
         cu.execute("drop table OldLabelMap")
         self.db.loadSchema()
         return True
-                      
-    
+    # migrate to 15.3
+    def migrate3(self):
+        # we create a whole bunch of indexes for foreign keys to smooth out the differences
+        # between MySQL and PostgreSQL
+        self.db.loadSchema()
+        # indexes on Nodes have to be cleaned up
+        self.db.dropIndex("Nodes", "NodesItemBranchVersionIdx")
+        self.db.createIndex("Nodes", "NodesItemVersionBranchIdx",
+                            "itemId, versionId, branchId", unique = True)
+        self.db.dropIndex("Nodes", "NodesItemVersionIdx")
+        self.db.dropIndex("Latest", "LatestIdx")
+        self.db.loadSchema()
+        schema.createSchema(self.db)
+        return True
+
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]

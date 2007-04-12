@@ -414,10 +414,10 @@ class BaseDatabase:
             # keep compatibility with old style table versioning
             if ret is None:
                 self.version = sqllib.DBversion(0,0)
-            elif ret.has_key("version"):
+            elif len(ret) == 1:
                 self.version = sqllib.DBversion(ret["version"])
             else:
-                self.version = sqllib.DBversion(ret["major"], ret["minor"])
+                self.version = sqllib.DBversion(ret["version"], ret["minor"])
         return self.version
 
     def setVersion(self, version):
@@ -439,12 +439,12 @@ class BaseDatabase:
         # do not allow "going back"
         assert (version >= crtVersion)
         if crtVersion == 0: # indicates table is not there
-            c.execute("CREATE TABLE DatabaseVersion (major INTEGER, minor INTEGER)")
-            c.execute("INSERT INTO DatabaseVersion (major, minor) VALUES (?,?)",
+            c.execute("CREATE TABLE DatabaseVersion (version INTEGER, minor INTEGER)")
+            c.execute("INSERT INTO DatabaseVersion (version, minor) VALUES (?,?)",
                       (version.major, version.minor))
             self.commit()
             return version
-        c.execute("UPDATE DatabaseVersion SET major = ?, minor = ?",
+        c.execute("UPDATE DatabaseVersion SET version = ?, minor = ?",
                   (version.major, version.minor))
         self.commit()
         return version

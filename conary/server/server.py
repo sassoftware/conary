@@ -525,6 +525,7 @@ def getServer():
             logMe(1, "WARNING: database schema is more recent than codebase!")
             logMe(1, "WARNING================================================")
         if 'migrate' in argSet:
+            logMe(1, "Schema migration complete. Server exiting...")
             sys.exit(0)
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)
