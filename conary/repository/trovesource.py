@@ -227,7 +227,7 @@ class SearchableTroveSource(AbstractTroveSource):
     def iterAllTroveNames(self):
         raise NotImplementedError
 
-    def getTroves(self, troveList, withFiles = True):
+    def getTroves(self, troveList, withFiles = True, callback = None):
         raise NotImplementedError
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
@@ -460,7 +460,7 @@ class SimpleTroveSource(SearchableTroveSource):
         return [ x in self._trovesByName.get(x[0], []) for x in troveTups ]
 
     def __len__(self):
-        return len(list(self))
+        return len([x for x in self ])
         
     def __iter__(self):
         return itertools.chain(*self._trovesByName.itervalues())
@@ -490,8 +490,8 @@ class TroveListTroveSource(SimpleTroveSource):
     def getSourceTroves(self):
         return self.getTroves(self.sourceTups)
 
-    def getTroves(self, troveTups, withFiles=False):
-        return self.source.getTroves(troveTups, withFiles)
+    def getTroves(self, troveTups, withFiles=False, callback=None):
+        return self.source.getTroves(troveTups, withFiles, callback=callback)
 
     def hasTroves(self, troveTups):
         return self.source.hasTroves(troveTups)
@@ -517,8 +517,8 @@ class GroupRecipeSource(SearchableTroveSource):
         for (n,v,f) in self.sourceTups:
             self._trovesByName.setdefault(n, []).append((n,v,f))
 
-    def getTroves(self, troveTups, withFiles=False):
-        return self.source.getTroves(troveTups, withFiles)
+    def getTroves(self, troveTups, withFiles=False, callback=None):
+        return self.source.getTroves(troveTups, withFiles, callback=callback)
 
     def hasTroves(self, troveTups):
         return self.source.hasTroves(troveTups)
@@ -735,7 +735,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         return retList
 
-    def getTroves(self, troveList, withFiles = True):
+    def getTroves(self, troveList, withFiles = True, callback = None):
         retList = []
 
         for info in troveList:
@@ -1060,7 +1060,8 @@ class SourceStack(object):
             raise errors.TroveMissing(name, version)
         return trv
 
-    def getTroves(self, troveList, withFiles = True, allowMissing=True):
+    def getTroves(self, troveList, withFiles = True, allowMissing=True,
+                    callback=None):
         troveList = list(enumerate(troveList)) # make a copy and add indexes
         numTroves = len(troveList)
         results = [None] * numTroves
@@ -1070,7 +1071,8 @@ class SourceStack(object):
             newIndexes = []
             try:
                 troves = source.getTroves([x[1] for x in troveList], 
-                                          withFiles=withFiles)
+                                          withFiles=withFiles,
+                                          callback=callback)
             except NotImplementedError:
                 continue
             for ((index, troveTup), trove) in itertools.izip(troveList, troves):
