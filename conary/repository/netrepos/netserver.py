@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -703,15 +703,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavorSet[flavor] = flavorId
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
-                    cu.execute("""INSERT INTO ffFlavor
-                    (flavorId, base, sense, depClass) VALUES (?, ?, ?, ?)""", (
-                        flavorId, dep.name, deps.FLAG_SENSE_REQUIRED, depClass.tag),
+                    cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, NULL)",
+                               flavorId, dep.name, deps.FLAG_SENSE_REQUIRED,
                                start_transaction = False)
                     for (flag, sense) in dep.flags.iteritems():
-                        cu.execute("""INSERT INTO ffFlavor
-                        (flavorId, base, sense, depClass, flag)
-                        VALUES (?, ?, ?, ?, ?)""", (
-                            flavorId, dep.name, sense, depClass.tag, flag),
+                        cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
+                                   flavorId, dep.name, sense, flag,
                                    start_transaction = False)
         cu.execute("select count(*) from ffFlavor")
         entries = cu.next()[0]
@@ -917,7 +914,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 FlavorMap.flavorId = gtlTmp.flavorId
             LEFT OUTER JOIN ffFlavor ON
                 %(extra)s ffFlavor.base = FlavorMap.base
-                AND ffFlavor.depClass = FlavorMap.depClass
                 AND ( ffFlavor.flag = FlavorMap.flag OR
                       (ffFlavor.flag is NULL AND FlavorMap.flag is NULL) )
             LEFT OUTER JOIN FlavorScores ON

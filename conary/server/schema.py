@@ -1,4 +1,5 @@
-# Copyright (c) 2005-2007 rPath, Inc.
+#
+# Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -20,7 +21,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = sqllib.DBversion(15, 3)
+VERSION = sqllib.DBversion(15, 2)
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -86,9 +87,8 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE FlavorMap(
             flavorId        INTEGER NOT NULL,
-            base            VARCHAR(254) NOT NULL,
+            base            VARCHAR(254),
             sense           INTEGER,
-            depClass        INTEGER NOT NULL,
             flag            VARCHAR(254),
             CONSTRAINT FlavorMap_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
@@ -96,7 +96,7 @@ def createFlavors(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FlavorMap"] = []
         commit = True
-    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId, depClass, base")
+    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId")
 
     if "FlavorScores" not in db.tables:
         from conary.deps import deps
@@ -702,14 +702,13 @@ def setupTempTables(db):
     if "ffFlavor" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE ffFlavor(
-            flavorId    INTEGER NOT NULL,
-            base        VARCHAR(254) NOT NULL,
+            flavorId    INTEGER,
+            base        VARCHAR(254),
             sense       INTEGER,
-            depClass    INTEGER NOT NULL,
             flag        VARCHAR(254)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["ffFlavor"] = True
-        db.createIndex("ffFlavor", "ffFlavorBaseIdx", "flavorId,depClass,base",
+        db.createIndex("ffFlavor", "ffFlavorBaseIdx", "flavorId,base",
                        check = False)
         db.createIndex("ffFlavor", "ffFlavorSenseIdx", "flavorId,sense",
                        check = False)

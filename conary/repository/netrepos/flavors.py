@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -19,29 +19,21 @@ class Flavors:
     def __init__(self, db):
         self.db = db
 
-    def createFlavorMap(self, flavorId, flavor, cu = None):
-        if cu is None:
-            cu = self.db.cursor()
-        for depClass in flavor.getDepClasses().itervalues():
-            for dep in depClass.getDeps():
-                cu.execute("""INSERT INTO FlavorMap
-                (flavorId, base, depClass, sense, flag)
-                VALUES (?, ?, ?, ?, NULL)""",
-                           flavorId, dep.name,
-                           depClass.tag, deps.FLAG_SENSE_REQUIRED)
-                for (flag, sense) in dep.flags.iteritems():
-                    cu.execute("""INSERT INTO FlavorMap
-                    (flavorId, base, depClass, sense, flag)
-                    VALUES (?, ?, ?, ?, ?)""",
-                               flavorId, dep.name,
-                               depClass.tag, sense, flag)
-
     def createFlavor(self, flavor):
 	cu = self.db.cursor()
 	cu.execute("INSERT INTO Flavors (flavor) VALUES (?)",
                    flavor.freeze())
 	flavorId = cu.lastrowid
-        self.createFlavorMap(flavorId, flavor, cu)
+
+	for depClass in flavor.getDepClasses().itervalues():
+	    for dep in depClass.getDeps():
+		cu.execute("INSERT INTO FlavorMap (flavorId, base, sense, flag) "
+                           "VALUES (?, ?, ?, NULL)",
+			   flavorId, dep.name, deps.FLAG_SENSE_REQUIRED)
+		for (flag, sense) in dep.flags.iteritems():
+		    cu.execute("INSERT INTO FlavorMap (flavorId, base, sense, flag) "
+                               "VALUES (?, ?, ?, ?)",
+			       flavorId, dep.name, sense, flag)
 
     def __getitem__(self, flavor):
 	val = self.get(flavor, None)
