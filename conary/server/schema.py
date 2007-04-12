@@ -21,7 +21,7 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = sqllib.DBversion(15, 2)
+VERSION = sqllib.DBversion(15, 3)
 
 def createTrigger(db, table, column = "changed", pinned = False):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -57,10 +57,13 @@ def createInstances(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Instances"] = []
         commit = True
+    # this also serves in place of a fk index for itemId
     db.createIndex("Instances", "InstancesIdx", "itemId,versionId,flavorId",
                    unique = True)
-    db.createIndex("Instances", "InstancesChangedIdx", "changed,instanceId")
+    db.createIndex("Instances", "InstancesVersionId_fk", "versionId, instanceId")
+    db.createIndex("Instances", "InstancesFlavorId_fk", "flavorId, instanceId")
     db.createIndex("Instances", "InstancesClonedFromIdx", "clonedFromId,instanceId")
+    db.createIndex("Instances", "InstancesChangedIdx", "changed,instanceId")
     db.createIndex("Instances", "InstancesPresentIdx", "isPresent,instanceId")
     if createTrigger(db, "Instances"):
         commit = True
@@ -150,10 +153,10 @@ def createNodes(db):
         (nodeId, itemId, branchId, versionId, timeStamps, finalTimeStamp)
         VALUES (0, 0, 0, 0, NULL, 0.0)""")
         commit = True
-    db.createIndex("Nodes", "NodesItemBranchVersionIdx",
-                   "itemId, branchId, versionId",
-                   unique = True)
-    db.createIndex("Nodes", "NodesItemVersionIdx", "itemId, versionId")
+    db.createIndex("Nodes", "NodesItemVersionBranchIdx",
+                        "itemId, versionId, branchId", unique = True)
+    db.createIndex("Nodes", "NodesBranchId_fk", "branchId, itemId")
+    db.createIndex("Nodes", "NodesVersionId_fk", "versionId, itemId")
     db.createIndex("Nodes", "NodesSourceItemIdx", "sourceItemId, branchId")
     if createTrigger(db, "Nodes"):
         commit = True
@@ -198,11 +201,13 @@ def createLatest(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Latest"] = []
         commit = True
-    db.createIndex("Latest", "LatestIdx", "itemId, branchId, flavorId",
-                   unique = False)
+    # this serves as a substitute for a fk index
     db.createIndex("Latest", "LatestCheckIdx",
-                   "itemId, branchId, flavorId, latestType",
-                   unique = True)
+                   "itemId, branchId, flavorId, latestType", unique = True)
+    db.createIndex("Latest", "LatestBranchId_fk", "branchId, itemId")
+    db.createIndex("Latest", "LatestFlavorId_fk", "flavorId, itemId")
+    db.createIndex("Latest", "LatestVersionId_fk", "versionId, itemId")
+    db.createIndex("Latest", "LatestCapId_fk", "capId")
     db.createIndex("Latest", "LatestChangedIdx", "changed, latestType")
     if createTrigger(db, "Latest"):
         commit = True
@@ -299,10 +304,22 @@ def createUsers(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Permissions"] = []
         commit = True
+    # this serves as a fk index for userGroupId
     db.createIndex("Permissions", "PermissionsIdx",
                    "userGroupId, labelId, itemId", unique = True)
+    db.createIndex("Permissions", "PermissionsLabelId_fk", "labelId, userGroupId")
+    db.createIndex("Permissions", "PermissionsItemId_fk", "itemId, userGroupId")
+    db.createIndex("Permissions", "PermissionsCapId_fk", "capId")
     if createTrigger(db, "Permissions"):
         commit = True
+
+    if commit:
+        db.commit()
+        db.loadSchema()
+
+def createEntitlements(db):
+    cu = db.cursor()
+    commit = False
 
     if "EntitlementGroups" not in db.tables:
         cu.execute("""
@@ -371,6 +388,8 @@ def createUsers(db):
         commit = True
     db.createIndex("EntitlementAccessMap", "EntitlementAccessMapIndex",
                    "entGroupId, userGroupId", unique = True)
+    db.createIndex("EntitlementAccessMap", "EntitlementAMapUserGroupId_fk",
+                   "userGroupId, entGroupId", unique = True)
     if createTrigger(db, "EntitlementAccessMap"):
         commit = True
 
@@ -399,8 +418,7 @@ def createPGPKeys(db):
         commit = True
     db.createIndex("PGPKeys", "PGPKeysFingerprintIdx",
                    "fingerprint", unique = True)
-    db.createIndex("PGPKeys", "PGPKeysUserIdx",
-                   "userId")
+    db.createIndex("PGPKeys", "PGPKeysUserIdx", "userId")
     if createTrigger(db, "PGPKeys"):
         commit = True
 
@@ -467,12 +485,12 @@ def createTroves(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveFiles"] = []
         commit = True
-    # FIXME: rename these indexes
+    # FIXME: rename the next two indexes. One day...
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
+    db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
     db.createIndex("TroveFiles", "TroveFilesPathIdx", "path,instanceId",
                    unique=True)
-
     if createTrigger(db, "TroveFiles"):
         commit = True
 
@@ -541,6 +559,9 @@ def createTroves(db):
         db.tables["TroveRedirects"] = []
         commit = True
     db.createIndex("TroveRedirects", "TroveRedirectsIdx", "instanceId")
+    db.createIndex("TroveRedirects", "TroveRedirectsItemId_fk", "itemId")
+    db.createIndex("TroveRedirects", "TroveRedirectsBranchId_fk", "branchId")
+    db.createIndex("TroveRedirects", "TroveRedirectsFlavorId_fk", "flavorId")
     if createTrigger(db, "TroveRedirects"):
         commit = True
 
@@ -572,6 +593,9 @@ def createMetadata(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Metadata"] = []
         commit = True
+    db.createIndex("Metadata", "MetadataItemId_fk", "itemId")
+    db.createIndex("Metadata", "MetadataVersionId_fk", "versionId")
+    db.createIndex("Metadata", "MetadataBranchId_fk", "branchId")
     if createTrigger(db, "Metadata"):
         commit = True
     if 'MetadataItems' not in db.tables:
@@ -660,6 +684,7 @@ def createLabelMap(db):
         commit = True
     db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
+    db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
     if createTrigger(db, "LabelMap"):
         commit = True
     if commit:
@@ -896,6 +921,7 @@ def createSchema(db):
     createLabelMap(db)
 
     createUsers(db)
+    createEntitlements(db)
     createPGPKeys(db)
 
     createFlavors(db)
@@ -998,6 +1024,7 @@ def loadSchema(db, major=False):
     version = migrate.migrateSchema(db, major=major)
     db.loadSchema()
     # run through the schema creation to create any missing objects
+    logMe(2, "checking for/initializing missing schema elements...")
     createSchema(db)
     if version > 0 and version != VERSION:
         # schema creation/conversion failed. SHOULD NOT HAPPEN!
