@@ -238,7 +238,7 @@ class GroupRecipe(_BaseGroupRecipe):
                          byDefault = True)
         self._setDefaultGroup(group)
 
-    def _findSources(repos, callback=None):
+    def _findSources(self, repos, callback=None):
         """
             Method used to find all of the source components that would
             need to be built to build this group, including their flavor.
@@ -2599,6 +2599,8 @@ def addPackagesForComponents(group, repos, troveCache):
                     if not (group.hasTrove(*x) and group.isExplicit(*x)) ]
     troveTups = packages.keys()
     hasTroves = repos.hasTroves(troveTups)
+    if isinstance(hasTroves, list):
+        hasTroves = dict(izip(troveTups, hasTroves))
     troveTups = [ x for x in troveTups if hasTroves[x] ]
 
     if not troveTups:
