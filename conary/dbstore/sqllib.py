@@ -20,7 +20,10 @@ class DBversion:
     def __init__(self, major, minor=0):
         self.major = major
         self.minor = minor
-        
+
+    def __nonzero__(self):
+        return self != 0
+
     def __cmp__(self, other):
         if isinstance(other, int):
             if self.major == other:
