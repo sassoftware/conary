@@ -805,7 +805,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                             and targetLabel != versions.CookLabel()
                             and not prep and not downloadOnly)
 
-    result  = _cookPackageObject(repos, cfg, recipeClass, 
+    result  = _cookPackageObjWrap(repos, cfg, recipeClass, 
                                  sourceVersion, prep=prep,
                                  macros=macros, resume=resume,
                                  ignoreDeps=ignoreDeps, 
@@ -813,7 +813,8 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                                  crossCompile=crossCompile,
                                  enforceManagedPolicy=enforceManagedPolicy,
                                  requireCleanSources = requireCleanSources,
-                                 downloadOnly = downloadOnly)
+                                 downloadOnly = downloadOnly,
+                                 targetLabel = targetLabel)
     if type(result) is not tuple:
         return
 
@@ -829,11 +830,39 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
+def _cookPackageObjWrap(*args, **kwargs):
+    targetLabel = kwargs.pop('targetLabel', None)
+    isOnLocalHost = isinstance(targetLabel,
+                            (versions.CookLabel, versions.EmergeLabel,
+                            versions.RollbackLabel, versions.LocalLabel))
+
+    if not isOnLocalHost or not (hasattr(sys.stdin, "isatty") and 
+                                 sys.stdin.isatty):
+        # For repository cooks, or for recipe cooks that had stdin not a tty,
+        # redirect stdin from /dev/null
+        redirectStdin = True
+        oldStdin = os.dup(sys.stdin.fileno())
+        devnull = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(devnull, 0)
+        os.close(devnull)
+    else:
+        redirectStdin = False
+        oldStdin = sys.stdin.fileno()
+
+    kwargs['redirectStdin'] = redirectStdin
+    try:
+        ret = _cookPackageObject(*args, **kwargs)
+    finally:
+        if redirectStdin:
+            os.dup2(oldStdin, 0)
+            os.close(oldStdin)
+    return ret
+
 def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		       macros={}, resume = None, ignoreDeps=False, 
                        logBuild=False, crossCompile=None, 
                        enforceManagedPolicy=False,  requireCleanSources = False,
-                       downloadOnly = False):
+                       downloadOnly = False, redirectStdin = False):
     """Builds the package for cookPackageObject.  Parameter meanings are 
        described there.
     """
@@ -936,7 +965,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         # a file there for packaging
         open(logPath, 'w')
         try:
-            logFile = logger.startLog(tmpLogPath)
+            logFile = logger.startLog(tmpLogPath, withStdin = not redirectStdin)
         except OSError, err:
             if err.args[0] == 'out of pty devices':
                 log.warning('*** No ptys found -- not logging build ***')
