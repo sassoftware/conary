@@ -34,8 +34,10 @@ Changes in @NEW@:
       trace, but an error message. (CNY-1292)
     * The Conary library uses a built-in difflib if the system's difflib
       is not patched for recursion. (CNY-1377)
-    * mirroring troves marked as removed from repsoitories running on 
+    * Mirroring troves marked as removed from repsoitories running on 
       mysql has been fixed (CNY-1193)
+    * Repository cooks will redirect the subprocess' stdin from /dev/null
+      to avoid hanging while waiting from stdin. (CNY-783)
 
 Changes in 1.1.21:
   o Repository Changes:
