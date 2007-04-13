@@ -236,19 +236,27 @@ class UpdateJob:
         for jobList in jobs:
             yield list(self._thawJobList(jobList))
 
+    def _freezeJob(self, job):
+        (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) = job
+        return (trvName,
+                (self._freezeRevision(oRev), self._freezeFlavor(oFlv)),
+                (self._freezeRevision(rev), self._freezeFlavor(flv)),
+                int(searchLocalRepo))
+
     def _freezeJobList(self, jobList):
-        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
-            yield (trvName,
-                   (self._freezeRevision(oRev), self._freezeFlavor(oFlv)),
-                   (self._freezeRevision(rev), self._freezeFlavor(flv)),
-                   int(searchLocalRepo))
+        for job in jobList:
+            yield self._freezeJob(job)
+
+    def _thawJob(self, job):
+        (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) = job
+        return (trvName,
+                (self._thawRevision(oRev), self._thawFlavor(oFlv)),
+                (self._thawRevision(rev), self._thawFlavor(flv)),
+                bool(searchLocalRepo))
 
     def _thawJobList(self, jobList):
-        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
-            yield (trvName,
-                   (self._thawRevision(oRev), self._thawFlavor(oFlv)),
-                   (self._thawRevision(rev), self._thawFlavor(flv)),
-                   bool(searchLocalRepo))
+        for job in jobList:
+            yield self._thawJob(job)
 
     def _freezeRevision(self, rev):
         if rev is None:
@@ -273,13 +281,12 @@ class UpdateJob:
 
     def _freezeJobPreScripts(self):
         # Freeze the job and the string together
-        return itertools.izip(self._freezeJobList(x[0]
-                                    for x in self._jobPreScripts),
-                              (x[1] for x in self._jobPreScripts))
+        for item in self._jobPreScripts:
+            yield (self._freezeJob(item[0]), item[1], item[2], item[3])
 
     def _thawJobPreScripts(self, frzrepr):
-        return itertools.izip(self._thawJobList(x[0] for x in frzrepr),
-                              (x[1] for x in frzrepr))
+        for item in frzrepr:
+            yield (self._thawJob(item[0]), item[1], item[2], item[3])
 
     def _freezeChangesetFilesTroveSource(self, troveSource, frzdir,
                                         withChangesetReferences=True):
