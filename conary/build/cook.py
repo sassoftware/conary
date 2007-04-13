@@ -626,19 +626,35 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setConaryVersion(constants.version)
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
+            compatClass = group.compatibilityClass
+            if compatClass is not None:
+                grpTrv.setCompatibilityClass(compatClass)
 
-            for (recipeScripts, troveScripts) in \
-                    [ (recipeObj.postInstallScripts,
+            for (recipeScripts, isRollback, troveScripts) in \
+                    [ (recipeObj.postInstallScripts, False,
                             grpTrv.troveInfo.scripts.postInstall),
-                      (recipeObj.postRollbackScripts,
+                      (recipeObj.postRollbackScripts, True,
                             grpTrv.troveInfo.scripts.postRollback),
-                      (recipeObj.postUpdateScripts,
+                      (recipeObj.postUpdateScripts, False,
                             grpTrv.troveInfo.scripts.postUpdate),
-                      (recipeObj.preUpdateScripts,
+                      (recipeObj.preUpdateScripts, False,
                             grpTrv.troveInfo.scripts.preUpdate) ]:
                 if groupName in recipeScripts:
+                    scriptClassList = recipeScripts[groupName][1]
+                    # rollback scripts move from this class to another
+                    # while normal scripts move from another class to this
+                    if scriptClassList is not None and compatClass is None:
+                        raise CookError, ('Group compatibility class must '
+                                          'be set for a group script to '
+                                          'define a conversion class path.')
+                    elif scriptClassList is not None and isRollback:
+                        troveScripts.conversions.addList(
+                            [ (compatClass, x) for x in scriptClassList ])
+                    elif scriptClassList is not None:
+                        troveScripts.conversions.addList(
+                            [ (x, compatClass) for x in scriptClassList ])
+
                     troveScripts.script.set(recipeScripts[groupName][0])
-                    troveScripts.rollbackFence.set(recipeScripts[groupName][1])
 
             for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,

@@ -364,8 +364,9 @@ class UpdateJob:
     def updateInvalidatesRollbacks(self):
         return self._invalidateRollbackStack
 
-    def addJobPreScript(self, job, script):
-        self._jobPreScripts.append((job, script))
+    def addJobPreScript(self, job, script, oldCompatClass, newCompatClass):
+        self._jobPreScripts.append((job, script, oldCompatClass,
+                                    newCompatClass))
 
     def iterJobPreScripts(self):
             for i in self._jobPreScripts:
@@ -1003,7 +1004,7 @@ class Database(SqlDbRepository):
             # isn't committed until the self.commit below
             # an object for historical reasons
             try:
-                localrep.LocalRepositoryChangeSetJob(
+                csJob = localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
                     filePriorityPath,
                     allowIncomplete = (rollbackPhase is not None),
@@ -1113,24 +1114,29 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
 	self.commit()
 
-        if fsJob.getInvalidateRollbacks():
+        if updateDatabase and csJob.invalidateRollbacks():
             self.invalidateRollbacks()
 
         if rollbackPhase is not None:
             return fsJob
 
-        fsJob.runPostScripts(tagScript, rollbackPhase)
+        if not justDatabase:
+            fsJob.runPostScripts(tagScript, rollbackPhase)
 
-    def runPreScripts(self, uJob, callback, tagScript = None, 
-                      isRollback = False, tmpDir = '/tmp'):
-        if isRollback:
-           return
+    def runPreScripts(self, uJob, callback, tagScript = None,
+                      isRollback = False, justDatabase = False,
+                      tmpDir = '/tmp'):
+        if isRollback or justDatabase:
+           return True
 
-        for job, script in uJob.iterJobPreScripts():
+        for (job, script, oldCompatClass, newCompatClass) in \
+                                                uJob.iterJobPreScripts():
             scriptId = "%s preupdate" % job[0]
             rc = update.runTroveScript(job, script, tagScript, tmpDir,
                                        self.root, callback, isPre = True,
-                                       scriptId = scriptId)
+                                       scriptId = scriptId,
+                                       oldCompatClass = oldCompatClass,
+                                       newCompatClass = newCompatClass)
             if rc:
                 return False
 
@@ -1420,6 +1426,9 @@ class Database(SqlDbRepository):
 
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
+
+    def getTroveCompatibilityClass(self, name, version, flavor):
+        return self.db.getTroveCompatibilityClass(name, version, flavor)
 
     def iterFindPathReferences(self, path, justPresent = False):
         return self.db.iterFindPathReferences(path, justPresent = justPresent)

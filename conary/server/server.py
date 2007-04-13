@@ -239,14 +239,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
-        if not targetServerName or targetServerName in self.cfg.serverName:
-            repos = self.netRepos
-        elif self.netProxy:
+        if self.netProxy:
             repos = self.netProxy
         else:
-            result = (False, True, [ 'RepositoryMismatch',
-                                   self.cfg.serverName, targetServerName ] )
-            repos = None
+            repos = self.netRepos
 
         if repos is not None:
             try:
@@ -371,7 +367,6 @@ class HTTPServer(BaseHTTPServer.HTTPServer):
 class ServerConfig(netserver.ServerConfig):
 
     port		= (CfgInt,  8000)
-    proxy               = (CfgBool, False)
 
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)

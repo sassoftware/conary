@@ -658,24 +658,55 @@ _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
 _TROVEINFO_TAG_METADATA       = 17
-_TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through a fix for
-                                    # incompleteness. only used on the client, and left
-                                    # out of frozen forms normally (since it should always
-                                    # be None)
-_TROVEINFO_TAG_LAST           = 18
+_TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through 
+                                    # a fix for incompleteness. only used on
+                                    # the client, and left out of frozen forms
+                                    # normally (since it should always be None)
+_TROVEINFO_TAG_COMPAT_CLASS   = 19
+_TROVEINFO_TAG_LAST           = 19
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
              if tag > _TROVEINFO_ORIGINAL_SIG ]
 
+_TROVESCRIPTS_COMPAT_OLD      = 0
+_TROVESCRIPTS_COMPAT_NEW      = 1
+
+class TroveScriptCompatibility(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVESCRIPTS_COMPAT_OLD : (SMALL, streams.ShortStream, 'old'),
+        _TROVESCRIPTS_COMPAT_NEW : (SMALL, streams.ShortStream, 'new'  ),
+    }
+
+    def __str__(self):
+        return "%s->%s" % (self.old(), self.new())
+
+class TroveScriptCompatibilityCollection(streams.StreamCollection):
+
+    streamDict = { 1 : TroveScriptCompatibility }
+
+    def addList(self, l):
+        for (old, new) in l:
+            cvt = TroveScriptCompatibility()
+            cvt.old.set(old)
+            cvt.new.set(new)
+            self.addStream(1, cvt)
+
+    def iter(self):
+        return ( x[1] for x in self.iterAll() )
+
 _TROVESCRIPT_SCRIPT        = 0
-_TROVESCRIPT_ROLLBACKFENCE = 1
+#_TROVESCRIPT_ROLLBACKFENCE = 1   Supported in 1.1.21; never used
+_TROVESCRIPT_CONVERSIONS   = 2
 
 class TroveScript(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
-        _TROVESCRIPT_SCRIPT         : (DYNAMIC, streams.StringStream, 'script' ),
-        _TROVESCRIPT_ROLLBACKFENCE  : (SMALL, streams.ByteStream,   'rollbackFence' ),
+        _TROVESCRIPT_SCRIPT        : (DYNAMIC, streams.StringStream,
+                                                        'script' ),
+        _TROVESCRIPT_CONVERSIONS   : (DYNAMIC, TroveScriptCompatibilityCollection,
+                                                        'conversions' ),
     }
 
 _TROVESCRIPTS_PREUPDATE    = 0
@@ -713,6 +744,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SCRIPTS       : (DYNAMIC, TroveScripts,       'scripts'    ),
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
+        _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -2269,6 +2301,16 @@ class Trove(streams.StreamSet):
     def setSize(self, sz):
         return self.troveInfo.size.set(sz)
 
+    def setCompatibilityClass(self, theClass):
+        self.troveInfo.compatibilityClass.set(theClass)
+
+    def getCompatibilityClass(self):
+        c = self.troveInfo.compatibilityClass()
+        if c is None:
+            return 0
+
+        return c
+
     def getSourceName(self):
         return self.troveInfo.sourceName()
 
@@ -2618,21 +2660,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
         scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
                                        self.absoluteTroveInfo())
         if scriptStream is None:
-            return None, False
+            return None
 
         # this is horrid, but it's just looking up the script stream we're
         # looking for
         script = scriptStream.__getattribute__(scriptStream.streamDict[kind][2])
-        return script.script(), script.rollbackFence()
-
-    def _getRollbackFence(self, kind):
-        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
-                                       self.absoluteTroveInfo())
-        if scriptStream is None:
-            return None
-
-        # this is horrid as well
-        return scriptStream.__getattribute__(scriptStream.streamDict[kind][2]).rollbackFence()
+        return script.script()
 
     def getPostInstallScript(self):
         return self._getScript(_TROVESCRIPTS_POSTINSTALL)
@@ -2646,12 +2679,49 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getPostRollbackScript(self):
         return self._getScript(_TROVESCRIPTS_POSTROLLBACK)
 
-    def isRollbackFence(self, update = False):
-        if update:
-            return (self._getRollbackFence(_TROVESCRIPTS_POSTUPDATE) or
-                    self._getRollbackFence(_TROVESCRIPTS_PREUPDATE))
+    def getNewCompatibilityClass(self):
+        c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
+                                         self.absoluteTroveInfo())
+        if c is None:
+            # no compatibility class has been set for this trove; treat that
+            # as compatibility class 0
+            c = 0
         else:
-            return self._getRollbackFence(_TROVESCRIPTS_POSTINSTALL)
+            c = c()
+
+        return c
+
+    def isRollbackFence(self, oldCompatibilityClass = None, update = False):
+        """
+        oldCompatibilityClass of None means we don't use compatibility
+        class checks to restruct rollbacks.
+        """
+        if oldCompatibilityClass is None:
+            return False
+
+        thisCompatClass = self.getNewCompatibilityClass()
+
+        # if both old a new have the same compatibility class, there is no
+        # fence
+        if oldCompatibilityClass == thisCompatClass:
+            return False
+
+        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
+                                       self.absoluteTroveInfo())
+
+        if scriptStream is None or not scriptStream.postRollback.script():
+            # there is no rollback script; use a strict compatibility class
+            # check
+            return oldCompatibilityClass != thisCompatClass
+
+        # otherwise see if the rollback script is valid for this case
+        for cvt in list(scriptStream.postRollback.conversions.iter()):
+            # this may look backwards, but it's a rollback script
+            if (cvt.new() == oldCompatibilityClass and
+                                cvt.old() == thisCompatClass):
+                return True
+
+        return False
 
     def setTroveInfo(self, ti):
         self.absoluteTroveInfo.set((ti.freeze()))

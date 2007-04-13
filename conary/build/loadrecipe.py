@@ -540,7 +540,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if len(troves) > 1:
             troves = [_pickLatest(name, troves)]
         if troves:
-            sourceVersion =  troves[0][1].getSourceVersion()
+            sourceVersion =  troves[0][1].getSourceVersion(False)
             flavor = troves[0][2]
             sourceName = name.split(':')[0] + ':source'
             noFlavor = deps.parseFlavor('')

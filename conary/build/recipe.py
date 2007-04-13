@@ -39,6 +39,13 @@ def isInfoRecipe(recipeClass):
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
 
+class _sourceHelper:
+    def __init__(self, theclass, recipe):
+        self.theclass = theclass
+	self.recipe = recipe
+    def __call__(self, *args, **keywords):
+        self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
+
 class Recipe:
     """Virtual base class for all Recipes"""
     _trove = None
@@ -48,9 +55,13 @@ class Recipe:
     _recipeType = RECIPE_TYPE_UNKNOWN
     _isDerived = False
 
-    def __init__(self):
+    def __init__(self, lightInstance = False):
         assert(self.__class__ is not Recipe)
         self.validate()
+        self.externalMethods = {}
+        # lightInstance for only instantiating, not running (such as checkin)
+        self._lightInstance = lightInstance
+        self._sources = []
 
     @classmethod
     def getType(class_):
@@ -89,6 +100,33 @@ class Recipe:
 
     def validate(self):
         pass
+
+    def __getattr__(self, name):
+        """
+        Allows us to dynamically suck in namespace of other modules
+        with modifications.
+         - The public namespace of the build module is accessible,
+           and build objects are created and put on the build list
+           automatically when they are referenced.
+         - The public namespaces of the policy modules are accessible;
+           policy objects already on their respective lists are returned,
+           policy objects not on their respective lists are added to
+           the end of their respective lists like build objects are
+           added to the build list.
+        """
+        if not name.startswith('_'):
+            externalMethod = self.externalMethods.get(name, None)
+            if externalMethod is not None:
+                return externalMethod
+
+            if self._lightInstance:
+                return _ignoreCall
+
+        # we don't get here if name is in __dict__, so it must not be defined
+        raise AttributeError, name
+
+    def _addSourceAction(self, name, item):
+        self.externalMethods[name] = _sourceHelper(item, self)
 
     def isCrossCompileTool(self):
         return False

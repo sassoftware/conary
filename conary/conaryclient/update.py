@@ -1682,14 +1682,20 @@ conary erase '%s=%s[%s]'
                 else:
                     removedTroves.append(job)
 
-            rollbackFence = rollbackFence or \
-                troveCs.isRollbackFence(update = (job[1][0] is not None) )
-
             if job[1][0] is not None:
+                oldCompatClass = self.db.getTroveCompatibilityClass(
+                        job[0], job[1][0], job[1][1])
                 # it's an update; check for preupdate scripts
-                preScript, isFence = troveCs.getPreUpdateScript()
+                preScript = troveCs.getPreUpdateScript()
                 if preScript:
-                    uJob.addJobPreScript(job, preScript)
+                    uJob.addJobPreScript(job, preScript, oldCompatClass,
+                                         troveCs.getNewCompatibilityClass())
+            else:
+                oldCompatClass = None
+
+            rollbackFence = rollbackFence or \
+                troveCs.isRollbackFence(update = (job[1][0] is not None),
+                                        oldCompatibilityClass = oldCompatClass)
 
         uJob.setInvalidateRollbacksFlag(rollbackFence)
 
@@ -1972,14 +1978,20 @@ conary erase '%s=%s[%s]'
                 continue
 
             troveCs = infoCs.getNewTroveVersion(job[0], job[2][0], job[2][1])
-            rollbackFence = rollbackFence or \
-                    troveCs.isRollbackFence(update = (job[1][0] is not None))
 
             if job[1][0] is not None:
                 # it's an update; check for preupdate scripts
-                preScript, isFence = troveCs.getPreUpdateScript()
+                oldCompatClass = self.db.getTroveCompatibilityClass(
+                        job[0], job[1][0], job[1][1])
+                preScript = troveCs.getPreUpdateScript()
                 if preScript:
                     uJob.addJobPreScript(job, preScript)
+            else:
+                oldCompatClass = None
+
+            rollbackFence = rollbackFence or \
+                troveCs.isRollbackFence(update = (job[1][0] is not None),
+                                        oldCompatibilityClass = oldCompatClass)
 
         uJob.setInvalidateRollbacksFlag(rollbackFence)
 
@@ -2861,6 +2873,7 @@ conary erase '%s=%s[%s]'
         # run preinstall scripts
         if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
                                      tagScript = tagScript,
+                                     justDatabase = justDatabase,
                                      tmpDir = self.cfg.tmpDir):
             raise UpdateError('error: preupdate script failed')
 
