@@ -457,7 +457,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return l[0]
 
     def getTroves(self, troveList, pristine = True, withFiles = True,
-                  withDeps = True):
+                  withDeps = True, callback = None):
         if not troveList:
             return []
         return self.db.getTroves(troveList, pristine, withFiles = withFiles,
