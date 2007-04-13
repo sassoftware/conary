@@ -211,11 +211,19 @@ def migrate_table(t):
         pgsql.commit()
         return i
 
-    def copyBulk(t, src):
-        pgsql.dbh.bulkload(t, (rowvals(funcs, row) for row in src), fields)
-        pgsql.commit()
+    def copyBulk(t, src, batch=10000):
+        i = 0
+        while i <= count:
+            pgsql.dbh.bulkload(t, itertools.islice(src, batch), fields)
+            i = i + batch
+            pgsql.commit()
+            sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
+            sys.stdout.flush()
         dst.execute("select count(*) from %s" %(t,))
-        return dst.fetchall()[0][0]
+        ret = dst.fetchall()[0][0]
+        sys.stdout.write("\r%s: %s" % (t, timings(ret, count, t1)))
+        sys.stdout.flush()
+        return ret
 
     src.execute("SELECT * FROM %s" % t)
     t1 = time.time()
@@ -225,6 +233,7 @@ def migrate_table(t):
             sys.stdout.flush()
             ret = copyBulk(t, src)
         else:
+            print "WARNING: not using bulk load, update your python-pgsql bindings!"
             ret = copy1by1(t, src)
         assert (ret == count), "Inserted %d rows != source count %d rows" % (ret, count)
     except Exception, e:
@@ -267,13 +276,14 @@ def verify_table(t, quick=False):
 # PROGRAM MAIN LOOP
 for t in tList:
     migrate_table(t)
-    verify_table(t)
+    #verify_table(t)
 
 # and now create the indexes
 dst = pgsql.cursor()
 for stmt in getIndexes("postgresql"):
     print stmt
     dst.execute(stmt)
+pgsql.dbh.execute("VACUUM ANALYZE")
 pgsql.setVersion(VERSION)
 pgsql.commit()
 

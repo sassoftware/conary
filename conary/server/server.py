@@ -504,9 +504,23 @@ def getServer():
         db = dbstore.connect(database, driver)
         logMe(1, "checking schema version")
         # if there is no schema or we're asked to migrate, loadSchema
-        if db.getVersion() == 0 or 'migrate' in argSet:
-            schema.loadSchema(db)
+        dbVersion = db.getVersion()
+        # a more recent major is not compatible
+        if dbVersion.major > schema.VERSION.major:
+            print "ERROR: code base too old for this repository database"
+            print "ERROR: repo=", dbVersion, "code=", self.VERSION
+            sys.exit(-1)
+        if dbVersion == 0 or dbVersion < schema.VERSION:
+            dbVersion = schema.loadSchema(db, major = 'migrate' in argSet)
+        if dbVersion < schema.VERSION: # migration failed...
+            print "ERROR: schema migration has failed from %s to %s" %(
+                dbVersion, schema.VERSION)
+        if dbVersion > schema.VERSION:
+            logMe(1, "WARNING================================================")
+            logMe(1, "WARNING: database schema is more recent than codebase!")
+            logMe(1, "WARNING================================================")
         if 'migrate' in argSet:
+            logMe(1, "Schema migration complete. Server exiting...")
             sys.exit(0)
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)

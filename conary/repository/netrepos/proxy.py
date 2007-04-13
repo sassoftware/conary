@@ -44,7 +44,7 @@ class ProxyCaller:
         try:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
-            return [ False, True, [ 'ProxyError', e.strerror[1] ] ]
+            rc = [ False, True, [ 'ProxyError', e.strerror[1] ] ]
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission

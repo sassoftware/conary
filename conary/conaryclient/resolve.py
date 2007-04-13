@@ -90,6 +90,10 @@ class DependencySolver(object):
 
         suggMap = {}
 
+        if not hasattr(resolveSource, 'filterDependencies'):
+            # add the identity fn for this new api
+            resolveSource.filterDependencies = lambda x: x
+        depList = resolveSource.filterDependencies(depList)
         while resolveSource.prepareForResolution(depList):
 
             sugg = resolveSource.resolveDependencies()
@@ -112,6 +116,7 @@ class DependencySolver(object):
                                        keepRequired = keepRequired,
                                        criticalUpdateInfo = criticalUpdateInfo)
             keepList.extend(newKeepList)
+            depList = resolveSource.filterDependencies(depList)
 
         if criticalUpdateInfo is None:
             # backwards compatibility with conary v. 1.0.30/1.1.3 and earlier

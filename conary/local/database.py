@@ -372,6 +372,28 @@ class UpdateJob:
             for i in self._jobPreScripts:
                 yield i
 
+    def splitCriticalJobs(self):
+        criticalJobs = self.getCriticalJobs()
+        if not criticalJobs:
+            return [], self.getJobs()
+        jobs = self.getJobs()
+        firstCritical = criticalJobs[0]
+        criticalJobs = jobs[:firstCritical + 1]
+        remainingJobs = jobs[firstCritical + 1:]
+        return criticalJobs, remainingJobs
+
+    def loadCriticalJobsOnly(self):
+        """Loads the critical jobs and returns the remaining jobs to be
+        performed"""
+        criticalJobs, remainingJobs = self.splitCriticalJobs()
+        if not criticalJobs:
+            # No critical jobs, so nothing remaining
+            return []
+        self.setJobs(criticalJobs)
+        # This update job no longer has critical update jobs
+        self.setCriticalJobs([])
+        return remainingJobs
+
     def __init__(self, db, searchSource = None):
         self.jobs = []
         self.pinMapping = set()
@@ -640,7 +662,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def _getDb(self):
         if not self._db:
-            self._initDb()
+            try:
+                self._initDb()
+            except sqldb.sqlerrors.DatabaseError, e:
+                raise errors.ConaryError("Database error: %s" % (e, ))
         return self._db
 
     db = property(_getDb)

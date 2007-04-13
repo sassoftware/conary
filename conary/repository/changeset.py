@@ -14,7 +14,6 @@
 
 import struct
 import tempfile
-import difflib
 import errno
 import gzip
 import itertools
@@ -23,7 +22,7 @@ import os
 from StringIO import StringIO
 
 from conary import files, streams, trove, versions
-from conary.lib import enum, log, misc, patch, sha1helper, util
+from conary.lib import enum, fixeddifflib, log, misc, patch, sha1helper, util
 from conary.repository import filecontainer, filecontents, errors
 
 # "refr" being the same length as "file" matters
@@ -1364,10 +1363,10 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 	if ((first or second) and
             (not first or first[-1][-1] == '\n') and
             (not second or second[-1][-1] == '\n')):
-	    diff = difflib.unified_diff(first, second, 
-					"old", "new")
-	    diff.next()
-	    diff.next()
+            diff = fixeddifflib.unified_diff(first, second, 
+                                             "old", "new")
+            diff.next()
+            diff.next()
 	    cont = filecontents.FromString("".join(diff))
 	    contType = ChangedFileTypes.diff
 	else:

@@ -1043,18 +1043,20 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """
     flavor = oldFlavor.copy()
     ISD = InstructionSetDependency
-    if (flavor.hasDepClass(ISD) and newFlavor.hasDepClass(ISD)):
+    TISD = TargetInstructionSetDependency
+    for depClass in  (ISD, TISD):
+        if (flavor.hasDepClass(depClass) and newFlavor.hasDepClass(depClass)):
 
-        arches = set()
+            arches = set()
 
-        for dep in newFlavor.iterDepsByClass(ISD):
-            arches.add(dep.name)
+            for dep in newFlavor.iterDepsByClass(depClass):
+                arches.add(dep.name)
 
-        oldArches = []
-        for dep in oldFlavor.iterDepsByClass(ISD):
-            if dep.name not in arches:
-                oldArches.append(dep)
-        flavor.removeDeps(ISD, oldArches)
+            oldArches = []
+            for dep in oldFlavor.iterDepsByClass(depClass):
+                if dep.name not in arches:
+                    oldArches.append(dep)
+            flavor.removeDeps(depClass, oldArches)
             
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor

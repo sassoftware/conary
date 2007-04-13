@@ -127,3 +127,6 @@ class Recipe:
 
     def _addSourceAction(self, name, item):
         self.externalMethods[name] = _sourceHelper(item, self)
+
+    def isCrossCompileTool(self):
+        return False

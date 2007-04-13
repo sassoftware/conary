@@ -127,6 +127,9 @@ class XMLOpener(urllib.FancyURLopener):
                 user_passwd, host = urllib.splituser(host)
                 host = urllib.unquote(host)
             realhost = host
+            # SPX: use the full URL here, not just the selector or name
+            # based virtual hosts don't work
+            selector = '%s:%s' %(protocol, url)
         else:
             host, selector = url
             urltype, rest = urllib.splittype(selector)
@@ -154,11 +157,8 @@ class XMLOpener(urllib.FancyURLopener):
             h = httplib.HTTPS(host, None, None)
         else:
             h = httplib.HTTP(host)
-	# SPX: use the full URL here, not just the selector or name
-	# based virtual hosts don't work
-        fullUrl = '%s:%s' %(protocol, url)
         if data is not None:
-            h.putrequest('POST', fullUrl)
+            h.putrequest('POST', selector)
             if self.compress:
                 h.putheader('Content-encoding', 'deflate')
                 data = zlib.compress(data, 9)
@@ -166,7 +166,7 @@ class XMLOpener(urllib.FancyURLopener):
             h.putheader('Content-length', '%d' % len(data))
             h.putheader('Accept-encoding', 'deflate')
         else:
-            h.putrequest('GET', fullUrl)
+            h.putrequest('GET', selector)
         if auth:
             h.putheader('Authorization', 'Basic %s' % auth)
         if realhost:
@@ -191,7 +191,7 @@ class XMLOpener(urllib.FancyURLopener):
                 #fp = DecompressFileObj(fp)
                 fp = StringIO(zlib.decompress(fp.read()))
 
-            return usedAnonymous, urllib.addinfourl(fp, headers, fullUrl)
+            return usedAnonymous, urllib.addinfourl(fp, headers, selector)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
@@ -261,20 +261,13 @@ class Transport(xmlrpclib.Transport):
 	self.verbose = verbose
 
 	realhost = getrealhost(host)
-        # XXX: bug: what happens when we can't resolve here?
-        #      client will probably freak out
-        targetIP = socket.gethostbyname(realhost)
-        hostIP = socket.gethostbyname(socket.gethostname())
-        localIP = '127.0.0.1'
-        if targetIP in (hostIP, localIP):
+        if realhost == 'localhost':
             # don't proxy localhost unless the proxy is running on
             # localhost as well
             proxyHost = None
-            proxyIP = None
             if self.proxies and 'http' in self.proxies:
                 proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
-                proxyIP = socket.gethostbyname(proxyHost)
-            if proxyIP not in (localIP, hostIP):
+            if proxyHost == 'localhost':
                 opener = XMLOpener({})
             else:
                 opener = XMLOpener(self.proxies)

@@ -14,14 +14,15 @@
 import itertools
 import re
 import os
+import tempfile
 import traceback
 import sys
 
-from conary import conarycfg
+from conary import conarycfg, constants
 from conary.callbacks import UpdateCallback
-from conary.conaryclient import resolve
+from conary.conaryclient import cmdline, resolve
 from conary.deps import deps
-from conary.errors import ClientError, InternalConaryError, MissingTrovesError
+from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource
@@ -2296,6 +2297,88 @@ conary erase '%s=%s[%s]'
 
             cs.merge(newCs)
 
+    def loadRestartInfo(self, restartInfo):
+        return _loadRestartInfo(restartInfo)
+
+    def saveRestartInfo(self, updJob, remainingJobs):
+        return _storeJobInfo(remainingJobs, updJob.getTroveSource())
+
+    def cleanRestartInfo(self, restartInfo):
+        if not restartInfo:
+            return
+        util.rmtree(restartInfo, ignore_errors=True)
+
+    def createUpdateJob(self, itemList, **kwargs):
+        # A callback object must be supplied
+        assert(self.updateCallback is not None)
+
+        applyCriticalOnly = kwargs.pop('applyCriticalOnly', False)
+        criticalUpdateInfo = kwargs.setdefault('criticalUpdateInfo',
+            CriticalUpdateInfo(applyCriticalOnly))
+        syncChildren = kwargs.get('syncChildren', False)
+
+        restartChangeSets = []
+        restartInfo = kwargs.pop('restartInfo', None)
+        if restartInfo:
+            # ignore itemList passed in, we load it from the restart info
+            itemList, restartChangeSets = self.loadRestartInfo(restartInfo)
+            kwargs['recurse'] = False
+            syncChildren = False # we don't recalculate update info anyway
+                                 # so we'll just revert to regular update.
+
+        if syncChildren:
+            for name, oldInf, newInfo, isAbs in itemList:
+                if not isAbs:
+                    raise ConaryError(
+                            'cannot specify erases/relative updates with sync')
+
+        kwargs['syncChildren'] = syncChildren
+
+        # Add information from the stored update job, if available
+        for cs in restartChangeSets:
+            criticalUpdateInfo.addChangeSet(cs)
+
+        try:
+            (updJob, suggMap) = self.updateChangeSet(itemList, **kwargs)
+        except DependencyFailure, e:
+            if e.hasCriticalUpdates() and not applyCriticalOnly:
+                e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
+            raise
+        except:
+            if restartChangeSets:
+                log.error('** NOTE: A critical update was applied - rerunning this command may resolve this error')
+            raise
+
+        return updJob, suggMap
+
+    def applyUpdateJob(self, updJob, **kwargs):
+        # Apply the update job, return restart information if available
+        noRestart = kwargs.pop('noRestart', False)
+        if noRestart:
+            # Apply everything
+            remainingJobs = []
+        else:
+            # Load just the critical jobs (or everything if no critical jobs
+            # are present)
+            remainingJobs = updJob.loadCriticalJobsOnly()
+
+        # XXX May have to use a callback for this
+        log.syslog.command()
+        self.applyUpdate(updJob, **kwargs)
+        log.syslog.commandComplete()
+
+        if remainingJobs:
+            # FIXME: write the updJob.getTroveSource() changeset(s) to disk
+            # write the job set to disk
+            # Restart conary telling it to use those changesets and jobset
+            # (ignore ordering).
+            # do depresolution on that job set to compare contents and warn
+            # if contents have changed.
+            restartDir = self.saveRestartInfo(updJob, remainingJobs)
+            return restartDir
+
+        return None
+
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
@@ -3081,4 +3164,81 @@ class InstallPathConflicts(UpdateError):
     
     def __init__(self, conflicts):
         self.conflicts = conflicts
+
+def _storeJobInfo(remainingJobs, changeSetSource):
+    restartDir = tempfile.mkdtemp(prefix='conary-restart-')
+    for idx, cs in enumerate(changeSetSource.iterChangeSets()):
+        if isinstance(cs, changeset.ChangeSetFromFile):
+            # these will be picked up on restart by parsing the command line
+            # arguments
+            continue
+        cs.reset()
+        cs.writeToFile(restartDir + '/%d.ccs' % idx)
+
+    jobSetPath = os.path.join(restartDir, 'joblist')
+    jobFile = open(jobSetPath, 'w')
+    jobStrs = []
+    for job in itertools.chain(*remainingJobs): # flatten list
+        jobStr = []
+        if job[1][0]:
+            jobStr.append('%s=%s[%s]--' % (job[0], job[1][0], job[1][1]))
+        else:
+            jobStr.append('%s=--' % (job[0],))
+        if job[2][0]:
+            jobStr.append('%s[%s]' % (job[2][0], job[2][1]))
+        jobStrs.append(''.join(jobStr))
+    jobFile.write('\n'.join(jobStrs))
+    jobFile.close()
+    # Write the version of the conary client
+    # CNY-1034: we need to save more information about the currently running
+    # client; upon restart, the new client may later check the old client's
+    # version and recompute the update set if the old client was buggy.
+
+    # Unfortunately, _loadRestartInfo will only ignore joblist, so we can't
+    # drop a state file in the same restartDir. We'll create a new directory
+    # and save the version file there.
+    extraDir = restartDir + "misc"
+    try:
+        os.mkdir(extraDir)
+    except OSError, e:
+        # restartDir was a temporary directory, the likelyhood of extraDir
+        # existing is close to zero
+        # Just in case, remove the existing directory and re-create it
+        util.rmtree(extraDir, ignore_errors=True)
+        os.mkdir(extraDir)
+
+    versionFilePath = os.path.join(extraDir, "__version__")
+    versionFile = open(versionFilePath, "w+")
+    versionFile.write("version %s\n" % constants.version)
+    versionFile.close()
+    return restartDir
+
+def _loadRestartInfo(restartDir):
+    changeSetList = []
+    # Skip files that are not changesets (.ccs).
+    # This was the first attempt to fix CNY-1034, but it would break
+    # old clients.
+    # Nevertheless the code now ignores files everything but .ccs files
+    filelist = [ x for x in os.listdir(restartDir) if x.endswith('.ccs') ]
+    for path in filelist:
+        cs = changeset.ChangeSetFromFile(os.path.join(restartDir, path))
+        changeSetList.append(cs)
+    jobSetPath = os.path.join(restartDir, 'joblist')
+    jobSet = cmdline.parseChangeList(x.strip() for x in open(jobSetPath))
+    finalJobSet = []
+    for job in jobSet:
+        if job[1][0]:
+            oldVersion = versions.VersionFromString(job[1][0])
+        else:
+            oldVersion = None
+        if job[2][0]:
+            newVersion = versions.VersionFromString(job[2][0])
+        else:
+            newVersion = None
+        finalJobSet.append((job[0], (oldVersion, job[1][1]), 
+                            (newVersion, job[2][1]), job[3]))
+    # If there was something to be done with the version information, it would
+    # be performed by now. Clean up the misc directory
+    util.rmtree(restartDir + "misc", ignore_errors=True)
+    return finalJobSet, changeSetList
 

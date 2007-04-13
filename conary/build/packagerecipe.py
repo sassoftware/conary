@@ -81,26 +81,62 @@ def clearBuildReqs(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
+    _clearReqs('buildRequires', buildReqs)
+
+def clearCrossReqs(*crossReqs):
+    """ Clears inherited build requirement lists of a given set of packages,
+        or all packages if none listed.
+    """
+    _clearReqs('crossRequires', crossReqs)
+
+def _clearReqs(attrName, reqs):
     def _removePackages(class_, pkgs):
         if not pkgs:
-            class_.buildRequires = []
+            setattr(class_, attrName, [])
         else:
             for pkg in pkgs:
-                if pkg in class_.buildRequires:
-                    class_.buildRequires.remove(pkg)
+                if pkg in getattr(class_, attrName):
+                    getattr(class_, attrName).remove(pkg)
 
-    callerGlobals = inspect.stack()[1][0].f_globals
+    callerGlobals = inspect.stack()[2][0].f_globals
     classes = []
     for value in callerGlobals.itervalues():
         if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
             classes.append(value)
 
     for class_ in classes:
-        _removePackages(class_, buildReqs)
+        _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
             if issubclass(base, _AbstractPackageRecipe):
-                _removePackages(base, buildReqs)
+                _removePackages(base, reqs)
+
+def keepBuildReqs(*buildReqs):
+    callerGlobals = inspect.stack()[1][0].f_globals
+    classes = []
+    for value in callerGlobals.itervalues():
+        if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
+            classes.append(value)
+    for class_ in classes:
+        if buildReqs:
+            if isinstance(class_.keepBuildReqs, list):
+                class_.keepBuildReqs.extend(buildReqs)
+            else:
+                class_.keepBuildReqs = buildReqs
+        else:
+            class_.keepBuildReqs = True
+
+crossFlavor = deps.parseFlavor('cross')
+def getCrossCompileSettings(flavor):
+    flavorTargetSet = flavor.getDepClasses().get(deps.DEP_CLASS_TARGET_IS, None)
+    if flavorTargetSet is None:
+        return None
+
+    targetFlavor = deps.Flavor()
+    for insSet in flavorTargetSet.getDeps():
+        targetFlavor.addDep(deps.InstructionSetDependency, insSet)
+    isCrossTool = flavor.stronglySatisfies(crossFlavor)
+    return None, targetFlavor, isCrossTool
 
 def _ignoreCall(*args, **kw):
     pass
@@ -118,6 +154,8 @@ class _AbstractPackageRecipe(Recipe):
         'conary-build:python',
         'sqlite:lib',
     ]
+    crossRequires = []
+    keepBuildReqs = []
 
     Flags = use.LocalFlags
     explicitMainDir = False
@@ -161,19 +199,19 @@ class _AbstractPackageRecipe(Recipe):
         else:
             basepath = os.path.basename(path)
         if basepath in self.sourcePathMap:
-            if basepath == path:
+            if self.sourcePathMap[basepath] == path:
                 # we only care about truly different source locations with the
                 # same basename
                 return
             if basepath in self.pathConflicts:
-                self.pathConflicts[basepath].append(path)
+                self.pathConflicts[basepath].add(path)
             else:
-                self.pathConflicts[basepath] = [
+                self.pathConflicts[basepath] = set([
                     # previous (first) instance
                     self.sourcePathMap[basepath],
                     # this instance
                     path
-                ]
+                ])
         else:
             self.sourcePathMap[basepath] = path
 
@@ -256,46 +294,90 @@ class _AbstractPackageRecipe(Recipe):
             return versionMatches
 
         def _filterBuildReqsByFlavor(flavor, troves):
-            troves.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
+            troves.sort(key = lambda x: x.getVersion(), reverse=True)
             if flavor is None:
                 return troves[-1]
-            for trove in reversed(versionMatches):
+            for trove in troves:
                 troveFlavor = trove.getFlavor()
                 if troveFlavor.stronglySatisfies(flavor):
                     return trove
 
+        def _matchReqs(reqList, db):
+            reqMap = {}
+            missingReqs = []
+            for buildReq in reqList:
+                (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
+                # XXX move this to use more of db.findTrove's features, instead
+                # of hand parsing
+                try:
+                    troves = db.trovesByName(name)
+                    troves = db.getTroves(troves)
+                except errors.TroveNotFound:
+                    missingReqs.append(buildReq)
+                    continue
+
+                versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
+
+                if not versionMatches:
+                    missingReqs.append(buildReq)
+                    continue
+                match = _filterBuildReqsByFlavor(flavor, versionMatches)
+                if match:
+                    reqMap[buildReq] = match
+                else:
+                    missingReqs.append(buildReq)
+            return reqMap, missingReqs
+
+
 	db = database.Database(cfg.root, cfg.dbPath)
-        time = sourceVersion.timeStamps()[-1]
-        reqMap = {}
-        missingReqs = []
-        for buildReq in self.buildRequires:
-            (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
-            # XXX move this to use more of db.findTrove's features, instead
-            # of hand parsing
-            try:
-                troves = db.trovesByName(name)
-                troves = db.getTroves(troves)
-            except errors.TroveNotFound:
-                missingReqs.append(buildReq)
-                continue
+        if self.crossRequires:
+            if not self.macros.sysroot:
+                err = ("cross requirements needed but %(sysroot)s undefined")
+                if raiseError:
+                    log.error(err)
+                    raise errors.RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
+            elif not os.path.exists(self.macros.sysroot):
+                err = ("cross requirements needed but sysroot (%s) does not exist" % (self.macros.sysroot))
+                if raiseError:
+                    raise errors.RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
 
-            versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
-
-            if not versionMatches:
-                missingReqs.append(buildReq)
-                continue
-            match = _filterBuildReqsByFlavor(flavor, versionMatches)
-            if match:
-                reqMap[buildReq] = match
             else:
-                missingReqs.append(buildReq)
+                crossDb = database.Database(self.macros.sysroot, cfg.dbPath)
+        time = sourceVersion.timeStamps()[-1]
 
+        reqMap, missingReqs = _matchReqs(self.buildRequires, db)
+        if self.crossRequires:
+            crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
+                                                       crossDb)
+        else:
+            missingCrossReqs = []
+            crossReqMap = {}
 
-
-        if missingReqs:
-            err = ("Could not find the following troves "
-                   "needed to cook this recipe:\n"
-                   "%s" % '\n'.join(sorted(missingReqs)))
+        if missingReqs or missingCrossReqs:
+            if missingReqs:
+                err = ("Could not find the following troves "
+                       "needed to cook this recipe:\n"
+                       "%s" % '\n'.join(sorted(missingReqs)))
+                if missingCrossReqs:
+                    err += '\n'
+            else:
+                err = ''
+            if missingCrossReqs:
+                err += ("Could not find the following cross requirements"
+                        " (that must be installed in %s) needed to cook this"
+                        " recipe:\n"
+                        "%s" % (self.macros.sysroot,
+                                '\n'.join(sorted(missingCrossReqs))))
             if raiseError:
                 log.error(err)
                 raise errors.RecipeDependencyError(
@@ -303,6 +385,7 @@ class _AbstractPackageRecipe(Recipe):
             else:
                 log.warning(err)
         self.buildReqMap = reqMap
+        self.crossReqMap = crossReqMap
         self.ignoreDeps = not raiseError
 
     def _getTransitiveBuildRequiresNames(self):
@@ -556,6 +639,12 @@ class _AbstractPackageRecipe(Recipe):
 	del self.__dict__[name]
 
     def _includeSuperClassBuildReqs(self):
+        self._includeSuperClassItemsForAttr('buildRequires')
+
+    def _includeSuperClassCrossReqs(self):
+        self._includeSuperClassItemsForAttr('crossRequires')
+
+    def _includeSuperClassItemsForAttr(self, attr):
         """ Include build requirements from super classes by searching
             up the class hierarchy for buildRequires.  You can only
             override this currenly by calling
@@ -563,8 +652,8 @@ class _AbstractPackageRecipe(Recipe):
         """
         buildReqs = set()
         for base in inspect.getmro(self.__class__):
-            buildReqs.update(getattr(base, 'buildRequires', []))
-        self.buildRequires = list(buildReqs)
+            buildReqs.update(getattr(base, attr, []))
+        setattr(self, attr, list(buildReqs))
 
     def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
@@ -583,7 +672,7 @@ class _AbstractPackageRecipe(Recipe):
                  binaries from this build should be runnable on the build
                  architecture.
         """
-        def _parseArch(archSpec):
+        def _parseArch(archSpec, target=False):
             if isinstance(archSpec, deps.Flavor):
                 return archSpec, None, None
 
@@ -594,7 +683,10 @@ class _AbstractPackageRecipe(Recipe):
                 vendor = hostOs = None
 
             try:
-                flavor = deps.parseFlavor('is: ' + arch)
+                if target:
+                    flavor = deps.parseFlavor('target: ' + arch)
+                else:
+                    flavor = deps.parseFlavor('is: ' + arch)
             except deps.ParseError, msg:
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
@@ -610,11 +702,6 @@ class _AbstractPackageRecipe(Recipe):
                 flag._set(False)
             use.setBuildFlagsFromFlavor(self.name, flavor)
 
-        def _setBuildMacros(macros):
-            # get the necessary information about the build system
-            # the only information we can grab is the arch.
-            macros['buildarch'] = use.Arch._getMacro('targetarch')
-
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
             if vendor:
@@ -622,7 +709,16 @@ class _AbstractPackageRecipe(Recipe):
             if targetOs:
                 macros['targetos'] = targetOs
             _setArchFlags(targetFlavor)
+            self.targetFlavor = deps.Flavor()
+            targetDeps = targetFlavor.iterDepsByClass(
+                                            deps.InstructionSetDependency)
+            self.targetFlavor.addDeps(deps.TargetInstructionSetDependency,
+                                      targetDeps)
             macros['targetarch'] = use.Arch._getMacro('targetarch')
+            archMacros = use.Arch._getMacros()
+            # don't override values we've set for crosscompiling
+            archMacros.pop('targetarch', False)
+            macros.update(archMacros)
 
         def _setHostMacros(crossHost, macros):
             hostFlavor, vendor, hostOs = _parseArch(crossHost)
@@ -631,54 +727,85 @@ class _AbstractPackageRecipe(Recipe):
             if hostOs:
                 macros['hostos'] = hostOs
 
-            tmpArch = copy.deepcopy(use.Arch)
             _setArchFlags(hostFlavor)
             macros['hostarch'] = use.Arch._getMacro('targetarch')
             macros['hostmajorarch'] = use.Arch.getCurrentArch()._name
-                
-            use.Arch = tmpArch
+            self.hostmacros = _createMacros('%(host)s', hostOs)
 
-        def _setSiteConfig(macros):
+        def _setBuildMacros(macros):
+            # get the necessary information about the build system
+            # the only information we can grab is the arch.
+            macros['buildarch'] = use.Arch._getMacro('targetarch')
+            self.buildmacros = _createMacros('%(build)s')
+
+
+        def _createMacros(compileTarget, osName=None):
+            theMacros = self.macros.copy(False)
+
+            archMacros = use.Arch._getMacros()
+            theMacros.majorarch = use.Arch.getCurrentArch()._name
+            theMacros.update(archMacros)
+            # locate the correct config.site files
+            theMacros.env_path = os.environ['PATH']
+            _setSiteConfig(theMacros, theMacros.majorarch, osName)
+            theMacros['cc'] = '%s-gcc' % compileTarget
+            theMacros['cxx'] = '%s-g++' % compileTarget
+            theMacros['strip'] = '%s-strip' % compileTarget
+            theMacros['strip_archive'] = '%s-strip -g' % compileTarget
+            return theMacros
+
+        def _setSiteConfig(macros, arch, osName, setEnviron=False):
+            if osName is None:
+                osName = self.macros.os
             archConfig = None
             osConfig = None
             for siteDir in self.cfg.siteConfigPath:
-                ac = '/'.join((siteDir, macros.hostmajorarch))
+                ac = '/'.join((siteDir, arch))
                 if util.exists(ac):
                     archConfig = ac
-                oc = '/'.join((siteDir, macros.hostos))
-                if util.exists(oc):
-                    osConfig = oc
+                if osName:
+                    oc = '/'.join((siteDir, osName))
+                    if util.exists(oc):
+                        osConfig = oc
             if not archConfig and not osConfig:
+                macros.env_siteconfig = ''
                 return
 
             siteConfig = None
-            if 'CONFIG_SITE' in os.environ:
+            if setEnviron and 'CONFIG_SITE' in os.environ:
                 siteConfig = os.environ['CONFIG_SITE']
             siteConfig = ' '.join((x for x in [siteConfig, archConfig, osConfig]
                                    if x is not None))
-            os.environ['CONFIG_SITE'] = siteConfig
+            macros.env_siteconfig = siteConfig
+            if setEnviron:
+                os.environ['CONFIG_SITE'] = siteConfig
 
-        macros = self.macros
-        macros.update(dict(x for x in crossMacros.iteritems() if x[0] not in macros))
+        self.macros.update(dict(x for x in crossMacros.iteritems() 
+                                 if x[0] not in self.macros))
 
         tmpArch = use.Arch.copy()
 
-        _setBuildMacros(macros)
-        _setTargetMacros(crossTarget, macros)
+        _setBuildMacros(self.macros)
+
+        if isCrossTool:
+            targetFlavor, vendor, targetOs = _parseArch(crossTarget, True)
+            self._isCrossCompileTool = True
+        else:
+            self._isCrossCompiling = True
 
         if crossHost is None:
             if isCrossTool:
-                # we want the resulting binaries to run on
-                # this machine.
-                macros['hostarch'] = macros['buildarch']
-                macros['hostmajorarch'] = use.Arch.getCurrentArch()._name
+                _setHostMacros(self._buildFlavor, self.macros)
+                _setTargetMacros(crossTarget, self.macros)
+                # leave things set up for the target
             else:
                 # we want the resulting binaries to run
                 # on the target machine.
-                macros['hostarch'] = macros['targetarch']
-                _setHostMacros(crossTarget, macros)
+                _setTargetMacros(crossTarget, self.macros)
+                _setHostMacros(crossTarget, self.macros)
         else:
-            _setHostMacros(crossHost, macros)
+            _setTargetMacros(crossTarget, self.macros)
+            _setHostMacros(crossHost, self.macros)
 
         # make sure that host != build, so that we are always
         # doing a real cross compile.  To make this work, we add
@@ -687,12 +814,12 @@ class _AbstractPackageRecipe(Recipe):
         # gcc and g++ for local builds are located, so set those local
         # values first.
 
-        origBuild = macros['build'] % macros
-        macros['buildcc'] = '%s-gcc' % (origBuild)
-        macros['buildcxx'] = '%s-g++' % (origBuild)
+        origBuild = self.macros['build'] % self.macros
+        self.macros['buildcc'] = '%s-gcc' % (origBuild)
+        self.macros['buildcxx'] = '%s-g++' % (origBuild)
 
-        if (macros['host'] % macros) == (macros['build'] % macros):
-            macros['buildvendor'] += '_build'
+        if (self.macros['host'] % self.macros) == (self.macros['build'] % self.macros):
+            self.macros['buildvendor'] += '_build'
 
         if isCrossTool:
             # we want the resulting binaries to run on our machine
@@ -703,16 +830,12 @@ class _AbstractPackageRecipe(Recipe):
             # target
             compileTarget = '%(target)s'
 
-        macros['cc'] = '%s-gcc' % compileTarget
-        macros['cxx'] = '%s-g++' % compileTarget
-        macros['strip'] = '%s-strip' % compileTarget
-        macros['strip_archive'] = '%s-strip -g' % compileTarget
+        self.macros['cc'] = '%s-gcc' % compileTarget
+        self.macros['cxx'] = '%s-g++' % compileTarget
+        self.macros['strip'] = '%s-strip' % compileTarget
+        self.macros['strip_archive'] = '%s-strip -g' % compileTarget
 
 
-	archMacros = use.Arch._getMacros()
-        # don't override values we've set for crosscompiling
-        archMacros = dict(x for x in archMacros.iteritems() if x[0] != 'targetarch')
-        macros.update(archMacros)
         newPath = '%(crossprefix)s/bin:' % self.macros
         os.environ['PATH'] = newPath + os.environ['PATH']
 
@@ -724,17 +847,30 @@ class _AbstractPackageRecipe(Recipe):
             self.macros.buildcxx = '%(bindir)s/' + self.macros.buildcxx
         
         # locate the correct config.site files
-        _setSiteConfig(macros)
+        _setSiteConfig(self.macros, self.macros.hostmajorarch,
+                       self.macros.hostos, setEnviron=True)
 
-        # set the bootstrap flag
-        # FIXME: this should probably be a cross flag instead.
-        use.Use.bootstrap._set()
+    def needsCrossFlags(self):
+        return self._isCrossCompileTool or self._isCrossCompiling
+
+    def isCrossCompiling(self):
+        return self._isCrossCompiling
+
+    def isCrossCompileTool(self):
+        return self._isCrossCompileTool
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance)
 	self._build = []
         self.buildinfo = False
+
+        # lightInstance for only instantiating, not running (such as checkin)
+        self._lightInstance = lightInstance
+        if not hasattr(self,'_buildFlavor'):
+            self._buildFlavor = cfg.buildFlavor
+
+        self.externalMethods = {}
 
         self._policyPathMap = {}
         self._policies = {}
@@ -743,6 +879,7 @@ class _AbstractPackageRecipe(Recipe):
         self._componentProvs = {}
         self._derivedFiles = {} # used only for derived packages
         self._includeSuperClassBuildReqs()
+        self._includeSuperClassCrossReqs()
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
@@ -751,6 +888,8 @@ class _AbstractPackageRecipe(Recipe):
 	self.macros = macros.Macros()
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
+        self.hostmacros = self.macros.copy()
+        self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
 
         # allow for architecture not to be set -- this could happen
@@ -769,6 +908,11 @@ class _AbstractPackageRecipe(Recipe):
 	if extraMacros:
 	    self.macros.update(extraMacros)
 
+        self._isCrossCompileTool = False
+        self._isCrossCompiling = False
+        if crossCompile is None:
+            crossCompile = getCrossCompileSettings(self._buildFlavor)
+
         if crossCompile:
             self.setCrossCompile(crossCompile)
         else:
@@ -776,7 +920,19 @@ class _AbstractPackageRecipe(Recipe):
             self.macros.setdefault('hostarch', self.macros['targetarch'])
             self.macros.setdefault('buildarch', self.macros['targetarch'])
 
-	self.mainDir(self.nameVer(), explicit=False)
+        if self.needsCrossFlags() and self.keepBuildReqs is not True:
+            crossSuffixes = ['devel', 'devellib']
+            crossTools = ['gcc', 'libgcc', 'binutils']
+            newCrossRequires = \
+                [ x for x in self.buildRequires 
+                   if (':' in x and x.split(':')[-1] in crossSuffixes
+                       and x.split(':')[0] not in crossTools
+                       and x not in self.keepBuildReqs) ]
+            self.buildRequires = [ x for x in self.buildRequires
+                                   if x not in newCrossRequires ]
+            self.crossRequires.extend(newCrossRequires)
+
+        self.mainDir(self.nameVer(), explicit=False)
         self.sourcePathMap = {}
         self.pathConflicts = {}
         self._autoCreatedFileCount = 0

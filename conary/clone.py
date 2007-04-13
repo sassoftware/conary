@@ -111,7 +111,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
         fromLoc = _convertLabelOrBranch(fromLoc, context)
         if fromLoc is not None:
             if isinstance(fromLoc, versions.Branch):
-                context = fromLoc.trailingLabel()
+                context = fromLoc.label()
             else:
                 context = fromLoc
         toLoc = _convertLabelOrBranch(toLoc, context)

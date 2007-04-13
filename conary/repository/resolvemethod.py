@@ -48,6 +48,9 @@ class DepResolutionMethod(object):
         """
         raise NotImplementedError
 
+    def filterDependencies(self, depList):
+        return depList
+
     def filterSuggestions(self, depList, sugg, suggMap):
         """
             Given a list of several suggestions for one dependency,

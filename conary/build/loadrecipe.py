@@ -84,11 +84,13 @@ def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.build.derivedrecipe', 'DerivedPackageRecipe')
     localImport(d, 'conary.build.packagerecipe', 
                                   ('clearBuildReqs',
+                                   'clearCrossReqs',
+                                   'keepBuildReqs',
                                    'PackageRecipe', 
                                    'BuildPackageRecipe',
                                    'CPackageRecipe',
                                    'AutoPackageRecipe'))
-    localImport(d, 'conary.build.inforecipe',  ('UserInfoRecipe', 
+    localImport(d, 'conary.build.inforecipe',  ('UserInfoRecipe',
                                                 'GroupInfoRecipe'))
     localImport(d, 'conary.lib', ('util',))
     for x in ('os', 're', 'sys', 'stat'):
@@ -538,7 +540,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         if len(troves) > 1:
             troves = [_pickLatest(name, troves)]
         if troves:
-            sourceVersion =  troves[0][1].getSourceVersion()
+            sourceVersion =  troves[0][1].getSourceVersion(False)
             flavor = troves[0][2]
             sourceName = name.split(':')[0] + ':source'
             noFlavor = deps.parseFlavor('')

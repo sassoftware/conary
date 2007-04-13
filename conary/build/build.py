@@ -444,6 +444,7 @@ class Configure(BuildCommand):
                 'dir': '',
                 'skipMissingSubDir': False,
                 'skipMissingDir': False,
+                'local': False,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -464,7 +465,11 @@ class Configure(BuildCommand):
         BuildCommand.__init__(self, recipe, *args, **keywords)
 
     def do(self, macros):
-	macros = macros.copy()
+        macros = macros.copy(False)
+        if self.local:
+            # this will set CC, etc to be like a local build.
+            macros.update(self.recipe.buildmacros.itermacros())
+
         macros.actionDir = action._expandOnePath(self.dir, macros,
              macros.builddir, error=not self.skipMissingDir)
         if not os.path.exists(macros.actionDir):
@@ -480,26 +485,36 @@ class Configure(BuildCommand):
             macros.mkObjdir = ''
             macros.cdObjdir = ''
             macros.configure = './%s' % self.configureName
-        # using the get method avoids adding bootstrap flag to tracked flags
-        # (if the flag is really significant, it will be checked elsewhere)
-        if Use.bootstrap._get():
+
+        if self.local:
+            oldPath = os.environ['PATH']
+            oldSite = os.environ['CONFIG_SITE']
+            macros.bootstrapFlags = ''
+            os.environ['PATH'] = self.recipe.buildmacros.env_path
+            os.environ['CONFIG_SITE'] = self.recipe.buildmacros.env_siteconfig
+        elif self.recipe.needsCrossFlags():
             macros.bootstrapFlags = self.bootstrapFlags
         else:
             macros.bootstrapFlags = ''
         try:
-            util.execute(self.command %macros)
-        except RuntimeError, info:
-            if not self.recipe.isatty():
-                # When conary is being scripted, logs might be
-                # redirected to a file, and it might be easier to
-                # see config.log output in that logfile than by
-                # inspecting the build directory
-                # Each file line will have the filename prepended
-                # The "|| :" makes it OK if there is no config.log
-                util.execute('cd %(actionDir)s; %(cdObjdir)s'
-                             'find . -name config.log | xargs grep -H . || :'
-                             %macros)
-            raise
+            try:
+                util.execute(self.command %macros)
+            except RuntimeError, info:
+                if not self.recipe.isatty():
+                    # When conary is being scripted, logs might be
+                    # redirected to a file, and it might be easier to
+                    # see config.log output in that logfile than by
+                    # inspecting the build directory
+                    # Each file line will have the filename prepended
+                    # The "|| :" makes it OK if there is no config.log
+                    util.execute('cd %(actionDir)s; %(cdObjdir)s'
+                                 'find . -name config.log | xargs grep -H . || :'
+                                 %macros)
+                raise
+        finally:
+            if self.local:
+                os.environ['PATH'] = oldPath
+                os.environ['CONFIG_SITE'] = oldSite
 
 class ManualConfigure(Configure):
     """
@@ -634,6 +649,7 @@ class Make(BuildCommand):
                 'skipMissingSubDir': False,
                 'skipMissingDir': False,
 		'forceFlags': False,
+                'local': False,
                 'makeName': 'make'}
 
     def __init__(self, recipe, *args, **keywords):
@@ -658,6 +674,8 @@ class Make(BuildCommand):
 
     def do(self, macros):
 	macros = macros.copy()
+        if self.local:
+            macros.update(self.recipe.buildmacros.itermacros())
 	if self.forceFlags:
 	    # XXX should this be just '-e'?
 	    macros['overrides'] = ('CFLAGS="%(cflags)s"'
@@ -672,7 +690,17 @@ class Make(BuildCommand):
             assert(self.skipMissingDir)
             return
 
-	BuildCommand.do(self, macros)
+        if self.local:
+            oldPath = os.environ['PATH']
+            oldSite = os.environ['CONFIG_SITE']
+            os.environ['PATH'] = self.recipe.buildmacros.env_path
+            os.environ['CONFIG_SITE'] = self.recipe.buildmacros.env_siteconfig
+        try:
+            BuildCommand.do(self, macros)
+        finally:
+            if self.local:
+                os.environ['PATH'] = oldPath
+                os.environ['CONFIG_SITE'] = oldSite
 
 class MakeParallelSubdir(Make):
     """
