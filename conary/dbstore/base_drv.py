@@ -404,20 +404,24 @@ class BaseDatabase:
         c = self.cursor()
         # schema might not be loaded, so we have to try: except: here
         # instead of looking at the self.tables
+
+        # DatabaseVersion canbe an old style table that has only a version column
+        # or it could be a new style version that has (version, minor) columns
+        # or it can be a mint table that has (version, timestamps) columns
         try:
-            c.execute("select * from DatabaseVersion")
+            c.execute("select * from DatabaseVersion limit 1")
         except sqlerrors.InvalidTable, e:
             self.version = sqllib.DBversion(0,0)
             return self.version
-        else:
-            ret = c.fetchone_dict()
-            # keep compatibility with old style table versioning
-            if ret is None:
-                self.version = sqllib.DBversion(0,0)
-            elif len(ret) == 1:
-                self.version = sqllib.DBversion(ret["version"])
-            else:
-                self.version = sqllib.DBversion(ret["version"], ret["minor"])
+        # keep compatibility with old style table versioning
+        ret = c.fetchone_dict()
+        if ret is None: # no version record found...
+            self.version = sqllib.DBversion(0,0)
+        elif ret.has_key("minor"): # assume new style
+            self.version = sqllib.DBversion(ret["version"], ret["minor"])
+        else: # assume mint/old style
+            c.execute("select max(version) from DatabaseVersion")
+            self.version = sqllib.DBversion(c.fetchone()[0])
         return self.version
 
     def setVersion(self, version):
