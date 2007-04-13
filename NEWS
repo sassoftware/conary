@@ -65,7 +65,6 @@ Changes in @NEW@:
     * Repository cooks will redirect the subprocess' stdin from /dev/null
       to avoid hanging while waiting from stdin. (CNY-783)
 
->>>>>>> /tmp/NEWS~other.M4zKk2
 Changes in 1.1.21:
   o Repository Changes:
     * A "hidden" keyword argument has been added to the
