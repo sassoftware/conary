@@ -395,6 +395,7 @@ def createSchema(db):
 
 # redefine to enable stdout messaging for the migration process
 class SchemaMigration(migration.SchemaMigration):
+    allowMajorMigration = True
     def message(self, msg = None):
         if msg is None:
             msg = self.msg
@@ -405,7 +406,7 @@ class SchemaMigration(migration.SchemaMigration):
 
 class MigrateTo_5(SchemaMigration):
     Version = 5
-    def check(self):
+    def canUpgrade(self):
         return self.version in [2,3,4]
 
     def migrate(self):
@@ -650,9 +651,13 @@ class MigrateTo_14(SchemaMigration):
     def migrate(self):
         # we need to rerun the MigrateTo_10 migration since we missed
         # some trovefiles the first time around
-        m10 = MigrateTo_10(self.db)
+        class M10(MigrateTo_10):
+            # override sanity checks to force the migration to run
+            # out of order
+            def canUpgrade(self):
+                return self.version == 13
+        m10 = M10(self.db)
         m10.migrate()
-
         # We need to make sure that loadedTroves and buildDeps troveinfo
         # isn't included in any commponent's trove.
         self.cu.execute("""
@@ -900,9 +905,9 @@ def checkVersion(db):
 
     # instantiate and call appropriate migration objects in succession.
     while version and version < VERSION:
-        version = (lambda x : sys.modules[__name__].__dict__[ \
-            'MigrateTo_' + str(x + 1)])(version)(db)()
-
+        fname = 'MigrateTo_' + str(version.major + 1)
+        migr = sys.modules[__name__].__dict__[fname](db)
+        version = migr()
     return version
 
 class OldDatabaseSchema(errors.DatabaseError):

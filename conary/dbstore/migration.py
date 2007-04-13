@@ -31,6 +31,7 @@ def getDatabaseVersion(db):
 
 class SchemaMigration:
     Version = 0              # this current migration's version
+    allowMajorMigration = False
     def __init__(self, db):
         self.db = db
         self.cu = db.cursor()
@@ -77,11 +78,13 @@ class SchemaMigration:
         return toVer
     
     # XXX: need way to control only minor/with major schema updates
-    def __call__(self, major=False):
+    def __call__(self, major = None):
         if not self.canUpgrade():
             return self.version
         # is a major schema update needed?
         if self.version.major < self.Version.major:
+            if major is None:
+                major = self.allowMajorMigration
             if major: # major schema updates allowed
                 # we can perform the major schema update
                 toVer = self._dbVersion(self.Version.major)
