@@ -1985,7 +1985,8 @@ conary erase '%s=%s[%s]'
                         job[0], job[1][0], job[1][1])
                 preScript = troveCs.getPreUpdateScript()
                 if preScript:
-                    uJob.addJobPreScript(job, preScript)
+                    uJob.addJobPreScript(job, preScript, oldCompatClass,
+                                         troveCs.getNewCompatibilityClass())
             else:
                 oldCompatClass = None
 
