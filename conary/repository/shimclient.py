@@ -22,12 +22,8 @@ import tempfile
 class FakeServerCache(netclient.ServerCache):
     def __init__(self, server, repMap, userMap, conaryProxies):
         self._server = server
-        if conaryProxies:
-           proxies = { 'http' : conaryProxies, 'https' : conaryProxies }
-        else:
-           proxies = None
         netclient.ServerCache.__init__(self, repMap, userMap,
-                proxies=proxies)
+                conaryProxies)
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)
