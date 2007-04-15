@@ -12,7 +12,10 @@
 # full details.
 #
 
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary.lib import sha1helper
 

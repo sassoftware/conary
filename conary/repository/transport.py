@@ -24,7 +24,10 @@ import time
 import xmlrpclib
 import urllib
 import zlib
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 class DecompressFileObj:
     "implements a wrapper file object that decompress()s data on the fly"
