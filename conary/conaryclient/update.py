@@ -2309,23 +2309,36 @@ conary erase '%s=%s[%s]'
             return
         util.rmtree(restartInfo, ignore_errors=True)
 
-    def createUpdateJob(self, itemList, **kwargs):
+    def newUpdateJob(self):
+        updJob = database.UpdateJob(self.db)
+        return updJob
+
+    def prepareUpdateJob(self, updJob, itemList, keepExisting = False,
+                        recurse = True,
+                        resolveDeps = True, test = False,
+                        updateByDefault = True,
+                        split = True, sync = False, fromChangesets = [],
+                        checkPathConflicts = True, checkPrimaryPins = True,
+                        resolveRepos = True, syncChildren = False,
+                        updateOnly = False, resolveGroupList=None,
+                        installMissing = False, removeNotByDefault = False,
+                        keepRequired = False, migrate = False,
+                        criticalUpdateInfo=None, resolveSource = None,
+                        applyCriticalOnly = False, restartInfo = None):
+
         # A callback object must be supplied
         assert(self.updateCallback is not None)
 
-        applyCriticalOnly = kwargs.pop('applyCriticalOnly', False)
-        criticalUpdateInfo = kwargs.setdefault('criticalUpdateInfo',
-            CriticalUpdateInfo(applyCriticalOnly))
-        syncChildren = kwargs.get('syncChildren', False)
+        if not criticalUpdateInfo:
+            criticalUpdateInfo = CriticalUpdateInfo(applyCriticalOnly)
 
         restartChangeSets = []
-        restartInfo = kwargs.pop('restartInfo', None)
         if restartInfo:
             # ignore itemList passed in, we load it from the restart info
             itemList, restartChangeSets = self.loadRestartInfo(restartInfo)
-            kwargs['recurse'] = False
-            syncChildren = False # we don't recalculate update info anyway
-                                 # so we'll just revert to regular update.
+            recurse = False
+            syncChildren = False    # we don't recalculate update info anyway
+                                    # so we'll just revert to regular update.
 
         if syncChildren:
             for name, oldInf, newInfo, isAbs in itemList:
@@ -2333,14 +2346,35 @@ conary erase '%s=%s[%s]'
                     raise ConaryError(
                             'cannot specify erases/relative updates with sync')
 
-        kwargs['syncChildren'] = syncChildren
-
         # Add information from the stored update job, if available
         for cs in restartChangeSets:
             criticalUpdateInfo.addChangeSet(cs)
 
+
         try:
-            (updJob, suggMap) = self.updateChangeSet(itemList, **kwargs)
+            (updJob, suggMap) = self.updateChangeSet(itemList,
+                    keepExisting = keepExisting,
+                    recurse = recurse,
+                    resolveDeps = resolveDeps,
+                    test = test,
+                    updateByDefault = updateByDefault,
+                    split = split,
+                    sync = sync,
+                    fromChangesets = fromChangesets,
+                    checkPathConflicts = checkPathConflicts,
+                    checkPrimaryPins = checkPrimaryPins,
+                    resolveRepos = resolveRepos,
+                    syncChildren = syncChildren,
+                    updateOnly = updateOnly,
+                    resolveGroupList = resolveGroupList,
+                    installMissing = installMissing,
+                    removeNotByDefault = removeNotByDefault,
+                    keepRequired = keepRequired,
+                    migrate = migrate,
+                    criticalUpdateInfo = criticalUpdateInfo,
+                    resolveSource = resolveSource,
+                    updateJob = updJob,
+            )
         except DependencyFailure, e:
             if e.hasCriticalUpdates() and not applyCriticalOnly:
                 e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
@@ -2350,11 +2384,17 @@ conary erase '%s=%s[%s]'
                 log.error('** NOTE: A critical update was applied - rerunning this command may resolve this error')
             raise
 
-        return updJob, suggMap
+        return suggMap
 
-    def applyUpdateJob(self, updJob, **kwargs):
+    def applyUpdateJob(self, updJob, replaceFiles = False, tagScript = None,
+                    test = False, justDatabase = False, journal = None,
+                    localRollbacks = False,
+                    autoPinList = conarycfg.RegularExpressionList(),
+                    keepJournal = False, noRestart=False):
+        # A callback object must be supplied
+        assert(self.updateCallback is not None)
+
         # Apply the update job, return restart information if available
-        noRestart = kwargs.pop('noRestart', False)
         if noRestart:
             # Apply everything
             remainingJobs = []
@@ -2365,7 +2405,12 @@ conary erase '%s=%s[%s]'
 
         # XXX May have to use a callback for this
         log.syslog.command()
-        self.applyUpdate(updJob, **kwargs)
+        self.applyUpdate(updJob, replaceFiles = replaceFiles,
+                        tagScript = tagScript, test = test,
+                        justDatabase = justDatabase, journal = journal,
+                        localRollbacks = localRollbacks,
+                        autoPinList = autoPinList,
+                        keepJournal = keepJournal)
         log.syslog.commandComplete()
 
         if remainingJobs:
@@ -2390,7 +2435,8 @@ conary erase '%s=%s[%s]'
                         updateOnly = False, resolveGroupList=None,
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
-                        criticalUpdateInfo=None, resolveSource = None):
+                        criticalUpdateInfo=None, resolveSource = None,
+                        updateJob = None):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations. If self.cfg.autoResolve is set, dependencies
@@ -2480,7 +2526,10 @@ conary erase '%s=%s[%s]'
         if criticalUpdateInfo is None:
             criticalUpdateInfo = CriticalUpdateInfo()
 
-        uJob = database.UpdateJob(self.db)
+        if updateJob:
+            uJob = updateJob
+        else:
+            uJob = database.UpdateJob(self.db)
 
         for changeSet in criticalUpdateInfo.iterChangeSets():
             uJob.getTroveSource().addChangeSet(changeSet)
