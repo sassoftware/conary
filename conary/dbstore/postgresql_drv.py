@@ -283,7 +283,13 @@ class Database(BaseDatabase):
     # Postgresql's trigegr syntax kind of sucks because we have to
     # create a function first and then call that function from the
     # trigger
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # first create the trigger function
@@ -292,26 +298,15 @@ class Database(BaseDatabase):
             return False
         funcName = "%s_func" % triggerName
         cu = self.dbh.cursor()
-        if pinned:
-            cu.execute("""
-            CREATE OR REPLACE FUNCTION %s()
-            RETURNS trigger
-            AS $$
-            BEGIN
-                NEW.%s := OLD.%s ;
-                RETURN NEW;
-            END ; $$ LANGUAGE 'plpgsql';
-            """ % (funcName, column, column))
-        else:
-            cu.execute("""
-            CREATE OR REPLACE FUNCTION %s()
-            RETURNS trigger
-            AS $$
-            BEGIN
-                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
-                RETURN NEW;
-            END ; $$ LANGUAGE 'plpgsql';
-            """ % (funcName, column))
+        cu.execute("""
+        CREATE OR REPLACE FUNCTION %s()
+        RETURNS trigger
+        AS $$
+        BEGIN
+            NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
+            RETURN NEW;
+        END ; $$ LANGUAGE 'plpgsql';
+        """ % (funcName, column))
         # now create the trigger based on the above function
         cu.execute("""
         CREATE TRIGGER %s

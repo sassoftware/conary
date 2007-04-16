@@ -276,7 +276,7 @@ class MigrateTo_9(SchemaMigration):
         schema.createTroves(self.db)
         # we changed the Instances update trigger to protect the changed column from changing
         self.db.dropTrigger("Instances", "UPDATE")
-        schema.createTrigger(self.db, "Instances", pinned=True)
+        schema.createTrigger(self.db, "Instances")
         # done...
         return self.Version
 

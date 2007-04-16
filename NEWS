@@ -47,6 +47,10 @@ Changes in @NEW@:
       and a standalone server; this removes the standalone proxies dependence
       on the X-Conary-Servername header.
 
+  o Internal Changes:
+    * The createTrigger() method of dbstore drivers no longer accepts
+      the "pinned" keyword parameter.
+
   o Bug Fixes:
     * Fixed a bug in proxy code that would cause conary to use https through
       the proxy when http was desired (CNY-1530)

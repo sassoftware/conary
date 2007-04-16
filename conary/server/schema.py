@@ -23,9 +23,9 @@ TROVE_TROVES_WEAKREF   = 1 << 1
 
 VERSION = sqllib.DBversion(15, 3)
 
-def createTrigger(db, table, column = "changed", pinned = False):
+def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
-    retUpdate = db.createTrigger(table, column, "UPDATE", pinned=pinned)
+    retUpdate = db.createTrigger(table, column, "UPDATE")
     return retInsert or retUpdate
 
 def createInstances(db):
