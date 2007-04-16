@@ -271,9 +271,9 @@ class Transport(xmlrpclib.Transport):
             if self.proxies and 'http' in self.proxies:
                 proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
             if proxyHost == 'localhost':
-                opener = XMLOpener({})
-            else:
                 opener = XMLOpener(self.proxies)
+            else:
+                opener = XMLOpener({})
         else:
             opener = XMLOpener(self.proxies)
         opener.setCompress(self.compress)
