@@ -1,13 +1,15 @@
 Changes in @NEW@:
   o Major Changes:
-    * Group troves can now declare an (integer) compatibility class which is
-      used to automatically invalidate rollbacks (existing groups are
-      considered to be in compatibility class zero). When a group is upgraded
-      to a new group which has a different compatibility class, the rollback
-      stack is invalidated unless the group also contains postRollback script
-      which can rollback to the version being updated. Postrollback scripts
-      can now be defined with a list of compatibility versions they are able
-      to roll back to. Old invalidateRollback parameter for some group
+
+    * Group troves can now declare an (integer) compatibility class
+      which is used to automatically invalidate rollbacks (existing
+      groups are considered to be in compatibility class zero). When a
+      group is upgraded to a new group which has a different
+      compatibility class, the rollback stack is invalidated unless
+      the group also contains postRollback script which can rollback
+      to the version being updated. Postrollback scripts can now be
+      defined with a list of compatibility versions they are able to
+      roll back to. Old invalidateRollback parameter for some group
       scripts is no longer supported.
 
   o Client Changes:
@@ -68,6 +70,8 @@ Changes in @NEW@:
       mysql has been fixed (CNY-1193)
     * Repository cooks will redirect the subprocess' stdin from /dev/null
       to avoid hanging while waiting from stdin. (CNY-783)
+    * Trove.verifyDigests() no longer fails erroneously if a signature
+      version 0 digest has not been calculated and set in troveInfo. (CNY-1552)
 
 Changes in 1.1.21:
   o Repository Changes:

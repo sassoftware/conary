@@ -475,7 +475,8 @@ class TroveSignatures(streams.StreamSet):
         (digest, None) before any signatures for that digest. The digests
         are returned as digets stream objects.
         """
-        yield (_TROVESIG_VER_CLASSIC, self.sha1, None)
+        if self.sha1():
+            yield (_TROVESIG_VER_CLASSIC, self.sha1, None)
 
         for sig in self.digitalSigs:
             yield (_TROVESIG_VER_CLASSIC, self.sha1, sig)
@@ -1101,8 +1102,13 @@ class Trove(streams.StreamSet):
         """
 
         lastSigVersion = None
+        lastDigest = None
         for (sigVersion, sigDigest, signature) in self.troveInfo.sigs:
-            if lastSigVersion != sigVersion:
+            if lastSigVersion == sigVersion:
+                if sigDigest() != lastDigest:
+                    return False
+            else:
+                lastDigest = sigDigest()
                 lastSigVersion = sigVersion
                 s = self._sigString(sigVersion)
                 if not sigDigest.verify(s):
