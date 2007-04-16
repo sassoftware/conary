@@ -13,8 +13,8 @@ Changes in @NEW@:
   o Client Changes:
     * To take advantage of Conary's ability to apply the critical
       update set and restart before applying the rest of the updates,
-      two new API calls have been added: createUpdateJob and
-      applyUpdateJob. (CNY-1454)
+      three new API calls have been added: newUpdateJob, prepareUpdateJob
+      and applyUpdateJob. (CNY-1454)
     * A new argument, --no-restart, has been added to conary. This
       has to be used in conjunction with --root and allows one to skip
       the restarts after applying critical updates when installing in
