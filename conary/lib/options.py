@@ -17,7 +17,10 @@ Command-line option handling
 
 import inspect
 import optparse
-import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary.lib import log, util
 import sys
@@ -205,8 +208,8 @@ def _getUsageStr(usage):
     # message.  We want it to be a string.  For now, we
     # convert here to allow backwards compatibility.
     if hasattr(usage, '__call__'):
-        stdout = StringIO.StringIO()
-        stderr = StringIO.StringIO()
+        stdout = StringIO()
+        stderr = StringIO()
         oldStdOut = sys.stdout
         oldStdErr = sys.stderr
         # set a default message

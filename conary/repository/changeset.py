@@ -19,7 +19,10 @@ import gzip
 import itertools
 import os
 
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary import files, streams, trove, versions
 from conary.lib import enum, fixeddifflib, log, misc, patch, sha1helper, util

@@ -12,7 +12,10 @@
 # full details.
 #
 
-import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 import base64
 
 from conary.constants import version
@@ -44,7 +47,7 @@ class OpenPGPKeyTable:
         # this ignore duplicate keys
         cu = self.db.cursor()
 
-        keyRing = StringIO.StringIO(pgpKeyData)
+        keyRing = StringIO(pgpKeyData)
 
         # make sure it's a public key
         keyType = openpgpfile.readBlockType(keyRing)
