@@ -1234,7 +1234,14 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.fileQueue = []
         for csf in itertools.chain(self.fileContainers, self.csfWrappers):
+            # find the first non-config file
             entry = csf.getNextFile()
+            while entry:
+                if entry[1][0] == '0':
+                    break
+
+                entry = csf.getNextFile()
+
             if entry:
                 util.tupleListBsearchInsert(self.fileQueue, entry + (csf,),
                                             self.fileQueueCmp)
