@@ -138,9 +138,6 @@ def getCrossCompileSettings(flavor):
     isCrossTool = flavor.stronglySatisfies(crossFlavor)
     return None, targetFlavor, isCrossTool
 
-def _ignoreCall(*args, **kw):
-    pass
-
 class _AbstractPackageRecipe(Recipe):
     buildRequires = [
         'filesystem:runtime',
