@@ -22,7 +22,7 @@ from conary.deps import deps
 
 class UserGroupInfoRecipe(_AbstractPackageRecipe):
     _recipeType = RECIPE_TYPE_INFO
-    abstractBaseClass = 1
+    internalAbstractBaseClass = 1
     # we need to add this line because _AbstractPackageRecipe
     # isn't copied in
     buildRequires = _AbstractPackageRecipe.buildRequires[:]
