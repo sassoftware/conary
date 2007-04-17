@@ -24,6 +24,9 @@ RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
 
+def _ignoreCall(*args, **kw):
+    pass
+
 def isPackageRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_PACKAGE
 
