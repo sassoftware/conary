@@ -74,6 +74,8 @@ Changes in @NEW@:
       version 0 digest has not been calculated and set in troveInfo. (CNY-1552)
     * Fixed bug in changeset reset() which affected reusing changesets in
       merges (CNY-1534)
+    * Fixed bug in changeset based trove sources where the underlying
+      changesets never got reset (CNY-1534)
 
 Changes in 1.1.21:
   o Repository Changes:
