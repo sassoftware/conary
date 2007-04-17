@@ -72,6 +72,8 @@ Changes in @NEW@:
       to avoid hanging while waiting from stdin. (CNY-783)
     * Trove.verifyDigests() no longer fails erroneously if a signature
       version 0 digest has not been calculated and set in troveInfo. (CNY-1552)
+    * Fixed bug in changeset reset() which affected reusing changesets in
+      merges (CNY-1534)
 
 Changes in 1.1.21:
   o Repository Changes:
