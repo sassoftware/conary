@@ -1295,13 +1295,14 @@ class GroupRecipe(_BaseGroupRecipe):
             raise RecipeFileError('script already set for group %s'
                                         % groupName)
 
-        if type(fromClass) == int:
-            fromClass = [ fromClass ]
+        if fromClass is not None:
+            if type(fromClass) != list and type(fromClass) != tuple:
+                fromClass = [ fromClass ]
 
-        for f in fromClass:
-            if type(f) is not int:
-                raise RecipeFileError('group compatibility classes must be '
-                                      'integers')
+            for f in fromClass:
+                if type(f) is not int:
+                    raise RecipeFileError('group compatibility classes must be '
+                                          'integers')
 
         scriptDict[groupName] = (contents, fromClass)
 
