@@ -616,6 +616,74 @@ class RepQueryCommand(_AbstractQueryCommand):
                                versionFilter, flavorFilter, **kw)
 _register(RepQueryCommand)
 
+
+class RdiffCommand(ConaryCommand):
+
+    commands = [ 'rdiff' ]
+    paramHelp = "<pkgname>=<version1>[[flavor1]]--<version2>[[flavor]]"
+    help = 'Display differences between troves'
+    commandGroup = 'Information Display'
+    docs = { 'show-empty'  : 'Show troves even if they did not change',
+             'build-reqs'  : 'Show build requirements changes',
+             'deps'        : 'Show changes in overall dependencies',
+             'ls'          : 'Show file changes',
+             'lsl'         : 'Show detailed file changes',
+             'tags'        : 'Show changes in file tags',
+             'file-versions' : 'Show file versions',
+             'file-deps'   : 'Show file dependency changes',
+             'file-contents' : 'Show file content changes (non-binary)',
+           }
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        d = {}
+        #d["components"] = NO_PARAM
+        d["deps"] = NO_PARAM
+        d["show-empty"] = NO_PARAM
+        d["build-reqs"] = NO_PARAM
+        argDef['Trove-related Changes'] = d
+
+        d = {}
+        d["ls"] = NO_PARAM
+        d["lsl"] = NO_PARAM
+        d["tags"] = NO_PARAM
+        d["file-versions"] = NO_PARAM
+        d["file-deps"] = NO_PARAM
+        d["file-contents"] = NO_PARAM
+        argDef['File-related Changes'] = d
+
+    def runCommand(self, cfg, argSet, otherArgs):
+
+        args = otherArgs[2:]
+        if len(args) != 1:
+            return self.usage()
+
+        diffSpec = args[0]
+        troveSpec = cmdline.parseChangeList(diffSpec)[0]
+        if troveSpec[1][0] is None:
+            # Most likely, syntax did not specify <old>--<new>
+            return self.usage()
+
+        kw = {}
+        kw['fullFlavors'] = cfg.fullFlavors
+        kw['fullVersions'] = cfg.fullVersions
+        kw['showLabels'] = cfg.showLabels
+        kw['showEmptyDiffs'] = argSet.pop('show-empty', False)
+        kw['withBuildReqs'] = argSet.pop('build-reqs', False)
+        kw['withFileContents'] = argSet.pop('file-contents', False)
+        kw['withFileDeps'] = argSet.pop('file-deps', False)
+        kw['withFiles'] = argSet.pop('ls', False)
+        kw['withFilesStat'] = argSet.pop('lsl', False)
+        kw['withFileTags'] = argSet.pop('tags', False)
+        kw['withFileVersions'] = argSet.pop('file-versions', False)
+        kw['withTroveDeps'] = argSet.pop('deps', False)
+        if argSet:
+            raise Exception(argSet)
+
+        queryrep.diffTroves(cfg, troveSpec, **kw)
+_register(RdiffCommand)
+
+
 class ShowChangesetCommand(_AbstractQueryCommand):
 
     commands = [ "showcs", "scs" ]

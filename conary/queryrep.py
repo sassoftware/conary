@@ -1,4 +1,4 @@
-#
+# 
 # Copyright (c) 2004-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -16,7 +16,7 @@ Provides the output for the "conary repquery" command
 """
 import itertools
 
-from conary import conaryclient
+from conary import conaryclient, cscmd, trove
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
@@ -234,7 +234,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         # Search for troves using findTroves.  The options we
         # specify to findTroves are determined by the version and 
         # flavor filter.
-        troveSpecs = [ cmdline.parseTroveSpec(x, allowEmptyName=False) \
+        troveSpecs = [ ((not isinstance(x, str) and x) or
+                         cmdline.parseTroveSpec(x, allowEmptyName=False)) \
                                                         for x in troveSpecs ]
         searchFlavor = defaultFlavor
 
@@ -467,3 +468,353 @@ def getTrovesByPath(repos, pathList, versionFilter, flavorFilter, labelPath,
                                      defaultFlavor, None)
         finalList.extend(results)
     return finalList
+
+def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
+               withFileVersions = False, withFileDeps = False,
+               withFileContents = False, showLabels = False,
+               fullVersions = False, fullFlavors = False,
+               showEmptyDiffs = False, withBuildReqs = False,
+               withFiles = False, withFilesStat = False):
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+
+    # Fetch the absolute changeset for the old trove and the relative
+    # changeset from the old trove to the new trove
+    primaryCsList = cscmd.computeTroveList(client, [ troveSpec ])
+    trv = primaryCsList[0]
+    primaryCsList = [ (trv[0], (None, None), trv[1], True), trv ]
+    cs = repos.createChangeSet(primaryCsList, withFiles=True,
+                               withFileContents=withFileContents)
+    oldTroves = {}
+    newTroves = {}
+    newTroveCsList = []
+    for trvCs in cs.iterNewTroveList():
+        trvName = trvCs.getName()
+        if trvCs.isAbsolute():
+            oldTroves[trvName] = trove.Trove(trvCs)
+            newTroves[trvName] = trove.Trove(trvCs)
+        else:
+            newTroveCsList.append(trvCs)
+
+    for trvCs in newTroveCsList:
+        trv = newTroves[trvCs.getName()]
+        trv.applyChangeSet(trvCs)
+
+    del cs
+    del newTroveCsList
+
+    sOldTroves = set(oldTroves)
+    sNewTroves = set(newTroves)
+    trvAdded = sNewTroves.difference(sOldTroves)
+    trvRemoved = sOldTroves.difference(sNewTroves)
+    trvChanged = sNewTroves.intersection(sOldTroves)
+
+    trvDepsKeys = DiffDisplay.troveDependencyLabels
+
+    diffs = {}
+    # Check dependencies
+    for trvName in trvChanged:
+        trvDiff = {}
+        oldTrv = oldTroves[trvName]
+        newTrv = newTroves[trvName]
+
+        trvDiff.update(_diffTroveCollections(oldTrv, newTrv))
+        trvDiff.update(_diffTroveFlavors(oldTrv, newTrv))
+        trvDiff.update(_diffTroveDeps(oldTrv, newTrv, trvDepsKeys))
+        trvDiff.update(_diffBuildRequirements(oldTrv, newTrv))
+        # XXX Metadata
+
+        trvDiff.update(_diffFiles(oldTrv, newTrv))
+
+        if trvDiff:
+            diffs[trvName] = trvDiff
+
+    diffDisplay = DiffDisplay(oldTroves, newTroves, diffs,
+                              fullFlavors = fullFlavors,
+                              fullVersions = fullVersions,
+                              showLabels = showLabels,
+                              showEmptyDiffs = showEmptyDiffs,
+                              withBuildReqs = withBuildReqs,
+                              withFileContents = withFileContents,
+                              withFileDeps = withFileDeps,
+                              withFilesStat = withFilesStat,
+                              withFiles = withFiles,
+                              withFileTags = withFileTags,
+                              withFileVersions = withFileVersions,
+                              withTroveDeps = withTroveDeps,
+                              )
+    for line in diffDisplay.lines():
+        print line
+
+class DiffDisplay(object):
+    charOld = '-'
+    charNew = '+'
+    charRemoved = '-'
+    charAdded = '+'
+
+    pads = [ " " * 4 * i for i in range(5) ]
+
+    troveDependencyLabels = [('Provides', 'getProvides'), ('Requires', 'getRequires')]
+
+    def __init__(self, oldTroves, newTroves, diffs, **kwargs):
+        self.fullFlavors = kwargs.pop('fullFlavors')
+        self.fullVersions = kwargs.pop('fullVersions')
+        self.showLabels = kwargs.pop('showLabels')
+        self.showEmptyDiffs = kwargs.pop('showEmptyDiffs')
+        self.withBuildReqs = kwargs.pop('withBuildReqs')
+        self.withFileContents = kwargs.pop('withFileContents')
+        self.withFileDeps = kwargs.pop('withFileDeps')
+        self.withFiles = kwargs.pop('withFiles')
+        self.withFilesStat = kwargs.pop('withFilesStat')
+        self.withFileTags = kwargs.pop('withFileTags')
+        self.withFileVersions = kwargs.pop('withFileVersions')
+        self.withTroveDeps = kwargs.pop('withTroveDeps')
+
+        if self.withFilesStat:
+            self.withFiles = True
+
+        self.oldTroves = oldTroves
+        self.newTroves = newTroves
+        self.diffs = diffs
+
+    def lines(self):
+        for trvName, trvDiff in sorted(self.diffs.iteritems()):
+            if not trvDiff and not self.showEmptyDiffs:
+                continue
+            for line in self.formatDiffTrove(trvName, trvDiff, padLevel=0):
+                yield line
+
+    def formatDiffTrove(self, trvName, trvDiff, padLevel):
+        padding = self.pads[padLevel]
+        otrv = self.oldTroves[trvName]
+        ntrv = self.newTroves[trvName]
+        yield "%s%s %s=%s" % (padding, self.charOld, trvName,
+            self.formatVF((otrv.getVersion(), otrv.getFlavor())))
+        yield "%s%s %s=%s" % (padding, self.charNew, trvName,
+            self.formatVF((ntrv.getVersion(), ntrv.getFlavor())))
+
+        for line in self.formatDiffFlavor(trvDiff, padLevel + 1): yield line
+        for line in self.formatDiffColl(trvDiff, padLevel + 1): yield line
+        for line in self.formatTroveDeps(trvDiff, padLevel + 1): yield line
+        for line in self.formatBuildReqs(trvDiff, padLevel + 1): yield line
+        for line in self.formatFileList(trvDiff, padLevel + 1): yield line
+
+    def formatDiffFlavor(self, trvDiff, padLevel):
+        pad1 = self.pads[padLevel]
+        pad2 = self.pads[padLevel + 1]
+        if 'flavor' in trvDiff:
+            o, n = trvDiff['flavor']
+            yield "%sFlavors:" % pad1
+            yield "%s%s %s" % (pad2, self.charOld, o)
+            yield "%s%s %s" % (pad2, self.charNew, n)
+
+    def formatDiffColl(self, trvDiff, padLevel):
+        pad1 = self.pads[padLevel]
+        pad1 = self.pads[padLevel + 1]
+        if 'isCollection' in trvDiff:
+            o, n = trvDiff['isCollection']
+            yield "%s%s is a collection: %s" % (pad1, bool(o))
+            yield "%s%s is a collection: %s" % (pad1, bool(n))
+
+        if 'troveList' in trvDiff:
+            added, removed = trvDiff['troveList']
+            yield "%sTrove list:" % pad1
+            template = "%s%s %s"
+            for t in removed:
+                yield template % (pad2, self.charRemoved, t)
+            for t in added:
+                yield template % (pad2, self.charAdded, t)
+
+    def formatTroveDeps(self, trvDiff, padLevel):
+        if 'troveDeps' not in trvDiff:
+            return
+        pad1 = self.pads[padLevel]
+        if not self.withTroveDeps:
+            yield "%sDependencies" % (pad1, )
+            return
+
+        pad2 = self.pads[padLevel + 1]
+        tDeps = trvDiff['troveDeps']
+        for (dep, meth) in self.troveDependencyLabels:
+            if dep not in tDeps:
+                continue
+            val = tDeps[dep]
+            yield "%s%s:" % (pad1, dep)
+            for sense, vdep in zip((self.charAdded, self.charRemoved), val):
+                for v in str(vdep).split('\n'):
+                    if not v:
+                        continue
+                    yield "%s%s %s" % (pad2, sense, v)
+
+    def formatBuildReqs(self, trvDiff, padLevel):
+        if 'buildRequirements' not in trvDiff:
+            return
+        pad1 = self.pads[padLevel]
+        if not self.withBuildReqs:
+            yield "%sBuild Requirements" % (pad1, )
+            return
+
+        pad2 = self.pads[padLevel + 1]
+        yield "%sBuild Requirements:" % pad1
+        added, removed, changed = trvDiff['buildRequirements']
+        template = "%s%s %s"
+        for n, (v, f) in sorted(removed):
+            yield template % (pad2, self.charRemoved, n)
+        for n, (v, f) in sorted(added):
+            yield template % (pad2, self.charAdded, n)
+
+        template = "%s%s %s=%s"
+        for n, (ov, of), (nv, nf) in sorted(changed):
+            if of == nf and not self.fullFlavors:
+                ostr = self.formatVF(ov)
+                nstr = self.formatVF(nv)
+            else:
+                ostr = self.formatVF((ov, of))
+                nstr = self.formatVF((nv, nf))
+            yield template % (pad2, self.charRemoved, n, ostr)
+            yield template % (pad2, self.charAdded, n, nstr)
+
+    def formatFileList(self, trvDiff, padLevel):
+        if 'fileDiffs' not in trvDiff:
+            return
+        pad1 = self.pads[padLevel]
+        if not self.withFiles:
+            yield "%sFiles" % (pad1, )
+            return
+
+        pad2 = self.pads[padLevel + 1]
+        pad3 = self.pads[padLevel + 2]
+        pad4 = self.pads[padLevel + 3]
+        yield "%sFile Changes:" % pad1
+        added, removed, changed = trvDiff['fileDiffs']
+        if removed:
+            yield "%sRemoved:" % pad2
+            for n, (v, o) in sorted(removed):
+                yield "%s%s" % (pad3, n)
+        if added:
+            yield "%sAdded:" % pad2
+            for n, (v, o) in sorted(added):
+                yield "%s%s" % (pad3, n)
+        if changed:
+            yield "%sChanged:" % pad2
+            for n, (ov, oo), (nv, no) in sorted(changed):
+                yield "%s%s" % (pad3, n)
+                if self.withFileVersions:
+                    template = "%s%s %s"
+                    yield template % (pad4, self.charOld, ov)
+                    yield template % (pad4, self.charNew, nv)
+
+    def formatVF(self, VF):
+        """Formats the version-flavor tuple according to the display options"""
+        return formatVF(VF, fullFlavors = self.fullFlavors,
+                        showLabels = self.showLabels,
+                        fullVersions = self.fullVersions)
+
+def _diffTroveCollections(oldTrv, newTrv):
+    oldIsColl = oldTrv.isCollection()
+    newIsColl = newTrv.isCollection()
+    ret = {}
+    if not (oldIsColl or newIsColl):
+        # Neither are collections
+        return ret
+    if (oldIsColl and newIsColl):
+        ocoll = set(x[0] for x in oldTrv.iterTroveList(strongRefs=True))
+        ncoll = set(x[0] for x in newTrv.iterTroveList(strongRefs=True))
+        if ocoll != ncoll:
+            # Format is (added, removed)
+            ret['troveList'] = (ncoll - ocoll, ocoll - ncoll)
+    else:
+            # Format is (old, new)
+        ret['isCollection'] = (oldIsColl, newIsColl)
+    return ret
+
+def _diffTroveFlavors(oldTrv, newTrv):
+    # Flavor changed?
+    ret = {}
+    oldFlv, newFlv = oldTrv.getFlavor(), newTrv.getFlavor()
+    if oldFlv != newFlv:
+        ret['flavor'] = (oldFlv, newFlv)
+    return ret
+
+def _diffTroveDeps(oldTrv, newTrv, depKeys):
+    ret = {}
+    for (dep, meth) in depKeys:
+        oldD = getattr(oldTrv, meth)()
+        newD = getattr(newTrv, meth)()
+        added, removed = newD - oldD, oldD - newD
+        if added or removed:
+            ret[dep] = (added, removed)
+    if ret:
+        return {'troveDeps' : ret}
+    return ret
+
+def _diffBuildRequirements(oldTrv, newTrv):
+    oldBR = dict((x[0], (x[1], x[2])) for x in oldTrv.getBuildRequirements())
+    newBR = dict((x[0], (x[1], x[2])) for x in newTrv.getBuildRequirements())
+    ret = _diffNV(oldBR, newBR)
+    if not ret:
+        return {}
+    return {'buildRequirements' : ret}
+
+def _diffFiles(oldTrv, newTrv):
+    oldFiles = dict((x[1], (x[3], x)) for x in oldTrv.iterFileList())
+    newFiles = dict((x[1], (x[3], x)) for x in newTrv.iterFileList())
+    ret = _diffNV(oldFiles, newFiles)
+    if not ret:
+        return {}
+    return {'fileDiffs' : ret}
+
+def _diffNV(dict1, dict2):
+    """
+    Diffs two dictionaries of NV objects, keyed on N, with V as
+    value
+    Return a 3-item tuple: added, removed, changed
+    Added and removed are NV lists
+    changed is a list of (n, oldV, newV)
+    """
+
+    setN1 = set(dict1)
+    setN2 = set(dict2)
+    added, removed = setN2 - setN1, setN1 - setN2
+
+    added = [ (x, dict2[x]) for x in added ]
+    removed = [ (x, dict1[x]) for x in removed ]
+    # Potentially changed
+    common = setN1.intersection(setN2)
+    # Extract the file versions
+    # Put file versions in a dictionary keyed by path
+    cLeft = dict((x, dict1[x]) for x in common)
+    # Walk the other file versions and compare them with the old ones
+
+    vDiffs = []
+    for fPath, fValRight in ((x, dict2[x]) for x in common):
+        fValLeft = cLeft[fPath]
+        if fValLeft[0] == fValRight[0]:
+            del cLeft[fPath]
+        else:
+            vDiffs.append((fPath, fValLeft, fValRight))
+
+    if added or removed or vDiffs:
+        return added, removed, vDiffs
+
+    return None
+
+def formatVF(vf, showLabels=False, fullVersions=False, fullFlavors=False):
+    ver, flavor = _splitVF(vf)
+
+    if not showLabels and not fullVersions:
+        vdisp = ver.trailingRevision()
+    elif fullVersions:
+        vdisp = ver.asString()
+    else: #labels
+        vdisp = "%s/%s" % (ver.branch().label(), ver.trailingRevision())
+
+    if not fullFlavors or flavor is None:
+        return vdisp
+    return "%s[%s]" % (vdisp, flavor)
+
+def _splitVF(vf):
+    if isinstance(vf, tuple):
+        assert len(vf) == 2, "Expected 2-item tuple, got %s items" % len(vf)
+        return vf
+    return vf, None
