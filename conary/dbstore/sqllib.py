@@ -36,9 +36,14 @@ class DBversion:
             return cmp(self.major, other.major) or cmp(self.minor, other.minor)
         raise RuntimeError("incompatible type compare for DBversion",
                            [(self.major, self.minor), other])
-    def __str__(self):
+    def __repr__(self):
         return "DBversion(%d,%d)" % (self.major, self.minor)
-    __repr__ = __str__
+
+    def __str__(self):
+        if self.minor:
+            return '%d.%d' % (self.major, self.minor)
+        else:
+            return str(self.major)
 
 # a case-insensitive key dict
 class CaselessDict(dict):
