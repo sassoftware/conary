@@ -116,16 +116,15 @@ def keepBuildReqs(*buildReqs):
     classes = []
     for value in callerGlobals.itervalues():
         if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
-            classes.append(value)
+            if not getattr(value, 'internalAbstractBaseClass', False):
+                classes.append(value)
     for class_ in classes:
         if buildReqs:
-            if isinstance(class_.keepBuildReqs, list):
-                # don't modify this in place, it could have been derived
-                # from a superclass and modifying in place could have
-                # negative side effects
-                class_.keepBuildReqs = class_.keepBuildReqs + list(buildReqs)
+            if (hasattr(class_, 'keepBuildReqs') and
+                isinstance(class_.keepBuildReqs, set)):
+                class_.keepBuildReqs = class_.keepBuildReqs | set(buildReqs)
             else:
-                class_.keepBuildReqs = list(buildReqs)
+                class_.keepBuildReqs = set(buildReqs)
         else:
             class_.keepBuildReqs = True
 
@@ -155,7 +154,6 @@ class _AbstractPackageRecipe(Recipe):
         'sqlite:lib',
     ]
     crossRequires = []
-    keepBuildReqs = []
 
     Flags = use.LocalFlags
     explicitMainDir = False
@@ -923,6 +921,11 @@ class _AbstractPackageRecipe(Recipe):
         if self.needsCrossFlags() and self.keepBuildReqs is not True:
             crossSuffixes = ['devel', 'devellib']
             crossTools = ['gcc', 'libgcc', 'binutils']
+            if (not hasattr(self, 'keepBuildReqs') 
+                or not hasattr(self.keepBuildReqs, '__iter__')):
+                # if we're in the "lightReference" mode, this might 
+                # return some bogus object...
+                self.keepBuildReqs = []
             newCrossRequires = \
                 [ x for x in self.buildRequires 
                    if (':' in x and x.split(':')[-1] in crossSuffixes

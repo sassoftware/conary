@@ -129,7 +129,6 @@ def _copyReusedRecipes(moduleDict):
                                  recipeClass.__dict__.copy())
         recipeCopy.buildRequires = recipeCopy.buildRequires[:]
         recipeCopy.crossRequires = recipeCopy.crossRequires[:]
-        recipeCopy.keepBuildReqs = recipeCopy.keepBuildReqs[:]
         moduleDict[name] = recipeCopy
 
 class RecipeLoader:
