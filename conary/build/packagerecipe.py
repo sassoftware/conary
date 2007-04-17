@@ -111,23 +111,6 @@ def _clearReqs(attrName, reqs):
             if issubclass(base, _AbstractPackageRecipe):
                 _removePackages(base, reqs)
 
-def keepBuildReqs(*buildReqs):
-    callerGlobals = inspect.stack()[1][0].f_globals
-    classes = []
-    for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
-            if not getattr(value, 'internalAbstractBaseClass', False):
-                classes.append(value)
-    for class_ in classes:
-        if buildReqs:
-            if (hasattr(class_, 'keepBuildReqs') and
-                isinstance(class_.keepBuildReqs, set)):
-                class_.keepBuildReqs = class_.keepBuildReqs | set(buildReqs)
-            else:
-                class_.keepBuildReqs = set(buildReqs)
-        else:
-            class_.keepBuildReqs = True
-
 crossFlavor = deps.parseFlavor('cross')
 def getCrossCompileSettings(flavor):
     flavorTargetSet = flavor.getDepClasses().get(deps.DEP_CLASS_TARGET_IS, None)
@@ -917,6 +900,8 @@ class _AbstractPackageRecipe(Recipe):
             self.macros.update(use.Arch._getMacros())
             self.macros.setdefault('hostarch', self.macros['targetarch'])
             self.macros.setdefault('buildarch', self.macros['targetarch'])
+        if not hasattr(self, 'keepBuildReqs'):
+            self.keepBuildReqs = []
 
         if self.needsCrossFlags() and self.keepBuildReqs is not True:
             crossSuffixes = ['devel', 'devellib']
@@ -925,7 +910,7 @@ class _AbstractPackageRecipe(Recipe):
                 or not hasattr(self.keepBuildReqs, '__iter__')):
                 # if we're in the "lightReference" mode, this might 
                 # return some bogus object...
-                self.keepBuildReqs = []
+                self.keepBuildReqs = set()
             newCrossRequires = \
                 [ x for x in self.buildRequires 
                    if (':' in x and x.split(':')[-1] in crossSuffixes
