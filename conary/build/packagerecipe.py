@@ -120,7 +120,10 @@ def keepBuildReqs(*buildReqs):
     for class_ in classes:
         if buildReqs:
             if isinstance(class_.keepBuildReqs, list):
-                class_.keepBuildReqs.extend(buildReqs)
+                # don't modify this in place, it could have been derived
+                # from a superclass and modifying in place could have
+                # negative side effects
+                class_.keepBuildReqs = class_.keepBuildReqs + buildReqs
             else:
                 class_.keepBuildReqs = buildReqs
         else:
