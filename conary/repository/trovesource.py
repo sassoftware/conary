@@ -954,6 +954,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                         keep = True
 
                 if keep:
+                    subCs.reset()
                     mergedCs.merge(subCs)
 
         # Remove all of the new and old job information from the merged
