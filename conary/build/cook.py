@@ -645,8 +645,9 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                     # while normal scripts move from another class to this
                     if scriptClassList is not None and compatClass is None:
                         raise CookError, ('Group compatibility class must '
-                                          'be set for a group script to '
-                                          'define a conversion class path.')
+                                          'be set for group "%s" to '
+                                          'define a conversion class path.'
+                                          % groupName)
                     elif scriptClassList is not None and isRollback:
                         troveScripts.conversions.addList(
                             [ (compatClass, x) for x in scriptClassList ])

@@ -1283,7 +1283,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def _addScript(self, contents, groupName, scriptDict, fromClass = None):
         if groupName is None:
-            groupName = self.name
+            groupName = self.defaultGroup.name
 
         if groupName not in self.groups:
             raise RecipeFileError, 'Group %s not defined' % groupName
@@ -1297,6 +1297,11 @@ class GroupRecipe(_BaseGroupRecipe):
 
         if type(fromClass) == int:
             fromClass = [ fromClass ]
+
+        for f in fromClass:
+            if type(f) is not int:
+                raise RecipeFileError('group compatibility classes must be '
+                                      'integers')
 
         scriptDict[groupName] = (contents, fromClass)
 
@@ -1366,8 +1371,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self._addScript(contents, groupName, self.postRollbackScripts,
                         fromClass = toClass)
 
-    def addPostUpdateScript(self, contents = None, groupName = None,
-                            fromClass = None):
+    def addPostUpdateScript(self, contents = None, groupName = None):
         """
         NAME
         ====
@@ -1395,11 +1399,9 @@ class GroupRecipe(_BaseGroupRecipe):
         B{contents} : (None) The contents of the script
         B{groupName} : (None) The name of the group to add the script to
         """
-        self._addScript(contents, groupName, self.postUpdateScripts,
-                        fromClass = fromClass)
+        self._addScript(contents, groupName, self.postUpdateScripts)
 
-    def addPreUpdateScript(self, contents = None, groupName = None,
-                           fromClass = None):
+    def addPreUpdateScript(self, contents = None, groupName = None):
         """
         NAME
         ====
@@ -1427,8 +1429,7 @@ class GroupRecipe(_BaseGroupRecipe):
         B{contents} : (None) The contents of the script
         B{groupName} : (None) The name of the group to add the script to
         """
-        self._addScript(contents, groupName, self.preUpdateScripts,
-                        fromClass = fromClass)
+        self._addScript(contents, groupName, self.preUpdateScripts)
 
     def setCompatibilityClass(self, theClass, groupName = None):
         """
@@ -1809,6 +1810,10 @@ class SingleGroup(object):
         return self.size
 
     def setCompatibilityClass(self, theClass):
+        if type(theClass) is not int:
+            raise RecipeFileError('group compatibility classes must be '
+                                  'integers')
+
         self.compatibilityClass = theClass
 
     def iterTroveList(self, strongRefs=False, weakRefs=False):
