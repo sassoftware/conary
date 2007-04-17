@@ -342,7 +342,8 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
 static PyObject * py_pread(PyObject *self, PyObject *args) {
     void * data;
     int fd;
-    off_t offset, size, rc;
+    size_t size;
+    off_t offset, rc;
     PyObject *pysize, *pyfd, *pyoffset, *buf;
 
     if (PyTuple_GET_SIZE(args) != 3) {
