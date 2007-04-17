@@ -33,6 +33,7 @@ static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
+static PyObject * py_pread(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -46,6 +47,7 @@ static PyMethodDef MiscMethods[] = {
 	"unlinks a file if it exists; silently fails if it does not exist. "
 	"returns a boolean indicating whether or not a file was removed" },
     { "unpack", unpack, METH_VARARGS },
+    { "pread", py_pread, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -225,7 +227,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
 
     /* This avoids PyArg_ParseTuple because it's sloooow */
     if (PyTuple_GET_SIZE(args) != 3) {
-        PyErr_SetString(PyExc_TypeError, "exactly two arguments expected");
+        PyErr_SetString(PyExc_TypeError, "exactly three arguments expected");
         return NULL;
     }
 
@@ -336,6 +338,56 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
 
     return retVal;
 }
+
+static PyObject * py_pread(PyObject *self, PyObject *args) {
+    void * data;
+    int fd;
+    off_t offset, size, rc;
+    PyObject *pysize, *pyfd, *pyoffset, *buf;
+
+    if (PyTuple_GET_SIZE(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "exactly three arguments expected");
+        return NULL;
+    }
+
+    pyfd = PyTuple_GET_ITEM(args, 0);
+    pysize = PyTuple_GET_ITEM(args, 1);
+    pyoffset = PyTuple_GET_ITEM(args, 2);
+
+    if (!PyInt_CheckExact(pyfd)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
+        return NULL;
+    } else if (!PyInt_CheckExact(pysize)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
+        return NULL;
+    } else if (!PyInt_CheckExact(pyoffset)) {
+        PyErr_SetString(PyExc_TypeError, "third argument must be an int");
+        return NULL;
+    }
+
+    fd = PyInt_AS_LONG(pyfd);
+    offset = PyInt_AS_LONG(pyoffset);
+    size = PyInt_AS_LONG(pysize);
+
+    data = malloc(size);
+
+    if (NULL == data) {
+	PyErr_NoMemory();
+	return NULL;
+    }
+
+    rc = pread(fd, data, size, offset);
+    if (-1 == rc) {
+	free(data);
+        PyErr_SetFromErrno(PyExc_OSError);
+	return NULL;
+    }
+
+    buf = PyString_FromStringAndSize(data, rc);
+    free(data);
+    return buf;
+}
+
 
 PyMODINIT_FUNC
 initmisc(void)
