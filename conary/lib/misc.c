@@ -369,8 +369,8 @@ static PyObject * py_pread(PyObject *self, PyObject *args) {
     }
 
     fd = PyInt_AS_LONG(pyfd);
-    size = PyLong_AsLong(pysize);
-    offset = PyLong_AsLong(pyoffset);
+    size = PyLong_AsUnsignedLong(pysize);
+    offset = PyLong_AsUnsignedLong(pyoffset);
 
     data = malloc(size);
 
