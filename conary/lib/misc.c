@@ -358,17 +358,19 @@ static PyObject * py_pread(PyObject *self, PyObject *args) {
     if (!PyInt_CheckExact(pyfd)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be an int");
         return NULL;
-    } else if (!PyInt_CheckExact(pysize)) {
-        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
+    } else if (!PyInt_CheckExact(pysize) &&
+	       !PyLong_CheckExact(pysize)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be an int or long");
         return NULL;
-    } else if (!PyInt_CheckExact(pyoffset)) {
-        PyErr_SetString(PyExc_TypeError, "third argument must be an int");
+    } else if (!PyInt_CheckExact(pyoffset) &&
+	       !PyLong_CheckExact(pyoffset)) {
+        PyErr_SetString(PyExc_TypeError, "third argument must be an int or long");
         return NULL;
     }
 
     fd = PyInt_AS_LONG(pyfd);
-    offset = PyInt_AS_LONG(pyoffset);
-    size = PyInt_AS_LONG(pysize);
+    size = PyLong_AsLong(pysize);
+    offset = PyLong_AsLong(pyoffset);
 
     data = malloc(size);
 
