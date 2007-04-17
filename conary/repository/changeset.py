@@ -1265,7 +1265,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         try:
             if type(fileName) is str:
                 try:
-                    f = open(fileName, "r")
+                    f = util.ExtendedFile(fileName, "r", buffering = False)
                 except IOError, err:
                     raise errors.ConaryError(
                                 "Error opening changeset '%s': %s" % 
@@ -1289,6 +1289,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             raise filecontainer.BadContainer(
                         "File %s is not a valid conary changeset." % fileName)
 
+        control.file.seek(control.start)
 	start = gzip.GzipFile(None, 'r', fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)
 
@@ -1450,9 +1451,10 @@ class DictAsCsf:
         self.next = 0
 
 def _convertChangeSetV2V1(inPath, outPath):
-    inFc = filecontainer.FileContainer(open(inPath, "r"))
+    inFc = filecontainer.FileContainer(
+                        util.ExtendedFile(inPath, "r", buffering = False))
     assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
-    outFcObj = open(outPath, "w+")
+    outFcObj = util.ExtendedFile(outPath, "w+", buffering = False)
     outFc = filecontainer.FileContainer(outFcObj,
             version = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
 

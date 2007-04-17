@@ -31,8 +31,9 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary.repository.changeset import parseKey
 from conary.repository.filecontainer import FileContainer
 from conary.lib.sha1helper import *
+from conary.lib import util
 
-f = open(sys.argv[1], "r")
+f = util.ExtendedFile(sys.argv[1], "r", buffering = False)
 c = FileContainer(f)
 if len(sys.argv) == 2:
     rc = c.getNextFile()
@@ -46,7 +47,7 @@ if len(sys.argv) == 2:
             pathId, fileId = parseKey(name)
             name = md5ToString(pathId) + "," + sha1ToString(fileId)
 
-	print "%s (%s)" % (name, tag)
+	print "%s (%s) %d" % (name, tag, f.size)
 	rc = c.getNextFile()
 elif len(sys.argv) == 3:
     name = sys.argv[2]

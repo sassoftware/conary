@@ -28,6 +28,9 @@ Changes in @NEW@:
       single proxy being using for both protocols. Users who need the old
       behavior should set explicit configure the same proxy for both protocols.
     * --just-db no longer runs group scripts
+    * SeekableNestedFile and FileContainer objects no longer depend on the
+      file pointer for reads; pread() is used everywhere making those objects
+      safe to use for files with shared file descriptors.
 
   o Build Changes:
     * Conary has tools in place through a new cross flag and a new "target"

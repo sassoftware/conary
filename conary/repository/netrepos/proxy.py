@@ -575,8 +575,9 @@ class ProxyRepositoryServer(ChangesetFilter):
 
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
+            dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
+            os.close(fd)
             os.unlink(tmpPath)
-            dest = os.fdopen(fd, "w+")
             inUrl = urllib.urlopen(url, proxies = self.proxies)
             size = util.copyfileobj(inUrl, dest)
             inUrl.close()

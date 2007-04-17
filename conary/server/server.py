@@ -151,7 +151,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
             for path, size, isChangeset, preserveFile in items:
                 if isChangeset:
-                    cs = FileContainer(open(path))
+                    cs = FileContainer(util.ExtendedFile(path,
+                                                         buffering = False))
                     cs.dump(self.wfile.write,
                             lambda name, tag, size, f, sizeCb:
                                 _writeNestedFile(self.wfile, name, tag, size, f,
