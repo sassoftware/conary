@@ -822,6 +822,7 @@ class LineReader:
 
 exists = misc.exists
 removeIfExists = misc.removeIfExists
+pread = misc.pread
 
 class _LazyFile(object):
     __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
