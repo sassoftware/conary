@@ -1177,9 +1177,11 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
             # TroveFinder should be cleaned up
             if source._allowNoLabel:
                 sourceLabelPath = None
-                sourceDefaultFlavor = None
             else:
                 sourceLabelPath = labelPath
+            if source._flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
+                sourceDefaultFlavor = None
+            else:
                 sourceDefaultFlavor = defaultFlavor
 
             if source.searchableByType():
