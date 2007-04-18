@@ -2371,8 +2371,8 @@ class Trove(streams.StreamSet):
         return [ versions.Label(x) for x in self.troveInfo.labelPath ]
 
     def setBuildRequirements(self, itemList):
-        for (name, ver, release) in itemList:
-            self.troveInfo.buildReqs.add(name, ver, release)
+        for (name, ver, flavor) in itemList:
+            self.troveInfo.buildReqs.add(name, ver, flavor)
 
     def getBuildRequirements(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor()) 
