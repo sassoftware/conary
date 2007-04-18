@@ -1,5 +1,5 @@
-#
-# Copyright (c) 2004-2006 rPath, Inc.
+
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -226,6 +226,39 @@ class CfgLabelList(list):
 
         return cmp(firstIdx, secondIdx)
 
+class ProxyEntry(CfgType):
+
+    def parseString(self, str):
+        match = re.match('https?://.*', str)
+        if match is None:
+            raise ParseError('Invalid proxy url %s' % str)
+
+        return CfgType.parseString(self, str)
+
+class CfgProxy(CfgDict):
+
+    def parseString(self, str):
+        l = str.split()
+
+        if len(l) > 2:
+            raise ParseError("Too many arguments for proxy configuration '%s'"
+                             % str)
+        elif not len(l):
+            raise ParseError("Arguments required for proxy configuration")
+        elif len(l) == 1:
+            protocol, rest = str.split(':', 1)
+            rc = CfgDict.parseString(self, 'http http:' + rest)
+            rc.update(CfgDict.parseString(self, 'https https:' + rest))
+        elif l[0] not in ('http', 'https'):
+            raise ParseError('Unknown proxy procotol %s' % l[0])
+        else:
+            rc = CfgDict.parseString(self, str)
+
+        return rc
+
+    def __init__(self, default={}):
+        CfgDict.__init__(self, ProxyEntry, default=default)
+
 CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
 
 class ConaryContext(ConfigSection):
@@ -281,7 +314,7 @@ class ConaryContext(ConfigSection):
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
-    proxy                 =  None
+    proxy                 =  CfgProxy
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])

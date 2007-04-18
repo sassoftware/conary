@@ -92,8 +92,6 @@ tList = [
     'TroveTroves',
     'TroveFiles',
     ]
-# tables with non-integer primary keys require special handling
-noIntPK = [ 'PGPFingerprints' ]
 
 skip = ['databaseversion', 'instructionsets']
 knowns = [x.lower() for x in tList]
@@ -145,38 +143,39 @@ for t in tList:
         src: %s
         dst: %s""" % (t, f1, f2))
 
-# update the primary key sequence
-def fix_pk(table):
+# update the primary key sequences for all tables
+def fix_primary_keys(cu):
     # get the name of the primary key
-    dst.execute("""
+    cu.execute("""
     select
         t.relname as table_name,
-        ind.relname as pk_name,
         col.attname as column_name
     from pg_class t
     join pg_index i on t.oid = i.indrelid and i.indisprimary = true
     join pg_class ind on i.indexrelid = ind.oid
     join pg_attribute col on col.attrelid = t.oid and col.attnum = i.indkey[0]
-    where
-        t.relname = ?
-    and i.indnatts = 1
-    and pg_catalog.pg_table_is_visible(t.oid)
-    """, table.lower())
-    ret = dst.fetchall()
-    if not len(ret):
-        return
-    pkname = ret[0][2]
-    # get the max seq value
-    dst.execute("select max(%s) from %s" % (pkname, table))
-    pkval = dst.fetchall()[0][0]
-    if not pkval:
-        pkval = 1
-    # now reset the sequence for the primary key
-    dst.execute("select pg_catalog.setval(pg_catalog.pg_get_serial_sequence(?, ?), ?, false)",
-                table.lower(), pkname.lower(), pkval)
-    ret = dst.fetchall()[0][0]
-    assert (ret == pkval)
-    print "    SETVAL %s(%s) = %d" % (table, pkname, ret)
+    where i.indnatts = 1
+      and pg_catalog.pg_table_is_visible(t.oid)
+    """)
+    for (t, col) in cu.fetchall():
+        table = t.lower()
+        cu.execute("select pg_catalog.pg_get_serial_sequence(?, ?)", (table, col))
+        seqname = cu.fetchone()[0]
+        if seqname is None:
+            # this primary key does not have a sequence associated with it
+            continue
+        # get the max seq value
+        cu.execute("select max(%s) from %s" % (col, table))
+        seqval = cu.fetchone()[0]
+        if not seqval:
+            seqval = 1
+        else:
+            seqval += 1 # we need the next one in line
+        # now reset the sequence for the primary key
+        cu.execute("select pg_catalog.setval(?, ?, false)", (seqname, seqval))
+        ret = cu.fetchone()[0]
+        assert (ret == seqval)
+        print "SETVAL %s = %d (%s.%s)" % (seqname, ret, table, col)
 
 def migrate_table(t):
     global pgsql, src, dst
@@ -242,8 +241,6 @@ def migrate_table(t):
         raise
     else:
         print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
-        if t not in noIntPK:
-            fix_pk(t)
     pgsql.commit()
 
 def verify_table(t, quick=False):
@@ -283,6 +280,9 @@ dst = pgsql.cursor()
 for stmt in getIndexes("postgresql"):
     print stmt
     dst.execute(stmt)
+# fix the primary keys
+fix_primary_keys(dst)
+print "VACUUM ANALYZE"
 pgsql.dbh.execute("VACUUM ANALYZE")
 pgsql.setVersion(VERSION)
 pgsql.commit()
@@ -292,3 +292,6 @@ srcdb.close()
 
 del dst
 pgsql.close()
+
+print "Done"
+

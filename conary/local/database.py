@@ -236,19 +236,27 @@ class UpdateJob:
         for jobList in jobs:
             yield list(self._thawJobList(jobList))
 
+    def _freezeJob(self, job):
+        (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) = job
+        return (trvName,
+                (self._freezeRevision(oRev), self._freezeFlavor(oFlv)),
+                (self._freezeRevision(rev), self._freezeFlavor(flv)),
+                int(searchLocalRepo))
+
     def _freezeJobList(self, jobList):
-        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
-            yield (trvName,
-                   (self._freezeRevision(oRev), self._freezeFlavor(oFlv)),
-                   (self._freezeRevision(rev), self._freezeFlavor(flv)),
-                   int(searchLocalRepo))
+        for job in jobList:
+            yield self._freezeJob(job)
+
+    def _thawJob(self, job):
+        (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) = job
+        return (trvName,
+                (self._thawRevision(oRev), self._thawFlavor(oFlv)),
+                (self._thawRevision(rev), self._thawFlavor(flv)),
+                bool(searchLocalRepo))
 
     def _thawJobList(self, jobList):
-        for (trvName, (oRev, oFlv), (rev, flv), searchLocalRepo) in jobList:
-            yield (trvName,
-                   (self._thawRevision(oRev), self._thawFlavor(oFlv)),
-                   (self._thawRevision(rev), self._thawFlavor(flv)),
-                   bool(searchLocalRepo))
+        for job in jobList:
+            yield self._thawJob(job)
 
     def _freezeRevision(self, rev):
         if rev is None:
@@ -273,13 +281,12 @@ class UpdateJob:
 
     def _freezeJobPreScripts(self):
         # Freeze the job and the string together
-        return itertools.izip(self._freezeJobList(x[0]
-                                    for x in self._jobPreScripts),
-                              (x[1] for x in self._jobPreScripts))
+        for item in self._jobPreScripts:
+            yield (self._freezeJob(item[0]), item[1], item[2], item[3])
 
     def _thawJobPreScripts(self, frzrepr):
-        return itertools.izip(self._thawJobList(x[0] for x in frzrepr),
-                              (x[1] for x in frzrepr))
+        for item in frzrepr:
+            yield (self._thawJob(item[0]), item[1], item[2], item[3])
 
     def _freezeChangesetFilesTroveSource(self, troveSource, frzdir,
                                         withChangesetReferences=True):
@@ -364,8 +371,9 @@ class UpdateJob:
     def updateInvalidatesRollbacks(self):
         return self._invalidateRollbackStack
 
-    def addJobPreScript(self, job, script):
-        self._jobPreScripts.append((job, script))
+    def addJobPreScript(self, job, script, oldCompatClass, newCompatClass):
+        self._jobPreScripts.append((job, script, oldCompatClass,
+                                    newCompatClass))
 
     def iterJobPreScripts(self):
             for i in self._jobPreScripts:
@@ -456,7 +464,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return l[0]
 
     def getTroves(self, troveList, pristine = True, withFiles = True,
-                  withDeps = True):
+                  withDeps = True, callback = None):
         if not troveList:
             return []
         return self.db.getTroves(troveList, pristine, withFiles = withFiles,
@@ -1003,7 +1011,7 @@ class Database(SqlDbRepository):
             # isn't committed until the self.commit below
             # an object for historical reasons
             try:
-                localrep.LocalRepositoryChangeSetJob(
+                csJob = localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
                     filePriorityPath,
                     allowIncomplete = (rollbackPhase is not None),
@@ -1113,24 +1121,29 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
 	self.commit()
 
-        if fsJob.getInvalidateRollbacks():
+        if updateDatabase and csJob.invalidateRollbacks():
             self.invalidateRollbacks()
 
         if rollbackPhase is not None:
             return fsJob
 
-        fsJob.runPostScripts(tagScript, rollbackPhase)
+        if not justDatabase:
+            fsJob.runPostScripts(tagScript, rollbackPhase)
 
-    def runPreScripts(self, uJob, callback, tagScript = None, 
-                      isRollback = False, tmpDir = '/tmp'):
-        if isRollback:
-           return
+    def runPreScripts(self, uJob, callback, tagScript = None,
+                      isRollback = False, justDatabase = False,
+                      tmpDir = '/tmp'):
+        if isRollback or justDatabase:
+           return True
 
-        for job, script in uJob.iterJobPreScripts():
+        for (job, script, oldCompatClass, newCompatClass) in \
+                                                uJob.iterJobPreScripts():
             scriptId = "%s preupdate" % job[0]
             rc = update.runTroveScript(job, script, tagScript, tmpDir,
                                        self.root, callback, isPre = True,
-                                       scriptId = scriptId)
+                                       scriptId = scriptId,
+                                       oldCompatClass = oldCompatClass,
+                                       newCompatClass = newCompatClass)
             if rc:
                 return False
 
@@ -1420,6 +1433,9 @@ class Database(SqlDbRepository):
 
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
+
+    def getTroveCompatibilityClass(self, name, version, flavor):
+        return self.db.getTroveCompatibilityClass(name, version, flavor)
 
     def iterFindPathReferences(self, path, justPresent = False):
         return self.db.iterFindPathReferences(path, justPresent = justPresent)

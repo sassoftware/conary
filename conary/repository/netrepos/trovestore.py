@@ -490,7 +490,7 @@ class TroveStore:
 
         cu.execute("""
         INSERT INTO TroveTroves (instanceId, includedId, flags)
-        SELECT ?, Instances.instanceId, newTroveTroves.flags
+        SELECT %d, Instances.instanceId, newTroveTroves.flags
         FROM newTroveTroves
         JOIN Items USING (item)
         JOIN Versions ON Versions.version = newTroveTroves.version
@@ -499,7 +499,7 @@ class TroveStore:
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
-        """, troveInstanceId)
+        """ %(troveInstanceId,))
 
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 

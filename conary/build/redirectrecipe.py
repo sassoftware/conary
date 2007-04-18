@@ -357,6 +357,7 @@ class RedirectRecipe(Recipe):
         return self.redirections
 
     def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
+        Recipe.__init__(self)
         self.repos = repos
         self.cfg = cfg
         self.redirections = {}

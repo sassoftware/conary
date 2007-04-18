@@ -151,7 +151,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
             for path, size, isChangeset, preserveFile in items:
                 if isChangeset:
-                    cs = FileContainer(open(path))
+                    cs = FileContainer(util.ExtendedFile(path,
+                                                         buffering = False))
                     cs.dump(self.wfile.write,
                             lambda name, tag, size, f, sizeCb:
                                 _writeNestedFile(self.wfile, name, tag, size, f,
@@ -239,14 +240,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
         (params, method) = xmlrpclib.loads(data)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
-        if not targetServerName or targetServerName in self.cfg.serverName:
-            repos = self.netRepos
-        elif self.netProxy:
+        if self.netProxy:
             repos = self.netProxy
         else:
-            result = (False, True, [ 'RepositoryMismatch',
-                                   self.cfg.serverName, targetServerName ] )
-            repos = None
+            repos = self.netRepos
 
         if repos is not None:
             try:
@@ -371,7 +368,6 @@ class HTTPServer(BaseHTTPServer.HTTPServer):
 class ServerConfig(netserver.ServerConfig):
 
     port		= (CfgInt,  8000)
-    proxy               = (CfgBool, False)
 
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)
@@ -525,6 +521,7 @@ def getServer():
             logMe(1, "WARNING: database schema is more recent than codebase!")
             logMe(1, "WARNING================================================")
         if 'migrate' in argSet:
+            logMe(1, "Schema migration complete. Server exiting...")
             sys.exit(0)
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)

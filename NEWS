@@ -1,13 +1,36 @@
 Changes in @NEW@:
+  o Major Changes:
+
+    * Group troves can now declare an (integer) compatibility class
+      which is used to automatically invalidate rollbacks (existing
+      groups are considered to be in compatibility class zero). When a
+      group is upgraded to a new group which has a different
+      compatibility class, the rollback stack is invalidated unless
+      the group also contains postRollback script which can rollback
+      to the version being updated. Postrollback scripts can now be
+      defined with a list of compatibility versions they are able to
+      roll back to. Old invalidateRollback parameter for some group
+      scripts is no longer supported.
+
   o Client Changes:
     * To take advantage of Conary's ability to apply the critical
       update set and restart before applying the rest of the updates,
-      two new API calls have been added: createUpdateJob and
-      applyUpdateJob. (CNY-1454)
+      three new API calls have been added: newUpdateJob, prepareUpdateJob
+      and applyUpdateJob. (CNY-1454)
     * A new argument, --no-restart, has been added to conary. This
       has to be used in conjunction with --root and allows one to skip
       the restarts after applying critical updates when installing in
       a chroot. (CNY-1458)
+    * Proxy configuration parameter is now of the form 'proxy protocol url'
+      (i.e. 'proxy http http://proxy.some.com'), and allows separate proxies
+      to be configured for http and https. If old 'proxy url' form is used,
+      separate proxies are configured for http and https rather than a
+      single proxy being using for both protocols. Users who need the old
+      behavior should set explicit configure the same proxy for both protocols.
+    * --just-db no longer runs group scripts
+    * SeekableNestedFile and FileContainer objects no longer depend on the
+      file pointer for reads; pread() is used everywhere making those objects
+      safe to use for files with shared file descriptors.
 
   o Build Changes:
     * Conary has tools in place through a new cross flag and a new "target"
@@ -20,6 +43,18 @@ Changes in @NEW@:
   o Server Changes:
     * repository schema now understands the concept of minor and major
       schema revisions (CNY-811)
+
+  o Proxy Changes:
+    * The proxy can now be configured to use an http proxy for all outgoing
+      requests. The 'proxy' configuration item is supported in a manner
+      identical to the client.
+    * Removed standalone servers (unused) ability to act as both a proxy
+      and a standalone server; this removes the standalone proxies dependence
+      on the X-Conary-Servername header.
+
+  o Internal Changes:
+    * The createTrigger() method of dbstore drivers no longer accepts
+      the "pinned" keyword parameter.
 
   o Bug Fixes:
     * Fixed a bug in proxy code that would cause conary to use https through
@@ -38,6 +73,12 @@ Changes in @NEW@:
       mysql has been fixed (CNY-1193)
     * Repository cooks will redirect the subprocess' stdin from /dev/null
       to avoid hanging while waiting from stdin. (CNY-783)
+    * Trove.verifyDigests() no longer fails erroneously if a signature
+      version 0 digest has not been calculated and set in troveInfo. (CNY-1552)
+    * Fixed bug in changeset reset() which affected reusing changesets in
+      merges (CNY-1534)
+    * Fixed bug in changeset based trove sources where the underlying
+      changesets never got reset (CNY-1534)
 
 Changes in 1.1.21:
   o Repository Changes:

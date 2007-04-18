@@ -327,21 +327,22 @@ class Database(BaseDatabase):
         return version
 
     # A trigger that syncs up a column to the timestamp
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the
         # BaseTrigger for creation
         when = "BEFORE"
         # force the current_timestamp into a numeric context
-        if pinned:
-            sql = """
-            SET NEW.%s = OLD.%s ;
-            """ % (column, column)
-        else:
-            sql = """
-            SET NEW.%s = current_timestamp() + 0 ;
-            """ % (column,)
+        sql = """
+        SET NEW.%s = current_timestamp() + 0 ;
+        """ % (column,)
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
     # MySQL uses its own "special" syntax for dropping indexes....

@@ -19,7 +19,10 @@ import gzip
 import itertools
 import os
 
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary import files, streams, trove, versions
 from conary.lib import enum, fixeddifflib, log, misc, patch, sha1helper, util
@@ -1231,7 +1234,14 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.fileQueue = []
         for csf in itertools.chain(self.fileContainers, self.csfWrappers):
+            # find the first non-config file
             entry = csf.getNextFile()
+            while entry:
+                if entry[1][0] == '0':
+                    break
+
+                entry = csf.getNextFile()
+
             if entry:
                 util.tupleListBsearchInsert(self.fileQueue, entry + (csf,),
                                             self.fileQueueCmp)
@@ -1255,7 +1265,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         try:
             if type(fileName) is str:
                 try:
-                    f = open(fileName, "r")
+                    f = util.ExtendedFile(fileName, "r", buffering = False)
                 except IOError, err:
                     raise errors.ConaryError(
                                 "Error opening changeset '%s': %s" % 
@@ -1279,6 +1289,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             raise filecontainer.BadContainer(
                         "File %s is not a valid conary changeset." % fileName)
 
+        control.file.seek(control.start)
 	start = gzip.GzipFile(None, 'r', fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)
 
@@ -1440,9 +1451,10 @@ class DictAsCsf:
         self.next = 0
 
 def _convertChangeSetV2V1(inPath, outPath):
-    inFc = filecontainer.FileContainer(open(inPath, "r"))
+    inFc = filecontainer.FileContainer(
+                        util.ExtendedFile(inPath, "r", buffering = False))
     assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
-    outFcObj = open(outPath, "w+")
+    outFcObj = util.ExtendedFile(outPath, "w+", buffering = False)
     outFc = filecontainer.FileContainer(outFcObj,
             version = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
 

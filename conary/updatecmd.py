@@ -405,9 +405,10 @@ def _updateTroves(cfg, applyList, **kwargs):
                ' system irreparably if used incorrectly.')
         return
 
+    updJob = client.newUpdateJob()
 
     try:
-        updJob, suggMap = client.createUpdateJob(applyList, **kwargs)
+        suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
         callback.done()
         raise

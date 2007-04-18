@@ -954,6 +954,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                         keep = True
 
                 if keep:
+                    subCs.reset()
                     mergedCs.merge(subCs)
 
         # Remove all of the new and old job information from the merged
@@ -1177,9 +1178,11 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
             # TroveFinder should be cleaned up
             if source._allowNoLabel:
                 sourceLabelPath = None
-                sourceDefaultFlavor = None
             else:
                 sourceLabelPath = labelPath
+            if source._flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
+                sourceDefaultFlavor = None
+            else:
                 sourceDefaultFlavor = defaultFlavor
 
             if source.searchableByType():

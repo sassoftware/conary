@@ -129,7 +129,13 @@ class Database(BaseDatabase):
         return self.getVersion()
 
     # A trigger that syncs up the changed column
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         return True
         onAction = onAction.lower()
         assert(onAction in ["insert into", "update of"])
@@ -139,23 +145,13 @@ class Database(BaseDatabase):
             return False
         funcName = "%s_func" % triggerName
         cu = self.dbh.cursor()
-        # XXX: fix pinned values
-        if pinned:
-            cu.execute("""
-            CREATE PROCEDURE %s() AS
-            BEGIN
-                NEW.%s := OLD.%s ;
-                RETURN NEW;
-            END ;
-            """ % (funcName, column, column))
-        else:
-            cu.execute("""
-            CREATE PROCEDURE %s() AS
-            BEGIN
-                NEW.%s := _bintim() ;
-                RETURN NEW;
-            END ;
-            """ % (funcName, column))
+        cu.execute("""
+        CREATE PROCEDURE %s() AS
+        BEGIN
+            NEW.%s := _bintim() ;
+            RETURN NEW;
+        END ;
+        """ % (funcName, column))
         # now create the trigger based on the above function
         cu.execute("""
         CREATE RULE %s

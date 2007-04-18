@@ -52,6 +52,16 @@ IGNOREINITIALCONTENTS = 1 << 4
 ROLLBACK_PHASE_REPOS = 1
 ROLLBACK_PHASE_LOCAL = 2
 
+class LastRestored(object):
+
+    __slots__ = [ 'pathId', 'fileId', 'target', 'type' ]
+
+    def __init__(self):
+        self.pathId = None
+        self.fileId = None
+        self.target = None
+        self.type = None
+
 class FilesystemJob:
     """
     Represents a set of actions which need to be applied to the filesystem.
@@ -392,7 +402,7 @@ class FilesystemJob:
 
         restoreIndex = 0
         j = 0
-        lastRestored = (None, None, None)
+        lastRestored = LastRestored()
         while restoreIndex < len(restores):
             (pathId, fileId, fileObj, target, override, msg) = \
                                                 restores[restoreIndex]
@@ -449,18 +459,33 @@ class FilesystemJob:
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
                         continue
                 else:
-                    if lastRestored[0:2] == (pathId, fileId):
+                    if (lastRestored.pathId, lastRestored.fileId) == \
+                                    (pathId, fileId):
                         # we share contents with another path
-                        contType = changeset.ChangedFileTypes.file
-                        contents = filecontents.FromFilesystem(lastRestored[2])
+                        contType = lastRestored.type
+                        if lastRestored.type == changeset.ChangedFileTypes.ptr:
+                            contents = filecontents.FromString(
+                                                lastRestored.target)
+                        else:
+                            contents = filecontents.FromFilesystem(
+                                                lastRestored.target)
                     else:
                         contType, contents = self.changeSet.getFileContents(
                                                                 pathId, fileId)
 
                     assert(contType != changeset.ChangedFileTypes.diff)
-                    # PTR types are restored later
+                    # PTR types are restored later. We need to cache
+                    # information about them in lastRestored in case another
+                    # instances of this fileId/pathId combination needs the
+                    # same target
                     if contType == changeset.ChangedFileTypes.ptr:
                         targetPtrId = contents.get().read()
+
+                        lastRestored.pathId = pathId
+                        lastRestored.fileId = fileId
+                        lastRestored.type = changeset.ChangedFileTypes.ptr
+                        lastRestored.target = targetPtrId
+
                         delayedRestores.append((pathId, fileObj, target, msg,
                                                 targetPtrId, fileId))
                         if not ptrTargets.has_key(targetPtrId):
@@ -505,7 +530,10 @@ class FilesystemJob:
 
 	    restoreFile(fileObj, contents, self.root, target, journal,
                         opJournal)
-            lastRestored = (pathId, fileId, target)
+            lastRestored.pathId = pathId
+            lastRestored.fileId = fileId
+            lastRestored.target = target
+            lastRestored.type = changeset.ChangedFileTypes.file
 	    log.debug(msg, target)
 
             if fileObj.hasContents and fileObj.linkGroup():
@@ -700,7 +728,7 @@ class FilesystemJob:
 	    tagCommands.run(tagScript, self.root)
 
     def runPostScripts(self, tagScript, isRollback):
-        for (troveCs, script) in self.postScripts:
+        for (baseCompatClass, troveCs, script) in self.postScripts:
             if isRollback:
                 scriptId = "%s postrollback" % troveCs.getName()
             elif troveCs.getOldVersion():
@@ -710,10 +738,9 @@ class FilesystemJob:
 
             runTroveScript(troveCs.getJob(), script, tagScript, '/tmp',
                            self.root, self.callback, isPre = False,
-                           scriptId = scriptId)
-
-    def getInvalidateRollbacks(self):
-        return self.invalidateRollbacks
+                           scriptId = scriptId,
+                           oldCompatClass = baseCompatClass,
+                           newCompatClass = troveCs.getNewCompatibilityClass())
 
     def getErrorList(self):
 	return self.errors
@@ -911,21 +938,21 @@ class FilesystemJob:
             removalList = []
 
         # queue up postinstall scripts
+        baseCompatClass = None
         if self.rollbackPhase == ROLLBACK_PHASE_REPOS:
             if baseTrove:
                 s = baseTrove.troveInfo.scripts.postRollback.script()
-                rbInv = baseTrove.troveInfo.scripts.postRollback.rollbackFence()
+                baseCompatClass = baseTrove.getCompatibilityClass()
             else:
                 s = None
-                rbInv = False
         elif troveCs.getOldVersion():
-            s, rbInv = troveCs.getPostUpdateScript()
+            s = troveCs.getPostUpdateScript()
+            baseCompatClass = baseTrove.getCompatibilityClass()
         else:
-            s, rbInv = troveCs.getPostInstallScript()
+            s = troveCs.getPostInstallScript()
 
         if s:
-            self.invalidateRollbacks = self.invalidateRollbacks or rbInv
-            self.postScripts.append((troveCs, s))
+            self.postScripts.append((baseCompatClass, troveCs, s))
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -1569,7 +1596,6 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
         self.postScripts = []
-        self.invalidateRollbacks = False
         self.rollbackPhase = rollbackPhase
 	self.db = db
         self.pathRemovedCache = (None, None, None)
@@ -2474,16 +2500,21 @@ def silentlyReplace(newF, oldF):
     return False
 
 def runTroveScript(job, script, tagScript, tmpDir, root, callback,
-                   isPre = False, scriptId = "unknown script"):
+                   isPre = False, scriptId = "unknown script",
+                   oldCompatClass = None, newCompatClass = None):
     environ = { 'PATH' : '/usr/bin:/usr/sbin:/bin:/sbin' }
 
     name = job[0]
     environ['CONARY_NEW_NAME'] = name
     environ['CONARY_NEW_VERSION'] = str(job[2][0])
     environ['CONARY_NEW_FLAVOR'] = str(job[2][1])
+    environ['CONARY_NEW_COMPATIBILITY_CLASS'] = str(newCompatClass)
+
     if job[1][0] is not None:
         environ['CONARY_OLD_VERSION'] = str(job[1][0])
         environ['CONARY_OLD_FLAVOR'] = str(job[1][1])
+        if oldCompatClass is not None:
+            environ['CONARY_OLD_COMPATIBILITY_CLASS'] = str(oldCompatClass)
 
     scriptFd, scriptName = tempfile.mkstemp(suffix = '.trvscript',
                                             dir = root + tmpDir)
@@ -2495,7 +2526,7 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
         f = open(tagScript, "a", 0600)
         if isPre:
             f.write('# ')
-        for env, value in environ.iteritems():
+        for env, value in sorted(environ.iteritems()):
             f.write("%s='%s' " % (env, value))
         f.write(scriptName)
         f.write("\n")

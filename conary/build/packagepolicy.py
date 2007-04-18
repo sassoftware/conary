@@ -1706,7 +1706,7 @@ class _dependency(policy.Policy):
 
     def _createELFDepSet(self, m, elfinfo, recipe=None, basedir=None,
                          soname=None, soflags=None,
-                         libPathMap={}, getRPATH=None):
+                         libPathMap={}, getRPATH=None, path=None):
         """
         Add dependencies from ELF information.
 
@@ -1757,9 +1757,13 @@ class _dependency(policy.Policy):
                     if requiredSet.issubset(providedSet):
                         main = provided.getName()[0]
                     else:
-                        self.warn('Not replacing %s with %s because of missing %s',
+                        pathString = ''
+                        if path:
+                            pathString = 'for path %s' %path
+                        self.warn('Not replacing %s with %s because of missing %s%s',
                                   main, provided.getName()[0],
-                                  sorted(list(requiredSet-providedSet)))
+                                  sorted(list(requiredSet-providedSet)),
+                                  pathString)
                     
                 curClass = deps.SonameDependencies
                 flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
@@ -2158,7 +2162,8 @@ class Provides(_dependency):
         self._addDepSetToMap(path, pkg.providesMap,
             self._createELFDepSet(m, elfinfo,
                                   recipe=self.recipe, basedir=basedir,
-                                  soname=soname, soflags=soflags))
+                                  soname=soname, soflags=soflags,
+                                  path=path))
 
 
     def _generatePythonProvidesSysPath(self):
@@ -2696,7 +2701,8 @@ class Requires(_addInfo, _dependency):
         self._addDepSetToMap(path, pkg.requiresMap,
             self._createELFDepSet(m, m.contents['requires'],
                 libPathMap=self._privateDepMap,
-                getRPATH=_findSonameInRpath))
+                getRPATH=_findSonameInRpath,
+                path=path))
 
 
     def _generatePythonRequiresSysPath(self):

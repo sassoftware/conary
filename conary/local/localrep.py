@@ -15,7 +15,10 @@
 import gzip
 import sha
 import zlib
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary.repository import errors, repository, datastore
 from conary.local import schema

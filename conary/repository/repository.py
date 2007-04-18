@@ -309,6 +309,12 @@ class ChangeSetJob:
     def markTroveRemoved(self, name, version, flavor):
         raise NotImplementedError
 
+    def invalidateRollbacks(self, set = None):
+        if set is not None:
+            self.invalidateRollbacksFlag = set
+        else:
+            return self.invalidateRollbacksFlag
+
     def addFileContents(self, sha1, fileVersion, fileContents, 
                         restoreContents, isConfig, precompressed = False):
 	# Note that the order doesn't matter, we're just copying
@@ -336,6 +342,7 @@ class ChangeSetJob:
                  hidden = False):
 	self.repos = repos
 	self.cs = cs
+        self.invalidateRollbacksFlag = False
 
 	configRestoreList = []
 	normalRestoreList = []
@@ -393,6 +400,13 @@ class ChangeSetJob:
                                           pristine = True).copy()
                 self.oldTrove(newTrove, csTrove, troveName, oldTroveVersion,
                               oldTroveFlavor)
+
+                oldCompatClass = newTrove.getCompatibilityClass()
+
+                if csTrove.isRollbackFence(
+                                   oldCompatibilityClass = oldCompatClass,
+                                   update = True):
+                    self.invalidateRollbacks(set = True)
 	    else:
 		newTrove = trove.Trove(csTrove.getName(), newVersion,
                                        troveFlavor, csTrove.getChangeLog(),

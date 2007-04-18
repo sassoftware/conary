@@ -213,13 +213,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                  parentFlavor)
 
         # Fetch all binaries built from this source
-        #
-        # This (esp the _setBuildCount(None) bit) is ugly. We can't
-        # use getSourceVersion() here, because it undoes shadows. Instead
-        # turn the parentVersion we have into a source version by setting
-        # the build count to None.
-        v = parentVersion.copy()
-        v.trailingRevision()._setBuildCount(None)
+        v = parentVersion.getSourceVersion(removeShadows=False)
         binaries = repos.getTrovesBySource(self.name + ':source', v)
 
         # Filter out older ones

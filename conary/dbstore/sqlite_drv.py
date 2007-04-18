@@ -217,7 +217,13 @@ class Database(BaseDatabase):
             self.loadSchema()
 
     # A trigger that syncs up the changed column
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the
