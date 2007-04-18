@@ -20,7 +20,7 @@ import time
 import xmlrpclib
 import zlib
 
-from conary.lib import log
+from conary.lib import log, util
 from conary.repository import changeset, errors, netclient
 from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
@@ -187,7 +187,7 @@ def get(port, isSecure, repos, req):
         req.content_type = "application/x-conary-change-set"
         for (path, size, isChangeset, preserveFile) in items:
             if isChangeset:
-                cs = FileContainer(open(path))
+                cs = FileContainer(util.ExtendedFile(path, buffering=False))
                 try:
                     cs.dump(req.write,
                             lambda name, tag, size, f, sizeCb:
