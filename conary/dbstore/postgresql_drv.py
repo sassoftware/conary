@@ -26,7 +26,7 @@ class KeywordDict(BaseKeywordDict):
         'PRIMARYKEY' : 'SERIAL PRIMARY KEY',
         'BLOB'       : 'BYTEA',
         'MEDIUMBLOB' : 'BYTEA',
-        'PATHTYPE'   : 'BYTEA',
+        'PATHTYPE'   : 'VARCHAR',
         'STRING'     : 'VARCHAR'
         } )
 
