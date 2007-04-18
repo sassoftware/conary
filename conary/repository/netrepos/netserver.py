@@ -2099,15 +2099,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert(len(fileIds) % fileIdLen == 0)
         fileIdCount = len(fileIds) // fileIdLen
 
-        def splitFileIds():
+        def splitFileIds(cu):
             for i in range(fileIdCount):
                 start = fileIdLen * i
                 end = start + fileIdLen
-                yield fileIds[start : end]
+                yield cu.binary(fileIds[start : end])
 
         schema.resetTable(cu, 'tmpFileIds')
-        cu.executemany("INSERT INTO tmpFileIds (fileId) "
-                       "VALUES (?)", splitFileIds())
+        cu.executemany("INSERT INTO tmpFileIds (fileId) VALUES (?)", splitFileIds(cu))
 
         # Fetch paths by file id too
         query = """

@@ -485,7 +485,7 @@ class TroveStore:
                                                 updateLatest = False)
 
             instanceId = self.getInstanceId(itemId, versionId, flavorId,
-                                clonedFromId, trv.isRedirect(),
+                                clonedFromId, trv.getType(),
                                 isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""
