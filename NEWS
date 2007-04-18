@@ -28,10 +28,6 @@ Changes in @NEW@:
       protocols. Users who need the old behavior should set explicit
       configure the same proxy for both protocols.
     * --just-db no longer runs group scripts
-    * SeekableNestedFile and FileContainer objects no longer depend on
-      the file pointer for reads; pread() is used everywhere making
-      those objects safe to use for files with shared file
-      descriptors.
 
   o Build Changes:
     * Conary has tools in place through a new cross flag and a new
@@ -43,8 +39,8 @@ Changes in @NEW@:
       is being created. (CNY-1260, CNY-1540)
 
   o Server Changes:
-    * repository schema now understands the concept of minor and major
-      schema revisions (CNY-811)
+    * Repository schema now understands the concept of minor and major
+      schema revisions. (CNY-811)
 
   o Proxy Changes:
     * The proxy can now be configured to use an http proxy for all
@@ -57,6 +53,10 @@ Changes in @NEW@:
   o Internal Changes:
     * The createTrigger() method of dbstore drivers no longer accepts
       the "pinned" keyword parameter.
+    * SeekableNestedFile and FileContainer objects no longer depend on
+      the file pointer for reads; pread() is used everywhere.  This
+      allows the underlying file descriptors to be shared between
+      objects or between threads.
 
   o Bug Fixes:
     * Fixed a bug in proxy code that would cause conary to use https
