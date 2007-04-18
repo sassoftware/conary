@@ -1224,7 +1224,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             if totalSize == None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            #assert(totalSize == sum(sizes))
+            assert(totalSize == sum(sizes))
             inF.close()
 
             for size in sizes:
@@ -1272,7 +1272,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if target:
             try:
-                outFile = open(target, "w+")
+                outFile = util.ExtendedFile(target, "w+", buffering = False)
             except IOError, e:
                 strerr = "Error writing to file %s: %s" % (e.filename,
                     e.strerror)
@@ -1280,7 +1280,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     strerr)
         else:
             (outFd, tmpName) = util.mkstemp()
-            outFile = os.fdopen(outFd, "w+")
+            outFile = util.ExtendedFile(tmpName, "w+", buffering = False)
+            os.close(outFd)
             os.unlink(tmpName)
 
         if primaryTroveList is None:
@@ -1798,8 +1799,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 outF = tmpFile
             else:
                 (fd, path) = util.mkstemp()
+                outF = util.ExtendedFile(path, "r+", buffering = False)
                 os.unlink(path)
-                outF = os.fdopen(fd, "r+")
                 start = 0
 
             totalSize = util.copyfileobj(inF, outF,

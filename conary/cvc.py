@@ -240,7 +240,10 @@ class PromoteCommand(CvcCommand):
                                   ' but does not modify the repository'),
              'without-sources'    : (VERBOSE_HELP,
                                      'Do not clone sources for the binaries'
-                                     ' being cloned')
+                                     ' being cloned'),
+             'default-only'    : (VERBOSE_HELP, 'EXPERIMENTAL - '
+                                   ' Clones only those components'
+                                   'that are installed by default.')
            }
 
     def addParameters(self, argDef):
@@ -252,6 +255,7 @@ class PromoteCommand(CvcCommand):
         argDef["all-flavors"] = NO_PARAM
         argDef["without-sources"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
+        argDef["default-only"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -274,10 +278,12 @@ class PromoteCommand(CvcCommand):
         allFlavors = argSet.pop("all-flavors", False)
         cloneSources = not argSet.pop("without-sources", False)
         argSet.pop("with-sources", False)
+        defaultOnly = argSet.pop("default-only", False)
         clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test,
-                            cloneSources=cloneSources, allFlavors=allFlavors)
+                            cloneSources=cloneSources, allFlavors=allFlavors,
+                            cloneOnlyByDefaultTroves=defaultOnly)
 _register(PromoteCommand)
 
 

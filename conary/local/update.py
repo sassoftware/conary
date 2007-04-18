@@ -52,6 +52,16 @@ IGNOREINITIALCONTENTS = 1 << 4
 ROLLBACK_PHASE_REPOS = 1
 ROLLBACK_PHASE_LOCAL = 2
 
+class LastRestored(object):
+
+    __slots__ = [ 'pathId', 'fileId', 'target', 'type' ]
+
+    def __init__(self):
+        self.pathId = None
+        self.fileId = None
+        self.target = None
+        self.type = None
+
 class FilesystemJob:
     """
     Represents a set of actions which need to be applied to the filesystem.
@@ -392,7 +402,7 @@ class FilesystemJob:
 
         restoreIndex = 0
         j = 0
-        lastRestored = (None, None, None)
+        lastRestored = LastRestored()
         while restoreIndex < len(restores):
             (pathId, fileId, fileObj, target, override, msg) = \
                                                 restores[restoreIndex]
@@ -449,18 +459,33 @@ class FilesystemJob:
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
                         continue
                 else:
-                    if lastRestored[0:2] == (pathId, fileId):
+                    if (lastRestored.pathId, lastRestored.fileId) == \
+                                    (pathId, fileId):
                         # we share contents with another path
-                        contType = changeset.ChangedFileTypes.file
-                        contents = filecontents.FromFilesystem(lastRestored[2])
+                        contType = lastRestored.type
+                        if lastRestored.type == changeset.ChangedFileTypes.ptr:
+                            contents = filecontents.FromString(
+                                                lastRestored.target)
+                        else:
+                            contents = filecontents.FromFilesystem(
+                                                lastRestored.target)
                     else:
                         contType, contents = self.changeSet.getFileContents(
                                                                 pathId, fileId)
 
                     assert(contType != changeset.ChangedFileTypes.diff)
-                    # PTR types are restored later
+                    # PTR types are restored later. We need to cache
+                    # information about them in lastRestored in case another
+                    # instances of this fileId/pathId combination needs the
+                    # same target
                     if contType == changeset.ChangedFileTypes.ptr:
                         targetPtrId = contents.get().read()
+
+                        lastRestored.pathId = pathId
+                        lastRestored.fileId = fileId
+                        lastRestored.type = changeset.ChangedFileTypes.ptr
+                        lastRestored.target = targetPtrId
+
                         delayedRestores.append((pathId, fileObj, target, msg,
                                                 targetPtrId, fileId))
                         if not ptrTargets.has_key(targetPtrId):
@@ -505,7 +530,10 @@ class FilesystemJob:
 
 	    restoreFile(fileObj, contents, self.root, target, journal,
                         opJournal)
-            lastRestored = (pathId, fileId, target)
+            lastRestored.pathId = pathId
+            lastRestored.fileId = fileId
+            lastRestored.target = target
+            lastRestored.type = changeset.ChangedFileTypes.file
 	    log.debug(msg, target)
 
             if fileObj.hasContents and fileObj.linkGroup():

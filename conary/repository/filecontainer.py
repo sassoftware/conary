@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -51,6 +51,9 @@ Each file table entry looks like::
   length of arbitrary data (4 bytes)
   file name 
   arbitrary file table data
+
+This code is careful not to depend on the file pointer at all for reading
+(via pread). The file pointer is used while creating file containers.
 """
 
 import gzip
@@ -79,11 +82,11 @@ class FileContainer:
     bufSize = 128 * 1024
 
     def readHeader(self):
-	magic = self.file.read(4)
+	magic = self.file.pread(4, 0)
 	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
 	    raise BadContainer, "bad magic"
 
-	version = self.file.read(4)
+	version = self.file.pread(4, 4)
 	if len(version) != 4:
 	    raise BadContainer, "invalid container version"
         self.version = struct.unpack("!I", version)[0]
@@ -91,7 +94,7 @@ class FileContainer:
             raise BadContainer, "unsupported file container version %d" % \
                         self.version
 
-	self.contentsStart = self.file.tell()
+	self.contentsStart = 8
 	self.next = self.contentsStart
 
     def close(self):
@@ -124,28 +127,35 @@ class FileContainer:
     def getNextFile(self):
 	assert(not self.mutable)
 
-        self.file.seek(self.next, SEEK_SET)
-	name, tag, size = self.nextFile()
+	name, tag, size, dataOffset = self._nextFile()
 
 	if name is None:
 	    return None
 
-	fcf = util.SeekableNestedFile(self.file, size)
+	fcf = util.SeekableNestedFile(self.file, size, start = dataOffset)
 
-	self.next = self.file.tell() + size
+	self.next = dataOffset + size
 
 	return (name, tag, fcf)
 
-    def nextFile(self):
-	nameLen = self.file.read(10)
+    def _nextFile(self):
+        offset = self.next
+
+	nameLen = self.file.pread(10, offset)
 	if not len(nameLen):
-	    return (None, None, None)
+	    return (None, None, None, None)
+
+        offset += 10
 
 	subMagic, nameLen, size, tagLen = struct.unpack("!HHIH", nameLen)
         assert(subMagic == SUBFILE_MAGIC)
-	name = self.file.read(nameLen)
-	tag = self.file.read(tagLen)
-	return (name, tag, size)
+	name = self.file.pread(nameLen, offset)
+        offset += nameLen
+
+	tag = self.file.pread(tagLen, offset)
+        offset += tagLen
+
+	return (name, tag, size, offset)
 
     def dump(self, dumpString, dumpFile):
         def sizeCallback(dumpString, name, tag, size):
@@ -154,9 +164,8 @@ class FileContainer:
             dumpString(hdr)
 
 	assert(not self.mutable)
-        pos = self.file.seek(SEEK_SET, 0)
 
-        fileHeader = self.file.read(8)
+        fileHeader = self.file.pread(8, 0)
         dumpString(fileHeader)
 
         next = self.getNextFile()
@@ -173,7 +182,6 @@ class FileContainer:
         Reset the current position in the filecontainer to the beginning.
         """
         assert(not self.mutable)
-        self.file.seek(self.contentsStart, SEEK_SET)
         self.next = self.contentsStart
 
     def __del__(self):
@@ -205,7 +213,8 @@ class FileContainer:
 
 	    self.mutable = True
 	else:
-	    self.file.seek(0, SEEK_SET)
+            # we don't need to put this file pointer back; we don't depend
+            # on it here at all; everything is through pseek
 	    try:
 		self.readHeader()
 	    except:

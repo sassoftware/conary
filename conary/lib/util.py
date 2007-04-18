@@ -646,48 +646,53 @@ def verFormat(cfg, version):
         return version.trailingRevision().asString()
     return version.asString()
 
-class NestedFile:
+class ExtendedFile(file):
 
-    def close(self):
-	pass
+    def __init__(self, path, mode = "r", buffering = True):
+        assert(not buffering)
+        file.__init__(self, path, mode, buffering)
 
-    def read(self, bytes = -1):
-        if self.needsSeek:
-            self.file.seek(self.pos + self.start, 0)
-            self.needsSeek = False
+    def pread(self, bytes, offset):
+        return misc.pread(self.fileno(), bytes, offset)
 
-	if bytes < 0 or (self.end - self.pos) <= bytes:
-	    # return the rest of the file
-	    count = self.end - self.pos
-	    self.pos = self.end
-	    return self.file.read(count)
-	else:
-	    self.pos = self.pos + bytes
-	    return self.file.read(bytes)
-
-    def __init__(self, file, size):
-	self.file = file
-	self.size = size
-	self.end = self.size
-	self.pos = 0
-        self.start = 0
-        self.needsSeek = False
-
-class SeekableNestedFile(NestedFile):
+class SeekableNestedFile:
 
     def __init__(self, file, size, start = -1):
-        NestedFile.__init__(self, file, size)
+        self.file = file
+        self.size = size
+        self.end = self.size
+        self.pos = 0
 
         if start == -1:
             self.start = file.tell()
         else:
             self.start = start
 
-        self.needsSeek = True
+    def close(self):
+        pass
 
-    def read(self, bytes = -1):
-        self.needsSeek = True
-        return NestedFile.read(self, bytes)
+    def read(self, bytes = -1, offset = None):
+        if offset is None:
+            readPos = self.pos
+        else:
+            readPos = offset
+
+	if bytes < 0 or (self.end - readPos) <= bytes:
+	    # return the rest of the file
+	    count = self.end - readPos
+	    newPos = self.end
+	else:
+            count = bytes
+            newPos = readPos + bytes
+
+        buf = self.file.pread(count, readPos + self.start)
+
+        if offset is None:
+            self.pos = newPos
+
+        return buf
+
+    pread = read
 
     def seek(self, offset, whence = 0):
         if whence == 0:
@@ -696,12 +701,11 @@ class SeekableNestedFile(NestedFile):
             newPos = self.pos + offset
         else:
             newPos = self.size + offset
-            
+
         if newPos > self.size or newPos < 0:
             raise IOError
-        
+
         self.pos = newPos
-        self.needsSeek = True
 
     def tell(self):
         return self.pos
@@ -822,6 +826,7 @@ class LineReader:
 
 exists = misc.exists
 removeIfExists = misc.removeIfExists
+pread = misc.pread
 
 class _LazyFile(object):
     __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
@@ -857,7 +862,7 @@ class _LazyFile(object):
 
     def _reopen(self):
         # Initialize the file descriptor
-        self._realFd = open(self.path, self.mode)
+        self._realFd = ExtendedFile(self.path, self.mode, buffering = False)
         self._realFd.seek(*self.marker)
         self._timestamp = time.time()
 
@@ -872,6 +877,10 @@ class _LazyFile(object):
 
     @reopen
     def read(self, bytes):
+        pass
+
+    @reopen
+    def pread(self, bytes, offset):
         pass
 
     @reopen
