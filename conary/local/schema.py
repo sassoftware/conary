@@ -395,7 +395,6 @@ def createSchema(db):
 
 # redefine to enable stdout messaging for the migration process
 class SchemaMigration(migration.SchemaMigration):
-    allowMajorMigration = True
     def message(self, msg = None):
         if msg is None:
             msg = self.msg

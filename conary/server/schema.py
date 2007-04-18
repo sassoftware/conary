@@ -21,7 +21,8 @@ from conary.local.schema import createDependencies, setupTempDepTables
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
-VERSION = sqllib.DBversion(15, 3)
+# This is the major number of the schema we need
+VERSION = sqllib.DBversion(15)
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -963,27 +964,16 @@ def checkVersion(db):
 
         Current schema version is %s; Required schema version is %s.
         """ % (version, VERSION), version)
-        
-    # next, the minor version of the repo must be at least what we need
-    if version.minor < VERSION.minor:
-        raise sqlerrors.SchemaVersionError("""
-        This code version is too old for the Conary repository
-        database schema that you are running. You need to upgrade the
-        conary repository code base to a more recent version.
-
-        Current schema version is %s; Required schema version is %s.
-        """ % (version, VERSION), version)
+    # the minor numbers are considered compatible up and down across a major
     return version
 
 # run through the schema creation and migration (if required)
-def loadSchema(db, major=False):
+def loadSchema(db, migrate=False):
     global VERSION
     try:
         version =  checkVersion(db)
-        needMigrate = False
     except sqlerrors.SchemaVersionError, e:
         version = e.args[0]
-        needMigrate = True
     logMe(1, "current =", version, "required =", VERSION)
     # load the current schema object list
     db.loadSchema()
@@ -993,13 +983,6 @@ def loadSchema(db, major=False):
         createSchema(db)
         db.loadSchema()
         return db.setVersion(VERSION)
-    if version == VERSION:
-        return version
-    if version.major == VERSION.major and version.minor >= VERSION.minor:
-        # repo schema is newer, but compatible
-        logMe(1, "warning: repo schema version %s is newer than required %s" %(
-            version, VERSION))
-        return version
     # test if  the repo schema is newer than what we understand
     # (by major schema number)
     if version.major > VERSION.major:
@@ -1007,26 +990,31 @@ def loadSchema(db, major=False):
         The repository schema version is newer and incompatible with
         this code base. You need to update conary code to a version
         that undersand repo schema %s""" % version, version)
-    # is the repo schema too old? we only support migrations from schema 13 on
+    # now we need to perform a schema migration
+    if version.major < VERSION.major and not migrate:
+        raise sqlerrors.SchemaVersionError("""
+        Repository schema needs to have a major schema update performed.
+        Please run server.py with --migrate option to perform this upgrade.
+        """, version, VERSION)
+    # now the version.major is smaller than VERSION.major - but is it too small?
+    # we only support migrations from schema 13 on
     if version < 13:
         raise sqlerrors.SchemaVersionError("""
         Repository schemas from Conary versions older than 1.0 are not
         supported. Contact rPath for help converting your repository to
         a supported version.""", version)
-    # now we need to perform a schema migration
-    if version.major < VERSION.major and not major:
-        raise sqlerrors.SchemaVersionError("""
-        Repository schema needs to have a major schema update performed.
-        Please run server.py with --migrate option to perform this upgrade.
-        """, version, VERSION)
+    # compatible schema versions have the same major
+    if version.major == VERSION.major and not migrate:
+        return version
+    # if we reach here, a schema migration is needed/requested
     # avoid a recursive import by importing just what we need
     from conary.server import migrate
-    version = migrate.migrateSchema(db, major=major)
+    version = migrate.migrateSchema(db)
     db.loadSchema()
     # run through the schema creation to create any missing objects
     logMe(2, "checking for/initializing missing schema elements...")
     createSchema(db)
-    if version > 0 and version != VERSION:
+    if version > 0 and version.major != VERSION.major:
         # schema creation/conversion failed. SHOULD NOT HAPPEN!
         raise sqlerrors.SchemaVersionError("""
         Schema migration process has failed to bring the database
