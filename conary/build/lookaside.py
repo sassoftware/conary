@@ -32,8 +32,10 @@ import urllib2
 import urlparse
 import cookielib
 
-# location is normally the package name
-networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://')
+# location is normally the package name. lookaside is for something populated
+# by a method other than lookaside lookups
+networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://',
+                   'lookaside://')
 
 def _truncateName(name):
     for prefix in networkPrefixes:
@@ -345,7 +347,7 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             name, mirror = name
 
         prefix = name.split('://', 1)[0] + '://'
-        if not prefix in networkPrefixes:
+        if not prefix in networkPrefixes or prefix == 'lookaside://':
             continue
 
         f = fetchURL(cfg, name, location, httpHeaders, guessName, mirror)

@@ -427,7 +427,7 @@ class addArchive(_Source):
                 self.recipe.mainDir(oldMainDir)
 Archive = addArchive
 
-class addPatch(_Source):
+class addPatch(addArchive):
     """
     NAME
     ====
@@ -997,6 +997,75 @@ class addAction(action.RecipeAction):
     def fetch(self, refreshFilter=None):
 	return None
 Action = addAction
+
+class _RevisionControl(addArchive):
+
+    def fetch(self, refreshFilter=None):
+        import epdb
+        epdb.st()
+        fullPath = self.getFilename()
+        url = 'lookaside:/' + fullPath
+        reposPath = '/'.join(fullPath.split('/')[:-1] + [ 'hg' ])
+
+        path = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+            url, self.recipe.name, self.recipe.srcdirs, allowNone = True,
+            autoSource = True, refreshFilter = refreshFilter)
+
+        if path:
+            return path
+
+        # the source doesn't exist; we need to create the snapshot
+        repositoryDir = lookaside.createCacheName(self.recipe.cfg,
+                                                  reposPath,
+                                                  self.recipe.name)
+        del reposPath
+
+        if not os.path.exists(repositoryDir):
+            # get a new archive
+            util.mkdirChain(os.path.dirname(repositoryDir))
+            self.createArchive(repositoryDir)
+        else:
+            self.updateArchive(repositoryDir)
+
+        path = lookaside.createCacheName(self.recipe.cfg, fullPath,
+                                         self.recipe.name)
+
+        self.createSnapshot(repositoryDir, path)
+
+        return path
+
+    def doDownload(self):
+        return self.fetch()
+
+class addMercurialSnapshot(_RevisionControl):
+
+    keywords = {'url': None,
+                'tag': 'tip'}
+
+    def getFilename(self):
+        d = self.url.split('//', 1)[1]
+        return '/%s/%s--%s.tar.bz2' % (d, self.url.split('/')[-1], self.tag)
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        os.system('hg clone %s %s' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        os.system("cd %s; hg pull %s" % (lookasideDir, self.url))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.url,
+                 self.tag)
+        os.system("cd %s; hg archive -r %s -t tbz2 %s" %
+                        (lookasideDir, self.tag, target))
+
+    def __init__(self, recipe, url, tag = 'tip'):
+        self.url = url
+        self.tag = tag
+        kwArgs = { 'url' : url, 'tag' : tag }
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName, **kwArgs)
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
