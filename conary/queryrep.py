@@ -16,7 +16,7 @@ Provides the output for the "conary repquery" command
 """
 import itertools
 
-from conary import conaryclient, cscmd, trove
+from conary import conaryclient, cscmd, files, trove
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
@@ -484,7 +484,7 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
     trv = primaryCsList[0]
     primaryCsList = [ (trv[0], (None, None), trv[1], True), trv ]
     cs = repos.createChangeSet(primaryCsList, withFiles=True,
-                               withFileContents=withFileContents)
+                               withFileContents=False)
     oldTroves = {}
     newTroves = {}
     newTroveCsList = []
@@ -500,7 +500,6 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
         trv = newTroves[trvCs.getName()]
         trv.applyChangeSet(trvCs)
 
-    del cs
     del newTroveCsList
 
     sOldTroves = set(oldTroves)
@@ -524,10 +523,22 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
         trvDiff.update(_diffBuildRequirements(oldTrv, newTrv))
         # XXX Metadata
 
-        trvDiff.update(_diffFiles(oldTrv, newTrv))
+        trvDiff.update(_diffFiles(cs, oldTrv, newTrv))
 
         if trvDiff:
             diffs[trvName] = trvDiff
+
+    # Grab all the files that changed, and make a single trip to the server
+    if withFileContents:
+        filesNeeded = set()
+        for trvName, trvDiff in diffs.iteritems():
+            if 'fileDiffs' not in trvDiff:
+                continue
+            fneeded = {}
+            added, removed, changed = trvDiff['fileDiffs']
+            for n, (ov, ot), (nv, nt) in changed:
+                filesNeeded.add((ot[0], ot[2], ot[3]))
+                filesNeeded.add((nt[0], nt[2], nt[3]))
 
     diffDisplay = DiffDisplay(oldTroves, newTroves, diffs,
                               fullFlavors = fullFlavors,
@@ -552,7 +563,7 @@ class DiffDisplay(object):
     charRemoved = '-'
     charAdded = '+'
 
-    pads = [ " " * 4 * i for i in range(5) ]
+    pads = [ " " * 2 * i for i in range(5) ]
 
     troveDependencyLabels = [('Provides', 'getProvides'), ('Requires', 'getRequires')]
 
@@ -570,7 +581,7 @@ class DiffDisplay(object):
         self.withFileVersions = kwargs.pop('withFileVersions')
         self.withTroveDeps = kwargs.pop('withTroveDeps')
 
-        if self.withFilesStat:
+        if self.withFilesStat or self.withFileTags:
             self.withFiles = True
 
         self.oldTroves = oldTroves
@@ -697,12 +708,54 @@ class DiffDisplay(object):
                 yield "%s%s" % (pad3, n)
         if changed:
             yield "%sChanged:" % pad2
-            for n, (ov, oo), (nv, no) in sorted(changed):
+            for item in sorted(changed):
+                n, (ov, opid, ofid), (nv, npid, nfid) = item[:3]
                 yield "%s%s" % (pad3, n)
                 if self.withFileVersions:
                     template = "%s%s %s"
+                    yield template % (pad4, "File versions:", "")
                     yield template % (pad4, self.charOld, ov)
                     yield template % (pad4, self.charNew, nv)
+
+                if len(item) < 4:
+                    continue
+                if not self.withFilesStat and not self.withFileTags:
+                    continue
+
+                # Inode diff present
+                inodeO, inodeN = [], []
+                for iO, iN in item[3]:
+                    if iO == iN:
+                        iN = ''
+                    inodeO.append(iO)
+                    inodeN.append(iN)
+
+                (typO, permO, ownO, grpO, mtimeO, sizeO, tagO) = inodeO
+                (typN, permN, ownN, grpN, mtimeN, sizeN, tagN) = inodeN
+                # Fix up owner and group
+                if ownO.startswith('+'):
+                    ownO = ownO[1:]
+                if ownN.startswith('+'):
+                    ownN = ownN[1:]
+                if grpO.startswith('+'):
+                    grpO = grpO[1:]
+                if grpN.startswith('+'):
+                    grpN = grpN[1:]
+
+                if self.withFilesStat:
+                    yield "%sFile details:" % (pad4, )
+                    template = "%s%s %9s %-8s %-8s %8s %12s %s"
+                    yield template % (pad4, self.charOld, permO, ownO, grpO,
+                                      sizeO, mtimeO, typO)
+                    yield template % (pad4, self.charNew, permN, ownN, grpN,
+                                      sizeN, mtimeN, typN)
+                tagO, tagN = item[3][6]
+                if not self.withFileTags or tagO == tagN:
+                    continue
+                yield "%sFile tags:" % (pad4, )
+                template = "%s%s %s"
+                yield template % (pad4, self.charOld, tagO)
+                yield template % (pad4, self.charNew, tagN)
 
     def formatVF(self, VF):
         """Formats the version-flavor tuple according to the display options"""
@@ -756,13 +809,44 @@ def _diffBuildRequirements(oldTrv, newTrv):
         return {}
     return {'buildRequirements' : ret}
 
-def _diffFiles(oldTrv, newTrv):
-    oldFiles = dict((x[1], (x[3], x)) for x in oldTrv.iterFileList())
-    newFiles = dict((x[1], (x[3], x)) for x in newTrv.iterFileList())
+def _diffFiles(changeset, oldTrv, newTrv):
+    oldFiles = dict((x[1], (x[3], x[0], x[2])) for x in oldTrv.iterFileList())
+    newFiles = dict((x[1], (x[3], x[0], x[2])) for x in newTrv.iterFileList())
     ret = _diffNV(oldFiles, newFiles)
     if not ret:
         return {}
-    return {'fileDiffs' : ret}
+    added, removed, changed = ret
+    if not changed:
+        return {'fileDiffs' : ret}
+    fchanged = []
+    for (fPath, (fOldVer, fOldPId, fOldFId), (fNewVer, fNewPId, fNewFId)) in changed:
+        changeOld = changeset.getFileChange(None, fOldFId)
+        changeNew = changeset.getFileChange(fOldFId, fNewFId)
+        fObjOld = files.ThawFile(changeOld, fOldPId)
+        fObjNew = files.ThawFile(changeOld, fOldPId)
+        fObjNew.twm(changeNew, fObjOld)
+        # Diff the inodes
+        idiff = []
+        idiff.append(("(%s)" % fObjOld.__class__.__name__,
+                      "(%s)" % fObjNew.__class__.__name__))
+        for acs in ['permsString', 'owner', 'group', 'timeString']:
+            vold = getattr(fObjOld.inode, acs)()
+            vnew = getattr(fObjNew.inode, acs)()
+            idiff.append((vold, vnew))
+
+        szold = fObjOld.sizeString()
+        sznew = fObjNew.sizeString()
+        idiff.append((szold.strip(), sznew.strip()))
+
+        # tags
+        idiff.append((' '.join(sorted(fObjOld.tags)),
+                      ' '.join(sorted(fObjNew.tags))))
+
+        # idiff is (type, perms, owner, group, time, size, tag)
+        fchanged.append((fPath, (fOldVer, fOldPId, fOldFId),
+                                (fNewVer, fNewPId, fNewPId), tuple(idiff)))
+
+    return {'fileDiffs' : (added, removed, fchanged)}
 
 def _diffNV(dict1, dict2):
     """
