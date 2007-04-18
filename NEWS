@@ -28,6 +28,8 @@ Changes in @NEW@:
       protocols. Users who need the old behavior should set explicit
       configure the same proxy for both protocols.
     * --just-db no longer runs group scripts
+    * The conary.conaryclient.mirror.mirrorRepository() function now
+      accepts a list of target repositories.
 
   o Build Changes:
     * Conary has tools in place through a new cross flag and a new
