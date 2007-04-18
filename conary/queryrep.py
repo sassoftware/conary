@@ -563,7 +563,7 @@ class DiffDisplay(object):
     charRemoved = '-'
     charAdded = '+'
 
-    pads = [ " " * 2 * i for i in range(5) ]
+    pads = [ " " * 2 * i for i in range(6) ]
 
     troveDependencyLabels = [('Provides', 'getProvides'), ('Requires', 'getRequires')]
 
@@ -581,7 +581,7 @@ class DiffDisplay(object):
         self.withFileVersions = kwargs.pop('withFileVersions')
         self.withTroveDeps = kwargs.pop('withTroveDeps')
 
-        if self.withFilesStat or self.withFileTags:
+        if self.withFilesStat or self.withFileTags or self.withFileDeps:
             self.withFiles = True
 
         self.oldTroves = oldTroves
@@ -652,10 +652,13 @@ class DiffDisplay(object):
             val = tDeps[dep]
             yield "%s%s:" % (pad1, dep)
             for sense, vdep in zip((self.charAdded, self.charRemoved), val):
-                for v in str(vdep).split('\n'):
+                for v in self._iterDeps(vdep):
                     if not v:
                         continue
                     yield "%s%s %s" % (pad2, sense, v)
+
+    def _iterDeps(self, thawDep):
+        return sorted(str(thawDep).split('\n'))
 
     def formatBuildReqs(self, trvDiff, padLevel):
         if 'buildRequirements' not in trvDiff:
@@ -668,20 +671,17 @@ class DiffDisplay(object):
         pad2 = self.pads[padLevel + 1]
         yield "%sBuild Requirements:" % pad1
         added, removed, changed = trvDiff['buildRequirements']
-        template = "%s%s %s"
-        for n, (v, f) in sorted(removed):
-            yield template % (pad2, self.charRemoved, n)
-        for n, (v, f) in sorted(added):
-            yield template % (pad2, self.charAdded, n)
-
         template = "%s%s %s=%s"
+        for n, (v, f) in sorted(removed):
+            ostr = self.formatVF((v, f))
+            yield template % (pad2, self.charRemoved, n, ostr)
+        for n, (v, f) in sorted(added):
+            ostr = self.formatVF((v, f))
+            yield template % (pad2, self.charAdded, n, ostr)
+
         for n, (ov, of), (nv, nf) in sorted(changed):
-            if of == nf and not self.fullFlavors:
-                ostr = self.formatVF(ov)
-                nstr = self.formatVF(nv)
-            else:
-                ostr = self.formatVF((ov, of))
-                nstr = self.formatVF((nv, nf))
+            ostr = self.formatVF((ov, of))
+            nstr = self.formatVF((nv, nf))
             yield template % (pad2, self.charRemoved, n, ostr)
             yield template % (pad2, self.charAdded, n, nstr)
 
@@ -696,15 +696,16 @@ class DiffDisplay(object):
         pad2 = self.pads[padLevel + 1]
         pad3 = self.pads[padLevel + 2]
         pad4 = self.pads[padLevel + 3]
+        pad5 = self.pads[padLevel + 4]
         yield "%sFile Changes:" % pad1
         added, removed, changed = trvDiff['fileDiffs']
         if removed:
             yield "%sRemoved:" % pad2
-            for n, (v, o) in sorted(removed):
+            for n, (v, pid, fid) in sorted(removed):
                 yield "%s%s" % (pad3, n)
         if added:
             yield "%sAdded:" % pad2
-            for n, (v, o) in sorted(added):
+            for n, (v, pid, fid) in sorted(added):
                 yield "%s%s" % (pad3, n)
         if changed:
             yield "%sChanged:" % pad2
@@ -717,21 +718,19 @@ class DiffDisplay(object):
                     yield template % (pad4, self.charOld, ov)
                     yield template % (pad4, self.charNew, nv)
 
-                if len(item) < 4:
-                    continue
-                if not self.withFilesStat and not self.withFileTags:
-                    continue
-
                 # Inode diff present
                 inodeO, inodeN = [], []
-                for iO, iN in item[3]:
+                statChanged = False
+                for iO, iN in item[3][:-3]:
                     if iO == iN:
                         iN = ''
+                    else:
+                        statChanged = True
                     inodeO.append(iO)
                     inodeN.append(iN)
 
-                (typO, permO, ownO, grpO, mtimeO, sizeO, tagO) = inodeO
-                (typN, permN, ownN, grpN, mtimeN, sizeN, tagN) = inodeN
+                (typO, permO, ownO, grpO, mtimeO, sizeO) = inodeO
+                (typN, permN, ownN, grpN, mtimeN, sizeN) = inodeN
                 # Fix up owner and group
                 if ownO.startswith('+'):
                     ownO = ownO[1:]
@@ -749,13 +748,39 @@ class DiffDisplay(object):
                                       sizeO, mtimeO, typO)
                     yield template % (pad4, self.charNew, permN, ownN, grpN,
                                       sizeN, mtimeN, typN)
+                else:
+                    yield "%sFile details" % (pad4, )
+
                 tagO, tagN = item[3][6]
-                if not self.withFileTags or tagO == tagN:
-                    continue
-                yield "%sFile tags:" % (pad4, )
+
+                addedProv, removedProv = item[3][7]
+                addedReq, removedReq = item[3][7]
+
+                map = [('Provides', addedProv, removedProv),
+                       ('Requires', addedReq, removedReq)]
+
                 template = "%s%s %s"
-                yield template % (pad4, self.charOld, tagO)
-                yield template % (pad4, self.charNew, tagN)
+                senses = (self.charRemoved, self.charAdded)
+                for title, addedDep, removedDep in map:
+                    title = pad4 + title
+                    if addedDep or removedDep:
+                        if not self.withFileDeps:
+                            yield title
+                            continue
+                        yield title + ':'
+                        for sense, deps in zip(senses, (removedDep, addedDep)):
+                            for v in self._iterDeps(deps):
+                                yield template % (pad5, sense, v)
+
+                if tagO == tagN:
+                    continue
+                if self.withFileTags:
+                    yield "%sFile tags:" % (pad4, )
+                    template = "%s%s %s"
+                    yield template % (pad4, self.charOld, tagO)
+                    yield template % (pad4, self.charNew, tagN)
+                else:
+                    yield "%sFile tags" % (pad4, )
 
     def formatVF(self, VF):
         """Formats the version-flavor tuple according to the display options"""
@@ -842,9 +867,16 @@ def _diffFiles(changeset, oldTrv, newTrv):
         idiff.append((' '.join(sorted(fObjOld.tags)),
                       ' '.join(sorted(fObjNew.tags))))
 
-        # idiff is (type, perms, owner, group, time, size, tag)
+        oProv, nProv = fObjOld.provides(), fObjNew.provides()
+        oReqs, nReqs = fObjOld.requires(), fObjNew.requires()
+
+        idiff.append((nProv - oProv, oProv - nProv))
+        idiff.append((nReqs - oReqs, oReqs - nReqs))
+
+        # idiff is (type, perms, owner, group, time, size, tag, provides,
+        # requires)
         fchanged.append((fPath, (fOldVer, fOldPId, fOldFId),
-                                (fNewVer, fNewPId, fNewPId), tuple(idiff)))
+                                (fNewVer, fNewPId, fNewFId), tuple(idiff)))
 
     return {'fileDiffs' : (added, removed, fchanged)}
 
