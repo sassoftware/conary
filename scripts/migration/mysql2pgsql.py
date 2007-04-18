@@ -171,6 +171,8 @@ def fix_pk(table):
     pkval = dst.fetchall()[0][0]
     if not pkval:
         pkval = 1
+    else:
+        pkval += 1 # we need the next one in line
     # now reset the sequence for the primary key
     dst.execute("select pg_catalog.setval(pg_catalog.pg_get_serial_sequence(?, ?), ?, false)",
                 table.lower(), pkname.lower(), pkval)
