@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.22:
   o Major Changes:
     * Group troves can now declare an (integer) compatibility class
       which is used to automatically invalidate rollbacks (existing
