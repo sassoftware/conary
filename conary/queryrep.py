@@ -452,7 +452,7 @@ def getTrovesByPath(repos, pathList, versionFilter, flavorFilter, labelPath,
         for path, tups in results.iteritems():
             allResults.setdefault(path, []).extend(tups)
 
-    allResults = [ allResults[x] for x in pathList ]
+    allResults = [ allResults.get(x) for x in pathList ]
 
     finalList = [ ]
     for tupList in allResults:
