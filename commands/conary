@@ -624,7 +624,7 @@ class RdiffCommand(ConaryCommand):
     help = 'Display differences between troves'
     commandGroup = 'Information Display'
     docs = { 'show-empty'  : 'Show troves even if they did not change',
-             'build-reqs'  : 'Show build requirements changes',
+             'buildreqs'  : 'Show build requirements changes',
              'deps'        : 'Show changes in overall dependencies',
              'ls'          : 'Show file changes',
              'lsl'         : 'Show detailed file changes',
@@ -640,7 +640,7 @@ class RdiffCommand(ConaryCommand):
         #d["components"] = NO_PARAM
         d["deps"] = NO_PARAM
         d["show-empty"] = NO_PARAM
-        d["build-reqs"] = NO_PARAM
+        d["buildreqs"] = NO_PARAM
         argDef['Trove-related Changes'] = d
 
         d = {}
@@ -669,7 +669,7 @@ class RdiffCommand(ConaryCommand):
         kw['fullVersions'] = cfg.fullVersions
         kw['showLabels'] = cfg.showLabels
         kw['showEmptyDiffs'] = argSet.pop('show-empty', False)
-        kw['withBuildReqs'] = argSet.pop('build-reqs', False)
+        kw['withBuildReqs'] = argSet.pop('buildreqs', False)
         kw['withFileContents'] = argSet.pop('file-contents', False)
         kw['withFileDeps'] = argSet.pop('file-deps', False)
         kw['withFiles'] = argSet.pop('ls', False)
