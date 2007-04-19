@@ -27,8 +27,7 @@ def getDatabaseVersion(db):
     ret = cu.fetchone_dict()
     if ret.has_key("minor"):
         return sqllib.DBversion(ret["version"], ret["minor"])
-    else:
-        return sqllib.DBversion(ret["version"])
+    return sqllib.DBversion(ret["version"])
 
 class SchemaMigration:
     Version = 0              # this current migration's version
