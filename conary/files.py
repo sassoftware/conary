@@ -173,28 +173,8 @@ class InodeStream(streams.StreamSet):
 	return "".join(l)
 
     def timeString(self, now = None):
-	if not now:
-	    now = time.time()
-	timeSet = time.localtime(self.mtime())
-	nowSet = time.localtime(now)
-
-	# if this file is more then 6 months old, use the year
-	monthDelta = nowSet[1] - timeSet[1]
-	yearDelta = nowSet[0] - timeSet[0]
-
-	if monthDelta < 0:
-	    yearDelta = yearDelta - 1
-	    monthDelta = monthDelta + 12
-
-	monthDelta = monthDelta + 12 * yearDelta
-
-	if nowSet[2] < timeSet[2]:
-	    monthDelta = monthDelta - 1
-
-	if monthDelta < 6:
-	    return time.strftime("%b %e %H:%M", timeSet)
-	else:
-	    return time.strftime("%b %e  %Y", timeSet)
+        # We're ignoring now now
+        return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(self.mtime()))
 
     def __eq__(self, other, skipSet = { 'mtime' : True }):
         return streams.StreamSet.__eq__(self, other, skipSet = skipSet)
