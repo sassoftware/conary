@@ -536,18 +536,6 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
         if showEmptyDiffs or trvDiff:
             diffs[trvName] = trvDiff
 
-    # Grab all the files that changed, and make a single trip to the server
-    if withFileContents:
-        filesNeeded = set()
-        for trvName, trvDiff in diffs.iteritems():
-            if 'fileDiffs' not in trvDiff:
-                continue
-            fneeded = {}
-            added, removed, changed = trvDiff['fileDiffs']
-            for n, (ov, ot), (nv, nt) in changed:
-                filesNeeded.add((ot[0], ot[2], ot[3]))
-                filesNeeded.add((nt[0], nt[2], nt[3]))
-
     diffDisplay = DiffDisplay(oldTroves, newTroves, diffs,
                               fullFlavors = fullFlavors,
                               fullVersions = fullVersions,
