@@ -751,9 +751,14 @@ class DiffDisplay(object):
                 if grpN.startswith('+'):
                     grpN = grpN[1:]
 
+                # Shorten the output for the regular case: no changes, regular
+                # file
+                if not typN and typO == "(RegularFile)":
+                    typO = ""
+
                 if self.withFilesStat:
                     yield "%sFile details:" % (pad4, )
-                    template = "%s%s %9s %-8s %-8s %8s %12s %s"
+                    template = "%s%s %9s %-8s %-8s %8s %23s %s"
                     yield template % (pad4, self.charOld, permO, ownO, grpO,
                                       sizeO, mtimeO, typO)
                     yield template % (pad4, self.charNew, permN, ownN, grpN,
@@ -861,8 +866,11 @@ def _diffFiles(changeset, oldTrv, newTrv):
         changeOld = changeset.getFileChange(None, fOldFId)
         changeNew = changeset.getFileChange(fOldFId, fNewFId)
         fObjOld = files.ThawFile(changeOld, fOldPId)
-        fObjNew = files.ThawFile(changeOld, fOldPId)
-        fObjNew.twm(changeNew, fObjOld)
+        if files.fileStreamIsDiff(changeNew):
+            fObjNew = files.ThawFile(changeOld, fOldPId)
+            fObjNew.twm(changeNew, fObjOld)
+        else:
+            fObjNew = files.ThawFile(changeNew, fNewFId)
         # Diff the inodes
         idiff = []
         idiff.append(("(%s)" % fObjOld.__class__.__name__,
