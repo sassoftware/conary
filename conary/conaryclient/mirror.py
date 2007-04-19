@@ -63,6 +63,27 @@ class VerboseChangesetCallback(clientCallbacks.ChangesetCallback):
     def done(self):
         self._message('\r')
 
+class MirrorConfigurationSection(cfg.ConfigSection):
+    repositoryMap         =  conarycfg.CfgRepoMap
+    user                  =  conarycfg.CfgUserInfo
+
+class MirrorConfiguration(cfg.SectionedConfigFile):
+    host                  =  cfg.CfgString
+    entitlementDirectory  =  cfg.CfgPath
+    labels                =  conarycfg.CfgInstallLabelPath
+    matchTroves           =  cfg.CfgSignedRegExpList
+    recurseGroups         =  (cfg.CfgBool, False)
+    uploadRateLimit       =  (conarycfg.CfgInt, 0)
+    downloadRateLimit     =  (conarycfg.CfgInt, 0)
+    lockFile              =  cfg.CfgString
+
+    _allowNewSections = True
+    _defaultSectionType = MirrorConfigurationSection
+    
+    def __init__(self):
+        cfg.SectionedConfigFile.__init__(self)
+
+
 def Main(argv=sys.argv[1:]):
     try:
         options = parseArgs(argv)
@@ -71,7 +92,7 @@ def Main(argv=sys.argv[1:]):
         sys.stderr.write("\n")
         return e.errcode
 
-    cfg =MirrorConfiguration()
+    cfg = MirrorConfiguration()
     cfg.read(options.configFile, exception = True)
     callback = callbacks.ChangesetCallback()
 
@@ -88,75 +109,41 @@ def Main(argv=sys.argv[1:]):
             log.debug('lock held by another process, exiting')
             sys.exit(0)
 
-
-    # We need two repos clients, one for the server and one for the client. Since
-    # they have the same name (the repositorymap gets us to the right hosts).
-    sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
-                              cfg.source.user,
-                              uploadRateLimit = cfg.uploadRateLimit,
-                              downloadRateLimit = cfg.downloadRateLimit,
-                              entitlementDir = cfg.entitlementDirectory)
-
-    targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
-                              cfg.target.user,
-                              uploadRateLimit = cfg.uploadRateLimit,
-                              downloadRateLimit = cfg.downloadRateLimit,
-                              entitlementDir = cfg.entitlementDirectory)
-
+    # need to make sure we have a 'source' section
+    if not cfg.hasSection('source'):
+        log.debug("ERROR: mirror configuration file is missing a [source] section")
+        sys,exit(-1)
+    srcCfg = cfg.getSection('source')
+    sourceRepos = netclient.NetworkRepositoryClient(
+        srcCfg.repositoryMap, srcCfg.user,
+        uploadRateLimit = cfg.uploadRateLimit,
+        downloadRateLimit = cfg.downloadRateLimit,
+        entitlementDir = cfg.entitlementDirectory)
+    # we need to build a target repo client for each of the "target*"
+    # sections in the config file
+    targets = []
+    for name in cfg.iterSectionNames():
+        if not name.startswith("target"):
+            continue
+        secCfg = cfg.getSection(name)
+        target = netclient.NetworkRepositoryClient(
+            secCfg.repositoryMap, secCfg.user,
+            uploadRateLimit = cfg.uploadRateLimit,
+            downloadRateLimit = cfg.downloadRateLimit,
+            entitlementDir = cfg.entitlementDirectory)
+        target = TargetRepository(target, cfg, name, test=options.test)
+        targets.append(target)
     # we pass in the sync flag only the first time around, because after
     # that we need the targetRepos mark to advance accordingly after being
     # reset to -1
-    count = mirrorRepository(sourceRepos, targetRepos, cfg,
-                             test = options.test, sync = options.sync,
-                             syncSigs = options.syncSigs,
-                             callback = callback)
-    while count:
-        count = mirrorRepository(sourceRepos, targetRepos, cfg,
-                                 test = options.test, callback = callback)
+    callAgain = mirrorRepository(sourceRepos, targets, cfg,
+                                 test = options.test, sync = options.sync,
+                                 syncSigs = options.syncSigs,
+                                 callback = callback)
+    while callAgain:
+        callAgain = mirrorRepository(sourceRepos, targets, cfg,
+                                     test = options.test, callback = callback)
 
-
-class MirrorConfigurationSection(cfg.ConfigSection):
-    repositoryMap         =  conarycfg.CfgRepoMap
-    user                  =  conarycfg.CfgUserInfo
-
-class MirrorConfiguration(cfg.SectionedConfigFile):
-    host                  =  cfg.CfgString
-    entitlementDirectory  =  cfg.CfgPath
-    labels                =  conarycfg.CfgInstallLabelPath
-    matchTroves           =  cfg.CfgSignedRegExpList
-    recurseGroups         =  (cfg.CfgBool, False)
-    source                =  MirrorConfigurationSection
-    target                =  MirrorConfigurationSection
-    uploadRateLimit       =  (conarycfg.CfgInt, 0)
-    downloadRateLimit     =  (conarycfg.CfgInt, 0)
-    lockFile              =  cfg.CfgString
-
-    def __init__(self):
-        cfg.SectionedConfigFile.__init__(self)
-
-
-def filterAlreadyPresent(repos, troveList):
-    # Filter out troves which are already in the local repository. Since
-    # the marks aren't distinct (they increase, but not monotonially), it's
-    # possible that something new got committed with the same mark we
-    # last updated to, so we have to look again at all of the troves in the
-    # source repository with the last mark which made it into our target.
-    present = repos.hasTroves([ x[1] for x in troveList ], hidden = True)
-    filteredList = [ x for x in troveList if not present[x[1]] ]
-
-    return filteredList
-
-def filterSigsWithoutTroves(repos, currentMark, sigList):
-    # Sigs whose mark is the same as currentMark might not have their trove
-    # available on the server (it might be coming as part of this mirror
-    # run). sigList has to be sorted by mark for this to work.
-
-    inQuestion = [ x for x in sigList if x[0] == currentMark ]
-    present = repos.hasTroves([ x[1] for x in inQuestion ])
-    # keep troves whose mark are older than currentMark and troves which
-    # are present on the target
-    sigList = [ x for x in sigList if present.get(x[1], True) ]
-    return sigList
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
@@ -213,7 +200,6 @@ def buildJobList(repos, groupList):
                             closeness = 100000
                         else:
                             closeness = version.closeness(repVersion)
-
                         if score is False: continue
                         if score < currentMatch[3]:
                             continue
@@ -324,32 +310,8 @@ def displayBundle(bundle):
 def displayJobList(jobList):
     return displayBundle([(0, x) for x in jobList])
 
-# this is to keep track of GPG keys we already added to avoid repeated
-# add operation into the target
-addedKeys = {}
-def mirrorGPGKeys(sourceRepos, targetRepos, cfg, host, test = False):
-    global addedKeys
-    # avoid duplicate effort
-    if addedKeys.has_key(host):
-        return
-    log.debug("mirroring pgp keys for %s", host)
-    # we mirror the entire set of GPG keys in one step to avoid
-    # multiple roundtrips to the sourceRepos. Also, mirroring new
-    # signatures for old troves is the first mirroring step, so we
-    # need to have the GPG keys available early on
-    keyList = sourceRepos.getNewPGPKeys(host, -1)
-    if test:
-        log.debug("(not adding %d keys due to test mode)", len(keyList))
-        return
-    if len(keyList):
-        log.debug("adding %d keys to target", len(keyList))
-        targetRepos.addPGPKeyList(cfg.host, keyList)
-    else:
-        keyList = [ False ]
-    addedKeys[host] = set(keyList)
-
 # mirroring stuff when we are running into PathIdConflict errors
-def splitJobList(jobList, sourceRepos, targetRepos, callback = None):
+def splitJobList(jobList, src, targetSet, callback = None):
     log.debug("PathIdConflict detected; splitting job further...")
     jobs = {}
     for job in jobList:
@@ -364,20 +326,18 @@ def splitJobList(jobList, sourceRepos, targetRepos, callback = None):
         os.close(outFd)
         log.debug("jobsplit %d of %d %s" % (
             i + 1, len(jobs), displayBundle([(0,x) for x in smallJobList])))
-        cs = sourceRepos.createChangeSetFile(smallJobList, tmpName, recurse = False,
-                                             callback = callback)
-        log.debug("committing")
-        targetRepos.commitChangeSetFile(tmpName, mirror = True, callback = callback)
+        cs = src.createChangeSetFile(smallJobList, tmpName, recurse = False,
+                                     callback = callback)
+        for target in targetSet:
+            target.commitChangeSetFile(tmpName, callback = callback)
         os.unlink(tmpName)
         callback.done()
         i += 1
     return
 
-def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
-                     test = False, syncSigs = False):
-    # miror the GPG keys for the main source repo
-    mirrorGPGKeys(sourceRepos, targetRepos, cfg, cfg.host, test)
-
+def mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs=False):
+    for t in targets:
+        t.mirrorGPG(sourceRepos, cfg.host)
     if syncSigs:
         log.debug("getting full trove list for signature sync")
         troveDict = sourceRepos.getTroveVersionList(cfg.host, { None : None })
@@ -388,7 +348,7 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
                     sigList.append((currentMark, (name, version, flavor)))
     else:
         log.debug("looking for new trove signatures")
-        sigList = sourceRepos.getNewSigList(cfg.host, currentMark)
+        sigList = sourceRepos.getNewSigList(cfg.host, str(currentMark))
     # protection against duplicate items returned in the list by some servers
     if not len(sigList):
         return 0
@@ -408,23 +368,15 @@ def mirrorSignatures(sourceRepos, targetRepos, currentMark, cfg,
         sigList = [x for x in sigList if
                    cfg.matchTroves.match(x[1][0]) > 0]
         log.debug("after matchTroves %d sigs are needed", len(sigList))
-
-    log.debug("removing signatures for troves not yet mirrored")
-    sigList = filterSigsWithoutTroves(targetRepos, currentMark, sigList)
-    log.debug("%d signatures need to be mirrored", len(sigList))
-
+    if not sigList:
+        return 0
+    
     updateCount = 0
-    if sigList:
-        log.debug("downloading %d signatures from source repository", len(sigList))
-        sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
-        # build the ((n,v,f), signature) list only for the troves that have signatures
-        sigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
-        if test:
-            log.debug("not mirroring %d signatures due to test mode", len(sigs))
-        else:
-            log.debug("uploading %d unique signatures to target repository", len(sigs))
-            updateCount = targetRepos.setTroveSigs(sigs)
-
+    log.debug("downloading %d signatures from source repository", len(sigList))
+    sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
+    # update these sigs on each target
+    for t in targets:
+        updateCount += t.setTroveSigs(sigList, sigs)
     return updateCount
 
 # this mirrors all the troves marked as removed from the sourceRepos into the targetRepos
@@ -450,7 +402,6 @@ def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = N
     log.debug("mirroring %d removed troves", len(troveSet))
     if not troveSet:
         return 0
-
     jobList = [ (name, (None, None), (version, flavor), True) for
                 (name, version, flavor) in troveSet ]
     log.debug("mirroring removed troves %s" % (displayJobList(jobList),))
@@ -467,46 +418,139 @@ def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = N
 CurrentTestMark = None
 LastBundleSet = None
 
+# target repo class that helps dealing with testing mode
+class TargetRepository:
+    def __init__(self, repo, cfg, name = 'target', test=False):
+        self.repo = repo
+        self.test = test
+        self.cfg = cfg
+        self.__mark = None
+        self.name = name
+        self.__gpg = {}
+    def getMirrorMark(self):
+        if self.__mark is None:
+            self.__mark = self.repo.getMirrorMark(self.cfg.host)
+        self.__mark = str(int(self.__mark))
+        return self.__mark
+    def setMirrorMark(self, mark):
+        self.__mark = str(int(mark))
+        log.debug("%s setting mirror mark to %s", self.name, self.__mark)
+        if self.test:
+            return
+        self.repo.setMirrorMark(self.cfg.host, self.__mark)
+    def mirrorGPG(self, src, host):
+        if self.__gpg.has_key(host):
+            return
+        keyList = src.getNewPGPKeys(host, -1)
+        self.__gpg[host] = keyList
+        log.debug("%s adding %d gpg keys", self.name, len(keyList))
+        if self.test:
+            return
+        self.repo.addPGPKeyList(self.cfg.host, keyList)
+    def setTroveSigs(self, sigList, sigs):
+        log.debug("%s checking which trove sigs are required", self.name)
+        # Sigs whose mark is the same as currentMark might not have their trove
+        # available on the server (it might be coming as part of this mirror
+        # run). sigList has to be sorted by mark for this to work.
+        inQuestion = [ x[1] for x in sigList if x[0] == self.__mark ]
+        present = self.repo.hasTroves(inQuestion)
+        # build the ((n,v,f), signature) list only for the troves that have signatures
+        setSigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
+        # filter out the ones that are not present
+        setSigs = [ x for x in setSigs if present.get(x[0], True) ]
+        log.debug("%s uploading %d signatures", self.name, len(sigs))
+        if self.test:
+            return
+        return self.repo.setTroveSigs(setSigs)
+    def addTroveList(self, tl):
+        # Filter out troves which are already in the local repository. Since
+        # the marks aren't distinct (they increase, but not monotonially), it's
+        # possible that something new got committed with the same mark we
+        # last updated to, so we have to look again at all of the troves in the
+        # source repository with the last mark which made it into our target.
+        present = self.repo.hasTroves([ x[1] for x in tl ], hidden = True)
+        ret = [ x for x in tl if not present[x[1]] ]
+        log.debug("%s found %d troves not present", self.name, len(ret))
+        return ret
+    def commitChangeSetFile(self, filename, callback):
+        if self.test:
+            log.debug("%s skipping commit (test mode)", self.name)
+            return
+        log.debug("%s committing", self.name)
+        ret = self.repo.commitChangeSetFile(filename, mirror=True, callback=callback)
+        callback.done()
+        return ret
+    
+# split a troveList in changeset jobs
+def buildBundles(target, troveList):
+    bundles = []
+    log.debug("grouping %d troves based on version and flavor", len(troveList))
+    groupList = groupTroves(troveList)
+    log.debug("building grouped job list")
+    bundles = buildJobList(target.repo, groupList)
+    return bundles
+
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
                      callback = callbacks.ChangesetCallback()):
-    global CurrentTestMark
-    global LastBundleSet
-
-    # find the latest timestamp stored on the target mirror
+    if not hasattr(targetRepos, '__iter__'):
+        targetRepos = [ targetRepos ]
+    targets = []
+    for t in targetRepos:
+        if isinstance(t, netclient.NetworkRepositoryClient):
+            targets.append(TargetRepository(t, cfg, test=test))
+        elif isinstance(t, TargetRepository):
+            targets.append(t)
+        else:
+            raise RuntimeError("Can not handle unknown target repository type", t)
     if sync:
         currentMark = -1
-        if test:
-            CurrentTestMark = currentMark
-        else:
-            targetRepos.setMirrorMark(cfg.host, currentMark)
     else:
-        if test and CurrentTestMark is not None:
-            currentMark = CurrentTestMark
-        else:
-            currentMark = targetRepos.getMirrorMark(cfg.host)
-            CurrentTestMark = currentMark
+        marks = [ int(t.getMirrorMark()) for t in targets ]
+        # we use the oldest mark as a starting point (since we have to
+        # get stuff from source for that oldest one anyway)
+        currentMark = min(marks)
+    log.debug("current mirror mark %s", currentMark)
+    # reset mirror mark to the lowest common denominator
+    for t in targets:
+        if int(t.getMirrorMark()) != currentMark:
+            t.setMirrorMark(currentMark)
+    # first, we need to mirror changed signatures for troves in each target
+    updateCount = mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs)
 
-    log.debug("currently up to date through %d", int(currentMark))
-
-    # first, mirror signatures for troves already mirrored
-    updateCount = mirrorSignatures(sourceRepos, targetRepos, currentMark,
-                                   cfg = cfg, test = test, syncSigs = syncSigs)
-
-    log.debug("looking for new troves")
-    # now find all of the troves we need from from the mirror source
     # FIXME: getNewTroveList should accept and only return troves on
     # the labels we're interested in
-    troveList = sourceRepos.getNewTroveList(cfg.host, currentMark)
+    log.debug("looking for new troves")
+    # make sure we always treat the mark as an integer
+    troveList = [(int(m), (n,v,f), t) for m, (n,v,f), t in
+                  sourceRepos.getNewTroveList(cfg.host, str(currentMark))]
     # we need to protect ourselves from duplicate items in the troveList
     troveList = list(set(troveList))
-    troveList.sort(lambda a,b: cmp(a[0], b[0]))
-    log.debug("%d new troves are available", len(troveList))
-    crtTroveLen = len(troveList)
-    if not crtTroveLen:
+    if not len(troveList):
         # this should be the end - no more troves to look at
         return 0
+    
+    # sort by mark
+    troveList.sort(lambda a,b: cmp(a[0], b[0]))
+    log.debug("%d new troves returned", len(troveList))
 
+    # We cut off the last troves that have the same flavor, version to
+    # avoid committing an incomplete trove. This could happen if the
+    # server side only listed some of a trove's components due to
+    # server side limits on how many results it can return on each query
+    lastIdx = len(troveList) - 1
+    # compare with the last one
+    ml, (nl,vl,fl), tl = troveList[-1]
+    while lastIdx >= 0:
+        m, (n,v,f), t = troveList[lastIdx]
+        if v == vl and f == fl:
+            lastIdx -= 1
+        else:
+            break
+    # if all troves in troveList have the same version/flavor, do nothing
+    if lastIdx >= 0:
+        troveList = troveList[:lastIdx+1]
+        log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
     # prepare a new max mark to be used when we need to break out of a loop
     crtMaxMark = max(x[0] for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:
@@ -548,53 +592,70 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         log.debug("after group recursion %d troves are needed", len(troveList))
         # we need to make sure we mirror the GPG keys of any newly added troves
         for host in set([x[1].getHost() for x in troveSetList + removedSet]) - set([cfg.host]):
-            mirrorGPGKeys(sourceRepos, targetRepos, cfg, host, test)
+            for t in targets:
+                t.mirrorGPG(src, host)
 
+    # we check which troves from the troveList are needed on each
+    # target and we split the troveList into separate lists depending
+    # on how many targets require each
+    byTarget = {}
+    targetSetList = []
     if len(troveList):
-        # now filter the ones already existing
-        troveList = filterAlreadyPresent(targetRepos, troveList)
-        log.debug("found %d troves not present in the mirror", len(troveList))
-
+        byTrove = {}
+        for i, target in enumerate(targets):
+            for t in target.addTroveList(troveList):
+                bt = byTrove.setdefault(t, set())
+                bt.add(i)
+        # invert the dict by target now
+        for trv, ts in byTrove.iteritems():
+            targetSet = [ targets[i] for i in ts ]
+            try:
+                targetIdx = targetSetList.index(targetSet)
+            except ValueError:
+                targetSetList.append(targetSet)
+                targetIdx = len(targetSetList)-1
+            bt = byTarget.setdefault(targetIdx, [])
+            bt.append(trv)
+        del byTrove
     # if we were returned troves, but we filtered them all out, advance the
     # mark and signal "try again"
-    if len(troveList) == 0 and len(removedSet) == 0 and crtTroveLen:
+    if len(byTarget) == 0 and len(removedSet) == 0 and len(troveList):
         # we had troves and now we don't
         log.debug("no troves found for our label %s" % cfg.labels)
-        log.debug("advancing newMark to %d" % int(crtMaxMark))
-        if test:
-            CurrentTestMark = crtMaxMark
-        else:
-            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
+        for t in targets:
+            t.setMirrorMark(crtMaxMark)
         # try again
         return -1
+    
+    # now we get each section of the troveList for each targetSet. We
+    # start off mirroring by those required by fewer targets, using
+    # the assumption that those troves are what is required for the
+    # targets to catch up to a common set
+    if len(byTarget) > 1:
+        log.debug("split %d troves into %d chunks by target", len(troveList), len(byTarget))
+    # sort the targetSets by length
+    targetSets = list(enumerate(targetSetList))
+    targetSets.sort(lambda a,b: cmp(len(a[1]), len(b[1])))
+    bundlesMark = 0
+    for idx, targetSet in targetSets:
+        troveList = byTarget[idx]
+        if not troveList: # XXX: should notn happen...
+            continue
+        log.debug("mirroring %d troves into %d targets", len(troveList), len(targetSet))
+        # since these troves are required for all targets, we can use
+        # the "first" one to build the relative changeset requests
+        target = list(targetSet)[0]
+        bundles = buildBundles(target, troveList)
 
-    bundles = []
-    if troveList:
-        log.debug("grouping %d troves based on version and flavor", len(troveList))
-        groupList = groupTroves(troveList)
-        log.debug("building grouped job list")
-        bundles = buildJobList(targetRepos, groupList)
-
-        if len(bundles) > 1:
-            # We cut off the last bundle if there is more than one and let the
-            # next pass through this function handle it. That makes sure that
-            # we don't half-commit a package when the server limits the number
-            # of responses getNewTroveList() will return
-            bundles = bundles[:-1]
-
-        if test and LastBundleSet == bundles:
-            log.debug("test mode detected a loop, ending...")
-            return 0
-        LastBundleSet = bundles
-
-    for i, bundle in enumerate(bundles):
-        jobList = [ x[1] for x in bundle ]
-        # XXX it's a shame we can't give a hint as to what server to use
-        # to avoid having to open the changeset and read in bits of it
-        if test:
-            log.debug("test mode: skipping retrieval (%d of %d) %s" % (i + 1, len(bundles), jobList))
-            log.debug("test mode: skipping commit")
-        else:
+        for i, bundle in enumerate(bundles):
+            jobList = [ x[1] for x in bundle ]
+            # XXX it's a shame we can't give a hint as to what server to use
+            # to avoid having to open the changeset and read in bits of it
+            if test:
+                log.debug("test mode: skipping retrieval (%d of %d) %s" % (i + 1, len(bundles), jobList))
+                log.debug("test mode: skipping commit")
+                updateCount += len(bundle)
+                continue
             (outFd, tmpName) = util.mkstemp()
             os.close(outFd)
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
@@ -602,25 +663,25 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                 cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
                                                      callback = callback)
             except changeset.ChangeSetKeyConflictError, e:
-                splitJobList(jobList, sourceRepos, targetRepos, callback = callback)
+                splitJobList(jobList, sourceRepos, targetSet, callback = callback)
             else:
-                log.debug("committing")
-                targetRepos.commitChangeSetFile(tmpName, mirror = True, callback = callback)
+                for target in targetSet:
+                    target.commitChangeSetFile(tmpName, callback=callback)
             try:
                 os.unlink(tmpName)
             except OSError:
                 pass
             callback.done()
         updateCount += len(bundle)
+        # compute the max mark of the bundles we comitted
+        mark = max([min([x[0] for x in bundle]) for bundle in bundles])
+        if mark > bundlesMark:
+            bundlesMark = mark
     else: # only when we're all done looping advance mark to the new max
-        if len(bundles):
-            # compute the max mark of the bundles we comitted
-            crtMaxMark = max([min([x[0] for x in bundle]) for bundle in bundles])
-        log.debug("setting the mirror mark to %d", int(crtMaxMark))
-        if test:
-            CurrentTestMark = crtMaxMark
-        else:
-            targetRepos.setMirrorMark(cfg.host, crtMaxMark)
-    updateCount += mirrorRemoved(sourceRepos, targetRepos, removedSet,
-                                 test = test, callback = callback)
+        for target in targetRepos:
+            target.setMirrorMark(bundlesMark)
+    # mirroring removed troves requires one by one processing
+    for target in targets:
+        updateCount += mirrorRemoved(sourceRepos, target.repo, removedSet,
+                                     test=test, callback=callback)
     return updateCount
