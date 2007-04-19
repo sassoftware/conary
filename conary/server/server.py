@@ -517,7 +517,7 @@ def getServer():
             print "ERROR: schema migration has failed from %s to %s" %(
                 dbVersion, schema.VERSION)
         if 'migrate' in argSet:
-            logMe(1, "Schema migration complete. Server exiting...")
+            logMe(1, "Schema migration complete", dbVersion)
             sys.exit(0)
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)

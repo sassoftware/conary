@@ -406,6 +406,13 @@ def _getMigration(major):
         return None
     return ret
 
+# return the last major.minor version for a given major
+def majorMinor(major):
+    migr = _getMigration(major)
+    if migr is None:
+        return (major, 0)
+    return migr.Version
+
 # entry point that migrates the schema
 def migrateSchema(db):
     version = db.getVersion()

@@ -978,11 +978,15 @@ def loadSchema(db, migrate=False):
     # load the current schema object list
     db.loadSchema()
 
+    # avoid a recursive import by importing just what we need
+    from conary.server import migrate
+
     # expedite the initial repo creation
     if version == 0:
         createSchema(db)
         db.loadSchema()
-        return db.setVersion(VERSION)
+        setVer = migrate.majorMinor(VERSION)
+        return db.setVersion(setVer)
     # test if  the repo schema is newer than what we understand
     # (by major schema number)
     if version.major > VERSION.major:
@@ -1007,8 +1011,6 @@ def loadSchema(db, migrate=False):
     if version.major == VERSION.major and not migrate:
         return version
     # if we reach here, a schema migration is needed/requested
-    # avoid a recursive import by importing just what we need
-    from conary.server import migrate
     version = migrate.migrateSchema(db)
     db.loadSchema()
     # run through the schema creation to create any missing objects
