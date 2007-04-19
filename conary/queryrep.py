@@ -756,14 +756,14 @@ class DiffDisplay(object):
                 if not typN and typO == "(RegularFile)":
                     typO = ""
 
-                if self.withFilesStat:
+                if statChanged and self.withFilesStat:
                     yield "%sFile details:" % (pad4, )
                     template = "%s%s %9s %-8s %-8s %8s %23s %s"
                     yield template % (pad4, self.charOld, permO, ownO, grpO,
                                       sizeO, mtimeO, typO)
                     yield template % (pad4, self.charNew, permN, ownN, grpN,
                                       sizeN, mtimeN, typN)
-                else:
+                elif statChanged:
                     yield "%sFile details" % (pad4, )
 
                 tagO, tagN = item[3][6]
