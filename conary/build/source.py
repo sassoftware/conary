@@ -1001,18 +1001,19 @@ Action = addAction
 class _RevisionControl(addArchive):
 
     def fetch(self, refreshFilter=None):
-        import epdb
-        epdb.st()
         fullPath = self.getFilename()
         url = 'lookaside:/' + fullPath
         reposPath = '/'.join(fullPath.split('/')[:-1] + [ 'hg' ])
 
-        path = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-            url, self.recipe.name, self.recipe.srcdirs, allowNone = True,
-            autoSource = True, refreshFilter = refreshFilter)
+        # don't look in the lookaside for a snapshot if we need to refresh
+        # the lookaside
+        if not refreshFilter or not refreshFilter(os.path.basename(fullPath)):
+            path = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                url, self.recipe.name, self.recipe.srcdirs, allowNone = True,
+                autoSource = True, refreshFilter = refreshFilter)
 
-        if path:
-            return path
+            if path:
+                return path
 
         # the source doesn't exist; we need to create the snapshot
         repositoryDir = lookaside.createCacheName(self.recipe.cfg,
@@ -1043,16 +1044,22 @@ class addMercurialSnapshot(_RevisionControl):
                 'tag': 'tip'}
 
     def getFilename(self):
-        d = self.url.split('//', 1)[1]
-        return '/%s/%s--%s.tar.bz2' % (d, self.url.split('/')[-1], self.tag)
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag)
 
     def createArchive(self, lookasideDir):
         log.info('Cloning repository from %s', self.url)
-        os.system('hg clone %s %s' % (self.url, lookasideDir))
+        os.system('hg -q clone %s %s' % (self.url, lookasideDir))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
-        os.system("cd %s; hg pull %s" % (lookasideDir, self.url))
+        os.system("cd %s; hg -q pull %s" % (lookasideDir, self.url))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
