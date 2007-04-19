@@ -679,8 +679,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         if mark > bundlesMark:
             bundlesMark = mark
     else: # only when we're all done looping advance mark to the new max
-        if bundlesMark == currentMark:
-            bundlesMark += 1 # avoid repeating the same query...
+        if bundlesMark == 0 or bundlesMark == currentMark:
+            bundlesMark = crtMaxMark # avoid repeating the same query...
         for target in targetRepos:
             target.setMirrorMark(bundlesMark)
     # mirroring removed troves requires one by one processing
