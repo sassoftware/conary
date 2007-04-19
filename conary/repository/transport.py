@@ -264,13 +264,13 @@ class Transport(xmlrpclib.Transport):
 	self.verbose = verbose
 
 	realhost = getrealhost(host)
-        if realhost == 'localhost':
+        if realhost in ('localhost', 'localhost.localdomain'):
             # don't proxy localhost unless the proxy is running on
             # localhost as well
             proxyHost = None
             if self.proxies and 'http' in self.proxies:
                 proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
-            if proxyHost == 'localhost':
+            if proxyHost in ('localhost', 'localhost.localdomain'):
                 opener = XMLOpener(self.proxies)
             else:
                 opener = XMLOpener({})
