@@ -22,7 +22,7 @@ import fcntl
 import gzip
 import os
 import re
-import subprocess
+import shutil, subprocess
 import sys
 import tempfile
 
@@ -1003,7 +1003,7 @@ class _RevisionControl(addArchive):
     def fetch(self, refreshFilter=None):
         fullPath = self.getFilename()
         url = 'lookaside:/' + fullPath
-        reposPath = '/'.join(fullPath.split('/')[:-1] + [ 'hg' ])
+        reposPath = '/'.join(fullPath.split('/')[:-1] + [ self.name ])
 
         # don't look in the lookaside for a snapshot if we need to refresh
         # the lookaside
@@ -1040,8 +1040,8 @@ class _RevisionControl(addArchive):
 
 class addMercurialSnapshot(_RevisionControl):
 
-    keywords = {'url': None,
-                'tag': 'tip'}
+    keywords = {}
+    name = 'hg'
 
     def getFilename(self):
         urlBits = self.url.split('//', 1)
@@ -1070,9 +1070,50 @@ class addMercurialSnapshot(_RevisionControl):
     def __init__(self, recipe, url, tag = 'tip'):
         self.url = url
         self.tag = tag
-        kwArgs = { 'url' : url, 'tag' : tag }
         sourceName = self.getFilename()
-        _RevisionControl.__init__(self, recipe, sourceName, **kwArgs)
+        _RevisionControl.__init__(self, recipe, sourceName)
+
+class addCvsSnapshot(_RevisionControl):
+
+    keywords = {}
+    name = 'cvs'
+
+    def getFilename(self):
+        s = '%s/%s--%s.tar.bz2' % (self.root, self.project, self.tag)
+        if s[0] == '/':
+            s = s[1:]
+
+        return s
+
+    def createArchive(self, lookasideDir):
+        os.mkdir(lookasideDir)
+        log.info('Checking out project %s from %s', self.project, self.root)
+        os.system('cvs -d %s checkout -d %s %s' %
+                  (self.root, lookasideDir, self.project))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.project)
+        os.system("cd %s; cvs -d %s update" % (lookasideDir, self.root))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.project,
+                 self.tag)
+        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        stagePath = tmpPath + '/' + self.project + '--' + self.tag
+        os.mkdir(stagePath)
+        os.system("cvs -d %s export -d %s -r %s %s; cd %s; "
+                  "tar cjf %s %s" %
+                        (self.root, stagePath, self.tag, self.project,
+                         tmpPath, target, os.path.basename(stagePath)))
+        shutil.rmtree(stagePath)
+
+    def __init__(self, recipe, root, project, tag = 'HEAD'):
+        self.root = root
+        self.project = project
+        self.tag = tag
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName)
+
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
