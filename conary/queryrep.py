@@ -482,6 +482,10 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
     # changeset from the old trove to the new trove
     primaryCsList = cscmd.computeTroveList(client, [ troveSpec ])
     trv = primaryCsList[0]
+    if trv[1] == trv[2]:
+        # Diffing against ourselves
+        print "Identical troves"
+        return
     primaryCsList = [ (trv[0], (None, None), trv[1], True), trv ]
     cs = repos.createChangeSet(primaryCsList, withFiles=True,
                                withFileContents=False)
@@ -490,8 +494,12 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
     newTroveCsList = []
     for trvCs in cs.iterNewTroveList():
         trvName = trvCs.getName()
-        if trvCs.isAbsolute():
-            oldTroves[trvName] = trove.Trove(trvCs)
+        #if trvCs.isAbsolute():
+        if trvCs.getOldVersion() is None:
+            if trvCs.isAbsolute():
+                # isAbsolute() can be False, and getOldVersion() returns None
+                # if it's a new trove
+                oldTroves[trvName] = trove.Trove(trvCs)
             newTroves[trvName] = trove.Trove(trvCs)
         else:
             newTroveCsList.append(trvCs)
@@ -613,7 +621,7 @@ class DiffDisplay(object):
     def formatDiffFlavor(self, trvDiff, padLevel):
         pad1 = self.pads[padLevel]
         pad2 = self.pads[padLevel + 1]
-        if 'flavor' in trvDiff:
+        if 'flavor' in trvDiff and not self.fullFlavors:
             o, n = trvDiff['flavor']
             yield "%sFlavors:" % pad1
             yield "%s%s %s" % (pad2, self.charOld, o)
@@ -621,7 +629,7 @@ class DiffDisplay(object):
 
     def formatDiffColl(self, trvDiff, padLevel):
         pad1 = self.pads[padLevel]
-        pad1 = self.pads[padLevel + 1]
+        pad2 = self.pads[padLevel + 1]
         if 'isCollection' in trvDiff:
             o, n = trvDiff['isCollection']
             yield "%s%s is a collection: %s" % (pad1, bool(o))

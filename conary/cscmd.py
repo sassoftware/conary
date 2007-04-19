@@ -21,18 +21,20 @@ from conary.local import update
 from conary.repository import errors
 
 def computeTroveList(client, applyList):
-    toFind = []
+    # As dumb as this may sound, the same trove may be present multiple times
+    # in applyList, so remove duplicates
+    toFind = set()
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
         if n[0] in ('-', '+'):
             n = n[1:]
 
         found = False
         if oldVer or (oldFla is not None):
-            toFind.append((n, oldVer,oldFla))
+            toFind.add((n, oldVer,oldFla))
             found = True
 
         if newVer or (newFla is not None):
-            toFind.append((n, newVer, newFla))
+            toFind.add((n, newVer, newFla))
             found = True
 
         if not found:
