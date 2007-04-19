@@ -661,13 +661,14 @@ class PreadWrapper(object):
 
     def __init__(self, f):
         self.path = None
-        if not hasattr(f, 'mode') and hasattr(f, 'path'):
-            # this is an rMake LazyFile
-            self.path = f.path
+        if not hasattr(f, 'mode'):
+            if hasattr(f, 'path'):
+                # this is an rMake LazyFile
+                self.path = f.path
+            else:
+                raise ValueError('PreadWrapper does not know how to handle this file object')
         elif f.mode != 'r':
             raise ValueError('PreadWrapper.__init__() requires a read-only file object')
-        else:
-            raise ValueError('PreadWrapper does not know how to handle this file object')
         self.f = f
 
     def __getattr__(self, attr):
