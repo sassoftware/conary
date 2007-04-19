@@ -701,6 +701,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
+            if flavor is '':
+                # empty flavor yields a dummy dep on a null flag
+                cu.execute("INSERT INTO ffFlavor VALUES(?, 'use', ?, NULL)",
+                           flavorId, deps.FLAG_SENSE_REQUIRED,
+                           start_transaction = False)
+                continue
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
                     cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, NULL)",
@@ -728,10 +734,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                start_transaction = False)
                 else:
                     for flavorSpec in flavorList:
-                        if flavorSpec:
-                            flavorId = flavorIndices[flavorSpec]
-                        else:
-                            flavorId = None
+                        flavorId = flavorIndices.get(flavorSpec, None)
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
                                    troveName, versionSpec, flavorId,
                                    start_transaction = False)
@@ -771,7 +774,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         flavorIndices = {}
         if troveSpecs:
             # populate flavorIndices with all of the flavor lookups we
-            # need. a flavor of 0 (numeric) means "None"
+            # need; a flavor of 0 (numeric) means "None"
             for versionDict in troveSpecs.itervalues():
                 for flavorList in versionDict.itervalues():
                     if flavorList is not None:

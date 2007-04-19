@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A corner case affcting server-side matching of troves against
+      negative flavors has been fixed. (CNY-641)
+
 Changes in 1.1.22:
   o Major Changes:
     * Group troves can now declare an (integer) compatibility class
