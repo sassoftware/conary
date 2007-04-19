@@ -1088,12 +1088,12 @@ class addCvsSnapshot(_RevisionControl):
     def createArchive(self, lookasideDir):
         os.mkdir(lookasideDir)
         log.info('Checking out project %s from %s', self.project, self.root)
-        os.system('cvs -d %s checkout -d %s %s' %
+        os.system('cvs -Q -d %s checkout -d %s %s' %
                   (self.root, lookasideDir, self.project))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.project)
-        os.system("cd %s; cvs -d %s update" % (lookasideDir, self.root))
+        os.system("cd %s; cvs -Q -d %s update" % (lookasideDir, self.root))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.project,
@@ -1101,7 +1101,7 @@ class addCvsSnapshot(_RevisionControl):
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + self.tag
         os.mkdir(stagePath)
-        os.system("cvs -d %s export -d %s -r %s %s; cd %s; "
+        os.system("cvs -Q -d %s export -d %s -r %s %s; cd %s; "
                   "tar cjf %s %s" %
                         (self.root, stagePath, self.tag, self.project,
                          tmpPath, target, os.path.basename(stagePath)))
