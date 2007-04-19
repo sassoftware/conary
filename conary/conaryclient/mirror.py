@@ -559,7 +559,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # if we're hung on the current max then we need to
         # forcibly advance the mark in case we're stuck
         crtMaxMark += 1 # only used if we filter out all troves below
-
+    initTLlen = len(troveList)
+    
     # we're trying to "weed out" troves that don't belong on the configured labels.
     if cfg.labels:
         troveList = [ x for x in troveList
@@ -621,7 +622,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         del byTrove
     # if we were returned troves, but we filtered them all out, advance the
     # mark and signal "try again"
-    if len(byTarget) == 0 and len(removedSet) == 0 and len(troveList):
+    if len(byTarget) == 0 and len(removedSet) == 0 and initTLlen:
         # we had troves and now we don't
         log.debug("no troves found for our label %s" % cfg.labels)
         for t in targets:
