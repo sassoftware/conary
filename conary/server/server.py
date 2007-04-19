@@ -511,7 +511,7 @@ def getServer():
             print "ERROR: code base too old for this repository database"
             print "ERROR: repo=", dbVersion, "code=", self.VERSION
             sys.exit(-1)
-        if dbVersion == 0 or dbVersion <= schema.VERSION:
+        if dbVersion == 0 or dbVersion.major <= schema.VERSION.major:
             dbVersion = schema.loadSchema(db, 'migrate' in argSet)
         if dbVersion < schema.VERSION: # migration failed...
             print "ERROR: schema migration has failed from %s to %s" %(

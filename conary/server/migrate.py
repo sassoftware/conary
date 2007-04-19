@@ -417,7 +417,7 @@ def majorMinor(major):
 def migrateSchema(db):
     version = db.getVersion()
     assert(version >= 13) # minimum version we support
-    if version > schema.VERSION:
+    if version.major > schema.VERSION.major:
         return version # noop, should not have been called.
     logMe(2, "migrating from version", version)
     # first, we need to make sure that for the current major we're up
