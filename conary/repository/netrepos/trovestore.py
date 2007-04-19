@@ -1197,7 +1197,7 @@ class TroveStore:
         # in reality the labels table never gets that big.
         schema.resetTable(cu, 'tmpInstances')
         cu.execute("""INSERT INTO tmpInstances
-             SELECT labelId FROM Labels
+             SELECT Labels.labelId FROM Labels
                 LEFT OUTER JOIN LabelMap ON
                     LabelMap.labelId = Labels.labelId
                 WHERE
