@@ -1277,11 +1277,13 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                                 "File %s is not a valid conary changeset: %s" % (fileName, err))
                 self.fileName = fileName
             else:
+                if not hasattr(fileName, 'pread'):
+                    # FIXME: This code is deprecated and will be removed
+                    # in conary 1.1.23
+                    import warnings
+                    warnings.warn('ChangeSetFromFile() requires open file objects have a pread() method.  Use util.ExtendedFile() to create such a file object')
+                    fileName = util.PreadWrapper(fileName)
                 csf = filecontainer.FileContainer(fileName)
-                if hasattr(fileName, 'path'):
-                    # Instance of LazyFile, or some other file object that 
-                    # provides a path
-                    self.fileName = fileName.path
 
             (name, tagInfo, control) = csf.getNextFile()
             assert(name == "CONARYCHANGESET")
@@ -1289,7 +1291,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             raise filecontainer.BadContainer(
                         "File %s is not a valid conary changeset." % fileName)
 
-        control.file.seek(control.start)
+        control.file.seek(control.start, 0)
 	start = gzip.GzipFile(None, 'r', fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)
 

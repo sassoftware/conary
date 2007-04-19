@@ -655,6 +655,36 @@ class ExtendedFile(file):
     def pread(self, bytes, offset):
         return misc.pread(self.fileno(), bytes, offset)
 
+class PreadWrapper(object):
+    # DEPRECATED. Will be removed in 1.1.23.
+    __slots__ = ('f', 'path')
+
+    def __init__(self, f):
+        self.path = None
+        if not hasattr(f, 'mode') and hasattr(f, 'path'):
+            # this is an rMake LazyFile
+            self.path = f.path
+        elif f.mode != 'r':
+            raise ValueError('PreadWrapper.__init__() requires a read-only file object')
+        else:
+            raise ValueError('PreadWrapper does not know how to handle this file object')
+        self.f = f
+
+    def __getattr__(self, attr):
+        if attr != 'pread':
+            return getattr(self.f, attr)
+        else:
+            return self.pread
+
+    def pread(self, bytes, offset):
+        if self.path:
+            # hack for rMake compatibility
+            f = open(self.path, 'r')
+            buf = misc.pread(f.fileno(), bytes, offset)
+            f.close()
+            return buf
+        return misc.pread(self.fileno(), bytes, offset)
+
 class SeekableNestedFile:
 
     def __init__(self, file, size, start = -1):
