@@ -443,6 +443,8 @@ class TargetRepository:
             return
         keyList = src.getNewPGPKeys(host, -1)
         self.__gpg[host] = keyList
+        if not len(keyList):
+            return
         log.debug("%s adding %d gpg keys", self.name, len(keyList))
         if self.test:
             return
@@ -460,8 +462,9 @@ class TargetRepository:
         setSigs = [ x for x in setSigs if present.get(x[0], True) ]
         log.debug("%s uploading %d signatures", self.name, len(sigs))
         if self.test:
-            return
-        return self.repo.setTroveSigs(setSigs)
+            return 0
+        self.repo.setTroveSigs(setSigs)
+        return len(setSigs)
     def addTroveList(self, tl):
         # Filter out troves which are already in the local repository. Since
         # the marks aren't distinct (they increase, but not monotonially), it's
@@ -474,8 +477,7 @@ class TargetRepository:
         return ret
     def commitChangeSetFile(self, filename, callback):
         if self.test:
-            log.debug("%s skipping commit (test mode)", self.name)
-            return
+            return 0
         log.debug("%s committing", self.name)
         ret = self.repo.commitChangeSetFile(filename, mirror=True, callback=callback)
         callback.done()
@@ -510,7 +512,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # we use the oldest mark as a starting point (since we have to
         # get stuff from source for that oldest one anyway)
         currentMark = min(marks)
-    log.debug("current mirror mark %s", currentMark)
+    log.debug("using common mirror mark %s", currentMark)
     # reset mirror mark to the lowest common denominator
     for t in targets:
         if int(t.getMirrorMark()) != currentMark:
@@ -652,8 +654,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             # XXX it's a shame we can't give a hint as to what server to use
             # to avoid having to open the changeset and read in bits of it
             if test:
-                log.debug("test mode: skipping retrieval (%d of %d) %s" % (i + 1, len(bundles), jobList))
-                log.debug("test mode: skipping commit")
+                log.debug("test mode: not mirroring (%d of %d) %s" % (i + 1, len(bundles), jobList))
                 updateCount += len(bundle)
                 continue
             (outFd, tmpName) = util.mkstemp()
@@ -678,6 +679,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         if mark > bundlesMark:
             bundlesMark = mark
     else: # only when we're all done looping advance mark to the new max
+        if bundlesMark == currentMark:
+            bundlesMark += 1 # avoid repeating the same query...
         for target in targetRepos:
             target.setMirrorMark(bundlesMark)
     # mirroring removed troves requires one by one processing
