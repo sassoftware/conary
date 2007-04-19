@@ -215,7 +215,7 @@ class TroveStore:
         cu.execute("SELECT DISTINCT Items.item as item "
                    " FROM Instances JOIN Items USING(itemId) "
                    " WHERE Instances.isPresent = ? ORDER BY item",
-                   INSTANCES_PRESENT_NORMAL);
+                   instances.INSTANCE_PRESENT_NORMAL)
 
         for (item,) in cu:
             yield item

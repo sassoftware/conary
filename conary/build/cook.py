@@ -854,7 +854,7 @@ def _cookPackageObjWrap(*args, **kwargs):
                             versions.RollbackLabel, versions.LocalLabel))
 
     if not isOnLocalHost or not (hasattr(sys.stdin, "isatty") and 
-                                 sys.stdin.isatty):
+                                 sys.stdin.isatty()):
         # For repository cooks, or for recipe cooks that had stdin not a tty,
         # redirect stdin from /dev/null
         redirectStdin = True
