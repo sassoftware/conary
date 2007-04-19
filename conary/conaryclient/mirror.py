@@ -470,8 +470,11 @@ LastBundleSet = None
 def mirrorRepository(sourceRepos, targetRepos, cfg, *args, **kwargs):
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
+    callAgain = 0
     for target in targetRepos:
-        _mirrorRepository(sourceRepos, target, cfg, *args, **kwargs)
+        if _mirrorRepository(sourceRepos, target, cfg, *args, **kwargs):
+            callAgain = 1
+    return callAgain
 
 def _mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
