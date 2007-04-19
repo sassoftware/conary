@@ -533,7 +533,7 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
 
         trvDiff.update(_diffFiles(cs, oldTrv, newTrv))
 
-        if trvDiff:
+        if showEmptyDiffs or trvDiff:
             diffs[trvName] = trvDiff
 
     # Grab all the files that changed, and make a single trip to the server
@@ -638,11 +638,13 @@ class DiffDisplay(object):
         if 'troveList' in trvDiff:
             added, removed = trvDiff['troveList']
             yield "%sTrove list:" % pad1
-            template = "%s%s %s"
-            for t in removed:
-                yield template % (pad2, self.charRemoved, t)
-            for t in added:
-                yield template % (pad2, self.charAdded, t)
+            template = "%s%s %s=%s"
+            for n, v, f in removed:
+                yield template % (pad2, self.charRemoved, n,
+                                  self.formatVF((v,f)))
+            for n, v, f in added:
+                yield template % (pad2, self.charAdded, n,
+                                  self.formatVF((v,f)))
 
     def formatTroveDeps(self, trvDiff, padLevel):
         if 'troveDeps' not in trvDiff:
@@ -804,11 +806,14 @@ def _diffTroveCollections(oldTrv, newTrv):
         # Neither are collections
         return ret
     if (oldIsColl and newIsColl):
-        ocoll = set(x[0] for x in oldTrv.iterTroveList(strongRefs=True))
-        ncoll = set(x[0] for x in newTrv.iterTroveList(strongRefs=True))
-        if ocoll != ncoll:
-            # Format is (added, removed)
-            ret['troveList'] = (ncoll - ocoll, ocoll - ncoll)
+        ocoll = dict((x[0], x) for x in oldTrv.iterTroveList(strongRefs=True))
+        ncoll = dict((x[0], x) for x in newTrv.iterTroveList(strongRefs=True))
+        socoll = set(ocoll.keys())
+        sncoll = set(ncoll.keys())
+        if socoll != sncoll:
+            added = sorted([ ncoll[x] for x in sncoll - socoll ])
+            removed = sorted([ ocoll[x] for x in socoll - sncoll ])
+            ret['troveList'] = (added, removed)
     else:
             # Format is (old, new)
         ret['isCollection'] = (oldIsColl, newIsColl)
