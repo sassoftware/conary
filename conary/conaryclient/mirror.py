@@ -467,11 +467,11 @@ def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = N
 CurrentTestMark = None
 LastBundleSet = None
 
-def mirrorRepository(sourceRepos, targetRepos, cfg, **kwargs):
+def mirrorRepository(sourceRepos, targetRepos, cfg, *args, **kwargs):
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
     for target in targetRepos:
-        _mirrorRepository(sourceRepos, target, cfg, **kwargs)
+        _mirrorRepository(sourceRepos, target, cfg, *args, **kwargs)
 
 def _mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
