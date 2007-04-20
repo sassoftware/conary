@@ -526,7 +526,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
         B{toGroup} : The name of the group to move the components to
 
-        B{ByDefault} : (None) When specified, this ensures that all the 
+        B{byDefault} : (None) When specified, this ensures that all the 
                        components that are added have the byDefault value
                        specified (either True or False).  If not specified,
                        the components get the byDefault value they had in the
@@ -578,7 +578,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
         B{toGroup} : The name of the group to copy the components to
 
-        B{ByDefault} : (None) When specified, this ensures that all the 
+        B{byDefault} : (None) When specified, this ensures that all the 
                        components that are added have the byDefault value
                        specified (either True or False).  If not specified,
                        the components get the byDefault value they had in the

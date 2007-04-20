@@ -215,7 +215,7 @@ class TroveStore:
         cu.execute("SELECT DISTINCT Items.item as item "
                    " FROM Instances JOIN Items USING(itemId) "
                    " WHERE Instances.isPresent = ? ORDER BY item",
-                   INSTANCES_PRESENT_NORMAL);
+                   instances.INSTANCE_PRESENT_NORMAL)
 
         for (item,) in cu:
             yield item
@@ -485,7 +485,7 @@ class TroveStore:
                                                 updateLatest = False)
 
             instanceId = self.getInstanceId(itemId, versionId, flavorId,
-                                clonedFromId, trv.isRedirect(),
+                                clonedFromId, trv.getType(),
                                 isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""
@@ -1197,8 +1197,9 @@ class TroveStore:
         # in reality the labels table never gets that big.
         schema.resetTable(cu, 'tmpInstances')
         cu.execute("""INSERT INTO tmpInstances
-             SELECT labelId FROM Labels
-                LEFT OUTER JOIN LabelMap USING (labelId)
+             SELECT Labels.labelId FROM Labels
+                LEFT OUTER JOIN LabelMap ON
+                    LabelMap.labelId = Labels.labelId
                 WHERE
                     LabelMap.labelId IS NULL AND
                     Labels.labelId != 0

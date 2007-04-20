@@ -364,18 +364,8 @@ class MigrateTo_15(SchemaMigration):
         ret = schema.createTrigger(self.db, "Instances")
         self.db.loadSchema()
         return ret
-    # migrate to 15.2
+    # this migration has been moved to a major schema migration
     def migrate2(self):
-        # create a primary key for labelmap
-        cu = self.db.cursor()
-        cu.execute("create table OldLabelMap as select * from LabelMap")
-        cu.execute("drop table LabelMap")
-        self.db.loadSchema()
-        schema.createLabelMap(self.db)
-        cu.execute("insert into LabelMap (itemId, labelId, branchId) "
-                   "select itemId, labelId, branchId from OldLabelMap ")
-        cu.execute("drop table OldLabelMap")
-        self.db.loadSchema()
         return True
     # migrate to 15.3
     def migrate3(self):
@@ -392,6 +382,23 @@ class MigrateTo_15(SchemaMigration):
         schema.createSchema(self.db)
         return True
 
+class MigrateTo_16(SchemaMigration):
+    Version = (16.0)
+    def migrate0(self):
+        # create a primary key for labelmap
+        cu = self.db.cursor()
+        cu.execute("create table OldLabelMap as select * from LabelMap")
+        cu.execute("drop table LabelMap")
+        self.db.loadSchema()
+        schema.createLabelMap(self.db)
+        cu.execute("insert into LabelMap (itemId, labelId, branchId) "
+                   "select itemId, labelId, branchId from OldLabelMap ")
+        cu.execute("drop table OldLabelMap")
+        self.db.loadSchema()
+        return True
+    def migrate(self):
+        return self.migrate0()
+
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]
@@ -399,11 +406,18 @@ def _getMigration(major):
         return None
     return ret
 
+# return the last major.minor version for a given major
+def majorMinor(major):
+    migr = _getMigration(major)
+    if migr is None:
+        return (major, 0)
+    return migr.Version
+
 # entry point that migrates the schema
-def migrateSchema(db, major=True):
+def migrateSchema(db):
     version = db.getVersion()
     assert(version >= 13) # minimum version we support
-    if version > schema.VERSION:
+    if version.major > schema.VERSION.major:
         return version # noop, should not have been called.
     logMe(2, "migrating from version", version)
     # first, we need to make sure that for the current major we're up
@@ -414,14 +428,12 @@ def migrateSchema(db, major=True):
             "Could not find migration code that deals with repository "
             "schema %s" % version, version)
     # migrate all the way to the latest minor for the current major
-    migrateFunc(db)(major=False)
+    migrateFunc(db)()
     version = db.getVersion()
     # migrate to the latest major
-    if not major:
-        return version
     while version.major < schema.VERSION.major:
         migrateFunc = _getMigration(version.major+1)
-        newVersion = migrateFunc(db)(major=major)
+        newVersion = migrateFunc(db)()
         assert(newVersion.major == version.major+1)
         version = newVersion
     return version

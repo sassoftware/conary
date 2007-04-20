@@ -23,7 +23,7 @@ class FakeServerCache(netclient.ServerCache):
     def __init__(self, server, repMap, userMap, conaryProxies):
         self._server = server
         netclient.ServerCache.__init__(self, repMap, userMap,
-                conaryProxies)
+                proxies=conaryProxies)
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)

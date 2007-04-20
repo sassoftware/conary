@@ -25,13 +25,12 @@ def getDatabaseVersion(db):
     except:
         return sqllib.DBversion(0)
     ret = cu.fetchone_dict()
-    if ret.has_key("version"):
-        return sqllib.DBversion(ret["version"])
-    return sqllib.DBversion(ret["major"], ret["minor"])
+    if ret.has_key("minor"):
+        return sqllib.DBversion(ret["version"], ret["minor"])
+    return sqllib.DBversion(ret["version"])
 
 class SchemaMigration:
     Version = 0              # this current migration's version
-    allowMajorMigration = False
     def __init__(self, db):
         self.db = db
         self.cu = db.cursor()
@@ -53,8 +52,6 @@ class SchemaMigration:
     # likely candidates for overrides
     def canUpgrade(self):
         # comparing db version vs our Version
-        if self.version.major > self.Version.major:
-            return False
         if self.version.major == self.Version.major:
             return self.version.minor <= self.Version.minor
         if self.version.major == self.Version.major - 1:
@@ -77,22 +74,14 @@ class SchemaMigration:
         self.db.setVersion(toVer)
         return toVer
     
-    # XXX: need way to control only minor/with major schema updates
-    def __call__(self, major = None):
+    def __call__(self):
         if not self.canUpgrade():
             return self.version
         # is a major schema update needed?
         if self.version.major < self.Version.major:
-            if major is None:
-                major = self.allowMajorMigration
-            if major: # major schema updates allowed
-                # we can perform the major schema update
-                toVer = self._dbVersion(self.Version.major)
-                self.version = self.__migrate(toVer, self.migrate)
-            else:
-                raise sqlerrors.SchemaVersionError(
-                    "major schema upgrade not allowed",
-                    self.version, self.Version)
+            # we can perform the major schema update
+            toVer = self._dbVersion(self.Version.major)
+            self.version = self.__migrate(toVer, self.migrate)
         assert(self.version.major == self.Version.major)
 
         # perform minor version upgrades, if needed

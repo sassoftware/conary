@@ -511,17 +511,13 @@ def getServer():
             print "ERROR: code base too old for this repository database"
             print "ERROR: repo=", dbVersion, "code=", self.VERSION
             sys.exit(-1)
-        if dbVersion == 0 or dbVersion < schema.VERSION:
-            dbVersion = schema.loadSchema(db, major = 'migrate' in argSet)
+        if dbVersion == 0 or dbVersion.major <= schema.VERSION.major:
+            dbVersion = schema.loadSchema(db, 'migrate' in argSet)
         if dbVersion < schema.VERSION: # migration failed...
             print "ERROR: schema migration has failed from %s to %s" %(
                 dbVersion, schema.VERSION)
-        if dbVersion > schema.VERSION:
-            logMe(1, "WARNING================================================")
-            logMe(1, "WARNING: database schema is more recent than codebase!")
-            logMe(1, "WARNING================================================")
         if 'migrate' in argSet:
-            logMe(1, "Schema migration complete. Server exiting...")
+            logMe(1, "Schema migration complete", dbVersion)
             sys.exit(0)
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)

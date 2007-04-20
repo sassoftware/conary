@@ -1,6 +1,10 @@
 Changes in @NEW@:
-  o Major Changes:
+  o Bug Fixes:
+    * A corner case affcting server-side matching of troves against
+      negative flavors has been fixed. (CNY-641)
 
+Changes in 1.1.22:
+  o Major Changes:
     * Group troves can now declare an (integer) compatibility class
       which is used to automatically invalidate rollbacks (existing
       groups are considered to be in compatibility class zero). When a
@@ -15,70 +19,77 @@ Changes in @NEW@:
   o Client Changes:
     * To take advantage of Conary's ability to apply the critical
       update set and restart before applying the rest of the updates,
-      three new API calls have been added: newUpdateJob, prepareUpdateJob
-      and applyUpdateJob. (CNY-1454)
-    * A new argument, --no-restart, has been added to conary. This
-      has to be used in conjunction with --root and allows one to skip
-      the restarts after applying critical updates when installing in
-      a chroot. (CNY-1458)
-    * Proxy configuration parameter is now of the form 'proxy protocol url'
-      (i.e. 'proxy http http://proxy.some.com'), and allows separate proxies
-      to be configured for http and https. If old 'proxy url' form is used,
-      separate proxies are configured for http and https rather than a
-      single proxy being using for both protocols. Users who need the old
-      behavior should set explicit configure the same proxy for both protocols.
-    * --just-db no longer runs group scripts
-    * SeekableNestedFile and FileContainer objects no longer depend on the
-      file pointer for reads; pread() is used everywhere making those objects
-      safe to use for files with shared file descriptors.
+      three new API calls have been added: newUpdateJob,
+      prepareUpdateJob and applyUpdateJob. (CNY-1454)
+    * A new argument, --no-restart, has been added to conary. This has
+      to be used in conjunction with --root and allows one to skip the
+      restarts after applying critical updates when installing in a
+      chroot. (CNY-1458)
+    * Proxy configuration parameter is now of the form 'proxy protocol
+      url' (i.e. 'proxy http http://proxy.some.com'), and allows
+      separate proxies to be configured for http and https. If old
+      'proxy url' form is used, separate proxies are configured for
+      http and https rather than a single proxy being using for both
+      protocols. Users who need the old behavior should set explicit
+      configure the same proxy for both protocols.
+
+    * Conary no longer runs group scripts when "--just-db" is
+      specified on the command line.
+    * The conary.conaryclient.mirror.mirrorRepository() function now
+      accepts a list of target repositories.
 
   o Build Changes:
-    * Conary has tools in place through a new cross flag and a new "target"
-      flavor to support better defining of cross compiling builds.  (CNY-1003)
-    * Configuration files are again allowed to have executable bits set,
-      but configuration files with executable bits set are not included
-      in the :config component even if the :config component is being
-      created. (CNY-1260, CNY-1540)
-
-  o Server Changes:
-    * repository schema now understands the concept of minor and major
-      schema revisions (CNY-811)
+    * Conary has tools in place through a new cross flag and a new
+      "target" flavor to support better defining of cross compiling
+      builds.  (CNY-1003)
+    * Configuration files are again allowed to have executable bits
+      set, but configuration files with executable bits set are not
+      included in the :config component even if the :config component
+      is being created. (CNY-1260, CNY-1540)
 
   o Proxy Changes:
-    * The proxy can now be configured to use an http proxy for all outgoing
-      requests. The 'proxy' configuration item is supported in a manner
-      identical to the client.
-    * Removed standalone servers (unused) ability to act as both a proxy
-      and a standalone server; this removes the standalone proxies dependence
-      on the X-Conary-Servername header.
+    * A proxy can now be configured to use an http proxy for all
+      outgoing requests. The 'proxy' configuration item is supported
+      in a manner identical to the client.
+    * The (unused) ability for a standalone server to act as both a
+      proxy and a standalone server has been removed; this removes the
+      standalone proxies dependence on the X-Conary-Servername header.
 
   o Internal Changes:
     * The createTrigger() method of dbstore drivers no longer accepts
       the "pinned" keyword parameter.
+    * SeekableNestedFile and FileContainer objects no longer depend on
+      the file pointer for reads; pread() is used everywhere.  This
+      allows the underlying file descriptors to be shared between
+      objects or between threads.
+    * Repository schema now understands the concept of minor and major
+      schema revisions. (CNY-811)
 
   o Bug Fixes:
-    * Fixed a bug in proxy code that would cause conary to use https through
-      the proxy when http was desired (CNY-1530)
-    * Fixed a bug in clone/promote relating to cloning when there are flavors
-      on the clone label that are superset of the current flavor, but the 
-      current flavor doesn't exist. (RMK-415)
-    * Fixed a race condition related to the multithreaded Conary client,
+    * A bug in proxy code that caused conary to use https through a
+      proxy when http was desired has been fixed. (CNY-1530)
+    * A bug in clone/promote relating to cloning when there are
+      flavors on the clone label that are superset of the current
+      flavor, but the current flavor doesn't exist has been
+      fixed. (RMK-415)
+    * A race condition related to the multithreaded Conary client,
       where one thread could modify an unprotected variable assumed
-      immutable by a different thread.  (CNY-1450)
+      immutable by a different thread has been fixed. (CNY-1450)
     * If the database is locked, Conary will no longer display a stack
       trace, but an error message. (CNY-1292)
-    * The Conary library uses a built-in difflib if the system's difflib
-      is not patched for recursion. (CNY-1377)
-    * Mirroring troves marked as removed from repsoitories running on 
-      mysql has been fixed (CNY-1193)
-    * Repository cooks will redirect the subprocess' stdin from /dev/null
-      to avoid hanging while waiting from stdin. (CNY-783)
+    * The Conary library now uses a built-in difflib if the system's
+      difflib is not patched for recursion. (CNY-1377)
+    * Mirroring troves marked as removed from repositories running on
+      MySQL has been fixed. (CNY-1193)
+    * Repository cooks now sets the subprocess' stdin to /dev/null to
+      avoid hanging while waiting from stdin. (CNY-783)
     * Trove.verifyDigests() no longer fails erroneously if a signature
-      version 0 digest has not been calculated and set in troveInfo. (CNY-1552)
-    * Fixed bug in changeset reset() which affected reusing changesets in
-      merges (CNY-1534)
-    * Fixed bug in changeset based trove sources where the underlying
-      changesets never got reset (CNY-1534)
+      version 0 digest has not been calculated and set in
+      troveInfo. (CNY-1552)
+    * A bug in changeset reset() which affected reusing changesets in
+      merges has been fixed. (CNY-1534)
+    * A bug in changeset based trove sources where the underlying
+      changesets never got reset has been fixed. (CNY-1534)
 
 Changes in 1.1.21:
   o Repository Changes:

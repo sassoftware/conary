@@ -701,6 +701,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for i, flavor in enumerate(flavorSet.iterkeys()):
             flavorId = i + 1
             flavorSet[flavor] = flavorId
+            if flavor is '':
+                # empty flavor yields a dummy dep on a null flag
+                cu.execute("INSERT INTO ffFlavor VALUES(?, 'use', ?, NULL)",
+                           flavorId, deps.FLAG_SENSE_REQUIRED,
+                           start_transaction = False)
+                continue
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
                     cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, NULL)",
@@ -728,10 +734,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                start_transaction = False)
                 else:
                     for flavorSpec in flavorList:
-                        if flavorSpec:
-                            flavorId = flavorIndices[flavorSpec]
-                        else:
-                            flavorId = None
+                        flavorId = flavorIndices.get(flavorSpec, None)
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
                                    troveName, versionSpec, flavorId,
                                    start_transaction = False)
@@ -771,7 +774,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         flavorIndices = {}
         if troveSpecs:
             # populate flavorIndices with all of the flavor lookups we
-            # need. a flavor of 0 (numeric) means "None"
+            # need; a flavor of 0 (numeric) means "None"
             for versionDict in troveSpecs.itervalues():
                 for flavorList in versionDict.itervalues():
                     if flavorList is not None:
@@ -2099,15 +2102,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         assert(len(fileIds) % fileIdLen == 0)
         fileIdCount = len(fileIds) // fileIdLen
 
-        def splitFileIds():
+        def splitFileIds(cu):
             for i in range(fileIdCount):
                 start = fileIdLen * i
                 end = start + fileIdLen
-                yield fileIds[start : end]
+                yield cu.binary(fileIds[start : end])
 
         schema.resetTable(cu, 'tmpFileIds')
-        cu.executemany("INSERT INTO tmpFileIds (fileId) "
-                       "VALUES (?)", splitFileIds())
+        cu.executemany("INSERT INTO tmpFileIds (fileId) VALUES (?)", splitFileIds(cu))
 
         # Fetch paths by file id too
         query = """
@@ -2707,7 +2709,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # about to set sigs for. we look over the signatures we need
         # to update and perform the updates
         cu.execute("""
-        select gtl.idx, gtlInst.instanceId, TroveInfo.data
+        select gtl.idx, gtlInst.instanceId,
+               TroveInfo.instanceId as tid, TroveInfo.data
         from gtl
         join gtlInst on gtl.idx = gtlInst.idx
         left join TroveInfo on
@@ -2717,24 +2720,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         inserts = []
         updates = []
         sigList = [base64.decodestring(s) for (n,v,f),s in infoList]
-        for i, instanceId, sig in cu:
-            sig = cu.frombinary(sig)
+        for i, instanceId, tid, sig in cu:
+            if sig is not None:
+                sig = cu.frombinary(sig)
             i -= minIdx
-            if sig is None:
-                # don't have a sig yet
-                inserts.append((i, instanceId, sig))
-            elif sig != sigList[i]:
-                # it has changed
-                updates.append((i, instanceId, sigList[i]))
-        invList = []
+            # what do we need to put in the database
+            tup = (i, instanceId, sigList[i])
+            if tid is None: # don't have a sig yet
+                inserts.append(tup)
+            elif sig != sigList[i]: # it is has changed
+                updates.append(tup)
         if len(inserts):
             cu.executemany("insert into TroveInfo (instanceId, infoType, data) "
                            "values (?,?,?) ",
                            [(instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig))
                             for i, instanceId, sig in inserts])
-            for i, instanceId, sig in inserts:
-                (n,v,f),s = infoList[i]
-                invList.append((n,v,f))
         if len(updates):
             # SQL update does not executemany() very well
             for i, instanceId, sig in updates:
@@ -2742,10 +2742,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 UPDATE TroveInfo SET data = ?
                 WHERE infoType = ? AND instanceId = ?
                 """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
-                (n,v,f),s = infoList[i]
-                invList.append((n,v,f))
         self.log(3, "updated signatures for", len(inserts+updates), "troves")
-        self.log(3, "invalidated cache for", len(invList), "troves")
         return len(inserts) + len(updates)
 
     @accessReadOnly

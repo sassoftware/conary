@@ -311,6 +311,8 @@ class _AbstractPackageRecipe(Recipe):
 
 
 	db = database.Database(cfg.root, cfg.dbPath)
+
+
         if self.crossRequires:
             if not self.macros.sysroot:
                 err = ("cross requirements needed but %(sysroot)s undefined")
@@ -322,8 +324,13 @@ class _AbstractPackageRecipe(Recipe):
                     self.buildReqMap = {}
                     self.ignoreDeps = True
                     return
-            elif not os.path.exists(self.macros.sysroot):
-                err = ("cross requirements needed but sysroot (%s) does not exist" % (self.macros.sysroot))
+
+            if self.cfg.root != '/':
+                sysroot = self.cfg.root + self.macros.sysroot
+            else:
+                sysroot = self.macros.sysroot
+            if not os.path.exists(sysroot):
+                err = ("cross requirements needed but sysroot (%s) does not exist" % (sysroot))
                 if raiseError:
                     raise errors.RecipeDependencyError(err)
                 else:
@@ -333,7 +340,7 @@ class _AbstractPackageRecipe(Recipe):
                     return
 
             else:
-                crossDb = database.Database(self.macros.sysroot, cfg.dbPath)
+                crossDb = database.Database(sysroot, cfg.dbPath)
         time = sourceVersion.timeStamps()[-1]
 
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
@@ -357,8 +364,7 @@ class _AbstractPackageRecipe(Recipe):
                 err += ("Could not find the following cross requirements"
                         " (that must be installed in %s) needed to cook this"
                         " recipe:\n"
-                        "%s" % (self.macros.sysroot,
-                                '\n'.join(sorted(missingCrossReqs))))
+                        "%s" % (sysroot, '\n'.join(sorted(missingCrossReqs))))
             if raiseError:
                 log.error(err)
                 raise errors.RecipeDependencyError(
