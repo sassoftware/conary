@@ -1,12 +1,12 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * A corner case affcting server-side matching of troves against
-      negative flavors has been fixed. (CNY-641)
-
   o Client Changes:
     * A new command, conary rdiff, has been added. This allows one to
       inspect the differences between two troves from a repository.
       (CNY-855)
+
+  o Bug Fixes:
+    * A corner case affcting server-side matching of troves against
+      negative flavors has been fixed. (CNY-641)
 
 Changes in 1.1.22:
   o Major Changes:
