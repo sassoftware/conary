@@ -454,7 +454,7 @@ class TargetRepository:
         # Sigs whose mark is the same as currentMark might not have their trove
         # available on the server (it might be coming as part of this mirror
         # run). sigList has to be sorted by mark for this to work.
-        inQuestion = [ x[1] for x in sigList if x[0] == self.__mark ]
+        inQuestion = [ x[1] for x in sigList if str(int(x[0])) == self.__mark ]
         present = self.repo.hasTroves(inQuestion)
         # build the ((n,v,f), signature) list only for the troves that have signatures
         setSigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
@@ -505,6 +505,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             targets.append(t)
         else:
             raise RuntimeError("Can not handle unknown target repository type", t)
+    log.debug("-" * 20 + " start loop " + "-" * 20)
     if sync:
         currentMark = -1
     else:
@@ -532,8 +533,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # this should be the end - no more troves to look at
         return 0
     
-    # sort by mark
-    troveList.sort(lambda a,b: cmp(a[0], b[0]))
+    # sort deterministically by mark, version, flavor, reverse name
+    troveList.sort(lambda a,b: cmp(a[0], b[0]) or
+                   cmp(a[1][1], b[1][1]) or
+                   cmp(a[1][2], b[1][2]) or
+                   cmp(b[1][0], a[1][0]) )
     log.debug("%d new troves returned", len(troveList))
 
     # We cut off the last troves that have the same flavor, version to
