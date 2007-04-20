@@ -2597,8 +2597,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getNewSigList(self, authToken, clientVersion, mark):
         # only show troves the user is allowed to see
-        cu = self.db.cursor()
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
         self.log(2, mark)
+        cu = self.db.cursor()
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return []
@@ -2747,6 +2751,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getNewPGPKeys(self, authToken, clientVersion, mark):
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
@@ -2769,6 +2777,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getNewTroveList(self, authToken, clientVersion, mark):
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
 	if not self.auth.check(authToken, write = False, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
