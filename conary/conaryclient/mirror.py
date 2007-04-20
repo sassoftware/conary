@@ -19,6 +19,7 @@ import itertools
 import optparse
 import os
 import sys
+import time
 
 from conary.conaryclient import callbacks as clientCallbacks
 from conary import conarycfg, callbacks, trove
@@ -61,6 +62,7 @@ def parseArgs(argv):
 
 class VerboseChangesetCallback(clientCallbacks.ChangesetCallback):
     def done(self):
+        self.clearPrefix()
         self._message('\r')
 
 class MirrorConfigurationSection(cfg.ConfigSection):
@@ -424,20 +426,20 @@ class TargetRepository:
         self.repo = repo
         self.test = test
         self.cfg = cfg
-        self.__mark = None
+        self.mark = None
         self.name = name
         self.__gpg = {}
     def getMirrorMark(self):
-        if self.__mark is None:
-            self.__mark = self.repo.getMirrorMark(self.cfg.host)
-        self.__mark = str(int(self.__mark))
-        return self.__mark
+        if self.mark is None:
+            self.mark = self.repo.getMirrorMark(self.cfg.host)
+        self.mark = str(long(self.mark))
+        return long(self.mark)
     def setMirrorMark(self, mark):
-        self.__mark = str(int(mark))
-        log.debug("%s setting mirror mark to %s", self.name, self.__mark)
+        self.mark = str(long(mark))
+        log.debug("%s setting mirror mark to %s", self.name, self.mark)
         if self.test:
             return
-        self.repo.setMirrorMark(self.cfg.host, self.__mark)
+        self.repo.setMirrorMark(self.cfg.host, self.mark)
     def mirrorGPG(self, src, host):
         if self.__gpg.has_key(host):
             return
@@ -454,13 +456,13 @@ class TargetRepository:
         # Sigs whose mark is the same as currentMark might not have their trove
         # available on the server (it might be coming as part of this mirror
         # run). sigList has to be sorted by mark for this to work.
-        inQuestion = [ x[1] for x in sigList if str(int(x[0])) == self.__mark ]
+        inQuestion = [ x[1] for x in sigList if str(long(x[0])) == self.mark ]
         present = self.repo.hasTroves(inQuestion)
         # build the ((n,v,f), signature) list only for the troves that have signatures
         setSigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
         # filter out the ones that are not present
         setSigs = [ x for x in setSigs if present.get(x[0], True) ]
-        log.debug("%s uploading %d signatures", self.name, len(sigs))
+        log.debug("%s uploading %d signatures", self.name, len(setSigs))
         if self.test:
             return 0
         self.repo.setTroveSigs(setSigs)
@@ -478,9 +480,12 @@ class TargetRepository:
     def commitChangeSetFile(self, filename, callback):
         if self.test:
             return 0
-        log.debug("%s committing", self.name)
+        callback.setPrefix(self.name + ": ")
+        t1 = time.time()
         ret = self.repo.commitChangeSetFile(filename, mirror=True, callback=callback)
+        t2 = time.time()
         callback.done()
+        log.debug("%s commit (%.2f sec)", self.name, t2-t1)
         return ret
     
 # split a troveList in changeset jobs
@@ -509,14 +514,14 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     if sync:
         currentMark = -1
     else:
-        marks = [ int(t.getMirrorMark()) for t in targets ]
+        marks = [ t.getMirrorMark() for t in targets ]
         # we use the oldest mark as a starting point (since we have to
         # get stuff from source for that oldest one anyway)
         currentMark = min(marks)
     log.debug("using common mirror mark %s", currentMark)
     # reset mirror mark to the lowest common denominator
     for t in targets:
-        if int(t.getMirrorMark()) != currentMark:
+        if t.getMirrorMark() != currentMark:
             t.setMirrorMark(currentMark)
     # first, we need to mirror changed signatures for troves in each target
     updateCount = mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs)
@@ -525,7 +530,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     # the labels we're interested in
     log.debug("looking for new troves")
     # make sure we always treat the mark as an integer
-    troveList = [(int(m), (n,v,f), t) for m, (n,v,f), t in
+    troveList = [(long(m), (n,v,f), t) for m, (n,v,f), t in
                   sourceRepos.getNewTroveList(cfg.host, str(currentMark))]
     # we need to protect ourselves from duplicate items in the troveList
     troveList = list(set(troveList))
