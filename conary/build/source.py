@@ -1114,6 +1114,51 @@ class addCvsSnapshot(_RevisionControl):
         sourceName = self.getFilename()
         _RevisionControl.__init__(self, recipe, sourceName)
 
+class addSvnSnapshot(_RevisionControl):
+
+    keywords = {}
+    name = 'svn'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if urlBits[0] == 'file:':
+            dirPath = urlBits[1]
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.project,
+                                       self.url.split('/')[-1])
+
+    def createArchive(self, lookasideDir):
+        os.mkdir(lookasideDir)
+        log.info('Checking out %s', self.url)
+        os.system('svn -q checkout %s %s' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.project)
+        os.system("cd %s; svn -q update" % lookasideDir)
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s', self.url)
+        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        stagePath = tmpPath + '/' + self.project + '--' + \
+                            self.url.split('/')[-1]
+        os.system("svn -q export %s %s; cd %s; "
+                  "tar cjf %s %s" %
+                        (self.url, stagePath,
+                         tmpPath, target, os.path.basename(stagePath)))
+        shutil.rmtree(stagePath)
+
+    def __init__(self, recipe, url, project = None):
+        self.url = url
+        if project is None:
+            self.project = recipe.name
+        else:
+            self.project = project
+
+        sourceName = self.getFilename()
+
+        _RevisionControl.__init__(self, recipe, sourceName)
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
