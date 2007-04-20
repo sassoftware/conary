@@ -1000,6 +1000,9 @@ Action = addAction
 
 class _RevisionControl(addArchive):
 
+    keywords = {'dir': '',
+                'package': None}
+
     def fetch(self, refreshFilter=None):
         fullPath = self.getFilename()
         url = 'lookaside:/' + fullPath
@@ -1040,7 +1043,46 @@ class _RevisionControl(addArchive):
 
 class addMercurialSnapshot(_RevisionControl):
 
-    keywords = {}
+    """
+    NAME
+    ====
+
+    B{C{r.addMercurialSnapshot()}} - Adds a snapshot from a mercurial
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addMercurialSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addMercurialSnapshot()} class extracts sources from a
+    mercurial repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}. 
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : Mercurial tag to use for the snapshot.
+    """
+
     name = 'hg'
 
     def getFilename(self):
@@ -1067,15 +1109,54 @@ class addMercurialSnapshot(_RevisionControl):
         os.system("cd %s; hg archive -r %s -t tbz2 %s" %
                         (lookasideDir, self.tag, target))
 
-    def __init__(self, recipe, url, tag = 'tip'):
+    def __init__(self, recipe, url, tag = 'tip', **kwargs):
         self.url = url
         self.tag = tag
         sourceName = self.getFilename()
-        _RevisionControl.__init__(self, recipe, sourceName)
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
 class addCvsSnapshot(_RevisionControl):
 
-    keywords = {}
+    """
+    NAME
+    ====
+
+    B{C{r.addCvsSnapshot()}} - Adds a snapshot from a CVS
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addCvsSnapshot([I{root},] [I{project},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addCvsSnapshot()} class extracts sources from a
+    CVS repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : CVS tag to use for the snapshot.
+    """
+
     name = 'cvs'
 
     def getFilename(self):
@@ -1107,16 +1188,53 @@ class addCvsSnapshot(_RevisionControl):
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
-    def __init__(self, recipe, root, project, tag = 'HEAD'):
+    def __init__(self, recipe, root, project, tag = 'HEAD', **kwargs):
         self.root = root
         self.project = project
         self.tag = tag
         sourceName = self.getFilename()
-        _RevisionControl.__init__(self, recipe, sourceName)
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
 class addSvnSnapshot(_RevisionControl):
 
-    keywords = {}
+    """
+    NAME
+    ====
+
+    B{C{r.addSvnSnapshot()}} - Adds a snapshot from a subversion
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addSvnSnapshot([I{url},] [I{project}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addSvnSnapshot()} class extracts sources from a
+    subversion repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}. 
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+    """
+
     name = 'svn'
 
     def getFilename(self):
@@ -1149,7 +1267,7 @@ class addSvnSnapshot(_RevisionControl):
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
-    def __init__(self, recipe, url, project = None):
+    def __init__(self, recipe, url, project = None, **kwargs):
         self.url = url
         if project is None:
             self.project = recipe.name
@@ -1158,7 +1276,7 @@ class addSvnSnapshot(_RevisionControl):
 
         sourceName = self.getFilename()
 
-        _RevisionControl.__init__(self, recipe, sourceName)
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
