@@ -2722,21 +2722,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for i, instanceId, sig in cu:
             sig = cu.frombinary(sig)
             i -= minIdx
-            if sig is None:
-                # don't have a sig yet
-                inserts.append((i, instanceId, sig))
-            elif sig != sigList[i]:
-                # it has changed
-                updates.append((i, instanceId, sigList[i]))
-        invList = []
+            # what do we need to put in the database
+            tup = (i, instanceId, sigList[i])
+            if sig is None: # don't have a sig yet
+                inserts.append(tup)
+            elif sig != sigList[i]: # it is has changed
+                updates.append(tup)
         if len(inserts):
             cu.executemany("insert into TroveInfo (instanceId, infoType, data) "
                            "values (?,?,?) ",
                            [(instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig))
                             for i, instanceId, sig in inserts])
-            for i, instanceId, sig in inserts:
-                (n,v,f),s = infoList[i]
-                invList.append((n,v,f))
         if len(updates):
             # SQL update does not executemany() very well
             for i, instanceId, sig in updates:
@@ -2745,9 +2741,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 WHERE infoType = ? AND instanceId = ?
                 """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
                 (n,v,f),s = infoList[i]
-                invList.append((n,v,f))
         self.log(3, "updated signatures for", len(inserts+updates), "troves")
-        self.log(3, "invalidated cache for", len(invList), "troves")
         return len(inserts) + len(updates)
 
     @accessReadOnly
