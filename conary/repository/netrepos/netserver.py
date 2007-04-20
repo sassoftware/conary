@@ -2740,7 +2740,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 UPDATE TroveInfo SET data = ?
                 WHERE infoType = ? AND instanceId = ?
                 """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
-                (n,v,f),s = infoList[i]
         self.log(3, "updated signatures for", len(inserts+updates), "troves")
         return len(inserts) + len(updates)
 
