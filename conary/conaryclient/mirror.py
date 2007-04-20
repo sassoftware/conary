@@ -65,6 +65,12 @@ class VerboseChangesetCallback(clientCallbacks.ChangesetCallback):
         self.clearPrefix()
         self._message('\r')
 
+class ChangesetCallback(callbacks.ChangesetCallback):
+    def setPrefix(self, *args):
+        pass
+    def clearPrefix(self):
+        pass
+
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
     user                  =  conarycfg.CfgUserInfo
@@ -96,7 +102,7 @@ def Main(argv=sys.argv[1:]):
 
     cfg = MirrorConfiguration()
     cfg.read(options.configFile, exception = True)
-    callback = callbacks.ChangesetCallback()
+    callback = ChangesetCallback()
 
     if options.verbose:
         log.setVerbosity(log.DEBUG)
