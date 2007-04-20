@@ -460,6 +460,59 @@ Repository querying matches this behavior to help you see what trove will be ins
 .RE
 .RE
 .TP
+.B Displaying Trove Differences From The Repository
+.RS 4
+.TP
+.B rdiff \fItrovename\fP=\fIoldver\fP[\fI<flavor>\fP]--\fInewver\fP[\fI<flavor>\fP] [\fI--buildreqs\fP] [\fI--deps\fP] [\fI--show-empty\fP] [\fI--ls\fP] [\fI--lsl\fP] [\fI--file-deps\fP] [\fI--file-versions\fP] [\fI--tags\fP] [\fI--file-contents\fP]  [\fI--labels\fP]  [\fI--flavors\fP]  [\fI--full-versions\fP] [\fI--tags\fP]
+.TP
+Report differences between the two specified troves.
+.TP
+The command line options explicitly turn on extra output for different sections.
+.RS 4
+.TP
+.B \-\-buildreqs
+Display changes in build requirements.
+.TP
+.B \-\-deps
+Display changes in trove dependencies. For file dependencies, see \fI--file-deps\fP below.
+.TP
+.B \-\-show-empty
+By default, troves that have not changed do not get displayed. This option includes these in the output as well.
+.TP
+.B \-\-tags
+Display changes in file tags.
+.TP
+.B \-\-ls
+Show added, removed and changed files.
+.TP
+.B \-\-lsl
+Detailed output of how the file has changed. The output for the new file omits the elements that have not changed.
+.TP
+.B \-\-file-deps
+Display changes in file dependencies.
+.TP
+.B \-\-file-versions
+Turn on the display for file versions.
+.TP
+.B \-\-labels
+Displays <label>/<revision> instead of abbreviated version numbers.
+.TP
+.B \-\-full-version
+Full version strings are displayed instead of abbreviated version numbers
+
+.RE
+For example, to see the difference between python 2.4.1-20.7-1 (x86 flavor) and
+2.4.1-20.7-2 (x86_64 flavor), one can run:
+.TP
+.B conary rdiff 'python=2.4.1-20.7-1[is:x86]--2.4.1-20.8-1[is:x86]'
+
+.RE
+\fBNOTE:\fR the format for the output is subject to change.
+.RE
+
+.RE
+.RE
+.TP
 .B Querying The Local System
 .RS 4
 .TP
@@ -490,7 +543,7 @@ The \fBshowcs\fP command can also be invoked as \fBscs\fP.
 .B \-\-show-changes
 For files that have been modified, lists the old version of the file above the
 new version of the file for easy comparison.  Implies --ls
-is specified.  
+if specified.  
 .TP 4
 .B \-\-recurse-repository
 When recursing, use the repository to download information about troves not in 
@@ -529,7 +582,6 @@ then children are synced to the new trove.
 
 Arguments include
 .RS 4
-.TP 4
 .TP 4
 .B \-\-current
 Cause only the children of the specified troves to be updated to match the 
