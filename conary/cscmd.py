@@ -38,7 +38,7 @@ def computeTroveList(client, applyList):
             found = True
 
         if not found:
-            toFind.append((n, None, None))
+            toFind.add((n, None, None))
 
     repos = client.getRepos()
     results = repos.findTroves(client.cfg.installLabelPath, toFind, 
