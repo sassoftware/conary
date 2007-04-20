@@ -2709,7 +2709,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # about to set sigs for. we look over the signatures we need
         # to update and perform the updates
         cu.execute("""
-        select gtl.idx, gtlInst.instanceId, TroveInfo.data
+        select gtl.idx, gtlInst.instanceId,
+               TroveInfo.instanceId as tid, TroveInfo.data
         from gtl
         join gtlInst on gtl.idx = gtlInst.idx
         left join TroveInfo on
@@ -2719,12 +2720,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         inserts = []
         updates = []
         sigList = [base64.decodestring(s) for (n,v,f),s in infoList]
-        for i, instanceId, sig in cu:
-            sig = cu.frombinary(sig)
+        for i, instanceId, tid, sig in cu:
+            if sig is not None:
+                sig = cu.frombinary(sig)
             i -= minIdx
             # what do we need to put in the database
             tup = (i, instanceId, sigList[i])
-            if sig is None: # don't have a sig yet
+            if tid is None: # don't have a sig yet
                 inserts.append(tup)
             elif sig != sigList[i]: # it is has changed
                 updates.append(tup)
