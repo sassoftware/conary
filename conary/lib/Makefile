@@ -93,6 +93,6 @@ dist: default-dist
 
 include ../../Make.rules
 # needs to come after including Make.rules so that PYINCLUDE is defined
-CFLAGS:=-Wall -I$(PYINCLUDE) -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
+CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
 
 $(cstreamsmodule_objs): cstreams.h

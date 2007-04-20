@@ -7,6 +7,11 @@ Changes in @NEW@:
   o Bug Fixes:
     * A corner case affcting server-side matching of troves against
       negative flavors has been fixed. (CNY-641)
+    * A bug in the StreamSet thaw code that prevented frozen StreamSet
+      objects with a tag value greater than 128 from being thawed
+      properly has been fixed.
+    * A bug that prevented a creating a diff of a Trove object that
+      contained troveInfo with unknown data has been fixed. (CNY-1569)
 
 Changes in 1.1.22:
   o Major Changes:

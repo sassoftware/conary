@@ -750,6 +750,9 @@ class TroveInfo(streams.StreamSet):
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
 
+    def diff(self, other):
+        return streams.StreamSet.diff(self, other, skipUnknown=True)
+
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
     """
@@ -1395,7 +1398,8 @@ class Trove(streams.StreamSet):
             # incomplete flag is dynamic (the old trove's flag can be set now
             # even if it wasn't originally). Use the relative data (which may
             # set it or not).
-            self.troveInfo = TroveInfo(trvCs.getFrozenTroveInfo())
+            troveInfoClass = self.streamDict[_STREAM_TRV_TROVEINFO][1]
+            self.troveInfo = troveInfoClass(trvCs.getFrozenTroveInfo())
             if not self.troveInfo.incomplete():
                 self.troveInfo.incomplete.set(incomplete)
         elif not trvCs.getOldVersion():
