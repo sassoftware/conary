@@ -41,6 +41,7 @@ def post(port, isSecure, repos, req):
     else:
         protocol = "http"
 
+    repos.log.reset()
     if req.headers_in['Content-Type'] == "text/xml":
         # handle XML-RPC requests
         encoding = req.headers_in.get('Content-Encoding', None)
