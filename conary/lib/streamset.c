@@ -1005,7 +1005,6 @@ static PyMethodDef StreamSetMethods[] = {
     { "find",   (PyCFunction) StreamSet_Find,   METH_VARARGS | METH_CLASS    },
     { "freeze", (PyCFunction) StreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
     { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
-    { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
     { "twm",    (PyCFunction) StreamSet_Twm,    METH_VARARGS | METH_KEYWORDS },
     {NULL}  /* Sentinel */
 };
