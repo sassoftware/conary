@@ -358,7 +358,7 @@ class TroveStore:
 
         # Note: writing the next two steps in a single query causes
         # very slow full table scans on FileStreams. Don't get fancy.
-
+        self.db.analyze("NewFiles")
         # get the common entries we're gonna update. In the extreme
         # case of binary shadowing this might require a bit of of
         # memory for large troves, but it is preferable to constant
