@@ -465,8 +465,13 @@ class Database(BaseDatabase):
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
 
-    def analyze(self):
-        self.loadSchema()
+    # analyze one or all tables in the database
+    def analyze(self, table=""):
         cu = self.cursor()
+        if table:
+            assert (isinstance(table, str))
+            cu.execute("ANALYZE TABLE %s" % table)
+            return
+        self.loadSchema()
         for table in self.tables:
             cu.execute("ANALYZE TABLE %s" % table)

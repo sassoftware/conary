@@ -324,3 +324,9 @@ class Database(BaseDatabase):
             # need to rollback the last transaction
             self.dbh.rollback()
         return ret
+
+    def analyze(self, table=""):
+        cu = self.cursor()
+        assert (isinstance(table, str))
+        cu.execute("ANALYZE %s" %table)
+        
