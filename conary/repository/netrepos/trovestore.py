@@ -175,7 +175,6 @@ class TroveStore:
 	# then using all of the and's in this join
 
         schema.resetTable(cu, 'itf')
-
         for troveName in troveDict.keys():
             outD[troveName] = {}
             for version in troveDict[troveName]:
@@ -185,7 +184,7 @@ class TroveStore:
                 cu.execute("INSERT INTO itf VALUES (?, ?, ?)",
                            (troveName, versionStr, versionStr),
                            start_transaction = False)
-
+        self.db.analyze("itf")
         cu.execute("""
         SELECT Items.item, fullVersion, Flavors.flavor
         FROM itf
@@ -233,11 +232,7 @@ class TroveStore:
 
     def addTrove(self, trv, hidden = False):
 	cu = self.db.cursor()
-
         schema.resetTable(cu, 'NewFiles')
-        schema.resetTable(cu, 'NeededFlavors')
-        schema.resetTable(cu, 'newTroveTroves')
-
 	return (cu, trv, hidden)
 
     def addTroveDone(self, troveInfo):
@@ -287,11 +282,12 @@ class TroveStore:
                 flavorsNeeded[flavor] = True
 
 	flavorIndex = {}
+        schema.resetTable(cu, 'NeededFlavors')
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
 	    cu.execute("INSERT INTO NeededFlavors VALUES(?)", flavor.freeze())
-
 	del flavorsNeeded
+        self.db.analyze("NeededFlavors")
 
 	# it seems like there must be a better way to do this, but I can't
 	# figure it out. I *think* inserting into a view would help, but I
@@ -412,6 +408,7 @@ class TroveStore:
 
         # iterate over both strong and weak troves, and set weakFlag to
         # indicate which kind we're looking at when
+        schema.resetTable(cu, 'newTroveTroves')
         for ((name, version, flavor), weakFlag) in itertools.chain(
                 itertools.izip(trv.iterTroveList(strongRefs = True,
                                                    weakRefs   = False),
@@ -434,7 +431,8 @@ class TroveStore:
             INSERT INTO newTroveTroves (item, version, frozenVersion, flavor, flags)
             VALUES (?, ?, ?, ?, ?)
             """, (name, str(version), version.freeze(), flavor.freeze(), flags))
-
+        self.db.analyze("newTroveTroves")
+        
         cu.execute("""
         INSERT INTO Items (item)
         SELECT DISTINCT newTroveTroves.item
@@ -654,7 +652,8 @@ class TroveStore:
             cu.execute("INSERT INTO gtl VALUES (?, ?, ?, %s)" %(flavorStr,),
                        idx, info[0], info[1].asString(),
                        start_transaction = False)
-
+        self.db.analyze("gtl")
+        
         cu.execute("""
         SELECT gtl.idx, Instances.instanceId, Instances.troveType, Nodes.timeStamps,
                Changelogs.name, ChangeLogs.contact, ChangeLogs.message
@@ -679,6 +678,8 @@ class TroveStore:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
                        singleTroveIds[0], singleTroveIds[1],
                        start_transaction = False)
+        self.db.analyze("gtlInst")
+        
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
         SELECT idx, item, version, flavor, flags, Nodes.timeStamps
@@ -951,19 +952,15 @@ class TroveStore:
             #raise errors.CommitError('Marking a group as removed is not implemented')
         cu = self.db.cursor()
 
-        schema.resetTable(cu, 'tmpRemovals')
-        schema.resetTable(cu, 'tmpInstances')
-
         cu.execute("""
         SELECT I.instanceId, I.itemId, I.versionId, I.flavorId, I.troveType
         FROM Instances as I
         JOIN Items USING (itemId)
         JOIN Versions ON I.versionId = Versions.versionId
         JOIN Flavors ON I.flavorId = Flavors.flavorId
-        WHERE
-            Items.item = ? AND
-            Versions.version = ? AND
-            Flavors.flavor = ?
+        WHERE Items.item = ?
+          AND Versions.version = ?
+          AND Flavors.flavor = ?
         """, (name, version.asString(), flavor.freeze()))
 
         try:
@@ -973,15 +970,6 @@ class TroveStore:
 
         assert(troveType == trove.TROVE_TYPE_NORMAL or
                troveType == trove.TROVE_TYPE_REDIRECT)
-
-        cu.execute("SELECT nodeId, branchId FROM Nodes "
-                   "WHERE itemId = ? AND versionId = ?", itemId, versionId)
-        nodeId, branchId = cu.next()
-
-        # tmpRemovals drives the removal of most of the shared tables
-        cu.execute("INSERT INTO tmpRemovals (itemId, versionId, flavorId, "
-                                            "branchId) "
-                   "VALUES (?, ?, ?, ?)", itemId, versionId, flavorId, branchId)
 
         # remove all dependencies which are used only by this instanceId
         cu.execute("""
@@ -1048,6 +1036,13 @@ class TroveStore:
             if cu.next()[0] == 0:
                 filesToRemove.append(sha1)
 
+        # tmpRemovals drives the removal of most of the shared tables
+        schema.resetTable(cu, 'tmpRemovals')
+        cu.execute("SELECT nodeId, branchId FROM Nodes "
+                   "WHERE itemId = ? AND versionId = ?", (itemId, versionId))
+        nodeId, branchId = cu.next()
+        cu.execute("INSERT INTO tmpRemovals (itemId, versionId, flavorId, branchId) "
+                   "VALUES (?, ?, ?, ?)", (itemId, versionId, flavorId, branchId))
         # Look for troves which this trove references which aren't present
         # on this repository (if they are present, we shouldn't remove them)
         # and aren't referenced by anything else
@@ -1068,13 +1063,13 @@ class TroveStore:
             Instances.isPresent = 0 AND
             Other.includedId IS NULL
         """, instanceId, instanceId)
-
         cu.execute("""
         INSERT INTO tmpRemovals (itemId, flavorId, branchId)
         SELECT TroveRedirects.itemId, TroveRedirects.flavorId,
                TroveRedirects.branchId
         FROM TroveRedirects WHERE TroveRedirects.instanceId = ?
         """, instanceId)
+        self.db.analyze("tmpRemovals")
 
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM TroveRedirects WHERE instanceId=?", instanceId)
@@ -1090,6 +1085,7 @@ class TroveStore:
             cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
         # look for troves referenced by this one
+        schema.resetTable(cu, 'tmpInstances')
         cu.execute("""
         INSERT INTO tmpInstances
         SELECT Nodes.nodeId
@@ -1098,7 +1094,8 @@ class TroveStore:
         LEFT JOIN Instances USING (itemId, versionId)
         WHERE Instances.itemId IS NULL
         """)
-
+        self.db.analyze("tmpInstances")
+        
         # Was this the only Instance for the node?
         cu.execute("""
         DELETE FROM Changelogs
@@ -1172,7 +1169,8 @@ class TroveStore:
         WHERE LabelMap.labelId IS NULL
           AND Labels.labelId != 0
         """)
-
+        self.db.analyze("tmpInstances")
+        
         cu.execute("""
         DELETE FROM Labels
         WHERE labelId IN (SELECT * from tmpInstances)
@@ -1216,6 +1214,7 @@ class TroveStore:
         for (n,v,f) in troveList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
                        (n,v,f), start_transaction=False)
+        self.db.analyze("gtl")
         # get the instanceIds of the parents of what we can find
         cu.execute("""
         insert into gtlInst(instanceId)
@@ -1230,6 +1229,7 @@ class TroveStore:
             Flavors.flavorId = Instances.flavorId
         join TroveTroves on TroveTroves.includedId = Instances.instanceId
         """)
+        self.db.analyze("gtlInst")
         # gtlInst now has instanceIds of the parents
         cu.execute("""
         select Items.item, Versions.version, Flavors.flavor
@@ -1267,7 +1267,6 @@ class FileRetriever:
         self.log = log or tracelog.getLog(None)
 
     def get(self, l):
-	self.log(3, "start FileRetriever inserts")
         lookup = range(len(l))
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
@@ -1275,14 +1274,9 @@ class FileRetriever:
                             (itemId, self.cu.binary(fileId)),
                             start_transaction = False)
             lookup[itemId] = (pathId, fileId)
-
-	self.log(3, "start FileRetriever select")
-        self.cu.execute("""
-        SELECT itemId, stream
-        FROM getFilesTbl
-        JOIN FileStreams using (fileId)
-        """)
-
+        self.db.analyze("getFilesTbl")
+        self.cu.execute("SELECT itemId, stream FROM getFilesTbl "
+                        "JOIN FileStreams using (fileId) ")
         d = {}
         for itemId, stream in self.cu:
             pathId, fileId = lookup[itemId]
@@ -1291,8 +1285,5 @@ class FileRetriever:
             else:
                 f = None
             d[(pathId, fileId)] = f
-        self.cu.execute("DELETE FROM getFilesTbl", start_transaction = False)
-
-	self.log(3, "stop FileRetriever")
-
+        schema.resetTable(self.cu, "getFilesTbl")
         return d
