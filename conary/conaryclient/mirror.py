@@ -254,7 +254,7 @@ def buildJobList(repos, groupList):
 
 recursedGroups = set()
 def recurseTrove(sourceRepos, name, version, flavor,
-                 callback = callbacks.ChangesetCallback()):
+                 callback = ChangesetCallback()):
     global recursedGroups
     assert(name.startswith("group-"))
     # there's nothing much we can recurse from the source
@@ -321,7 +321,7 @@ def displayJobList(jobList):
     return displayBundle([(0, x) for x in jobList])
 
 # mirroring stuff when we are running into PathIdConflict errors
-def splitJobList(jobList, src, targetSet, callback = None):
+def splitJobList(jobList, src, targetSet, callback = ChangesetCallback()):
     log.debug("PathIdConflict detected; splitting job further...")
     jobs = {}
     for job in jobList:
@@ -390,7 +390,7 @@ def mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs=False):
     return updateCount
 
 # this mirrors all the troves marked as removed from the sourceRepos into the targetRepos
-def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = None):
+def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = ChangesetCallback()):
     if not troveSet:
         return 0
     log.debug("checking on %d removed troves", len(troveSet))
@@ -507,7 +507,7 @@ def buildBundles(target, troveList):
 
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
-                     callback = callbacks.ChangesetCallback()):
+                     callback = ChangesetCallback()):
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
     targets = []
@@ -699,7 +699,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     else: # only when we're all done looping advance mark to the new max
         if bundlesMark == 0 or bundlesMark == currentMark:
             bundlesMark = crtMaxMark # avoid repeating the same query...
-        for target in targetRepos:
+        for target in targets:
             target.setMirrorMark(bundlesMark)
     # mirroring removed troves requires one by one processing
     for target in targets:
