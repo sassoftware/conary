@@ -566,10 +566,14 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             lastIdx -= 1
         else:
             break
-    # if all troves in troveList have the same version/flavor, do nothing
+    # the min mark of the troves we skip has to be higher than max
+    # mark of troves we'll commit or otherwise we'll skip them for good...
     if lastIdx >= 0:
-        troveList = troveList[:lastIdx+1]
-        log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
+        firstMark = max([x[0] for x in troveList[:lastIdx+1]])
+        lastMark = min([x[0] for x in troveList[lastIdx:]])
+        if lastMark > firstMark:
+            troveList = troveList[:lastIdx+1]
+            log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
     # prepare a new max mark to be used when we need to break out of a loop
     crtMaxMark = max(x[0] for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:
