@@ -751,7 +751,7 @@ class TroveInfo(streams.StreamSet):
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
 
     def diff(self, other):
-        return streams.StreamSet.diff(self, other, skipUnknown=True)
+        return streams.StreamSet.diff(self, other, ignoreUnknown=True)
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
