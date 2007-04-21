@@ -2159,11 +2159,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return {}
         schema.resetTable(cu, 'hasTrovesTmp')
         for row, item in enumerate(troveList):
-            flavor = item[2]
             cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
-                       "VALUES (?, ?, ?, ?)", row, item[0], item[1], flavor)
+                       "VALUES (?, ?, ?, ?)", row, item[0], item[1], item[2])
         self.db.analyze("hasTrovesTmp")
-        
         if hidden:
             hiddenClause = ("OR (Instances.isPresent = %d AND UP.canWrite = 1)"
                         % instances.INSTANCE_PRESENT_HIDDEN)
