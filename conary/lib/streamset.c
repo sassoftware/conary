@@ -803,10 +803,9 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
     }
 
     if (chptr != end) {
-	printf("An internal error has occurred.  Halting execution.\n");
-	fflush(stdout);
-	i = 1;
-	while (i) ;
+	PyErr_SetString(PyExc_AssertionError,
+			"chptr != end in Thaw_raw");
+	return -1;
     }
     assert(chptr == end);
 
