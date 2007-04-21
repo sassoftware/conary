@@ -1233,6 +1233,7 @@ class DependencyTables:
             WHERE Items.item = ? AND Versions.version = ? AND Flavors.flavor = ?
             """, ( (n, v.asString(), f.freeze()) for (n, v, f)
                            in troveList), start_transaction = False )
+            self.db.analyze("tmpInstances")
             # now grab the instanceIds of their included troves, avoiding duplicates
             cu.execute("""
             INSERT INTO tmpInstances2
@@ -1248,6 +1249,7 @@ class DependencyTables:
             cu.execute("INSERT INTO tmpInstances "
                        "SELECT instanceId FROM tmpInstances2",
                        start_transaction=False)
+            self.db.analyze("tmpInstances")
             restrictBy = ()
             restrictor = self._restrictResolveByTrove
         else:

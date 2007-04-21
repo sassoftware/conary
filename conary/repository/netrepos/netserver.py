@@ -716,9 +716,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
                                    flavorId, dep.name, sense, flag,
                                    start_transaction = False)
-        cu.execute("select count(*) from ffFlavor")
-        entries = cu.next()[0]
-        self.log(4, "created temporary table ffFlavor", entries)
+        self.db.analyze("ffFlavor")
 
     def _setupTroveFilter(self, cu, troveSpecs, flavorIndices):
         self.log(3, troveSpecs, flavorIndices)
@@ -738,9 +736,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)",
                                    troveName, versionSpec, flavorId,
                                    start_transaction = False)
-        cu.execute("select count(*) from gtvlTbl")
-        entries = cu.next()[0]
-        self.log(4, "created temporary table gtvlTbl", entries)
+        self.db.analyze("gtvlTbl")
 
     def _latestType(self, queryType):
         return queryType
@@ -1623,6 +1619,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     VALUES (?, ?, ?, ?)
                 """, jobId, job[0], job[2][0], job[2][1])
 
+            self.db.analyze("gtl")
             cu.execute("""SELECT
                     gtl.idx, I_Items.item, I_Versions.version,
                     I_Flavors.flavor, TroveTroves.flags
@@ -1947,6 +1944,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             cu.execute("INSERT INTO gfsTable (idx, fileId) VALUES (?, ?)",
                        (i, cu.binary(fileId)))
 
+        self.db.analyze("gfsTable")
         q = """
         SELECT DISTINCT
             gfsTable.idx, FileStreams.stream, UP.permittedTrove, Items.item
@@ -2083,7 +2081,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             filePrefixes = ['']
         cu.executemany("INSERT INTO tmpFilePrefixes (prefix) VALUES (?)",
                        ( f + '%' for f in filePrefixes ))
-
+        self.db.analyze("tmpFilePrefixes")
         cu.execute(query, sourceName, branch)
         ids = {}
         for (pathId, path, version, fileId, timeStamp) in cu:
@@ -2110,7 +2108,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         schema.resetTable(cu, 'tmpFileIds')
         cu.executemany("INSERT INTO tmpFileIds (fileId) VALUES (?)", splitFileIds(cu))
-
+        self.db.analyze("tmpFileIds")
+        
         # Fetch paths by file id too
         query = """
         SELECT DISTINCT
@@ -2153,17 +2152,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def hasTroves(self, authToken, clientVersion, troveList, hidden = False):
         # returns False for troves the user doesn't have permission to view
+        self.log(2, troveList)
         cu = self.db.cursor()
-        schema.resetTable(cu, 'hasTrovesTmp')
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return {}
-        self.log(2, troveList)
+        schema.resetTable(cu, 'hasTrovesTmp')
         for row, item in enumerate(troveList):
             flavor = item[2]
             cu.execute("INSERT INTO hasTrovesTmp (row, item, version, flavor) "
                        "VALUES (?, ?, ?, ?)", row, item[0], item[1], flavor)
-
+        self.db.analyze("hasTrovesTmp")
+        
         if hidden:
             hiddenClause = ("OR (Instances.isPresent = %d AND UP.canWrite = 1)"
                         % instances.INSTANCE_PRESENT_HIDDEN)
@@ -2221,16 +2221,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          all=False):
         self.log(2, pathList, label, all)
         cu = self.db.cursor()
-        schema.resetTable(cu, 'trovesByPathTmp')
-
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
         if not userGroupIds:
             return {}
 
+        schema.resetTable(cu, 'trovesByPathTmp')
         for row, path in enumerate(pathList):
             cu.execute("INSERT INTO trovesByPathTmp (row, path) "
                        "VALUES (?, ?)", row, path)
-
+        self.db.analyze("trovesByPathTmp")
 
         # FIXME: MySQL 5.0.18 does not like "SELECT row, ..." so we are
         # explicit
@@ -2681,6 +2680,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for (n,v,f), sig in infoList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
                        (n,v,f))
+        self.db.analyze("gtl")
         # we'll need the min idx to account for differences in SQL backends
         cu.execute("SELECT MIN(idx) from gtl")
         minIdx = cu.fetchone()[0]
@@ -2697,6 +2697,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
         """)
+        self.db.analyze("gtlInst")
         # see what troves are missing, if any
         cu.execute("""
         select gtl.idx
@@ -2902,6 +2903,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ret[i] = (-1,'') # next best thing is trive missing
             cu.execute("insert into gtl(idx,name,version,flavor) values (?,?,?,?)",
                        (i, n, v, f), start_transaction=False)
+        self.db.analyze("gtl")
         # get the data doing a full scan of gtl
         cu.execute("""
         SELECT gtl.idx, TroveInfo.data
@@ -2946,6 +2948,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for (n,v,f) in troveInfoList:
             cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
                        (n, v, f), start_transaction=False)
+        self.db.analyze("gtl")
         # we'll need the min idx to account for differences in SQL backends
         cu.execute("SELECT MIN(idx) from gtl")
         minIdx = cu.fetchone()[0]
@@ -2963,6 +2966,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Flavors.flavorId = Instances.flavorId
         join TroveTroves on TroveTroves.includedId = Instances.instanceId
         """, start_transaction=False)
+        self.db.analyze("gtlInst")
         # gtlInst now has instanceIds of the parents. retrieve the data we need
         cu.execute("""
         select
