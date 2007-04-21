@@ -749,6 +749,8 @@ def setupTempTables(db):
         # validity of the table
         db.createIndex("NewFiles", "NewFilesFileIdx", "fileId",
                        check = False)
+        db.createIndex("NewFiles", "NewFilesVersionIdx", "versionId",
+                       check = False)
     if "NewRedirects" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE NewRedirects(
@@ -780,8 +782,7 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["gtlInst"] = True
         db.createIndex("gtlInst", "gtlInstIdx", "idx", check = False)
-        db.createIndex("gtlInst", "gtlInstInstanceIdx", "instanceId, idx",
-                       check = False)
+        db.createIndex("gtlInst", "gtlInstInstanceIdx", "instanceId", check = False)
     if "getFilesTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(

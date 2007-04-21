@@ -291,7 +291,7 @@ class BaseDatabase:
         return self.sequenceClass(self, name)
 
     # perform the equivalent of a analyze on $self
-    def analyze(self):
+    def analyze(self, table=""):
         assert(self.database)
         pass
 
