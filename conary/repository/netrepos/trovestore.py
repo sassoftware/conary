@@ -1260,8 +1260,8 @@ class TroveStore:
         self._cleanCache()
 
 class FileRetriever:
-
     def __init__(self, db, log = None):
+        self.db = db
         self.cu = db.cursor()
         schema.resetTable(self.cu, 'getFilesTbl')
         self.log = log or tracelog.getLog(None)
