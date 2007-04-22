@@ -516,6 +516,56 @@ def buildBundles(target, troveList):
     bundles = buildJobList(target.repo, groupList)
     return bundles
 
+# return the new list of troves to process after filtering and sanity checks
+def getTroveList(src, cfg, mark):
+    # FIXME: getNewTroveList should accept and only return troves on
+    # the labels we're interested in
+    log.debug("looking for new troves")
+    # make sure we always treat the mark as an integer
+    troveList = [(long(m), (n,v,f), t) for m, (n,v,f), t in
+                  src.getNewTroveList(cfg.host, str(mark))]
+    if not len(troveList):
+        # this should be the end - no more troves to look at
+        return []
+    # we need to protect ourselves from duplicate items in the troveList
+    l = len(troveList)
+    troveList = list(set(troveList))
+    if len(troveList) < l:
+        l = len(troveList)
+        log.debug("after duplicate elimination %d troves are left", len(troveList))
+    # eliminate troves that are not on the host we're mirroring (sanity check)
+    troveList = [ x for x in troveList if x[1][1].branch().label().getHost() == cfg.host ]
+    if len(troveList) < l:
+        log.debug("after eliminating foreign labels %d troves are left", len(troveList))   
+    # sort deterministically by mark, version, flavor, reverse name
+    troveList.sort(lambda a,b: cmp(a[0], b[0]) or
+                   cmp(a[1][1], b[1][1]) or
+                   cmp(a[1][2], b[1][2]) or
+                   cmp(b[1][0], a[1][0]) )
+    log.debug("%d new troves returned", len(troveList))
+    # We cut off the last troves that have the same flavor, version to
+    # avoid committing an incomplete trove. This could happen if the
+    # server side only listed some of a trove's components due to
+    # server side limits on how many results it can return on each query
+    lastIdx = len(troveList) - 1
+    # compare with the last one
+    ml, (nl,vl,fl), tl = troveList[-1]
+    while lastIdx >= 0:
+        m, (n,v,f), t = troveList[lastIdx]
+        if v == vl and f == fl:
+            lastIdx -= 1
+        else:
+            break
+    # the min mark of the troves we skip has to be higher than max
+    # mark of troves we'll commit or otherwise we'll skip them for good...
+    if lastIdx >= 0:
+        firstMark = max([x[0] for x in troveList[:lastIdx+1]])
+        lastMark = min([x[0] for x in troveList[lastIdx:]])
+        if lastMark > firstMark:
+            troveList = troveList[:lastIdx+1]
+            log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
+    return troveList
+
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
                      callback = ChangesetCallback()):
@@ -545,47 +595,10 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             t.setMirrorMark(currentMark)
     # first, we need to mirror changed signatures for troves in each target
     updateCount = mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs)
-
-    # FIXME: getNewTroveList should accept and only return troves on
-    # the labels we're interested in
-    log.debug("looking for new troves")
-    # make sure we always treat the mark as an integer
-    troveList = [(long(m), (n,v,f), t) for m, (n,v,f), t in
-                  sourceRepos.getNewTroveList(cfg.host, str(currentMark))]
-    # we need to protect ourselves from duplicate items in the troveList
-    troveList = list(set(troveList))
-    if not len(troveList):
-        # this should be the end - no more troves to look at
+    troveList = getTroveList(sourceRepos, cfg, currentMark)
+    if not troveList:
         return 0
     
-    # sort deterministically by mark, version, flavor, reverse name
-    troveList.sort(lambda a,b: cmp(a[0], b[0]) or
-                   cmp(a[1][1], b[1][1]) or
-                   cmp(a[1][2], b[1][2]) or
-                   cmp(b[1][0], a[1][0]) )
-    log.debug("%d new troves returned", len(troveList))
-
-    # We cut off the last troves that have the same flavor, version to
-    # avoid committing an incomplete trove. This could happen if the
-    # server side only listed some of a trove's components due to
-    # server side limits on how many results it can return on each query
-    lastIdx = len(troveList) - 1
-    # compare with the last one
-    ml, (nl,vl,fl), tl = troveList[-1]
-    while lastIdx >= 0:
-        m, (n,v,f), t = troveList[lastIdx]
-        if v == vl and f == fl:
-            lastIdx -= 1
-        else:
-            break
-    # the min mark of the troves we skip has to be higher than max
-    # mark of troves we'll commit or otherwise we'll skip them for good...
-    if lastIdx >= 0:
-        firstMark = max([x[0] for x in troveList[:lastIdx+1]])
-        lastMark = min([x[0] for x in troveList[lastIdx:]])
-        if lastMark > firstMark:
-            troveList = troveList[:lastIdx+1]
-            log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
     # prepare a new max mark to be used when we need to break out of a loop
     crtMaxMark = max(x[0] for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:
