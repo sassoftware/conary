@@ -1060,9 +1060,9 @@ class TroveStore:
             Other.instanceId != ?
         WHERE
             TroveTroves.instanceId = ? AND
-            Instances.isPresent = 0 AND
+            Instances.isPresent = ? AND
             Other.includedId IS NULL
-        """, instanceId, instanceId)
+        """, (instanceId, instanceId, instances.INSTANCE_PRESENT_MISSING))
         cu.execute("""
         INSERT INTO tmpRemovals (itemId, flavorId, branchId)
         SELECT TroveRedirects.itemId, TroveRedirects.flavorId,
