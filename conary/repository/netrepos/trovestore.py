@@ -149,7 +149,7 @@ class TroveStore:
 	"""
 	cu = self.db.cursor()
 	cu.execute("""
-        SELECT version, timeStamps
+        SELECT Versions.version, Nodes.timeStamps
         FROM LabelMap
         JOIN Latest using (itemId, branchId)
         JOIN Nodes using (itemId, versionId)
@@ -533,7 +533,7 @@ class TroveStore:
 
         cu.execute("""
         INSERT INTO TroveRedirects (instanceId, itemId, branchId, flavorId)
-        SELECT %d, itemId, branchId, flavorId
+        SELECT %d, Items.itemId, Branches.branchId, Flavors.flavorId
         FROM NewRedirects
         JOIN Items USING (item)
         JOIN Branches ON NewRedirects.branch = Branches.branch
@@ -682,7 +682,8 @@ class TroveStore:
         
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
-        SELECT gtlInst.idx, item, version, flavor, flags, Nodes.timeStamps
+        SELECT gtlInst.idx, Items.item, Versions.version, Flavors.flavor,
+               TroveTroves.flags, Nodes.timeStamps
         FROM gtlInst
         JOIN TroveTroves using(instanceId)
         JOIN Instances on TroveTroves.includedId = Instances.instanceId
@@ -697,7 +698,8 @@ class TroveStore:
         troveFilesCursor = self.db.cursor()
 	if withFileStreams:
             troveFilesCursor.execute("""
-            SELECT gtlInst.idx, pathId, path, version, fileId, stream
+            SELECT gtlInst.idx, TroveFiles.pathId, TroveFiles.path,
+                   Versions.version, FileStreams.fileId, FileStreams.stream
             FROM gtlInst
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
@@ -707,7 +709,8 @@ class TroveStore:
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
         elif withFiles:
             troveFilesCursor.execute("""
-            SELECT gtlInst.idx, pathId, path, version, fileId, NULL
+            SELECT gtlInst.idx, TroveFiles.pathId, TroveFiles.path,
+                   Versions.version, FileStreams.fileId, NULL
             FROM gtlInst
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
@@ -720,7 +723,7 @@ class TroveStore:
 
         troveRedirectsCursor = self.db.cursor()
         troveRedirectsCursor.execute("""
-        SELECT gtlInst.idx, item, branch, flavor 
+        SELECT gtlInst.idx, Items.item, Branches.branch, Flavors.flavor 
         FROM gtlInst 
         JOIN TroveRedirects using (instanceId)
         JOIN Items using (itemId)
