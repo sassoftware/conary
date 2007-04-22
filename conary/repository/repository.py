@@ -395,9 +395,9 @@ class ChangeSetJob:
 			(newVersion.asString(), csTrove.getName())
 
 	    if oldTroveVersion:
-		newTrove = repos.getTrove(troveName, oldTroveVersion, 
-                                          oldTroveFlavor,
-                                          pristine = True).copy()
+                newTrove = repos.getTrove(troveName, oldTroveVersion, 
+                                          oldTroveFlavor, pristine = True,
+                                          hidden = hidden).copy()
                 self.oldTrove(newTrove, csTrove, troveName, oldTroveVersion,
                               oldTroveFlavor)
 

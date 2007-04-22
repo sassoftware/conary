@@ -114,9 +114,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 					troveFlavor = flavor)
 
     def getTrove(self, pkgName, version, flavor, pristine = True,
-                 withFiles = True):
-        return self.troveStore.getTrove(pkgName, version, flavor,
-                                        withFiles = withFiles)
+                 withFiles = True, hidden = False):
+        return self.troveStore.getTrove(
+            pkgName, version, flavor, withFiles = withFiles,
+            hidden = hidden)
 
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)

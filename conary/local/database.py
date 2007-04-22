@@ -1555,7 +1555,7 @@ class DatabaseCacheWrapper:
     def __getattr__(self, attr):
         return getattr(self.db, attr)
 
-    def getTrove(self, name, version, flavor, pristine = True):
+    def getTrove(self, name, version, flavor, pristine = True, *args, **kw):
         l = self.getTroves([ (name, version, flavor) ], pristine = pristine)
         if l[0] is None:
             raise errors.TroveMissing(name, version)

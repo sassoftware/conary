@@ -1839,7 +1839,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # need to catch the DatabaseLocked errors here and retry
             # the commit ourselves
             try:
-                ret = self._commitChangeSet(authToken, cs, mirror, hidden)
+                ret = self._commitChangeSet(authToken, cs, mirror=mirror,
+                                            hidden=hidden)
             except sqlerrors.DatabaseLocked, e:
                 # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d: %s", attempt, str(e.args))
@@ -1865,7 +1866,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def _commitChangeSet(self, authToken, cs, mirror = False, hidden = False):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
-
         verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
                     for x in cs.iterNewTroveList())
         self._checkCommitPermissions(authToken, verList, mirror, hidden)

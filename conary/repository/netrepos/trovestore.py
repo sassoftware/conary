@@ -631,9 +631,10 @@ class TroveStore:
 	return self.instances.isPresent((troveItemId, troveVersionId,
 					 troveFlavorId))
 
-    def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
+    def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True,
+                 hidden = False):
 	iter = self.iterTroves(( (troveName, troveVersion, troveFlavor), ),
-                               withFiles = withFiles)
+                               withFiles = withFiles, hidden = hidden)
         trv = [ x for x in iter ][0]
 
         if trv is None:
@@ -641,7 +642,8 @@ class TroveStore:
 
         return trv
 
-    def iterTroves(self, troveInfoList, withFiles = True, withFileStreams = False):
+    def iterTroves(self, troveInfoList, withFiles = True, withFileStreams = False,
+                   hidden = False):
 	cu = self.db.cursor()
 
         schema.resetTable(cu, 'gtl')
@@ -653,7 +655,11 @@ class TroveStore:
                        idx, info[0], info[1].asString(),
                        start_transaction = False)
         self.db.analyze("gtl")
-        
+        args = [instances.INSTANCE_PRESENT_NORMAL]
+        presence = "Instances.isPresent = ?"
+        if hidden:
+            args.append(instances.INSTANCE_PRESENT_HIDDEN)
+            presence = "Instances.isPresent in (?,?)"
         cu.execute("""
         SELECT gtl.idx, Instances.instanceId, Instances.troveType, Nodes.timeStamps,
                Changelogs.name, ChangeLogs.contact, ChangeLogs.message
@@ -669,9 +675,9 @@ class TroveStore:
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
         LEFT JOIN ChangeLogs using(nodeId)
-        WHERE Instances.isPresent = ?
+        WHERE %s
         ORDER BY gtl.idx
-        """, instances.INSTANCE_PRESENT_NORMAL)
+        """ % presence, args)
         troveIdList = [ x for x in cu ]
 
         for singleTroveIds in troveIdList:
