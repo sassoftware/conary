@@ -656,12 +656,14 @@ class TroveStore:
                        start_transaction = False)
         self.db.analyze("gtl")
         args = [instances.INSTANCE_PRESENT_NORMAL]
-        presence = "Instances.isPresent = ?"
+        d = dict(presence = "Instances.isPresent = ?")
         if hidden:
             args.append(instances.INSTANCE_PRESENT_HIDDEN)
-            presence = "Instances.isPresent in (?,?)"
+            d = dict(presence = "Instances.isPresent in (?,?)")
+        d.update(self.db.keywords)
         cu.execute("""
-        SELECT gtl.idx, Instances.instanceId, Instances.troveType, Nodes.timeStamps,
+        SELECT %(STRAIGHTJOIN)s gtl.idx, Instances.instanceId, Instances.troveType,
+               Nodes.timeStamps,
                Changelogs.name, ChangeLogs.contact, ChangeLogs.message
         FROM gtl
         JOIN Items on gtl.name = Items.item
@@ -675,11 +677,10 @@ class TroveStore:
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
         LEFT JOIN ChangeLogs using(nodeId)
-        WHERE %s
+        WHERE %(presence)s
         ORDER BY gtl.idx
-        """ % presence, args)
+        """ % d, args)
         troveIdList = [ x for x in cu ]
-
         for singleTroveIds in troveIdList:
             cu.execute("INSERT INTO gtlInst VALUES (?, ?)",
                        singleTroveIds[0], singleTroveIds[1],
@@ -688,17 +689,19 @@ class TroveStore:
         
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
-        SELECT gtlInst.idx, Items.item, Versions.version, Flavors.flavor,
+        SELECT %(STRAIGHTJOIN)s gtlInst.idx, Items.item, Versions.version, Flavors.flavor,
                TroveTroves.flags, Nodes.timeStamps
         FROM gtlInst
         JOIN TroveTroves using(instanceId)
         JOIN Instances on TroveTroves.includedId = Instances.instanceId
-        JOIN Nodes USING (versionId, itemId)
         JOIN Items on Instances.itemId = Items.itemId
         JOIN Versions on Instances.versionId = Versions.versionId
         JOIN Flavors on Instances.flavorId = Flavors.flavorId
+        JOIN Nodes on
+            Instances.itemId = Nodes.itemId and
+            Instances.versionId = Nodes.versionId
         ORDER BY gtlInst.idx
-        """)
+        """ % self.db.keywords)
         troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
 
         troveFilesCursor = self.db.cursor()
@@ -738,7 +741,6 @@ class TroveStore:
         ORDER BY gtlInst.idx
         """)
         troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
-
 
         neededIdx = 0
         versionObjCache = {}
