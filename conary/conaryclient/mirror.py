@@ -84,7 +84,8 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     uploadRateLimit       =  (conarycfg.CfgInt, 0)
     downloadRateLimit     =  (conarycfg.CfgInt, 0)
     lockFile              =  cfg.CfgString
-
+    useHiddenCommits      =  (cfg.CfgBool, True)
+    
     _allowNewSections   = True
     _defaultSectionType = MirrorConfigurationSection
 
@@ -332,7 +333,7 @@ def displayJobList(jobList):
     return displayBundle([(0, x) for x in jobList])
 
 # mirroring stuff when we are running into PathIdConflict errors
-def splitJobList(jobList, src, targetSet, callback = ChangesetCallback()):
+def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCallback()):
     log.debug("Changeset Key conflict detected; splitting job further...")
     jobs = {}
     for job in jobList:
@@ -350,7 +351,7 @@ def splitJobList(jobList, src, targetSet, callback = ChangesetCallback()):
         cs = src.createChangeSetFile(smallJobList, tmpName, recurse = False,
                                      callback = callback)
         for target in targetSet:
-            target.commitChangeSetFile(tmpName, callback = callback)
+            target.commitChangeSetFile(tmpName, hidden = hidden, callback = callback)
         os.unlink(tmpName)
         callback.done()
         i += 1
@@ -496,17 +497,23 @@ class TargetRepository:
         ret = [ x for x in tl if not present[x[1]] ]
         log.debug("%s found %d troves not present", self.name, len(ret))
         return ret
-    def commitChangeSetFile(self, filename, callback):
+    def commitChangeSetFile(self, filename, hidden, callback):
         if self.test:
             return 0
         callback.setPrefix(self.name + ": ")
         t1 = time.time()
-        ret = self.repo.commitChangeSetFile(filename, mirror=True, callback=callback)
+        ret = self.repo.commitChangeSetFile(filename, mirror=True, hidden=hidden,
+                                            callback=callback)
         t2 = time.time()
         callback.done()
-        log.debug("%s commit (%.2f sec)", self.name, t2-t1)
+        hstr = ""
+        if hidden: hstr = "hidden "
+        log.debug("%s %scommit (%.2f sec)", self.name, hstr, t2-t1)
         return ret
-    
+    def presentHiddenTroves(self):
+        log.debug("%s unhiding comitted troves", self.name)
+        self.repo.presentHiddenTroves(self.cfg.host)
+                                      
 # split a troveList in changeset jobs
 def buildBundles(target, troveList):
     bundles = []
@@ -547,22 +554,23 @@ def getTroveList(src, cfg, mark):
     # avoid committing an incomplete trove. This could happen if the
     # server side only listed some of a trove's components due to
     # server side limits on how many results it can return on each query
-    lastIdx = len(troveList) - 1
+    lastIdx = len(troveList)-1
     # compare with the last one
     ml, (nl,vl,fl), tl = troveList[-1]
     while lastIdx >= 0:
+        lastIdx -= 1
         m, (n,v,f), t = troveList[lastIdx]
         if v == vl and f == fl:
-            lastIdx -= 1
-        else:
-            break
+            continue
+        lastIdx += 1
+        break
     # the min mark of the troves we skip has to be higher than max
     # mark of troves we'll commit or otherwise we'll skip them for good...
     if lastIdx >= 0:
-        firstMark = max([x[0] for x in troveList[:lastIdx+1]])
+        firstMark = max([x[0] for x in troveList[:lastIdx]])
         lastMark = min([x[0] for x in troveList[lastIdx:]])
         if lastMark > firstMark:
-            troveList = troveList[:lastIdx+1]
+            troveList = troveList[:lastIdx]
             log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
     return troveList
 
@@ -581,6 +589,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         else:
             raise RuntimeError("Can not handle unknown target repository type", t)
     log.debug("-" * 20 + " start loop " + "-" * 20)
+
+    hidden = len(targets) > 1 and cfg.useHiddenCommits
+    if hidden:
+        log.debug("will use hidden commits to syncronize target mirrors")
+
     if sync:
         currentMark = -1
     else:
@@ -711,10 +724,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                 cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
                                                      callback = callback)
             except changeset.ChangeSetKeyConflictError, e:
-                splitJobList(jobList, sourceRepos, targetSet, callback = callback)
+                splitJobList(jobList, sourceRepos, targetSet, hidden=hidden,
+                             callback=callback)
             else:
                 for target in targetSet:
-                    target.commitChangeSetFile(tmpName, callback=callback)
+                    target.commitChangeSetFile(tmpName, hidden=hidden, callback=callback)
             try:
                 os.unlink(tmpName)
             except OSError:
@@ -729,6 +743,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         if bundlesMark == 0 or bundlesMark <= currentMark:
             bundlesMark = crtMaxMark # avoid repeating the same query...
         for target in targets:
+            if hidden: # if we've hidden the last commits, show them now
+                target.presentHiddenTroves()
             target.setMirrorMark(bundlesMark)
     # mirroring removed troves requires one by one processing
     for target in targets:
