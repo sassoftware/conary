@@ -433,20 +433,20 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args,
     PyObject ** vals;
     StreamSetDefObject * ssd;
     int i, len, useAlloca = 0;
-    PyObject * attr, * otherAttr, *rc, *skipUnknown = Py_False;
+    PyObject * attr, * otherAttr, *rc, *ignoreUnknown = Py_False;
     StreamSetObject * other;
-    static char * kwlist[] = { "other", "skipUnknown", NULL };
+    static char * kwlist[] = { "other", "ignoreUnknown", NULL };
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O", kwlist,
-				     self->ob_type, &other, &skipUnknown))
+				     self->ob_type, &other, &ignoreUnknown))
         return NULL;
 
-    if (skipUnknown != Py_False && skipUnknown != Py_True) {
-        PyErr_SetString(PyExc_TypeError, "skipUnknown must be boolean");
+    if (ignoreUnknown != Py_False && ignoreUnknown != Py_True) {
+        PyErr_SetString(PyExc_TypeError, "ignoreUnknown must be boolean");
         return NULL;
     }
 
-    if (skipUnknown != Py_True && (self->unknownCount || other->unknownCount)) {
+    if (ignoreUnknown != Py_True && (self->unknownCount || other->unknownCount)) {
         PyErr_SetString(PyExc_ValueError,
                         "Cannot diff streams with unknown tags");
         return NULL;
@@ -468,7 +468,13 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args,
 	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
 	otherAttr = PyObject_GetAttr((PyObject *) other, ssd->tags[i].name);
 
-	vals[i] = PyObject_CallMethod(attr, "diff", "O", otherAttr);
+	if (PyObject_IsInstance((PyObject *) attr,
+				(PyObject *) &allStreams[STREAM_SET].pyType)) {
+	    vals[i] = PyObject_CallMethod(attr, "diff", "OO", otherAttr,
+					  ignoreUnknown);
+	} else {
+	    vals[i] = PyObject_CallMethod(attr, "diff", "O", otherAttr);
+	}
 
 	Py_DECREF(attr);
 	Py_DECREF(otherAttr);
