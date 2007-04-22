@@ -94,6 +94,17 @@ class MirrorConfiguration(MirrorFileConfiguration):
     source = MirrorConfigurationSection
     target = MirrorConfigurationSection
 
+# some sanity checks for the mirror configuration
+def checkConfig(cfg):
+    if not cfg.host:
+        log.error("ERROR: cfg.host is not defined")
+        sys.exit(-1)
+    # make sure that each label belongs to the host we're mirroring
+    for label in cfg.labels:
+        if label.getHost() != cfg.host:
+            log.error("ERROR: label %s is not on host %s", label, cfg.host)
+            sys.exit(-1)
+
 def Main(argv=sys.argv[1:]):
     try:
         options = parseArgs(argv)
@@ -508,6 +519,7 @@ def buildBundles(target, troveList):
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
                      callback = ChangesetCallback()):
+    checkConfig(cfg)
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
     targets = []
