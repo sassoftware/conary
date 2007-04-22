@@ -870,7 +870,10 @@ def setupTempTables(db):
             flags           INTEGER NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["newTroveTroves"] = True
-
+        # XXX: this index helps postgresql and hurts mysql.
+        #db.createIndex("newTroveTroves", "newTroveTrovesIdx", "item",
+        #               check = False)
+        
     if "tmpFileIds" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE
