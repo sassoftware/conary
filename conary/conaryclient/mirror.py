@@ -322,7 +322,7 @@ def displayJobList(jobList):
 
 # mirroring stuff when we are running into PathIdConflict errors
 def splitJobList(jobList, src, targetSet, callback = ChangesetCallback()):
-    log.debug("PathIdConflict detected; splitting job further...")
+    log.debug("Changeset Key conflict detected; splitting job further...")
     jobs = {}
     for job in jobList:
         name = job[0]
@@ -701,7 +701,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         if mark > bundlesMark:
             bundlesMark = mark
     else: # only when we're all done looping advance mark to the new max
-        if bundlesMark == 0 or bundlesMark == currentMark:
+        if bundlesMark == 0 or bundlesMark <= currentMark:
             bundlesMark = crtMaxMark # avoid repeating the same query...
         for target in targets:
             target.setMirrorMark(bundlesMark)
