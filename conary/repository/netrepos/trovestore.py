@@ -682,7 +682,7 @@ class TroveStore:
         
         troveTrovesCursor = self.db.cursor()
         troveTrovesCursor.execute("""
-        SELECT idx, item, version, flavor, flags, Nodes.timeStamps
+        SELECT gtlInst.idx, item, version, flavor, flags, Nodes.timeStamps
         FROM gtlInst
         JOIN TroveTroves using(instanceId)
         JOIN Instances on TroveTroves.includedId = Instances.instanceId
@@ -697,7 +697,7 @@ class TroveStore:
         troveFilesCursor = self.db.cursor()
 	if withFileStreams:
             troveFilesCursor.execute("""
-            SELECT idx, pathId, path, version, fileId, stream
+            SELECT gtlInst.idx, pathId, path, version, fileId, stream
             FROM gtlInst
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
@@ -707,7 +707,7 @@ class TroveStore:
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
         elif withFiles:
             troveFilesCursor.execute("""
-            SELECT idx, pathId, path, version, fileId, NULL
+            SELECT gtlInst.idx, pathId, path, version, fileId, NULL
             FROM gtlInst
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
@@ -720,7 +720,7 @@ class TroveStore:
 
         troveRedirectsCursor = self.db.cursor()
         troveRedirectsCursor.execute("""
-        SELECT idx, item, branch, flavor 
+        SELECT gtlInst.idx, item, branch, flavor 
         FROM gtlInst 
         JOIN TroveRedirects using (instanceId)
         JOIN Items using (itemId)
