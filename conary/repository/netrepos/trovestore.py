@@ -189,7 +189,7 @@ class TroveStore:
         SELECT Items.item, fullVersion, Flavors.flavor
         FROM itf
         JOIN Items on itf.item = Items.item
-        JOIN Versions on itf.version = Versions.versionId
+        JOIN Versions on itf.version = Versions.version
         JOIN Instances on
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId
