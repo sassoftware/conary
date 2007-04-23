@@ -115,6 +115,43 @@ class XMLOpener(urllib.FancyURLopener):
     def open_https(self, url, data=None):
         return self.open_http(url, data=data, ssl=True)
 
+    def _splitport(self, hostport, defaultPort):
+        host, port = urllib.splitport(hostport)
+        if port is None:
+            port = defaultPort
+        return (host, int(port))
+
+    def proxy_ssl(self, proxy, endpoint):
+        host, port = self._splitport(proxy, 3128)
+        endpointHost, endpointPort = self._splitport(endpoint,
+            httplib.HTTPS_PORT)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+
+        sock.sendall("CONNECT %s:%s HTTP/1.0\r\n" %
+                                         (endpointHost, endpointPort))
+        sock.sendall("User-Agent: %s\r\n" % Transport.user_agent)
+        # Proxy-Authorization headers should be present here too
+        sock.sendall('\r\n')
+
+        # Have HTTPResponse parse the status line for us
+        resp = httplib.HTTPResponse(sock, strict=True)
+        resp.begin()
+
+        if resp.status != 200:
+            raise socket.error("Error talking to HTTP proxy %s:%s: %s (%s)" %
+                               (host, port, resp.status, resp.reason))
+
+        # We can safely close the response, it duped the original socket
+        resp.close()
+
+        # Wrap the socket in an SSL socket
+        sslSock = socket.ssl(sock, None, None)
+        h = httplib.HTTP("%s:%s" % (endpointHost, endpointPort))
+        # This is a bit unclean
+        h._conn.sock = httplib.FakeSocket(sock, sslSock)
+        return h
+
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
 	   one magic string -- the content type --
@@ -138,8 +175,7 @@ class XMLOpener(urllib.FancyURLopener):
             urltype, rest = urllib.splittype(selector)
             url = rest
             user_passwd = None
-            # XXX proxy broken with https
-            if urltype.lower() != 'http':
+            if urltype.lower() not in ['http', 'https']:
                 realhost = None
             else:
                 realhost, rest = urllib.splithost(rest)
@@ -157,7 +193,10 @@ class XMLOpener(urllib.FancyURLopener):
         else:
             auth = None
         if ssl:
-            h = httplib.HTTPS(host, None, None)
+            if host != realhost:
+                h = self.proxy_ssl(host, realhost)
+            else:
+                h = httplib.HTTPS(host, None, None)
         else:
             h = httplib.HTTP(host)
         if data is not None:
