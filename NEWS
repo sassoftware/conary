@@ -5,13 +5,30 @@ Changes in @NEW@:
       (CNY-855)
 
   o Bug Fixes:
-    * A corner case affcting server-side matching of troves against
+    * A corner case affecting server-side matching of troves against
       negative flavors has been fixed. (CNY-641)
     * A bug in the StreamSet thaw code that prevented frozen StreamSet
       objects with a tag value greater than 128 from being thawed
       properly has been fixed.
-    * A bug that prevented a creating a diff of a Trove object that
-      contained troveInfo with unknown data has been fixed. (CNY-1569)
+    * A bug has been fixed that prevented creating a diff of a Trove
+      object that contained troveInfo with unknown data. (CNY-1569)
+    * Conary previously determined incorrectly whether or not the
+      rollback stack should be invalidated based on group update
+      scripts. (CNY-1564)
+
+  o Build Changes:
+    * Conary recipes can now directly reference source code through
+      version control systems.  The new r.addMercurialSnapshot(),
+      r.addCvsSnapshot(), and r.addSvnSnapshot() source actions
+      check out repositories and package snapshots.  They are
+      integrated with the "cvc refresh" command for fetching more
+      recent source code from version control repositories. (CNY-1)
+    * The r.replace() function in group recipes now supports the
+      searchPath parameter. (CNY-1574)
+
+  o Repository Changes:
+    * Small race condition in populating the cache for both repositories
+      and proxies has been fixed (CNY-1576)
 
 Changes in 1.1.22:
   o Major Changes:

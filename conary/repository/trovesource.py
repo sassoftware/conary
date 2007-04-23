@@ -33,11 +33,15 @@ class AbstractTroveSource:
         well.
     """
 
+
     def __init__(self, searchableByType=False):
         self._allowNoLabel = True
         self._bestFlavor = False
         self._getLeavesOnly = False
         self._searchableByType = searchableByType
+        self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
+        self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
+        self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
 
     def requiresLabelPath(self):
         return not self._allowNoLabel
@@ -97,7 +101,7 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def findTroves(self, labelPath, troves, defaultFlavor=None, 
-                   acrossLabels=True, acrossFlavors=True, 
+                   acrossLabels=False, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False, 
                    bestFlavor=None, getLeaves=None, 
                    troveTypes=TROVE_QUERY_PRESENT):
@@ -297,7 +301,10 @@ class SearchableTroveSource(AbstractTroveSource):
         # doing so may be impossible and/or expensive - for example, we would 
         # have to instantiate matching troves from changesets before we could
         # filter by flavor.
-        assert(troveTypes == TROVE_QUERY_PRESENT)
+
+        # That said, we just ignore the troveType and assume that
+        # the trove source only has the correct types in it.
+        #assert(troveTypes == TROVE_QUERY_PRESENT)
 
         if bestFlavor:
             flavorFilter = _GET_TROVE_BEST_FLAVOR
@@ -1160,7 +1167,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
         return True
 
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
-                   acrossLabels=True, acrossFlavors=True, 
+                   acrossLabels=False, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False,
                    bestFlavor=None, getLeaves=None,
                    troveTypes=TROVE_QUERY_PRESENT):

@@ -2708,6 +2708,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         """
         if oldCompatibilityClass is None:
             return False
+        assert(type(oldCompatibilityClass) == int)
 
         thisCompatClass = self.getNewCompatibilityClass()
 
@@ -2729,9 +2730,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
             # this may look backwards, but it's a rollback script
             if (cvt.new() == oldCompatibilityClass and
                                 cvt.old() == thisCompatClass):
-                return True
+                return False
 
-        return False
+        return True
 
     def setTroveInfo(self, ti):
         self.absoluteTroveInfo.set((ti.freeze()))

@@ -1811,7 +1811,7 @@ order by
             # instance match, but no entry in TroveInfo
             return 0
 
-        return streams.ShortStream(l[0][0])
+        return streams.ShortStream(l[0][0])()
 
     def findRemovedByName(self, name):
         """
