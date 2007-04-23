@@ -33,11 +33,15 @@ class AbstractTroveSource:
         well.
     """
 
+
     def __init__(self, searchableByType=False):
         self._allowNoLabel = True
         self._bestFlavor = False
         self._getLeavesOnly = False
         self._searchableByType = searchableByType
+        self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
+        self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
+        self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
 
     def requiresLabelPath(self):
         return not self._allowNoLabel
