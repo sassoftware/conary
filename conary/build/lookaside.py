@@ -32,8 +32,10 @@ import urllib2
 import urlparse
 import cookielib
 
-# location is normally the package name. lookaside is for something populated
-# by a method other than lookaside lookups
+# location is normally the package name.
+# lookaside:// is used internally only for things that are inserted
+# into the cache but managed by calling code.  It should not be
+# referenced from recipes
 networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://',
                    'lookaside://')
 

@@ -427,7 +427,7 @@ class addArchive(_Source):
                 self.recipe.mainDir(oldMainDir)
 Archive = addArchive
 
-class addPatch(addArchive):
+class addPatch(_Source):
     """
     NAME
     ====
