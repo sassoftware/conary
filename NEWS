@@ -27,6 +27,10 @@ Changes in @NEW@:
       integrated with the "cvc refresh" command for fetching more
       recent source code from version control repositories. (CNY-1)
 
+  o Repository Changes:
+    * Small race condition in populating the cache for both repositories
+      and proxies has been fixed (CNY-1576)
+
 Changes in 1.1.22:
   o Major Changes:
     * Group troves can now declare an (integer) compatibility class
