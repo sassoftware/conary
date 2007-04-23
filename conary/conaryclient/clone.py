@@ -592,8 +592,8 @@ class ClientClone:
         if trv.getName().endswith(':source') and not infoOnly:
             try:
                 cl = cloneJob.options.callback.getCloneChangeLog(trv)
-            except:
-                log.error(str(cl))
+            except Exception, e:
+                log.error(str(e))
                 return None
 
             if cl is None:
