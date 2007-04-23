@@ -12,6 +12,8 @@ Changes in @NEW@:
       properly has been fixed.
     * A bug that prevented a creating a diff of a Trove object that
       contained troveInfo with unknown data has been fixed. (CNY-1569)
+    * Determination of whether or not the rollback stack should be
+      invalidated based on group update scripts was incorrect (CNY-1564)
 
 Changes in 1.1.22:
   o Major Changes:

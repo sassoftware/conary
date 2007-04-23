@@ -2706,8 +2706,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
         oldCompatibilityClass of None means we don't use compatibility
         class checks to restruct rollbacks.
         """
+        import epdb
+        epdb.st('f')
         if oldCompatibilityClass is None:
             return False
+        assert(type(oldCompatibilityClass) == int)
 
         thisCompatClass = self.getNewCompatibilityClass()
 
@@ -2729,9 +2732,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
             # this may look backwards, but it's a rollback script
             if (cvt.new() == oldCompatibilityClass and
                                 cvt.old() == thisCompatClass):
-                return True
+                return False
 
-        return False
+        return True
 
     def setTroveInfo(self, ti):
         self.absoluteTroveInfo.set((ti.freeze()))
