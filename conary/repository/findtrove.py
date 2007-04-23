@@ -942,6 +942,10 @@ class TroveFinder:
         self.acrossFlavors = acrossFlavors
         if labelPath and not hasattr(labelPath, '__iter__'):
             labelPath = [ labelPath ]
+        if not labelPath:
+            # if you don't pass in a label, we may have to generate a label
+            # list.  In that case, we should always return all results.
+            acrossLabels = True
         self.labelPath = labelPath
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
