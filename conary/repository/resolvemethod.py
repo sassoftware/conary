@@ -210,6 +210,7 @@ class DepResolutionByLabelPath(DepResolutionMethod):
         DepResolutionMethod.__init__(self, cfg, db, flavor)
         self.index = 0
         self.depList = None
+        self.fullDepList = None
         self.searchMethod = searchMethod
         self.setLabelPath(installLabelPath)
 
@@ -246,6 +247,7 @@ class DepResolutionByLabelPath(DepResolutionMethod):
         if not depList:
             return False
 
+        self.fullDepList = depList
         newDepList = [ x[1] for x in depList ]
         if newDepList != self.depList:
             self.index = 0
@@ -261,8 +263,13 @@ class DepResolutionByLabelPath(DepResolutionMethod):
     def resolveDependencies(self):
         try:
             label, leavesOnly = self._labelPathWithLeaves[self.index]
-            return self.troveSource.resolveDependencies(label,
-                            self.depList, leavesOnly=leavesOnly)
+            if hasattr(self.troveSource, 'resolveDependenciesWithFilter'):
+                return self.troveSource.resolveDependenciesWithFilter(label,
+                                self.fullDepList, self.filterSuggestions,
+                                leavesOnly=leavesOnly)
+            else:
+                return self.troveSource.resolveDependencies(label,
+                                self.depList, leavesOnly=leavesOnly)
         except repoerrors.OpenError, err:
             log.warning('Could not access %s for dependency resolution: %s' % (
                                 self._labelPathWithLeaves[self.index][0], err))
