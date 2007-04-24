@@ -1,16 +1,16 @@
 Changes in @NEW@:
   o Client Changes:
-    * A new command, conary rdiff, has been added. This allows one to
-      inspect the differences between two troves from a repository.
-      (CNY-855)
+    * A new command, "conary rdiff", has been added. This allows one
+      to inspect the differences between any two troves with the same
+      name. (CNY-855)
 
   o Build Changes:
     * Conary recipes can now directly reference source code through
       version control systems.  The new r.addMercurialSnapshot(),
-      r.addCvsSnapshot(), and r.addSvnSnapshot() source actions
-      check out repositories and package snapshots.  They are
-      integrated with the "cvc refresh" command for fetching more
-      recent source code from version control repositories. (CNY-1)
+      r.addCvsSnapshot(), and r.addSvnSnapshot() source actions check
+      out repositories and create snapshots.  They are integrated with
+      the "cvc refresh" command for fetching more recent source code
+      from version control repositories. (CNY-1)
     * The r.replace() function in group recipes now supports the
       searchPath parameter. (CNY-1574)
 
@@ -22,14 +22,14 @@ Changes in @NEW@:
       properly has been fixed.
     * A bug has been fixed that prevented creating a diff of a Trove
       object that contained troveInfo with unknown data. (CNY-1569)
-    * Conary previously determined incorrectly whether or not the
-      rollback stack should be invalidated based on group update
-      scripts. (CNY-1564)
-    * A bug that caused an unhandled exception in the proxy when it
-      attempted to create a changeset from a pre-Conary-1.1.x server
-      has been fixed.
-    * Small race condition in populating the cache for both repositories
-      and proxies has been fixed (CNY-1576)
+    * A bug in the logic used by Conary to determine whether or not
+      the rollback stack should be invalidated based on group update
+      scripts has been fixed. (CNY-1564)
+    * A bug that caused an unhandled exception in a Conary proxy when
+      it attempted to create a changeset from a pre-Conary-1.1.x
+      server has been fixed.
+    * Small race condition in populating the cache for both
+      repositories and proxies has been fixed (CNY-1576)
 
 Changes in 1.1.22:
   o Major Changes:
