@@ -2204,21 +2204,13 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
     """
+
     protocol, uri = urllib.splittype(url)
     assert(protocol in ('http', 'https'))
 
-    if proxies is None:
-        proxy = os.environ.get('%s_proxy' % protocol, url)
-    else:
-        proxy = proxies.get(protocol, url)
-
-    protocol, uri = urllib.splittype(proxy)
-    host = urllib.splithost(uri)[0]
-
-    if protocol == 'http':
-        c = httplib.HTTPConnection(host)
-    else:
-        c = httplib.HTTPSConnection(host)
+    opener = transport.XMLOpener(proxies=proxies)
+    c, selector, headers = opener.createConnection(uri,
+        ssl = (protocol == 'https'), withProxy=True)
 
     BUFSIZE = 8192
 
@@ -2230,8 +2222,9 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
         callbackFn = wrapper.callback
 
     c.connect()
-    c.putrequest("PUT", url)
-    c.url = url
+    c.putrequest("PUT", selector)
+    for k, v in headers:
+        c.putheader(k, v)
 
     if chunked:
         c.putheader('Transfer-Encoding', 'chunked')
@@ -2264,5 +2257,5 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
         util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
                          rateLimit = rateLimit, sizeLimit = size)
 
-    r = c.getresponse()
-    return r.status, r.reason
+    errcode, errmsg, headers = c.getreply()
+    return errcode, errmsg

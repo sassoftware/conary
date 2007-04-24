@@ -18,6 +18,7 @@
 
 import base64
 import httplib
+import itertools
 import select
 import socket
 import time
@@ -152,14 +153,21 @@ class XMLOpener(urllib.FancyURLopener):
         h._conn.sock = httplib.FakeSocket(sock, sslSock)
         return h
 
-    def open_http(self, url, data=None, ssl=False):
-        """override this WHOLE FUNCTION to change
-	   one magic string -- the content type --
-	   which is hardcoded in (this version also supports https)"""
+    def createConnection(self, url, ssl=False, withProxy=False):
+        # Return an HTTP or HTTPS class suitable for use by open_http
         if ssl:
             protocol='https'
         else:
             protocol='http'
+
+        if withProxy:
+            # XXX this is duplicating work done in urllib.URLoperner.open
+            proxy = self.proxies.get(protocol, None)
+            if proxy:
+                urltype, proxyhost = urllib.splittype(proxy)
+                host, selector = splithost(proxyhost)
+                url = (host, url)
+
         user_passwd = None
         if isinstance(url, str):
             host, selector = urllib.splithost(url)
@@ -199,6 +207,23 @@ class XMLOpener(urllib.FancyURLopener):
                 h = httplib.HTTPS(host, None, None)
         else:
             h = httplib.HTTP(host)
+
+        headers = []
+        if realhost:
+            headers.append(('Host', realhost))
+        else:
+            headers.append(('Host', host))
+        if auth:
+            headers.append(('Authorization', 'Basic %s' % auth))
+        return h, selector, headers
+
+    def open_http(self, url, data=None, ssl=False):
+        """override this WHOLE FUNCTION to change
+	   one magic string -- the content type --
+	   which is hardcoded in (this version also supports https)"""
+        # Splitting some of the functionality so we can reuse this code with
+        # PUT requests too
+        h, selector, headers = self.createConnection(url, ssl=ssl)
         if data is not None:
             h.putrequest('POST', selector)
             if self.compress:
@@ -209,13 +234,7 @@ class XMLOpener(urllib.FancyURLopener):
             h.putheader('Accept-encoding', 'deflate')
         else:
             h.putrequest('GET', selector)
-        if auth:
-            h.putheader('Authorization', 'Basic %s' % auth)
-        if realhost:
-            h.putheader('Host', realhost)
-        else:
-            h.putheader('Host', host)
-        for args in self.addheaders:
+        for args in itertools.chain(headers, self.addheaders):
             h.putheader(*args)
         h.endheaders()
         if data is not None:
