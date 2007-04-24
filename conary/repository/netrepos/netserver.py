@@ -43,7 +43,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ]
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -151,6 +151,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'setTroveSigs',
                         'getNewPGPKeys',
                         'addPGPKeyList',
+                        'getNewTroveInfo',
                         'getNewTroveList',
                         'getTroveInfo',
                         'getTroveReferences',
@@ -2642,6 +2643,79 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if self.auth.checkTrove(pattern, name):
                 l.add((mark, (name, version, flavor)))
         return list(l)
+
+    @accessReadOnly
+    def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes):
+        # only show troves the user is allowed to see
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
+        self.log(2, mark)
+        cu = self.db.cursor()
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return []
+        if infoTypes:
+            try:
+                infoTypes = [int(x) for x in infoTypes]
+            except:
+                raise errors.InsufficientPermission
+            infoTypeLimiter = ('AND TroveInfo.infoType IN (%s)'
+                               %(','.join(str(x) for x in infoTypes)))
+        else:
+            infoTypeLimiter = ''
+        query = """
+        SELECT UP.permittedTrove, item, version, flavor,
+               infoType, data
+        FROM Instances
+        JOIN TroveInfo USING (instanceId)
+        JOIN Nodes ON
+             Instances.itemId = Nodes.itemId AND
+             Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+             Nodes.itemId = LabelMap.itemId AND
+             Nodes.branchId = LabelMap.branchId
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
+              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed <= ?
+          AND Instances.isPresent = ?
+          AND TroveInfo.changed >= ?
+          %s
+        ORDER BY instanceId, TroveInfo.changed
+        """ % (",".join("%d" % x for x in userGroupIds), infoTypeLimiter)
+        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark))
+
+        l = set()
+        currentTrove = None
+        currentTroveInfo = None
+        for pattern, name, version, flavor, tag, data in cu:
+            if self.auth.checkTrove(pattern, name):
+                t = (name, version, flavor)
+                if currentTrove != t:
+                    if currentTroveInfo != None:
+                        l.add((currentTrove, currentTroveInfo.freeze()))
+                    currentTrove = t
+                    currentTroveInfo = trove.TroveInfo()
+                if tag == -1:
+                    currentTroveInfo.thaw(cu.frombinary(data))
+                else:
+                    name = currentTroveInfo.streamDict[tag][2]
+                    currentTroveInfo.__getattribute__(name).thaw(cu.frombinary(data))
+        if currentTrove:
+            l.add((currentTrove, currentTroveInfo.freeze()))
+        return [ (x[0], base64.b64encode(x[1])) for x in l ]
 
     @accessReadOnly
     def getTroveSigs(self, authToken, clientVersion, infoList):
