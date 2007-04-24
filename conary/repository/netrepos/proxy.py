@@ -411,10 +411,14 @@ class ChangesetFilter(BaseProxy):
 
             if path is None:
                 # the changeset isn't in the cache.  create it
-                url, sizes, trovesNeeded, filesNeeded, removedTroves = \
-                    caller.getChangeSet(
-                              getCsVersion, [ rawJob ], recurse, withFiles,
-                              withFileContents, excludeAutoSource)[1]
+                rc = caller.getChangeSet(getCsVersion, [ rawJob ],
+                                         recurse, withFiles, withFileContents,
+                                         excludeAutoSource)[1]
+                removedTroves = []
+                if getCsVersion < 38:
+                    url, sizes, trovesNeeded, filesNeeded = rc
+                else:
+                    url, sizes, trovesNeeded, filesNeeded, removedTroves = rc
                 assert(len(sizes) == 1)
                 # ensure that the size is an integer -- protocol version
                 # 44 returns a string to avoid XML-RPC marshal limits

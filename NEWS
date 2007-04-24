@@ -15,6 +15,9 @@ Changes in @NEW@:
     * Conary previously determined incorrectly whether or not the
       rollback stack should be invalidated based on group update
       scripts. (CNY-1564)
+    * A bug that caused an unhandled exception in the proxy when it
+      attempted to create a changeset from a pre-Conary-1.1.x server
+      has been fixed.
 
   o Build Changes:
     * Conary recipes can now directly reference source code through
