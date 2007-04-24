@@ -118,7 +118,7 @@ class MigrateTo_14(SchemaMigration):
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 3)
+    Version = (15, 4)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -381,23 +381,29 @@ class MigrateTo_15(SchemaMigration):
         self.db.loadSchema()
         schema.createSchema(self.db)
         return True
+    # conary 1.1.22 went out with a busted definition of LabelMap - we need to fix it
+    def migrate4(self):
+        return createLabelMap(self.db)
 
+# looks like this LabelMap has to be recreated multiple times by
+# different stages of migraton :-(
+def createLabelMap(db):
+    cu = db.cursor()
+    cu.execute("create table OldLabelMap as select * from LabelMap")
+    cu.execute("drop table LabelMap")
+    db.loadSchema()
+    schema.createLabelMap(db)
+    cu.execute("insert into LabelMap (itemId, labelId, branchId) "
+               "select itemId, labelId, branchId from OldLabelMap ")
+    cu.execute("drop table OldLabelMap")
+    db.loadSchema()
+    return True
+    
 class MigrateTo_16(SchemaMigration):
     Version = (16.0)
-    def migrate0(self):
-        # create a primary key for labelmap
-        cu = self.db.cursor()
-        cu.execute("create table OldLabelMap as select * from LabelMap")
-        cu.execute("drop table LabelMap")
-        self.db.loadSchema()
-        schema.createLabelMap(self.db)
-        cu.execute("insert into LabelMap (itemId, labelId, branchId) "
-                   "select itemId, labelId, branchId from OldLabelMap ")
-        cu.execute("drop table OldLabelMap")
-        self.db.loadSchema()
-        return True
+    # create a primary key for labelmap
     def migrate(self):
-        return self.migrate0()
+        return createLabelMap(self.db)
 
 def _getMigration(major):
     try:
