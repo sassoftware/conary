@@ -1,7 +1,4 @@
 Changes in @NEW@:
-  o Build Changes:
-    * r.replace() now supports the searchPath parameter. (CNY-1574)
-
   o Client Changes:
     * A new command, conary rdiff, has been added. This allows one to
       inspect the differences between two troves from a repository.
@@ -26,6 +23,12 @@ Changes in @NEW@:
       check out repositories and package snapshots.  They are
       integrated with the "cvc refresh" command for fetching more
       recent source code from version control repositories. (CNY-1)
+    * The r.replace() function in group recipes now supports the
+      searchPath parameter. (CNY-1574)
+
+  o Repository Changes:
+    * Small race condition in populating the cache for both repositories
+      and proxies has been fixed (CNY-1576)
 
 Changes in 1.1.22:
   o Major Changes:
