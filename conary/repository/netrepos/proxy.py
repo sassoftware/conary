@@ -390,7 +390,8 @@ class ChangesetFilter(BaseProxy):
                 # empty fingerprint means "do not cache"
                 fullPrint = fingerprint + '-%d' % neededCsVersion
                 csPath = self.csCache.hashToPath(fullPrint)
-                if os.path.exists(csPath):
+                dataPath = csPath + '.data'
+                if os.path.exists(csPath) and os.path.exists(dataPath):
                     # touch to refresh atime; try/except protects against race
                     # with someone removing the entry during the time it took
                     # you to read this comment
@@ -400,7 +401,7 @@ class ChangesetFilter(BaseProxy):
                     except:
                         pass
 
-                    data = open(csPath + '.data')
+                    data = open(dataPath)
                     (trovesNeeded, filesNeeded, removedTroves), size = \
                         cPickle.loads(data.read())
                     sizes = [ size ]

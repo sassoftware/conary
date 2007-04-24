@@ -16,7 +16,7 @@
 
 from conary.repository import changeset, errors, filecontents
 from conary import files, trove
-from conary.lib import log, patch, openpgpkey, openpgpfile
+from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper
 
 class AbstractTroveDatabase:
 
@@ -469,7 +469,7 @@ class ChangeSetJob:
                             except errors.FileStreamMissing:
                                 # Missing from the repo; raise exception
                                 raise errors.IntegrityError(
-                                    "Incomplete changeset specified")
+                                    "Incomplete changeset specified: missing pathId %s fileId %s" % (sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
                         fileObj = None
                         fileStream = None
                     else:
@@ -573,7 +573,10 @@ class ChangeSetJob:
                     f = self.repos.getFileContents(
                                     [(oldFileId, oldVersion, oldfile)])[0].get()
                 except KeyError:
-                    raise errors.IntegrityError
+                    raise errors.IntegrityError(
+                        "Missing file contents for pathId %s, fileId %s" % (
+                                        sha1helper.md5ToString(pathId),
+                                        sha1helper.sha1ToString(fileId)))
 
 		oldLines = f.readlines()
                 f.close()
@@ -608,7 +611,10 @@ class ChangeSetJob:
                 (contType, fileContents) = cs.getFileContents(pathId, fileId,
                                                               compressed = True)
             except KeyError:
-                raise errors.IntegrityError
+                raise errors.IntegrityError(
+                        "Missing file contents for pathId %s, fileId %s" % (
+                                        sha1helper.md5ToString(pathId),
+                                        sha1helper.sha1ToString(fileId)))
             if contType == changeset.ChangedFileTypes.ptr:
                 ptrRestores.append(sha1)
                 continue

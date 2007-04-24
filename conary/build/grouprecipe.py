@@ -1186,7 +1186,7 @@ class GroupRecipe(_BaseGroupRecipe):
         return GroupReference(((name, versionStr, flavor),), ref)
 
     def replace(self, name, newVersionStr = None, newFlavor = None, ref = None,
-                groupName = None, allowNoMatch = False):
+                groupName = None, allowNoMatch = False, searchPath = None):
         """
         NAME
         ====
@@ -1196,7 +1196,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}], [I{allowNoMatch}])}
+        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}], [I{allowNoMatch}], [I{searchPath}])}
 
         DESCRIPTION
         ===========
@@ -1226,6 +1226,10 @@ class GroupRecipe(_BaseGroupRecipe):
         B{allowNoMatch} : (False) Silences the warning output if this replace
         did not match anything.
 
+        B{searchPath} : (None) Set a specific searchPath to search for this
+        particular trove.  This overrides the B{ref} flag.  See setSearchPath
+        for a description of how the searchPath works.
+
         EXAMPLES
         ========
 
@@ -1234,6 +1238,8 @@ class GroupRecipe(_BaseGroupRecipe):
 	Uses C{r.replace} to remove all instances of the C{distro-release}
 	trove, and replaces them with a new version of C{distro-release}.
         """
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
         newFlavor = self._parseFlavor(newFlavor)
         if groupName is None:
             self.replaceSpecs.append((((name, newVersionStr, newFlavor), ref),
