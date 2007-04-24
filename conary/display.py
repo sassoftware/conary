@@ -804,7 +804,7 @@ class TroveFormatter(TroveTupFormatter):
                 sha1 = ' '*41
 
         if dcfg.ids and pathId:
-            id = md5ToString(pathId) + ' ' + sha1ToString(fileObj.fileId()) + ', '
+            id = md5ToString(pathId) + ' ' + sha1ToString(fileId) + ', '
         if dcfg.fileVersions:
             if dcfg.useFullVersions():
                 verStr = '    %s' % version
@@ -817,12 +817,13 @@ class TroveFormatter(TroveTupFormatter):
 
         spacer = '  ' * indent
 
-        owner = fileObj.inode.owner()
-        if owner[0] == '+':
-            owner = owner[1:]
-        group = fileObj.inode.group()
-        if group[0] == '+':
-            group = group[1:]
+        if fileObj:
+            owner = fileObj.inode.owner()
+            if owner[0] == '+':
+                owner = owner[1:]
+            group = fileObj.inode.group()
+            if group[0] == '+':
+                group = group[1:]
 
         if verbose: 
             ln = "%s%s%s%s%s    1 %-8s %-8s %s %s %s%s%s%s" % \
