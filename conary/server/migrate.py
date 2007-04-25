@@ -257,19 +257,20 @@ class MigrateTo_15(SchemaMigration):
 
     # fix the duplicate path problems, if any
     def fixDuplicatePaths(self, cu, repos):
-        self.db.dropIndex("TroveFiles", "TroveFilesPathIdx")
+        logMe(2, "checking database for duplicate path entries...")
         # it is faster to select all the (instanceId, path) pairs into
         # an indexed table than create a non-unique index, do work,
         # drop the non-unique index and recreate it as a unique one
+        self.db.loadSchema()
         cu.execute("""
-        create temporary table tmpDupPath(
+        create table tmpDupPath(
             instanceId integer not null,
             path varchar(767) not null
         ) %(TABLEOPTS)s""" % self.db.keywords)
         self.db.createIndex("tmpDupPath", "tmpDupPathIdx",
                             "instanceId, path", check = False)
         cu.execute("""
-        create temporary table tmpDups(
+        create table tmpDups(
             counter integer,
             instanceId integer,
             path varchar(767)
@@ -285,6 +286,9 @@ class MigrateTo_15(SchemaMigration):
         group by instanceId, path
         having count(*) > 1""")
         counter = cu.execute("select count(*) from tmpDups").fetchall()[0][0]
+        if counter > 0:
+            # drop the old index, if any
+            self.db.dropIndex("TroveFiles", "TroveFilesPathIdx")
         logMe(3, "detected %d duplicates" % (counter,))
         # loop over every duplicate and apply the appropiate fix
         cu.execute("select instanceId, path from tmpDups")
@@ -307,7 +311,6 @@ class MigrateTo_15(SchemaMigration):
                 # need to recompute the sha1 - we might have changed the trove manifest
                 # if the records were different
                 self.fixTroveSig(repos, instanceId)
-
         # recreate the indexes and triggers - including new path
         # index for TroveFiles.  Also recreates the indexes table.
         logMe(2, 'Recreating indexes... (this could take a while)')
@@ -352,8 +355,8 @@ class MigrateTo_15(SchemaMigration):
         # needed for signature recalculation
         repos = trovestore.TroveStore(self.db)
         self.dropViews()
-        self.fixRedirects(cu, repos)
         self.fixDuplicatePaths(cu, repos)
+        self.fixRedirects(cu, repos)
         self.fixPermissions()
         self.updateLatest(cu)
         return True
