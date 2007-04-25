@@ -2803,6 +2803,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             i = -1
             for (instanceId,), (trvTuple, trvInfo) in itertools.izip(instanceIds, iList):
                 for infoType, data in streams.splitFrozenStreamSet(base64.b64decode(trvInfo)):
+                    # make sure that only signatures and metadata
+                    # are modified
+                    if infoType not in (trove._TROVEINFO_TAG_SIGS,
+                                        trove._TROVEINFO_TAG_METADATA):
+                        continue
                     i += 1
                     yield (i, instanceId, infoType, cu.binary(data))
         updateTroveInfo = list(_trvInfoIter(cu, infoList))
