@@ -390,10 +390,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # not run on production servers
             import traceback
             from conary.lib import debugger
-            debugger.st()
             excInfo = sys.exc_info()
             lines = traceback.format_exception(*excInfo)
-            print "".joinfields(lines)
+            print "".join(lines)
             if 1 or sys.stdout.isatty() and sys.stdin.isatty():
 		debugger.post_mortem(excInfo[2])
             raise
@@ -2785,7 +2784,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             for (instanceId,), (trvTuple, trvInfo) in itertools.izip(instanceIds, iList):
                 for infoType, data in streams.splitFrozenStreamSet(base64.b64decode(trvInfo)):
                     i += 1
-                    yield (i, instanceId, infoType, data)
+                    yield (i, instanceId, infoType, cu.binary(data))
         updateTroveInfo = list(_trvInfoIter(cu, infoList))
         cu.executemany("insert into updateTroveInfo (idx, instanceId, infoType, data) "
                        "values (?,?,?,?)", updateTroveInfo)
@@ -2803,6 +2802,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             info = updateTroveInfo[idx]
             cu.execute("update troveInfo set data=? where infoType=? and "
                        "instanceId=?", (info[3], info[2], info[1]))
+        #first update the existing entries
+        # mysql could do it this way
+##         cu.execute("""
+##         update TroveInfo join UpdateTroveInfo as uti on
+##             TroveInfo.instanceId = uti.instanceId
+##             and TroveInfo.infoType = uti.infoType
+##         set troveInfo.data=uti.data
+##         """)
 
         # now insert the rest
         cu.execute("""
