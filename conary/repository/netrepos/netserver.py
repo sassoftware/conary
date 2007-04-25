@@ -20,7 +20,7 @@ import sys
 import tempfile
 import time
 
-from conary import files, trove, versions
+from conary import files, trove, versions, streams
 from conary.conarycfg import CfgProxy, CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
@@ -43,7 +43,7 @@ from conary.errors import InvalidRegex
 # a list of the protocol versions we understand. Make sure the first
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version
-SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46 ]
+SERVER_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ]
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -151,6 +151,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'setTroveSigs',
                         'getNewPGPKeys',
                         'addPGPKeyList',
+                        'getNewTroveInfo',
+                        'setTroveInfo',
                         'getNewTroveList',
                         'getTroveInfo',
                         'getTroveReferences',
@@ -388,10 +390,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # not run on production servers
             import traceback
             from conary.lib import debugger
-            debugger.st()
             excInfo = sys.exc_info()
             lines = traceback.format_exception(*excInfo)
-            print "".joinfields(lines)
+            print "".join(lines)
             if 1 or sys.stdout.isatty() and sys.stdin.isatty():
 		debugger.post_mortem(excInfo[2])
             raise
@@ -1528,7 +1529,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         authCheckFn = lambda n, v, f: \
                 self.auth.check(authToken, write = False,
                                        trove = n, label = v.trailingLabel())
-
         # Big try-except to clean up files
         try:
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
@@ -1572,14 +1572,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSetFingerprints(self, authToken, clientVersion, chgSetList,
                     recurse, withFiles, withFileContents, excludeAutoSource):
 
-        def _troveFp(troveInfo, sig):
-            if not sig:
+        def _troveFp(troveInfo, sig, meta):
+            if not sig and not meta:
                 return "otherrepo"
 
-            (present, sigBlock) = sig
-            if present >= 1:
-                return (base64.decodestring(sigBlock), )
-
+            (sigPresent, sigBlock) = sig
+            l = []
+            if sigPresent >= 1:
+                l.append(base64.decodestring(sigBlock))
+            (metaPresent, metaBlock) = meta
+            if metaPresent >= 1:
+                l.append(base64.decodestring(metaBlock))
+            if sigPresent or metaPresent:
+                return tuple(l)
             return ("missing", ) + troveInfo
 
         if recurse:
@@ -1682,13 +1687,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pureSigList = self.getTroveInfo(authToken, clientVersion,
                                         trove._TROVEINFO_TAG_SIGS,
                                         [ x for x in sigItems if x ])
+        pureMetaList = self.getTroveInfo(authToken, clientVersion,
+                                        trove._TROVEINFO_TAG_METADATA,
+                                        [ x for x in sigItems if x ])
         sigList = []
+        metaList = []
         sigCount = 0
         for item in sigItems:
             if not item:
                 sigList.append(None)
+                metaList.append(None)
             else:
                 sigList.append(pureSigList[sigCount])
+                metaList.append(pureMetaList[sigCount])
                 sigCount += 1
 
         # 0 is a version number for this signature block; changing this will
@@ -1708,10 +1719,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         origJob[2][0], origJob[2][1], "%d" % origJob[3] ]
             for job in fullJob:
                 if job[1][0]:
-                    fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
+                    fpList += _troveFp(sigItems[sigCount], sigList[sigCount],
+                                       metaList[sigCount])
                     sigCount += 1
 
-                fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
+                fpList += _troveFp(sigItems[sigCount], sigList[sigCount],
+                                   metaList[sigCount])
                 sigCount += 1
 
             fp = sha1helper.sha1String("\0".join(fpList))
@@ -2642,6 +2655,192 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if self.auth.checkTrove(pattern, name):
                 l.add((mark, (name, version, flavor)))
         return list(l)
+
+    @accessReadOnly
+    def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
+                        labels):
+        # only show troves the user is allowed to see
+        try:
+            mark = long(mark)
+        except: # deny invalid marks
+            raise errors.InsufficientPermission
+        self.log(2, mark)
+        cu = self.db.cursor()
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+            return []
+        if infoTypes:
+            try:
+                infoTypes = [int(x) for x in infoTypes]
+            except:
+                raise errors.InsufficientPermission
+            infoTypeLimiter = ('AND TroveInfo.infoType IN (%s)'
+                               %(','.join(str(x) for x in infoTypes)))
+        else:
+            infoTypeLimiter = ''
+        if labels:
+            try:
+                [ self.toLabel(x) for x in labels ]
+            except:
+                raise errors.InsufficientPermission
+            cu.execute('select labelId from labels where label in (%s)'
+                       % ('?',) * len(labels), labels)
+            labelIds = [ str(x[0]) for x in cu.fetchall() ]
+            if not labelIds:
+                # no labels matched, short circuit
+                return []
+            labelLimit = 'AND LabelMap.labelId in (%s)' % (','.join(labelIds))
+        else:
+            labelLimit = ''
+        query = """
+        SELECT UP.permittedTrove, item, version, flavor,
+               infoType, data
+        FROM Instances
+        JOIN TroveInfo USING (instanceId)
+        JOIN Nodes ON
+             Instances.itemId = Nodes.itemId AND
+             Instances.versionId = Nodes.versionId
+        JOIN LabelMap ON
+             Nodes.itemId = LabelMap.itemId AND
+             Nodes.branchId = LabelMap.branchId
+        JOIN (SELECT
+                  Permissions.labelId as labelId,
+                  PerItems.item as permittedTrove,
+                  Permissions.permissionId as aclId
+              FROM Permissions
+              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
+              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
+              WHERE Permissions.userGroupId in (%s)
+                AND UserGroups.canMirror = 1
+             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN Versions ON Instances.versionId = Versions.versionId
+        JOIN Flavors ON Instances.flavorId = flavors.flavorId
+        WHERE Instances.changed <= ?
+          AND Instances.isPresent = ?
+          AND TroveInfo.changed >= ?
+          %s
+          %s
+        ORDER BY instanceId, TroveInfo.changed
+        """ % (",".join("%d" % x for x in userGroupIds), infoTypeLimiter,
+               labelLimit)
+        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark))
+
+        l = set()
+        currentTrove = None
+        currentTroveInfo = None
+        for pattern, name, version, flavor, tag, data in cu:
+            if self.auth.checkTrove(pattern, name):
+                t = (name, version, flavor)
+                if currentTrove != t:
+                    if currentTroveInfo != None:
+                        l.add((currentTrove, currentTroveInfo.freeze()))
+                    currentTrove = t
+                    currentTroveInfo = trove.TroveInfo()
+                if tag == -1:
+                    currentTroveInfo.thaw(cu.frombinary(data))
+                else:
+                    name = currentTroveInfo.streamDict[tag][2]
+                    currentTroveInfo.__getattribute__(name).thaw(cu.frombinary(data))
+        if currentTrove:
+            l.add((currentTrove, currentTroveInfo.freeze()))
+        return [ (x[0], base64.b64encode(x[1])) for x in l ]
+
+    @accessReadWrite
+    def setTroveInfo(self, authToken, clientVersion, infoList):
+        # return the number of signatures which have changed
+        self.log(2, infoList)
+        # batch permission check for writing
+        if False in self.auth.batchCheck(authToken, [
+            (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+        updateCount = 0
+
+        # look up if we have all the troves we're asked
+        schema.resetTable(cu, "gtl")
+        schema.resetTable(cu, "gtlInst")
+        schema.resetTable(cu, "updateTroveInfo")
+        for (n,v,f), info in infoList:
+            cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
+                       (n,v,f))
+        self.db.analyze("gtl")
+        # we'll need the min idx to account for differences in SQL backends
+        cu.execute("SELECT MIN(idx) from gtl")
+        minIdx = cu.fetchone()[0]
+
+        cu.execute("""
+        insert into gtlInst(idx, instanceId)
+        select idx, Instances.instanceId
+        from gtl
+        join Items on gtl.name = Items.item
+        join Versions on gtl.version = Versions.version
+        join Flavors on gtl.flavor = Flavors.flavor
+        join Instances on
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        """)
+        self.db.analyze("gtlInst")
+        # see what troves are missing, if any
+        cu.execute("""
+        select gtl.idx
+        from gtl left join gtlInst on gtl.idx = gtlInst.idx
+        where gtlInst.instanceId is NULL
+        """)
+        ret = cu.fetchall()
+        if len(ret):
+            # we'll report the first one
+            i = ret[0][0] - minIdx
+            raise errors.TroveMissing(infoList[i][0][0], infoList[i][0][1])
+
+        cu.execute('select instanceId from gtlInst order by idx')
+        def _trvInfoIter(instanceIds, iList):
+            i = -1
+            for (instanceId,), (trvTuple, trvInfo) in itertools.izip(instanceIds, iList):
+                for infoType, data in streams.splitFrozenStreamSet(base64.b64decode(trvInfo)):
+                    i += 1
+                    yield (i, instanceId, infoType, cu.binary(data))
+        updateTroveInfo = list(_trvInfoIter(cu, infoList))
+        cu.executemany("insert into updateTroveInfo (idx, instanceId, infoType, data) "
+                       "values (?,?,?,?)", updateTroveInfo)
+
+        # first update the existing entries
+        cu.execute("""
+        select uti.idx
+        from updateTroveInfo as uti
+        join TroveInfo on
+            TroveInfo.instanceId = uti.instanceId
+            and TroveInfo.infoType = uti.infoType
+        """)
+        rows = cu.fetchall()
+        for (idx,) in rows:
+            info = updateTroveInfo[idx]
+            cu.execute("update troveInfo set data=? where infoType=? and "
+                       "instanceId=?", (info[3], info[2], info[1]))
+        #first update the existing entries
+        # mysql could do it this way
+##         cu.execute("""
+##         update TroveInfo join UpdateTroveInfo as uti on
+##             TroveInfo.instanceId = uti.instanceId
+##             and TroveInfo.infoType = uti.infoType
+##         set troveInfo.data=uti.data
+##         """)
+
+        # now insert the rest
+        cu.execute("""
+        insert into TroveInfo (instanceId, infoType, data)
+        select uti.instanceId, uti.infoType, uti.data
+        from updateTroveInfo as uti
+        left join TroveInfo on
+            TroveInfo.instanceId = uti.instanceId
+            and TroveInfo.infoType = uti.infoType
+        where troveInfo.instanceId is NULL
+        """)
+
+        self.log(3, "updated trove info for", len(updateTroveInfo), "troves")
+        return len(updateTroveInfo)
 
     @accessReadOnly
     def getTroveSigs(self, authToken, clientVersion, infoList):

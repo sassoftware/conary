@@ -49,7 +49,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1934,6 +1934,32 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return [ (x[0], (x[1][0], self.toVersion(x[1][1]), 
                                   self.toFlavor(x[1][2]))) for
                     x in self.c[host].getNewSigList(mark) ]
+
+    def getNewTroveInfo(self, host, mark, infoTypes=[], labels=[], thaw=True):
+        server = self.c[host]
+        if server.getProtocolVersion() < 47:
+            raise errors.InvalidServerVersion('getNewTroveInfo requires '
+                                              'Conary 1.1.24 or newer')
+        if thaw:
+            labels = [ self.fromLabel(x) for x in labels ]
+        info = server.getNewTroveInfo(mark, infoTypes, labels)
+        if not thaw:
+            return info
+        return [ ((x[0][0], self.toVersion(x[0][1]), self.toFlavor(x[0][2])),
+                  trove.TroveInfo(base64.b64decode(x[1]))) for x in info ]
+
+
+    def setTroveInfo(self, host, info, freeze=True):
+        server = self.c[host]
+        if server.getProtocolVersion() < 47:
+            raise errors.InvalidServerVersion('getNewTroveInfo requires '
+                                              'Conary 1.1.24 or newer')
+        if freeze:
+            info = [
+                ((x[0][0], self.fromVersion(x[0][1]), self.fromFlavor(x[0][2])),
+                 base64.b64encode(x[1].freeze())) for x in info
+                ]
+        return server.setTroveInfo(info)
 
     def getNewTroveList(self, host, mark):
         server = self.c[host]

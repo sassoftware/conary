@@ -533,15 +533,23 @@ def getTroveList(src, cfg, mark):
                   src.getNewTroveList(cfg.host, str(mark))]
     if not len(troveList):
         # this should be the end - no more troves to look at
-        return []
+        log.debug("no new troves found")
+        return (mark, [])
     # we need to protect ourselves from duplicate items in the troveList
     l = len(troveList)
     troveList = list(set(troveList))
     if len(troveList) < l:
         l = len(troveList)
         log.debug("after duplicate elimination %d troves are left", len(troveList))
+    # if we filter out the entire list of troves we have been
+    # returned, we need to tell the caller what was the highest mark
+    # we had so it can continue asking for more
+    maxMark = max([x[0] for x in troveList])
     # eliminate troves that are not on the host we're mirroring (sanity check)
     troveList = [ x for x in troveList if x[1][1].branch().label().getHost() == cfg.host ]
+    if not troveList:
+        log.debug("no new troves found")
+        return (maxMark, [])
     if len(troveList) < l:
         log.debug("after eliminating foreign labels %d troves are left", len(troveList))   
     # sort deterministically by mark, version, flavor, reverse name
@@ -572,7 +580,8 @@ def getTroveList(src, cfg, mark):
         if lastMark > firstMark:
             troveList = troveList[:lastIdx]
             log.debug("reduced new trove list to %d to avoid partial commits", len(troveList))
-    return troveList
+    # since we're returning at least on trove, the caller will make the next mark decision
+    return (mark, troveList)
 
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
@@ -608,10 +617,13 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             t.setMirrorMark(currentMark)
     # first, we need to mirror changed signatures for troves in each target
     updateCount = mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs)
-    troveList = getTroveList(sourceRepos, cfg, currentMark)
+    newMark, troveList = getTroveList(sourceRepos, cfg, currentMark)
     if not troveList:
-        return 0
-    
+        if newMark > currentMark: # something was returned, but filtered out
+            for t in targets:
+                t.setMirrorMark(newMark)
+            return -1 # call again
+        return 0   
     # prepare a new max mark to be used when we need to break out of a loop
     crtMaxMark = max(x[0] for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:

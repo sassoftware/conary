@@ -19,6 +19,8 @@ void numericstreaminit(PyObject * m);
 void streamsetinit(PyObject * m);
 void stringstreaminit(PyObject * m);
 
+PyObject *StreamSet_split(PyObject *self, PyObject *args);
+
 extern PyTypeObject StringStreamType;
 extern PyTypeObject NumericStreamType;
 extern PyTypeObject IntStreamType;

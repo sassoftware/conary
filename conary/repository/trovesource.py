@@ -702,7 +702,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         for pathId, path, fileId, version in fileList:
             change = changes[pathId]
-            fileObj = files.ThawFile(change, pathId)
+            if change is None:
+                fileObj = None
+            else:
+                fileObj = files.ThawFile(change, pathId)
             yield pathId, path, fileId, version, fileObj
 
     def getFileVersion(self, pathId, fildId, version):

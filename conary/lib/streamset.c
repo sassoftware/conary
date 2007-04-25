@@ -818,6 +818,44 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
     return 0;
 }
 
+PyObject *StreamSet_split(PyObject *self, PyObject *args) {
+    char *data, *streamData, *chptr, *end;
+    int size, sizeType, dataLen;
+    unsigned int streamId;
+    PyObject *pydata, *l, *t;
+
+    if (PyTuple_GET_SIZE(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "exactly 1 argument expected");
+        return NULL;
+    }
+    pydata = PyTuple_GET_ITEM(args, 0);
+    data = PyString_AsString(pydata);
+    dataLen = PyString_Size(pydata);
+    end = data + dataLen;
+    chptr = data;
+    l = PyList_New(0);
+    while (chptr < end) {
+	getTag(&chptr, &streamId, &sizeType, &size);
+	streamData = chptr;
+	t = PyTuple_New(2);
+	PyTuple_SetItem(t, 0, PyInt_FromLong(streamId));
+	PyTuple_SetItem(t, 1, PyString_FromStringAndSize(streamData, size));
+	PyList_Append(l, t);
+	Py_DECREF(t);
+	chptr += size;
+    }
+
+    if (chptr != end) {
+	Py_DECREF(l);
+	PyErr_SetString(PyExc_AssertionError,
+			"chptr != end in Thaw_raw");
+	return NULL;
+    }
+    assert(chptr == end);
+
+    return l;
+}
+
 static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
                                 PyObject * kwargs) {
     char * kwlist[] = { "diff", "base", "skip", NULL };
