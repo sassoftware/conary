@@ -1,4 +1,4 @@
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -31,7 +31,14 @@ class SchemaMigration(migration.SchemaMigration):
 
 # dummy migration class that maintains compatbility with schema version13
 class MigrateTo_13(SchemaMigration):
-    Version = 13
+    Version = (13,1)
+    # fix a migration step that could have potentially failed in the
+    # migrations before conary 1.0
+    def migrate1(self):
+        # flavorId = 0 is now ''
+        cu = self.db.cursor()
+        cu.execute("UPDATE Flavors SET flavor = '' WHERE flavorId = 0")
+        return True
     def migrate(self):
         return self.Version
 
@@ -234,14 +241,17 @@ class MigrateTo_15(SchemaMigration):
             instanceId, trove._TROVEINFO_TAG_SIGS,
             cu.binary(trv.troveInfo.sigs.freeze())))
 
-    def fixRedirects(self, cu, repos):
+    def fixRedirects(self, repos):
         logMe(2, "removing dep provisions from redirects...")
         self.db.loadSchema()
+        # avoid creating this index until we had a chance to check the path indexes
+        self.db.tables["TroveFiles"].append("TroveFilesPathIdx")
         # remove dependency provisions from redirects -- the conary 1.0
         # branch would set redirects to provide their own names. this doesn't
         # clean up the dependency table; that would only matter on a trove
         # which was cooked as only a redirect in the repository; any other
         # instances would still need the depId anyway
+        cu = self.db.cursor()
         cu.execute("delete from provides where instanceId in "
                    "(select instanceId from instances "
                    "where troveType=? and isPresent=1)",
@@ -256,38 +266,42 @@ class MigrateTo_15(SchemaMigration):
             self.fixTroveSig(repos, instanceId)
 
     # fix the duplicate path problems, if any
-    def fixDuplicatePaths(self, cu, repos):
+    def fixDuplicatePaths(self, repos):
         logMe(2, "checking database for duplicate path entries...")
-        # it is faster to select all the (instanceId, path) pairs into
-        # an indexed table than create a non-unique index, do work,
-        # drop the non-unique index and recreate it as a unique one
-        self.db.loadSchema()
+        cu = self.db.cursor()
+        # we'll have to do a full table scan on TroveFiles. no way
+        # around it...
         cu.execute("""
-        create table tmpDupPath(
-            instanceId integer not null,
-            path varchar(767) not null
-        ) %(TABLEOPTS)s""" % self.db.keywords)
-        self.db.createIndex("tmpDupPath", "tmpDupPathIdx",
-                            "instanceId, path", check = False)
-        cu.execute("""
-        create table tmpDups(
-            counter integer,
+        create temporary table tmpDups(
             instanceId integer,
-            path varchar(767)
+            path %(PATHTYPE)s,
+            counter integer
         ) %(TABLEOPTS)s""" % self.db.keywords)
-        logMe(2, "searching the trovefiles table...")
-        cu.execute("insert into tmpDupPath (instanceId, path) "
-                   "select instanceId, path from TroveFiles")
         logMe(2, "looking for troves with duplicate paths...")
-        cu.execute("""
-        insert into tmpDups (counter, instanceId, path)
-        select count(*) as c, instanceId, path
-        from tmpDupPath
-        group by instanceId, path
-        having count(*) > 1""")
+        # sqlite has a real challenge dealing with large datasets
+        if self.db.driver == 'sqlite':
+            cu2 = self.db.cursor()
+            cu.execute("select distinct instanceId from TroveFiles")
+            # so we split this in very little tasks. lots of them
+            for (instanceId,) in cu:
+                cu2.execute("""
+                insert into tmpDups (instanceId, path, counter)
+                select instanceId, path, count(*)
+                from TroveFiles
+                where instanceId = ?
+                group by instanceId, path
+                having count(*) > 1""", instanceId)
+        else: # other backends should be able to process this in one shot
+            cu.execute("""
+            insert into tmpDups (instanceId, path, counter)
+            select instanceId, path, count(*)
+            from TroveFiles
+            group by instanceId, path
+            having count(*) > 1""")
         counter = cu.execute("select count(*) from tmpDups").fetchall()[0][0]
         if counter > 0:
             # drop the old index, if any
+            self.db.loadSchema()
             self.db.dropIndex("TroveFiles", "TroveFilesPathIdx")
         logMe(3, "detected %d duplicates" % (counter,))
         # loop over every duplicate and apply the appropiate fix
@@ -315,7 +329,6 @@ class MigrateTo_15(SchemaMigration):
         # index for TroveFiles.  Also recreates the indexes table.
         logMe(2, 'Recreating indexes... (this could take a while)')
         cu.execute("drop table tmpDups")
-        cu.execute("drop table tmpDupPath")
         self.db.loadSchema()
         schema.createTroves(self.db)
         logMe(2, 'Indexes created.')
@@ -355,8 +368,8 @@ class MigrateTo_15(SchemaMigration):
         # needed for signature recalculation
         repos = trovestore.TroveStore(self.db)
         self.dropViews()
-        self.fixDuplicatePaths(cu, repos)
-        self.fixRedirects(cu, repos)
+        self.fixRedirects(repos)
+        self.fixDuplicatePaths(repos)
         self.fixPermissions()
         self.updateLatest(cu)
         return True
