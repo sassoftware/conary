@@ -788,12 +788,12 @@ def setupTempTables(db):
         CREATE TEMPORARY TABLE updateTroveInfo(
             idx         INTEGER,
             instanceId  INTEGER,
-            infoType    INTEGAR,
+            infoType    INTEGER,
             data        %(MEDIUMBLOB)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["updateTroveInfo"] = True
         db.createIndex("updateTroveInfo", "utiIdx", "idx", check = False)
-        db.createIndex("updateTroveInfo", "utiType", "infoType", check = False)
+        db.createIndex("updateTroveInfo", "utiInfoTypeIdx", "infoType, instanceId", check = False)
     if "getFilesTbl" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE getFilesTbl(
