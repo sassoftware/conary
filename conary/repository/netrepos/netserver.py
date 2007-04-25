@@ -20,7 +20,7 @@ import sys
 import tempfile
 import time
 
-from conary import files, trove, versions
+from conary import files, trove, versions, streams
 from conary.conarycfg import CfgProxy, CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
@@ -152,6 +152,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'getNewPGPKeys',
                         'addPGPKeyList',
                         'getNewTroveInfo',
+                        'setTroveInfo',
                         'getNewTroveList',
                         'getTroveInfo',
                         'getTroveReferences',
@@ -1529,7 +1530,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         authCheckFn = lambda n, v, f: \
                 self.auth.check(authToken, write = False,
                                        trove = n, label = v.trailingLabel())
-
         # Big try-except to clean up files
         try:
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
@@ -1573,14 +1573,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSetFingerprints(self, authToken, clientVersion, chgSetList,
                     recurse, withFiles, withFileContents, excludeAutoSource):
 
-        def _troveFp(troveInfo, sig):
-            if not sig:
+        def _troveFp(troveInfo, sig, meta):
+            if not sig and not meta:
                 return "otherrepo"
 
-            (present, sigBlock) = sig
-            if present >= 1:
-                return (base64.decodestring(sigBlock), )
-
+            (sigPresent, sigBlock) = sig
+            l = []
+            if sigPresent >= 1:
+                l.append(base64.decodestring(sigBlock))
+            (metaPresent, metaBlock) = meta
+            if metaPresent >= 1:
+                l.append(base64.decodestring(sigBlock))
+            if sigPresent or metaPresent:
+                return tuple(l)
             return ("missing", ) + troveInfo
 
         if recurse:
@@ -1683,13 +1688,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pureSigList = self.getTroveInfo(authToken, clientVersion,
                                         trove._TROVEINFO_TAG_SIGS,
                                         [ x for x in sigItems if x ])
+        pureMetaList = self.getTroveInfo(authToken, clientVersion,
+                                        trove._TROVEINFO_TAG_METADATA,
+                                        [ x for x in sigItems if x ])
         sigList = []
+        metaList = []
         sigCount = 0
         for item in sigItems:
             if not item:
                 sigList.append(None)
+                metaList.append(None)
             else:
                 sigList.append(pureSigList[sigCount])
+                metaList.append(pureMetaList[sigCount])
                 sigCount += 1
 
         # 0 is a version number for this signature block; changing this will
@@ -1709,10 +1720,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         origJob[2][0], origJob[2][1], "%d" % origJob[3] ]
             for job in fullJob:
                 if job[1][0]:
-                    fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
+                    fpList += _troveFp(sigItems[sigCount], sigList[sigCount],
+                                       metaList[sigCount])
                     sigCount += 1
 
-                fpList += _troveFp(sigItems[sigCount], sigList[sigCount])
+                fpList += _troveFp(sigItems[sigCount], sigList[sigCount],
+                                   metaList[sigCount])
                 sigCount += 1
 
             fp = sha1helper.sha1String("\0".join(fpList))
@@ -2716,6 +2729,96 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if currentTrove:
             l.add((currentTrove, currentTroveInfo.freeze()))
         return [ (x[0], base64.b64encode(x[1])) for x in l ]
+
+    @accessReadWrite
+    def setTroveInfo(self, authToken, clientVersion, infoList):
+        # return the number of signatures which have changed
+        self.log(2, infoList)
+        # batch permission check for writing
+        if False in self.auth.batchCheck(authToken, [
+            (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
+            raise errors.InsufficientPermission
+
+        cu = self.db.cursor()
+        updateCount = 0
+
+        # look up if we have all the troves we're asked
+        schema.resetTable(cu, "gtl")
+        schema.resetTable(cu, "gtlInst")
+        schema.resetTable(cu, "updateTroveInfo")
+        for (n,v,f), info in infoList:
+            cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
+                       (n,v,f))
+        self.db.analyze("gtl")
+        # we'll need the min idx to account for differences in SQL backends
+        cu.execute("SELECT MIN(idx) from gtl")
+        minIdx = cu.fetchone()[0]
+
+        cu.execute("""
+        insert into gtlInst(idx, instanceId)
+        select idx, Instances.instanceId
+        from gtl
+        join Items on gtl.name = Items.item
+        join Versions on gtl.version = Versions.version
+        join Flavors on gtl.flavor = Flavors.flavor
+        join Instances on
+            Items.itemId = Instances.itemId AND
+            Versions.versionId = Instances.versionId AND
+            Flavors.flavorId = Instances.flavorId
+        """)
+        self.db.analyze("gtlInst")
+        # see what troves are missing, if any
+        cu.execute("""
+        select gtl.idx
+        from gtl left join gtlInst on gtl.idx = gtlInst.idx
+        where gtlInst.instanceId is NULL
+        """)
+        ret = cu.fetchall()
+        if len(ret):
+            # we'll report the first one
+            i = ret[0][0] - minIdx
+            raise errors.TroveMissing(infoList[i][0][0], infoList[i][0][1])
+
+        cu.execute('select instanceId from gtlInst order by idx')
+        def _trvInfoIter(instanceIds, iList):
+            i = -1
+            for (instanceId,), (trvTuple, trvInfo) in itertools.izip(instanceIds, iList):
+                for infoType, data in streams.splitFrozenStreamSet(base64.b64decode(trvInfo)):
+                    i += 1
+                    yield (i, instanceId, infoType, data)
+        updateTroveInfo = list(_trvInfoIter(cu, infoList))
+        cu.executemany("insert into updateTroveInfo (idx, instanceId, infoType, data) "
+                       "values (?,?,?,?)", updateTroveInfo)
+
+        # first update the existing entries
+        cu.execute("""
+        select uti.idx
+        from updateTroveInfo as uti
+        join TroveInfo on
+            TroveInfo.instanceId = uti.instanceId
+            and TroveInfo.infoType = uti.infoType
+        """)
+        rows = cu.fetchall()
+        for (idx,) in rows:
+            import epdb
+            epdb.st()
+            info = updateTroveInfo[idx]
+            cu.execute("update troveInfo set data=? where infoType=? and "
+                       "instanceId=?", (info[3], info[2], info[1]))
+
+        # now insert the rest
+        cu.execute("""
+        insert into TroveInfo (instanceId, infoType, data)
+        select uti.instanceId, uti.infoType, uti.data
+        from updateTroveInfo as uti
+        left join TroveInfo on
+            TroveInfo.instanceId = uti.instanceId
+            and TroveInfo.infoType = uti.infoType
+        where troveInfo.instanceId is NULL
+        """)
+
+        self.log(3, "updated trove info for", len(updateTroveInfo), "troves")
+        return len(updateTroveInfo)
 
     @accessReadOnly
     def getTroveSigs(self, authToken, clientVersion, infoList):
