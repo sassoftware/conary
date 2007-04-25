@@ -102,6 +102,16 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if userMap is None:
                 userMap = cfg.user
 
+        proxy = cfg.proxy
+        if not proxy:
+            # Is there a conaryProxy defined?
+            proxy = {}
+            for k, v in cfg.conaryProxy.iteritems():
+                # Munge http.* to conary.* to flag the transport layer that
+                # we're using a Conary proxy
+                v = 'conary' + v[4:]
+                proxy[k] = v
+
         return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                                        pwPrompt = passwordPrompter,
                                        localRepository = db,
@@ -112,7 +122,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                        uploadRateLimit =
                                           cfg.uploadRateLimit,
                                        entitlements = entitlements,
-                                       proxy = cfg.proxy)
+                                       proxy = proxy)
 
     def getRepos(self):
         return self.repos

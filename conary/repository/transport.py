@@ -168,6 +168,7 @@ class XMLOpener(urllib.FancyURLopener):
                 host, selector = splithost(proxyhost)
                 url = (host, url)
 
+        useConaryProxy = False
         user_passwd = None
         if isinstance(url, str):
             host, selector = urllib.splithost(url)
@@ -179,6 +180,10 @@ class XMLOpener(urllib.FancyURLopener):
             # based virtual hosts don't work
             selector = '%s:%s' %(protocol, url)
         else:
+            # Request should go through a proxy
+            # Check to see if it's a conary proxy
+            useConaryProxy = self.proxies[protocol].startswith('conary')
+
             host, selector = url
             urltype, rest = urllib.splittype(selector)
             url = rest
@@ -201,7 +206,7 @@ class XMLOpener(urllib.FancyURLopener):
         else:
             auth = None
         if ssl:
-            if host != realhost:
+            if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost)
             else:
                 h = httplib.HTTPS(host, None, None)

@@ -236,6 +236,7 @@ class ProxyEntry(CfgType):
         return CfgType.parseString(self, str)
 
 class CfgProxy(CfgDict):
+    overrides = 'conaryProxy'
 
     def parseString(self, str):
         l = str.split()
@@ -258,6 +259,9 @@ class CfgProxy(CfgDict):
 
     def __init__(self, default={}):
         CfgDict.__init__(self, ProxyEntry, default=default)
+
+class CfgConaryProxy(CfgProxy):
+    overrides = 'proxy'
 
 CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
 
@@ -314,6 +318,9 @@ class ConaryContext(ConfigSection):
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
+    # Upstream Conary proxy
+    conaryProxy           =  CfgConaryProxy
+    # HTTP proxy
     proxy                 =  CfgProxy
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',

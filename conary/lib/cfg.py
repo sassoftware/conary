@@ -348,6 +348,10 @@ class ConfigFile(_Config):
         try:
             key = self._lowerCaseMap[key.lower()]
             self[key] = self._options[key].parseString(self[key], val)
+            if hasattr(self._options[key].valueType, 'overrides'):
+                overrides = self._options[key].valueType.overrides
+                if overrides and hasattr(self, overrides):
+                    self.resetToDefault(overrides)
         except KeyError, msg:
             if self._ignoreErrors:
                 pass
