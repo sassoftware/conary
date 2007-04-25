@@ -2750,6 +2750,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def setTroveInfo(self, authToken, clientVersion, infoList):
         # return the number of signatures which have changed
         self.log(2, infoList)
+        # this requires mirror access and write access for that trove
+        if not self.auth.check(authToken, mirror=True):
+            raise errors.InsufficientPermission
         # batch permission check for writing
         if False in self.auth.batchCheck(authToken, [
             (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
@@ -2858,94 +2861,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def setTroveSigs(self, authToken, clientVersion, infoList):
-        # return the number of signatures which have changed
-        self.log(2, infoList)
-        # this requires mirror access and write access for that trove
-        if not self.auth.check(authToken, mirror=True):
-            raise errors.InsufficientPermission
-        # batch permission check for writing
-        if False in self.auth.batchCheck(authToken, [
-            (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
-            raise errors.InsufficientPermission
-        
-        cu = self.db.cursor()
-        updateCount = 0
-
-        # look up if we have all the troves we're asked
-        schema.resetTable(cu, "gtl")
-        schema.resetTable(cu, "gtlInst")
-        for (n,v,f), sig in infoList:
-            cu.execute("insert into gtl(name,version,flavor) values (?,?,?)",
-                       (n,v,f))
-        self.db.analyze("gtl")
-        # we'll need the min idx to account for differences in SQL backends
-        cu.execute("SELECT MIN(idx) from gtl")
-        minIdx = cu.fetchone()[0]
-
-        cu.execute("""
-        insert into gtlInst(idx, instanceId)
-        select idx, Instances.instanceId
-        from gtl
-        join Items on gtl.name = Items.item
-        join Versions on gtl.version = Versions.version
-        join Flavors on gtl.flavor = Flavors.flavor
-        join Instances on
-            Items.itemId = Instances.itemId AND
-            Versions.versionId = Instances.versionId AND
-            Flavors.flavorId = Instances.flavorId
-        """)
-        self.db.analyze("gtlInst")
-        # see what troves are missing, if any
-        cu.execute("""
-        select gtl.idx
-        from gtl left join gtlInst on gtl.idx = gtlInst.idx
-        where gtlInst.instanceId is NULL
-        """)
-        ret = cu.fetchall()
-        if len(ret):
-            # we'll report the first one
-            i = ret[0][0] - minIdx
-            raise errors.TroveMissing(infoList[i][0][0], infoList[i][0][1])
-
-        # we have now obtained the instanceIds of all the troves we're
-        # about to set sigs for. we look over the signatures we need
-        # to update and perform the updates
-        cu.execute("""
-        select gtl.idx, gtlInst.instanceId,
-               TroveInfo.instanceId as tid, TroveInfo.data
-        from gtl
-        join gtlInst on gtl.idx = gtlInst.idx
-        left join TroveInfo on
-            gtlInst.instanceId = TroveInfo.instanceId and
-            TroveInfo.infoType = ?
-        """, trove._TROVEINFO_TAG_SIGS)
-        inserts = []
-        updates = []
-        sigList = [base64.decodestring(s) for (n,v,f),s in infoList]
-        for i, instanceId, tid, sig in cu:
-            if sig is not None:
-                sig = cu.frombinary(sig)
-            i -= minIdx
-            # what do we need to put in the database
-            tup = (i, instanceId, sigList[i])
-            if tid is None: # don't have a sig yet
-                inserts.append(tup)
-            elif sig != sigList[i]: # it is has changed
-                updates.append(tup)
-        if len(inserts):
-            cu.executemany("insert into TroveInfo (instanceId, infoType, data) "
-                           "values (?,?,?) ",
-                           [(instanceId, trove._TROVEINFO_TAG_SIGS, cu.binary(sig))
-                            for i, instanceId, sig in inserts])
-        if len(updates):
-            # SQL update does not executemany() very well
-            for i, instanceId, sig in updates:
-                cu.execute("""
-                UPDATE TroveInfo SET data = ?
-                WHERE infoType = ? AND instanceId = ?
-                """, (cu.binary(sig), trove._TROVEINFO_TAG_SIGS, instanceId))
-        self.log(3, "updated signatures for", len(inserts+updates), "troves")
-        return len(inserts) + len(updates)
+        # re-use common setTroveInfo code
+        def _transform(l):
+            i = trove.TroveInfo()
+            for troveTuple, sig in l:
+                i.sigs = trove.TroveSignatures(base64.decodestring(sig))
+                yield troveTuple, base64.b64encode(i.freeze())
+        return self.setTroveInfo(authToken, clientVersion,
+                                 list(_transform(infoList)))
 
     @accessReadOnly
     def getNewPGPKeys(self, authToken, clientVersion, mark):
