@@ -1935,12 +1935,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                   self.toFlavor(x[1][2]))) for
                     x in self.c[host].getNewSigList(mark) ]
 
-    def getNewTroveInfo(self, host, mark, infoTypes=[], thaw=True):
+    def getNewTroveInfo(self, host, mark, infoTypes=[], labels=[], thaw=True):
         server = self.c[host]
         if server.getProtocolVersion() < 47:
             raise errors.InvalidServerVersion('getNewTroveInfo requires '
                                               'Conary 1.1.24 or newer')
-        info = server.getNewTroveInfo(mark, infoTypes)
+        if thaw:
+            labels = [ self.fromLabel(x) for x in labels ]
+        info = server.getNewTroveInfo(mark, infoTypes, labels)
         if not thaw:
             return info
         return [ ((x[0][0], self.toVersion(x[0][1]), self.toFlavor(x[0][2])),

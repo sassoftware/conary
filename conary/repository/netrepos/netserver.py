@@ -2657,7 +2657,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return list(l)
 
     @accessReadOnly
-    def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes):
+    def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
+                        labels):
         # only show troves the user is allowed to see
         try:
             mark = long(mark)
@@ -2677,6 +2678,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                %(','.join(str(x) for x in infoTypes)))
         else:
             infoTypeLimiter = ''
+        if labels:
+            try:
+                [ self.toLabel(x) for x in labels ]
+            except:
+                raise errors.InsufficientPermission
+            cu.execute('select labelId from labels where label in (%s)'
+                       % ('?',) * len(labels), labels)
+            labelIds = [ str(x[0]) for x in cu.fetchall() ]
+            if not labelIds:
+                # no labels matched, short circuit
+                return []
+            labelLimit = 'AND LabelMap.labelId in (%s)' % (','.join(labelIds))
+        else:
+            labelLimit = ''
         query = """
         SELECT UP.permittedTrove, item, version, flavor,
                infoType, data
@@ -2705,8 +2720,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND Instances.isPresent = ?
           AND TroveInfo.changed >= ?
           %s
+          %s
         ORDER BY instanceId, TroveInfo.changed
-        """ % (",".join("%d" % x for x in userGroupIds), infoTypeLimiter)
+        """ % (",".join("%d" % x for x in userGroupIds), infoTypeLimiter,
+               labelLimit)
         cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark))
 
         l = set()
