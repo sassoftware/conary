@@ -1583,7 +1583,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 l.append(base64.decodestring(sigBlock))
             (metaPresent, metaBlock) = meta
             if metaPresent >= 1:
-                l.append(base64.decodestring(sigBlock))
+                l.append(base64.decodestring(metaBlock))
             if sigPresent or metaPresent:
                 return tuple(l)
             return ("missing", ) + troveInfo
@@ -2800,8 +2800,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """)
         rows = cu.fetchall()
         for (idx,) in rows:
-            import epdb
-            epdb.st()
             info = updateTroveInfo[idx]
             cu.execute("update troveInfo set data=? where infoType=? and "
                        "instanceId=?", (info[3], info[2], info[1]))
