@@ -400,7 +400,7 @@ class CfgDict(CfgType):
         self.default = default
 
     def setFromString(self, val, str):
-        return self.dictType(self.parseString(str))
+        return self.updateFromString(self.dictType(), str)
 
     def set(self, curVal, newVal):
         curVal.update(newVal)
@@ -422,15 +422,7 @@ class CfgDict(CfgType):
         return val
 
     def parseString(self, val):
-        vals = val.split(None, 1)
-
-        if len(vals) == 1:
-            dkey, dvalue = val, ''
-        else:
-            (dkey, dvalue) = vals
-
-        dvalue = self.parseValueString(dkey, dvalue)
-        return {dkey : dvalue}
+        return self.updateFromString({}, val)
 
     def parseValueString(self, key, value):
         return self.valueType.parseString(value)

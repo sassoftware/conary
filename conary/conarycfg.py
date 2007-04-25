@@ -257,6 +257,36 @@ class CfgProxy(CfgDict):
 
         return rc
 
+    def updateFromString(self, val, str):
+        vlist = str.split()
+        if len(vlist) > 2:
+            raise ParseError("Too many arguments for proxy configuration '%s'"
+                             % str)
+        if not vlist:
+            raise ParseError("Arguments required for proxy configuration")
+        if len(vlist) == 2:
+            if vlist[0] not in ['http', 'https']:
+                raise ParseError('Unknown proxy procotol %s' % vlist[0])
+            return CfgDict.updateFromString(self, val, str)
+
+        # At this point, len(vlist) == 1
+        # Fix it up
+        try:
+            protocol, rest = str.split(':', 1)
+        except ValueError:
+            # : not in the value
+            raise ParseError("Invalid proxy configuration value %s" % str)
+
+        # This next test duplicates the work done by ProxyEntry.parseString,
+        # but it's pretty cheap to do here since we already have the protocol
+        # parsed out
+        if protocol not in ['http', 'https']:
+                raise ParseError('Unknown proxy procotol %s' % protocol)
+
+        CfgDict.updateFromString(self, val, 'http http:' + rest)
+        CfgDict.updateFromString(self, val, 'https https:' + rest)
+        return val
+
     def __init__(self, default={}):
         CfgDict.__init__(self, ProxyEntry, default=default)
 
