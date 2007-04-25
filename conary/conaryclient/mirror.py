@@ -533,6 +533,7 @@ def getTroveList(src, cfg, mark):
                   src.getNewTroveList(cfg.host, str(mark))]
     if not len(troveList):
         # this should be the end - no more troves to look at
+        log.debug("no new troves found")
         return (mark, [])
     # we need to protect ourselves from duplicate items in the troveList
     l = len(troveList)
@@ -547,6 +548,7 @@ def getTroveList(src, cfg, mark):
     # eliminate troves that are not on the host we're mirroring (sanity check)
     troveList = [ x for x in troveList if x[1][1].branch().label().getHost() == cfg.host ]
     if not troveList:
+        log.debug("no new troves found")
         return (maxMark, [])
     if len(troveList) < l:
         log.debug("after eliminating foreign labels %d troves are left", len(troveList))   
