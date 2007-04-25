@@ -1947,11 +1947,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                   trove.TroveInfo(base64.b64decode(x[1]))) for x in info ]
 
 
-    def setTroveInfo(self, host, info):
+    def setTroveInfo(self, host, info, freeze=True):
         server = self.c[host]
         if server.getProtocolVersion() < 47:
             raise errors.InvalidServerVersion('getNewTroveInfo requires '
                                               'Conary 1.1.24 or newer')
+        if freeze:
+            info = [
+                ((x[0][0], self.fromVersion(x[0][1]), self.fromFlavor(x[0][2])),
+                 base64.b64encode(x[1].freeze())) for x in info
+                ]
         return server.setTroveInfo(info)
 
     def getNewTroveList(self, host, mark):
