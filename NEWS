@@ -1,3 +1,18 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A bug in the way the proxy configuration variable is set has
+      been fixed. (CNY-1586)
+
+  o Client Changes:
+    * The Conary client now distinguishes between an upstream Conary
+      proxy and a plain HTTP proxy. This is so we can properly handle
+      SSL traffic through an HTTP proxy using the CONNECT HTTP method.
+      As such, there is now a "conaryProxy" configuration variable,
+      in addition to the "proxy" variable.
+      (CNY-1550).
+    * The "proxy" (and newly introduced "conaryProxy") variables can
+      be turned off by setting them to "None". (CNY-1378).
+
 Changes in 1.1.23:
   o Client Changes:
     * A new command, "conary rdiff", has been added. This allows one
