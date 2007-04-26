@@ -45,6 +45,8 @@ Changes in 1.1.23:
       server has been fixed.
     * Small race condition in populating the cache for both
       repositories and proxies has been fixed (CNY-1576)
+    * Applying rollbacks could attempt to invalidate the rollback stack,
+      which would cause corruption of the rollback stack (CNY-1587)
 
 Changes in 1.1.22:
   o Major Changes:

@@ -30,7 +30,7 @@
 
 static PyMethodDef CStreamsMethods[] = {
     { "splitFrozenStreamSet", StreamSet_split, METH_VARARGS },
-    {StreamSet_split}  /* Sentinel */
+    { NULL, NULL, NULL }  /* Sentinel */
 };
 
 struct singleStream allStreams[];
@@ -42,6 +42,9 @@ initcstreams(void)
     int i;
 
     m = Py_InitModule3("cstreams", CStreamsMethods, "");
+    if (NULL == m) {
+        return;
+    }
 
     streamsetinit(m);
     numericstreaminit(m);

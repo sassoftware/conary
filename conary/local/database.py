@@ -1121,7 +1121,8 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
 	self.commit()
 
-        if updateDatabase and csJob.invalidateRollbacks():
+        if rollbackPhase is None and updateDatabase and \
+                csJob.invalidateRollbacks():
             self.invalidateRollbacks()
 
         if rollbackPhase is not None:

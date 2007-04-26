@@ -134,12 +134,15 @@ trove signature or the respective troves will be rejected. If
 \-\-signature\-key None is specified, generation of trove signatures will be 
 disabled.
 .IP
-
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
 the package will be cooked from the repository.  If a version is 
 specified, it must be a source version for that component.
+.IP
+Conary caches already-downloaded sources aggresively, both on the
+local system and in the repository.  To refresh either cache, see
+the \fBrefresh\fP command.
 .TP 4
 .B add \fIfile...\fP
 Adds all the files listed on the command line to the source
