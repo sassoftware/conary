@@ -165,7 +165,7 @@ class XMLOpener(urllib.FancyURLopener):
             proxy = self.proxies.get(protocol, None)
             if proxy:
                 urltype, proxyhost = urllib.splittype(proxy)
-                host, selector = splithost(proxyhost)
+                host, selector = urllib.splithost(proxyhost)
                 url = (host, url)
 
         useConaryProxy = False
