@@ -102,15 +102,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if userMap is None:
                 userMap = cfg.user
 
-        proxy = cfg.proxy
-        if not proxy:
-            # Is there a conaryProxy defined?
-            proxy = {}
-            for k, v in cfg.conaryProxy.iteritems():
-                # Munge http.* to conary.* to flag the transport layer that
-                # we're using a Conary proxy
-                v = 'conary' + v[4:]
-                proxy[k] = v
+        proxy = getProxyFromConfig(cfg)
 
         return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                                        pwPrompt = passwordPrompter,
@@ -412,3 +404,20 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
     def applyRollback(self, rollbackSpec, **kwargs):
         return rollbacks.applyRollback(self, rollbackSpec, **kwargs)
+
+def getProxyFromConfig(cfg):
+    """Get the proper proxy configuration variable from the supplied config
+    object"""
+
+    proxy = cfg.proxy
+    if proxy:
+        return proxy
+
+    # Is there a conaryProxy defined?
+    proxy = {}
+    for k, v in cfg.conaryProxy.iteritems():
+        # Munge http.* to conary.* to flag the transport layer that
+        # we're using a Conary proxy
+        v = 'conary' + v[4:]
+        proxy[k] = v
+    return proxy
