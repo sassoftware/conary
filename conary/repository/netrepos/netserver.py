@@ -2694,7 +2694,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             labelLimit = ''
         query = """
         SELECT UP.permittedTrove, item, version, flavor,
-               infoType, data
+               TroveInfo.infoType, TroveInfo.data, TroveInfo.changed
         FROM Instances
         JOIN TroveInfo USING (instanceId)
         JOIN Nodes ON
@@ -2729,22 +2729,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         l = set()
         currentTrove = None
         currentTroveInfo = None
-        for pattern, name, version, flavor, tag, data in cu:
-            if self.auth.checkTrove(pattern, name):
-                t = (name, version, flavor)
-                if currentTrove != t:
-                    if currentTroveInfo != None:
-                        l.add((currentTrove, currentTroveInfo.freeze()))
-                    currentTrove = t
-                    currentTroveInfo = trove.TroveInfo()
-                if tag == -1:
-                    currentTroveInfo.thaw(cu.frombinary(data))
-                else:
-                    name = currentTroveInfo.streamDict[tag][2]
-                    currentTroveInfo.__getattribute__(name).thaw(cu.frombinary(data))
+        currentMark = None
+        for pattern, name, version, flavor, tag, data, tmark in cu:
+            if not self.auth.checkTrove(pattern, name):
+                continue
+            t = (name, version, flavor)
+            if currentTrove != t:
+                if currentTroveInfo != None:
+                    l.add((currentMark, currentTrove, currentTroveInfo.freeze()))
+                currentTrove = t
+                currentTroveInfo = trove.TroveInfo()
+                currentMark = tmark
+            if tag == -1:
+                currentTroveInfo.thaw(cu.frombinary(data))
+            else:
+                name = currentTroveInfo.streamDict[tag][2]
+                currentTroveInfo.__getattribute__(name).thaw(cu.frombinary(data))
+            if currentMark is None:
+                currentMark = tmark
+            currentMark = min(currentMark, tmark)
         if currentTrove:
-            l.add((currentTrove, currentTroveInfo.freeze()))
-        return [ (x[0], base64.b64encode(x[1])) for x in l ]
+            l.add((currentMark, currentTrove, currentTroveInfo.freeze()))
+        return [ (x[0], x[1], base64.b64encode(x[2])) for x in l ]
 
     @accessReadWrite
     def setTroveInfo(self, authToken, clientVersion, infoList):
