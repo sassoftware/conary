@@ -1941,11 +1941,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if thaw:
             labels = [ self.fromLabel(x) for x in labels ]
         info = server.getNewTroveInfo(mark, infoTypes, labels)
+        # we always thaw the trove tuples
+        info = [ (m, (n,self.toVersion(v),self.toFlavor(f)), ti)
+                 for (m,(n,v,f),ti) in info ]
         if not thaw:
             return info
-        return [ (m, (n,self.toVersion(v),self.toFlavor(f)),
-                  trove.TroveInfo(base64.b64decode(i)) )
-                 for (m, (n,v,f), i) in info ]
+        # need to thaw the troveinfo as well
+        return [ (m,t,trove.TroveInfo(base64.b64decode(ti)))
+                 for (m,t,ti) in info ]
 
     def setTroveInfo(self, info, freeze=True):
         # info is a set of ((name, version, flavor), troveInfo) tuples
@@ -1965,10 +1968,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         total = 0
         for host, infoList in byServer.iteritems():
             server = self.c[host]
-            if freeze:
-                info = [ ( (n,self.fromVersion(v),self.fromFlavor(f)),
-                            base64.b64encode(ti.freeze()) ) for (n,v,f),ti in infoList ]
-                total += server.setTroveInfo(info)
+            #(n,v,f) are always assumed to be instances
+            infoList = [ ((n,self.fromVersion(v),self.fromFlavor(f)), ti)
+                     for (n,v,f),ti in infoList ]
+            if freeze: # need to freeze the troveinfo as well
+                infoList = [ (t, base64.b64encode(ti.freeze()))
+                             for t, ti in infoList ]
+            total += server.setTroveInfo(infoList)
         return total
     
     def getNewTroveList(self, host, mark):
