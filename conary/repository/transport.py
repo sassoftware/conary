@@ -261,6 +261,9 @@ class XMLOpener(urllib.FancyURLopener):
         else:
 	    raise xmlrpclib.ProtocolError(urlstr, errcode, errmsg, headers)
 
+    open_conary = open_http
+    open_conarys = open_https
+
     def _wait(self, h):
         # wait for data if abortCheck is set
         if self.abortCheck:
