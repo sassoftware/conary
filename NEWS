@@ -2,6 +2,7 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug in the way the proxy configuration variable is set has
       been fixed. (CNY-1586)
+    * Local rollbacks didn't store weak references (CNY-1590)
 
   o Client Changes:
     * The Conary client now distinguishes between an upstream Conary

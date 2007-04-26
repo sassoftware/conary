@@ -419,13 +419,17 @@ class ChangeSet(streams.StreamSet):
             invertedTrove.setProvides(trv.getProvides())
             invertedTrove.setTroveInfo(trv.troveInfo)
 
-	    for (name, list) in troveCs.iterChangedTroves():
-		for (oper, version, flavor, byDef) in list:
-		    if oper == '+':
-			invertedTrove.oldTroveVersion(name, version, flavor)
-		    elif oper == "-":
-			invertedTrove.newTroveVersion(name, version, flavor,
-                            trv.includeTroveByDefault(name, version, flavor))
+            for weak in (True, False):
+                for (name, list) in troveCs.iterChangedTroves(
+                                strongRefs = not weak, weakRefs = weak):
+                    for (oper, version, flavor, byDef) in list:
+                        if oper == '+':
+                            invertedTrove.oldTroveVersion(name, version, flavor,
+                                                          weakRef = weak)
+                        elif oper == "-":
+                            invertedTrove.newTroveVersion(name, version, flavor,
+                               trv.includeTroveByDefault(name, version, flavor),
+                               weakRef = weak)
 
 	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)
