@@ -426,7 +426,7 @@ class ChangesetFilter(BaseProxy):
                 size = sizes[0]
 
                 if cachable:
-                    inF = transport.URLOpener(proxies = self.proxies).open(url)
+                    inF = transport.URLOpener(proxies = self.proxies).open(url)[1]
                     csPath =_addToCache(fingerprint, inF, wireCsVersion,
                                 (trovesNeeded, filesNeeded, removedTroves),
                                 size)
@@ -435,7 +435,7 @@ class ChangesetFilter(BaseProxy):
                 elif url.startswith('file://localhost/'):
                     csPath = url[17:]
                 else:
-                    inF = transport.URLOpener(proxies = self.proxies).open(url)
+                    inF = transport.URLOpener(proxies = self.proxies).open(url)[1]
                     (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                   suffix = '.ccs-out')
                     outF = os.fdopen(fd, "w")
@@ -583,7 +583,7 @@ class ProxyRepositoryServer(ChangesetFilter):
             dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
             os.close(fd)
             os.unlink(tmpPath)
-            inUrl = transport.URLOpener(proxies = self.proxies).open(url)
+            inUrl = transport.URLOpener(proxies = self.proxies).open(url)[1]
             size = util.copyfileobj(inUrl, dest)
             inUrl.close()
             dest.seek(0)
