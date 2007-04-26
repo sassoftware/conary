@@ -592,6 +592,7 @@ class ConfigOption:
         default = valueType.copy(self.default)
         new = self.__class__(self.name, valueType, default)
         listeners = list(self.listeners)
+        new._isDefault = self._isDefault
         new.listeners = listeners
         return new
 
