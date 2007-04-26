@@ -292,6 +292,9 @@ class URLOpener(XMLOpener):
     '''Replacement class for urllib.FancyURLopener'''
     contentType = 'application/x-www-form-urlencoded'
 
+    def open_http(self, *args, **kwargs):
+        return XMLOpener.open_http(self, *args, **kwargs)[1]
+
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
     atpoint = host.find('@') + 1
