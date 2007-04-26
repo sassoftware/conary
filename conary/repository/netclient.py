@@ -1898,14 +1898,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for i, info in enumerate(troveList):
             l = byServer.setdefault(info[1].branch().label().getHost(), [])
             l.append((i, info))
-
         for host, l in byServer.iteritems():
             sigs = self.c[host].getTroveSigs([ 
                        (x[1][0], self.fromVersion(x[1][1]),
                         self.fromFlavor(x[1][2])) for x in l ])
             for (i, info), sig in itertools.izip(l, sigs):
                 results[i] = base64.decodestring(sig)
-
         return results
 
     def setTroveSigs(self, itemList):
@@ -1943,24 +1941,42 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if thaw:
             labels = [ self.fromLabel(x) for x in labels ]
         info = server.getNewTroveInfo(mark, infoTypes, labels)
+        # we always thaw the trove tuples
+        info = [ (m, (n,self.toVersion(v),self.toFlavor(f)), ti)
+                 for (m,(n,v,f),ti) in info ]
         if not thaw:
             return info
-        return [ ((x[0][0], self.toVersion(x[0][1]), self.toFlavor(x[0][2])),
-                  trove.TroveInfo(base64.b64decode(x[1]))) for x in info ]
+        # need to thaw the troveinfo as well
+        return [ (m,t,trove.TroveInfo(base64.b64decode(ti)))
+                 for (m,t,ti) in info ]
 
-
-    def setTroveInfo(self, host, info, freeze=True):
-        server = self.c[host]
-        if server.getProtocolVersion() < 47:
-            raise errors.InvalidServerVersion('getNewTroveInfo requires '
-                                              'Conary 1.1.24 or newer')
-        if freeze:
-            info = [
-                ((x[0][0], self.fromVersion(x[0][1]), self.fromFlavor(x[0][2])),
-                 base64.b64encode(x[1].freeze())) for x in info
-                ]
-        return server.setTroveInfo(info)
-
+    def setTroveInfo(self, info, freeze=True):
+        # info is a set of ((name, version, flavor), troveInfo) tuples
+        byServer = {}
+        for item in info:
+            (n,v,f), ti = item
+            l = byServer.setdefault(v.branch().label().getHost(), [])
+            l.append(item)
+        total = 0
+        # all servers we talk to have to support the protocol we need
+        for host in byServer.iterkeys():
+            server = self.c[host]
+            if server.getProtocolVersion() < 47:
+                raise errors.InvalidServerVersion(
+                    'setTroveInfo requires Conary repository running 1.1.24 or newer')
+        # now we can do work
+        total = 0
+        for host, infoList in byServer.iteritems():
+            server = self.c[host]
+            #(n,v,f) are always assumed to be instances
+            infoList = [ ((n,self.fromVersion(v),self.fromFlavor(f)), ti)
+                     for (n,v,f),ti in infoList ]
+            if freeze: # need to freeze the troveinfo as well
+                infoList = [ (t, base64.b64encode(ti.freeze()))
+                             for t, ti in infoList ]
+            total += server.setTroveInfo(infoList)
+        return total
+    
     def getNewTroveList(self, host, mark):
         server = self.c[host]
         # from server protocol 40 onward we get returned the real troveTypes
