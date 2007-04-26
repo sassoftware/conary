@@ -25,7 +25,9 @@ import textwrap
 import urllib2
 
 from conary.lib import cfgtypes,util
-from conary import errors
+from conary import constants, errors
+
+configVersion = 1
 
 # NOTE: programs expect to be able to access all of the cfg types from
 # lib.cfg, so we import them here.  At some point, we may wish to make this
@@ -368,10 +370,16 @@ class ConfigFile(_Config):
         oldTimeout = socket.getdefaulttimeout()
         timeout = 2
         socket.setdefaulttimeout(timeout)
+        # Extra headers to send up
+        headers = {
+            'X-Conary-Version' : constants.version or "UNRELEASED",
+            'X-Conary-Config-Version' : int(configVersion),
+        }
+        req = urllib2.Request(url, headers = headers)
         try:
             for i in range(4):
                 try:
-                    return urllib2.urlopen(url)
+                    return urllib2.urlopen(req)
                 except urllib2.HTTPError, err:
                     raise CfgEnvironmentError(err.filename, err.msg)
                 except urllib2.URLError, err:
@@ -584,6 +592,7 @@ class ConfigOption:
         default = valueType.copy(self.default)
         new = self.__class__(self.name, valueType, default)
         listeners = list(self.listeners)
+        new._isDefault = self._isDefault
         new.listeners = listeners
         return new
 

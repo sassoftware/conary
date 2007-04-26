@@ -2326,8 +2326,8 @@ conary erase '%s=%s[%s]'
                         criticalUpdateInfo=None, resolveSource = None,
                         applyCriticalOnly = False, restartInfo = None):
 
-        # A callback object must be supplied
-        assert(self.updateCallback is not None)
+        if self.updateCallback is None:
+            self.setUpdateCallback(UpdateCallback())
 
         if not criticalUpdateInfo:
             criticalUpdateInfo = CriticalUpdateInfo(applyCriticalOnly)
@@ -2388,11 +2388,16 @@ conary erase '%s=%s[%s]'
 
     def applyUpdateJob(self, updJob, replaceFiles = False, tagScript = None,
                     test = False, justDatabase = False, journal = None,
-                    localRollbacks = False,
-                    autoPinList = conarycfg.RegularExpressionList(),
+                    localRollbacks = None, autoPinList = None,
                     keepJournal = False, noRestart=False):
         # A callback object must be supplied
         assert(self.updateCallback is not None)
+
+        if localRollbacks is None:
+            localRollbacks = self.cfg.localRollbacks
+
+        if autoPinList is None:
+            autoPinList = self.cfg.pinTroves
 
         # Apply the update job, return restart information if available
         if noRestart:

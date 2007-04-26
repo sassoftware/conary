@@ -20,7 +20,7 @@ from mod_python.util import FieldStorage
 
 # helper class for web handlers
 class WebHandler(object):
-    content_type = "application/xhtml+xml"
+    content_type = 'text/html; charset=utf-8'
 
     def _checkAuth(self, authToken):
         raise NotImplementedError

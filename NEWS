@@ -10,9 +10,16 @@ Changes in @NEW@:
       SSL traffic through an HTTP proxy using the CONNECT HTTP method.
       As such, there is now a "conaryProxy" configuration variable,
       in addition to the "proxy" variable.
-      (CNY-1550).
+      (CNY-1550)x.
     * The "proxy" (and newly introduced "conaryProxy") variables can
-      be turned off by setting them to "None". (CNY-1378).
+      be turned off by setting them to "None". (CNY-1378)x.
+    * Clients requesting the inclusion of configuration files residing
+      on the network now upload their version. This opens up the
+      possibility for the server to serve different configuration files
+      to different client generations. (CNY-1588)
+    * Configuration variables "localRollbacks" and "pinTroves" get
+      used as defaults when applying an update job; they can be 
+      explicitly overridden. (CNY-1583)
 
 Changes in 1.1.23:
   o Client Changes:
