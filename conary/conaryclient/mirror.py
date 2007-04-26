@@ -36,10 +36,13 @@ def parseArgs(argv):
     parser = optparse.OptionParser(version = '%prog 0.1')
     parser.add_option("--config-file", dest = "configFile",
                       help = "configuration file", metavar = "FILE")
-    parser.add_option("--full-sig-sync", dest = "syncSigs",
+    parser.add_option("--full-sig-sync", dest = "infoSync",
                       action = "store_true", default = False,
-                      help = "replace all of the trove signatures on "
-                             "the target repository")
+                      help = "deprecated: alias to --full-info-sync")
+    parser.add_option("--full-info-sync", dest = "infoSync",
+                      action = "store_true", default = False,
+                      help = "replace all the trove signatures and metadata "
+                      "in the target repository")
     parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
                       default = False,
                       help = "ignore the last-mirrored timestamp in the "
@@ -160,7 +163,7 @@ def Main(argv=sys.argv[1:]):
     # reset to -1
     callAgain = mirrorRepository(sourceRepos, targets, cfg,
                                  test = options.test, sync = options.sync,
-                                 syncSigs = options.syncSigs,
+                                 syncSigs = options.infoSync,
                                  callback = callback)
     while callAgain:
         callAgain = mirrorRepository(sourceRepos, targets, cfg,
@@ -357,48 +360,98 @@ def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCa
         i += 1
     return
 
-def mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs=False):
-    for t in targets:
-        t.mirrorGPG(sourceRepos, cfg.host)
-    if syncSigs:
-        log.debug("getting full trove list for signature sync")
-        troveDict = sourceRepos.getTroveVersionList(cfg.host, { None : None })
-        sigList = []
-        for name, versionD in troveDict.iteritems():
-            for version, flavorList in versionD.iteritems():
-                for flavor in flavorList:
-                    sigList.append((currentMark, (name, version, flavor)))
-    else:
-        log.debug("looking for new trove signatures")
-        sigList = sourceRepos.getNewSigList(cfg.host, str(currentMark))
+# filter a trove tuple based on cfg
+def _filterTup(troveTup, cfg):
+    (n, v, f) = troveTup
+    # if we're matching troves, filter by name first
+    if cfg.matchTroves and cfg.matchTroves.match(n) <= 0:
+        return False
+    # filter by host/label
+    l = v.branch().label()
+    if l.getHost() != cfg.host:
+        return False
+    if cfg.labels and l not in cfg.labels:
+        return False
+    return True
+
+# get all the trove info to be synced
+def _getAllInfo(src, cfg):
+    log.debug("resync all trove info from source. This will take a while...")
+    # grab the full list of all the trove versions and flavors in the src
+    troveDict = src.getTroveVersionList(cfg.host, { None : None })
+    troveList = []
+    # filter out the stuff we don't need
+    for name, versionD in troveDict.iteritems():
+        for version, flavorList in versionD.iteritems():
+            for flavor in flavorList:
+                tup = (name, version, flavor)
+                if not _filterTup(tup, cfg):
+                    continue
+                troveList.append(tup)
+    del troveDict
+    # retrieve the sigs and the metadata records to sync over
+    sigList = src.getTroveSigs(troveList)
+    metaList = src.getTroveInfo(trove._TROVEINFO_TAG_METADATA, troveList)
+    infoList = []
+    for t, s, ti in itertools.izip(troveList, sigList, metaList):
+        if ti is None:
+            ti = trove.TroveInfo()
+        ti.sigs.thaw(s)
+        infoList.append((t, ti))
+    return infoList
+
+# while talking to older repos - get the new trove sigs
+def _getNewSigs(src, cfg, mark):
+    # talking to an old source server. We do the best and we get the sigs out
+    sigList = src.getNewSigList(cfg.host, str(mark))
+    log.debug("obtained %d changed trove sigs", len(sigList))
+    sigList = [ x for x in sigList if _filterTup(x[1], cfg) ]
+    log.debug("%d changed sigs after label and match filtering", len(sigList))
     # protection against duplicate items returned in the list by some servers
-    if not len(sigList):
-        return 0
     sigList = list(set(sigList))
     sigList.sort(lambda a,b: cmp(a[0], b[0]))
-    log.debug("%d new signatures are available" % len(sigList))
-
-    # also weed out the signatures that don't belong on our label. Having none
-    # left after this isn't that big a deal, so we  don't have to return
-    if cfg.labels and len(sigList):
-        sigList = [ x for x in sigList if
-                    x[1][1].branch().label() in cfg.labels ]
-        log.debug("after label filtering %d sigs are needed", len(sigList))
-    # filter out signatures for troves we aren't interested in because
-    # of the matchTroves setting
-    if cfg.matchTroves and len(sigList):
-        sigList = [x for x in sigList if
-                   cfg.matchTroves.match(x[1][0]) > 0]
-        log.debug("after matchTroves %d sigs are needed", len(sigList))
-    if not sigList:
-        return 0
-    
-    updateCount = 0
     log.debug("downloading %d signatures from source repository", len(sigList))
-    sigs = sourceRepos.getTroveSigs([ x[1] for x in sigList ])
-    # update these sigs on each target
+    # XXX: we could also get the metadata in here, but getTroveInfo
+    # would use a getChangeSet call against older repos, severely
+    # impacting performance
+    sigs = src.getTroveSigs([ x[1] for x in sigList ])
+    # need to convert the sigs into TroveInfo instances
+    def _sig2info(sig):
+        ti = trove.TroveInfo()
+        ti.sigs.thaw(sig)
+        return ti
+    sigs = [ _sig2info(s) for s in sigs]
+    # we're gonna iterate repeatedely over the returned set, no itertools can do
+    return zip(sigList, sigs)
+
+# get the changed trove info entries for the troves comitted
+def _getNewInfo(src, cfg, mark):
+    # first, try the new getNewTroveInfo call
+    labels = cfg.labels or []
+    mark = str(long(mark)) # xmlrpc chokes on longs
+    infoTypes = [trove._TROVEINFO_TAG_SIGS, trove._TROVEINFO_TAG_METADATA]
+    try:
+        infoList = src.getNewTroveInfo(cfg.host, mark, infoTypes, labels)
+    except errors.InvalidServerVersion:
+        # otherwise we mirror just the sigs...
+        infoList = _getNewSigs(src, cfg, mark)
+    return infoList
+            
+# mirror new trove info for troves we have already mirrored.
+def mirrorTroveInfo(src, targets, mark, cfg, resync=False):
+    if resync:
+        log.debug("performing a full trove info sync")
+        infoList = _getAllInfo(src, cfg)
+        infoList = [(mark, t, ti) for t, ti in infoList ]
+    else:
+        log.debug("getting new trove info entries")
+        infoList = _getNewInfo(src, cfg, mark)
+    if not len(infoList):
+        return 0
+    log.debug("mirroring %d changed trove info" % len(infoList))
+    updateCount = 0
     for t in targets:
-        updateCount += t.setTroveSigs(sigList, sigs)
+        updateCount += t.setTroveInfo(infoList)
     return updateCount
 
 # this mirrors all the troves marked as removed from the sourceRepos into the targetRepos
@@ -436,10 +489,6 @@ def mirrorRemoved(sourceRepos, targetRepos, troveSet, test = False, callback = C
     callback.done()
     return len(jobList)
 
-# While running under --test, we should not touch the mirror mark of the target repository
-CurrentTestMark = None
-LastBundleSet = None
-
 # target repo class that helps dealing with testing mode
 class TargetRepository:
     def __init__(self, repo, cfg, name = 'target', test=False):
@@ -471,22 +520,32 @@ class TargetRepository:
         if self.test:
             return
         self.repo.addPGPKeyList(self.cfg.host, keyList)
-    def setTroveSigs(self, sigList, sigs):
-        log.debug("%s checking which trove sigs are required", self.name)
-        # Sigs whose mark is the same as currentMark might not have their trove
+    def setTroveInfo(self, infoList):
+        log.debug("%s checking what troveinfo needs to be mirrored", self.name)
+        # Items whose mark is the same as currentMark might not have their trove
         # available on the server (it might be coming as part of this mirror
-        # run). sigList has to be sorted by mark for this to work.
-        inQuestion = [ x[1] for x in sigList if str(long(x[0])) == self.mark ]
-        present = self.repo.hasTroves(inQuestion)
-        # build the ((n,v,f), signature) list only for the troves that have signatures
-        setSigs = [ (x[0][1], x[1]) for x in itertools.izip(sigList, sigs) if len(x[1]) > 0 ]
-        # filter out the ones that are not present
-        setSigs = [ x for x in setSigs if present.get(x[0], True) ]
-        log.debug("%s uploading %d signatures", self.name, len(setSigs))
+        # run).
+        inQuestion = [ x[1] for x in infoList if str(long(x[0])) == self.mark ]
+        present = self.repo.hasTroves(inQuestion, hidden=True)
+        # filter out the not present troves which will get mirrored in
+        # the current mirror run
+        infoList = [ (t, ti) for (m, t, ti) in infoList if present.get(t, True) ]
+        # avoid busy work for troveinfos which are empty
+        infoList = [ (t, ti) for (t, ti) in infoList if len(ti.freeze()) > 0 ]
         if self.test:
             return 0
-        self.repo.setTroveSigs(setSigs)
-        return len(setSigs)
+        try:
+            self.repo.setTroveInfo(infoList)
+        except errors.InvalidServerVersion: # to older servers we can only transport sigs
+            infoList = [ (t, ti.sigs.freeze()) for t, ti in infoList ]
+            # only send up the troves that actually have a signature change
+            infoList = [ x for x in infoList if len(x[1]) > 0 ]
+            log.debug("%s pushing %d trove sigs...", self.name, len(infoList))
+            self.repo.setTroveSigs(infoList)          
+        else:
+            log.debug("%s uploaded %d info records", self.name, len(infoList))
+        return len(infoList)
+    
     def addTroveList(self, tl):
         # Filter out troves which are already in the local repository. Since
         # the marks aren't distinct (they increase, but not monotonially), it's
@@ -547,11 +606,18 @@ def getTroveList(src, cfg, mark):
     maxMark = max([x[0] for x in troveList])
     # eliminate troves that are not on the host we're mirroring (sanity check)
     troveList = [ x for x in troveList if x[1][1].branch().label().getHost() == cfg.host ]
-    if not troveList:
-        log.debug("no new troves found")
-        return (maxMark, [])
     if len(troveList) < l:
-        log.debug("after eliminating foreign labels %d troves are left", len(troveList))   
+        l = len(troveList)
+        log.debug("after eliminating foreign labels %d troves are left", l)
+        if not troveList:
+            return (maxMark, [])
+    # filter out troves on labels and parse through matchTroves
+    troveList = [ x for x in troveList if _filterTup(x[1],cfg) ]
+    if len(troveList) < l:
+        l = len(troveList)
+        log.debug("after label filtering and matchTroves %d troves are left", l)
+        if not troveList:
+            return (maxMark, [])
     # sort deterministically by mark, version, flavor, reverse name
     troveList.sort(lambda a,b: cmp(a[0], b[0]) or
                    cmp(a[1][1], b[1][1]) or
@@ -583,6 +649,8 @@ def getTroveList(src, cfg, mark):
     # since we're returning at least on trove, the caller will make the next mark decision
     return (mark, troveList)
 
+# syncSigs really means "resync all info", but we keep the parameter
+# name for compatibility reasons
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
                      callback = ChangesetCallback()):
@@ -615,8 +683,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     for t in targets:
         if t.getMirrorMark() != currentMark:
             t.setMirrorMark(currentMark)
-    # first, we need to mirror changed signatures for troves in each target
-    updateCount = mirrorSignatures(sourceRepos, targets, currentMark, cfg, syncSigs)
+    # mirror gpg signatures from the src into the targets
+    for t in targets:
+        t.mirrorGPG(sourceRepos, cfg.host)
+    # mirror changed trove information for troves already mirrored
+    updateCount = mirrorTroveInfo(sourceRepos, targets, currentMark, cfg, syncSigs)
     newMark, troveList = getTroveList(sourceRepos, cfg, currentMark)
     if not troveList:
         if newMark > currentMark: # something was returned, but filtered out
@@ -625,24 +696,12 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             return -1 # call again
         return 0   
     # prepare a new max mark to be used when we need to break out of a loop
-    crtMaxMark = max(x[0] for x in troveList)
+    crtMaxMark = max(long(x[0]) for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:
         # if we're hung on the current max then we need to
         # forcibly advance the mark in case we're stuck
         crtMaxMark += 1 # only used if we filter out all troves below
     initTLlen = len(troveList)
-    
-    # we're trying to "weed out" troves that don't belong on the configured labels.
-    if cfg.labels:
-        troveList = [ x for x in troveList
-                      if x[1][1].branch().label() in cfg.labels ]
-        log.debug("after label filtering %d troves are needed", len(troveList))
-
-    # filter out troves based on the matchTroves value
-    if cfg.matchTroves:
-        troveList = [ x for x in troveList
-                      if cfg.matchTroves.match(x[1][0]) > 0 ]
-        log.debug("after matchTroves %d troves are needed", len(troveList))
 
     # removed troves are a special blend - we keep them separate
     removedSet  = set([ x[1] for x in troveList if x[2] == trove.TROVE_TYPE_REMOVED ])
