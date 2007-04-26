@@ -2235,7 +2235,7 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     assert(protocol in ('http', 'https'))
 
     opener = transport.XMLOpener(proxies=proxies)
-    c, selector, headers = opener.createConnection(uri,
+    c, urlstr, selector, headers = opener.createConnection(uri,
         ssl = (protocol == 'https'), withProxy=True)
 
     BUFSIZE = 8192

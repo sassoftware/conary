@@ -220,7 +220,7 @@ class XMLOpener(urllib.FancyURLopener):
             headers.append(('Host', host))
         if auth:
             headers.append(('Authorization', 'Basic %s' % auth))
-        return h, selector, headers
+        return h, url, selector, headers
 
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
@@ -228,7 +228,7 @@ class XMLOpener(urllib.FancyURLopener):
 	   which is hardcoded in (this version also supports https)"""
         # Splitting some of the functionality so we can reuse this code with
         # PUT requests too
-        h, selector, headers = self.createConnection(url, ssl=ssl)
+        h, urlstr, selector, headers = self.createConnection(url, ssl=ssl)
         if data is not None:
             h.putrequest('POST', selector)
             if self.compress:
@@ -259,7 +259,7 @@ class XMLOpener(urllib.FancyURLopener):
 
             return usedAnonymous, urllib.addinfourl(fp, headers, selector)
         else:
-	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
+	    raise xmlrpclib.ProtocolError(urlstr, errcode, errmsg, headers)
 
     def _wait(self, h):
         # wait for data if abortCheck is set
