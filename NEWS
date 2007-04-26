@@ -16,6 +16,9 @@ Changes in @NEW@:
       on the network now upload their version. This opens up the
       possibility for the server to serve different configuration files
       to different client generations. (CNY-1588)
+    * Configuration variables "localRollbacks" and "pinTroves" get
+      used as defaults when applying an update job; they can be 
+      explicitly overridden. (CNY-1583)
 
 Changes in 1.1.23:
   o Client Changes:
