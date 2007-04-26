@@ -166,7 +166,7 @@ class XMLOpener(urllib.FancyURLopener):
             if proxy:
                 urltype, proxyhost = urllib.splittype(proxy)
                 host, selector = urllib.splithost(proxyhost)
-                url = (host, url)
+                url = (host, protocol + ':' + url)
 
         useConaryProxy = False
         user_passwd = None
