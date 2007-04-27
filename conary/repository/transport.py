@@ -102,6 +102,7 @@ class DecompressFileObj:
         return self.fp.fileno()
 
 class XMLOpener(urllib.FancyURLopener):
+    contentType = 'text/xml'
     def __init__(self, *args, **kw):
         self.compress = False
         self.abortCheck = None
@@ -234,7 +235,7 @@ class XMLOpener(urllib.FancyURLopener):
             if self.compress:
                 h.putheader('Content-encoding', 'deflate')
                 data = zlib.compress(data, 9)
-            h.putheader('Content-type', 'text/xml')
+            h.putheader('Content-type', self.contentType)
             h.putheader('Content-length', '%d' % len(data))
             h.putheader('Accept-encoding', 'deflate')
         else:
@@ -286,6 +287,13 @@ class XMLOpener(urllib.FancyURLopener):
             else:
                 # ready to read response
                 break
+
+class URLOpener(XMLOpener):
+    '''Replacement class for urllib.FancyURLopener'''
+    contentType = 'application/x-www-form-urlencoded'
+
+    def open_http(self, *args, **kwargs):
+        return XMLOpener.open_http(self, *args, **kwargs)[1]
 
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
