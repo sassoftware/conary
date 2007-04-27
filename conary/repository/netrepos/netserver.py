@@ -2386,7 +2386,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                          trove._TROVEINFO_TAG_METADATA,
                                          [ (name, version, flavor) ])[0][1]
             metadata = trove.Metadata(metadata)
-            mi = trove.MetadataItem(base64.b64decode(item))
+            mi = trove.MetadataItem(base64.decodestring(item))
             metadata.addItem(mi)
             i = trove.TroveInfo()
             i.metadata = metadata
