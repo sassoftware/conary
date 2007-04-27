@@ -175,13 +175,18 @@ type ".quit" to exit, ".help" for help"""
             return self.format_column_rows(cu.fields(), rows, widths)
         return self.format_column_rows(cu.fields(), cu)
 
+    def format_val(self, col):
+        if isinstance(col, float):
+            return '%f' %col
+        return str(col)
+
     def format_list(self, cu):
         fields = None
         for row in cu:
             if self.show_headers and not fields:
                 fields = cu.fields()
                 yield 0, '|'.join(fields)
-            yield 1, '|'.join(str(x) for x in row)
+            yield 1, '|'.join(self.format_val(x) for x in row)
 
     def display(self, cu):
         lines = self.format(cu)
