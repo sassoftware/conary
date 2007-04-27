@@ -2381,16 +2381,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addMetadataItems(self, authToken, clientVersion, itemList):
         self.log(2, "adding %i metadata items" %len(itemList))
         l = []
-        for (name, version, flavor), item in itemList:
-            metadata = self.getTroveInfo(authToken, clientVersion,
-                                         trove._TROVEINFO_TAG_METADATA,
-                                         [ (name, version, flavor) ])[0][1]
-            metadata = trove.Metadata(base64.decodestring(metadata))
+        metadata = self.getTroveInfo(authToken, clientVersion,
+                                     trove._TROVEINFO_TAG_METADATA,
+                                     [ x[0] for x in itemList ])
+        for (troveTup, item), (mark, existing) in itertools.izip(itemList, metadata):
+            m = trove.Metadata(base64.decodestring(existing))
             mi = trove.MetadataItem(base64.b64decode(item))
-            metadata.addItem(mi)
+            m.addItem(mi)
             i = trove.TroveInfo()
-            i.metadata = metadata
-            l.append(((name, version, flavor), i.freeze()))
+            i.metadata = m
+            l.append((troveTup, i.freeze()))
         return self._setTroveInfo(authToken, clientVersion, l)
 
     @accessReadWrite
