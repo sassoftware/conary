@@ -562,21 +562,20 @@ class MetadataItem(streams.StreamSet):
                 (DYNAMIC, streams.StringsStream,  'notes'        ),
         }
 
+    _skipSet = { 'id' : True, 'signatures': True }
+    _keys = [ x[2] for x in streamDict.itervalues() if x[2] not in _skipSet ]
+
     def _digest(self, version=0):
         if version == 0:
             # version 0 of the digest
-            frz = streams.StreamSet.freeze(self,
-                                           skipSet = { 'id' : True,
-                                                       'signatures': True })
+            frz = streams.StreamSet.freeze(self, self._skipSet)
             digest = streams.Sha256Stream()
             digest.compute(frz)
             return digest()
         raise RuntimeError('unsupported version')
 
     def _updateId(self):
-        frz = streams.StreamSet.freeze(self,
-                                       skipSet = { 'id' : True,
-                                                   'signatures': True })
+        frz = streams.StreamSet.freeze(self, self._skipSet)
         digest = streams.Sha1Stream()
         digest.compute(frz)
         self.id.set(digest())
@@ -619,15 +618,27 @@ class MetadataItem(streams.StreamSet):
         self._updateDigests()
         return streams.StreamSet.freeze(self, *args, **kw)
 
-class Metadata(streams.StreamCollection):
+    def keys(self):
+        return [ x for x in self._keys if getattr(self, x)() ]
+
+    def __getitem__(self, key):
+        return getattr(self, key)()
+
+class Metadata(streams.OrderedStreamCollection):
     streamDict = { 1: MetadataItem }
 
-    def add(self, item):
+    def addItem(self, item):
         self.addStream(1, item)
 
     def __iter__(self):
         for item in self.getStreams(1):
             yield item
+
+    def get(self, lang):
+        d = dict.fromkeys(MetadataItem._keys)
+        for item in self.getStreams(1):
+            d.update(item)
+        return d
 
     def verifyDigitalSignatures(self, serverName=None):
         missingKeys = []
@@ -1146,7 +1157,10 @@ class Trove(streams.StreamSet):
 
     def getNameVersionFlavor(self):
         return self.name(), self.version(), self.flavor()
-    
+
+    def getMetadata(self, lang=None):
+        return self.troveInfo.metadata.get(lang)
+
     def changeVersion(self, version):
         self.version.set(version)
 
