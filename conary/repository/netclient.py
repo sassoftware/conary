@@ -541,6 +541,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             self.fromFlavor(flavor),
                                             encSig)
 
+    def addMetadataItems(self, itemList):
+        byServer = {}
+        for (name, version, flavor), item in itemList:
+            l = byServer.setdefault(version.getHost(), [])
+            l.append(
+                ((name, self.fromVersion(version), self.fromFlavor(flavor)),
+                 base64.b64encode(item.freeze())))
+        for server in byServer.keys():
+            s = self.c[version]
+            if s.getProtocolVersion() < 47:
+                raise InvalidServerVersion, "Cannot add metadata to troves on " \
+                      "repositories older than 1.1.24"
+        for server in byServer.keys():
+            s = self.c[server]
+            s.addMetadataItems(byServer[server])
+
     def addNewAsciiPGPKey(self, label, user, keyData):
         self.c[label].addNewAsciiPGPKey(user, keyData)
 
