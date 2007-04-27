@@ -943,7 +943,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             return {}
         byServer = {}
         for name, version, flavor in troveInfoList:
-            l = byServer.setdefault(version.branch().label().getHost(), [])
+            l = byServer.setdefault(version.getHost(), [])
             l.append(((name, version, flavor),
                       (name, self.fromVersion(version), 
                              self.fromFlavor(flavor))))
@@ -1912,7 +1912,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         byServer = {}
         results = [ None ] * len(troveList)
         for i, info in enumerate(troveList):
-            l = byServer.setdefault(info[1].branch().label().getHost(), [])
+            l = byServer.setdefault(info[1].getHost(), [])
             l.append((i, info))
         for host, l in byServer.iteritems():
             sigs = self.c[host].getTroveSigs([ 
@@ -1926,7 +1926,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # infoList is a set of ((name, version, flavor), sigBlock) tuples
         byServer = {}
         for item in itemList:
-            l = byServer.setdefault(item[0][1].branch().label().getHost(), [])
+            l = byServer.setdefault(item[0][1].getHost(), [])
             l.append(item)
 
         total = 0
@@ -1971,7 +1971,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         byServer = {}
         for item in info:
             (n,v,f), ti = item
-            l = byServer.setdefault(v.branch().label().getHost(), [])
+            l = byServer.setdefault(v.getHost(), [])
             l.append(item)
         total = 0
         # all servers we talk to have to support the protocol we need
@@ -2020,7 +2020,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         byServer = {}
         results = [ None ] * len(troveList)
         for i, info in enumerate(troveList):
-            l = byServer.setdefault(info[1].branch().label().getHost(), [])
+            l = byServer.setdefault(info[1].getHost(), [])
             l.append((i, info))
         for host, l in byServer.iteritems():
             tl = [ x[1] for x in l ]
