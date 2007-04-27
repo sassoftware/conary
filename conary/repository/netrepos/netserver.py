@@ -135,6 +135,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         'hasTroves',
                         'getCollectionMembers',
                         'getTrovesBySource',
+                        'addMetadataItems',
                         'addDigitalSignature',
                         'addNewAsciiPGPKey',
                         'addNewPGPKey',
@@ -2377,6 +2378,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return matches
 
     @accessReadWrite
+    def addMetadataItems(self, authToken, clientVersion, itemList):
+        self.log(2, "adding %i metadata items" %len(itemList))
+        l = []
+        for (name, version, flavor), item in itemList:
+            metadata = self.getTroveInfo(authToken, clientVersion,
+                                         trove._TROVEINFO_TAG_METADATA,
+                                         [ (name, version, flavor) ])[0][1]
+            metadata = trove.Metadata(metadata)
+            mi = trove.MetadataItem(base64.b64decode(item))
+            metadata.addItem(mi)
+            i = trove.TroveInfo()
+            i.metadata = metadata
+            l.append(((name, version, flavor), i.freeze()))
+        return self._setTroveInfo(authToken, clientVersion, l)
+
+    @accessReadWrite
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
         if clientVersion < 45:
@@ -2754,16 +2771,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def setTroveInfo(self, authToken, clientVersion, infoList):
+        infoList = [ (x[0], base64.b64decode(x[1])) for x in infoList ]
+        return self._setTroveInfo(authToken, clientVersion, infoList,
+                                  requireMirror=True)
+
+    def _setTroveInfo(self, authToken, clientVersion, infoList,
+                      requireMirror=False):
         # return the number of signatures which have changed
         self.log(2, infoList)
         # this requires mirror access and write access for that trove
-        if not self.auth.check(authToken, mirror=True):
+        if requireMirror and not self.auth.check(authToken, mirror=True):
             raise errors.InsufficientPermission
         # batch permission check for writing
         if False in self.auth.batchCheck(authToken, [
             (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
             raise errors.InsufficientPermission
-
         cu = self.db.cursor()
         updateCount = 0
 
@@ -2808,7 +2830,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         def _trvInfoIter(instanceIds, iList):
             i = -1
             for (instanceId,), (trvTuple, trvInfo) in itertools.izip(instanceIds, iList):
-                for infoType, data in streams.splitFrozenStreamSet(base64.b64decode(trvInfo)):
+                for infoType, data in streams.splitFrozenStreamSet(trvInfo):
                     # make sure that only signatures and metadata
                     # are modified
                     if infoType not in (trove._TROVEINFO_TAG_SIGS,
@@ -2877,9 +2899,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             i = trove.TroveInfo()
             for troveTuple, sig in l:
                 i.sigs = trove.TroveSignatures(base64.decodestring(sig))
-                yield troveTuple, base64.b64encode(i.freeze())
-        return self.setTroveInfo(authToken, clientVersion,
-                                 list(_transform(infoList)))
+                yield troveTuple, i.freeze()
+        return self._setTroveInfo(authToken, clientVersion,
+                                  list(_transform(infoList)))
 
     @accessReadOnly
     def getNewPGPKeys(self, authToken, clientVersion, mark):
