@@ -1,6 +1,7 @@
 # this file documents the wire protocol changes for conary.
 Version 47:
   - Added getNewTroveInfo and setTroveInfo
+  - added addMetadataItems call
 
 Version 46:
   - Added hidden flag to commitChangeSet and hasTroves call (only allowed for
