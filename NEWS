@@ -1,4 +1,13 @@
 Changes in @NEW@:
+  o New Feature:
+    * Conary 1.1.24 introduces the framework needed to implement a new
+      metadata design for Conary.  The new metadata feature allows
+      various information such as description to be set for a trove.
+      New XML-RPC interfaces, getNewTroveInfo() and setTroveInfo(),
+      have been added to facilitate mirroring metadata.
+      addMetadataItems() has been added to allow metadata to be added
+      to a trove after it has been built. (CNY-1577)
+
   o Client Changes:
     * The Conary client now distinguishes between an upstream Conary
       proxy and a plain HTTP proxy. This is so we can properly handle
