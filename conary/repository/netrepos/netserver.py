@@ -2384,7 +2384,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         metadata = self.getTroveInfo(authToken, clientVersion,
                                      trove._TROVEINFO_TAG_METADATA,
                                      [ x[0] for x in itemList ])
-        for (troveTup, item), (mark, existing) in itertools.izip(itemList, metadata):
+        # if we're signaled that any trove is missing, bail out
+        missing = [ i for i,x in enumerate(metadata) if x[0] < 0]
+        if missing: # report the first one
+            n,v,f = itemList[missing[0]][0]
+            raise errors.TroveMissing(n, v)
+        for (troveTup, item), (presence, existing) in itertools.izip(itemList, metadata):
             m = trove.Metadata(base64.decodestring(existing))
             mi = trove.MetadataItem(base64.b64decode(item))
             m.addItem(mi)
