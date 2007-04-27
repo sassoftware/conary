@@ -1,6 +1,3 @@
-    * Restoring local rollbacks now creates the directories locally modified
-      files were stored in (CNY-1444)
-
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
@@ -33,6 +30,10 @@ Changes in 1.1.24:
     * A bug that caused a traceback when rolling back group updates
       from rollback changesets created when the "localRollback"
       configuration option was set has been fixed. (CNY-1590)
+    * A bug that caused a traceback when applying a local rollback
+      changeset with a locally modified file has been fixed.  Conary
+      needed to create the directory that the locally modified file
+      resides in first. (CNY-1444)
 
 Changes in 1.1.23:
   o Client Changes:
