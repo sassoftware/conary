@@ -611,7 +611,6 @@ class ClientClone:
         return filesNeeded
 
     def _addCloneFiles(self, cs, newFilesNeeded, callback):
-        newFilesNeeded.sort()
         fileObjs = self.repos.getFileVersions(newFilesNeeded)
         contentsNeeded = []
         pathIdsNeeded = []
