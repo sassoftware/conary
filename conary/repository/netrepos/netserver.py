@@ -2706,7 +2706,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             except:
                 raise errors.InsufficientPermission
             cu.execute('select labelId from labels where label in (%s)'
-                       % ('?',) * len(labels), labels)
+                       % ",".join('?'*len(labels)), labels)
             labelIds = [ str(x[0]) for x in cu.fetchall() ]
             if not labelIds:
                 # no labels matched, short circuit
