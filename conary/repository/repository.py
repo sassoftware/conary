@@ -552,8 +552,8 @@ class ChangeSetJob:
 	    del newFileMap
 	    self.addTroveDone(troveInfo)
 
-	configRestoreList.sort()
-	normalRestoreList.sort()
+        configRestoreList.sort(key=lambda x: x[0:5])
+        normalRestoreList.sort(key=lambda x: x[0:3])
 
         # config files are cached, so we don't have to worry about not
         # restoring the same fileId/pathId twice
