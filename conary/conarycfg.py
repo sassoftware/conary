@@ -236,7 +236,6 @@ class ProxyEntry(CfgType):
         return CfgType.parseString(self, str)
 
 class CfgProxy(CfgDict):
-    overrides = 'conaryProxy'
 
     def updateFromString(self, val, str):
         suppProtocols = ['http', 'https']
@@ -282,9 +281,6 @@ class CfgProxy(CfgDict):
 
     def __init__(self, default={}):
         CfgDict.__init__(self, ProxyEntry, default=default)
-
-class CfgConaryProxy(CfgProxy):
-    overrides = 'proxy'
 
 CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
 
@@ -342,7 +338,7 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
     # Upstream Conary proxy
-    conaryProxy           =  CfgConaryProxy
+    conaryProxy           =  CfgProxy
     # HTTP proxy
     proxy                 =  CfgProxy
     pubRing               =  (CfgPathList, [ \
@@ -673,3 +669,19 @@ class EntitlementParser(dict):
         self.p.CharacterDataHandler = self.CharacterDataHandler
         dict.__init__(self)
 
+def getProxyFromConfig(cfg):
+    """Get the proper proxy configuration variable from the supplied config
+    object"""
+
+    proxy = cfg.proxy
+    if proxy:
+        return proxy
+
+    # Is there a conaryProxy defined?
+    proxy = {}
+    for k, v in cfg.conaryProxy.iteritems():
+        # Munge http.* to conary.* to flag the transport layer that
+        # we're using a Conary proxy
+        v = 'conary' + v[4:]
+        proxy[k] = v
+    return proxy
