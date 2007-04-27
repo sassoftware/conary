@@ -367,10 +367,9 @@ def _filterTup(troveTup, cfg):
     if cfg.matchTroves and cfg.matchTroves.match(n) <= 0:
         return False
     # filter by host/label
-    l = v.branch().label()
-    if l.getHost() != cfg.host:
+    if v.getHost() != cfg.host:
         return False
-    if cfg.labels and l not in cfg.labels:
+    if cfg.labels and v.branch().label() not in cfg.labels:
         return False
     return True
 
@@ -604,13 +603,6 @@ def getTroveList(src, cfg, mark):
     # returned, we need to tell the caller what was the highest mark
     # we had so it can continue asking for more
     maxMark = max([x[0] for x in troveList])
-    # eliminate troves that are not on the host we're mirroring (sanity check)
-    troveList = [ x for x in troveList if x[1][1].branch().label().getHost() == cfg.host ]
-    if len(troveList) < l:
-        l = len(troveList)
-        log.debug("after eliminating foreign labels %d troves are left", l)
-        if not troveList:
-            return (maxMark, [])
     # filter out troves on labels and parse through matchTroves
     troveList = [ x for x in troveList if _filterTup(x[1],cfg) ]
     if len(troveList) < l:
