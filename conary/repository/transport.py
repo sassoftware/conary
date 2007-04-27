@@ -248,8 +248,8 @@ class XMLOpener(urllib.FancyURLopener):
         # wait for a response
         self._wait(h)
         errcode, errmsg, headers = h.getreply()
+        fp = h.getfile()
         if errcode == 200:
-            fp = h.getfile()
             usedAnonymous = 'X-Conary-UsedAnonymous' in headers
 
             encoding = headers.get('Content-encoding', None)
@@ -260,10 +260,10 @@ class XMLOpener(urllib.FancyURLopener):
 
             return usedAnonymous, urllib.addinfourl(fp, headers, selector)
         else:
-            return self.http_error(url, fp, errcode, errmsg, headers, data)
+            return False, self.http_error(urlstr, fp, errcode, errmsg, headers, data)
 
-    def http_error(self, fp, errcode, errmsg, headers, data=None):
-        raise xmlrpclib.ProtocolError(urlstr, errcode, errmsg, headers)
+    def http_error(self, url, fp, errcode, errmsg, headers, data=None):
+        raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
     open_conary = open_http
     open_conarys = open_https
@@ -298,8 +298,8 @@ class URLOpener(XMLOpener):
     def open_http(self, *args, **kwargs):
         return XMLOpener.open_http(self, *args, **kwargs)[1]
 
-    def http_error(self, fp, errcode, errmsg, headers, data=None):
-        return urllib.FancyURLopener.http_error(self, fp, errcode, errmsg,
+    def http_error(self, url, fp, errcode, errmsg, headers, data=None):
+        return urllib.FancyURLopener.http_error(self, url, fp, errcode, errmsg,
                 headers, data=data)
 
     open_conary = open_http
