@@ -2901,7 +2901,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 i.sigs = trove.TroveSignatures(base64.decodestring(sig))
                 yield troveTuple, i.freeze()
         return self._setTroveInfo(authToken, clientVersion,
-                                  list(_transform(infoList)))
+                                  list(_transform(infoList)),
+                                  requireMirror=True)
 
     @accessReadOnly
     def getNewPGPKeys(self, authToken, clientVersion, mark):
