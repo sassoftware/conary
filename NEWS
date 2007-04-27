@@ -1,3 +1,6 @@
+    * Restoring local rollbacks now creates the directories locally modified
+      files were stored in (CNY-1444)
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new

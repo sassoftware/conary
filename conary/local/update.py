@@ -503,10 +503,11 @@ class FilesystemJob:
                         # missing contents; skip it and hope someone else
                         # figures it out later (probably in the local part
                         # of the rollback)
-                        
+
                         # XXX we need to create this or conary thinks it
                         # was removed by the user if it doesn't already
                         # exist, when that's not what we mean here
+                        util.mkdirChain(os.path.dirname(target))
                         open(target, "w")
                         continue
 
