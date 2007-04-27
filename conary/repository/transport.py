@@ -295,6 +295,12 @@ class URLOpener(XMLOpener):
     def open_http(self, *args, **kwargs):
         return XMLOpener.open_http(self, *args, **kwargs)[1]
 
+    def open_https(self, *args, **kwargs):
+        return XMLOpener.open_https(self, *args, **kwargs)[1]
+
+    open_conary = open_http
+    open_conarys = open_https
+
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
     atpoint = host.find('@') + 1
