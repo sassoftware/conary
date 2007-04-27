@@ -295,6 +295,8 @@ class URLOpener(XMLOpener):
     def open_http(self, *args, **kwargs):
         return XMLOpener.open_http(self, *args, **kwargs)[1]
 
+    # Technically this is not required to be redefined, since XMLOpener's
+    # open_https will call URLOpener's open_http
     def open_https(self, *args, **kwargs):
         return XMLOpener.open_https(self, *args, **kwargs)[1]
 
