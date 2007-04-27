@@ -2,23 +2,24 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug in the way the proxy configuration variable is set has
       been fixed. (CNY-1586)
-    * Local rollbacks didn't store weak references (CNY-1590)
+    * A bug that caused a traceback when rolling back group updates
+      from rollback changesets created when the "localRollback"
+      configuration option was set has been fixed. (CNY-1590)
 
   o Client Changes:
     * The Conary client now distinguishes between an upstream Conary
       proxy and a plain HTTP proxy. This is so we can properly handle
       SSL traffic through an HTTP proxy using the CONNECT HTTP method.
-      As such, there is now a "conaryProxy" configuration variable,
-      in addition to the "proxy" variable.
-      (CNY-1550)x.
+      As such, there is now a "conaryProxy" configuration variable, in
+      addition to the "proxy" variable. (CNY-1550)
     * The "proxy" (and newly introduced "conaryProxy") variables can
-      be turned off by setting them to "None". (CNY-1378)x.
+      be turned off by setting them to "None". (CNY-1378)
     * Clients requesting the inclusion of configuration files residing
       on the network now upload their version. This opens up the
-      possibility for the server to serve different configuration files
-      to different client generations. (CNY-1588)
+      possibility for the server to serve different configuration
+      files to different client generations. (CNY-1588)
     * Configuration variables "localRollbacks" and "pinTroves" get
-      used as defaults when applying an update job; they can be 
+      used as defaults when applying an update job; they can be
       explicitly overridden. (CNY-1583)
 
 Changes in 1.1.23:
