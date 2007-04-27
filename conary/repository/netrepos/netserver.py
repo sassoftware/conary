@@ -2385,7 +2385,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             metadata = self.getTroveInfo(authToken, clientVersion,
                                          trove._TROVEINFO_TAG_METADATA,
                                          [ (name, version, flavor) ])[0][1]
-            metadata = trove.Metadata(metadata)
+            metadata = trove.Metadata(base64.decodestring(metadata))
             mi = trove.MetadataItem(base64.b64decode(item))
             metadata.addItem(mi)
             i = trove.TroveInfo()
