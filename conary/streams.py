@@ -322,6 +322,9 @@ class StringsStream(list, InfoStream):
         self.thaw(diff)
         return False
 
+    def __call__(self):
+        return self
+
     def __init__(self, frz = ''):
 	self.thaw(frz)
 
@@ -477,6 +480,77 @@ class StreamCollection(InfoStream):
         else:
             self._data = None
             self._thawedItems = dict([ (x, {}) for x in self.streamDict ])
+
+
+class OrderedStreamCollection(StreamCollection):
+    # same as StreamCollection, but ordered
+    def freeze(self, skipSet = {}):
+        if self._data is not None:
+            return self._data
+
+        l = []
+        for typeId, itemList in (self._items.iteritems()):
+            for item in itemList:
+                s = item.freeze()
+                l.append(struct.pack("!BH", typeId, len(s)))
+                l.append(s)
+
+        return "".join(l)
+
+    def _thaw(self):
+        i = 0
+        self._thawedItems = dict([ (x, []) for x in self.streamDict ])
+
+        while (i < len(self._data)):
+            i, (typeId, s) = misc.unpack("!BSH", i, self._data)
+            item = self.streamDict[typeId](s)
+            self._thawedItems[typeId].append(item)
+
+        assert(i == len(self._data))
+        self._data = None
+
+    def addStream(self, typeId, item):
+        assert(item.__class__ == self.streamDict[typeId])
+        self._items[typeId].append(item)
+
+    def delStream(self, typeId, item):
+        l = self._items[typeId]
+        del l[l.index(item)]
+
+    def getStreams(self, typeId):
+        return self._items[typeId]
+
+    def iterAll(self):
+        for typeId, l in self._items.iteritems():
+            for item in l:
+                yield (typeId, item)
+
+    def count(self, typeId):
+        return len(self._items[typeId])
+
+    def twm(self, diff, base):
+        assert(self == base)
+        numRemoved, numAdded = struct.unpack("!HH", diff[0:4])
+        i = 4
+
+        for x in xrange(numRemoved + numAdded):
+            typeId, length = struct.unpack("!BH", diff[i : i + 3])
+            i += 3
+            item = self.streamDict[typeId](diff[i:i + length])
+            i += length
+
+            if x < numRemoved:
+                l = self._items[typeId]
+                del l[l.index(item)]
+            else:
+                self._items[typeId].append(item)
+
+    def __init__(self, data = None):
+        if data is not None:
+            self.thaw(data)
+        else:
+            self._data = None
+            self._thawedItems = dict([ (x, []) for x in self.streamDict ])
 
 class AbsoluteStreamCollection(StreamCollection):
     """
