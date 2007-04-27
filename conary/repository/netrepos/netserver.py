@@ -3253,6 +3253,7 @@ class ServerConfig(ConfigFile):
     forceSSL                = CfgBool
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
+    conaryProxy             = (CfgProxy, None)
     proxyContentsDir        = CfgPath
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver

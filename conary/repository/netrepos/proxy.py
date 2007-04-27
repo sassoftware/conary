@@ -127,10 +127,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.basicUrl = basicUrl
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
-        if cfg.proxy:
-            self.proxies = cfg.proxy
-        else:
-            self.proxies = None
+        self.proxies = conarycfg.getProxyFromConfig(cfg)
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -426,7 +423,7 @@ class ChangesetFilter(BaseProxy):
                 size = sizes[0]
 
                 if cachable:
-                    inF = transport.URLOpener(proxies = self.proxies).open(url)
+                    inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
                     csPath =_addToCache(fingerprint, inF, wireCsVersion,
                                 (trovesNeeded, filesNeeded, removedTroves),
                                 size)
@@ -435,7 +432,7 @@ class ChangesetFilter(BaseProxy):
                 elif url.startswith('file://localhost/'):
                     csPath = url[17:]
                 else:
-                    inF = transport.URLOpener(proxies = self.proxies).open(url)
+                    inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
                     (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                   suffix = '.ccs-out')
                     outF = os.fdopen(fd, "w")
@@ -583,7 +580,7 @@ class ProxyRepositoryServer(ChangesetFilter):
             dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
             os.close(fd)
             os.unlink(tmpPath)
-            inUrl = transport.URLOpener(proxies = self.proxies).open(url)
+            inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
             size = util.copyfileobj(inUrl, dest)
             inUrl.close()
             dest.seek(0)

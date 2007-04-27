@@ -1213,7 +1213,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            inF = transport.URLOpener(proxies = self.proxies).open(url)
+            inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -1797,7 +1797,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             sizes = [ int(x) for x in sizes ]
             assert(len(sizes) == len(fileList))
 
-            inF = transport.URLOpener(proxies = self.proxies).open(url)
+            inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
