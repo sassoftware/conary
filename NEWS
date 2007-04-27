@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
       metadata design for Conary.  The new metadata feature allows
