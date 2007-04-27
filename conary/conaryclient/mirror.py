@@ -421,7 +421,7 @@ def _getNewSigs(src, cfg, mark):
         return ti
     sigs = [ _sig2info(s) for s in sigs]
     # we're gonna iterate repeatedely over the returned set, no itertools can do
-    return zip(sigList, sigs)
+    return [(m, t, ti) for (m,t),ti in itertools.izip(sigList, sigs) ]
 
 # get the changed trove info entries for the troves comitted
 def _getNewInfo(src, cfg, mark):
