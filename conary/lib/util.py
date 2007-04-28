@@ -737,6 +737,7 @@ class SeekableNestedFile:
             raise IOError
 
         self.pos = newPos
+        return self.pos
 
     def tell(self):
         return self.pos
