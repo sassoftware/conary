@@ -528,6 +528,33 @@ class OrderedStreamCollection(StreamCollection):
     def count(self, typeId):
         return len(self._items[typeId])
 
+    def diff(self, other):
+        assert(self.__class__ == other.__class__)
+        us = set(self.iterAll()) 
+        them = set(other.iterAll())
+        added = us - them
+        removed = them - us
+
+        if not added and not removed:
+            return None
+
+        l = []
+        l.append(struct.pack("!HH", len(removed), len(added)))
+
+        for typeId, item in removed:
+            s = item.freeze()
+            l.append(struct.pack("!BH", typeId, len(s)))
+            l.append(s)
+
+        # make sure the additions are ordered
+        for typeId, item in them:
+            if (typeId, item) in added:
+                s = item.freeze()
+                l.append(struct.pack("!BH", typeId, len(s)))
+                l.append(s)
+
+        return "".join(l)
+
     def twm(self, diff, base):
         assert(self == base)
         numRemoved, numAdded = struct.unpack("!HH", diff[0:4])
