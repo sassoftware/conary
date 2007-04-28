@@ -101,8 +101,10 @@ class DecompressFileObj:
     def fileno(self):
         return self.fp.fileno()
 
-class XMLOpener(urllib.FancyURLopener):
-    contentType = 'text/xml'
+class URLOpener(urllib.FancyURLopener):
+    '''Replacement class for urllib.FancyURLopener'''
+    contentType = 'application/x-www-form-urlencoded'
+
     def __init__(self, *args, **kw):
         self.compress = False
         self.abortCheck = None
@@ -250,23 +252,15 @@ class XMLOpener(urllib.FancyURLopener):
         errcode, errmsg, headers = h.getreply()
         fp = h.getfile()
         if errcode == 200:
-            usedAnonymous = 'X-Conary-UsedAnonymous' in headers
-
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
                 # disable until performace is better
                 #fp = DecompressFileObj(fp)
                 fp = StringIO(zlib.decompress(fp.read()))
 
-            return usedAnonymous, urllib.addinfourl(fp, headers, selector)
+            return urllib.addinfourl(fp, headers, selector)
         else:
-            return False, self.http_error(urlstr, fp, errcode, errmsg, headers, data)
-
-    def http_error(self, url, fp, errcode, errmsg, headers, data=None):
-        raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
-
-    open_conary = open_http
-    open_conarys = open_https
+            return self.http_error(urlstr, fp, errcode, errmsg, headers, data)
 
     def _wait(self, h):
         # wait for data if abortCheck is set
@@ -291,18 +285,25 @@ class XMLOpener(urllib.FancyURLopener):
                 # ready to read response
                 break
 
-class URLOpener(XMLOpener):
-    '''Replacement class for urllib.FancyURLopener'''
-    contentType = 'application/x-www-form-urlencoded'
+class ConaryURLOpener(URLOpener):
+    """An opener aware of the conary:// protocol"""
+    open_conary = URLOpener.open_http
+    open_conarys = URLOpener.open_https
+
+class XMLOpener(URLOpener):
+    contentType = 'text/xml'
 
     def open_http(self, *args, **kwargs):
-        return XMLOpener.open_http(self, *args, **kwargs)[1]
+        fp = URLOpener.open_http(self, *args, **kwargs)
+        usedAnonymous = 'X-Conary-UsedAnonymous' in fp.headers
+        return usedAnonymous, fp
 
     def http_error(self, url, fp, errcode, errmsg, headers, data=None):
-        return urllib.FancyURLopener.http_error(self, url, fp, errcode, errmsg,
-                headers, data=data)
+        raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
     open_conary = open_http
+    open_conarys = URLOpener.open_https
+
 
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
@@ -318,6 +319,8 @@ class Transport(xmlrpclib.Transport):
 
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
+
+    localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1'])
 
     def __init__(self, https = False, entitlement = None, proxies = None,
                  serverName = None):
@@ -347,13 +350,13 @@ class Transport(xmlrpclib.Transport):
 	self.verbose = verbose
 
 	realhost = getrealhost(host)
-        if realhost in ('localhost', 'localhost.localdomain'):
+        if realhost in self.localhosts:
             # don't proxy localhost unless the proxy is running on
             # localhost as well
             proxyHost = None
             if self.proxies and 'http' in self.proxies:
                 proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
-            if proxyHost in ('localhost', 'localhost.localdomain'):
+            if proxyHost in self.localhosts:
                 opener = XMLOpener(self.proxies)
             else:
                 opener = XMLOpener({})
