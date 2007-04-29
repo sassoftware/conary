@@ -212,7 +212,7 @@ class ClientUpdate:
                                     ", ".join(x[0] for x in redirectSourceList))
                             assert(match not in redirectSourceList)
                             l = redirectHack.setdefault(match, 
-                                                        redirectSourceList)
+                                                        redirectSourceList[:])
                             l.append(item)
                             redirectJob = (match[0], (None, None),
                                                      match[1:], True)

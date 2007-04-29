@@ -492,8 +492,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     built = []
 
     flavors = set()
-    for (fromName, fromFlavor), (toName, toBranch, toFlavor,
-                                 subTroveList) in redirects.iteritems():
+    for (fromName, fromFlavor) in redirects.iterkeys():
         flavors.add(fromFlavor)
 
     targetVersion = nextVersion(repos, db, fullName, sourceVersion, 
@@ -502,19 +501,21 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
     redirList = []
     childList = []
-    for (fromName, fromFlavor), (toName, toBranch, toFlavor,
-                                 subTroveList) in redirects.iteritems():
+    for (fromName, fromFlavor), redirSpecList in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
                             None, type = trove.TROVE_TYPE_REDIRECT)
 
         redirList.append(redir.getNameVersionFlavor())
 
-        for subName in subTroveList:
-            redir.addTrove(subName, targetVersion, fromFlavor)
-            childList.append((subName, targetVersion, fromFlavor))
+        for redirSpec in redirSpecList:
+            for subName in redirSpec.components:
+                if not redir.hasTrove(subName, targetVersion, fromFlavor):
+                    redir.addTrove(subName, targetVersion, fromFlavor)
+                    childList.append((subName, targetVersion, fromFlavor))
 
-        if toName is not None:
-            redir.addRedirect(toName, toBranch, toFlavor)
+            if not redirSpec.isRemove:
+                redir.addRedirect(redirSpec.targetName, redirSpec.targetBranch,
+                                  redirSpec.targetFlavor)
 
         redir.setBuildTime(time.time())
         redir.setSourceName(fullName + ':source')
