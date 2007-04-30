@@ -4,6 +4,8 @@
       that "assert(subMagic == SUBFILE_MAGIC)" failed (CNY-1572).
     * Redirects with multiple targets can now be built and installed
       (CNY-1554)
+    * Use explicit commit lock to prevent overlapping updates and rollbacks
+      (CNY-1591)
 
 Changes in 1.1.24:
   o New Feature:

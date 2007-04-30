@@ -2896,6 +2896,8 @@ conary erase '%s=%s[%s]'
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
 
+        self.db.commitLock(True)
+
         uJobTransactionCounter = uJob.getTransactionCounter()
         if uJobTransactionCounter is None:
             # Legacy applications
@@ -2917,8 +2919,6 @@ conary erase '%s=%s[%s]'
 
         if self.updateCallback is None:
             self.setUpdateCallback(UpdateCallback())
-
-        # def applyUpdate -- body begins here
 
         allJobs = uJob.getJobs()
         jobsCsList = uJob.getJobsChangesetList()
@@ -3046,7 +3046,7 @@ conary erase '%s=%s[%s]'
                 # DEBUGGING NOTE: if you need to debug update code not
                 # related to threading, the easiest thing is to add 
                 # 'threaded False' to your conary config.
-                pass
+                self.db.commitLock(False)
 
 
 class UpdateError(ClientError):
