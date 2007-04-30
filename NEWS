@@ -7,6 +7,10 @@
     * Use explicit commit lock to prevent overlapping updates and rollbacks
       (CNY-1591)
 
+  o Bug Fixes:
+    * During a cvc update, new files in the source component could result
+      in user/group warnings (CNY-763)
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
