@@ -673,10 +673,6 @@ def getProxyFromConfig(cfg):
     """Get the proper proxy configuration variable from the supplied config
     object"""
 
-    proxy = cfg.proxy
-    if proxy:
-        return proxy
-
     # Is there a conaryProxy defined?
     proxy = {}
     for k, v in cfg.conaryProxy.iteritems():
@@ -684,4 +680,6 @@ def getProxyFromConfig(cfg):
         # we're using a Conary proxy
         v = 'conary' + v[4:]
         proxy[k] = v
-    return proxy
+    if proxy:
+        return proxy
+    return cfg.proxy
