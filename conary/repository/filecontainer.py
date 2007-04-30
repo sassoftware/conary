@@ -28,13 +28,7 @@ The file format is::
   - magic
   - file format version
   - file table entry 1
-  - file 1
   - file table entry 2
-  - file 2
-  .
-  .
-  .
-  - file table entry N
   - file N
 
 The header and table entries are uncompressed.  The contents of the file 
@@ -42,15 +36,31 @@ table are compressed, and each file is individually compressed. When files
 are retrieved from the container, the returned file object automatically 
 uncompresses the file.
 
-Each file table entry looks like::
+There are two formats for file table entrys. The original format is used
+for all files less than 4GB in size::
 
   SUBFILE_MAGIC (2 bytes)
-  length of entry (4 bytes), not including these 4 bytes
-  length of file name (4 bytes)
+  length of file name (2 bytes)
   length of compressed file data(4 bytes)
-  length of arbitrary data (4 bytes)
-  file name 
+  length of arbitrary data (2 bytes)
+  file name
   arbitrary file table data
+  file data
+
+Files larger than 4GB are stored somewhat differently:
+
+  LARGE_SUBFILE_MAGIC (2 bytes)
+  length of file name + length of file table data + file length (8 bytes)
+  file name
+  arbitrary file table data
+  file data
+  length of file name (2 bytes)
+  length of arbitrary data (2 bytes)
+
+This somewhat tortuous format was designed to accomodate the addFile API not
+knowing the total size being stored as well as the dynamic compression making
+that size unknowable in advance. It does limit file storage size a bit, but
+leaves us with well over 63 bits of length.
 
 This code is careful not to depend on the file pointer at all for reading
 (via pread). The file pointer is used while creating file containers.
@@ -65,6 +75,8 @@ from conary.repository import filecontents
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 SUBFILE_MAGIC = 0x3FBB
+# used for files whose contents are > 4gig
+LARGE_SUBFILE_MAGIC = 0x40CD
 
 FILE_CONTAINER_VERSION_FILEID_IDX   = 2007022001
 FILE_CONTAINER_VERSION_WITH_REMOVES = 2006071301
@@ -105,8 +117,8 @@ class FileContainer:
 	assert(self.mutable)
 
 	fileObj = contents.get()
+        headerOffset = self.file.tell()
         self.file.write(struct.pack("!HH", SUBFILE_MAGIC, len(fileName)))
-        sizeLoc = self.file.tell()
 	self.file.write(struct.pack("!IH", 0, len(tableData)))
 	self.file.write(fileName)
 	self.file.write(tableData)
@@ -120,21 +132,30 @@ class FileContainer:
             gzFile.close()
             size = self.file.tell() - start
 
-        self.file.seek(sizeLoc, SEEK_SET)
-        self.file.write(struct.pack("!I", size))
-        self.file.seek(0, SEEK_END)
+        if size < 0x100000000:
+            self.file.seek(headerOffset + 4, SEEK_SET)
+            self.file.write(struct.pack("!I", size))
+            self.file.seek(0, SEEK_END)
+        else:
+            self.file.seek(headerOffset, SEEK_SET)
+            totalSize = size + len(fileName) + len(tableData)
+            self.file.write(struct.pack("!HII", LARGE_SUBFILE_MAGIC,
+                                        totalSize >> 32,
+                                        totalSize & 0xFFFFFFFF))
+            self.file.seek(0, SEEK_END)
+            self.file.write(struct.pack("!HH", len(fileName), len(tableData)))
 
     def getNextFile(self):
 	assert(not self.mutable)
 
-	name, tag, size, dataOffset = self._nextFile()
+        name, tag, size, dataOffset, nextOffset = self._nextFile()
 
 	if name is None:
 	    return None
 
 	fcf = util.SeekableNestedFile(self.file, size, start = dataOffset)
 
-	self.next = dataOffset + size
+        self.next = nextOffset
 
 	return (name, tag, fcf)
 
@@ -143,19 +164,30 @@ class FileContainer:
 
 	nameLen = self.file.pread(10, offset)
 	if not len(nameLen):
-	    return (None, None, None, None)
+            return (None, None, None, None, None)
 
         offset += 10
 
-	subMagic, nameLen, size, tagLen = struct.unpack("!HHIH", nameLen)
-        assert(subMagic == SUBFILE_MAGIC)
-	name = self.file.pread(nameLen, offset)
-        offset += nameLen
+        subMagic = struct.unpack("!H", nameLen[0:2])[0]
+        if subMagic == LARGE_SUBFILE_MAGIC:
+            most, least = struct.unpack("!II", nameLen[2:])
+            totalSize = (most << 32) + least
 
-	tag = self.file.pread(tagLen, offset)
+            otherLengths = self.file.pread(4, offset + totalSize)
+            nameLen, tagLen  = struct.unpack("!HH", otherLengths)
+            size = totalSize - nameLen - tagLen
+            nextOffset = offset + totalSize + 4
+        else:
+            assert(subMagic == SUBFILE_MAGIC)
+            nameLen, size, tagLen = struct.unpack("!HIH", nameLen[2:])
+            nextOffset = offset + nameLen + tagLen + size
+
+        name = self.file.pread(nameLen, offset)
+        offset += nameLen
+        tag = self.file.pread(tagLen, offset)
         offset += tagLen
 
-	return (name, tag, size, offset)
+        return (name, tag, size, offset, nextOffset)
 
     def dump(self, dumpString, dumpFile):
         def sizeCallback(dumpString, name, tag, size):

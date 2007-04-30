@@ -13,7 +13,7 @@
 #
 
 #stdlib
-import errno
+import errno, fcntl
 import itertools
 import os
 import shutil
@@ -23,6 +23,7 @@ import xmlrpclib
 from conary import constants, files, trove, versions
 from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
+from conary.errors import DatabaseLockedError
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList, CfgLabelList
 from conary.deps import deps
@@ -1228,6 +1229,37 @@ class Database(SqlDbRepository):
         self._updateTransactionCounter = True
         self.commit()
 
+    def commitLock(self, acquire):
+        if not acquire:
+            if self.lockFd is not None:
+                # closing frees the lockf() lock
+                os.close(self.lockFd)
+                self.lockFd = None
+        else:
+            try:
+                lockFd = os.open(self.lockFile, os.O_RDWR | os.O_CREAT |
+                                                    os.O_EXCL)
+            except OSError, e:
+                if e.errno != errno.EEXIST:
+                    raise
+
+                lockFd = None
+
+            if lockFd is None:
+                lockFd = os.open(self.lockFile, os.O_RDWR)
+
+            fcntl.fcntl(lockFd, fcntl.F_SETFD,
+                        fcntl.fcntl(lockFd, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
+
+            try:
+                fcntl.lockf(lockFd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                pass
+            except IOError, e:
+                if e.errno in (errno.EACCES, errno.EAGAIN):
+                    raise DatabaseLockedError
+
+            self.lockFd = lockFd
+
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
         if os.path.exists(rbDir):
@@ -1326,6 +1358,8 @@ class Database(SqlDbRepository):
     def applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
                           justDatabase = False):
+        self.commitLock(True)
+
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -1432,6 +1466,8 @@ class Database(SqlDbRepository):
 
             self.removeRollback(name)
 
+        self.commitLock(False)
+
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
 
@@ -1526,6 +1562,8 @@ class Database(SqlDbRepository):
                         'journal file exists. use revert command to '
                         'undo the previous (failed) operation')
 
+            self.lockFile = top + "/syslock"
+            self.lockFd = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
             if not os.path.exists(self.rollbackCache):

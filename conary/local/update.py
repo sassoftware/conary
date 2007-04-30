@@ -339,7 +339,8 @@ class FilesystemJob:
 				digest = d)
 		assert(d.digest() == fileObj.contents.sha1())
 	    else:
-		fileObj.restore(contents, root, target, journal=journal)
+		fileObj.restore(contents, root, target, journal=journal,
+                                nameLookup = (not self.isSourceTrove))
 
             if isinstance(fileObj, files.Directory):
                 opJournal.mkdir(target)
@@ -928,9 +929,11 @@ class FilesystemJob:
             rootFixup = cwd + "/"
             assert(not pathsMoved)
             isSrcTrove = True
+            self.isSourceTrove = True
         else:
             rootFixup = root
             isSrcTrove = False
+            self.isSourceTrove = False
 
         newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor())
