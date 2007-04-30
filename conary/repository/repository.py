@@ -598,8 +598,6 @@ class ChangeSetJob:
 	    self.addFileContents(sha1, newVersion, fileContents, 
                                  restoreContents, 1)
 
-        # normalRestoreList is empty if storeOnlyConfigFiles
-	normalRestoreList.sort()
         ptrRestores = []
         lastRestore = None         # restore each pathId,fileId combo once
         for (pathId, fileId, sha1, version, restoreContents) in \
