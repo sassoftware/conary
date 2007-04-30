@@ -36,8 +36,8 @@ table are compressed, and each file is individually compressed. When files
 are retrieved from the container, the returned file object automatically 
 uncompresses the file.
 
-There are two formats for file table entrys. The original format is used
-for all files less than 4GB in size::
+There are two formats for file table entries. The original format is used
+for all files less than 4GB in size (after compression)::
 
   SUBFILE_MAGIC (2 bytes)
   length of file name (2 bytes)
