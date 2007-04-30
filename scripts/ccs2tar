@@ -83,7 +83,7 @@ for pathId, path, fileId in fileList:
     if isinstance(f, files.RegularFile):
         tarInfo.size = f.contents.size()
         tarInfo.type = tarfile.REGTYPE
-        fObj = cs.getFileContents(pathId)[1].get()
+        fObj = cs.getFileContents(pathId, fileId)[1].get()
     elif isinstance(f, files.Directory):
         tarInfo.type = tarfile.DIRTYPE
     elif isinstance(f, files.SymbolicLink):

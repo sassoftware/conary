@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -212,7 +212,7 @@ class ClientUpdate:
                                     ", ".join(x[0] for x in redirectSourceList))
                             assert(match not in redirectSourceList)
                             l = redirectHack.setdefault(match, 
-                                                        redirectSourceList)
+                                                        redirectSourceList[:])
                             l.append(item)
                             redirectJob = (match[0], (None, None),
                                                      match[1:], True)
@@ -2896,6 +2896,8 @@ conary erase '%s=%s[%s]'
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
 
+        self.db.commitLock(True)
+
         uJobTransactionCounter = uJob.getTransactionCounter()
         if uJobTransactionCounter is None:
             # Legacy applications
@@ -2917,8 +2919,6 @@ conary erase '%s=%s[%s]'
 
         if self.updateCallback is None:
             self.setUpdateCallback(UpdateCallback())
-
-        # def applyUpdate -- body begins here
 
         allJobs = uJob.getJobs()
         jobsCsList = uJob.getJobsChangesetList()
@@ -3046,7 +3046,7 @@ conary erase '%s=%s[%s]'
                 # DEBUGGING NOTE: if you need to debug update code not
                 # related to threading, the easiest thing is to add 
                 # 'threaded False' to your conary config.
-                pass
+                self.db.commitLock(False)
 
 
 class UpdateError(ClientError):

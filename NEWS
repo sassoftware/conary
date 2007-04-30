@@ -1,3 +1,16 @@
+  o New Feature:
+    * Conary now supports files whose compressed contents are more than
+      4 gig in size. Old versions of Conary will report an error saying
+      that "assert(subMagic == SUBFILE_MAGIC)" failed (CNY-1572).
+    * Redirects with multiple targets can now be built and installed
+      (CNY-1554)
+    * Use explicit commit lock to prevent overlapping updates and rollbacks
+      (CNY-1591)
+
+  o Bug Fixes:
+    * During a cvc update, new files in the source component could result
+      in user/group warnings (CNY-763)
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
