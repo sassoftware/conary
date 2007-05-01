@@ -171,18 +171,6 @@ class _Source(_AnySource):
 	self._checkSignature(f)
 	return f
 
-    def fetchLocal(self):
-        if self.rpm:
-            toFetch = self.rpm
-        else:
-            toFetch = self.sourcename
-
-        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                                toFetch, self.recipe.name,
-                                self.recipe.srcdirs, localOnly=True,
-                                allowNone=True)
-        return f
-
     def getPath(self):
         if self.rpm:
             return self.rpm
@@ -1341,7 +1329,7 @@ class addPostInstallScript(TroveScript):
     SYNOPSIS
     ========
 
-    C{r.addPostInstallScript(I{contents}, I{groupName}}
+    C{r.addPostInstallScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
@@ -1376,7 +1364,7 @@ class addPostRollbackScript(TroveScript):
     SYNOPSIS
     ========
 
-    C{r.addPostRollbackScript(I{contents}, I{groupName}}
+    C{r.addPostRollbackScript(I{sourcename}, I[{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
@@ -1416,7 +1404,7 @@ class addPostUpdateScript(TroveScript):
     SYNOPSIS
     ========
 
-    C{r.addPostUpdateScript(I{contents}, I{groupName}}
+    C{r.addPostUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
@@ -1448,7 +1436,7 @@ class addPreUpdateScript(TroveScript):
     SYNOPSIS
     ========
 
-    C{r.addPreUpdateScript(I{contents}, I{groupName}}
+    C{r.addPreUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========

@@ -15,6 +15,7 @@
 from conary import files
 from conary.errors import ParseError
 from conary.build import action, source
+from conary.build.errors import RecipeFileError
 
 import os
 
@@ -150,17 +151,6 @@ class Recipe(object):
 
     def loadSourceActions(self):
         pass
-
-    def fetchLocalSources(self):
-        files = []
-        for src in self._sources:
-            f = src.fetchLocal()
-            if f:
-                if type(f) in (tuple, list):
-                    files.extend(f)
-                else:
-                    files.append(f)
-        return files
 
     def fetchAllSources(self, refreshFilter=None, skipFilter=None):
         """

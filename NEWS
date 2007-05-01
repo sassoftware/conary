@@ -7,6 +7,12 @@
     * Use explicit commit lock to prevent overlapping updates and rollbacks
       (CNY-1591)
 
+  o Build Changes:
+    * Internal recipe source management moved into generic Recipe class
+      from PackageRecipeClass
+    * GroupRecipe.add*Script now accepts a path to the script as the
+      initial parameter (following PackageRecipe.addSource)
+
   o Bug Fixes:
     * During a cvc update, new files in the source component could result
       in user/group warnings (CNY-763)
