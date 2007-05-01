@@ -321,13 +321,20 @@ def commit(repos, cfg, message, callback=None, test=False):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+    if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
+            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
-            recipeObj = recipeClass(cfg, lcache, srcdirs, lightInstance=True)
+            if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+                recipeObj = recipeClass(cfg, lcache, srcdirs,
+                                        lightInstance=True)
+            elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
+                recipeObj = recipeClass(repos, cfg, state.getVersion(),
+                                        None, lcache, srcdirs,
+                                        lightInstance = True)
         except builderrors.RecipeFileError, msg:
             log.error(str(msg))
             sys.exit(1)
@@ -346,7 +353,6 @@ def commit(repos, cfg, message, callback=None, test=False):
         # os.path.basenames stripts the protocol off a url as well
         sourceFiles = [ os.path.basename(x.getPath()) for x in 
                                 recipeObj.getSourcePathList() ]
-
         # sourceFiles is a list of everything which ought to be autosourced.
         # those are either the same as in the previous trove, new (in which
         # case they are missing from the previous trove), or nonexistant. So
@@ -1837,7 +1843,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
 
     # don't download sources for groups or filesets
     if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-        raise errors.CvcError('Only package recipes can be refreshed')
+        raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter)
     srcdirs = [ os.path.dirname(recipeClass.filename),

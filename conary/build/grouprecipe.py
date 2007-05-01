@@ -50,8 +50,10 @@ class _BaseGroupRecipe(Recipe):
         operations on those groups.
     """
     internalAbstractBaseClass = 1
-    def __init__(self):
-        Recipe.__init__(self)
+    def __init__(self, laReposCache = None, srcdirs = None,
+                 lightInstance = None):
+        Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs,
+                        lightInstance = lightInstance)
         self.groups = {}
         self.defaultGroup = None
 
@@ -105,6 +107,8 @@ class _BaseGroupRecipe(Recipe):
             unseen.difference_update([x[0] for x in group.iterNewGroupList()])
         return unseen
 
+    def loadSourceActions(self):
+        self._loadSourceActions(lambda item: item._groupAction is True)
 
 
 
@@ -211,7 +215,12 @@ class GroupRecipe(_BaseGroupRecipe):
     checkOnlyByDefaultDeps = True
     checkPathConflicts = True
 
-    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
+    def __init__(self, repos, cfg, label, flavor, laReposCache, srcdirs,
+                 extraMacros={}, lightInstance = False):
+        _BaseGroupRecipe.__init__(self, laReposCache = laReposCache,
+                                  srcdirs = srcdirs,
+                                  lightInstance = lightInstance)
+
         self.troveSource = repos
         self.labelPath = [ label ]
         self.cfg = cfg
@@ -219,8 +228,9 @@ class GroupRecipe(_BaseGroupRecipe):
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.defaultSource = None
-        self.searchSource = self._getSearchSource()
-        self.defaultSource = self.searchSource
+        if not lightInstance:
+            self.searchSource = self._getSearchSource()
+            self.defaultSource = self.searchSource
         self.resolveSource = None
 
         self.replaceSpecs = []
@@ -231,7 +241,6 @@ class GroupRecipe(_BaseGroupRecipe):
         self.postRollbackScripts = {}
         self.postUpdateScripts = {}
 
-        _BaseGroupRecipe.__init__(self)
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,
                          checkOnlyByDefaultDeps = self.checkOnlyByDefaultDeps,
@@ -1292,13 +1301,7 @@ class GroupRecipe(_BaseGroupRecipe):
         if groupName is None:
             groupName = self.defaultGroup.name
 
-        if groupName not in self.groups:
-            raise RecipeFileError, 'Group %s not defined' % groupName
-
-        if contents is None:
-            raise RecipeFileError('script contents required for group %s'
-                                        % groupName)
-        elif groupName in scriptDict:
+        if groupName in scriptDict:
             raise RecipeFileError('script already set for group %s'
                                         % groupName)
 
@@ -1312,132 +1315,6 @@ class GroupRecipe(_BaseGroupRecipe):
                                           'integers')
 
         scriptDict[groupName] = (contents, fromClass)
-
-    def addPostInstallScript(self, contents = None, groupName = None):
-        """
-        NAME
-        ====
-
-        B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
-
-        SYNOPSIS
-        ========
-
-        C{r.addPostInstallScript(I{contents}, I{groupName}}
-
-        DESCRIPTION
-        ===========
-
-        The C{r.addPostInstallScript} command specifies the post install script
-        for a group. This script is run after the group has been installed
-        for the first time (not when the group is being upgraded from a
-        previously installed version to version defining the script).
-
-        PARAMETERS
-        ==========
-
-        The C{r.addPostInstallScript()} command accepts the following parameters,
-        with default values shown in parentheses:
-
-        B{contents} : (None) The contents of the script
-        B{groupName} : (None) The name of the group to add the script to
-        """
-        self._addScript(contents, groupName, self.postInstallScripts)
-
-    def addPostRollbackScript(self, contents = None, groupName = None,
-                              toClass = None):
-        """
-        NAME
-        ====
-
-        B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
-
-        SYNOPSIS
-        ========
-
-        C{r.addPostRollbackScript(I{contents}, I{groupName}}
-
-        DESCRIPTION
-        ===========
-
-        The C{r.addPostRollbackScript} command specifies the post rollback
-        script for a group. This script is run after the group defining the
-        script has been rolled back to a previous version of the group.
-
-        PARAMETERS
-        ==========
-
-        The C{r.addPostRollbackScript()} command accepts the following parameters,
-        with default values shown in parentheses:
-
-        B{contents} : (None) The contents of the script
-        B{groupName} : (None) The name of the group to add the script to
-        B{toClass} : (None) The trove compatibility classes this script
-        is able to support rollbacks to. This may be a single integer
-        or a list of integers.
-        """
-        self._addScript(contents, groupName, self.postRollbackScripts,
-                        fromClass = toClass)
-
-    def addPostUpdateScript(self, contents = None, groupName = None):
-        """
-        NAME
-        ====
-
-        B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
-
-        SYNOPSIS
-        ========
-
-        C{r.addPostUpdateScript(I{contents}, I{groupName}}
-
-        DESCRIPTION
-        ===========
-
-        The C{r.addPostUpdateScript} command specifies the post update script
-        for a group. This script is run after the group has been updated from
-        a previously-installed version to the version defining the script.
-
-        PARAMETERS
-        ==========
-
-        The C{r.addPostUpdateScript()} command accepts the following parameters,
-        with default values shown in parentheses:
-
-        B{contents} : (None) The contents of the script
-        B{groupName} : (None) The name of the group to add the script to
-        """
-        self._addScript(contents, groupName, self.postUpdateScripts)
-
-    def addPreUpdateScript(self, contents = None, groupName = None):
-        """
-        NAME
-        ====
-
-        B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
-
-        SYNOPSIS
-        ========
-
-        C{r.addPreUpdateScript(I{contents}, I{groupName}}
-
-        DESCRIPTION
-        ===========
-
-        The C{r.addPreUpdateScript} command specifies the pre update script
-        for a group. This script is run before the group is updated from
-        a previously-installed version to the version defining the script.
-
-        PARAMETERS
-        ==========
-
-        The C{r.addPreUpdateScript()} command accepts the following parameters,
-        with default values shown in parentheses:
-
-        B{contents} : (None) The contents of the script
-        B{groupName} : (None) The name of the group to add the script to
-        """
-        self._addScript(contents, groupName, self.preUpdateScripts)
 
     def setCompatibilityClass(self, theClass, groupName = None):
         """

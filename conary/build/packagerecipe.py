@@ -32,7 +32,6 @@ from conary.build import source
 from conary.build import use
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary import files
 from conary.lib import log, magic, util
 from conary.local import database
 
@@ -173,70 +172,6 @@ class _AbstractPackageRecipe(Recipe):
     def cleanup(self, builddir, destdir):
 	if self.cfg.cleanAfterCook:
 	    util.rmtree(builddir)
-
-    def sourceMap(self, path):
-        if os.path.exists(path):
-            basepath = path
-        else:
-            basepath = os.path.basename(path)
-        if basepath in self.sourcePathMap:
-            if self.sourcePathMap[basepath] == path:
-                # we only care about truly different source locations with the
-                # same basename
-                return
-            if basepath in self.pathConflicts:
-                self.pathConflicts[basepath].add(path)
-            else:
-                self.pathConflicts[basepath] = set([
-                    # previous (first) instance
-                    self.sourcePathMap[basepath],
-                    # this instance
-                    path
-                ])
-        else:
-            self.sourcePathMap[basepath] = path
-
-    def fetchAllSources(self, refreshFilter=None, skipFilter=None):
-	"""
-	returns a list of file locations for all the sources in
-	the package recipe
-	"""
-        # first make sure we had no path conflicts:
-        if self.pathConflicts:
-            errlist = []
-            for basepath in self.pathConflicts.keys():
-                errlist.extend([x for x in self.pathConflicts[basepath]])
-            raise RecipeFileError("The following file names conflict "
-                                  "(cvc does not currently support multiple"
-                                  " files with the same name from different"
-                                  " locations):\n   " + '\n   '.join(errlist))
-	self.prepSources()
-	files = []
-	for src in self.getSourcePathList():
-            if skipFilter and skipFilter(os.path.basename(src.getPath())):
-                continue
-
-	    f = src.fetch(refreshFilter)
-	    if f:
-		if type(f) in (tuple, list):
-		    files.extend(f)
-		else:
-		    files.append(f)
-	return files
-
-    def fetchLocalSources(self):
-	files = []
-	for src in self._sources:
-	    f = src.fetchLocal()
-	    if f:
-		if type(f) in (tuple, list):
-		    files.extend(f)
-		else:
-		    files.append(f)
-        return files
-
-    def getSourcePathList(self):
-        return [ x for x in self._sources if isinstance(x, source._Source) ]
 
     def checkBuildRequirements(self, cfg, sourceVersion, raiseError=True):
         """ Checks to see if the build requirements for the recipe
@@ -391,23 +326,6 @@ class _AbstractPackageRecipe(Recipe):
 
         return self.transitiveBuildRequiresNames
 
-
-    def extraSource(self, action):
-	"""
-	extraSource allows you to append a source list item that is
-	not a part of source.py.  Be aware when writing these source
-	list items that you are writing conary internals!  In particular,
-	anything that needs to add a source file to the repository will
-	need to implement fetch(), and all source files will have to be
-	sought using the lookaside cache.
-	"""
-        self._sources.append(action)
-
-
-    def prepSources(self):
-	for source in self._sources:
-	    source.doPrep()
-
     def processResumeList(self, resume):
 	resumelist = []
 	if resume:
@@ -444,25 +362,6 @@ class _AbstractPackageRecipe(Recipe):
 		    if action.linenum == resumeBegin:
 			yield action
 
-    def unpackSources(self, resume=None, downloadOnly=False):
-	if resume == 'policy':
-	    return
-	elif resume:
-	    log.info("Resuming on line(s) %s" % resume)
-	    # note resume lines must be in order
-	    self.processResumeList(resume)
-	    for source in self.iterResumeList(self._sources):
-		source.doPrep()
-		source.doAction()
-        elif downloadOnly:
-            for source in self._sources:
-                source.doPrep()
-                source.doDownload()
-	else:
-	    for source in self._sources:
-		source.doPrep()
-		source.doAction()
-
     def extraBuild(self, action):
 	"""
 	extraBuild allows you to append a build list item that is
@@ -483,6 +382,9 @@ class _AbstractPackageRecipe(Recipe):
         else:
             for bld in self._build:
                 bld.doAction()
+
+    def loadSourceActions(self):
+        self._loadSourceActions(lambda item: item._packageAction is True)
 
     def loadPolicy(self, policySet = None,
                    internalPolicyModules =
@@ -543,52 +445,6 @@ class _AbstractPackageRecipe(Recipe):
 
     def disableParallelMake(self):
         self.macros._override('parallelmflags', '')
-
-    def populateLcache(self):
-        """
-        Populate a repository lookaside cache
-        """
-        recipeClass = self.__class__
-        repos = self.laReposCache.repos
-
-        # build a list containing this recipe class and any ancestor class
-        # from which it descends
-        classes = [ recipeClass ]
-        bases = list(recipeClass.__bases__)
-        while bases:
-            parent = bases.pop()
-            bases.extend(list(parent.__bases__))
-            if issubclass(parent, PackageRecipe):
-                classes.append(parent)
-
-        # reverse the class list, this way the files will be found in the
-        # youngest descendant first
-        classes.reverse()
-
-        # populate the repository source lookaside cache from the :source
-        # components
-        for rclass in classes:
-            if not rclass._trove:
-                continue
-            srcName = rclass._trove.getName()
-            srcVersion = rclass._trove.getVersion()
-            # CNY-31: walk over the files in the trove we found upstream
-            # (which we may have modified to remove the non-autosourced files
-            # Also, if an autosource file is marked as needing to be refreshed
-            # in the Conary state file, the lookaside cache has to win, so
-            # don't populate it with the repository file)
-            for pathId, path, fileId, version in rclass._trove.iterFileList():
-                assert(path[0] != "/")
-                # we might need to retrieve this source file
-                # to enable a build, so we need to find the
-                # sha1 hash of it since that's how it's indexed
-                # in the file store
-                fileObj = repos.getFileVersion(pathId, fileId, version)
-                if isinstance(fileObj, files.RegularFile):
-                    # it only makes sense to fetch regular files, skip
-                    # anything that isn't
-                    self.laReposCache.addFileHash(srcName, srcVersion, pathId,
-                        path, fileId, version, fileObj.contents.sha1())
 
     def isatty(self, value=None):
         if value is not None:
@@ -848,16 +704,14 @@ class _AbstractPackageRecipe(Recipe):
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        Recipe.__init__(self, lightInstance = lightInstance)
+        Recipe.__init__(self, lightInstance = lightInstance,
+                        laReposCache = laReposCache, srcdirs = srcdirs)
 	self._build = []
-        self.buildinfo = False
 
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
         if not hasattr(self,'_buildFlavor'):
             self._buildFlavor = cfg.buildFlavor
-
-        self.externalMethods = {}
 
         self._policyPathMap = {}
         self._policies = {}
@@ -870,8 +724,6 @@ class _AbstractPackageRecipe(Recipe):
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
-	self.laReposCache = laReposCache
-	self.srcdirs = srcdirs
 	self.macros = macros.Macros()
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
@@ -927,8 +779,6 @@ class _AbstractPackageRecipe(Recipe):
             self.crossRequires.extend(newCrossRequires)
 
         self.mainDir(self.nameVer(), explicit=False)
-        self.sourcePathMap = {}
-        self.pathConflicts = {}
         self._autoCreatedFileCount = 0
 
 
@@ -977,10 +827,6 @@ class PackageRecipe(_AbstractPackageRecipe):
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
-
-        for name, item in source.__dict__.items():
-            if name[0:3] == 'add' and issubclass(item, action.Action):
-                self._addSourceAction(name, item)
 
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)

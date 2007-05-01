@@ -377,6 +377,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         ret = cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion,
                                macros = macros, targetLabel = targetLabel,
                                alwaysBumpCount = alwaysBumpCount,
+                               requireCleanSources = requireCleanSources,
                                callback = callback)
         needsSigning = True
     else:
@@ -533,7 +534,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
 def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                      targetLabel = None, alwaysBumpCount=False, 
-                     callback = callbacks.CookCallback()):
+                     callback = callbacks.CookCallback(),
+                     requireCleanSources = False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -560,6 +562,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     normal trove.
     """
     troveCache = grouprecipe.TroveCache(repos, callback)
+    lcache = lookaside.RepositoryCache(repos)
 
     changeSet = changeset.ChangeSet()
 
@@ -577,8 +580,16 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             # other way (like our testsuite) to be used to load the recipe
             use.setBuildFlagsFromFlavor(recipeClass.name,
                                         recipeClass._localFlavor)
+
+        if requireCleanSources:
+            srcdirs = []
+        else:
+            srcdirs = [ os.path.dirname(recipeClass.filename),
+                        cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
+
         recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
-                                buildFlavor, macros)
+                                buildFlavor, lcache, srcdirs, macros)
+        recipeObj.populateLcache()
 
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
@@ -591,7 +602,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         flavors = [buildpackage._getUseFlavor(recipeObj)]
 
-        grouprecipe.buildGroups(recipeObj, cfg, repos, callback, 
+        recipeObj.unpackSources()
+        grouprecipe.buildGroups(recipeObj, cfg, repos, callback,
                                 troveCache=troveCache)
 
         callback.buildingChangeset()
@@ -631,6 +643,9 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             if compatClass is not None:
                 grpTrv.setCompatibilityClass(compatClass)
 
+            import epdb
+            epdb.st('f')
+
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (recipeObj.postInstallScripts, False,
                             grpTrv.troveInfo.scripts.postInstall),
@@ -640,6 +655,12 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                             grpTrv.troveInfo.scripts.postUpdate),
                       (recipeObj.preUpdateScripts, False,
                             grpTrv.troveInfo.scripts.preUpdate) ]:
+
+                for recipeGroupName in recipeScripts:
+                    if not recipeObj._hasGroup(recipeGroupName):
+                        raise CookError(
+                                    'Group %s not defined' % recipeGroupName)
+
                 if groupName in recipeScripts:
                     scriptClassList = recipeScripts[groupName][1]
                     # rollback scripts move from this class to another

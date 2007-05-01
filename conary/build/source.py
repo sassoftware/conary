@@ -31,9 +31,16 @@ from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import util
 from conary.build import action, errors
+from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest
 
-class _Source(action.RecipeAction):
+class _AnySource(action.RecipeAction):
+
+    # marks classes which have source files which need committing
+
+    pass
+
+class _Source(_AnySource):
     keywords = {'rpm': '',
                 'dir': '',
                 'keyid': None,
@@ -1277,6 +1284,188 @@ class addSvnSnapshot(_RevisionControl):
         sourceName = self.getFilename()
 
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+class TroveScript(_AnySource):
+
+    keywords = { 'contents' : None,
+                 'groupName' : None }
+    _packageAction = False
+    _groupAction = True
+    _scriptName = None
+    _compatibilityMap = None
+
+    def __init__(self, recipe, *args, **keywords):
+        _AnySource.__init__(self, recipe, *args, **keywords)
+        if args:
+            self.sourcename = args[0]
+        else:
+            self.sourcename = ''
+
+        if not self.sourcename and not self.contents:
+            raise RecipeFileError('no contents given for group script')
+        elif self.sourcename and self.contents:
+            raise RecipeFileError('both contents and filename given for '
+                                  'group script')
+
+    def fetch(self, refreshFilter=None):
+        if self.contents is None:
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                self.sourcename, self.recipe.name, self.recipe.srcdirs,
+                refreshFilter=refreshFilter, allowNone = True)
+            if f is None:
+                raise RecipeFileError('file "%s" not found for group script' %
+                                      self.sourcename)
+            self.contents = open(f).read()
+
+    def getPath(self):
+        return self.sourcename
+
+    def doDownload(self):
+        self.fetch()
+
+    def do(self):
+        self.doDownload()
+        self.recipe._addScript(self.contents, self.groupName,
+                               self.recipe.__getattr__(self._scriptName),
+                               fromClass = self._compatibilityMap)
+
+class addPostInstallScript(TroveScript):
+    _scriptName = 'postInstallScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostInstallScript(I{contents}, I{groupName}}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostInstallScript} command specifies the post install script
+    for a group. This script is run after the group has been installed
+    for the first time (not when the group is being upgraded from a
+    previously installed version to version defining the script).
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostInstallScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+class addPostRollbackScript(TroveScript):
+
+    _scriptName = 'postRollbackScripts'
+    keywords = dict(TroveScript.keywords)
+    keywords['toClass'] = None
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostRollbackScript(I{contents}, I{groupName}}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostRollbackScript} command specifies the post rollback
+    script for a group. This script is run after the group defining the
+    script has been rolled back to a previous version of the group.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostRollbackScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    B{toClass} : (None) The trove compatibility classes this script
+    is able to support rollbacks to. This may be a single integer
+    or a list of integers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        TroveScript.__init__(self, *args, **kwargs)
+        if self.toClass:
+            self._compatibilityMap = self.toClass
+
+class addPostUpdateScript(TroveScript):
+
+    _scriptName = 'postUpdateScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostUpdateScript(I{contents}, I{groupName}}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostUpdateScript} command specifies the post update script
+    for a group. This script is run after the group has been updated from
+    a previously-installed version to the version defining the script.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostUpdateScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+class addPreUpdateScript(TroveScript):
+
+    _scriptName = 'preUpdateScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPreUpdateScript(I{contents}, I{groupName}}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPreUpdateScript} command specifies the pre update script
+    for a group. This script is run before the group is updated from
+    a previously-installed version to the version defining the script.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPreUpdateScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory

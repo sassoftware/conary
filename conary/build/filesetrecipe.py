@@ -134,8 +134,9 @@ class FilesetRecipe(Recipe):
 	for (pathId, (path, fileId, version)) in self.files.iteritems():
 	    yield (pathId, path, fileId, version)
 
-    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
-        Recipe.__init__(self)
+    def __init__(self, repos, cfg, label, flavor, extraMacros={},
+                 laReposCache = None, srcdirs = None):
+        Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs)
 	self.repos = repos
 	self.cfg = cfg
 	self.files = {}
