@@ -140,8 +140,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         self.setByDefaultOn(set(x for x in byDefault if byDefault[x]))
         self.setByDefaultOff(set(x for x in byDefault if not byDefault[x]))
 
-    def unpackSources(self, builddir, destdir, resume=None,
-                      downloadOnly=False):
+    def unpackSources(self, resume=None, downloadOnly=False):
 
         repos = self.laReposCache.repos
         if self.parentVersion:
@@ -232,8 +231,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         self._expandChangeset()
 
-        _AbstractPackageRecipe.unpackSources(self, builddir, destdir,
-                                             resume = resume,
+        _AbstractPackageRecipe.unpackSources(self, resume = resume,
                                              downloadOnly = downloadOnly)
 
     def loadPolicy(self):

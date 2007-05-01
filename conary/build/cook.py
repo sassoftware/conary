@@ -1007,7 +1007,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.macros.builddir = builddir
         recipeObj.macros.destdir = destdir
 
-        recipeObj.unpackSources(builddir, destdir, resume, downloadOnly=downloadOnly)
+        recipeObj.unpackSources(resume, downloadOnly=downloadOnly)
 
         # if we're only extracting or downloading, continue to the next recipe class.
         if prep or downloadOnly:

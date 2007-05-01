@@ -444,7 +444,7 @@ class _AbstractPackageRecipe(Recipe):
 		    if action.linenum == resumeBegin:
 			yield action
 
-    def unpackSources(self, builddir, destdir, resume=None, downloadOnly=False):
+    def unpackSources(self, resume=None, downloadOnly=False):
 	if resume == 'policy':
 	    return
 	elif resume:
