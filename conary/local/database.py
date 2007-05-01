@@ -1231,9 +1231,9 @@ class Database(SqlDbRepository):
 
     def commitLock(self, acquire):
         if not acquire:
-            if self.lockFd is not None:
+            if self.lockFileObj is not None:
                 # closing frees the lockf() lock
-                os.close(self.lockFd)
+                self.lockFileObj.close()
                 self.lockFd = None
         else:
             try:
@@ -1258,7 +1258,7 @@ class Database(SqlDbRepository):
                 if e.errno in (errno.EACCES, errno.EAGAIN):
                     raise DatabaseLockedError
 
-            self.lockFd = lockFd
+            self.lockFileObj = os.fdopen(lockFd)
 
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
@@ -1563,7 +1563,7 @@ class Database(SqlDbRepository):
                         'undo the previous (failed) operation')
 
             self.lockFile = top + "/syslock"
-            self.lockFd = None
+            self.lockFileObj = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
             if not os.path.exists(self.rollbackCache):
