@@ -1486,8 +1486,9 @@ def removeFile(filename, repos=None):
 
     conaryState.write("CONARY")
 
-def newTrove(repos, cfg, name, dir = None, template = None):
-    parts = name.split('=', 1) 
+def newTrove(repos, cfg, name, dir = None, template = None,
+             buildBranch=None):
+    parts = name.split('=', 1)
     if len(parts) == 1:
         label = cfg.buildLabel
     else:
@@ -1504,7 +1505,10 @@ def newTrove(repos, cfg, name, dir = None, template = None):
 
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
-    branch = versions.Branch([label])
+    if not buildBranch:
+        branch = versions.Branch([label])
+    else:
+        branch = buildBranch
     sourceState = SourceState(component, versions.NewVersion(), branch)
     conaryState = ConaryState(cfg.context, sourceState)
 
