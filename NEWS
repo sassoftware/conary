@@ -1,3 +1,5 @@
+Changes in @NEW@:
+
   o New Feature:
     * Conary now supports files whose compressed contents are more than
       4 gig in size. Old versions of Conary will report an error saying
@@ -10,6 +12,8 @@
   o Bug Fixes:
     * During a cvc update, new files in the source component could result
       in user/group warnings (CNY-763)
+    * Derived packages (experimental) built from unflavored troves get
+      properly flavored as unflavored. (CNY-1506)
 
 Changes in 1.1.24:
   o New Feature:
