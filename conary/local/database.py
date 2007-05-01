@@ -1253,10 +1253,10 @@ class Database(SqlDbRepository):
 
             try:
                 fcntl.lockf(lockFd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                pass
             except IOError, e:
                 if e.errno in (errno.EACCES, errno.EAGAIN):
                     raise DatabaseLockedError
+                raise
 
             self.lockFileObj = os.fdopen(lockFd)
 
