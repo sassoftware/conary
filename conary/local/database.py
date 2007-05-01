@@ -1234,7 +1234,7 @@ class Database(SqlDbRepository):
             if self.lockFileObj is not None:
                 # closing frees the lockf() lock
                 self.lockFileObj.close()
-                self.lockFd = None
+                self.lockFileObj = None
         else:
             try:
                 lockFd = os.open(self.lockFile, os.O_RDWR | os.O_CREAT |
