@@ -116,10 +116,6 @@ class PackageSpec(packagepolicy.PackageSpec):
 class Flavor(packagepolicy.Flavor):
     processUnmodified = True
 
-    requires = (
-        ('PackageSpec', policy.REQUIRED_PRIOR),
-    )
-
     def preProcess(self):
         packagepolicy.Flavor.preProcess(self)
 
