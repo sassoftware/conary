@@ -80,8 +80,12 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
     def __str__(self):
         return self.__repr__()
 
-    def __call__(self, *args):
-        return self.doCall(self.__protocolVersion, *args)
+    def __call__(self, *args, **kwargs):
+        # Keyword arguments are ignored, we just use them to override the
+        # protocol version
+        protocolVersion = (kwargs.get('protocolVersion', None) or
+            self.__protocolVersion)
+        return self.doCall(protocolVersion, *args)
 
     def __doCall(self, clientVersion, argList):
         newArgs = ( clientVersion, ) + argList
