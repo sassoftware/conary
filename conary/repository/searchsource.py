@@ -54,7 +54,21 @@ from conary.repository import errors
 from conary.repository import resolvemethod
 from conary.repository import trovesource
 
-class SearchSource(object):
+class AbstractSearchSource(object):
+    # used for doing isinstance/issubclass checks.
+    def getTroveSource(self):
+        raise NotImplementedError
+
+    def findTrove(self, troveSpec, useAffinity=False, **kw):
+        raise NotImplementedError
+
+    def findTroves(self, troveSpecs, useAffinity=False, **kw):
+        raise NotImplementedError
+
+    def getResolveMethod(self):
+        raise NotImplementedError
+
+class SearchSource(AbstractSearchSource):
     def __init__(self, source, flavor, db=None):
         source.searchWithFlavor()
         self.source = source
@@ -159,7 +173,7 @@ class TroveSearchSource(SearchSource):
         m.setTroveSource(self.source)
         return m
 
-class SearchSourceStack(trovesource.SourceStack):
+class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
     """
         Created by SearchSourceStack(*sources)
 
@@ -171,6 +185,7 @@ class SearchSourceStack(trovesource.SourceStack):
     def getTroveSource(self):
         if len(self.sources) == 1:
             return self.sources[0].getTroveSource()
+        return trovesource.stack(*[ x.getTroveSource() for x in self.sources])
 
     def findTrove(self, troveSpec, useAffinity=False, **kw):
         """
@@ -270,11 +285,17 @@ def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
             2. string for label (conary.rpath.com@rpl:devel)
             3. label objects or list of label objects.
     """
-    searchPath = createSearchPathFromStrings(searchPath)
-    return createSearchSourceStack(searchSource, searchPath, flavor, db)
+    try:
+        strings = searchPath
+        searchPath = createSearchPathFromStrings(searchPath)
+        return createSearchSourceStack(searchSource, searchPath, flavor, db)
+    except baseerrors.ConaryError, err:
+        raise baseerrors.ConaryError('Could not create search path "%s": %s' % (
+                                     ' '.join(strings), err))
 
 def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
-                            resolveLeavesFirst=True, troveSource=None):
+                            resolveLeavesFirst=True, troveSource=None, 
+                            useAffinity=True):
     """
         Creates a searchSourceStack based on a searchPath.
 
@@ -304,7 +325,7 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
             searchStack.addSource(s)
         elif isinstance(item[0], (list, tuple)):
             if not isinstance(item[0][1], versions.Version):
-                item = searchSource.findTroves(item)
+                item = searchSource.findTroves(item, useAffinity=useAffinity)
                 item = list(itertools.chain(*item.itervalues()))
             s = TroveSearchSource(searchSource.getTroveSource(), item,
                                   flavor)

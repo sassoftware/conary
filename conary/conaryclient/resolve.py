@@ -17,6 +17,7 @@ import re
 from conary import errors
 from conary.lib import log
 from conary.repository import trovesource
+from conary.repository import searchsource
 from conary.repository import errors as repoerrors
 from conary.repository.resolvemethod import *
 from conary.deps import deps
@@ -60,9 +61,15 @@ class DependencySolver(object):
             instead.
             @type keepRequired: bool
         """
-        troveSource = uJob.getSearchSource()
+        searchSource = uJob.getSearchSource()
+        if not isinstance(searchSource, searchsource.AbstractSearchSource):
+            searchSource = searchsource.SearchSource(searchSource,
+                                                     self.cfg.flavor, self.db)
         if useRepos:
-            troveSource = trovesource.stack(troveSource, self.repos)
+            defaultSearchSource = self.client.getSearchSource()
+            searchSource = searchsource.stack(searchSource,
+                                              defaultSearchSource)
+        troveSource = searchSource.getTroveSource()
 
         ineligible = set()
 
@@ -82,11 +89,10 @@ class DependencySolver(object):
             cannotResolve = []
 
         if resolveSource is None:
-            resolveSource = DepResolutionByLabelPath(self.cfg, self.db,
-                                             self.cfg.installLabelPath,
-                                             searchMethod=RESOLVE_LEAVES_FIRST)
-
-        resolveSource.setTroveSource(troveSource)
+            resolveSource = searchSource.getResolveMethod()
+            resolveSource.searchLeavesFirst()
+        else:
+            resolveSource.setTroveSource(troveSource)
 
         suggMap = {}
 

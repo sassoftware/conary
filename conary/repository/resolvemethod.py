@@ -182,6 +182,15 @@ class DepResolutionMethod(object):
         else:
             return scoredList[-1][-1]
 
+    def searchLeavesOnly(self):
+        pass
+
+    def searchLeavesFirst(self):
+        pass
+
+    def searchAllVersions(self):
+        pass
+
 class BasicResolutionMethod(DepResolutionMethod):
     def __init__(self, cfg, db, flavor=None):
         DepResolutionMethod.__init__(self, cfg, db, flavor)
@@ -300,6 +309,7 @@ class DepResolutionByTroveList(DepResolutionMethod):
         return self.troveSource.resolveDependenciesByGroups(self.troveList,
                                                             self.depList)
 
+
 class ResolutionStack(DepResolutionMethod):
     def __init__(self, *sources):
         self.sources = []
@@ -346,6 +356,19 @@ class ResolutionStack(DepResolutionMethod):
 
     def resolveDependencies(self):
         return self.sources[self.sourceIndex].resolveDependencies()
+
+    def searchLeavesOnly(self):
+        for source in self.sources:
+            source.searchLeavesOnly()
+
+    def searchLeavesFirst(self):
+        for source in self.sources:
+            source.searchLeavesFirst()
+
+    def searchAllVersions(self):
+        for source in self.sources:
+            source.searchAllVersions()
+
 
 def stack(sources):
     return ResolutionStack(*sources)

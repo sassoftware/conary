@@ -284,6 +284,12 @@ class CfgProxy(CfgDict):
 
 CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
 
+
+class CfgSearchPathItem(CfgType):
+    def parseString(self, item):
+        return item
+CfgSearchPath = CfgLineList(CfgSearchPathItem)
+
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
         be set based on a keyword that can be set at the command line.
@@ -355,6 +361,7 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/recipeTemplates'))
     showLabels            =  CfgBool
     showComponents        =  CfgBool
+    searchPath            =  CfgSearchPath
     signatureKey          =  CfgFingerPrint
     signatureKeyMap       =  CfgFingerPrintMap
     siteConfigPath        =  (CfgPathList, ('/etc/conary/site',
