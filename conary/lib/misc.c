@@ -371,10 +371,15 @@ static PyObject * py_pread(PyObject *self, PyObject *args) {
     fd = PyInt_AS_LONG(pyfd);
     size = PyLong_AsUnsignedLong(pysize);
     if (PyErr_Occurred())
-	return NULL;
-    offset = PyLong_AsUnsignedLong(pyoffset);
+        return NULL;
+
+    /* sizeof(off_t) is 8 (same as long long) */
+    if (PyInt_CheckExact(pyoffset))
+        offset = PyLong_AsUnsignedLong(pyoffset);
+    else /* A PyLong_Type to be converted to a long long */
+        offset = PyLong_AsUnsignedLongLong(pyoffset);
     if (PyErr_Occurred())
-	return NULL;
+        return NULL;
 
     data = malloc(size);
 
