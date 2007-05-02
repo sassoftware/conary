@@ -14,6 +14,8 @@ Changes in @NEW@:
       in user/group warnings (CNY-763)
     * Derived packages (experimental) built from unflavored troves get
       properly flavored as unflavored. (CNY-1506)
+    * Macros in arguments to the version control system recipe class
+      commands are now properly expanded. (CNY-1614)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
