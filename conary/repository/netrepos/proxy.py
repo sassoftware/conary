@@ -182,10 +182,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         # cut off older clients entirely, no negotiation
         if clientVersion < self.SERVER_VERSIONS[0]:
-            raise errors.InvalidClientVersion(
+            raise ProxyRepositoryError(("InvalidClientVersion",
                'Invalid client version %s.  Server accepts client versions %s '
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
-               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS)))
+               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS))))
 
         useAnon, parentVersions = caller.checkVersion(clientVersion)
 
