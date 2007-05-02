@@ -43,6 +43,8 @@ InstallPathConflicts = update.InstallPathConflicts
 
 CriticalUpdateInfo = update.CriticalUpdateInfo
 
+ChangeSetFromFile = update.changeset.ChangeSetFromFile
+
 class TroveNotFound(Exception):
     def __init__(self, troveName):
         self.troveName = troveName

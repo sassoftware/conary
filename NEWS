@@ -20,6 +20,10 @@ Changes in @NEW@:
     * Derived packages (experimental) built from unflavored troves get
       properly flavored as unflavored. (CNY-1506)
 
+  o Client Changes:
+    * The conaryclient module now exposes ChangeSetFromFile to instantiate
+      changesets from .ccs files. (CNY-1578)
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
