@@ -43,7 +43,7 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-download\fI] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
+.B \ \ \ \ \ [\fR\-\-resume=[<linenums>|policy]] \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-flavor <flavor>] \e
@@ -74,7 +74,7 @@ is downloaded into your lookaside, but is not unpacked or built. If
 definition per line) to apply to the recipe macro set. Macro files can also
 contain comments starting with "#" and blank lines.
 .IP
-If \fB\-\-resume <linenums>\fP is specified, 
+If \fB\-\-resume=<linenums>\fP is specified, 
 conary will cook the specified line numbers of the recipe.  The format of
 <linenums> is any number of pairs of n or n:m 
 separated by commas, where n and m are line numbers in the recipe.  
@@ -82,19 +82,19 @@ If the initial line number in a pair is left off, leaving :m,
 conary will begin cooking from the beginning of the file.  
 If the final line number is left off, leaving n:, conary will cook
 until the end 
-of the file, run all the policy, and create a changeset.  A \-\-resume n without
+of the file, run all the policy, and create a changeset.  A \-\-resume=n without
 a colon is equivalent to n:n, if there are other ranges given to \-\-resume,
 or n: if it is the only argument given to \-\-resume.  All resume line 
 numbers must be provided in increasing order.
 
 If \fB\-\-resume\fP is specified with no parameter,
 the recipe will be recooked from the line of last failure.  
-If \fB\-\-resume policy\fP is specified, the policy will be rechecked 
+If \fB\-\-resume=policy\fP is specified, the policy will be rechecked 
 from the last build; this only works if the destdir still exists,
 either because of a policy error or because the \fB\-\-no-clean\fP option
 was provided.
 
-Example: cvc cook \-\-resume 5:10,15,35:
+Example: cvc cook \-\-resume=5:10,15,35:
 
 Note that the \fB\-\-resume\fP option may
 be used only with local recipe files, not source components being
