@@ -1335,12 +1335,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 server = self.c[serverName]
                 args = (target, cs, server, job, recurse, withFiles,
                         withFileContents, excludeAutoSource,
-                        filesNeeded, chgSetList, removedList, changesetVersion)
+                        filesNeeded, chgSetList, removedList)
 
                 try:
                     if server.__class__ == ServerProxy:
                         # this is a XML-RPC proxy for a remote repository
-                        rc = _getCsFromRepos(*args)
+                        rc = _getCsFromRepos(*(args + [changesetVersion]))
                     else:
                         # assume we are a shim repository
                         rc = _getCsFromShim(*args)
