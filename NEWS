@@ -21,6 +21,8 @@ Changes in @NEW@:
       properly flavored as unflavored. (CNY-1506)
     * Macros in arguments to the version control system recipe class
       commands are now properly expanded. (CNY-1614)
+    * The Conary client will now bypass proxies running on remote machines
+      with repositories running on localhost. (CNY-1621)
     * Cvc promote no longer displays some warnings that were rarely helpful 
       unless you are in --debug mode. (CNY-1581)
 
