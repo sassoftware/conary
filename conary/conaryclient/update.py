@@ -1373,6 +1373,18 @@ conary erase '%s=%s[%s]'
         None. Flavors may be None.
         @type itemList: list
         """
+        searchSource = uJob.getSearchSource()
+        if not isinstance(searchSource, searchsource.AbstractSearchSource):
+            if searchSource.isSearchAsDatabase():
+                searchSource = searchsource.SearchSource(
+                                                  uJob.getSearchSource(),
+                                                  self.cfg.flavor, self.db)
+            else:
+                searchSource = searchsource.NetworkSearchSource(
+                                                  uJob.getSearchSource(),
+                                                  self.cfg.installLabelPath,
+                                                  self.cfg.flavor, self.db)
+            uJob.setSearchSource(searchSource)
 
         def _separateInstalledItems(jobSet):
             present = self.db.hasTroves([ (x[0], x[2][0], x[2][1]) for x in 
