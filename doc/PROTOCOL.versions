@@ -1,4 +1,8 @@
 # this file documents the wire protocol changes for conary.
+Version 48: Conary 1.1.25
+  - Added extra argument to getChangeSet to force the creation of a specific
+    changeset version.
+
 Version 47:
   - Added getNewTroveInfo and setTroveInfo
   - added addMetadataItems call

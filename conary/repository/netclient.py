@@ -33,6 +33,7 @@ from conary import versions
 from conary.lib import util
 from conary.repository import changeset
 from conary.repository import errors
+from conary.repository import filecontainer
 from conary.repository import filecontents
 from conary.repository import findtrove
 from conary.repository import repository
@@ -49,7 +50,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 ]
+CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48 ]
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -410,6 +411,14 @@ class ServerCache:
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository, 
                               trovesource.SearchableTroveSource):
+    # Constants for changeset versions
+    FILE_CONTAINER_VERSION_FILEID_IDX = \
+                            filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+    FILE_CONTAINER_VERSION_WITH_REMOVES = \
+                            filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+    FILE_CONTAINER_VERSION_NO_REMOVES = \
+                            filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
+
     # fixme: take a cfg object instead of all these parameters
     def __init__(self, repMap, userMap,
                  localRepository = None, pwPrompt = None,
@@ -1059,19 +1068,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return mergeTarget
 
     def createChangeSetFile(self, jobList, fName, recurse = True,
-                            primaryTroveList = None, callback = None):
+                            primaryTroveList = None, callback = None,
+                            changesetVersion = None):
         """
         @raise FilesystemError: if the destination file is not writable
         """
         return self._getChangeSet(jobList, target = fName,
                                   recurse = recurse,
                                   primaryTroveList = primaryTroveList,
-                                  callback = callback)
+                                  callback = callback,
+                                  changesetVersion = changesetVersion)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None,
                       excludeAutoSource = False, primaryTroveList = None,
-                      callback = None, forceLocalGeneration = False):
+                      callback = None, forceLocalGeneration = False,
+                      changesetVersion = None):
         # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
@@ -1192,16 +1204,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         def _getCsFromRepos(target, cs, server, job, recurse,
                             withFiles, withFileContents,
                             excludeAutoSource, filesNeeded,
-                            chgSetList, removedList):
+                            chgSetList, removedList, changesetVersion):
             abortCheck = None
             if callback:
                 callback.requestingChangeSet()
             server.setAbortCheck(abortCheck)
-            l = server.getChangeSet(job, recurse,
-                                    withFiles,
-                                    withFileContents,
-                                    excludeAutoSource)
-            if server.getProtocolVersion() < 38:
+            args = (job, recurse, withFiles, withFileContents,
+                    excludeAutoSource)
+            serverVersion = server.getProtocolVersion()
+            if changesetVersion and serverVersion > 47:
+                args += (changesetVersion, )
+            l = server.getChangeSet(*args)
+            if serverVersion < 38:
                 (url, sizes, extraTroveList, extraFileList) = l
                 removedTroveList = []
             else:
@@ -1321,7 +1335,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 server = self.c[serverName]
                 args = (target, cs, server, job, recurse, withFiles,
                         withFileContents, excludeAutoSource,
-                        filesNeeded, chgSetList, removedList)
+                        filesNeeded, chgSetList, removedList, changesetVersion)
 
                 try:
                     if server.__class__ == ServerProxy:

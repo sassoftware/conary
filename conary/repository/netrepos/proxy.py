@@ -223,14 +223,7 @@ class ChangesetFilter(BaseProxy):
     @staticmethod
     def _getChangeSetVersion(clientVersion):
         # Determine the changeset version based on the client version
-        # Add more params if necessary
-        if clientVersion < 38:
-            return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
-        elif clientVersion < 43:
-            return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
-        # Add more changeset versions here as the currently newest client is
-        # replaced by a newer one
-        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+        return changeset.getNativeChangesetVersion(clientVersion)
 
     def _convertChangeSet(self, csPath, size, destCsVersion, csVersion):
         # Changeset is in the file csPath
@@ -310,7 +303,8 @@ class ChangesetFilter(BaseProxy):
         return cspath, size
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
-                     recurse, withFiles, withFileContents, excludeAutoSource):
+                     recurse, withFiles, withFileContents, excludeAutoSource,
+                     changesetVersion = None):
 
         def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
             csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
@@ -347,7 +341,7 @@ class ChangesetFilter(BaseProxy):
         else:
             getCsVersion = clientVersion
 
-        neededCsVersion = self._getChangeSetVersion(clientVersion)
+        neededCsVersion = changesetVersion or self._getChangeSetVersion(clientVersion)
         wireCsVersion = self._getChangeSetVersion(getCsVersion)
 
         # Get the desired changeset version for this client

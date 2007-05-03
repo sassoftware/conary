@@ -26,6 +26,12 @@ Changes in @NEW@:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
       changesets from .ccs files. (CNY-1578)
 
+  o Internal Changes:
+    * Conary clients can ask newer Conary repositories (speaking at least
+      protocol version 48) for a specific changeset format. This allows one
+      to use new Conary clients to generate changesets understood by older
+      clients. (CNY-1544)
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new

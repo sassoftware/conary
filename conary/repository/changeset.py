@@ -1500,3 +1500,17 @@ def _convertChangeSetV2V1(inPath, outPath):
     outFcObj.close()
 
     return size
+
+def getNativeChangesetVersion(protocolVersion):
+    """Return the native changeset version supported by a client speaking the
+    supplied protocol version"""
+    # Add more versions as necessary, but do remember to add them to
+    # netclient's FILE_CONTAINER_* constants
+    if protocolVersion < 38:
+        return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
+    elif protocolVersion < 43:
+        return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+    # Add more changeset versions here as the currently newest client is
+    # replaced by a newer one
+    return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+

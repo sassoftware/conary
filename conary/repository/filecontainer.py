@@ -78,6 +78,7 @@ SUBFILE_MAGIC = 0x3FBB
 # used for files whose contents are > 4gig
 LARGE_SUBFILE_MAGIC = 0x40CD
 
+# File container versions. Add references to these in netclient too.
 FILE_CONTAINER_VERSION_FILEID_IDX   = 2007022001
 FILE_CONTAINER_VERSION_WITH_REMOVES = 2006071301
 FILE_CONTAINER_VERSION_NO_REMOVES   = 2005101901
