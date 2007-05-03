@@ -1340,7 +1340,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 try:
                     if server.__class__ == ServerProxy:
                         # this is a XML-RPC proxy for a remote repository
-                        rc = _getCsFromRepos(*(args + [changesetVersion]))
+                        rc = _getCsFromRepos(*(args + (changesetVersion, )))
                     else:
                         # assume we are a shim repository
                         rc = _getCsFromShim(*args)
