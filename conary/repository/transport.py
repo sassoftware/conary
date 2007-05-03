@@ -105,6 +105,9 @@ class URLOpener(urllib.FancyURLopener):
     '''Replacement class for urllib.FancyURLopener'''
     contentType = 'application/x-www-form-urlencoded'
 
+    localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
+        socket.gethostname()])
+
     def __init__(self, *args, **kw):
         self.compress = False
         self.abortCheck = None
@@ -156,6 +159,18 @@ class URLOpener(urllib.FancyURLopener):
         h._conn.sock = httplib.FakeSocket(sock, sslSock)
         return h
 
+    def proxyBypass(self, proxy, host):
+        # Split the port and username/pass from proxy
+        proxyHost = urllib.splituser(urllib.splitport(proxy)[0])[1]
+
+        destHost = urllib.splitport(host)[0]
+
+        # don't proxy localhost unless the proxy is running on
+        # localhost as well
+        if destHost in self.localhosts and proxyHost not in self.localhosts:
+            return True
+        return False
+
     def createConnection(self, url, ssl=False, withProxy=False):
         # Return an HTTP or HTTPS class suitable for use by open_http
         if ssl:
@@ -199,7 +214,7 @@ class URLOpener(urllib.FancyURLopener):
                     user_passwd, realhost = urllib.splituser(realhost)
                 if user_passwd:
                     selector = "%s://%s%s" % (urltype, realhost, rest)
-                if urllib.proxy_bypass(realhost):
+                if self.proxyBypass(host, realhost):
                     host = realhost
 
             #print "proxy via http:", host, selector
@@ -320,8 +335,6 @@ class Transport(xmlrpclib.Transport):
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
 
-    localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1'])
-
     def __init__(self, https = False, entitlement = None, proxies = None,
                  serverName = None):
         self.https = https
@@ -349,19 +362,9 @@ class Transport(xmlrpclib.Transport):
     def request(self, host, handler, body, verbose=0):
 	self.verbose = verbose
 
-	realhost = getrealhost(host)
-        if realhost in self.localhosts:
-            # don't proxy localhost unless the proxy is running on
-            # localhost as well
-            proxyHost = None
-            if self.proxies and 'http' in self.proxies:
-                proxyHost = urllib.splitport(urllib.splithost(urllib.splittype(self.proxies['http'])[1])[0])[0]
-            if proxyHost in self.localhosts:
-                opener = XMLOpener(self.proxies)
-            else:
-                opener = XMLOpener({})
-        else:
-            opener = XMLOpener(self.proxies)
+        protocol = self._protocol()
+
+        opener = XMLOpener(self.proxies)
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 
@@ -381,7 +384,7 @@ class Transport(xmlrpclib.Transport):
 
 	opener.addheader('User-agent', self.user_agent)
         tries = 0
-        url = ''.join([self._protocol(), '://', host, handler])
+        url = ''.join([protocol, '://', host, handler])
         while tries < 5:
             try:
                 usedAnonymous, response = opener.open(url, body)
