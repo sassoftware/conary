@@ -295,7 +295,7 @@ class ClientClone:
                 try:
                     results = troveCache.hasTroves(troveTups)
                 except neterrors.OpenError, msg:
-                    log.warning('Could not access host %s: %s' % (host, msg))
+                    log.debug('warning: Could not access host %s: %s' % (host, msg))
                     results = dict((x, False) for x in troveTups)
                 hasTroves.update(results)
             troves = troveCache.getTroves([ x for x in toGet if hasTroves[x]], 
