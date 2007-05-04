@@ -25,6 +25,8 @@ Changes in @NEW@:
       with repositories running on localhost. (CNY-1621)
     * Cvc promote no longer displays some warnings that were rarely helpful 
       unless you are in --debug mode. (CNY-1581)
+    * A bug that caused the storage of unneeded "unknown" entries in
+      the TroveInfo table has been fixed. (CNY-1613)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
