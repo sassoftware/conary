@@ -1838,7 +1838,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 'server is "%s".'
                 %(url, base))
 	# +1 strips off the ? from the query url
-	fileName = url[len(self.urlBase()) + 1:] + "-in"
+	fileName = url[len(base) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
         self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
         attempt = 1
