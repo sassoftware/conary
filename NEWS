@@ -1,3 +1,9 @@
+Changes in 1.1.24.1:
+  o Release Correction
+    * The source archive for 1.1.24 was not built from the tag for
+      1.1.24 in the Mercurial repository.  1.1.24.1 is built from the
+      1.1.24 tag.
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
