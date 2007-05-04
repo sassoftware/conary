@@ -1,5 +1,4 @@
 Changes in @NEW@:
-
   o New Feature:
     * Conary now supports files whose compressed contents are more than
       4 gig in size. Old versions of Conary will report an error saying
@@ -37,6 +36,12 @@ Changes in @NEW@:
       protocol version 48) for a specific changeset format. This allows one
       to use new Conary clients to generate changesets understood by older
       clients. (CNY-1544)
+
+Changes in 1.1.24.1:
+  o Release Correction
+    * The source archive for 1.1.24 was not built from the tag for
+      1.1.24 in the Mercurial repository.  1.1.24.1 is built from the
+      1.1.24 tag.
 
 Changes in 1.1.24:
   o New Feature:
