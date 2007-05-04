@@ -37,7 +37,7 @@ class TroveInfoTable:
                            "VALUES (?, ?, ?)", (idNum, tag, cu.binary(frz)))
 
         frz = trove.troveInfo.freeze(freezeKnown = False, freezeUnknown = True)
-        if frz is not None:
+        if frz:
             cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
                        "VALUES (?, ?, ?)", (idNum, -1, cu.binary(frz)))
 

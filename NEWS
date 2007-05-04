@@ -1,3 +1,7 @@
+  o Bug Fixes:
+    * A bug that caused the storage of unneeded "unknown" entries in
+      the TroveInfo table has been fixed. (CNY-1613)
+
 Changes in 1.1.24:
   o New Feature:
     * Conary 1.1.24 introduces the framework needed to implement a new
