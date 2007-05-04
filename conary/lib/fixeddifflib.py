@@ -85,4 +85,8 @@ if hasattr(difflib.SequenceMatcher, "_SequenceMatcher__helper"):
     # have to fix unified_diff
     difflib.SequenceMatcher = SequenceMatcher
 
+else:
+    SequenceMatcher = difflib.SequenceMatcher
+
+
 unified_diff = difflib.unified_diff

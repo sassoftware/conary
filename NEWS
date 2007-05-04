@@ -26,6 +26,9 @@ Changes in @NEW@:
       unless you are in --debug mode. (CNY-1581)
     * A bug that caused the storage of unneeded "unknown" entries in
       the TroveInfo table has been fixed. (CNY-1613)
+    * A regression in 'cvc annotate' that would produce a traceback for
+      not finding a SequenceMatcher class in fixeddifflib was fixed.
+      (CNY-1625)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
