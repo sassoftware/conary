@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,7 +18,7 @@ it, unpack it, and patch it in the correct directory.  Each of the
 public classes in this module is accessed from a recipe as addI{Name}.
 """
 
-import fcntl
+import fcntl, itertools
 import gzip
 import os
 import re
@@ -183,6 +183,9 @@ class _Source(_AnySource):
 
 
 class addArchive(_Source):
+    keywords = dict(_Source.keywords)
+    keywords['preserveOwnership'] = None
+
     """
     NAME
     ====
@@ -192,7 +195,7 @@ class addArchive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=}])}
 
     DESCRIPTION
     ===========
@@ -231,6 +234,11 @@ class addArchive(_Source):
     search for a file named I{archivename}C{.{sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
+
+    B{preserveOwnership} : If C{preserveOwnership} is True and the files
+    are unpacked into the build directory, the packaged files are owned
+    by the same user and group which owned them in the archive. Only cpio,
+    rpm, and tar achives are allowed when C{preserveOwnership} is used.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
     looks in the file or URL specified by C{rpm} for a binary or
@@ -324,10 +332,32 @@ class addArchive(_Source):
 	self._checkSignature(f)
         return f
 
+    @staticmethod
+    def _cpioOwners(fullOutput):
+        lines = fullOutput.split('\n')
+        for line in lines:
+            if not line: continue
+            fields = line.split()
+            yield (fields[8], fields[2], fields[3])
+
+    @staticmethod
+    def _tarOwners(fullOutput):
+        lines = fullOutput.split('\n')
+        for line in lines:
+            if not line: continue
+            fields = line.split()
+            owner, group = fields[1].split('/')
+            yield (fields[5], owner, group)
+
     def do(self):
         f = self.doDownload()
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
+
+        if self.preserveOwnership and \
+           not(destDir.startswith(self.recipe.macros.destdir)):
+            raise SourceError, "preserveOwnership not allowed when " \
+                               "unpacking into build directory"
 
         guessMainDir = (not self.recipe.explicitMainDir and
                         not self.dir.startswith('/'))
@@ -344,19 +374,32 @@ class addArchive(_Source):
         util.mkdirChain(destDir)
 
 	if f.endswith(".zip"):
+            if self.preserveOwnership:
+                raise SourceError('cannot preserveOwnership for zip archives')
+
 	    util.execute("unzip -q -o -d %s '%s'" % (destDir, f))
 
 	elif f.endswith(".rpm"):
             log.info("extracting %s into %s" % (f, destDir))
-	    _extractFilesFromRPM(f, directory=destDir)
-
+            ownerList = _extractFilesFromRPM(f, directory=destDir)
+            if self.preserveOwnership:
+                for (path, user, group) in ownerList:
+                    self.recipe.Ownership(user, group, re.escape(path))
         elif f.endswith(".iso"):
-            log.info("extracting %s into %s", f, destDir)
+            if self.preserveOwnership:
+                raise SourceError('cannot preserveOwnership for iso images')
+
             _extractFilesFromISO(f, directory=destDir)
 
 	else:
             m = magic.magic(f)
             _uncompress = "cat"
+            # command to run to get ownership info; if this isn't set, use
+            # stdout from the command
+            ownerListCmd = None
+            # function which parses the ownership string to get file ownership
+            # details
+            ownerParser = None
 
             # Question: can magic() ever get these wrong?!
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
@@ -374,19 +417,48 @@ class addArchive(_Source):
                 preserve = ''
                 if self.dir.startswith('/'):
                     preserve = 'p'
-                _unpack = "tar -C %s -xS%sf -" % (destDir, preserve)
+                _unpack = "tar -C %s -xvvS%sf -" % (destDir, preserve)
+                ownerParser = self._tarOwners
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
+                ownerListCmd = "cpio -tv --quiet"
+                ownerParser = self._cpioOwners
             elif _uncompress != 'cat':
                 # if we know we've got an archive, we'll default to
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
-                _unpack = "tar -C %s -xSpf -" % (destDir,)
+                _unpack = "tar -C %s -xvvSpf -" % (destDir,)
+                ownerParser = self._tarOwners
             else:
                 raise SourceError, "unknown archive format: " + f
 
-            util.execute("%s < '%s' | %s" % (_uncompress, f, _unpack))
+            cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
+            fObj = os.popen(cmd)
+            s = fObj.read()
+            output = ""
+            while s:
+                output += s
+                s = fObj.read()
+
+            fObj.close()
+
+            if ownerListCmd:
+                cmd = "%s < '%s' | %s" % (_uncompress, f, ownerListCmd)
+                fObj = os.popen(cmd)
+                s = fObj.read()
+                output = ""
+                while s:
+                    output += s
+                    s = fObj.read()
+
+                fObj.close()
+
+            if ownerParser and self.preserveOwnership:
+                for (path, user, group) in ownerParser(output):
+                    if path[-1] == '/': path = path[:-1]
+
+                    self.recipe.Ownership(user, group, re.escape(path))
 
         if guessMainDir:
             bd = self.builddir
@@ -1478,6 +1550,12 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
         compression = h[rpmhelper.PAYLOADCOMPRESSOR]
         if compression == 'bzip2':
             decompressor = lambda fobj: util.BZ2File(fobj)
+
+    # assemble the path/owner/group list
+    ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                    h[rpmhelper.FILEUSERNAME],
+                                    h[rpmhelper.FILEGROUPNAME]))
+
     # rewind the file to let seekToData do its job
     r.seek(0)
     rpmhelper.seekToData(r)
@@ -1517,6 +1595,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	raise IOError, 'failed to extract source %s from RPM %s' \
 		       %(filename, os.path.basename(rpm))
 
+    return ownerList
 
 def _extractFilesFromISO(iso, directory):
     isoInfo = util.popen("isoinfo -d -i %s" %iso).read()
