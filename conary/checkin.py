@@ -907,6 +907,78 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 
     _showChangeSet(repos, cs, old, new)
 
+def revert(repos, fileList):
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
+
+    origTrove = repos.getTrove(state.getName(),
+                               state.getVersion().canonicalVersion(),
+                               deps.deps.DependencySet())
+
+    checkList = []
+
+    pathsToCheck = set(fileList)
+    # look file files we've been asked to revert
+    for fileInfo in origTrove.iterFileList():
+        if not fileList:
+            if not state.fileIsAutoSource(fileInfo[0]):
+                checkList.append(fileInfo)
+        elif fileInfo[1] in fileList:
+            checkList.append(fileInfo)
+            pathsToCheck.remove(fileInfo[1])
+
+    if pathsToCheck:
+        includedFiles = set( x[1] for x in state.iterFileList() )
+        #includedFiles.update(set( x[1] for x in origTrove.iterFileList() ))
+        for path in pathsToCheck:
+            if path in includedFiles:
+                log.error('file %s was newly added; use cvc remove to '
+                          'remove it' % path)
+            else:
+                log.error('file %s not found in source component' % path)
+
+        return 1
+
+    del pathsToCheck
+
+    fileObjects = repos.getFileVersions(
+                            [ (x[0], x[2], x[3]) for x in checkList ] )
+    contentsNeeded = [ (x[0][2], x[0][3]) for x in
+                            itertools.izip(checkList, fileObjects)
+                            if x[1].hasContents ]
+    contents = repos.getFileContents(contentsNeeded)
+
+    currentDir = os.getcwd()
+
+    for fileInfo, fileObj in itertools.izip(checkList, fileObjects):
+        if fileObj.flags.isAutoSource():
+            raise errors.CvcError('autosource files cannot be '
+                                  'reverted')
+
+        path = fileInfo[1]
+
+        if fileObj.hasContents:
+            content = contents.pop(0)
+        else:
+            content = None
+
+        if os.path.exists(path):
+            currentFileObj = files.FileFromFilesystem(path, fileInfo[0])
+            currentFileObj.flags.thaw(fileObj.flags.freeze())
+            if fileObj.__eq__(currentFileObj, ignoreOwnerGroup = True):
+                continue
+
+        log.info('reverting %s', path)
+        fileObj.restore(content, '/', currentDir + '/' + path,
+                        nameLookup = False)
+
+        # the user originally to removed the file (which means marking it
+        # as autosource!) but now wants it back
+        if state.fileIsAutoSource(fileInfo[0]):
+            state.fileIsAutoSource(fileInfo[0], set = False)
+
+    conaryState.write("CONARY")
+
 def diff(repos, versionStr = None):
     # return 0 if no differences, 1 if differences, 2 on error
     state = ConaryStateFromFile("CONARY", repos).getSourceState()

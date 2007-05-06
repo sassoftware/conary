@@ -13,8 +13,8 @@ and permissions, and so forth.  The \fIC\fPonary \fIv\fPersion
 \fIc\fPontrol program, called \fBcvc\fP, handles build and source
 management, and is responsible for all changes to the repository.
 .SH REFERENCE
-cvc has several common command-line arguments, all of which modify 
-configuration entries and are documented with other configuration
+cvc has several common command-line arguments which modify
+configuration entries and are documented with those configuration
 entries.  The rest of its command-line arguments are specific to
 which cvc \fBcommand\fP you are running, and are documented with
 the commands.
@@ -91,8 +91,9 @@ If \fB\-\-resume\fP is specified with no parameter,
 the recipe will be recooked from the line of last failure.  
 If \fB\-\-resume policy\fP is specified, the policy will be rechecked 
 from the last build; this only works if the destdir still exists,
-either because of a policy error or because the \fB\-\-no-clean\fP option
-was provided.
+either because a policy error occurred during the previous build
+or because the \fB\-\-no-clean\fP option was provided to the previous
+\fBcook\fP command.
 
 Example: cvc cook \-\-resume 5:10,15,35:
 
@@ -316,6 +317,10 @@ Synonyms: \fBrm\fP
 Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
 and marks it to be removed from the repository at the next
 \fBcvc commit\fP.
+.TP
+.B revert [\fI<filename>...\fP]
+Any changes made to local files are reverted. If one or more filenames
+are passed as arguments, only the changes made to those files are reverted.
 .TP
 .B set \fI<filename>...>/fP \fI[--text]\fP \fI[--binary]\fP
 Binary and text files in source components are handled slightly differently
