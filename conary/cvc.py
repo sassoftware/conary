@@ -622,6 +622,19 @@ class RenameCommand(CvcCommand):
         checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
 
+class RevertCommand(CvcCommand):
+    commands = ['revert']
+    help = 'Revert local changes to one or more files'
+    commandGroup = 'File Operations'
+    paramHelp = "[<file> <file2> <file3> ...]"
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        if argSet: return self.usage()
+
+        checkin.revert(repos, args[2:])
+_register(RevertCommand)
+
+_register(DiffCommand)
 class SignCommand(CvcCommand):
     commands = ['sign']
     paramHelp = "<newshadow> <trove>[=<version>][[flavor]]"

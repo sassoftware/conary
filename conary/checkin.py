@@ -321,13 +321,20 @@ def commit(repos, cfg, message, callback=None, test=False):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+    if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
+            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
-            recipeObj = recipeClass(cfg, lcache, srcdirs, lightInstance=True)
+            if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+                recipeObj = recipeClass(cfg, lcache, srcdirs,
+                                        lightInstance=True)
+            elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
+                recipeObj = recipeClass(repos, cfg, state.getVersion(),
+                                        None, lcache, srcdirs,
+                                        lightInstance = True)
         except builderrors.RecipeFileError, msg:
             log.error(str(msg))
             sys.exit(1)
@@ -346,7 +353,6 @@ def commit(repos, cfg, message, callback=None, test=False):
         # os.path.basenames stripts the protocol off a url as well
         sourceFiles = [ os.path.basename(x.getPath()) for x in 
                                 recipeObj.getSourcePathList() ]
-
         # sourceFiles is a list of everything which ought to be autosourced.
         # those are either the same as in the previous trove, new (in which
         # case they are missing from the previous trove), or nonexistant. So
@@ -900,6 +906,78 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
                                  False)])
 
     _showChangeSet(repos, cs, old, new)
+
+def revert(repos, fileList):
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
+
+    origTrove = repos.getTrove(state.getName(),
+                               state.getVersion().canonicalVersion(),
+                               deps.deps.DependencySet())
+
+    checkList = []
+
+    pathsToCheck = set(fileList)
+    # look file files we've been asked to revert
+    for fileInfo in origTrove.iterFileList():
+        if not fileList:
+            if not state.fileIsAutoSource(fileInfo[0]):
+                checkList.append(fileInfo)
+        elif fileInfo[1] in fileList:
+            checkList.append(fileInfo)
+            pathsToCheck.remove(fileInfo[1])
+
+    if pathsToCheck:
+        includedFiles = set( x[1] for x in state.iterFileList() )
+        #includedFiles.update(set( x[1] for x in origTrove.iterFileList() ))
+        for path in pathsToCheck:
+            if path in includedFiles:
+                log.error('file %s was newly added; use cvc remove to '
+                          'remove it' % path)
+            else:
+                log.error('file %s not found in source component' % path)
+
+        return 1
+
+    del pathsToCheck
+
+    fileObjects = repos.getFileVersions(
+                            [ (x[0], x[2], x[3]) for x in checkList ] )
+    contentsNeeded = [ (x[0][2], x[0][3]) for x in
+                            itertools.izip(checkList, fileObjects)
+                            if x[1].hasContents ]
+    contents = repos.getFileContents(contentsNeeded)
+
+    currentDir = os.getcwd()
+
+    for fileInfo, fileObj in itertools.izip(checkList, fileObjects):
+        if fileObj.flags.isAutoSource():
+            raise errors.CvcError('autosource files cannot be '
+                                  'reverted')
+
+        path = fileInfo[1]
+
+        if fileObj.hasContents:
+            content = contents.pop(0)
+        else:
+            content = None
+
+        if os.path.exists(path):
+            currentFileObj = files.FileFromFilesystem(path, fileInfo[0])
+            currentFileObj.flags.thaw(fileObj.flags.freeze())
+            if fileObj.__eq__(currentFileObj, ignoreOwnerGroup = True):
+                continue
+
+        log.info('reverting %s', path)
+        fileObj.restore(content, '/', currentDir + '/' + path,
+                        nameLookup = False)
+
+        # the user originally to removed the file (which means marking it
+        # as autosource!) but now wants it back
+        if state.fileIsAutoSource(fileInfo[0]):
+            state.fileIsAutoSource(fileInfo[0], set = False)
+
+    conaryState.write("CONARY")
 
 def diff(repos, versionStr = None):
     # return 0 if no differences, 1 if differences, 2 on error
@@ -1841,7 +1919,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
 
     # don't download sources for groups or filesets
     if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-        raise errors.CvcError('Only package recipes can be refreshed')
+        raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter)
     srcdirs = [ os.path.dirname(recipeClass.filename),

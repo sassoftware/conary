@@ -125,14 +125,15 @@ def genExcepthook(self):
                                               type.__name__, exc_msg)
             print exc_message
 
-        try:
-            buildinfo = self.recipe.buildinfo
-            buildinfo.error = exc_message
-            buildinfo.file = self.file
-            buildinfo.lastline = self.linenum
-            buildinfo.stop()
-        except:
-            log.warning("could not write out to buildinfo")
+        if self.recipe.buildinfo:
+            try:
+                buildinfo = self.recipe.buildinfo
+                buildinfo.error = exc_message
+                buildinfo.file = self.file
+                buildinfo.lastline = self.linenum
+                buildinfo.stop()
+            except:
+                log.warning("could not write out to buildinfo")
 
         if cfg.debugRecipeExceptions and self.recipe.isatty():
             debugger.post_mortem(tb, type, exc_msg)
@@ -153,6 +154,10 @@ class RecipeAction(Action):
         'use': None
     }
 
+    # define which types of recipe an action is available for
+    _packageAction = True
+    _groupAction = False
+
     def __init__(self, recipe, *args, **keywords):
         assert(self.__class__ is not RecipeAction)
 	self._getLineNum()
@@ -171,7 +176,8 @@ class RecipeAction(Action):
 	    else:
 		oldexcepthook = sys.excepthook
 		sys.excepthook = genExcepthook(self)
-                self.recipe.buildinfo.lastline = self.linenum
+                if self.recipe.buildinfo:
+                    self.recipe.buildinfo.lastline = self.linenum
 		self.do()
 		sys.excepthook = oldexcepthook
 

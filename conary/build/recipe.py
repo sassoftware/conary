@@ -12,7 +12,12 @@
 # full details.
 #
 
+from conary import files
 from conary.errors import ParseError
+from conary.build import action, source
+from conary.build.errors import RecipeFileError
+
+import os
 
 """
 Contains the base Recipe class
@@ -49,7 +54,7 @@ class _sourceHelper:
     def __call__(self, *args, **keywords):
         self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
 
-class Recipe:
+class Recipe(object):
     """Virtual base class for all Recipes"""
     _trove = None
     _trackedFlags = None
@@ -57,14 +62,22 @@ class Recipe:
     _loadedSpecs = {}
     _recipeType = RECIPE_TYPE_UNKNOWN
     _isDerived = False
+    _sourceModule = None
 
-    def __init__(self, lightInstance = False):
+    def __init__(self, lightInstance = False, laReposCache = None,
+                 srcdirs = None):
         assert(self.__class__ is not Recipe)
         self.validate()
         self.externalMethods = {}
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
         self._sources = []
+        self.loadSourceActions()
+        self.buildinfo = None
+        self.laReposCache = laReposCache
+        self.srcdirs = srcdirs
+        self.sourcePathMap = {}
+        self.pathConflicts = {}
 
     @classmethod
     def getType(class_):
@@ -125,11 +138,152 @@ class Recipe:
             if self._lightInstance:
                 return _ignoreCall
 
-        # we don't get here if name is in __dict__, so it must not be defined
-        raise AttributeError, name
+        return object.__getattribute__(self, name)
 
     def _addSourceAction(self, name, item):
         self.externalMethods[name] = _sourceHelper(item, self)
+
+    def _loadSourceActions(self, test):
+        for name, item in source.__dict__.items():
+            if (name[0:3] == 'add' and issubclass(item, action.Action)
+                    and test(item)):
+                self._addSourceAction(name, item)
+
+    def loadSourceActions(self):
+        pass
+
+    def fetchAllSources(self, refreshFilter=None, skipFilter=None):
+        """
+        returns a list of file locations for all the sources in
+        the package recipe
+        """
+        # first make sure we had no path conflicts:
+        if self.pathConflicts:
+            errlist = []
+            for basepath in self.pathConflicts.keys():
+                errlist.extend([x for x in self.pathConflicts[basepath]])
+            raise RecipeFileError("The following file names conflict "
+                                  "(cvc does not currently support multiple"
+                                  " files with the same name from different"
+                                  " locations):\n   " + '\n   '.join(errlist))
+        self.prepSources()
+        files = []
+        for src in self.getSourcePathList():
+            if skipFilter and skipFilter(os.path.basename(src.getPath())):
+                continue
+
+            f = src.fetch(refreshFilter)
+            if f:
+                if type(f) in (tuple, list):
+                    files.extend(f)
+                else:
+                    files.append(f)
+        return files
+
+    def getSourcePathList(self):
+        return [ x for x in self._sources if isinstance(x, source._AnySource) ]
+
+    def extraSource(self, action):
+        """
+        extraSource allows you to append a source list item that is
+        not a part of source.py.  Be aware when writing these source
+        list items that you are writing conary internals!  In particular,
+        anything that needs to add a source file to the repository will
+        need to implement fetch(), and all source files will have to be
+        sought using the lookaside cache.
+        """
+        self._sources.append(action)
+
+    def prepSources(self):
+        for source in self._sources:
+            source.doPrep()
+
+    def unpackSources(self, resume=None, downloadOnly=False):
+        if resume == 'policy':
+            return
+        elif resume:
+            log.info("Resuming on line(s) %s" % resume)
+            # note resume lines must be in order
+            self.processResumeList(resume)
+            for source in self.iterResumeList(self._sources):
+                source.doPrep()
+                source.doAction()
+        elif downloadOnly:
+            for source in self._sources:
+                source.doPrep()
+                source.doDownload()
+        else:
+            for source in self._sources:
+                source.doPrep()
+                source.doAction()
+
+    def populateLcache(self):
+        """
+        Populate a repository lookaside cache
+        """
+        recipeClass = self.__class__
+        repos = self.laReposCache.repos
+
+        # build a list containing this recipe class and any ancestor class
+        # from which it descends
+        classes = [ recipeClass ]
+        bases = list(recipeClass.__bases__)
+        while bases:
+            parent = bases.pop()
+            bases.extend(list(parent.__bases__))
+            if issubclass(parent, Recipe):
+                classes.append(parent)
+
+        # reverse the class list, this way the files will be found in the
+        # youngest descendant first
+        classes.reverse()
+
+        # populate the repository source lookaside cache from the :source
+        # components
+        for rclass in classes:
+            if not rclass._trove:
+                continue
+            srcName = rclass._trove.getName()
+            srcVersion = rclass._trove.getVersion()
+            # CNY-31: walk over the files in the trove we found upstream
+            # (which we may have modified to remove the non-autosourced files
+            # Also, if an autosource file is marked as needing to be refreshed
+            # in the Conary state file, the lookaside cache has to win, so
+            # don't populate it with the repository file)
+            for pathId, path, fileId, version in rclass._trove.iterFileList():
+                assert(path[0] != "/")
+                # we might need to retrieve this source file
+                # to enable a build, so we need to find the
+                # sha1 hash of it since that's how it's indexed
+                # in the file store
+                fileObj = repos.getFileVersion(pathId, fileId, version)
+                if isinstance(fileObj, files.RegularFile):
+                    # it only makes sense to fetch regular files, skip
+                    # anything that isn't
+                    self.laReposCache.addFileHash(srcName, srcVersion, pathId,
+                        path, fileId, version, fileObj.contents.sha1())
+
+    def sourceMap(self, path):
+        if os.path.exists(path):
+            basepath = path
+        else:
+            basepath = os.path.basename(path)
+        if basepath in self.sourcePathMap:
+            if self.sourcePathMap[basepath] == path:
+                # we only care about truly different source locations with the
+                # same basename
+                return
+            if basepath in self.pathConflicts:
+                self.pathConflicts[basepath].add(path)
+            else:
+                self.pathConflicts[basepath] = set([
+                    # previous (first) instance
+                    self.sourcePathMap[basepath],
+                    # this instance
+                    path
+                ])
+        else:
+            self.sourcePathMap[basepath] = path
 
     def isCrossCompileTool(self):
         return False

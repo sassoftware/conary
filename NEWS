@@ -13,6 +13,16 @@ Changes in @NEW@:
       sense to first install the version of a package referenced in group-os,
       then to fall back to installing from contrib.rpath.org@rpl:1. (CNY-1571)
 
+  o Build Changes:
+    * Internal recipe source management moved into generic Recipe class
+      from PackageRecipeClass
+    * GroupRecipe.add*Script now accepts a path to the script as the
+      initial parameter (following PackageRecipe.addSource)
+    * addArchive now supports a preserveOwnership parameter. When set to
+      True, owners and groups from cpio, rpm, and tar archives are used
+      as the owners and groups for the final packaging (CNY-927).
+    * 'cvc revert' added to undo local changes (CNY-1222)
+
   o Bug Fixes:
     * During a cvc update, new files in the source component could result
       in user/group warnings (CNY-763)

@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -18,7 +17,7 @@ it, unpack it, and patch it in the correct directory.  Each of the
 public classes in this module is accessed from a recipe as addI{Name}.
 """
 
-import fcntl
+import fcntl, itertools
 import gzip
 import os
 import re
@@ -31,9 +30,16 @@ from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import util
 from conary.build import action, errors
+from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest
 
-class _Source(action.RecipeAction):
+class _AnySource(action.RecipeAction):
+
+    # marks classes which have source files which need committing
+
+    pass
+
+class _Source(_AnySource):
     keywords = {'rpm': '',
                 'dir': '',
                 'keyid': None,
@@ -164,18 +170,6 @@ class _Source(action.RecipeAction):
 	self._checkSignature(f)
 	return f
 
-    def fetchLocal(self):
-        if self.rpm:
-            toFetch = self.rpm
-        else:
-            toFetch = self.sourcename
-
-        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                                toFetch, self.recipe.name,
-                                self.recipe.srcdirs, localOnly=True,
-                                allowNone=True)
-        return f
-
     def getPath(self):
         if self.rpm:
             return self.rpm
@@ -188,6 +182,9 @@ class _Source(action.RecipeAction):
 
 
 class addArchive(_Source):
+    keywords = dict(_Source.keywords)
+    keywords['preserveOwnership'] = None
+
     """
     NAME
     ====
@@ -197,7 +194,7 @@ class addArchive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=}])}
 
     DESCRIPTION
     ===========
@@ -236,6 +233,11 @@ class addArchive(_Source):
     search for a file named I{archivename}C{.{sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
+
+    B{preserveOwnership} : If C{preserveOwnership} is True and the files
+    are unpacked into the build directory, the packaged files are owned
+    by the same user and group which owned them in the archive. Only cpio,
+    rpm, and tar achives are allowed when C{preserveOwnership} is used.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
     looks in the file or URL specified by C{rpm} for a binary or
@@ -329,10 +331,32 @@ class addArchive(_Source):
 	self._checkSignature(f)
         return f
 
+    @staticmethod
+    def _cpioOwners(fullOutput):
+        lines = fullOutput.split('\n')
+        for line in lines:
+            if not line: continue
+            fields = line.split()
+            yield (fields[8], fields[2], fields[3])
+
+    @staticmethod
+    def _tarOwners(fullOutput):
+        lines = fullOutput.split('\n')
+        for line in lines:
+            if not line: continue
+            fields = line.split()
+            owner, group = fields[1].split('/')
+            yield (fields[5], owner, group)
+
     def do(self):
         f = self.doDownload()
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
+
+        if self.preserveOwnership and \
+           not(destDir.startswith(self.recipe.macros.destdir)):
+            raise SourceError, "preserveOwnership not allowed when " \
+                               "unpacking into build directory"
 
         guessMainDir = (not self.recipe.explicitMainDir and
                         not self.dir.startswith('/'))
@@ -349,19 +373,32 @@ class addArchive(_Source):
         util.mkdirChain(destDir)
 
 	if f.endswith(".zip"):
+            if self.preserveOwnership:
+                raise SourceError('cannot preserveOwnership for zip archives')
+
 	    util.execute("unzip -q -o -d %s '%s'" % (destDir, f))
 
 	elif f.endswith(".rpm"):
             log.info("extracting %s into %s" % (f, destDir))
-	    _extractFilesFromRPM(f, directory=destDir)
-
+            ownerList = _extractFilesFromRPM(f, directory=destDir)
+            if self.preserveOwnership:
+                for (path, user, group) in ownerList:
+                    self.recipe.Ownership(user, group, re.escape(path))
         elif f.endswith(".iso"):
-            log.info("extracting %s into %s", f, destDir)
+            if self.preserveOwnership:
+                raise SourceError('cannot preserveOwnership for iso images')
+
             _extractFilesFromISO(f, directory=destDir)
 
 	else:
             m = magic.magic(f)
             _uncompress = "cat"
+            # command to run to get ownership info; if this isn't set, use
+            # stdout from the command
+            ownerListCmd = None
+            # function which parses the ownership string to get file ownership
+            # details
+            ownerParser = None
 
             # Question: can magic() ever get these wrong?!
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
@@ -379,19 +416,48 @@ class addArchive(_Source):
                 preserve = ''
                 if self.dir.startswith('/'):
                     preserve = 'p'
-                _unpack = "tar -C %s -xS%sf -" % (destDir, preserve)
+                _unpack = "tar -C %s -xvvS%sf -" % (destDir, preserve)
+                ownerParser = self._tarOwners
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
+                ownerListCmd = "cpio -tv --quiet"
+                ownerParser = self._cpioOwners
             elif _uncompress != 'cat':
                 # if we know we've got an archive, we'll default to
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
-                _unpack = "tar -C %s -xSpf -" % (destDir,)
+                _unpack = "tar -C %s -xvvSpf -" % (destDir,)
+                ownerParser = self._tarOwners
             else:
                 raise SourceError, "unknown archive format: " + f
 
-            util.execute("%s < '%s' | %s" % (_uncompress, f, _unpack))
+            cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
+            fObj = os.popen(cmd)
+            s = fObj.read()
+            output = ""
+            while s:
+                output += s
+                s = fObj.read()
+
+            fObj.close()
+
+            if ownerListCmd:
+                cmd = "%s < '%s' | %s" % (_uncompress, f, ownerListCmd)
+                fObj = os.popen(cmd)
+                s = fObj.read()
+                output = ""
+                while s:
+                    output += s
+                    s = fObj.read()
+
+                fObj.close()
+
+            if ownerParser and self.preserveOwnership:
+                for (path, user, group) in ownerParser(output):
+                    if path[-1] == '/': path = path[:-1]
+
+                    self.recipe.Ownership(user, group, re.escape(path))
 
         if guessMainDir:
             bd = self.builddir
@@ -1278,6 +1344,188 @@ class addSvnSnapshot(_RevisionControl):
 
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
+class TroveScript(_AnySource):
+
+    keywords = { 'contents' : None,
+                 'groupName' : None }
+    _packageAction = False
+    _groupAction = True
+    _scriptName = None
+    _compatibilityMap = None
+
+    def __init__(self, recipe, *args, **keywords):
+        _AnySource.__init__(self, recipe, *args, **keywords)
+        if args:
+            self.sourcename = args[0]
+        else:
+            self.sourcename = ''
+
+        if not self.sourcename and not self.contents:
+            raise RecipeFileError('no contents given for group script')
+        elif self.sourcename and self.contents:
+            raise RecipeFileError('both contents and filename given for '
+                                  'group script')
+
+    def fetch(self, refreshFilter=None):
+        if self.contents is None:
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                self.sourcename, self.recipe.name, self.recipe.srcdirs,
+                refreshFilter=refreshFilter, allowNone = True)
+            if f is None:
+                raise RecipeFileError('file "%s" not found for group script' %
+                                      self.sourcename)
+            self.contents = open(f).read()
+
+    def getPath(self):
+        return self.sourcename
+
+    def doDownload(self):
+        self.fetch()
+
+    def do(self):
+        self.doDownload()
+        self.recipe._addScript(self.contents, self.groupName,
+                               self.recipe.__getattr__(self._scriptName),
+                               fromClass = self._compatibilityMap)
+
+class addPostInstallScript(TroveScript):
+    _scriptName = 'postInstallScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostInstallScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostInstallScript} command specifies the post install script
+    for a group. This script is run after the group has been installed
+    for the first time (not when the group is being upgraded from a
+    previously installed version to version defining the script).
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostInstallScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+class addPostRollbackScript(TroveScript):
+
+    _scriptName = 'postRollbackScripts'
+    keywords = dict(TroveScript.keywords)
+    keywords['toClass'] = None
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostRollbackScript(I{sourcename}, I[{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostRollbackScript} command specifies the post rollback
+    script for a group. This script is run after the group defining the
+    script has been rolled back to a previous version of the group.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostRollbackScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    B{toClass} : (None) The trove compatibility classes this script
+    is able to support rollbacks to. This may be a single integer
+    or a list of integers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        TroveScript.__init__(self, *args, **kwargs)
+        if self.toClass:
+            self._compatibilityMap = self.toClass
+
+class addPostUpdateScript(TroveScript):
+
+    _scriptName = 'postUpdateScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostUpdateScript} command specifies the post update script
+    for a group. This script is run after the group has been updated from
+    a previously-installed version to the version defining the script.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostUpdateScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+class addPreUpdateScript(TroveScript):
+
+    _scriptName = 'preUpdateScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPreUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPreUpdateScript} command specifies the pre update script
+    for a group. This script is run before the group is updated from
+    a previously-installed version to the version defining the script.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPreUpdateScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
     if not directory:
@@ -1301,6 +1549,12 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
         compression = h[rpmhelper.PAYLOADCOMPRESSOR]
         if compression == 'bzip2':
             decompressor = lambda fobj: util.BZ2File(fobj)
+
+    # assemble the path/owner/group list
+    ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                    h[rpmhelper.FILEUSERNAME],
+                                    h[rpmhelper.FILEGROUPNAME]))
+
     # rewind the file to let seekToData do its job
     r.seek(0)
     rpmhelper.seekToData(r)
@@ -1340,6 +1594,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	raise IOError, 'failed to extract source %s from RPM %s' \
 		       %(filename, os.path.basename(rpm))
 
+    return ownerList
 
 def _extractFilesFromISO(iso, directory):
     isoInfo = util.popen("isoinfo -d -i %s" %iso).read()
