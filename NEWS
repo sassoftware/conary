@@ -39,6 +39,8 @@ Changes in @NEW@:
     * A regression in 'cvc annotate' that would produce a traceback for
       not finding a SequenceMatcher class in fixeddifflib was fixed.
       (CNY-1625)
+    * Many build commands invoked shell commands without proper quoting
+      (thanks to Pavel Volkovitskiy for finding and fixing this) (CNY-1627)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate

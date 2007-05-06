@@ -119,7 +119,7 @@ class _Source(_AnySource):
         log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
     def _checkKeyID(self, filepath, keyid):
-	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"
+	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify '%s' '%s'"
 		      %(self.localgpgfile, filepath))
 	result = p.read()
 	found = result.find("key ID %s" % keyid)
@@ -376,7 +376,7 @@ class addArchive(_Source):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for zip archives')
 
-	    util.execute("unzip -q -o -d %s '%s'" % (destDir, f))
+            util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
 
 	elif f.endswith(".rpm"):
             log.info("extracting %s into %s" % (f, destDir))
@@ -416,10 +416,10 @@ class addArchive(_Source):
                 preserve = ''
                 if self.dir.startswith('/'):
                     preserve = 'p'
-                _unpack = "tar -C %s -xvvS%sf -" % (destDir, preserve)
+                _unpack = "tar -C '%s' -xvvS%sf -" % (destDir, preserve)
                 ownerParser = self._tarOwners
             elif True in [f.endswith(x) for x in _cpioSuffix]:
-                _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
+                _unpack = "( cd '%s' ; cpio -iumd --quiet )" % (destDir,)
                 ownerListCmd = "cpio -tv --quiet"
                 ownerParser = self._cpioOwners
             elif _uncompress != 'cat':
@@ -427,7 +427,7 @@ class addArchive(_Source):
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
-                _unpack = "tar -C %s -xvvSpf -" % (destDir,)
+                _unpack = "tar -C '%s' -xvvSpf -" % (destDir,)
                 ownerParser = self._tarOwners
             else:
                 raise SourceError, "unknown archive format: " + f
@@ -1163,16 +1163,16 @@ class addMercurialSnapshot(_RevisionControl):
 
     def createArchive(self, lookasideDir):
         log.info('Cloning repository from %s', self.url)
-        os.system('hg -q clone %s %s' % (self.url, lookasideDir))
+        os.system('hg -q clone %s \'%s\'' % (self.url, lookasideDir))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
-        os.system("cd %s; hg -q pull %s" % (lookasideDir, self.url))
+        os.system("cd '%s'; hg -q pull %s" % (lookasideDir, self.url))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
                  self.tag)
-        os.system("cd %s; hg archive -r %s -t tbz2 %s" %
+        os.system("cd '%s'; hg archive -r %s -t tbz2 '%s'" %
                         (lookasideDir, self.tag, target))
 
     def __init__(self, recipe, url, tag = 'tip', **kwargs):
@@ -1235,12 +1235,12 @@ class addCvsSnapshot(_RevisionControl):
     def createArchive(self, lookasideDir):
         os.mkdir(lookasideDir)
         log.info('Checking out project %s from %s', self.project, self.root)
-        os.system('cvs -Q -d %s checkout -d %s %s' %
+        os.system('cvs -Q -d \'%s\' checkout -d \'%s\' \'%s\'' %
                   (self.root, lookasideDir, self.project))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.project)
-        os.system("cd %s; cvs -Q -d %s update" % (lookasideDir, self.root))
+        os.system("cd '%s'; cvs -Q -d '%s' update" % (lookasideDir, self.root))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.project,
@@ -1248,8 +1248,8 @@ class addCvsSnapshot(_RevisionControl):
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + self.tag
         os.mkdir(stagePath)
-        os.system("cvs -Q -d %s export -d %s -r %s %s; cd %s; "
-                  "tar cjf %s %s" %
+        os.system("cvs -Q -d '%s' export -d '%s' -r '%s' '%s'; cd '%s'; "
+                  "tar cjf '%s' '%s'" %
                         (self.root, stagePath, self.tag, self.project,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
@@ -1316,19 +1316,19 @@ class addSvnSnapshot(_RevisionControl):
     def createArchive(self, lookasideDir):
         os.mkdir(lookasideDir)
         log.info('Checking out %s', self.url)
-        os.system('svn -q checkout %s %s' % (self.url, lookasideDir))
+        os.system('svn -q checkout \'%s\' \'%s\'' % (self.url, lookasideDir))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.project)
-        os.system("cd %s; svn -q update" % lookasideDir)
+        os.system("cd '%s'; svn -q update" % lookasideDir)
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s', self.url)
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
-        os.system("svn -q export %s %s; cd %s; "
-                  "tar cjf %s %s" %
+        os.system("svn -q export '%s' '%s'; cd '%s'; "
+                  "tar cjf '%s' '%s'" %
                         (self.url, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
@@ -1597,7 +1597,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     return ownerList
 
 def _extractFilesFromISO(iso, directory):
-    isoInfo = util.popen("isoinfo -d -i %s" %iso).read()
+    isoInfo = util.popen("isoinfo -d -i '%s'" %iso).read()
     JolietRE = re.compile('Joliet.*found')
     RockRidgeRE = re.compile('Rock Ridge.*found')
     if JolietRE.search(isoInfo):
@@ -1609,11 +1609,11 @@ def _extractFilesFromISO(iso, directory):
                       %iso)
 
     errorMessage = 'extracting ISO %s' %os.path.basename(iso)
-    filenames = util.popen("isoinfo -i %s %s -f" %(iso, isoType)).readlines()
+    filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 
     for filename in filenames:
-        r = util.popen("isoinfo %s -i %s -x %s" %(isoType, iso, filename))
+        r = util.popen("isoinfo '%s' -i '%s' -x '%s'" %(isoType, iso, filename))
         fullpath = '/'.join((directory, filename))
         dirName = os.path.dirname(fullpath)
         if not util.exists(dirName):

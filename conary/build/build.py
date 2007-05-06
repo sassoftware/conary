@@ -241,7 +241,7 @@ class Run(BuildCommand):
         macros.envcmd = envStr
 
         if self.dir:
-            macros.cdcmd = 'cd %s; ' % (action._expandOnePath(self.dir, macros))
+            macros.cdcmd = 'cd \'%s\'; ' % (action._expandOnePath(self.dir, macros))
 	else:
 	    macros.cdcmd = ''
 
@@ -307,7 +307,7 @@ class Automake(BuildCommand):
     and C{--foreign} arguments to the C{automake} program.
     """
     # note: no use of %(args)s -- to which command would it apply?
-    template = ('cd %%(actionDir)s && '
+    template = ('cd \'%%(actionDir)s\' && '
                 'aclocal %%(m4DirArgs)s %(aclocalArgs)s && '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s && '
 		'automake%(automakeVer)s %(autoMakeArgs)s')
@@ -413,7 +413,7 @@ class Configure(BuildCommand):
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
     template = (
-	'cd %%(actionDir)s; '
+	'cd \'%%(actionDir)s\'; '
 	'%%(mkObjdir)s '
     'CLASSPATH="%%(classpath)s"'
 	' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -478,8 +478,8 @@ class Configure(BuildCommand):
 
         if self.objDir:
 	    objDir = self.objDir %macros
-            macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
-            macros.cdObjdir = 'cd %s;' %objDir
+            macros.mkObjdir = 'mkdir -p \'%s\'; cd \'%s\';' %(objDir, objDir)
+            macros.cdObjdir = 'cd \'%s\';' %objDir
 	    macros.configure = '../%s' % self.configureName
         else:
             macros.mkObjdir = ''
@@ -507,7 +507,7 @@ class Configure(BuildCommand):
                     # inspecting the build directory
                     # Each file line will have the filename prepended
                     # The "|| :" makes it OK if there is no config.log
-                    util.execute('cd %(actionDir)s; %(cdObjdir)s'
+                    util.execute('cd \'%(actionDir)s\'; %(cdObjdir)s'
                                  'find . -name config.log | xargs grep -H . || :'
                                  %macros)
                 raise
@@ -545,7 +545,7 @@ class ManualConfigure(Configure):
     Calls C{r.ManualConfigure()} and specifies the C{--prefix} and C{--shared}
     arguments to the configure script.
     """
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
                 '%%(mkObjdir)s '
                 'CLASSPATH="%%(classpath)s"'
                 ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -637,7 +637,7 @@ class Make(BuildCommand):
     # there is no makefile definition; if they are defined in the
     # makefile, then it takes a command-line argument to override
     # them.
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -726,7 +726,7 @@ class MakeParallelSubdir(Make):
     the top-level C{Makefile} does not work correctly with parallel C{make},
     but the lower-level Makefiles do work correctly with parallel C{make}.
     """
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -787,7 +787,7 @@ class MakeInstall(Make):
     Demonstrates using C{r.MakeInstall()}, and setting the environment variable
     C{LIBTOOL} to C{%(bindir)s/libtool}.
     """
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -835,7 +835,7 @@ class MakePathsInstall(Make):
     make variable to C{%(destdir)s/%(mandir)s/man1}.
     """
     template = (
-	'cd %%(actionDir)s; '
+	'cd \'%%(actionDir)s\'; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -907,7 +907,7 @@ class Ant(BuildCommand):
 
     def do(self, macros):
         macros = macros.copy()
-        if self.dir: macros.cdcmd = 'cd %s;' % (self.dir % macros)
+        if self.dir: macros.cdcmd = 'cd \'%s\';' % (self.dir % macros)
         else: macros.cdcmd = ''
         if self.options: macros.antoptions = self.options
         if self.verbose: macros.antoptions += ' -v'
@@ -1140,7 +1140,7 @@ class PythonSetup(BuildCommand):
 	    macros.cdcmd = ''
 	else:
             rundir = action._expandOnePath(self.dir, macros)
-            macros.cdcmd = 'cd %s; ' % rundir
+            macros.cdcmd = 'cd \'%s\'; ' % rundir
 
         if self.rootDir == '%(destdir)s':
             macros.rootdir = '%(destdir)s'
@@ -1410,7 +1410,7 @@ class Desktopfile(BuildCommand, _FileAction):
     Demonstrates creation of the desktop file C{thunderbird.desktop} with
     C{r.Desktopfile()}.
     """
-    template = ('cd %%(builddir)s; '
+    template = ('cd \'%%(builddir)s\'; '
 		'desktop-file-validate %(args)s ; '
 		'desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
@@ -2740,7 +2740,7 @@ exit $failed
 		    self.subdirs.append(fullpath[baselen:])
 		    self.buildMakeDependencies(fullpath, command)
 	util.execute(r"sed -i 's/^%s\s*:\(:\?\)\s*\(.*\)/conary-pre-%s:\1 \2\n\n%s:\1/' %s" % (makeTarget, makeTarget, makeTarget, makefile))
-	util.execute('cd %s; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
+	util.execute('cd \'%s\'; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
 
     def do(self, macros):
 	self.macros = macros.copy()
