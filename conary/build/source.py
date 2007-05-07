@@ -170,6 +170,18 @@ class _Source(_AnySource):
 	self._checkSignature(f)
 	return f
 
+    def fetchLocal(self):
+        # Used by rMake to find files that are not autosourced.
+        if self.rpm:
+            toFetch = self.rpm
+        else:
+            toFetch = self.sourcename
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                                  toFetch, self.recipe.name,
+                                  self.recipe.srcdirs, localOnly=True,
+                                  allowNone=True)
+            return f
+
     def getPath(self):
         if self.rpm:
             return self.rpm

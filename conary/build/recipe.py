@@ -152,6 +152,21 @@ class Recipe(object):
     def loadSourceActions(self):
         pass
 
+    def fetchLocalSources(self):
+        """
+            Return locations for all files that are not autosourced.
+            Useful for determining where used in the recipe are located.
+        """
+        files = []
+        for src in self._sources:
+            f = src.fetchLocal()
+            if f:
+                if type(f) in (tuple, list):
+                    files.extend(f)
+                else:
+                    files.append(f)
+        return files
+
     def fetchAllSources(self, refreshFilter=None, skipFilter=None):
         """
         returns a list of file locations for all the sources in

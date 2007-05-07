@@ -215,7 +215,7 @@ class GroupRecipe(_BaseGroupRecipe):
     checkOnlyByDefaultDeps = True
     checkPathConflicts = True
 
-    def __init__(self, repos, cfg, label, flavor, laReposCache, srcdirs,
+    def __init__(self, repos, cfg, label, flavor, laReposCache, srcdirs=None,
                  extraMacros={}, lightInstance = False):
         _BaseGroupRecipe.__init__(self, laReposCache = laReposCache,
                                   srcdirs = srcdirs,
