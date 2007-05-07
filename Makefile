@@ -58,13 +58,7 @@ dist:
 archive:
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d dist || exit 1; done
-	for f in $(dist_files); do \
-		mkdir -p $(DISTDIR)/`dirname $$f`; \
-		cp -a $$f $(DISTDIR)/$$f; \
-	done; \
-	tar cjf $(DISTDIR).tar.bz2 `basename $(DISTDIR)` ; \
-	rm -rf $(DISTDIR)
+	hg archive -t tbz2 -r conary-$(VERSION) conary-$(VERSION).tar.bz2
 
 smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
