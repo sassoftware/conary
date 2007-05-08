@@ -210,22 +210,25 @@ def buildJobList(repos, groupList):
         # for each job find what it's relative to and build up groupJobList
         # as the job list for this group
         for mark, (name, version, flavor) in group:
+            # name, version, versionDistance, flavorScore
+            currentMatch = (None, None, None, None)
             if name not in latestAvailable:
                 job = (name, (None, None), (version, flavor), True)
-                currentMatch = (None, None, None, None)
             else:
                 d = latestAvailable[name]
-                verFlvMap = set()
-                # name, version, versionDistance, flavorScore
-                currentMatch = (None, None, None, None)
                 for repVersion, flavorList in d.iteritems():
+                    # the versions have to be on the same host to be
+                    # able to generate relative changesets
+                    if version.getHost() != repVersion.getHost():
+                        continue
                     for repFlavor in flavorList:
                         score = flavor.score(repFlavor)
+                        if score is False:
+                            continue
                         if repVersion == version:
                             closeness = 100000
                         else:
                             closeness = version.closeness(repVersion)
-                        if score is False: continue
                         if score < currentMatch[3]:
                             continue
                         elif score > currentMatch[3]:
@@ -765,14 +768,13 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     bundlesMark = 0
     for idx, targetSet in targetSets:
         troveList = byTarget[idx]
-        if not troveList: # XXX: should notn happen...
+        if not troveList: # XXX: should not happen...
             continue
         log.debug("mirroring %d troves into %d targets", len(troveList), len(targetSet))
         # since these troves are required for all targets, we can use
         # the "first" one to build the relative changeset requests
         target = list(targetSet)[0]
         bundles = buildBundles(target, troveList)
-
         for i, bundle in enumerate(bundles):
             jobList = [ x[1] for x in bundle ]
             # XXX it's a shame we can't give a hint as to what server to use
