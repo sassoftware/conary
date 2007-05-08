@@ -43,6 +43,9 @@ Changes in @NEW@:
       (thanks to Pavel Volkovitskiy for finding and fixing this) (CNY-1627)
     * Mirroring using group recursion has been fixed (CNY-1629)
     * r.Install will replace files which are read-only (CNY-1634)
+    * Mirroring using group recursion no longer creates
+      cross-repository relative changesets (CNY-1640)
+
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
