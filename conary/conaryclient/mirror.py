@@ -719,7 +719,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         newHosts = set([x[1].getHost() for x in troveSetList.union(removedSet)])
         for host in newHosts.difference(set([cfg.host])):
             for t in targets:
-                t.mirrorGPG(src, host)
+                t.mirrorGPG(sourceRepos, host)
 
     # we check which troves from the troveList are needed on each
     # target and we split the troveList into separate lists depending
