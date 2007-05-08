@@ -643,9 +643,6 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             if compatClass is not None:
                 grpTrv.setCompatibilityClass(compatClass)
 
-            import epdb
-            epdb.st('f')
-
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (recipeObj.postInstallScripts, False,
                             grpTrv.troveInfo.scripts.postInstall),
