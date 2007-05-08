@@ -41,6 +41,7 @@ Changes in @NEW@:
       (CNY-1625)
     * Many build commands invoked shell commands without proper quoting
       (thanks to Pavel Volkovitskiy for finding and fixing this) (CNY-1627)
+    * r.Install will replace files which are read-only (CNY-1634)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
