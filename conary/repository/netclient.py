@@ -308,6 +308,13 @@ class ServerCache:
              ' locally, and cannot be queried.')
         return serverName
 
+    def __delitem__(self, item):
+        serverName = self._getServerName(item)
+        del self.cache[serverName]
+
+    def keys(self):
+        return self.cache.keys()
+
     def __getitem__(self, item):
         serverName = self._getServerName(item)
 
@@ -458,6 +465,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def open(self, *args):
         pass
+
+    def reopen(self, hostname = None):
+        if hostname is None:
+            for hostname in self.c.keys():
+                del self.c[hostname]
+        else:
+            del self.c[hostname]
 
     def getUserMap(self):
         """
