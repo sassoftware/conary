@@ -274,10 +274,10 @@ def recurseTrove(sourceRepos, name, version, flavor,
     assert(name.startswith("group-"))
     # there's nothing much we can recurse from the source
     if name.endswith(":source"):
-        return []
+        return [], []
     # avoid grabbing the same group multiple times
     if (name, version, flavor) in recursedGroups:
-        return []
+        return [], []
     # we need to grab the trove list recursively for
     # mirroring. Unfortunately the netclient does not wire the
     # repository's getChangeSet parameters, so we need to cheat a
@@ -291,14 +291,14 @@ def recurseTrove(sourceRepos, name, version, flavor,
     ret = []
     removedList = []
     for troveCs in groupCs.iterNewTroveList():
-        (trvName, trvVersion, trvFlavor) = troveCs.getNewNameVersionFlavor()
+        nvf = troveCs.getNewNameVersionFlavor()
         # keep track of groups we have already recursed through
-        if trvName.startswith("group-"):
-            recursedGroups.add((trvName, trvVersion, trvFlavor))
+        if nvf[0].startswith("group-"):
+            recursedGroups.add(nvf)
         if troveCs.getType() == trove.TROVE_TYPE_REMOVED:
-            removedList.append((trvName, trvVersion, trvFlavor))
+            removedList.append(nvf)
         else:
-            ret.append((trvName, trvVersion, trvFlavor))
+            ret.append(nvf)
     return ret, removedList
 
 # format a bundle for display
@@ -703,10 +703,10 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     if cfg.recurseGroups:
         # avoid adding duplicates
         troveSetList = set([x[1] for x in troveList])
-        for (mark, (name, version, flavor), troveType) in troveList:
+        for mark, (name, version, flavor) in troveList:
             if name.startswith("group-"):
                 recTroves, rmTroves = recurseTrove(sourceRepos, name, version, flavor,
-                                         callback = callback)
+                                                   callback = callback)
                 # add the results at the end with the current mark
                 for (n,v,f) in recTroves:
                     if (n,v,f) not in troveSetList:
@@ -716,7 +716,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                     removedSet.add(x)
         log.debug("after group recursion %d troves are needed", len(troveList))
         # we need to make sure we mirror the GPG keys of any newly added troves
-        for host in set([x[1].getHost() for x in troveSetList + removedSet]) - set([cfg.host]):
+        newHosts = set([x[1].getHost() for x in troveSetList.union(removedSet)])
+        for host in newHosts.difference(set([cfg.host])):
             for t in targets:
                 t.mirrorGPG(src, host)
 
