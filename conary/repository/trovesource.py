@@ -46,6 +46,9 @@ class AbstractTroveSource:
     def requiresLabelPath(self):
         return not self._allowNoLabel
 
+    def getFileVersion(self, pathId, fileId, version):
+        return self.getFileVersions([(pathId, fileId, version)])[0]
+
     def searchableByType(self):
         return self._searchableByType
 
