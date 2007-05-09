@@ -46,7 +46,13 @@ Changes in @NEW@:
     * r.Install will replace files which are read-only (CNY-1634)
     * Mirroring using group recursion no longer creates
       cross-repository relative changesets (CNY-1640)
-
+    * A bug that caused an unhandled exception when creating a local rollback
+      for a trove that had missing troveinfo has been fixed
+    * Attempting to 'cvc merge' to a directory which was not already at the
+      tip of the shadow caused a confusing error message
+    * cvc commands which need to instantiate the recipe object (merge,
+      refresh, and commit) would fail if unknown use flags were used by
+      the recipe
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
