@@ -27,6 +27,12 @@ import zlib
 import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
+# Secure server support
+try:
+    from M2Crypto import SSL
+except ImportError:
+    SSL = None
+
 thisFile = sys.modules[__name__].__file__
 thisPath = os.path.dirname(thisFile)
 if thisPath:
@@ -40,7 +46,7 @@ from conary.lib import coveragehook
 from conary import dbstore
 from conary.lib import options
 from conary.lib import util
-from conary.lib.cfg import CfgBool, CfgInt
+from conary.lib.cfg import CfgBool, CfgInt, CfgPath
 from conary.lib.tracelog import initLog, logMe
 from conary.repository import changeset, errors, netclient
 from conary.repository.filecontainer import FileContainer
@@ -365,9 +371,40 @@ class HTTPServer(BaseHTTPServer.HTTPServer):
                 break
         BaseHTTPServer.HTTPServer.close_request(self, request)
 
+if SSL:
+    class SecureHTTPServer(HTTPServer):
+        def __init__(self, server_address, RequestHandlerClass, sslContext):
+            self.sslContext = sslContext
+            HTTPServer.__init__(self, server_address, RequestHandlerClass)
+
+        def server_bind(self):
+            HTTPServer.server_bind(self)
+            conn = SSL.Connection(self.sslContext, self.socket)
+            self.socket = conn
+
+        def handle_request(self):
+            try:
+                return HTTPServer.handle_request(self)
+            except SSL.SSLError:
+                return
+
+        def close_request(self, request):
+            request.set_shutdown(SSL.SSL_RECEIVED_SHUTDOWN |
+                                 SSL.SSL_SENT_SHUTDOWN)
+            HTTPServer.close_request(self, request)
+
+    def createSSLContext(cfg):
+        ctx = SSL.Context("sslv23")
+        sslCert, sslKey = cfg.sslCert, cfg.sslKey
+        ctx.load_cert_chain(sslCert, sslKey)
+        return ctx
+
 class ServerConfig(netserver.ServerConfig):
 
-    port		= (CfgInt,  8000)
+    port                    = (CfgInt,  8000)
+    sslCert                 = CfgPath
+    sslKey                  = CfgPath
+    useSSL                  = CfgBool
 
     def __init__(self, path="serverrc"):
 	netserver.ServerConfig.__init__(self)
@@ -485,6 +522,20 @@ def getServer():
         print "tmpDir cannot include symbolic links"
         sys.exit(1)
 
+    if cfg.useSSL:
+        errmsg = "Unable to start server with SSL support."
+        if not SSL:
+            print errmsg + " Please install m2crypto."
+            sys.exit(1)
+        if not (cfg.sslCert and cfg.sslKey):
+            print errmsg + (" Please set the sslCert and sslKey "
+                            "configuration options.")
+            sys.exit(1)
+        for f in [cfg.sslCert, cfg.sslKey]:
+            if not os.path.exists(f):
+                print errmsg + " %s does not exist" % f
+                sys.exit(1)
+
     if cfg.proxyContentsDir:
         if len(otherArgs) > 1:
             usage()
@@ -541,7 +592,11 @@ def getServer():
     if argSet:
         usage()
 
-    httpServer = HTTPServer(("", cfg.port), HttpRequests)
+    if cfg.useSSL:
+        ctx = createSSLContext(cfg)
+        httpServer = SecureHTTPServer(("", cfg.port), HttpRequests, ctx)
+    else:
+        httpServer = HTTPServer(("", cfg.port), HttpRequests)
     return httpServer, profile
 
 def serve(httpServer, profile=False):
