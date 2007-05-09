@@ -49,6 +49,9 @@ Changes in @NEW@:
       for a trove that had missing troveinfo has been fixed
     * Attempting to 'cvc merge' to a directory which was not already at the
       tip of the shadow caused a confusing error message
+    * cvc commands which need to instantiate the recipe object (merge,
+      refresh, and commit) would fail if unknown use flags were used by
+      the recipe
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
