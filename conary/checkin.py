@@ -1207,7 +1207,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     # make sure the current version is at head
     shadowHeadVersion = repos.getTroveLatestVersion(troveName, troveBranch)
     if state.getVersion() != shadowHeadVersion:
-        log.info("working directory is already based on head of branch")
+        log.info("working directory is not at the tip of the shadow")
         return
 
     # safe to call parentBranch() b/c a shadow will always have a parent branch
