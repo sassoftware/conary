@@ -12,6 +12,7 @@ Changes in @NEW@:
       For example, "searchPath group-os contrib.rpath.org@rpl:1" would make
       sense to first install the version of a package referenced in group-os,
       then to fall back to installing from contrib.rpath.org@rpl:1. (CNY-1571)
+    * conary q --debug --info now also displays cloned from information
 
   o Build Changes:
     * Internal recipe source management moved into generic Recipe class
