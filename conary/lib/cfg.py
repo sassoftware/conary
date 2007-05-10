@@ -140,6 +140,9 @@ class _Config:
         """
         self._directives[key.lower()] = fn
 
+    def addAlias(self, alias, realKey):
+        self._lowerCaseMap[alias.lower()] = self._lowerCaseMap[realKey.lower()]
+
     # --- Display options allow arbitrary display parameters to be set --
     # they can be picked up by the strings printing themselves
 
