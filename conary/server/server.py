@@ -506,7 +506,11 @@ def getServer():
         prof = hotshot.Profile('server.prof')
         prof.start()
 
-    baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
+    if cfg.useSSL:
+        protocol = 'https'
+    else:
+        protocol = 'http'
+    baseUrl="%s://%s:%s/" % (protocol, os.uname()[1], cfg.port)
 
     # start the logging
     if 'migrate' in argSet:
