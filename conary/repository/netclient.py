@@ -1085,6 +1085,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             primaryTroveList = None, callback = None,
                             changesetVersion = None):
         """
+        @param changesetVersion: (optional) request a specific changeset
+            version from the server. The value is one of the FILE_CONTAINER_*
+            constants defined in the NetworkRepositoryClient class.
         @raise FilesystemError: if the destination file is not writable
         """
         return self._getChangeSet(jobList, target = fName,
