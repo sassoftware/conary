@@ -2326,6 +2326,8 @@ conary erase '%s=%s[%s]'
         within the job are automatically closed. Returns a mapping with
         suggestions for possible dependency resolutions.
 
+        @param updJob: An UpdateJob object
+        @type updJob: conary.local.database.UpdateJob object
 	@param itemList: A list of change specs:
         (troveName, (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor),
         isAbsolute).  isAbsolute specifies whether to try to find an older
@@ -2469,6 +2471,28 @@ conary erase '%s=%s[%s]'
                     keepJournal = False, noRestart=False):
         """
         Apply the update job.
+        @param updJob: An UpdateJob object.
+        @type updJob: conary.local.database.UpdateJob object
+        @param replaceFiles: Replace locally changed files.
+        @type replaceFiles: bool
+        @param tagScript:
+        @type tagScript:
+        @param test: Dry-run, don't perform any changes.
+        @type test: bool
+        @param justDatabase: If set, no filesystem changes will be performed
+        (changes are limited to the database).
+        @type justDatabase: bool
+        @param journal:
+        @type journal:
+        @param localRollbacks: Store the complete rollback information in the
+        rollback directory (without referring to the changesets in the
+        repository). This allows the system to apply rollbacks without
+        connecting the repository, at the expense of disk space consumption.
+        The setting defaults to the value of self.cfg.localRollbacks.
+        @type localRollbacks: bool
+        @autoPinList: A list of troves that will not change. Defaults to the
+        value from self.cfg.pinList
+        @type autoPinList: list
         @return: None if the update was fully applied, or restart information
         if a critical update was applied and a restart is necessary to make it
         active.
