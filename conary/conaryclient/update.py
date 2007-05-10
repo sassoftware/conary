@@ -2403,9 +2403,6 @@ conary erase '%s=%s[%s]'
         @type restartInfo: string
         @rtype: dict
         """
-                        resolveGroupList=None,
-                        migrate = False,
-                        applyCriticalOnly = False, restartInfo = None):
 
         if self.updateCallback is None:
             self.setUpdateCallback(UpdateCallback())
