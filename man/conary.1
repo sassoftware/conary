@@ -757,6 +757,11 @@ when building.
 .B buildPath
 The path packages are built under; default \fI/usr/src/conary/builds
 .TP
+.B conaryProxy
+The Conary proxy to use. The value can be \fIprotocol
+URL\fR (supported protocols are \fIhttp\fR and \fIhttps\fR), or just a URL, in
+which case it will be used for both protocols.
+.TP
 .B contact
 The contact name (normally an email address or URL) to put in changelog
 entries when committing changes to source components.
@@ -804,6 +809,11 @@ components.
 The regular expression of a trove name to pin when installing.
 Multiple regular expressions can be specified with mutiple pinTroves
 lines.
+.TP
+.B proxy
+The HTTP proxy to use to connect to the Internet. The value can be \fIprotocol
+URL\fR (supported protocols are \fIhttp\fR and \fIhttps\fR), or just a URL, in
+which case it will be used for both protocols.
 .B pubRing
 The filename of the OpenPGP Keyring to refer to for signature keys.
 .TP
