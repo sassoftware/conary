@@ -2300,6 +2300,11 @@ conary erase '%s=%s[%s]'
         util.rmtree(restartInfo, ignore_errors=True)
 
     def newUpdateJob(self):
+        """Create a new update job
+        The job can be initialized either by using prepareUpdateJob or by
+        thawing it from a frozen representation.
+        @return: the new update job
+        """
         updJob = database.UpdateJob(self.db)
         return updJob
 
@@ -2314,6 +2319,92 @@ conary erase '%s=%s[%s]'
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
+                        applyCriticalOnly = False, restartInfo = None):
+        """
+        Populates an update job based on a set of trove update and erase
+        operations.If self.cfg.autoResolve is set, dependencies
+        within the job are automatically closed. Returns a mapping with
+        suggestions for possible dependency resolutions.
+
+	@param itemList: A list of change specs:
+        (troveName, (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor),
+        isAbsolute).  isAbsolute specifies whether to try to find an older
+        version of trove on the system to replace if none is specified.
+	If updateByDefault is True, trove names in itemList prefixed
+	by a '-' will be erased. If updateByDefault is False, troves without a
+	prefix will be erased, but troves prefixed by a '+' will be updated.
+        itemList can be None if restartInfo is set (see below).
+        @type itemList: [(troveName, (oldVer, oldFla), 
+                         (newVer, newFla), isAbs), ...]
+	@param keepExisting: If True, troves updated not erase older versions
+	of the same trove, as long as there are no conflicting files in either
+	trove.
+        @type keepExisting: bool
+	@param keepRequired: If True, troves are not erased when they
+        are the target of a dependency for a trove which is retained.
+        @type keepRequired: bool
+        @param recurse: Apply updates/erases to troves referenced by containers.
+        @type recurse: bool
+        @param resolveDeps: Should dependencies error be flagged or silently
+        ignored?
+        @type resolveDeps: bool
+        @param test: If True, the operations will be attempted but the 
+	filesystem and database will not be updated.
+        @type test: bool
+	@param updateByDefault: If True, troves passed to L{itemList} without a
+	'-' or '+' prefix will be updated. If False, troves without a prefix 
+	will be erased.
+        @type updateByDefault: bool
+        @param split: Split large update operations into separate jobs. As
+                      of 1.0.10, this must be true (False broke how we
+                      handle users and groups, which requires info- packages
+                      to be installed first and in separate jobs)
+        @type split: bool
+        @param sync: Limit acceptabe trove updates only to versions 
+        referenced in the local database.
+        @type sync: bool
+        @param fromChangesets: When specified, these changesets are used
+        as the source of troves instead of the repository.
+        @type fromChangesets: list of changeset.ChangeSetFromFile
+        @param checkPathConflicts: check that applying the update job would
+        not create path conflicts (True by default).
+        @type checkPathConflicts: bool
+        @param checkPrimaryPins: If True, pins on primary troves raise a 
+        warning if an update can be made while leaving the old trove in place,
+        or an error, if the update/erase cannot be made without removing the 
+        old trove.
+        @type checkPrimaryPins: bool
+        @param resolveRepos: If True, search the repository for resolution
+        troves.
+        @type resolveRepos: bool
+        @param syncChildren: If True, sync child troves so that they match
+        the references in the specified troves.
+        @type syncChildren: bool
+        @param updateOnly: If True, do not install missing troves, just
+        update installed troves.
+        @type updateOnly: bool
+        @param installMissing: If True, always install missing troves
+        @type installMissing: bool
+        @param removeNotByDefault: remove child troves that are not by default.
+        @type removeNotByDefault: bool
+        @param criticalUpdateInfo: Settings and data needed for critical
+        updates
+        @type: CriticalUpdateInfo instance
+        @param resolveSource: Instance of 
+        conaryclient.resolve.DepResolutionMethod to be used for dep resolution.
+        If left blank will be created based on installLabelPath or 
+        resolveGroups.
+        @type: conaryclient.resolveDepResolutionMethod instance
+        @param applyCriticalOnly: apply only the critical update.
+        @type applyCriticalOnly: bool
+        @param restartInfo: If specified, overrides itemList. It specifies the
+        location where the rest of an update job run was stored (after
+        applying the critical update).
+        @type restartInfo: string
+        @rtype: dict
+        """
+                        resolveGroupList=None,
+                        migrate = False,
                         applyCriticalOnly = False, restartInfo = None):
 
         if self.updateCallback is None:
@@ -2379,6 +2470,12 @@ conary erase '%s=%s[%s]'
                     test = False, justDatabase = False, journal = None,
                     localRollbacks = None, autoPinList = None,
                     keepJournal = False, noRestart=False):
+        """
+        Apply the update job.
+        @return: None if the update was fully applied, or restart information
+        if a critical update was applied and a restart is necessary to make it
+        active.
+        """
         # A callback object must be supplied
         assert(self.updateCallback is not None)
 
@@ -2431,72 +2528,8 @@ conary erase '%s=%s[%s]'
                         keepRequired = False, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
                         updateJob = None):
-        """
-        Creates a changeset to update the system based on a set of trove update
-        and erase operations. If self.cfg.autoResolve is set, dependencies
-        within the job are automatically closed.
-
-	@param itemList: A list of change specs: 
-        (troveName, (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor),
-        isAbsolute).  isAbsolute specifies whether to try to find an older
-        version of trove on the system to replace if none is specified.
-	If updateByDefault is True, trove names in itemList prefixed
-	by a '-' will be erased. If updateByDefault is False, troves without a
-	prefix will be erased, but troves prefixed by a '+' will be updated.
-        @type itemList: [(troveName, (oldVer, oldFla), 
-                         (newVer, newFla), isAbs), ...]
-	@param keepExisting: If True, troves updated not erase older versions
-	of the same trove, as long as there are no conflicting files in either
-	trove.
-        @type keepExisting: bool
-	@param keepRequired: If True, troves are not erased when they
-        are the target of a dependency for a trove which is retained.
-        @type keepRequired: bool
-        @param recurse: Apply updates/erases to troves referenced by containers.
-        @type recurse: bool
-        @param resolveDeps: Should dependencies error be flagged or silently
-        ignored?
-        @type resolveDeps: bool
-        @param test: If True, the operations will be attempted but the 
-	filesystem and database will not be updated.
-        @type test: bool
-	@param updateByDefault: If True, troves passed to L{itemList} without a
-	'-' or '+' prefix will be updated. If False, troves without a prefix 
-	will be erased.
-        @type updateByDefault: bool
-        @param split: Split large update operations into separate jobs. As
-                      of 1.0.10, this must be true (False broke how we
-                      handle users and groups, which requires info- packages
-                      to be installed first and in separate jobs)
-        @type split: bool
-        @param sync: Limit acceptabe trove updates only to versions 
-        referenced in the local database.
-        @type sync: bool
-        @param fromChangesets: When specified, these changesets are used
-        as the source of troves instead of the repository.
-        @type fromChangesets: list of changeset.ChangeSetFromFile
-        @param checkPrimaryPins: If True, pins on primary troves raise a 
-        warning if an update can be made while leaving the old trove in place,
-        or an error, if the update/erase cannot be made without removing the 
-        old trove.
-        @param resolveRepos: If True, search the repository for resolution
-        troves.
-        @param syncChildren: If True, sync child troves so that they match
-        the references in the specified troves.
-        @param updateOnly: If True, do not install missing troves, just
-        update installed troves.
-        @param installMissing: If True, always install missing troves
-        @param removeNotByDefault: remove child troves that are not by default.
-        @param criticalUpdateInfo: Settings and data needed for critical
-        updates
-        @type: CriticalUpdateInfo instance
-        @param resolveSource: Instance of 
-        conaryclient.resolve.DepResolutionMethod to be used for dep resolution.
-        If left blank will be created based on installLabelPath or 
-        resolveGroups.
-        @type: conaryclient.resolv.eDepResolutionMethod instance
-        @rtype: tuple
-        """
+        """Create an update job. DEPRECATED, use newUpdateJob and
+        prepareUpdateJob instead"""
         # FIXME: this API has gotten far out of hand.  Refactor when 
         # non backwards compatible API changes are acceptable. 
         # In particular. installMissing and updateOnly have similar meanings,
@@ -2891,6 +2924,7 @@ conary erase '%s=%s[%s]'
                     callback = None, localRollbacks = False,
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
+        """Apply an update job. DEPRECATED, use applyUpdateJob instead"""
 
         self.db.commitLock(True)
 
