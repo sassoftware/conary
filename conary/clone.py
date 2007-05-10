@@ -104,7 +104,8 @@ def _convertLabelOrBranch(lblStr, template):
 def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
-                  cloneSources = False, allFlavors = False, client=None):
+                  cloneSources = False, allFlavors = False, client=None, 
+                  targetFile = None):
     targetMap = {}
     for fromLoc, toLoc in targetList:
         context = cfg.buildLabel
@@ -152,10 +153,11 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
     if not okay:
         return False
     return _finishClone(client, cfg, cs, callback, info=info,
-                        test=test, ignoreConflicts=ignoreConflicts)
+                        test=test, ignoreConflicts=ignoreConflicts,
+                        targetFile=targetFile)
 
 def _finishClone(client, cfg, cs, callback, info=False, test=False, 
-                 ignoreConflicts=False):
+                 ignoreConflicts=False, targetFile=None):
     repos = client.repos
     if cfg.interactive or info:
         print 'The following clones will be created:'
@@ -186,8 +188,10 @@ def _finishClone(client, cfg, cs, callback, info=False, test=False,
 
     signAbsoluteChangesetByConfig(cs, cfg)
 
-    if not test:
+    if targetFile:
+        cs.writeToFile(targetFile)
+    elif not test:
         repos.commitChangeSet(cs, callback=callback)
-        return cs
+    return cs
 
 

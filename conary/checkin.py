@@ -41,7 +41,7 @@ from conary.build import errors as builderrors
 from conary.build.macros import Macros
 from conary.build.packagerecipe import loadMacros
 from conary.build.cook import signAbsoluteChangeset
-from conary.build import cook
+from conary.build import cook, use
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
 from conary.lib import fixeddifflib
@@ -305,6 +305,7 @@ def commit(repos, cfg, message, callback=None, test=False):
                       "from the head of the branch; use update")
             return
 
+    use.allowUnknownFlags(True)
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
                                      branch=state.getBranch())
@@ -1207,7 +1208,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     # make sure the current version is at head
     shadowHeadVersion = repos.getTroveLatestVersion(troveName, troveBranch)
     if state.getVersion() != shadowHeadVersion:
-        log.info("working directory is already based on head of branch")
+        log.info("working directory is not at the tip of the shadow")
         return
 
     # safe to call parentBranch() b/c a shadow will always have a parent branch
@@ -1260,6 +1261,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         return
 
     if os.path.exists(state.getRecipeFileName()):
+        use.allowUnknownFlags(True)
         loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                          cfg=cfg, repos=repos,
                                          branch=state.getBranch())
@@ -1905,6 +1907,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     if not isinstance(state.getVersion(), versions.NewVersion):
         srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
 
+    use.allowUnknownFlags(True)
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
                                      branch=state.getBranch())
