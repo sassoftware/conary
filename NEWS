@@ -53,6 +53,7 @@ Changes in @NEW@:
     * cvc commands which need to instantiate the recipe object (merge,
       refresh, and commit) would fail if unknown use flags were used by
       the recipe
+    * removed troves can be removed again without causing errors (CNY-1654)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
