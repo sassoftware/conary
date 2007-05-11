@@ -979,6 +979,10 @@ class TroveStore:
         except StopIteration:
             raise errors.TroveMissing(name, version)
 
+        if troveType == trove.TROVE_TYPE_REMOVED:
+            # double removes are okay; they just get ignored
+            return []
+
         assert(troveType == trove.TROVE_TYPE_NORMAL or
                troveType == trove.TROVE_TYPE_REDIRECT)
 
