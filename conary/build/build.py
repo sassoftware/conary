@@ -31,6 +31,7 @@ the permissions on files in classes derived from _PutFile.
 
 import os
 import re
+import sha
 import shutil
 import stat
 import sys
@@ -3380,3 +3381,103 @@ class SGMLCatalogEntry(BuildCommand):
 
         if cleanTemp:
             os.remove(tempPath)
+
+
+
+class NewLicense(BuildAction):
+    """
+    NAME
+    ====
+
+    B{C{r.NewLicense()}} - Adds entries to the licenses conary understands
+
+    SYNOPSIS
+    ========
+
+    C{r.NewLicense(I{directory} || I{(file, license)})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.NewLicense()} class is called from within a Conary recipe to add a
+    new license to the list of known licenses.
+
+    EXAMPLES
+    ========
+
+    C{r.NewLicense(('gpl.txt', 'GPL-2'), ('cpl', 'CPL-1.0'))}
+
+    Calls C{r.NewLicense()} to add the GPL and CPL licenses to the known
+    licenses.
+
+    C {r.NewLicense('licensedir')}
+
+    Calls C{r.NewLicense()} to add a directory of licenses to the known
+    licences. The format for this directory is the same format as
+    %(datadir)s/known-licenses. Note that all sha1sum values will be
+    recalculated after normalization of the license text, so the filename
+    inside the license directory is irrelevent.
+    """
+
+    def __init__(self, recipe, *args, **keywords):
+        BuildAction.__init__(self, recipe, **keywords)
+        self.args = args
+        self.macros = recipe.macros
+        self.licensePath = '%(datadir)s/known-licenses' % recipe.macros 
+        self.whitespace = re.compile(r'\s*$')
+        self.successiveLines = re.compile(r'\n\n+')
+
+    def sha1sum(self, text):
+        shaObj = sha.new(text)
+        return shaObj.hexdigest()
+
+    def normalize(self, text):
+        newtext = ''
+        # this convienently also converts to unix-style text
+        for line in text.split('\n'):
+            newtext += self.whitespace.sub('', line) + '\n'
+        dedup = self.successiveLines.sub('\n\n', newtext)
+        return dedup
+
+    def writeLicenses(self, text, license):
+        normal = self.normalize(text)
+        sha1 = self.sha1sum(normal)
+        outDir = os.path.join(self.macros.destdir, self.licensePath.lstrip('/'), license)
+        util.mkdirChain(outDir)
+        out = os.path.join(outDir, sha1)
+        open(out, 'w').write(normal)
+        return out
+
+    def walkLicenses(self, dir, write = False):
+        knownLicenses = {}
+        for license in os.listdir(dir):
+            fullPath = os.path.join(dir, license)
+            if os.path.isdir(fullPath):
+                for file in os.listdir(fullPath):
+                    fullFile = os.path.join(fullPath, file)
+                    if os.path.isfile(fullFile):
+                        if write:
+                            text = open(fullFile).read()
+                            dest = self.writeLicenses(text, license)
+                            file = dest
+                        knownLicenses[os.path.basename(file)] = license
+        return knownLicenses
+
+    def do(self, macros):
+        for arg in self.args:
+            # specified license and file
+            if isinstance(arg,tuple):
+                if not os.isfile(arg[0]):
+                    raise RuntimeError, arg[0]+' is not a normal file'
+                normalized = self.normalize(text)
+                self.writeLicenses(normalized,arg[1])
+
+            # directory of directories of licenses
+            elif os.path.isdir(arg):
+                self.walkLicenses(arg, write = True)
+
+            # invalid input
+            else:
+                raise RuntimeError, arg+' is unknown input'
+
+

@@ -27,6 +27,11 @@ Changes in @NEW@:
       onto to groups. New copyScripts and copyCompatibilityScripts options
       to GroupRecipe.addCopy() and GroupRecipe.addAll() can be used to
       change this behavior. (CNY-1642)
+    * A new build action has been added, NewLicense(). This build action will
+      take either a directory structure of licenses or a single license file,
+      normalize its contents, and place it in a directory in
+      /usr/share/known-licenses, which will be used at a later date by
+      conary-policy.
 
   o Bug Fixes:
     * During a cvc update, new files in the source component could result
