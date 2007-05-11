@@ -54,6 +54,8 @@ Changes in @NEW@:
       refresh, and commit) would fail if unknown use flags were used by
       the recipe
     * removed troves can be removed again without causing errors (CNY-1654)
+    * conary rdiff now works properly when multiple flavors of the same trove
+      are present in the same group. (CNY-1623)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
