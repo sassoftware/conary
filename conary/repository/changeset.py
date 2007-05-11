@@ -399,8 +399,11 @@ class ChangeSet(streams.StreamSet):
 	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
                                 troveCs.getOldFlavor())
 
-            newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
-            newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
+            if troveCs.getFrozenTroveInfo():
+                newTroveInfo = trove.TroveInfo(troveCs.getFrozenTroveInfo())
+            else:
+                newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
+                newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
             newTroveInfoDiff = trv.getTroveInfo().diff(newTroveInfo)
 
 	    # this is a modified trove and needs to be inverted

@@ -366,6 +366,8 @@ class CfgList(CfgType):
         return self.listType([self.valueType.parseString(val)])
 
     def updateFromString(self, val, str):
+        if str == '[]':
+            return self.listType()
         val.extend(self.parseString(str))
         return val
 

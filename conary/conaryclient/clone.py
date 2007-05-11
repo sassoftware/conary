@@ -38,6 +38,8 @@ back to the original branch being through the "clonedFrom" link.
 # I've been thinking about combining the cloneMap and leafMap.
 
 import itertools
+import os
+import tempfile
 import time
 
 from conary import callbacks
@@ -86,6 +88,8 @@ class CloneJob(object):
 
     def isEmpty(self):
         return not self.cloneJob
+
+MAX_CLONE_FILES  = 20000
 
 class ClientClone:
 
@@ -146,9 +150,27 @@ class ClientClone:
             callback.done()
             return True, cs
         callback.gettingCloneData()
-        self._addCloneFiles(cs, newFilesNeeded, callback)
+        finalCs = changeset.ReadOnlyChangeSet()
+        finalCs.merge(cs)
+        pathList = []
+        if newFilesNeeded > MAX_CLONE_FILES:
+            while newFilesNeeded:
+                cs = changeset.ChangeSet()
+                files = newFilesNeeded[:MAX_CLONE_FILES]
+                self._addCloneFiles(cs, files, callback)
+                newFilesNeeded = newFilesNeeded[MAX_CLONE_FILES:]
+                fd, path = tempfile.mkstemp(prefix='conary-promote-')
+                os.close(fd)
+                cs.writeToFile(path)
+                finalCs.merge(changeset.ChangeSetFromFile(path))
+                os.remove(path)
+        else:
+            # don't bother writing to disk
+            cs = changeset.ChangeSet()
+            self._addCloneFiles(cs, newFilesNeeded, callback)
+            finalCs.merge(cs)
         callback.done()
-        return True, cs
+        return True, finalCs
 
     def _createCloneJob(self, cloneOptions, chooser, troveCache):
         cloneJob = CloneJob(cloneOptions)

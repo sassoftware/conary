@@ -2927,6 +2927,7 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
         for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
             sourceSpec = _sourceSpec(troveSpec)
             toFind.setdefault(ref, set()).add(sourceSpec)
+            _addFlavors(ref, sourceSpec, troveSpec[2], flavorMap)
 
         for (troveSpec, ref), _ in group.iterReplaceSpecs():
             sourceSpec = _sourceSpec(troveSpec)

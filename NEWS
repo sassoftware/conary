@@ -12,6 +12,7 @@ Changes in @NEW@:
       For example, "searchPath group-os contrib.rpath.org@rpl:1" would make
       sense to first install the version of a package referenced in group-os,
       then to fall back to installing from contrib.rpath.org@rpl:1. (CNY-1571)
+    * conary q --debug --info now also displays cloned from information
 
   o Build Changes:
     * Internal recipe source management moved into generic Recipe class
@@ -45,7 +46,13 @@ Changes in @NEW@:
     * r.Install will replace files which are read-only (CNY-1634)
     * Mirroring using group recursion no longer creates
       cross-repository relative changesets (CNY-1640)
-
+    * A bug that caused an unhandled exception when creating a local rollback
+      for a trove that had missing troveinfo has been fixed
+    * Attempting to 'cvc merge' to a directory which was not already at the
+      tip of the shadow caused a confusing error message
+    * cvc commands which need to instantiate the recipe object (merge,
+      refresh, and commit) would fail if unknown use flags were used by
+      the recipe
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
@@ -56,6 +63,12 @@ Changes in @NEW@:
       protocol version 48) for a specific changeset format. This allows one
       to use new Conary clients to generate changesets understood by older
       clients. (CNY-1544)
+
+  o Server Changes:
+    * Standalone Conary repositories or proxies can be run in SSL mode,
+      if m2crypto (from contrib.rpath.org@rpl:1) is installed and the
+      configuration options useSSL, sslCert and sslKey are properly set.
+      (CNY-1649)
 
 Changes in 1.1.24.1:
   o Release Correction
