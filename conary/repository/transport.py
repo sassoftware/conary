@@ -111,6 +111,13 @@ class URLOpener(urllib.FancyURLopener):
     def __init__(self, *args, **kw):
         self.compress = False
         self.abortCheck = None
+        self.usedProxy = False
+        # FIXME: this should go away in a future release.
+        # forceProxy is used to ensure that if the proxy returns some
+        # bogus address like "localhost" from a URL fetch, we can
+        # be sure to use the proxy the next time we speak to the proxy
+        # too.
+        self.forceProxy = kw.pop('forceProxy', False)
         urllib.FancyURLopener.__init__(self, *args, **kw)
 
     def setCompress(self, compress):
@@ -160,6 +167,8 @@ class URLOpener(urllib.FancyURLopener):
         return h
 
     def proxyBypass(self, proxy, host):
+        if self.forceProxy:
+            return False
         # Split the port and username/pass from proxy
         proxyHost = urllib.splituser(urllib.splitport(proxy)[0])[1]
 
@@ -173,6 +182,7 @@ class URLOpener(urllib.FancyURLopener):
 
     def createConnection(self, url, ssl=False, withProxy=False):
         # Return an HTTP or HTTPS class suitable for use by open_http
+        self.usedProxy = False
         if ssl:
             protocol='https'
         else:
@@ -216,6 +226,8 @@ class URLOpener(urllib.FancyURLopener):
                     selector = "%s://%s%s" % (urltype, realhost, rest)
                 if self.proxyBypass(host, realhost):
                     host = realhost
+                else:
+                    self.usedProxy = True
 
             #print "proxy via http:", host, selector
         if not host: raise IOError, ('http error', 'no host given')
@@ -342,6 +354,7 @@ class Transport(xmlrpclib.Transport):
         self.abortCheck = None
         self.proxies = proxies
         self.serverName = serverName
+        self.usedProxy = False
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))
@@ -388,6 +401,7 @@ class Transport(xmlrpclib.Transport):
         while tries < 5:
             try:
                 usedAnonymous, response = opener.open(url, body)
+                self.usedProxy = getattr(opener, 'usedProxy', False)
                 break
             except IOError, e:
                 tries += 1

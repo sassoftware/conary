@@ -243,6 +243,9 @@ class ServerProxy(xmlrpclib.ServerProxy):
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.__protocolVersion)
 
+    def usedProxy(self):
+        return self.__transport.usedProxy
+
     def setAbortCheck(self, check):
         self.__transport.setAbortCheck(check)
 
@@ -1248,7 +1251,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            # FIXME: This check is for broken conary proxies that
+            # return a URL with "localhost" in it.  The proxy will know
+            # how to handle that.  So, we force the url to be reinterpreted
+            # by the proxy no matter what.
+            forceProxy = server.usedProxy()
+            inF = transport.ConaryURLOpener(proxies = self.proxies,
+                                            forceProxy=forceProxy).open(url)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -1832,7 +1841,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             sizes = [ int(x) for x in sizes ]
             assert(len(sizes) == len(fileList))
 
-            inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            # FIXME: This check is for broken conary proxies that
+            # return a URL with "localhost" in it.  The proxy will know
+            # how to handle that.  So, we force the url to be reinterpreted
+            # by the proxy no matter what.
+            forceProxy = self.c[server].usedProxy()
+            inF = transport.ConaryURLOpener(proxies = self.proxies,
+                                            forceProxy=forceProxy).open(url)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
