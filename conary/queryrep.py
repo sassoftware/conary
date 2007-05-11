@@ -496,22 +496,25 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
         trvName = trvCs.getName()
         #if trvCs.isAbsolute():
         if trvCs.getOldVersion() is None:
+            flavor = trvCs.getNewFlavor()
             if trvCs.isAbsolute():
                 # isAbsolute() can be False, and getOldVersion() returns None
                 # if it's a new trove
-                oldTroves[trvName] = trove.Trove(trvCs)
-            newTroves[trvName] = trove.Trove(trvCs)
+                oldTroves[(trvName, flavor)] = trove.Trove(trvCs)
+            newTroves[(trvName, flavor)] = trove.Trove(trvCs)
         else:
             newTroveCsList.append(trvCs)
 
     for trvCs in newTroveCsList:
-        trv = newTroves[trvCs.getName()]
+        trv = newTroves[(trvCs.getName(), trvCs.getOldFlavor())]
         trv.applyChangeSet(trvCs)
 
     del newTroveCsList
 
     sOldTroves = set(oldTroves)
     sNewTroves = set(newTroves)
+    # trvAdded and trvRemoved are ignored here, we'll catch changes at the
+    # toplevel compornent level anyway
     trvAdded = sNewTroves.difference(sOldTroves)
     trvRemoved = sOldTroves.difference(sNewTroves)
     trvChanged = sNewTroves.intersection(sOldTroves)
@@ -520,10 +523,10 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
 
     diffs = {}
     # Check dependencies
-    for trvName in trvChanged:
+    for trvName, trvFlavor in trvChanged:
         trvDiff = {}
-        oldTrv = oldTroves[trvName]
-        newTrv = newTroves[trvName]
+        oldTrv = oldTroves[(trvName, trvFlavor)]
+        newTrv = newTroves[(trvName, trvFlavor)]
 
         trvDiff.update(_diffTroveCollections(oldTrv, newTrv))
         trvDiff.update(_diffTroveFlavors(oldTrv, newTrv))
@@ -534,7 +537,7 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
         trvDiff.update(_diffFiles(cs, oldTrv, newTrv))
 
         if showEmptyDiffs or trvDiff:
-            diffs[trvName] = trvDiff
+            diffs[(trvName, trvFlavor)] = trvDiff
 
     diffDisplay = DiffDisplay(oldTroves, newTroves, diffs,
                               fullFlavors = fullFlavors,
@@ -585,16 +588,16 @@ class DiffDisplay(object):
         self.diffs = diffs
 
     def lines(self):
-        for trvName, trvDiff in sorted(self.diffs.iteritems()):
+        for (trvName, trvFlavor), trvDiff in sorted(self.diffs.iteritems()):
             if not trvDiff and not self.showEmptyDiffs:
                 continue
-            for line in self.formatDiffTrove(trvName, trvDiff, padLevel=0):
+            for line in self.formatDiffTrove(trvName, trvFlavor, trvDiff, padLevel=0):
                 yield line
 
-    def formatDiffTrove(self, trvName, trvDiff, padLevel):
+    def formatDiffTrove(self, trvName, trvFlavor, trvDiff, padLevel):
         padding = self.pads[padLevel]
-        otrv = self.oldTroves[trvName]
-        ntrv = self.newTroves[trvName]
+        otrv = self.oldTroves[(trvName, trvFlavor)]
+        ntrv = self.newTroves[(trvName, trvFlavor)]
         yield "%s%s %s=%s" % (padding, self.charOld, trvName,
             self.formatVF((otrv.getVersion(), otrv.getFlavor())))
         yield "%s%s %s=%s" % (padding, self.charNew, trvName,
