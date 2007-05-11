@@ -45,6 +45,10 @@ ADDALL_NORECURSE = 0
 ADDALL_RECURSE   = 1
 ADDALL_FLATTEN   = 2
 
+class AddAllFlags(object):
+
+    __slots__ = [ 'ref', 'recurse', 'copyCompatibilityClass', 'copyScripts' ]
+
 class _BaseGroupRecipe(Recipe):
     """ Defines a group recipe as collection of groups and provides
         operations on those groups.
@@ -706,8 +710,9 @@ class GroupRecipe(_BaseGroupRecipe):
             group.setByDefault(byDefault)
 
     def addAll(self, name, versionStr = None, flavor = None, ref = None,
-                           recurse=None, groupName = None, use = True, 
-                           searchPath = None, flatten=False):
+                           recurse=None, groupName = None, use = True,
+                           searchPath = None, flatten=False,
+                           copyScripts = False, copyCompatibilityClass = False):
         """
         NAME
         ====
@@ -719,7 +724,8 @@ class GroupRecipe(_BaseGroupRecipe):
         ========
 
         C{r.addAll(I{name}, [I{versionStr}], [I{flavor},] [I{ref},]
-        [I{recurse},] [I{groupName},] [I{use},] [I{searchPath},] [I{flatten}])}
+        [I{recurse},] [I{groupName},] [I{use},] [I{searchPath},] [I{flatten},]
+        [I{copyScripts},] [I{copyCompatibilityClass}])}
 
         DESCRIPTION
         ===========
@@ -764,6 +770,13 @@ class GroupRecipe(_BaseGroupRecipe):
         boolean values which determine whether the trove(s) are added to the
         group
 
+        B{copyScripts}: (False) When True the scripts attached to the group
+        being copied are attached to this group.
+
+        B{copyCompatibilityClass}: (False) When True the compatibility
+        class for this group is set based on the class of the group being
+        copied.
+
         B{ref}: (None) (deprecated) Trove reference to search in for this 
         trove. See C{r.addReference()} for more information.
 
@@ -784,7 +797,8 @@ class GroupRecipe(_BaseGroupRecipe):
 
         for group in self._getGroups(groupName):
             group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse,
-                         flatten = flatten)
+                         flatten = flatten, copyScripts = copyScripts,
+                         copyCompatibilityClass = copyCompatibilityClass)
 
     def removeItemsAlsoInNewGroup(self, name, groupName = None, use = True):
         """
@@ -914,7 +928,8 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def addCopy(self, name, versionStr = None, flavor = None, ref = None,
                 recurse=True, groupName = None, use = True, 
-                searchPath = None, flatten = False):
+                searchPath = None, flatten = False, copyScripts = True,
+                copyCompatibilityClass = True):
         """
         NAME
         ====
@@ -926,7 +941,8 @@ class GroupRecipe(_BaseGroupRecipe):
         ========
 
         C{r.addCopy(I{name}, [I{flavor},] [I{groupName},] [I{recurse},]
-        [I{ref},] [I{versionStr}])}
+        [I{ref},] [I{versionStr},] [I{copyScripts},]
+        [I{copyCompatibilityClass}])}
 
         DESCRIPTION
         ===========
@@ -961,6 +977,13 @@ class GroupRecipe(_BaseGroupRecipe):
         groups will be used.  Otherwise, the default settings will be used
         when creating any new groups.
 
+        B{copyScripts}: (True) When True the scripts attached to the groups
+        being copied are attached to the newly created groups.
+
+        B{copyCompatibilityClass}: (True) When True the compatibility
+        class for the newly created groups are set to the compatibility
+        classes from the groups being copied.
+
         B{ref}: (None) (Deprecated) Trove reference to search in for this 
         trove. See C{r.addReference()} for more information.
 
@@ -988,7 +1011,9 @@ class GroupRecipe(_BaseGroupRecipe):
         if searchPath:
             ref = searchsource.createSearchPathFromStrings(searchPath)
         self.addAll(name, versionStr = versionStr, flavor = flavor, ref = ref,
-                    recurse=recurse, groupName = name, flatten = flatten)
+                    recurse=recurse, groupName = name, flatten = flatten,
+                    copyScripts = copyScripts,
+                    copyCompatibilityClass = copyCompatibilityClass)
         for group in self._getGroups(groupName):
             self.addNewGroup(name)
 
@@ -1297,13 +1322,11 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         self.labelPath = [ versions.Label(x) for x in path ]
 
-    def _addScript(self, contents, groupName, scriptDict, fromClass = None):
+    def _addScript(self, contents, groupName, scriptName, fromClass = None):
         if groupName is None:
-            groupName = self.defaultGroup.name
-
-        if groupName in scriptDict:
-            raise RecipeFileError('script already set for group %s'
-                                        % groupName)
+            group = self.defaultGroup
+        else:
+            group = self._getGroup(groupName)
 
         if fromClass is not None:
             if type(fromClass) != list and type(fromClass) != tuple:
@@ -1314,7 +1337,7 @@ class GroupRecipe(_BaseGroupRecipe):
                     raise RecipeFileError('group compatibility classes must be '
                                           'integers')
 
-        scriptDict[groupName] = (contents, fromClass)
+        group.addScript(scriptName, contents, fromClass)
 
     def setCompatibilityClass(self, theClass, groupName = None):
         """
@@ -1475,8 +1498,20 @@ class SingleGroup(object):
         self.childTroves = {}
         self.size = None
 
+        self.postInstallScripts = None
+        self.postRollbackScripts = None
+        self.postUpdateScripts = None
+        self.preUpdateScripts = None
+
     def __repr__(self):
         return "<%s '%s'>" % (self.__class__.__name__, self.name)
+
+    def addScript(self, scriptName, contents, fromClass):
+        if getattr(self, scriptName, None) is not None:
+            raise RecipeFileError('script already set for group %s'
+                                        % self.name)
+
+        setattr(self, scriptName, (contents, fromClass))
 
     def addRequires(self, requirement):
         self.requires.addDep(deps.TroveDependencies,
@@ -1533,7 +1568,8 @@ class SingleGroup(object):
         self.replaceTroveList.append((((name, newVersionStr, newFlavor), ref),
                                       (allowNoMatch, isGlobal)))
 
-    def addAll(self, name, versionStr, flavor, ref, recurse, flatten):
+    def addAll(self, name, versionStr, flavor, ref, recurse, flatten,
+               copyScripts = False, copyCompatibilityClass = False):
         if flatten:
             if recurse:
                 raise RecipeFileError('Can only specify one of'
@@ -1544,7 +1580,12 @@ class SingleGroup(object):
         else:
             recurse = ADDALL_NORECURSE
 
-        self.addReferenceList.append(((name, versionStr, flavor), ref, recurse))
+        flags = AddAllFlags()
+        flags.ref = ref
+        flags.recurse = recurse
+        flags.copyCompatibilityClass = copyCompatibilityClass
+        flags.copyScripts = copyScripts
+        self.addReferenceList.append(((name, versionStr, flavor), flags))
 
     def getComponentsToRemove(self):
         return self.removeComponentList
@@ -2132,8 +2173,8 @@ def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs,
              refSource, components) in group.iterAddSpecs():
             toFind.setdefault(refSource, set()).add(troveSpec)
 
-        for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
-            toFind.setdefault(ref, set()).add(troveSpec)
+        for (troveSpec, flags) in group.iterAddAllSpecs():
+            toFind.setdefault(flags.ref, set()).add(troveSpec)
 
         for (troveSpec, ref), _ in group.iterReplaceSpecs():
             toFind.setdefault(ref, set()).add(troveSpec)
@@ -2164,18 +2205,18 @@ def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs,
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
         groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
-        for troveSpec, refSource, recurse in group.iterAddAllSpecs():
-            for troveTup in troveMap[refSource][troveSpec]:
-                processOneAddAllDirective(group, troveTup,  recurse,
+        for troveSpec, flags in group.iterAddAllSpecs():
+            for troveTup in troveMap[flags.ref][troveSpec]:
+                processOneAddAllDirective(group, troveTup, flags,
                                           recipeObj, cache, repos)
 
 
-def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
+def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
     topGroup = parentGroup
 
-    if recurse:
+    if flags.recurse:
         groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True,
                                                      weakRefs=True) \
                                         if x[0].startswith('group-') ]
@@ -2198,10 +2239,35 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
 
     while stack:
         trv, byDefaultTrv, parentGroup = stack.pop()
+
+        if flags.copyCompatibilityClass:
+            parentGroup.setCompatibilityClass(trv.getCompatibilityClass())
+
+        if flags.copyScripts:
+            for script in ('postInstall', 'preUpdate', 'postUpdate',
+                           'postRollback'):
+                contents = getattr(trv.troveInfo.scripts, script).script()
+                if not contents: continue
+
+                cvtList = []
+                for cvt in getattr(trv.troveInfo.scripts, script).conversions.iter():
+                    if script == 'postRollback':
+                        assert(cvt.old() == parentGroup.compatibilityClass)
+                        cvtList.append(cvt.new())
+                    else:
+                        assert(cvt.new() == parentGroup.compatibilityClass)
+                        cvtList.append(cvt.old())
+
+                if not cvtList:
+                    cvtList = None
+
+                parentGroup.addScript(script + 'Scripts',
+                                      contents, cvtList)
+
         for troveTup in trv.iterTroveList(strongRefs=True):
             byDefault = byDefaultTrv.includeTroveByDefault(*troveTup)
-            if recurse and troveTup[0].startswith('group-'):
-                if recurse == ADDALL_FLATTEN:
+            if flags.recurse and troveTup[0].startswith('group-'):
+                if flags.recurse == ADDALL_FLATTEN:
                     stack.append((groupTrvDict[troveTup], trv, parentGroup))
                     continue
 
@@ -2924,10 +2990,10 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
             toFind.setdefault(refSource, set()).add(sourceSpec)
             _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)
 
-        for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
+        for (troveSpec, flags) in group.iterAddAllSpecs():
             sourceSpec = _sourceSpec(troveSpec)
-            toFind.setdefault(ref, set()).add(sourceSpec)
-            _addFlavors(ref, sourceSpec, troveSpec[2], flavorMap)
+            toFind.setdefault(flags.ref, set()).add(sourceSpec)
+            _addFlavors(flags.ref, sourceSpec, troveSpec[2], flavorMap)
 
         for (troveSpec, ref), _ in group.iterReplaceSpecs():
             sourceSpec = _sourceSpec(troveSpec)

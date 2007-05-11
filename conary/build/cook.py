@@ -644,37 +644,33 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                 grpTrv.setCompatibilityClass(compatClass)
 
             for (recipeScripts, isRollback, troveScripts) in \
-                    [ (recipeObj.postInstallScripts, False,
+                    [ (group.postInstallScripts, False,
                             grpTrv.troveInfo.scripts.postInstall),
-                      (recipeObj.postRollbackScripts, True,
+                      (group.postRollbackScripts, True,
                             grpTrv.troveInfo.scripts.postRollback),
-                      (recipeObj.postUpdateScripts, False,
+                      (group.postUpdateScripts, False,
                             grpTrv.troveInfo.scripts.postUpdate),
-                      (recipeObj.preUpdateScripts, False,
+                      (group.preUpdateScripts, False,
                             grpTrv.troveInfo.scripts.preUpdate) ]:
+                if recipeScripts is None:
+                    continue
 
-                for recipeGroupName in recipeScripts:
-                    if not recipeObj._hasGroup(recipeGroupName):
-                        raise CookError(
-                                    'Group %s not defined' % recipeGroupName)
+                scriptClassList = recipeScripts[1]
+                # rollback scripts move from this class to another
+                # while normal scripts move from another class to this
+                if scriptClassList is not None and compatClass is None:
+                    raise CookError, ('Group compatibility class must '
+                                      'be set for group "%s" to '
+                                      'define a conversion class path.'
+                                      % groupName)
+                elif scriptClassList is not None and isRollback:
+                    troveScripts.conversions.addList(
+                        [ (compatClass, x) for x in scriptClassList ])
+                elif scriptClassList is not None:
+                    troveScripts.conversions.addList(
+                        [ (x, compatClass) for x in scriptClassList ])
 
-                if groupName in recipeScripts:
-                    scriptClassList = recipeScripts[groupName][1]
-                    # rollback scripts move from this class to another
-                    # while normal scripts move from another class to this
-                    if scriptClassList is not None and compatClass is None:
-                        raise CookError, ('Group compatibility class must '
-                                          'be set for group "%s" to '
-                                          'define a conversion class path.'
-                                          % groupName)
-                    elif scriptClassList is not None and isRollback:
-                        troveScripts.conversions.addList(
-                            [ (compatClass, x) for x in scriptClassList ])
-                    elif scriptClassList is not None:
-                        troveScripts.conversions.addList(
-                            [ (x, compatClass) for x in scriptClassList ])
-
-                    troveScripts.script.set(recipeScripts[groupName][0])
+                troveScripts.script.set(recipeScripts[0])
 
             for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,

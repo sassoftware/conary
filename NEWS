@@ -23,6 +23,10 @@ Changes in @NEW@:
       True, owners and groups from cpio, rpm, and tar archives are used
       as the owners and groups for the final packaging (CNY-927).
     * 'cvc revert' added to undo local changes (CNY-1222)
+    * GroupRecipe.addCopy() copies compatibility classes and group scripts
+      onto to groups. New copyScripts and copyCompatibilityScripts options
+      to GroupRecipe.addCopy() and GroupRecipe.addAll() can be used to
+      change this behavior. (CNY-1642)
 
   o Bug Fixes:
     * During a cvc update, new files in the source component could result
