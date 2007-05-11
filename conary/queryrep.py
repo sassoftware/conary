@@ -854,6 +854,9 @@ def _diffFiles(changeset, oldTrv, newTrv):
         return {'fileDiffs' : ret}
     fchanged = []
     for (fPath, (fOldVer, fOldPId, fOldFId), (fNewVer, fNewPId, fNewFId)) in changed:
+        if fOldFId == fNewFId:
+            # Same file ID, so they are identical
+            continue
         changeOld = changeset.getFileChange(None, fOldFId)
         changeNew = changeset.getFileChange(fOldFId, fNewFId)
         fObjOld = files.ThawFile(changeOld, fOldPId)
@@ -890,6 +893,9 @@ def _diffFiles(changeset, oldTrv, newTrv):
         fchanged.append((fPath, (fOldVer, fOldPId, fOldFId),
                                 (fNewVer, fNewPId, fNewFId), tuple(idiff)))
 
+    if not (added or removed or fchanged):
+        # No change
+        return {}
     return {'fileDiffs' : (added, removed, fchanged)}
 
 def _diffNV(dict1, dict2):
