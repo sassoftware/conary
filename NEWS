@@ -58,6 +58,9 @@ Changes in @NEW@:
       are present in the same group. (CNY-1605)
     * conary rdiff no longer produces an error if the same file is present
       on different labels. (CNY-1623)
+    * Fixed a bug that meant that if a pinned trove foo was updated to the 
+      version included in an installed group, the pin would not
+      hold. (CNY-1652)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate

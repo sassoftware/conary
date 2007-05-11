@@ -825,6 +825,7 @@ followLocalChanges: %s
                                 log.lowlevel('following local changes')
                                 childrenFollowLocalChanges = True
                                 replacedJobs[replacedInfo] = (newInfo[1], newInfo[2])
+                                pinned = self.db.trovesArePinned([replacedInfo])[0]
                     elif replacedInfo in referencedNotInstalled:
                         # the trove on the local system is one that's referenced
                         # but not installed, so, normally we would not install
@@ -877,6 +878,7 @@ followLocalChanges: %s
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
                         replacedJobs[replacedInfo] = (newInfo[1], newInfo[2])
+                        pinned = self.db.trovesArePinned([replacedInfo])[0]
                         log.lowlevel('using local update to replace %s, following local changes', replacedInfo)
 
                     elif not installRedirects:
