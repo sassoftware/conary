@@ -210,7 +210,10 @@ class URLOpener(urllib.FancyURLopener):
         else:
             # Request should go through a proxy
             # Check to see if it's a conary proxy
-            useConaryProxy = self.proxies[protocol].startswith('conary')
+            proxy = self.proxies[protocol]
+            proxyUrlType, proxyhost = urllib.splittype(proxy)
+            useConaryProxy = proxyUrlType in ('conary', 'conarys')
+
 
             host, selector = url
             urltype, rest = urllib.splittype(selector)
@@ -228,8 +231,16 @@ class URLOpener(urllib.FancyURLopener):
                     host = realhost
                 else:
                     self.usedProxy = True
+                    if useConaryProxy:
+                        # override ssl setting to talk the right protocol to the
+                        # proxy - the proxy will take the real url and communicate
+                        # either ssl or not as appropriate
 
-            #print "proxy via http:", host, selector
+                        # Other proxies will not support proxying ssl over !ssl
+                        # or vice versa.
+                        ssl = (proxyUrlType == 'conarys')
+
+
         if not host: raise IOError, ('http error', 'no host given')
         if user_passwd:
             auth = base64.b64encode(user_passwd)
