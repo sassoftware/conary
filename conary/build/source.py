@@ -1396,8 +1396,7 @@ class TroveScript(_AnySource):
 
     def do(self):
         self.doDownload()
-        self.recipe._addScript(self.contents, self.groupName,
-                               self.recipe.__getattr__(self._scriptName),
+        self.recipe._addScript(self.contents, self.groupName, self._scriptName,
                                fromClass = self._compatibilityMap)
 
 class addPostInstallScript(TroveScript):
