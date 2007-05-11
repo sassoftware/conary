@@ -56,6 +56,8 @@ Changes in @NEW@:
     * removed troves can be removed again without causing errors (CNY-1654)
     * conary rdiff now works properly when multiple flavors of the same trove
       are present in the same group. (CNY-1605)
+    * conary rdiff no longer produces an error if the same file is present
+      on different labels. (CNY-1623)
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate
