@@ -3224,7 +3224,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return SERVER_VERSIONS
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
-    def callWrapper(self, *args):
+    def callWrapper(self, *args, **kw):
         return (False, True, ("RepositoryClosed", self.cfg.closed))
 
     def __init__(self, cfg):
