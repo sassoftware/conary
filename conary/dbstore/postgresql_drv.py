@@ -316,6 +316,17 @@ class Database(BaseDatabase):
         """ % (triggerName, onAction, table, funcName))
         self.triggers[triggerName] = table
         return True
+    def dropTrigger(self, table, onAction):
+        onAction = onAction.lower()
+        triggerName = "%s_%s" % (table, onAction)
+        if triggerName not in self.triggers:
+            return False
+        funcName = "%s_func" % triggerName
+        cu = self.dbh.cursor()
+        cu.execute("DROP TRIGGER %s ON %s" % (triggerName, table))
+        cu.execute("DROP FUNCTION %s()" % funcName)
+        del self.triggers[triggerName]
+        return True
 
     # avoid leaving around invalid transations when schema is not initialized
     def getVersion(self):
