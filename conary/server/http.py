@@ -71,8 +71,11 @@ class HttpHandler(WebHandler):
 
         # see the comment about remote repositories in the checkAuth decorator
         self.isRemoteRepository = False
-        self.repServer = repServer.callFactory.repos
-        self.troveStore = self.repServer.troveStore
+        if isinstance(repServer, netserver.ClosedRepositoryServer):
+            self.repServer = self.troveStore = None
+        else:
+            self.repServer = repServer.callFactory.repos
+            self.troveStore = self.repServer.troveStore
 
         self._protocol = protocol
         self._port = port
@@ -97,6 +100,10 @@ class HttpHandler(WebHandler):
     def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
 
+        # the case e hvae a closed repository
+        if self.repServer is None:
+            return apache.HTTP_SERVICE_UNAVAILABLE
+        
         auth = self._getAuth()
         self.authToken = auth
 
