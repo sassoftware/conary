@@ -878,7 +878,8 @@ followLocalChanges: %s
                         replacedInfo = (replacedInfo[0], replaced[0], 
                                         replaced[1])
                         replacedJobs[replacedInfo] = (newInfo[1], newInfo[2])
-                        pinned = self.db.trovesArePinned([replacedInfo])[0]
+                        if replaced[0]:
+                            pinned = self.db.trovesArePinned([replacedInfo])[0]
                         log.lowlevel('using local update to replace %s, following local changes', replacedInfo)
 
                     elif not installRedirects:
