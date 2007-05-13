@@ -23,7 +23,6 @@ from conary import conarycfg
 from conary.repository import errors
 from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
-from conary.server import schema
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists
@@ -488,7 +487,7 @@ class NetworkAuthorization:
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
-            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
+            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, troveId)
 
         self.db.commit()
 
