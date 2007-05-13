@@ -387,8 +387,6 @@ def _getAllInfo(src, cfg):
         for version, flavorList in versionD.iteritems():
             for flavor in flavorList:
                 tup = (name, version, flavor)
-                if not _filterTup(tup, cfg):
-                    continue
                 troveList.append(tup)
     del troveDict
     # retrieve the sigs and the metadata records to sync over
@@ -448,9 +446,12 @@ def mirrorTroveInfo(src, targets, mark, cfg, resync=False):
     else:
         log.debug("getting new trove info entries")
         infoList = _getNewInfo(src, cfg, mark)
+    log.debug("obtained %d trove info records for mirroring", len(infoList))
+    infoList = [(m,t,ti) for (m,t,ti) in infoList if _filterTup(t, cfg)]
     if not len(infoList):
+        log.debug("no troveinfo records need to be mirrored")
         return 0
-    log.debug("mirroring %d changed trove info" % len(infoList))
+    log.debug("mirroring %d changed trove info records" % len(infoList))
     updateCount = 0
     for t in targets:
         updateCount += t.setTroveInfo(infoList)
