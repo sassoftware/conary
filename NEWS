@@ -32,6 +32,8 @@ Changes in @NEW@:
       normalize its contents, and place it in a directory in
       /usr/share/known-licenses, which will be used at a later date by
       conary-policy.
+    * A new macro, %(n_v)s, has been added which resolves to
+      %(name)s-%(version)s
 
   o Bug Fixes:
     * During a cvc update, new files in the source component could result
