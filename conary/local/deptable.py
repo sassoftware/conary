@@ -1221,7 +1221,7 @@ class DependencyTables:
             # troves
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
-            schema.resetTable(cu, "tmpInstances2")
+            schema.resetTable(cu, "tmpId")
 
             cu.executemany("""
             INSERT INTO tmpInstances
@@ -1236,18 +1236,17 @@ class DependencyTables:
             self.db.analyze("tmpInstances")
             # now grab the instanceIds of their included troves, avoiding duplicates
             cu.execute("""
-            INSERT INTO tmpInstances2
+            INSERT INTO tmpId(id)
                 SELECT DISTINCT TT.includedId
             FROM tmpInstances AS TI
             JOIN TroveTroves AS TT USING(instanceId)
             """, start_transaction=False)
             # drop the ones we already have
-            cu.execute("DELETE FROM tmpInstances2 WHERE instanceId IN "
+            cu.execute("DELETE FROM tmpId WHERE id IN "
                        "(SELECT instanceId FROM tmpInstances)",
                        start_transaction=False)
             # append the remaining instanceIds
-            cu.execute("INSERT INTO tmpInstances "
-                       "SELECT instanceId FROM tmpInstances2",
+            cu.execute("INSERT INTO tmpInstances SELECT id FROM tmpId",
                        start_transaction=False)
             self.db.analyze("tmpInstances")
             restrictBy = ()
