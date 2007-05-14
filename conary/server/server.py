@@ -251,18 +251,24 @@ class HttpRequests(SimpleHTTPRequestHandler):
         else:
             repos = self.netRepos
 
+        localAddr = "%s:%s" % self.request.getsockname()
+
         if repos is not None:
             try:
                 result = repos.callWrapper('http', None, method, authToken,
                             params, remoteIp = self.connection.getpeername()[0],
-                            rawUrl = self.path)
+                            rawUrl = self.path, localAddr = localAddr,
+                            protocolString = self.request_version,
+                            headers = self.headers)
             except errors.InsufficientPermission:
                 self.send_error(403)
                 return None
             logMe(3, "returned from", method)
 
         usedAnonymous = result[0]
-        result = result[1:]
+        # Get the extra information from the end of result
+        extraInfo = result[-1]
+        result = result[1:-1]
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
         logMe(3, "encoded xml-rpc response to %d bytes" % (len(resp),))
@@ -276,6 +282,18 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_header("Content-length", str(len(resp)))
         if usedAnonymous:
             self.send_header("X-Conary-UsedAnonymous", '1')
+        if extraInfo:
+            # If available, send to the client the via headers all the way up
+            # to us
+            via = extraInfo.getVia()
+            if via:
+                self.send_header('Via', via)
+            # And add our own via header
+            # Note that we don't do this if we are the origin server
+            # (talking to a repository; extraInfo is None in that case)
+            # We are HTTP/1.0 compliant
+            via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
+            self.send_header('Via', via)
 
 	self.end_headers()
 	self.wfile.write(resp)

@@ -41,6 +41,7 @@ def post(port, isSecure, repos, req):
     else:
         protocol = "http"
 
+    extraInfo = None
     repos.log.reset()
     if req.headers_in['Content-Type'] == "text/xml":
         # handle XML-RPC requests
@@ -69,11 +70,18 @@ def post(port, isSecure, repos, req):
             (params, method) = xmlrpclib.loads(data)
             repos.log(3, "decoding=%s" % method, authToken[0],
                       "%.3f" % (time.time()-startTime))
+            localAddr = "%s:%s" % req.connection.local_addr
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
                                            remoteIp = req.connection.remote_ip,
-                                           rawUrl = req.unparsed_uri)
+                                           rawUrl = req.unparsed_uri,
+                                           localAddr = localAddr,
+                                           protocolString = req.protocol,
+                                           headers = req.headers_in)
+                # Get the extra information from the end of result
+                extraInfo = result[-1]
+                result = result[:-1]
             except errors.InsufficientPermission:
                 return apache.HTTP_FORBIDDEN
 
@@ -94,6 +102,19 @@ def post(port, isSecure, repos, req):
         req.headers_out['Content-length'] = '%d' % len(resp)
         if usedAnonymous:
             req.headers_out["X-Conary-UsedAnonymous"] = "1"
+        if extraInfo:
+            # If available, send to the client the via headers all the way up
+            # to us
+            via = extraInfo.getVia()
+            if via:
+                req.headers_out['Via'] = via
+            # And add our own via header
+            # Note that we don't do this if we are the origin server
+            # (talking to a repository; extraInfo is None in that case)
+            # We are HTTP/1.0 compliant
+            via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
+            req.headers_out['Via'] = via
+
         req.write(resp)
         return apache.OK
     else:
