@@ -721,22 +721,22 @@ def setupTempTables(db):
     cu = db.cursor()
 
     # the following are specific temp tables for various functions.
-    if "ffFlavor" not in db.tempTables:
+    if "tmpFlavorMap" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE ffFlavor(
+        CREATE TEMPORARY TABLE tmpFlavorMap(
             flavorId    INTEGER,
             base        VARCHAR(254),
             sense       INTEGER,
             flag        VARCHAR(254)
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["ffFlavor"] = True
-        db.createIndex("ffFlavor", "ffFlavorBaseIdx", "flavorId,base",
+        db.tempTables["tmpFlavorMap"] = True
+        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,base",
                        check = False)
-        db.createIndex("ffFlavor", "ffFlavorSenseIdx", "flavorId,sense",
+        db.createIndex("tmpFlavorMap", "tmpFlavorMapSenseIdx", "flavorId,sense",
                        check = False)
-    if "NewFiles" not in db.tempTables:
+    if "tmpNewFiles" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE NewFiles(
+        CREATE TEMPORARY TABLE tmpNewFiles(
             pathId      %(BINARY16)s,
             versionId   INTEGER,
             fileId      %(BINARY20)s,
@@ -744,135 +744,110 @@ def setupTempTables(db):
             sha1        %(BINARY20)s,
             path        %(PATHTYPE)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["NewFiles"] = True
+        db.tempTables["tmpNewFiles"] = True
         # since this is an index on a temp table, don't check the
         # validity of the table
-        db.createIndex("NewFiles", "NewFilesFileIdx", "fileId",
+        db.createIndex("tmpNewFiles", "tmpNewFilesFileIdx", "fileId",
                        check = False)
-        db.createIndex("NewFiles", "NewFilesVersionIdx", "versionId",
+        db.createIndex("tmpNewFiles", "tmpNewFilesVersionIdx", "versionId",
                        check = False)
-    if "NewRedirects" not in db.tempTables:
+    if "tmpNewRedirects" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE NewRedirects(
+        CREATE TEMPORARY TABLE tmpNewRedirects(
             item        %(STRING)s,
             branch      %(STRING)s,
             flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["NewRedirects"] = True
-    if "NeededFlavors" not in db.tempTables:
+        db.tempTables["tmpNewRedirects"] = True
+    if "tmpNeededFlavors" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE NeededFlavors(
+        CREATE TEMPORARY TABLE tmpNeededFlavors(
             flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["NeededFlavors"] = True
-    if "gtl" not in db.tempTables:
+        db.tempTables["tmpNeededFlavors"] = True
+    if "tmpNVF" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE gtl(
+        CREATE TEMPORARY TABLE tmpNVF(
             idx         %(PRIMARYKEY)s,
             name        VARCHAR(254),
             version     %(STRING)s,
             flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["gtl"] = True
-    if "gtlInst" not in db.tempTables:
+        db.tempTables["tmpNVF"] = True
+        db.createIndex("tmpNVF", "tmpNVFnameIdx", "name", check=False)
+    if "tmpInstanceId" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE gtlInst(
+        CREATE TEMPORARY TABLE tmpInstanceId(
             idx         INTEGER,
             instanceId  INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["gtlInst"] = True
-        db.createIndex("gtlInst", "gtlInstIdx", "idx", check = False)
-        db.createIndex("gtlInst", "gtlInstInstanceIdx", "instanceId", check = False)
-    if "updateTroveInfo" not in db.tempTables:
+        db.tempTables["tmpInstanceId"] = True
+        db.createIndex("tmpInstanceId", "tmpInstanceIdIdx1", "idx", check=False)
+        db.createIndex("tmpInstanceId", "tmpInstanceIdIdx2", "instanceId", check=False)
+    if "tmpTroveInfo" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE updateTroveInfo(
+        CREATE TEMPORARY TABLE tmpTroveInfo(
             idx         INTEGER,
             instanceId  INTEGER,
             infoType    INTEGER,
             data        %(MEDIUMBLOB)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["updateTroveInfo"] = True
-        db.createIndex("updateTroveInfo", "utiIdx", "idx", check = False)
-        db.createIndex("updateTroveInfo", "utiInfoTypeIdx", "infoType, instanceId", check = False)
-    if "getFilesTbl" not in db.tempTables:
+        db.tempTables["tmpTroveInfo"] = True
+        db.createIndex("tmpTroveInfo", "tmpTIidx", "idx", check = False)
+        db.createIndex("tmpTroveInfo", "tmpTIinfoTypeIdx", "infoType, instanceId", check = False)
+    if "tmpFileId" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE getFilesTbl(
-            itemId      INTEGER PRIMARY KEY,
+        CREATE TEMPORARY TABLE tmpFileId(
+            itemId      %(PRIMARYKEY)s,
             fileId      %(BINARY20)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["getFilesTbl"] = True
-    if "itf" not in db.tempTables:
+        db.tempTables["tmpFileId"] = True
+        db.createIndex("tmpFileId", "tmpFileIdFileIdIdx", "fileId", check=False)
+    if "tmpIVF" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE itf(
+        CREATE TEMPORARY TABLE tmpIVF(
             item        VARCHAR(254),
             version     %(STRING)s,
             fullVersion %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["itf"] = True
-    if "gtvlTbl" not in db.tempTables:
+        db.tempTables["tmpIVF"] = True
+    if "tmpGTVL" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE gtvlTbl(
+        CREATE TEMPORARY TABLE tmpGTVL(
             item        %(STRING)s,
             versionSpec %(STRING)s,
             flavorId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["gtvlTbl"] = True
-        db.createIndex("gtvlTbl", "gtvlTblItemIdx", "item", check = False)
-    if "hasTrovesTmp" not in db.tempTables:
+        db.tempTables["tmpGTVL"] = True
+        db.createIndex("tmpGTVL", "tmpGTVLitemIdx", "item", check = False)
+    if "tmpPath" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        hasTrovesTmp(
+        CREATE TEMPORARY TABLE tmpPath(
             row         INTEGER,
-            item        VARCHAR(254),
-            version     %(STRING)s,
-            flavor      %(STRING)s
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["hasTrovesTmp"] = True
-        db.createIndex("hasTrovesTmp", "hasTrovesTmpIdx", "item, version",
-                       check = False)
- 
-    if "trovesByPathTmp" not in db.tempTables:
-        cu.execute("""
-             CREATE TEMPORARY TABLE
-             trovesByPathTmp(
-                 row                 INTEGER,
-                 path                %(PATHTYPE)s
-             )""" % db.keywords)
-        db.tempTables["trovesByPathTmp"] = True
-
+            path        %(PATHTYPE)s
+        )""" % db.keywords)
+        db.tempTables["tmpPath"] = True
+        db.createIndex("tmpPath", "tmpPathIdx", "path", check=False)
+    # used primarily for dependency resolution
     if "tmpInstances" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        tmpInstances(
+        CREATE TEMPORARY TABLE tmpInstances(
             instanceId    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpInstances"] = True
-        db.createIndex("tmpInstances", "tmpInstancesIdx", "instanceId",
-                       check = False)
-    if "tmpInstances2" not in db.tempTables:
+        db.createIndex("tmpInstances", "tmpInstancesIdx", "instanceId", check=False)
+    # general purpose temporary lists of integers
+    if "tmpId" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        tmpInstances2(
-            instanceId    INTEGER
+        CREATE TEMPORARY TABLE tmpId(
+            id    INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["tmpInstances2"] = True
+        db.tempTables["tmpId"] = True
+        db.createIndex("tmpId", "tmpIdIdx", "id", check=False)
 
-    # temporary table for _getFileStreams
-    if "gfsTable" not in db.tempTables:
+    if "tmpTroves" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        gfsTable(
-            idx         %(PRIMARYKEY)s,
-            fileId      %(BINARY20)s NOT NULL
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["gfsTable"] = True
-        db.createIndex("gfsTable", "gfsTableFileIdIdx", "fileId",
-                       check = False)
-
-    if "newTroveTroves" not in db.tempTables:
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        newTroveTroves(
+        CREATE TEMPORARY TABLE tmpTroves(
             idx             %(PRIMARYKEY)s,
             item            VARCHAR(254),
             version         %(STRING)s,
@@ -880,25 +855,14 @@ def setupTempTables(db):
             flavor          %(STRING)s,
             flags           INTEGER NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["newTroveTroves"] = True
+        db.tempTables["tmpTroves"] = True
         # XXX: this index helps postgresql and hurts mysql.
-        #db.createIndex("newTroveTroves", "newTroveTrovesIdx", "item",
+        #db.createIndex("tmpTroves", "tmpTrovesIdx", "item",
         #               check = False)
         
-    if "tmpFileIds" not in db.tempTables:
-        cu.execute("""
-        CREATE TEMPORARY TABLE
-        tmpFileIds(
-            fileId          %(BINARY20)s NOT NULL
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["tmpFileIds"] = True
-        db.createIndex("tmpFileIds", "tmpFileIdsFileIdIdx", "fileId",
-                       check = False)
-
     if "tmpFilePrefixes" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        tmpFilePrefixes(
+        CREATE TEMPORARY TABLE tmpFilePrefixes(
             prefix          %(STRING)s NOT NULL
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpFilePrefixes"] = True
@@ -907,8 +871,7 @@ def setupTempTables(db):
 
     if "tmpRemovals" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE
-        tmpRemovals(
+        CREATE TEMPORARY TABLE tmpRemovals(
             instanceId      INTEGER,
             itemId          INTEGER,
             versionId       INTEGER,
