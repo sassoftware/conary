@@ -70,6 +70,8 @@ Changes in @NEW@:
     * Fixed a bug that meant that if a pinned trove foo was updated to the 
       version included in an installed group, the pin would not
       hold. (CNY-1652)
+    * Shared contents to a file in a link group could break if the contents
+      were duplicated in the changeset due to distributed contents
 
   o Client Changes:
     * The conaryclient module now exposes ChangeSetFromFile to instantiate

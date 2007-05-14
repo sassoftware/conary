@@ -327,6 +327,23 @@ class FilesystemJob:
 
     def _applyFileChanges(self, opJournal, journal):
 
+        def updatePtrs(ptrId, pathId, ptrTargets, override, contents, target):
+            # someone is requesting that we use this path as a place 
+            # to grab its contents from.  That will only
+            # work if the contents are correct - which isn't the case
+            # if we aren't updating the file on disk (because it's an
+            # initial contents file)
+            if ptrId in ptrTargets:
+                if override != "":
+                    ptrTargets[ptrId] = contents
+                else:
+                    ptrTargets[ptrId] = target
+            elif pathId in ptrTargets:
+                if override != "":
+                    ptrTargets[pathId] = contents
+                else:
+                    ptrTargets[pathId] = target
+
 	def restoreFile(fileObj, contents, root, target, journal, opJournal):
             opJournal.backup(target)
 
@@ -458,7 +475,8 @@ class FilesystemJob:
                     # this creates links whose target we already know
                     # (because it was already present or already restored)
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
-                        continue
+                        updatePtrs(ptrId, pathId, ptrTargets, override,
+                                   contents, target)
                 else:
                     if (lastRestored.pathId, lastRestored.fileId) == \
                                     (pathId, fileId):
@@ -512,20 +530,7 @@ class FilesystemJob:
                         open(target, "w")
                         continue
 
-            # someone is requesting that we use this path as a place 
-            # to grab its contents from.  That will only
-            # work if the contents are correct - which won't be the
-            # case for initial contents files
-            if ptrId in ptrTargets:
-                if override != "":
-                    ptrTargets[ptrId] = contents
-                else:
-                    ptrTargets[ptrId] = target
-            elif pathId in ptrTargets:
-                if override != "":
-                    ptrTargets[pathId] = contents
-                else:
-                    ptrTargets[pathId] = target
+            updatePtrs(ptrId, pathId, ptrTargets, override, contents, target)
 
             if override != "":
                 contents = override
