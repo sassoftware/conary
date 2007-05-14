@@ -22,7 +22,7 @@ Changes in 1.1.25:
       copyCompatibilityScripts options to GroupRecipe.addCopy() and
       GroupRecipe.addAll() can be used to change this
       behavior. (CNY-1642)
-    * A new build r.NewLicense() action has been added. This build
+    * A new build r.IncludeLicense() action has been added. This build
       action will take either a directory structure of licenses or a
       single license file, normalize its contents, and place it in a
       directory in /usr/share/known-licenses, which will be used at a

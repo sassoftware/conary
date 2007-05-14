@@ -3384,35 +3384,35 @@ class SGMLCatalogEntry(BuildCommand):
 
 
 
-class NewLicense(BuildAction):
+class IncludeLicense(BuildAction):
     """
     NAME
     ====
 
-    B{C{r.NewLicense()}} - Adds entries to the licenses conary understands
+    B{C{r.IncludeLicense()}} - Adds entries to the licenses conary understands
 
     SYNOPSIS
     ========
 
-    C{r.NewLicense(I{directory} || I{(file, license)})}
+    C{r.IncludeLicense(I{directory} || I{(file, license)})}
 
     DESCRIPTION
     ===========
 
-    The C{r.NewLicense()} class is called from within a Conary recipe to add a
+    The C{r.IncludeLicense()} class is called from within a Conary recipe to add a
     new license to the list of known licenses.
 
     EXAMPLES
     ========
 
-    C{r.NewLicense(('gpl.txt', 'GPL-2'), ('cpl', 'CPL-1.0'))}
+    C{r.IncludeLicense(('gpl.txt', 'GPL-2'), ('cpl', 'CPL-1.0'))}
 
-    Calls C{r.NewLicense()} to add the GPL and CPL licenses to the known
+    Calls C{r.IncludeLicense()} to add the GPL and CPL licenses to the known
     licenses.
 
-    C {r.NewLicense('licensedir')}
+    C {r.IncludeLicense('licensedir')}
 
-    Calls C{r.NewLicense()} to add a directory of licenses to the known
+    Calls C{r.IncludeLicense()} to add a directory of licenses to the known
     licences. The format for this directory is the same format as
     %(datadir)s/known-licenses. Note that all sha1sum values will be
     recalculated after normalization of the license text, so the filename
