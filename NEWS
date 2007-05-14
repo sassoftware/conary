@@ -1,94 +1,118 @@
-Changes in @NEW@:
+Changes in 1.1.25:
   o New Feature:
-    * Conary now supports files whose compressed contents are more than
-      4 gig in size. Old versions of Conary will report an error saying
-      that "assert(subMagic == SUBFILE_MAGIC)" failed (CNY-1572).
-    * Redirects with multiple targets can now be built and installed
-      (CNY-1554)
-    * Use explicit commit lock to prevent overlapping updates and rollbacks
-      (CNY-1591)
-    * Conary now supports a "searchPath" configuration option, which works 
-      like the installLabelPath but can contain both packages and labels.
-      For example, "searchPath group-os contrib.rpath.org@rpl:1" would make
-      sense to first install the version of a package referenced in group-os,
-      then to fall back to installing from contrib.rpath.org@rpl:1. (CNY-1571)
-    * conary q --debug --info now also displays cloned from information
+    * Conary now supports a "searchPath" configuration option, which
+      operates like the installLabelPath configuration option but can
+      contain both packages and labels.  For example:
+      "searchPath group-os contrib.rpath.org@rpl:1" can be used to
+      configure conary to first install the version of a package
+      referenced in group-os, then to fall back to installing from
+      contrib.rpath.org@rpl:1. (CNY-1571)
 
   o Build Changes:
-    * Internal recipe source management moved into generic Recipe class
-      from PackageRecipeClass
     * GroupRecipe.add*Script now accepts a path to the script as the
-      initial parameter (following PackageRecipe.addSource)
-    * addArchive now supports a preserveOwnership parameter. When set to
-      True, owners and groups from cpio, rpm, and tar archives are used
-      as the owners and groups for the final packaging (CNY-927).
-    * 'cvc revert' added to undo local changes (CNY-1222)
-    * GroupRecipe.addCopy() copies compatibility classes and group scripts
-      onto to groups. New copyScripts and copyCompatibilityScripts options
-      to GroupRecipe.addCopy() and GroupRecipe.addAll() can be used to
-      change this behavior. (CNY-1642)
-    * A new build action has been added, NewLicense(). This build action will
-      take either a directory structure of licenses or a single license file,
-      normalize its contents, and place it in a directory in
-      /usr/share/known-licenses, which will be used at a later date by
-      conary-policy.
-    * A new macro, %(name_version)s, has been added which resolves to
-      %(name)s-%(version)s
-
-  o Bug Fixes:
-    * During a cvc update, new files in the source component could result
-      in user/group warnings (CNY-763)
-    * Derived packages (experimental) built from unflavored troves get
-      properly flavored as unflavored. (CNY-1506)
-    * Macros in arguments to the version control system recipe class
-      commands are now properly expanded. (CNY-1614)
-    * The Conary client will now bypass proxies running on remote machines
-      with repositories running on localhost. (CNY-1621)
-    * Cvc promote no longer displays some warnings that were rarely helpful 
-      unless you are in --debug mode. (CNY-1581)
-    * A bug that caused the storage of unneeded "unknown" entries in
-      the TroveInfo table has been fixed. (CNY-1613)
-    * A regression in 'cvc annotate' that would produce a traceback for
-      not finding a SequenceMatcher class in fixeddifflib was fixed.
-      (CNY-1625)
-    * Many build commands invoked shell commands without proper quoting
-      (thanks to Pavel Volkovitskiy for finding and fixing this) (CNY-1627)
-    * Mirroring using group recursion has been fixed (CNY-1629)
-    * r.Install will replace files which are read-only (CNY-1634)
-    * Mirroring using group recursion no longer creates
-      cross-repository relative changesets (CNY-1640)
-    * A bug that caused an unhandled exception when creating a local rollback
-      for a trove that had missing troveinfo has been fixed
-    * Attempting to 'cvc merge' to a directory which was not already at the
-      tip of the shadow caused a confusing error message
-    * cvc commands which need to instantiate the recipe object (merge,
-      refresh, and commit) would fail if unknown use flags were used by
-      the recipe
-    * removed troves can be removed again without causing errors (CNY-1654)
-    * conary rdiff now works properly when multiple flavors of the same trove
-      are present in the same group. (CNY-1605)
-    * conary rdiff no longer produces an error if the same file is present
-      on different labels. (CNY-1623)
-    * Fixed a bug that meant that if a pinned trove foo was updated to the 
-      version included in an installed group, the pin would not
-      hold. (CNY-1652)
-    * Shared contents to a file in a link group could break if the contents
-      were duplicated in the changeset due to distributed contents
+      initial parameter.
+    * r.addArchive() now supports a preserveOwnership parameter.  When
+      set to True, owners and groups from cpio, rpm, and tar archives
+      are used as the owners and groups in the final package.
+      (CNY-927)
+    * A new "cvc revert" command has been added that reverts any local
+      changes made in the current directory. (CNY-1222)
+    * GroupRecipe.addCopy() copies compatibility classes and group
+      scripts onto to groups.  New copyScripts and
+      copyCompatibilityScripts options to GroupRecipe.addCopy() and
+      GroupRecipe.addAll() can be used to change this
+      behavior. (CNY-1642)
+    * A new build r.IncludeLicense() action has been added. This build
+      action will take either a directory structure of licenses or a
+      single license file, normalize its contents, and place it in a
+      directory in /usr/share/known-licenses, which will be used at a
+      later date by conary-policy.  This method is only useful for
+      organizations maintaining a set of packages as part of a Linux
+      OS platform.
+    * A new macro, "%(name_version)s", has been added which resolves to
+      "%(name)s-%(version)s".
 
   o Client Changes:
-    * The conaryclient module now exposes ChangeSetFromFile to instantiate
-      changesets from .ccs files. (CNY-1578)
+    * An explicit commit lock is now used to prevent overlapping
+      updates and rollbacks.  (CNY-1591)
+    * The conaryclient module now exposes ChangeSetFromFile to
+      instantiate ReadOnlyChangeSet objects from .ccs
+      files. (CNY-1578)
+    * "conary q --debug --info" now also displays information about
+      where a trove was cloned from if it exists.
+    * Redirects with multiple targets can now be built and installed.
+      (CNY-1554)
+    * Conary repositories now support creating changesets that contain
+      files whose compressed contents are greater than or equal to 4
+      GiB in size.  Old versions of Conary that attempt to access a
+      changeset that contains a compressed file larger than 4 GiB in
+      size will report a error of "assert(subMagic == SUBFILE_MAGIC)".
+      Previously, an overflow error occurred. (CNY-1572)
 
   o Internal Changes:
-    * Conary clients can ask newer Conary repositories (speaking at least
-      protocol version 48) for a specific changeset format. This allows one
-      to use new Conary clients to generate changesets understood by older
-      clients. (CNY-1544)
+    * Conary clients can now request a specific changeset format
+      version from a Conary repository.  This feature requires Conary
+      protocol version 48.  This allows one to use new Conary clients
+      to generate changesets understood by older clients. (CNY-1544)
+    * Internal recipe source management moved into the generic
+      Recipe() class from PackageRecipeClass().
 
   o Server Changes:
-    * Standalone Conary repositories or proxies can be run in SSL mode,
-      if m2crypto is installed and the configuration options useSSL, sslCert
-      and sslKey are properly set.  (CNY-1649)
+    * Standalone Conary repositories or proxies can be run in SSL mode
+      if m2crypto is installed and the configuration options "useSSL",
+      "sslCert", and "sslKey" are properly set. (CNY-1649)
+
+  o Bug Fixes:
+    * A bug that sometimes caused "user/group does not exist - using
+      root" messages to be displayed when running "cvc update" created
+      new files has been fixed. (CNY-763)
+    * The flavor of a derived package (which is an experimental
+      feature) built from unflavored package is now properly set to
+      unflavored. (CNY-1506)
+    * Macros in arguments to the version control system recipe class
+      commands are now properly expanded. (CNY-1614)
+    * The Conary client will now bypass proxies running on remote
+      machines with repositories running on localhost. (CNY-1621)
+    * "cvc promote" no longer displays some warnings that were rarely
+      helpful unless invoked with the --debug argument. (CNY-1581)
+    * A bug that caused the storage of unneeded "unknown" entries in
+      the TroveInfo table has been fixed. (CNY-1613)
+    * A regression in "cvc annotate" that would produce a traceback
+      for not finding a SequenceMatcher class in fixeddifflib was
+      fixed.  (CNY-1625)
+    * Build commands that invoke shell commands now perform shell
+      quoting properly.  Thanks to Pavel Volkovitskiy for finding the
+      bugs and submitting the patch. (CNY-1627)
+    * Mirroring using group recursion has been fixed. (CNY-1629)
+    * Mirroring using group recursion no longer creates
+      cross-repository relative changesets. (CNY-1640)
+    * r.Install will now replace files which are read-only. (CNY-1634)
+    * A bug that caused an unhandled exception when creating a local
+      rollback for a trove that had missing troveinfo has been fixed.
+    * Attempting to run "cvc merge" in a directory which was not
+      already at the tip of a shadow no longer causes a confusing
+      error message.  Previously the message was "working directory is
+      already based on head of branch"; now the message is "working
+      directory is not at the tip of the shadow".
+    * cvc commands which need to instantiate the recipe object (merge,
+      refresh, and commit) no longer fail if unknown use flags are
+      used by the recipe.
+    * Running the command to mark a trove as removed from the
+      repository on a trove that has already been marked as removed no
+      longer results in an error. (CNY-1654)
+    * "conary rdiff" now works properly when multiple flavors of the
+      same trove are present in the same group. (CNY-1605)
+    * "conary rdiff" no longer produces an error if the same file is
+      present on different labels. (CNY-1623)
+    * A bug that caused inconsistent behavior when troves are pinned
+      has been fixed.  Previously, if an update operation would change
+      the version of a pinned trove to a version included in a group
+      that is installed on the system, the pin would not
+      hold. (CNY-1652)
+    * A bug that caused an unhandled exception in the Conary update
+      code when shared contents to a file in a link group are
+      duplicated in the changeset due to distributed contents has been
+      fixed.
 
 Changes in 1.1.24.1:
   o Release Correction
