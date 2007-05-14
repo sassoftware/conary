@@ -87,9 +87,8 @@ Changes in @NEW@:
 
   o Server Changes:
     * Standalone Conary repositories or proxies can be run in SSL mode,
-      if m2crypto (from contrib.rpath.org@rpl:1) is installed and the
-      configuration options useSSL, sslCert and sslKey are properly set.
-      (CNY-1649)
+      if m2crypto is installed and the configuration options useSSL, sslCert
+      and sslKey are properly set.  (CNY-1649)
 
 Changes in 1.1.24.1:
   o Release Correction
