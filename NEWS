@@ -29,7 +29,6 @@ Changes in 1.1.25:
       later date by conary-policy.  This method is only useful for
       organizations maintaining a set of packages as part of a Linux
       OS platform.
-
     * A new macro, "%(name_version)s", has been added which resolves to
       "%(name)s-%(version)s".
 
