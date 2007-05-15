@@ -1813,7 +1813,7 @@ conary erase '%s=%s[%s]'
         searchSource = uJob.getSearchSource()
 
         results = searchSource.findTroves(toFind, useAffinity=True)
-        newTroves = list(itertools.chain(*results.itervalues()))
+        newTroves = list(set(itertools.chain(*results.itervalues())))
         newTroves = searchSource.getTroves(newTroves, withFiles=False)
 
         newTroves, troveNames = _convertRedirects(searchSource, newTroves)
