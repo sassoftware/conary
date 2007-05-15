@@ -1,0 +1,228 @@
+#!/usr/bin/env python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2007 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+import optparse
+from conary import dbstore
+from conary.dbstore import idtable
+from conary.repository import changeset
+
+Items = None
+Versions = None
+Flavors = None
+
+def parseArgs(argv):
+    parser = optparse.OptionParser(usage="%prog [options]")
+    parser.set_defaults(verbose=True, scan=False, dbFile="", cacheDir="", check=False)
+    parser.add_option("-f", "--db-file", dest = "dbFile", metavar = "FILE",
+                      help = "use FILE as the cache list db. "
+                      "Defaults to CACHEDIR/cachelist.data")
+    parser.add_option("-d", "--dir", dest = "cacheDir", metavar = "DIR",
+                      help = "repository cache directory to list/scan")
+    parser.add_option("-s", "--scan", dest = "scan", action = "store_true",
+                      help = "rescan target directory/rebuild the cache list database")
+    parser.add_option("-c", "--check", dest = "check", action = "store_true",
+                      help = "check the cache database for stale entries while printing")
+    parser.add_option("-q", "--quiet", dest = "verbose", action = "store_false",
+                      help = "do not print any data while scanning the target directory")
+    (options, args) = parser.parse_args(argv)
+
+    # sanity checks
+    if not options.cacheDir and not options.dbFile:
+        parser.error("one of --dir and --db-file need to be specified")
+    if options.scan and not options.dbFile:
+        parser.error("--scan requires a database file to be supplied with --db-file")
+
+    if len(args):
+        if not options.cacheDir:
+            options.cacheDir = args[0]
+        else:
+            parser.error("extra arguments provided: %s" % str(args))
+
+    # check that the cacheDir exists
+    if options.cacheDir and not os.path.isdir(options.cacheDir):
+        parser.error("cache directory %s does not exist or I can not access it" % options.cacheDir)
+    return options
+
+# add an Entry to the cachelist table
+def addEntry(cu, nvf, path):
+    (n,v,f) = nvf
+    itemId = Items.getOrAddId(n)
+    versionId = Versions.getOrAddId(v.asString())
+    flavorId = Flavors.getOrAddId(f.freeze())
+    cu.execute("insert into CacheList(itemId, versionId, flavorId, path, flag) "
+               "values (?, ?, ?, ?, 1)", (itemId, versionId, flavorId, path))
+    return 1
+
+def hasPath(cu, fn, options):
+    cu.execute("select idx from CacheList where path=?", fn)
+    idxList = [x[0] for x in cu]
+    if not len(idxList):
+        return False
+    if options.verbose:
+        cu.execute("""
+        select item, version from CacheList
+        join Items on CacheList.itemId = Items.itemId
+        join Versions on CacheList.versionId = Versions.versionId
+        where idx in (%s)""" % ",".join([str(x) for x in idxList]))
+        for n, v in cu:
+            print fn, n, v
+    # mark those entries as "seen"
+    cu.execute("update CacheList set flag=1 where idx in (%s)" % ",".join([str(x) for x in idxList]))
+    return True
+
+MaxCommit = 500
+def scanCache(options, db=None):
+    global MaxCommit
+    cu = None
+    if db:
+        cu = db.cursor()
+        cu.execute("update CacheList set flag=0")
+        db.commit()
+    count = 0
+    for dirpath, dirnames, filenames in os.walk(options.cacheDir):
+        for filename in filenames:
+            if filename.endswith('.data'):
+                continue
+            fn = os.path.join(dirpath, filename)
+            if hasPath(cu, fn, options):
+                continue
+            cs = changeset.ChangeSetFromFile(fn)
+            for trvCs in cs.iterNewTroveList():
+                if options.verbose:
+                    print fn, trvCs.getName(), trvCs.getNewVersion()
+                if db:
+                    count += addEntry(cu, trvCs.getNewNameVersionFlavor(), fn)
+        if db and count > MaxCommit:
+            db.commit()
+            count=0
+    # clean up the leftovers
+    cu.execute("delete from CacheList where flag=0")
+    if db:
+        db.commit()
+
+# list the contents of a db cache file
+def listCache(options, db):
+    cu = db.cursor()
+    cu.execute("""
+    select CacheList.idx, CacheList.path, Items.item, Versions.version 
+    from CacheList 
+    join Items on CacheList.itemId = Items.itemId 
+    join Versions on CacheList.versionId = Versions.versionId
+    """)
+    removedIds = []
+    for i, p, n, v in cu:
+        if options.check and not os.path.isfile(p):
+            removedIds.append(i)
+            continue
+        print p, n, v
+    if removedIds:
+        cu.executemany("delete from CacheList where idx=?", removedIds)
+    db.commit()
+
+# create the database schema for storing cache entries
+def createSchema(db):
+    db.loadSchema()
+    if "Items" not in db.tables:
+        idtable.createIdTable(db, "Items", "itemId", "item")
+    if "Versions" not in db.tables:
+        idtable.createIdTable(db, "Versions", "versionId", "version")
+    if "Flavors" not in db.tables:
+        idtable.createIdTable(db, "Flavors", "flavorId", "flavor")
+    if "CacheList" not in db.tables:
+        cu = db.cursor()
+        cu.execute("""
+        create table CacheList(
+            idx         %(PRIMARYKEY)s,
+            path        STRING,
+            itemId      INTEGER,
+            versionId   INTEGER,
+            flavorId      INTEGER,
+            flag        INTEGER DEFAULT 1
+        )""" % db.keywords)
+        db.loadSchema()
+        db.createIndex("CacheList", "CacheListItemIdx", "itemId")
+        db.createIndex("CacheList", "CacheListVersionItemIdx", "versionId,itemId")
+        db.createIndex("CacheList", "CacheListPathIdx", "path")
+    db.commit()
+    db.loadSchema()
+    
+
+DBVERSION=1
+def getDB(options):
+    if not options.dbFile:
+        # no database use requested
+        return None
+    db = dbstore.connect(options.dbFile, driver="sqlite")
+    ver = db.getVersion()
+    if ver == 0:
+        createSchema(db)
+        db.setVersion(DBVERSION)
+        return db
+    elif ver == DBVERSION:
+        return db
+    if not options.scan:
+        raise RuntimeError("""
+        Detected incompatible schema in requested database.
+        Use --scan to rewrite the database file %s""" % options.dbFile,
+                           (ver, DBVERSION))
+    # need to refresh the database
+    db.loadSchema()
+    cu = db.cursor()
+    for t in db.tables.keys():
+        cu.execute("drop table %s" % (t,))
+    db.commit()
+    createSchema(db)
+    db.setVersion(DBVERSION)
+    return db
+
+
+if __name__ == '__main__':
+    options = parseArgs(sys.argv[1:])
+    db = getDB(options)
+    if db: # initialize the Items, Versions, Flavors tables
+        Items = idtable.CachedIdTable(db, "Items", "itemId", "item")
+        Versions = idtable.CachedIdTable(db, "Versions", "versionId", "version")
+        Flavors = idtable.CachedIdTable(db, "Flavors", "flavorId", "flavor")
+    # if we're asked to scan again, discard the old data
+    if options.scan:
+        cu = db.cursor()
+        cu.execute("delete from CacheList")
+        db.commit()
+    # if we're asked to walk a tree, update the database in the same step
+    if options.cacheDir:
+        try:
+            scanCache(options, db)
+        except:
+            if db:
+                print "Committing last transaction"
+                db.commit()
+            raise
+    else:
+        listCache(options, db)
+    
