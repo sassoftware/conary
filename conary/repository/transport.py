@@ -167,6 +167,10 @@ class URLOpener(urllib.FancyURLopener):
         # Wrap the socket in an SSL socket
         sslSock = socket.ssl(sock, None, None)
         h = httplib.HTTPConnection("%s:%s" % (endpointHost, endpointPort))
+        # Force HTTP/1.0 (this is the default for the old-style HTTP;
+        # new-style HTTPConnection defaults to 1.1)
+        h._http_vsn = 10
+        h._http_vsn_str = 'HTTP/1.0'
         # This is a bit unclean
         h.sock = httplib.FakeSocket(sock, sslSock)
         return h
@@ -258,6 +262,10 @@ class URLOpener(urllib.FancyURLopener):
                 h = httplib.HTTPSConnection(host)
         else:
             h = httplib.HTTPConnection(host)
+        # Force HTTP/1.0 (this is the default for the old-style HTTP;
+        # new-style HTTPConnection defaults to 1.1)
+        h._http_vsn = 10
+        h._http_vsn_str = 'HTTP/1.0'
 
         headers = []
         if realhost:
