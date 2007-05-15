@@ -528,7 +528,7 @@ class TargetRepository:
         # Items whose mark is the same as currentMark might not have their trove
         # available on the server (it might be coming as part of this mirror
         # run).
-        inQuestion = [ x[1] for x in infoList if str(long(x[0])) == self.mark ]
+        inQuestion = [ x[1] for x in infoList if str(long(x[0])) >= self.mark ]
         present = self.repo.hasTroves(inQuestion, hidden=True)
         # filter out the not present troves which will get mirrored in
         # the current mirror run
