@@ -374,6 +374,8 @@ class ServerCache:
         transporter.setCompress(True)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)
+        # Avoid poking at __transport
+        server._transport = transporter
 
         try:
             serverVersions = server.checkVersion()
@@ -2365,5 +2367,5 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
         util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
                          rateLimit = rateLimit, sizeLimit = size)
 
-    errcode, errmsg, headers = c.getreply()
-    return errcode, errmsg
+    resp = c.getresponse()
+    return resp.status, resp.reason
