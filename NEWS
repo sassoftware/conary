@@ -2,6 +2,7 @@ Changes in @NEW@:
   o New Features
     * The listcachedir script has been added to help with maintenance
       tasks for the repository changeset cache (CNY-1469)
+    * Conary proxies are now adding an HTTP Via: header. (CNY-1604)
 
 Changes in 1.1.25:
   o New Feature:
