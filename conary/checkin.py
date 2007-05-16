@@ -286,8 +286,11 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
+        # Don't add TROVE_QUERY_ALL here, removed packages could exist
+        # and we'd still want newpkg to work
         matches = repos.getTroveLeavesByLabel(
-        { troveName : { state.getBranch().label() : None } }).get(troveName, {})
+        { troveName : { state.getBranch().label() : None } }).get(
+                                                                troveName, {})
         if matches:
             for version in matches:
                 if version.branch() == state.getBranch():
@@ -461,14 +464,7 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     branch = state.getBranch()
 
-    # repos.nextVersion seems like a good idea, but it doesn't know how to
-    # handle shadow merges. this is easier than teaching it
-    if isinstance(state.getVersion(), versions.NewVersion):
-        # increment it like this to get it right on shadows
-        newVersion = state.getBranch().createVersion(
-                           versions.Revision("%s-0" % recipeVersionStr))
-        newVersion.incrementSourceCount()
-    elif (state.getLastMerged() 
+    if (state.getLastMerged() 
           and recipeVersionStr == state.getLastMerged().trailingRevision().getVersion()):
         # If we've merged, and our changes did not affect the original
         # version, then we try to maintain appropriate shadow dots
@@ -477,18 +473,23 @@ def commit(repos, cfg, message, callback=None, test=False):
                                     state.getVersion().branch().label())
         newVersion.incrementSourceCount()
     else:
-        d = repos.getTroveVersionsByBranch({ troveName : 
-                                             { state.getBranch() : None } } )
+        # repos.nextVersion seems like a good idea, but it doesn't know how to
+        # handle shadow merges. this is easier than teaching it
+        d = repos.getTroveVersionsByBranch({ troveName :
+                                            { state.getBranch() : None } },
+                                            troveTypes=repos.TROVE_QUERY_ALL)
         versionList = d.get(troveName, {}).keys()
         versionList.sort()
 
-        if state.getVersion().trailingRevision().getVersion() != \
-                                    recipeVersionStr:
+        ver = None
+        if (state.getVersion() == versions.NewVersion()
+            or state.getVersion().trailingRevision().getVersion() != \
+                                    recipeVersionStr):
             for ver in reversed(versionList):
                 if ver.trailingRevision().getVersion() == recipeVersionStr:
                     break
 
-            if ver.trailingRevision().getVersion() == recipeVersionStr:
+            if ver and ver.trailingRevision().getVersion() == recipeVersionStr:
                 newVersion = ver.copy()
             else:
                 newVersion = state.getBranch().createVersion(
@@ -1594,7 +1595,8 @@ def newTrove(repos, cfg, name, dir = None, template = None,
 
     # see if this package exists on our build branch
     if repos and repos.getTroveLeavesByLabel(
-                        { component : { label : None } }).get(component, []):
+                        { component : { label : None } },
+                        ).get(component, []):
         log.error("package %s already exists" % component)
         return
 

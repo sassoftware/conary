@@ -174,7 +174,7 @@ class SourceState(trove.Trove):
                                 sha1helper.sha1ToString(x[1][1]),
                                 self.fileInfo[x[0]],
                                 x[1][2].asString())
-                for x in self.idMap.iteritems() ]
+                for x in sorted(self.idMap.iteritems()) ]
 
 	f.write("".join(rc))
 
