@@ -234,7 +234,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
                         withFileContents = True, excludeAutoSource = False,
-                        authCheck = None):
+                        authCheck = None, mirrorMode = False):
 	"""
 	troveList is a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
@@ -402,7 +402,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if (contentsHash or (oldFile and newFile.flags.isConfig()
+		if (mirrorMode or contentsHash or
+                             (oldFile and newFile.flags.isConfig()
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion and oldFile.hasContents:
 			oldCont = self.getFileContents(
