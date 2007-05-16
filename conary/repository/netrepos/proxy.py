@@ -353,7 +353,7 @@ class ChangesetFilter(BaseProxy):
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource,
-                     changesetVersion = None):
+                     changesetVersion = None, mirrorMode = False):
 
         def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
             csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
@@ -410,9 +410,15 @@ class ChangesetFilter(BaseProxy):
         fingerprints = [ '' ] * len(chgSetList)
         if self.csCache:
             try:
-                useAnon, fingerprints = caller.getChangeSetFingerprints(43,
-                        chgSetList, recurse, withFiles, withFileContents,
-                        excludeAutoSource)
+                if mirrorMode:
+                    useAnon, fingerprints = caller.getChangeSetFingerprints(49,
+                            chgSetList, recurse, withFiles, withFileContents,
+                            excludeAutoSource)
+                else:
+                    useAnon, fingerprints = caller.getChangeSetFingerprints(43,
+                            chgSetList, recurse, withFiles, withFileContents,
+                            excludeAutoSource)
+
             except ProxyRepositoryError, e:
                 # old server; act like no fingerprints were returned
                 if e.args[0] == 'MethodNotSupported':
@@ -451,9 +457,15 @@ class ChangesetFilter(BaseProxy):
 
             if path is None:
                 # the changeset isn't in the cache.  create it
-                rc = caller.getChangeSet(getCsVersion, [ rawJob ],
+                if mirrorMode:
+                    rc = caller.getChangeSet(getCsVersion, [ rawJob ],
+                                         recurse, withFiles, withFileContents,
+                                         excludeAutoSource, mirrorMode)[1]
+                else:
+                    rc = caller.getChangeSet(getCsVersion, [ rawJob ],
                                          recurse, withFiles, withFileContents,
                                          excludeAutoSource)[1]
+
                 removedTroves = []
                 if getCsVersion < 38:
                     url, sizes, trovesNeeded, filesNeeded = rc
@@ -563,7 +575,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48 ]
+    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49 ]
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)

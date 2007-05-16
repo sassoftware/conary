@@ -789,7 +789,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
             try:
                 cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
-                                                     callback = callback)
+                                                     callback = callback,
+                                                     mirrorMode = True)
             except changeset.ChangeSetKeyConflictError, e:
                 splitJobList(jobList, sourceRepos, targetSet, hidden=hidden,
                              callback=callback)

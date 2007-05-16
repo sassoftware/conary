@@ -50,7 +50,8 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48 ]
+# end of range or last protocol version + 1
+CLIENT_VERSIONS = range(36,50)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1133,7 +1134,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #   5. Download any extra files (and create any extra diffs)
         #   which step 2 couldn't do for us.
 
-        def _separateJobList(jobList, removedList, forceLocalGeneration):
+        def _separateJobList(jobList, removedList, forceLocalGeneration,
+                             mirrorMode):
             if forceLocalGeneration:
                 return {}, jobList
 
@@ -1148,8 +1150,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     continue
 
                 serverName = new.getHost()
-
-                if old:
+                if mirrorMode and self.c[serverName].getProtocolVersion() < 49:
+                    # old clients don't support mirrorMode argument; force
+                    # local changeset generation
+                    ourJobList.append((troveName, (old, oldFlavor),
+                                       (new, newFlavor), absolute))
+                elif old:
                     if old.getHost() == serverName:
                         l = serverJobs.setdefault(serverName, [])
                         l.append((troveName, 
@@ -1231,7 +1237,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         def _getCsFromRepos(target, cs, server, job, recurse,
                             withFiles, withFileContents,
                             excludeAutoSource, filesNeeded,
-                            chgSetList, removedList, changesetVersion):
+                            chgSetList, removedList, changesetVersion,
+                            mirrorMode):
             abortCheck = None
             if callback:
                 callback.requestingChangeSet()
@@ -1239,8 +1246,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             args = (job, recurse, withFiles, withFileContents,
                     excludeAutoSource)
             serverVersion = server.getProtocolVersion()
-            if changesetVersion and serverVersion > 47:
+
+            if mirrorMode and serverVersion >= 49:
+                if not changesetVersion:
+                    changesetVersion = \
+                        filecontainer.FILE_CONTAINER_VERSION_LATEST
+
+                args += (changesetVersion, mirrorMode, )
+            elif changesetVersion and serverVersion > 47:
                 args += (changesetVersion, )
+
             l = server.getChangeSet(*args)
             if serverVersion < 38:
                 (url, sizes, extraTroveList, extraFileList) = l
@@ -1359,7 +1374,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         while chgSetList or removedList:
             (serverJobs, ourJobList) = _separateJobList(chgSetList,
                                                         removedList,
-                                                        forceLocalGeneration)
+                                                        forceLocalGeneration,
+                                                        mirrorMode)
 
             chgSetList = []
             removedList = []
@@ -1373,7 +1389,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 try:
                     if server.__class__ == ServerProxy:
                         # this is a XML-RPC proxy for a remote repository
-                        rc = _getCsFromRepos(*(args + (changesetVersion, )))
+                        rc = _getCsFromRepos(*(args + (changesetVersion,
+                                                       mirrorMode)))
                     else:
                         # assume we are a shim repository
                         rc = _getCsFromShim(*args)
