@@ -1088,24 +1088,29 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def createChangeSetFile(self, jobList, fName, recurse = True,
                             primaryTroveList = None, callback = None,
-                            changesetVersion = None):
+                            changesetVersion = None,
+                            mirrorMode = False):
         """
         @param changesetVersion: (optional) request a specific changeset
             version from the server. The value is one of the FILE_CONTAINER_*
             constants defined in the NetworkRepositoryClient class.
         @raise FilesystemError: if the destination file is not writable
         """
+
+        # mirrorMode forces contents to be included whenever the fileId
+        # changes; normally they change only if the sha1 changes
         return self._getChangeSet(jobList, target = fName,
                                   recurse = recurse,
                                   primaryTroveList = primaryTroveList,
                                   callback = callback,
-                                  changesetVersion = changesetVersion)
+                                  changesetVersion = changesetVersion,
+                                  mirrorMode = mirrorMode)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None,
                       excludeAutoSource = False, primaryTroveList = None,
                       callback = None, forceLocalGeneration = False,
-                      changesetVersion = None):
+                      changesetVersion = None, mirrorMode = False):
         # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
@@ -1522,7 +1527,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if excludeAutoSource and newFileObj.flags.isAutoSource():
                     continue
 
-                if withFileContents and hash:
+                if withFileContents and (mirrorMode or hash):
                     # pull contents from the trove it was originally
                     # built in
                     fetchItems = []

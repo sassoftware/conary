@@ -4,6 +4,12 @@ Changes in @NEW@:
       tasks for the repository changeset cache (CNY-1469)
     * Conary proxies are now adding an HTTP Via: header. (CNY-1604)
 
+  o Internal Changes:
+    * Creating changesets supports a 'mirrorMode', which includes file contents
+      of files if their version has changed (even if the sha1 of those
+      contents are the same). Mirroring uses this to ensure complete
+      contents (CNY-1626)
+
 Changes in 1.1.25:
   o New Feature:
     * Conary now supports a "searchPath" configuration option, which
