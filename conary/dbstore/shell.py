@@ -249,7 +249,7 @@ type ".quit" to exit, ".help" for help"""
 
         # check for no rows
         if not len(self.cu.fields()):
-            print "Query Ok"
+            print "Query OK"
             # reload the schema, in case there was a change
             self.db.loadSchema()
         else: # display the results (if any)
