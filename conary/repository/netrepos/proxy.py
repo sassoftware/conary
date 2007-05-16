@@ -191,7 +191,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         (i.e. HTTP/1.0)
         """
         if methodname not in self.publicCalls:
-            return (False, True, ("MethodNotSupported", methodname, ""))
+            return (False, True, ("MethodNotSupported", methodname, ""), None)
 
         self._port = port
         self._protocol = protocol
