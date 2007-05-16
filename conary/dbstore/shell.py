@@ -1,4 +1,4 @@
-# Copyright (C) 2006 rPath, Inc.
+# Copyright (C) 2006,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -247,13 +247,15 @@ type ".quit" to exit, ".help" for help"""
             print 'Error:', str(e)
             return False
 
-        # display the results (if any)
-        rows, end = self.display(self.cu)
-        if self.show_stats and rows != -1:
-            print '%d rows in set (%.2f sec)' %(rows, end - start)
-
-        # reload the schema, in case there was a change
-        self.db.loadSchema()
+        # check for no rows
+        if not len(self.cu.fields()):
+            print "Query Ok"
+            # reload the schema, in case there was a change
+            self.db.loadSchema()
+        else: # display the results (if any)
+            rows, end = self.display(self.cu)
+            if self.show_stats and rows != -1:
+                print '%d rows in set (%.2f sec)' %(rows, end - start)
         return False
 
     def cmdloop(self):
