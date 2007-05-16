@@ -1357,8 +1357,13 @@ class Database(SqlDbRepository):
 
     def applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
-                          justDatabase = False):
+                          justDatabase = False, transactionCounter = None):
         self.commitLock(True)
+        assert transactionCounter is not None, ("The transactionCounter "
+            "argument is mandatory")
+        if transactionCounter != self.getTransactionCounter():
+            raise RollbackError(names, "Database state has changed, please "
+                "run the rollback command again")
 
 	last = self.lastRollback
 	for name in names:
