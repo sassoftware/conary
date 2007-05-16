@@ -8,7 +8,7 @@ Changes in @NEW@:
     * Creating changesets supports a 'mirrorMode', which includes file contents
       of files if their version has changed (even if the sha1 of those
       contents are the same). Mirroring uses this to ensure complete
-      contents (CNY-1626)
+      contents (CNY-1570)
 
 Changes in 1.1.25:
   o New Feature:
