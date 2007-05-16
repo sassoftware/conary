@@ -18,6 +18,10 @@ Changes in @NEW@:
       further ensures long-running operations detect the state change.
       (CNY-1624)
 
+  o Bug fixes:
+    * Manipulating source components now works better when a source
+      component has been marked removed. 
+
 
 Changes in 1.1.25:
   o New Feature:
