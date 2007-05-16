@@ -1150,9 +1150,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     continue
 
                 serverName = new.getHost()
-                if mirrorMode and self.c[serverName].getProtocolVersion() < 49:
+                if old and mirrorMode and \
+                            self.c[serverName].getProtocolVersion() < 49:
                     # old clients don't support mirrorMode argument; force
-                    # local changeset generation
+                    # local changeset generation (but only for relative
+                    # change sets)
                     ourJobList.append((troveName, (old, oldFlavor),
                                        (new, newFlavor), absolute))
                 elif old:
