@@ -375,8 +375,6 @@ class ServerCache:
         transporter.setCompress(True)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap)
-        # Avoid poking at __transport
-        server._transport = transporter
 
         try:
             serverVersions = server.checkVersion()
