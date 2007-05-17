@@ -20,8 +20,9 @@ Changes in @NEW@:
 
   o Bug fixes:
     * Manipulating source components now works better when a source
-      component has been marked removed. 
-
+      component has been marked removed.
+    * Patch code no longer fails when trailing context is missing at the
+      end of the file (CNY-1638)
 
 Changes in 1.1.25:
   o New Feature:
