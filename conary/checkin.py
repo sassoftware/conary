@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -506,7 +506,8 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     try:
         result = update.buildLocalChanges(repos, 
-                        [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
+                        [(state, srcPkg, newVersion, 
+                          update.UpdateFlags(ignoreUGids = True))],
                         forceSha1=True,
                         crossRepositoryDeltas = False,
                         allowMissingFiles = bool(callback))
@@ -1008,7 +1009,8 @@ def diff(repos, versionStr = None):
 	oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
     result = update.buildLocalChanges(repos, 
-	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
+	    [(state, oldTrove, versions.NewVersion(),
+              update.UpdateFlags(ignoreUGids = True))],
             forceSha1=True, ignoreAutoSource = True)
     if not result: return 2
 
@@ -1145,7 +1147,8 @@ def updateSrc(repos, versionStr = None, callback = None):
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
                                  conarycfg.CfgLabelList(),
-				 flags = update.IGNOREUGIDS | update.MERGE)
+                                 flags = update.UpdateFlags(ignoreUGids = True,
+                                                            merge = True) )
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)
@@ -1314,7 +1317,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
                                  conarycfg.CfgLabelList(),
-				 flags = update.IGNOREUGIDS | update.MERGE)
+                                 flags = update.UpdateFlags(ignoreUGids = True,
+                                                            merge = True) )
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)
@@ -1997,7 +2001,8 @@ def stat_(repos):
     oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
     result = update.buildLocalChanges(repos, 
-	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
+	    [(state, oldTrove, versions.NewVersion(),
+              update.UpdateFlags(ignoreUGids = True) )],
             forceSha1=True, ignoreAutoSource = True)
 
     (changeSet, ((isDifferent, newState),)) = result

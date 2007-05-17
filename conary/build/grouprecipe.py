@@ -229,6 +229,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self.labelPath = [ label ]
         self.cfg = cfg
         self.flavor = flavor
+        self.keyFlavor = None
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.defaultSource = None
@@ -317,6 +318,29 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         for group in self._getGroups(groupName):
             group.addRequires(requirement)
+
+    def setFlavor(self, flavor):
+        """
+        NAME
+        ====
+
+        B{C{r.setFlavor()}} - Sets the flavors that should be used to determine
+        the final group flavors.  These flavors will be added to required
+        platform flavors (such as architecture) to determine the final flavor
+        of the groups.
+
+        EXAMPLE:
+
+        C{r.setFlavor('ssl')}
+
+        If the group was cooked with the flavors:
+            ...,readline,ssl,foo is: x86(~i686) and
+            ...,!readline,!ssl,foo is:x86(i586)
+        then the final group flavors would be:
+            ssl is: x86 and
+            !ssl is: x86(i586)
+        """
+        self.keyFlavor = deps.parseFlavor(flavor)
 
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None,
@@ -416,17 +440,16 @@ class GroupRecipe(_BaseGroupRecipe):
         ===========
 
         The C{r.remove} command removes a trove from the group which was
-        previously added with C{r.addAll}, or C{addTrove} commands.
+        previously added with C{r.addAll} or C{add} commands.
 
         Note: If the trove is not included explicitly, such as by C{r.add()},
         but rather implicitly, as a component in a package which has been
         added, then removing the trove only changes its B{byDefault} setting,
         so that installing this group will not install the trove.
 
-        Troves may be removed from a super group which are present due to an
-        included subgroup. For example, the group I{group-os} is a top
-        level group, and includes I{group-dist}, which in turn, includes
-        package I{foo}.
+        Troves present due to an included subgroup can be removed from a
+        supergroup. For example, the group I{group-os} is a top level group,
+        and includes I{group-dist}, which in turn, includes package I{foo}.
 
         Using C{r.remove('foo', groupName='group-os')} prevents installation
         of package I{foo} during the installation of the group I{group-os}.
@@ -736,7 +759,7 @@ class GroupRecipe(_BaseGroupRecipe):
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addAll(name, versionStr, flavor)} would be
-        equivalent to adding the C{r.addTrove} lines:
+        equivalent to adding the C{r.add} lines:
 
         C{r.add('foo1', <version>)}
         C{r.add('foo2', <version>)}.
@@ -953,7 +976,7 @@ class GroupRecipe(_BaseGroupRecipe):
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addCopy('group-foo')} would be
-        equivalent to adding the C{r.addTrove} lines:
+        equivalent to adding the C{r.add} lines:
 
         C{r.createNewGroup('group-foo')}
         C{r.add('foo1', <version>, groupName='group-foo')}

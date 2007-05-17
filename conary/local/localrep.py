@@ -115,7 +115,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs, callback, autoPinList, 
-                 filePriorityPath,
                  allowIncomplete = False, pathRemovedCheck = None,
                  replaceFiles = False):
 	assert(not cs.isAbsolute())
@@ -138,8 +137,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	    self.repos.eraseFileVersion(pathId, fileVersion)
 
         # this raises an exception if this install would create conflicts
-        self.repos.db.db.checkPathConflicts(self.trovesAdded, 
-                                            filePriorityPath, replaceFiles)
+        self.repos.db.db.checkPathConflicts(self.trovesAdded, replaceFiles)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:

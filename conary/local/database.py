@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -827,20 +827,17 @@ class Database(SqlDbRepository):
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
-                        removeHints = {}, filePriorityPath = None,
-                        autoPinList = RegularExpressionList(),
+                        removeHints = {}, autoPinList = RegularExpressionList(),
                         keepJournal = False, deferPostScripts = False,
                         deferredScripts = None):
 	assert(not cs.isAbsolute())
 
-        if filePriorityPath is None:
-            filePriorityPath = CfgLabelList()
-
-        flags = 0
+        flags = update.UpdateFlags()
         if replaceFiles:
-            flags |= update.REPLACEFILES
+            flags.replaceFiles = True
         if rollbackPhase:
-            flags |= update.MISSINGFILESOKAY | update.IGNOREINITIALCONTENTS
+            flags.missingFilesOkay = True
+            flags.ignoreInitialContents = True
 
         self.db.begin()
 
@@ -863,8 +860,7 @@ class Database(SqlDbRepository):
 		trv = dbCache.getTrove(name, old, flavor, pristine = False)
 		origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
 		assert(trv)
-		troveList.append((trv, origTrove, ver, 
-                                  flags & update.MISSINGFILESOKAY))
+		troveList.append((trv, origTrove, ver, flags))
 
         for (name, version, flavor) in cs.getOldTroveList():
             rollbackVersion = version.createShadow(versions.RollbackLabel())
@@ -872,8 +868,8 @@ class Database(SqlDbRepository):
             origTrove = dbCache.getTrove(name, version, flavor, 
                                          pristine = True)
             assert(trv)
-            troveList.append((trv, origTrove, rollbackVersion, 
-                              update.MISSINGFILESOKAY))
+            troveList.append((trv, origTrove, rollbackVersion,
+                              update.UpdateFlags(missingFilesOkay = True)))
 
         callback.creatingRollback()
 
@@ -892,11 +888,10 @@ class Database(SqlDbRepository):
 	if rollbackPhase is None:
             reposRollback = cs.makeRollback(dbCache, configFiles = True,
                                redirectionRollbacks = (not localRollbacks))
-            flags |= update.MERGE
+            flags.merge = True
 
         fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root,
-                                     filePriorityPath, flags = flags,
-                                     callback = callback,
+                                     flags = flags, callback = callback,
                                      removeHints = removeHints,
                                      rollbackPhase = rollbackPhase,
                                      deferredScripts = deferredScripts)
@@ -1014,7 +1009,6 @@ class Database(SqlDbRepository):
             try:
                 csJob = localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
-                    filePriorityPath,
                     allowIncomplete = (rollbackPhase is not None),
                     pathRemovedCheck = fsJob.pathRemoved,
                     replaceFiles = replaceFiles)

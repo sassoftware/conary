@@ -121,6 +121,9 @@ class GroupUnmatchedGlobalReplaces(_UnmatchedSpecs):
         msg = 'Could not find troves to replace in any group:\n'
         _UnmatchedSpecs.__init__(self, msg, troveSpecs)
 
+class GroupFlavorChangedError(CookError):
+    pass
+
 class MacroKeyError(KeyError):
     def __str__(self):
         return 'Unknown macro "%s" - check for spelling mistakes' % self.args[0]

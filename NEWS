@@ -1,5 +1,22 @@
+Changes in @NEW@:
+  o New Features:
+    * All group cooks for one source must be done as a large cvc cook action
+      instead of one-by-one. (CNY-1303)
+    * Group flavors are much shorter by default. Extra flags can be added to 
+      the group by calling "SetFlavor" in the group recipe.  Some flags, like
+      vmware and xen and architecture flags, are always included in a group
+      flavor.  (CNY-1641)
+
+  o Internal Changes:
+    * Flags for update jobs changed from a bitmask to a class
+    * Removed vestigal support for file label priority paths
+
+  o Bug fixes:
+    * Patch code no longer fails when trailing context is missing at the
+      end of the file (CNY-1638)
+
 Changes in 1.1.26:
-  o New Feature:
+  o New Features:
     * The listcachedir script has been added to help with maintenance
       tasks for the repository changeset cache. (CNY-1469)
     * Conary proxies are now adding an HTTP Via: header. (CNY-1604)

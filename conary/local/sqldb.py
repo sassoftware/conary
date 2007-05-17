@@ -906,8 +906,7 @@ order by
 
         return troveInstanceId
 
-    def checkPathConflicts(self, instanceIdList, filePriorityPath,
-                           replaceFiles):
+    def checkPathConflicts(self, instanceIdList, replaceFiles):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
         for instanceId in instanceIdList:
@@ -972,23 +971,15 @@ order by
                  existingVersion, existingFlavor,
                  addedInstanceId, addedPathId, addedTroveName, addedVersion,
                  addedFlavor) in cu:
-                pri = filePriorityPath.versionPriority(
-                            versions.VersionFromString(existingVersion),
-                            versions.VersionFromString(addedVersion))
-                if pri == -1:
-                    markNotPresent.append((addedInstanceId, addedPathId))
-                elif pri == 1:
-                    markNotPresent.append((existingInstanceId, existingPathId))
-                else:
-                    conflicts.append((path,
-                            (existingPathId,
-                             (existingTroveName,
-                              versions.VersionFromString(existingVersion),
-                              deps.deps.ThawFlavor(existingFlavor))),
-                            (addedPathId,
-                             (addedTroveName,
-                              versions.VersionFromString(addedVersion),
-                              deps.deps.ThawFlavor(addedFlavor)))))
+                conflicts.append((path,
+                        (existingPathId,
+                         (existingTroveName,
+                          versions.VersionFromString(existingVersion),
+                          deps.deps.ThawFlavor(existingFlavor))),
+                        (addedPathId,
+                         (addedTroveName,
+                          versions.VersionFromString(addedVersion),
+                          deps.deps.ThawFlavor(addedFlavor)))))
 
             for instanceId, pathId in markNotPresent:
                 cu.execute("UPDATE DBTroveFiles SET isPresent = 0 "

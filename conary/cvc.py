@@ -33,6 +33,7 @@ from conary import state
 from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove
+from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
 from conary.lib import openpgpfile
@@ -420,6 +421,7 @@ class CookCommand(CvcCommand):
         argDef['download'] = NO_PARAM
         argDef['resume'] = STRICT_OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
+        argDef['allow-flavor-change'] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -482,6 +484,8 @@ class CookCommand(CvcCommand):
             cfg.cleanAfterCook = False
             del argSet['no-clean']
 
+        allowFlavorChange = argSet.pop('allow-flavor-change', False)
+
         if argSet.has_key('resume'):
             resume = argSet['resume']
             del argSet['resume']
@@ -512,10 +516,19 @@ class CookCommand(CvcCommand):
 
         if argSet: return self.usage()
 
-        cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
+        groupOptions = cook.GroupCookOptions(alwaysBumpCount=True,
+                                 errorOnFlavorChange=not allowFlavorChange)
+
+        try:
+            cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
-                         crossCompile=crossCompile, downloadOnly=downloadOnly)
+                         crossCompile=crossCompile, downloadOnly=downloadOnly,
+                         groupOptions=groupOptions)
+        except builderrors.GroupFlavorChangedError, err:
+            err.args = (err.args[0] +
+                        '\n(Add the --allow-flavor-change flag to override this error)\n',)
+            raise
         log.setVerbosity(level)
 _register(CookCommand)
 
