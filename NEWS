@@ -21,6 +21,8 @@ Changes in 1.1.26:
   o Bug fixes:
     * Manipulating source components now works better when a source
       component has been marked removed.
+    * A problem related to the way shim clients use the ServerProxy
+      object has been fixed. (CNY-1668)
 
 Changes in 1.1.25:
   o New Feature:
