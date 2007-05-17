@@ -1034,5 +1034,10 @@ class Flags(object):
 
     def __setattr__(self, flag, val):
         if type(val) != bool:
-            raise TypeError
+            raise TypeError, 'bool expected'
         object.__setattr__(self, flag, val)
+
+    def __repr__(self):
+        return "%s(%s)" % (self.__class__.__name__,
+                "".join( flag for flag in self.__slots__
+                            if getattr(self, flag) ) )

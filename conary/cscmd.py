@@ -104,7 +104,7 @@ def LocalChangeSetCommand(db, cfg, item, outFileName):
 	    origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
                                     pristine = True)
 	    ver = ver.createShadow(versions.LocalLabel())
-	    list.append((trove, origTrove, ver, 0))
+            list.append((trove, origTrove, ver, update.UpdateFlags()))
 
     incomplete = [ db.troveIsIncomplete(x[1].getName(), x[1].getVersion(), 
                                         x[1].getFlavor()) for x in list ]
