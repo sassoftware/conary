@@ -70,7 +70,13 @@ def post(port, isSecure, repos, req):
             (params, method) = xmlrpclib.loads(data)
             repos.log(3, "decoding=%s" % method, authToken[0],
                       "%.3f" % (time.time()-startTime))
-            localAddr = "%s:%s" % req.connection.local_addr
+            # req.connection.local_addr[0] is the IP address the server
+            # listens on, not the IP address of the accepted socket. Most of
+            # the times it will be 0.0.0.0 which is not very useful. We're
+            # using local_ip instead, and we grab just the port from
+            # local_addr.
+            localAddr = "%s:%s" % (req.connection.local_ip,
+                                   req.connection.local_addr[1])
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
