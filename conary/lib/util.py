@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1018,3 +1018,26 @@ class LazyFileCache:
         self._fdMap.clear()
 
     __del__ = close
+
+class Flags(object):
+
+    # set the slots to the names of the flags to support
+
+    __slots__ = []
+
+    def __init__(self, **kwargs):
+        for flag in self.__slots__:
+            setattr(self, flag, False)
+
+        for (flag, val) in kwargs.iteritems():
+            setattr(self, flag, val)
+
+    def __setattr__(self, flag, val):
+        if type(val) != bool:
+            raise TypeError, 'bool expected'
+        object.__setattr__(self, flag, val)
+
+    def __repr__(self):
+        return "%s(%s)" % (self.__class__.__name__,
+                "".join( flag for flag in self.__slots__
+                            if getattr(self, flag) ) )
