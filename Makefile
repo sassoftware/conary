@@ -72,6 +72,7 @@ smoketest: archive
 forcedist: $(dist_files) smoketest
 
 tag:
+	$(MAKE) tag -C extra VERSION=$(VERSION)
 	hg tag conary-$(VERSION)
 
 clean: clean-subdirs default-clean

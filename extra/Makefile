@@ -14,10 +14,10 @@
 TOPDIR = ..
 
 extra_files = Makefile conary.spec.in
+gen_files = conary.spec
+dist_files = $(gen_files) $(extra_files)
 
-dist_files = conary.spec $(extra_files)
-
-all : conary.spec
+all : $(gen_files)
 
 conary.spec : conary.spec.in $(TOPDIR)/Makefile
 	sed s,@version@,$(VERSION),g $< > $@
@@ -26,8 +26,11 @@ install :
 
 dist : $(dist_files) default-dist
 
+tag : $(gen_files)
+	hg add $^
+	hg commit -m "rebuild $^ by make dist" $^
+
 clean : default-clean
-	rm -f conary.spec
 
 include $(TOPDIR)/Make.rules
 
