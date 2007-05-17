@@ -47,7 +47,7 @@ from conary.errors import CvcError
 class Flag(dict):
 
     def __init__(self, name, parent=None, value=False, 
-                 required=True, track=False, path=None):
+                 required=True, track=False, path=None, platform=False):
         self._name = name
         self._value = value
         self._parent = parent
@@ -56,6 +56,7 @@ class Flag(dict):
         self._used = False
         self._alias = None
         self._path = path
+        self._platform = platform
 
     def __repr__(self):
         if self._alias: 
@@ -76,6 +77,12 @@ class Flag(dict):
 
     def setRequired(self, value=True):
         self._required = value 
+
+    def setPlatform(self, value=True):
+        self._platform = platform
+
+    def isPlatformFlag(self):
+        return self._platform
 
     def _set(self, value=True):
         self._value = value
@@ -477,7 +484,8 @@ class ArchCollection(Collection):
 
 class MajorArch(CollectionWithFlag):
     
-    def __init__(self, name, parent, track=False, archProps=None, macros=None):
+    def __init__(self, name, parent, track=False, archProps=None, macros=None,
+                 platform=False):
         self._collectionType = SubArch
         if archProps:
             self._archProps = archProps.copy()
@@ -487,6 +495,7 @@ class MajorArch(CollectionWithFlag):
             self._macros = {}
         else:
             self._macros = macros
+        self._platform = platform
         CollectionWithFlag.__init__(self, name, parent, track=track)
 
     def _setUsed(self, used=True):
@@ -754,6 +763,13 @@ def allFlagsToFlavor(recipeName):
 def localFlagsToFlavor(recipeName):
     return createFlavor(recipeName, LocalFlags._iterAll())
 
+def platformFlagsToFlavor():
+    flags = []
+    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll()):
+        if flag.isPlatformFlag():
+            flags.append(flag)
+    return createFlavor(None, flags)
+
 def createFlavor(recipeName, *flagIterables, **kw):
     """ create a dependency set consisting of all of the flags in the 
         given flagIterables.  Note that is a broad category that includes
@@ -855,8 +871,6 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                     raise RuntimeError, ('Cannot set arctitecture build flags'
                                          ' to multiple architectures:'
                                          ' %s: %s' % (recipeName, flavor))
-                
-
 Arch = ArchCollection()
 Use = UseCollection()
 LocalFlags = LocalFlagCollection()

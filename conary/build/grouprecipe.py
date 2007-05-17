@@ -229,6 +229,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self.labelPath = [ label ]
         self.cfg = cfg
         self.flavor = flavor
+        self.keyFlavor = None
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.defaultSource = None
@@ -317,6 +318,29 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         for group in self._getGroups(groupName):
             group.addRequires(requirement)
+
+    def setFlavor(self, flavor):
+        """
+        NAME
+        ====
+
+        B{C{r.setFlavor()}} - Sets the flavors that should be used to determine
+        the final group flavors.  These flavors will be added to required
+        platform flavors (such as architecture) to determine the final flavor
+        of the groups.
+
+        EXAMPLE:
+
+        C{r.setFlavor('ssl')}
+
+        If the group was cooked with the flavors:
+            ...,readline,ssl,foo is: x86(~i686) and
+            ...,!readline,!ssl,foo is:x86(i586)
+        then the final group flavors would be:
+            ssl is: x86 and
+            !ssl is: x86(i586)
+        """
+        self.keyFlavor = deps.parseFlavor(flavor)
 
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None,
