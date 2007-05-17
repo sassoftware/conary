@@ -239,13 +239,109 @@ def getRecursiveRequirements(db, troveList, flavorPath):
                 troveList.update(depSols)
     return seen
 
+class GroupCookOptions(object):
+
+    def __init__(self, alwaysBumpCount=False, errorOnFlavorChange=False):
+        self.alwaysBumpCount = alwaysBumpCount
+        self.errorOnFlavorChange = errorOnFlavorChange
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def _checkCook(self, repos, recipeObj, groupNames, targetVersion,
+                   groupFlavors):
+        if self.errorOnFlavorChange:
+            self._checkFlavors(repos, groupNames, targetVersion, groupFlavors)
+
+    def _checkFlavors(self, repos, groupNames, targetVersion, groupFlavors):
+        def _outputFlavor(flavor, fDict):
+            if flavor.isEmpty():
+                flavor = '(Empty)'
+            return '\n     %s\n' % flavor
+
+        targetBranch = targetVersion.branch()
+        allGroupNames = set(itertools.chain(*groupNames))
+        latest = repos.findTroves(None, [(x, targetBranch, None)
+                                          for x in allGroupNames],
+                                          allowMissing=True)
+        latest = list(itertools.chain(*latest.itervalues()))
+        if latest:
+            maxVersion = max([x[1] for x in latest])
+            latest = [ x for x in latest if x[1] == maxVersion ]
+        newNamesByFlavor = dict(zip(groupFlavors, groupNames))
+        oldNamesByFlavor = {}
+        addedNames = {}
+        removedNames = {}
+        removedFlavors = []
+        for troveTup in latest:
+            oldNamesByFlavor.setdefault(troveTup[2], []).append(troveTup[0])
+        for flavor, oldNames in oldNamesByFlavor.items():
+            if flavor not in newNamesByFlavor:
+                removedFlavors.append(flavor)
+                continue
+            else:
+                newNames = newNamesByFlavor[flavor]
+                added = set(newNames) - set(oldNames)
+                removed = set(oldNames) - set(newNames)
+                if added:
+                    addedNames[flavor] = sorted(added)
+                if removed:
+                    removedNames[flavor] = sorted(removed)
+        addedFlavors = set(newNamesByFlavor) - set(oldNamesByFlavor)
+        if addedFlavors or removedFlavors:
+            fDict = deps.flavorDifferences(addedFlavors | set(removedFlavors))
+            errMsg = "The group flavors that were cooked changed from the previous cook."
+            if addedFlavors:
+                errMsg += '\nThe following flavors were newly cooked:\n    '
+                for flavor in sorted(addedFlavors):
+                    errMsg += _outputFlavor(flavor, fDict)
+
+            if removedFlavors:
+                errMsg += '\nThe following flavors were not cooked this time:\n    '
+                for flavor in sorted(removedFlavors):
+                    errMsg += _outputFlavor(flavor, fDict)
+
+            errMsg += '''
+With the latest conary, you must now cook all versions of a group at the same time.  This prevents potential race conditions when clients are selecting the version of a group to install.'''
+            raise builderrors.GroupFlavorChangedError(errMsg)
+
+    def shortenFlavors(self, keyFlavor, builtGroups):
+        if keyFlavor is None and len(builtGroups) == 1:
+            keyFlavor = deps.Flavor()
+        # how do we make kernel.smp a platform Flags
+        if keyFlavor is not None:
+            keyFlavors = [ keyFlavor, use.platformFlagsToFlavor()]
+        else:
+            keyFlavors = [ use.platformFlagsToFlavor() ]
+
+        newBuiltGroups = []
+        for recipeObj, flavor in builtGroups:
+            archFlags = list(flavor.iterDepsByClass(
+                                        deps.InstructionSetDependency))
+            shortenedFlavor = deps.filterFlavor(flavor, keyFlavors)
+            if archFlags:
+                shortenedFlavor.addDeps(deps.InstructionSetDependency, 
+                                        archFlags)
+            newBuiltGroups.append((recipeObj, shortenedFlavor))
+
+        groupFlavors = [x[1] for x in newBuiltGroups]
+        if len(set(groupFlavors)) == len(groupFlavors):
+            return newBuiltGroups
+
+        fDict = deps.flavorDifferences([x[1] for x in builtGroups])
+        for ((recipeObj, fullFlavor), (_, shortenedFlavor)) in \
+                                            zip(builtGroups, newBuiltGroups):
+            shortenedFlavor.union(fDict[fullFlavor])
+        return newBuiltGroups
+
 def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={},
                targetLabel = None, resume = None, alwaysBumpCount = False,
                allowUnknownFlags = False, allowMissingSource = False,
                ignoreDeps = False, logBuild = False,
                crossCompile = None, callback = None,
-               requireCleanSources = False, downloadOnly = False):
+               requireCleanSources = False, downloadOnly = False,
+               groupOptions = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -298,6 +394,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     sources all be from the repository.
     @rtype: list of strings
     """
+    if not groupOptions:
+        groupCookOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
+
     if not isinstance(recipeClass, (list, tuple)):
         recipeClasses = [recipeClass]
     else:
@@ -378,7 +477,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                macros = macros, targetLabel = targetLabel,
                                alwaysBumpCount = alwaysBumpCount,
                                requireCleanSources = requireCleanSources,
-                               callback = callback)
+                               callback = callback,
+                               groupOptions=groupOptions)
         needsSigning = True
     else:
         assert(len(recipeClasses) == 1) 
@@ -535,7 +635,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                      targetLabel = None, alwaysBumpCount=False, 
                      callback = callbacks.CookCallback(),
-                     requireCleanSources = False):
+                     requireCleanSources = False, groupOptions=None):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -561,6 +661,9 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     @param redirect: if True, a redirect trove is built instead of a
     normal trove.
     """
+    if groupOptions is None:
+        groupOptions = GroupCookOptions()
+
     troveCache = grouprecipe.TroveCache(repos, callback)
     lcache = lookaside.RepositoryCache(repos)
 
@@ -613,12 +716,21 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         grpFlavor = deps.mergeFlavorList(flavors,
                                          deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
         builtGroups.append((recipeObj, grpFlavor))
-        groupNames.extend(recipeObj.getGroupNames())
-        groupFlavors.append(grpFlavor)
+        groupNames.append(recipeObj.getGroupNames())
 
-    targetVersion = nextVersion(repos, db, groupNames, sourceVersion, 
+    keyFlavor = recipeObj.keyFlavor
+    groupFlavors = []
+    newBuiltGroups = []
+    builtGroups = groupOptions.shortenFlavors(keyFlavor, builtGroups)
+
+    groupFlavors = [ x[1] for x in builtGroups ]
+
+    allGroupNames = list(itertools.chain(*groupNames))
+    targetVersion = nextVersion(repos, db, allGroupNames, sourceVersion,
                                 groupFlavors, targetLabel,
-                                alwaysBumpCount=alwaysBumpCount)
+                                alwaysBumpCount=groupOptions.alwaysBumpCount)
+    groupOptions._checkCook(repos, recipeObj, groupNames, targetVersion, 
+                            groupFlavors)
     buildTime = time.time()
 
     built = []
@@ -1520,7 +1632,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 	     emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,
-             downloadOnly = False):
+             downloadOnly = False, groupOptions = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -1649,7 +1761,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                                 crossCompile=crossCompile,
                                 callback=callback,
                                 requireCleanSources=requireCleanSources,
-                                downloadOnly = downloadOnly)
+                                downloadOnly = downloadOnly,
+                                groupOptions=groupOptions)
             if troves:
                 built.extend(tuple(troves))
         except errors.RepositoryError, e:
@@ -1662,7 +1775,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 resume = None, allowUnknownFlags = False,
                 showBuildReqs = False, ignoreDeps = False,
                 profile = False, logBuild = True,
-                crossCompile = None, cookIds=None, downloadOnly=False):
+                crossCompile = None, cookIds=None, downloadOnly=False,
+                groupOptions=None):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
@@ -1749,7 +1863,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                              ignoreDeps = ignoreDeps, logBuild = logBuild,
                              crossCompile = crossCompile,
                              callback = CookCallback(),
-                             downloadOnly = downloadOnly)
+                             downloadOnly = downloadOnly, 
+                             groupOptions=groupOptions)
             if built is None:
                 # showBuildReqs true, most likely
                 # Make sure we call os._exit in the child, sys.exit raises a

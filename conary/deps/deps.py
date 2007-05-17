@@ -12,6 +12,7 @@
 # full details.
 #
 
+import itertools
 import re
 from conary.lib import misc, util
 from conary.errors import ParseError
@@ -1186,6 +1187,34 @@ def mergeFlavor(flavor, mergeBase):
         if useSet:
             mergedFlavor.addDeps(UseDependency, useSet)
     return mergedFlavor
+
+def filterFlavor(depSet, filters):
+    if not isinstance(filters, (list, tuple)):
+        filters = [filters]
+    finalDepSet = Flavor()
+    for depTag, depClass in depSet.members.items():
+        filterClasses = [ x.members.get(depClass.tag, None) for x in filters ]
+        filterClasses = [ x for x in filterClasses if x is not None ]
+        if not filterClasses:
+            continue
+        depList = []
+        for dep in depClass.getDeps():
+            filterDeps = [ x.members.get(dep.name, None) for x in filterClasses]
+            filterDeps = [ x for x in filterDeps if x is not None ]
+            if filterDeps:
+                finalDep = _filterDeps(depClass, dep, filterDeps)
+                if finalDep is not None:
+                    depList.append(finalDep)
+        if depList:
+            finalDepSet.addDeps(depClass.__class__, depList)
+    return finalDepSet
+
+def _filterDeps(depClass, dep, filterDeps):
+    filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
+    finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]
+    if not depClass.depNameSignificant and not finalFlags:
+        return None
+    return Dependency(dep.name, finalFlags)
 
 def formatFlavor(flavor):
     """
