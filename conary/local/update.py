@@ -76,7 +76,7 @@ class FilesystemJob:
     def _registerLinkGroup(self, linkGroup, target):
         self.linkGroups[linkGroup] = target
 
-    def _restore(self, fileObj, target, troveInfo, filePriorityPath, msg, 
+    def _restore(self, fileObj, target, troveInfo, msg,
                  contentsOverride = "", replaceFiles = False, fileId = None):
         assert(contentsOverride != "" or fileId is not None)
         restoreFile = True
@@ -85,18 +85,7 @@ class FilesystemJob:
             pathId = self.restores[target][0]
             formerTroveInfo = self.restores[target][4]
 
-            pri = filePriorityPath.versionPriority(formerTroveInfo[1],
-                                                   troveInfo[1])
-            if pri == -1:
-                # silently skip this file
-                restoreFile = False
-                self.userRemoval(troveInfo[0], troveInfo[1], troveInfo[2],
-                                 fileObj.pathId())
-            elif pri == 1:
-                # replace the file
-                self.userRemoval(formerTroveInfo[0], formerTroveInfo[1],
-                                 formerTroveInfo[2], pathId)
-            elif not replaceFiles:
+            if not replaceFiles:
                 # we're not going to be able to install this; record the
                 # error, but fix things up so we don't generate a duplicate
                 # error later on
@@ -879,7 +868,7 @@ class FilesystemJob:
         return headFile
 
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
-                     removalHints, filePriorityPath, pathsMoved, flags):
+                     removalHints, pathsMoved, flags):
 	"""
 	Build up the todo list for applying a single trove to the
 	filesystem. 
@@ -903,9 +892,6 @@ class FilesystemJob:
         are being removed as part of this operation; troves which are
         scheduled to be removed won't generate file conflicts with new
         troves or install contents
-        @param filePriorityPath: list of labels; labels earlier in the list
-        get automatic priority over those later in the list
-        @type filePriorityPath: conarycfg.CfgLabelList
         @param pathsMoved: dict of paths which moved into this trove from
         another trove in the same job
         @type pathsMoved: dict
@@ -1058,17 +1044,6 @@ class FilesystemJob:
                                 fileConflict = False
                                 break
 
-                            pri = filePriorityPath.versionPriority(
-                                        info[1], newTroveInfo[1])
-                            if pri == 1:
-                                # the new trove has priority
-                                fileConflict = False
-                            elif pri == -1:
-                                # the already installed trove has priority
-                                restoreFile = False
-                                self.userRemoval(replaced = False,
-                                                 *(newTroveInfo + (pathId,)))
-
                         if restoreFile and fileConflict:
                             existingFile = files.FileFromFilesystem(
                                 headRealPath, pathId)
@@ -1096,7 +1071,6 @@ class FilesystemJob:
 
             if restoreFile:
                 self._restore(headFile, headRealPath, newTroveInfo, 
-                              filePriorityPath,
                               "creating %s", replaceFiles = flags.replaceFiles,
                               fileId = headFileId)
                 if isSrcTrove:
@@ -1211,7 +1185,6 @@ class FilesystemJob:
                                 isConfig = headFile.flags.isConfig(),
                                 isAutoSource = True)
                 self._restore(headFile, realPath, newTroveInfo,
-                              filePriorityPath,
                               "creating %s with contents "
                               "from repository",
                               replaceFiles = flags.replaceFiles,
@@ -1365,7 +1338,6 @@ class FilesystemJob:
                         fsFile.contents.sha1.set(sha1helper.sha1String(newContents))
                         fsFile.contents.size.set(len(newContents))
                         self._restore(fsFile, realPath, newTroveInfo,
-                                      filePriorityPath,
                                       "replacing %s with merged "
                                       "config file",
 				      contentsOverride = headFileContents,
@@ -1377,7 +1349,6 @@ class FilesystemJob:
                             fsFile.contents.sha1.set(headFile.contents.sha1())
                             fsFile.contents.size.set(headFile.contents.size())
                         self._restore(fsFile, realPath, newTroveInfo,
-                                      filePriorityPath,
 				      "replacing %s with contents "
 				      "from repository",
                                       replaceFiles = flags.replaceFiles,
@@ -1425,7 +1396,6 @@ class FilesystemJob:
                     cont = filecontents.FromString("".join(newLines))
                     # XXX update fsFile.contents.{sha1,size}?
                     self._restore(fsFile, realPath, newTroveInfo,
-                          filePriorityPath,
                           "merging changes from repository into %s",
                           contentsOverride = cont,
                           replaceFiles = flags.replaceFiles,
@@ -1453,7 +1423,6 @@ class FilesystemJob:
 
 	    if attributesChanged and not beenRestored:
                 self._restore(fsFile, realPath, newTroveInfo,
-                      filePriorityPath,
 		      "merging changes from repository into %s",
                       contentsOverride = None,
                       replaceFiles = flags.replaceFiles,
@@ -1466,7 +1435,6 @@ class FilesystemJob:
                 # None). We can't skip the _restore entirely because that
                 # does important file conflict handling.
                 self._restore(fsFile, realPath, newTroveInfo,
-                      filePriorityPath,
                       "file has not changed",
                       contentsOverride = None,
                       replaceFiles = flags.replaceFiles,
@@ -1565,7 +1533,7 @@ class FilesystemJob:
 
         return pathsMoved
 
-    def __init__(self, db, changeSet, fsTroveDict, root, filePriorityPath,
+    def __init__(self, db, changeSet, fsTroveDict, root,
                  callback = None, flags = None, removeHints = {},
                  rollbackPhase = None, deferredScripts = None):
 	"""
@@ -1582,9 +1550,6 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
-        @param filePriorityPath: list of labels; labels earlier in the list
-        get automatic priority over those later in the list
-        @type filePriorityPath: conarycfg.CfgLabelList
 	@param flags: flags which modify update behavior.
 	@type flags: UpdateFlags
         @param rollbackPhase: What part of a rollback is this (None for
@@ -1663,8 +1628,7 @@ class FilesystemJob:
 					 baseTrove.getFlavor()))
 
             self._singleTrove(db, troveCs, changeSet, baseTrove, newFsTrove, 
-                              root, removeHints, filePriorityPath,
-                              pathsMoved, flags)
+                              root, removeHints, pathsMoved, flags)
 
             newFsTrove.mergeTroveListChanges(
                 troveCs.iterChangedTroves(strongRefs = True, weakRefs = False),

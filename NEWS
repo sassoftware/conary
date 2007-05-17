@@ -1,3 +1,7 @@
+  o Internal Changes:
+    * Flags for update jobs changed from a bitmask to a class
+    * Removed vestigal support for file label priority paths
+
 Changes in @NEW@:
   o New Features
     * The listcachedir script has been added to help with maintenance

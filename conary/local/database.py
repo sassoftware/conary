@@ -827,14 +827,10 @@ class Database(SqlDbRepository):
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
-                        removeHints = {}, filePriorityPath = None,
-                        autoPinList = RegularExpressionList(),
+                        removeHints = {}, autoPinList = RegularExpressionList(),
                         keepJournal = False, deferPostScripts = False,
                         deferredScripts = None):
 	assert(not cs.isAbsolute())
-
-        if filePriorityPath is None:
-            filePriorityPath = CfgLabelList()
 
         flags = update.UpdateFlags()
         if replaceFiles:
@@ -895,8 +891,7 @@ class Database(SqlDbRepository):
             flags.merge = True
 
         fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root,
-                                     filePriorityPath, flags = flags,
-                                     callback = callback,
+                                     flags = flags, callback = callback,
                                      removeHints = removeHints,
                                      rollbackPhase = rollbackPhase,
                                      deferredScripts = deferredScripts)
@@ -1014,7 +1009,6 @@ class Database(SqlDbRepository):
             try:
                 csJob = localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
-                    filePriorityPath,
                     allowIncomplete = (rollbackPhase is not None),
                     pathRemovedCheck = fsJob.pathRemoved,
                     replaceFiles = replaceFiles)
