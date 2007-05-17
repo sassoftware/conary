@@ -1,7 +1,27 @@
 Changes in @NEW@:
   o New Features
     * The listcachedir script has been added to help with maintenance
-      tasks for the repository changeset cache (CNY-1469)
+      tasks for the repository changeset cache. (CNY-1469)
+    * Conary proxies are now adding an HTTP Via: header. (CNY-1604)
+
+  o Internal Changes:
+    * Creating changesets supports a 'mirrorMode', which includes file
+      contents of files if their version has changed (even if the sha1
+      of those contents are the same). Mirroring uses this to ensure
+      complete contents. (CNY-1570)
+
+  o Client Changes:
+    * A potential race condition where an update could change the state
+      of the Conary database while the rollback code is executing has
+      been fixed. Note that as part of the fix for CNY-1591, the update
+      and rollback operations cannot commit at the same time; the fix
+      further ensures long-running operations detect the state change.
+      (CNY-1624)
+
+  o Bug fixes:
+    * Manipulating source components now works better when a source
+      component has been marked removed. 
+
 
 Changes in 1.1.25:
   o New Feature:

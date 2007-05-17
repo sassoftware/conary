@@ -30,6 +30,11 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+class InfoURL(urllib.addinfourl):
+    def __init__(self, fp, headers, url, protocolVersion):
+        urllib.addinfourl.__init__(self, fp, headers, url)
+        self.protocolVersion = protocolVersion
+
 class DecompressFileObj:
     "implements a wrapper file object that decompress()s data on the fly"
     def __init__(self, fp):
@@ -161,9 +166,13 @@ class URLOpener(urllib.FancyURLopener):
 
         # Wrap the socket in an SSL socket
         sslSock = socket.ssl(sock, None, None)
-        h = httplib.HTTP("%s:%s" % (endpointHost, endpointPort))
+        h = httplib.HTTPConnection("%s:%s" % (endpointHost, endpointPort))
+        # Force HTTP/1.0 (this is the default for the old-style HTTP;
+        # new-style HTTPConnection defaults to 1.1)
+        h._http_vsn = 10
+        h._http_vsn_str = 'HTTP/1.0'
         # This is a bit unclean
-        h._conn.sock = httplib.FakeSocket(sock, sslSock)
+        h.sock = httplib.FakeSocket(sock, sslSock)
         return h
 
     def proxyBypass(self, proxy, host):
@@ -250,9 +259,13 @@ class URLOpener(urllib.FancyURLopener):
             if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost)
             else:
-                h = httplib.HTTPS(host, None, None)
+                h = httplib.HTTPSConnection(host)
         else:
-            h = httplib.HTTP(host)
+            h = httplib.HTTPConnection(host)
+        # Force HTTP/1.0 (this is the default for the old-style HTTP;
+        # new-style HTTPConnection defaults to 1.1)
+        h._http_vsn = 10
+        h._http_vsn_str = 'HTTP/1.0'
 
         headers = []
         if realhost:
@@ -287,8 +300,10 @@ class URLOpener(urllib.FancyURLopener):
             h.send(data)
         # wait for a response
         self._wait(h)
-        errcode, errmsg, headers = h.getreply()
-        fp = h.getfile()
+        response = h.getresponse()
+        errcode, errmsg = response.status, response.reason
+        headers = response.msg
+        fp = response.fp
         if errcode == 200:
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
@@ -296,7 +311,8 @@ class URLOpener(urllib.FancyURLopener):
                 #fp = DecompressFileObj(fp)
                 fp = StringIO(zlib.decompress(fp.read()))
 
-            return urllib.addinfourl(fp, headers, selector)
+            protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
+            return InfoURL(fp, headers, selector, protocolVersion)
         else:
             return self.http_error(urlstr, fp, errcode, errmsg, headers, data)
 
@@ -306,8 +322,7 @@ class URLOpener(urllib.FancyURLopener):
             check = self.abortCheck
         else:
             check = lambda: False
-        # FIXME: this is poking at httplib internals.  Should subclass.
-        sourceFd = h._conn.sock.fileno()
+        sourceFd = h.sock.fileno()
         while True:
             if check():
                 raise AbortError
@@ -359,18 +374,27 @@ class Transport(xmlrpclib.Transport):
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
 
     def __init__(self, https = False, entitlement = None, proxies = None,
-                 serverName = None):
+                 serverName = None, extraHeaders = None):
         self.https = https
         self.compress = False
         self.abortCheck = None
         self.proxies = proxies
         self.serverName = serverName
+        self.setExtraHeaders(extraHeaders)
+        self.responseHeaders = None
+        self.responseProtocol = None
         self.usedProxy = False
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))
         else:
             self.entitlement = None
+
+    def setExtraHeaders(self, extraHeaders):
+        self.extraHeaders = extraHeaders or {}
+
+    def addExtraHeaders(self, extraHeaders):
+        self.extraHeaders.update(extraHeaders)
 
     def setCompress(self, compress):
         self.compress = compress
@@ -406,7 +430,10 @@ class Transport(xmlrpclib.Transport):
         if self.serverName:
             opener.addheader('X-Conary-Servername', self.serverName)
 
-	opener.addheader('User-agent', self.user_agent)
+        opener.addheader('User-agent', self.user_agent)
+        for k, v in self.extraHeaders.items():
+            opener.addheader(k, v)
+
         tries = 0
         url = ''.join([protocol, '://', host, handler])
         while tries < 5:
@@ -431,6 +458,9 @@ class Transport(xmlrpclib.Transport):
                         raise
                 else:
                     raise
+        if hasattr(response, 'headers'):
+            self.responseHeaders = response.headers
+            self.responseProtocol = response.protocolVersion
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc

@@ -14,7 +14,7 @@
 
 import base64, cPickle, itertools, os, tempfile, urllib, xmlrpclib
 
-from conary import conarycfg, trove
+from conary import constants, conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
@@ -38,6 +38,19 @@ class ProxyClient(xmlrpclib.ServerProxy):
 
     pass
 
+class ExtraInfo(object):
+    """This class is used for passing extra information back to the server
+    running class (either standalone or apache)"""
+    __slots__ = [ 'responseHeaders', 'responseProtocol' ]
+    def __init__(self, responseHeaders, responseProtocol):
+        self.responseHeaders = responseHeaders
+        self.responseProtocol = responseProtocol
+
+    def getVia(self):
+        if not self.responseHeaders:
+            return None
+        return self.responseHeaders.get('Via', None)
+
 class ProxyCaller:
 
     def callByName(self, methodname, *args):
@@ -57,16 +70,23 @@ class ProxyCaller:
 
         return (rc[0], rc[2])
 
+    def getExtraInfo(self):
+        """Return extra information if available"""
+        return ExtraInfo(self._transport.responseHeaders,
+                         self._transport.responseProtocol)
+
     def __getattr__(self, method):
         return lambda *args: self.callByName(method, *args)
 
-    def __init__(self, proxy):
+    def __init__(self, proxy, transport):
         self.proxy = proxy
+        self._transport = transport
 
 class ProxyCallFactory:
 
     @staticmethod
-    def createCaller(protocol, port, rawUrl, proxies, authToken):
+    def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
+                     protocolString, headers):
         url = redirectUrl(authToken, rawUrl)
 
         if authToken[2] is not None:
@@ -74,14 +94,26 @@ class ProxyCallFactory:
         else:
             entitlement = None
 
+        via = []
+        # Via is a multi-valued header. Multiple occurences will be collapsed
+        # as a single string, separated by ,
+        if 'Via' in headers:
+            via.append(headers['via'])
+        if localAddr and protocolString:
+            via.append(formatViaHeader(localAddr, protocolString))
+        lheaders = {}
+        if via:
+            lheaders['Via'] = ', '.join(via)
+
         transporter = transport.Transport(https = url.startswith('https:'),
                                           entitlement = entitlement,
                                           proxies = proxies)
+        transporter.setExtraHeaders(lheaders)
 
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
 
-        return ProxyCaller(proxy)
+        return ProxyCaller(proxy, transporter)
 
 class RepositoryCaller:
 
@@ -95,6 +127,10 @@ class RepositoryCaller:
 
         return (rc[0], rc[2])
 
+    def getExtraInfo(self):
+        """No extra information available for a RepositoryCaller"""
+        return None
+
     def __getattr__(self, method):
         return lambda *args: self.callByName(method, *args)
 
@@ -106,10 +142,14 @@ class RepositoryCaller:
 
 class RepositoryCallFactory:
 
-    def __init__(self, repos):
+    def __init__(self, repos, logger):
         self.repos = repos
+        self.log = logger
 
-    def createCaller(self, protocol, port, rawUrl, proxies, authToken):
+    def createCaller(self, protocol, port, rawUrl, proxies, authToken,
+                     localAddr, protocolString, headers):
+        if 'via' in headers:
+            self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos)
 
 class BaseProxy(xmlshims.NetworkConvertors):
@@ -142,9 +182,16 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.log(1, "proxy url=%s" % basicUrl)
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
-                    remoteIp = None, rawUrl = None):
+                    remoteIp = None, rawUrl = None, localAddr = None,
+                    protocolString = None, headers = None):
+        """
+        @param localAddr: if set, a string host:port identifying the address
+        the client used to talk to us.
+        @param protocolString: if set, the protocol version the client used
+        (i.e. HTTP/1.0)
+        """
         if methodname not in self.publicCalls:
-            return (False, True, ("MethodNotSupported", methodname, ""))
+            return (False, True, ("MethodNotSupported", methodname, ""), None)
 
         self._port = port
         self._protocol = protocol
@@ -154,7 +201,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
-                                               self.proxies, authToken)
+                                               self.proxies, authToken,
+                                               localAddr, protocolString,
+                                               headers)
 
         try:
             if hasattr(self, methodname):
@@ -165,13 +214,13 @@ class BaseProxy(xmlshims.NetworkConvertors):
                     self.callLog.log(remoteIp, authToken, methodname, args)
 
                 anon, r = method(caller, authToken, *args)
-                return (anon, False, r)
+                return (anon, False, r, caller.getExtraInfo())
 
             r = caller.callByName(methodname, *args)
         except ProxyRepositoryError, e:
-            return (False, True, e.args)
+            return (False, True, e.args, None)
 
-        return (r[0], False, r[1])
+        return (r[0], False, r[1], caller.getExtraInfo())
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -304,7 +353,7 @@ class ChangesetFilter(BaseProxy):
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource,
-                     changesetVersion = None):
+                     changesetVersion = None, mirrorMode = False):
 
         def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
             csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
@@ -361,9 +410,15 @@ class ChangesetFilter(BaseProxy):
         fingerprints = [ '' ] * len(chgSetList)
         if self.csCache:
             try:
-                useAnon, fingerprints = caller.getChangeSetFingerprints(43,
-                        chgSetList, recurse, withFiles, withFileContents,
-                        excludeAutoSource)
+                if mirrorMode:
+                    useAnon, fingerprints = caller.getChangeSetFingerprints(49,
+                            chgSetList, recurse, withFiles, withFileContents,
+                            excludeAutoSource)
+                else:
+                    useAnon, fingerprints = caller.getChangeSetFingerprints(43,
+                            chgSetList, recurse, withFiles, withFileContents,
+                            excludeAutoSource)
+
             except ProxyRepositoryError, e:
                 # old server; act like no fingerprints were returned
                 if e.args[0] == 'MethodNotSupported':
@@ -402,9 +457,15 @@ class ChangesetFilter(BaseProxy):
 
             if path is None:
                 # the changeset isn't in the cache.  create it
-                rc = caller.getChangeSet(getCsVersion, [ rawJob ],
+                if mirrorMode:
+                    rc = caller.getChangeSet(getCsVersion, [ rawJob ],
+                                         recurse, withFiles, withFileContents,
+                                         excludeAutoSource, mirrorMode)[1]
+                else:
+                    rc = caller.getChangeSet(getCsVersion, [ rawJob ],
                                          recurse, withFiles, withFileContents,
                                          excludeAutoSource)[1]
+
                 removedTroves = []
                 if getCsVersion < 38:
                     url, sizes, trovesNeeded, filesNeeded = rc
@@ -510,11 +571,11 @@ class SimpleRepositoryFilter(ChangesetFilter):
             csCache = None
 
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
-        self.callFactory = RepositoryCallFactory(repos)
+        self.callFactory = RepositoryCallFactory(repos, self.log)
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48 ]
+    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49 ]
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)
@@ -641,6 +702,10 @@ def redirectUrl(authToken, url):
     url = '/'.join(s)
 
     return url
+
+def formatViaHeader(localAddr, protocolString):
+    return "%s %s (Conary/%s)" % (protocolString, localAddr,
+                                  constants.version)
 
 class ProxyRepositoryError(Exception):
 

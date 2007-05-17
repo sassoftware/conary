@@ -83,10 +83,14 @@ def apply(db, cfg, rollbackSpec, **kwargs):
 
 def applyRollback(client, rollbackSpec, **kwargs):
     client.checkWriteableRoot()
+    # Record the transaction counter, to make sure the state of the database
+    # didn't change while we were computing the rollback list.
+    transactionCounter = client.db.getTransactionCounter()
 
     log.syslog.command()
 
-    defaults = { 'replaceFiles': False }
+    defaults = dict(replaceFiles = False,
+                    transactionCounter = transactionCounter)
     defaults.update(kwargs)
 
     client.db.readRollbackStatus()
