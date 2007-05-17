@@ -27,15 +27,15 @@ class Hunk:
 	fromLine = srcLine
 	for line in self.lines:
 	    if line[0] == " ":
+                if fromLine >= len(src):
+                    continue
+
 		result.append(src[fromLine])
 		fromLine = fromLine + 1
 	    elif line[0] == "+":
 		result.append(line[1:])
 	    elif line[0] == "-":
 		fromLine = fromLine + 1
-
-	assert(fromLine == self.fromLen + srcLine)
-	assert(len(result) == self.toLen)
 
 	return result
 
