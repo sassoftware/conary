@@ -151,6 +151,9 @@ class ShimServerProxy(netclient.ServerProxy):
     def getChangeSetObj(self, *args):
         return self._server._getChangeSetObj(self._authToken, *args)
 
+    def usedProxy(self, *args):
+        return False
+
     def __getattr__(self, name):
         return _ShimMethod(self._server,
             self._protocol, self._port,
