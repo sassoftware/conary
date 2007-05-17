@@ -355,7 +355,7 @@ def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCa
         log.debug("jobsplit %d of %d %s" % (
             i + 1, len(jobs), displayBundle([(0,x) for x in smallJobList])))
         cs = src.createChangeSetFile(smallJobList, tmpName, recurse = False,
-                                     callback = callback)
+                                     callback = callback, mirrorMode = True)
         for target in targetSet:
             target.commitChangeSetFile(tmpName, hidden = hidden, callback = callback)
         os.unlink(tmpName)
@@ -789,8 +789,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
             try:
                 cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
-                                                     callback = callback,
-                                                     mirrorMode = True)
+                                                     callback = callback, mirrorMode = True)
             except changeset.ChangeSetKeyConflictError, e:
                 splitJobList(jobList, sourceRepos, targetSet, hidden=hidden,
                              callback=callback)
