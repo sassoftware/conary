@@ -1974,9 +1974,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN FileStreams USING (fileId)
         JOIN TroveFiles USING (streamId)
         JOIN Instances USING (instanceId)
-        JOIN Items USING (itemId)
+        JOIN Items ON Instances.itemId = Items.itemId
         JOIN Nodes ON
-            Instances.itemId = Nodes.ItemId AND
+            Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
         JOIN LabelMap ON
             Nodes.itemId = LabelMap.itemId AND
