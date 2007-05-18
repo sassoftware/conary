@@ -402,7 +402,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if (mirrorMode or contentsHash or
+		if ((mirrorMode and newFile.hasContents) or contentsHash or
                              (oldFile and newFile.flags.isConfig()
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion and oldFile.hasContents:

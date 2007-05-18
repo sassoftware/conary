@@ -1546,7 +1546,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if excludeAutoSource and newFileObj.flags.isAutoSource():
                     continue
 
-                if withFileContents and (mirrorMode or hash):
+                if (withFileContents and 
+                        ((mirrorMode and newFileObj.hasContents) or hash)):
                     # pull contents from the trove it was originally
                     # built in
                     fetchItems = []
