@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -339,7 +339,7 @@ class ChangeSetJob:
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False, allowIncomplete = False,
-                 hidden = False):
+                 hidden = False, mirror = False):
 	self.repos = repos
 	self.cs = cs
         self.invalidateRollbacksFlag = False
@@ -469,7 +469,8 @@ class ChangeSetJob:
                             except errors.FileStreamMissing:
                                 # Missing from the repo; raise exception
                                 raise errors.IntegrityError(
-                                    "Incomplete changeset specified: missing pathId %s fileId %s" % (sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
+                                    "Incomplete changeset specified: missing pathId %s fileId %s" % (
+                                    sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
                         fileObj = None
                         fileStream = None
                     else:
@@ -479,18 +480,15 @@ class ChangeSetJob:
                                 # stored as a diff (the file type is the same
                                 # and (for *repository* commits) the file
                                 # is in the same repository between versions
-                                oldfile = repos.getFileVersion(pathId,
-                                                    oldFileId, oldVersion)
+                                oldfile = repos.getFileVersion(pathId, oldFileId, oldVersion)
                                 fileObj = oldfile.copy()
                                 fileObj.twm(diff, oldfile)
                                 assert(fileObj.pathId() == pathId)
                                 fileStream = fileObj.freeze()
 
-                                if (fileObj.hasContents and
-                                    fileObj.contents.sha1() ==
-                                        oldfile.contents.sha1() and
-                                    not (fileObj.flags.isConfig() and 
-                                            not oldfile.flags.isConfig())):
+                                if (not mirror) and (
+                                    fileObj.hasContents and fileObj.contents.sha1() == oldfile.contents.sha1()
+                                    and not (fileObj.flags.isConfig() and not oldfile.flags.isConfig())):
                                     restoreContents = 0
                             else:
                                 fileObj = files.ThawFile(diff, pathId)
