@@ -1058,7 +1058,7 @@ class PasswordCheckParser(dict):
         pass
 
     def CharacterDataHandler(self, data):
-        if data:
+        if data.strip():
             self.valid = False
 
     def parse(self, s):
