@@ -180,13 +180,13 @@ class InodeStream(streams.StreamSet):
         return streams.StreamSet.__eq__(self, other, skipSet = skipSet)
 
     def __init__(self, perms = None, mtime = None, owner = None, group = None):
-        if perms and mtime is None:
+        if perms is not None and mtime is None:
             # allow us to to pass in a frozen InodeStream as the 
             # first argument - mtime will be None in that case.
             streams.StreamSet.__init__(self, perms)
         else:
             streams.StreamSet.__init__(self)
-            if perms:
+            if perms is not None:
                 self.perms.set(perms)
                 self.mtime.set(mtime)
                 self.owner.set(owner)
