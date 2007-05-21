@@ -65,7 +65,7 @@ def verifyTrove(trove, db, cfg):
         origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
                               pristine = True)
         ver = ver.createShadow(versions.LocalLabel())
-        l.append((trove, origTrove, ver, 0))
+        l.append((trove, origTrove, ver, update.UpdateFlags()))
 
     try:
         result = update.buildLocalChanges(db, l, root = cfg.root, 

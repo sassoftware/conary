@@ -843,9 +843,9 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                 # change these values
                                 LocalFlags._override(flag, value)
                         elif error:
-                            raise RuntimeError, ('Trying to set a flavor with '
-                                                 'localflag %s when no trove '
-                                                 ' name was given' % flag)
+                            raise RuntimeError('Trying to set a flavor with '
+                                               'localflag %s when no trove '
+                                               'name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             if len([ x for x in depGroup.getDeps()]) > 1:
                 setOnlyIfMajArchSet = True

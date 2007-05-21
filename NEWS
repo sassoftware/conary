@@ -13,7 +13,11 @@ Changes in @NEW@:
 
   o Bug fixes:
     * Patch code no longer fails when trailing context is missing at the
-      end of the file (CNY-1638)
+      end of the file. (CNY-1638)
+    * Files with no permissions set (chmod 0) confused Conary due to
+      improper checks for None. (CNY-1678)
+    * Errors in the changeset downloading code are no longer ignored by the
+      client. (CNY-1682)
 
 Changes in 1.1.26:
   o New Features:
