@@ -338,7 +338,7 @@ class URLOpener(urllib.FancyURLopener):
                 # ready to read response
                 break
 
-    def http_error(self, url, fp, errcode, errmsg, headers, data=None):
+    def http_error_default(self, url, fp, errcode, errmsg, headers, data=None):
         raise TransportError("Unable to open %s: %s" % (url, errmsg))
 
 class ConaryURLOpener(URLOpener):
