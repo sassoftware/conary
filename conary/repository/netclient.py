@@ -180,6 +180,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise errors.FileStreamMissing((self.toFileId(exceptionArgs[0])))
         elif exceptionName == 'RepositoryLocked':
             raise errors.RepositoryLocked
+        elif exceptionName == 'RepositoryError':
+            raise errors.RepositoryError(exceptionArgs[0])
 	else:
             for klass, marshall in errors.simpleExceptions:
                 if exceptionName == marshall:
@@ -1280,8 +1282,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # how to handle that.  So, we force the url to be reinterpreted
             # by the proxy no matter what.
             forceProxy = server.usedProxy()
-            inF = transport.ConaryURLOpener(proxies = self.proxies,
-                                            forceProxy=forceProxy).open(url)
+            try:
+                inF = transport.ConaryURLOpener(proxies = self.proxies,
+                                                forceProxy=forceProxy).open(url)
+            except transport.TransportError, e:
+                raise errors.RepositoryError(*e.args)
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(

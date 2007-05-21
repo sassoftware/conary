@@ -314,7 +314,7 @@ class URLOpener(urllib.FancyURLopener):
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
             return InfoURL(fp, headers, selector, protocolVersion)
         else:
-            return self.http_error(urlstr, fp, errcode, errmsg, headers, data)
+            return self.http_error(selector, fp, errcode, errmsg, headers, data)
 
     def _wait(self, h):
         # wait for data if abortCheck is set
@@ -337,6 +337,9 @@ class URLOpener(urllib.FancyURLopener):
             else:
                 # ready to read response
                 break
+
+    def http_error(self, url, fp, errcode, errmsg, headers, data=None):
+        raise TransportError("Unable to open %s: %s" % (url, errmsg))
 
 class ConaryURLOpener(URLOpener):
     """An opener aware of the conary:// protocol"""
@@ -466,3 +469,5 @@ class Transport(xmlrpclib.Transport):
 	return rc
 
 class AbortError(Exception): pass
+
+class TransportError(Exception): pass
