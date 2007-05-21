@@ -1316,7 +1316,6 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     localVer = parentRootVersion.createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
-                                 conarycfg.CfgLabelList(),
                                  flags = update.UpdateFlags(ignoreUGids = True,
                                                             merge = True) )
     errList = fsJob.getErrorList()
