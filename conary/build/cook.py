@@ -250,7 +250,7 @@ class GroupCookOptions(object):
 
     def _checkCook(self, repos, recipeObj, groupNames, targetVersion,
                    groupFlavors):
-        if self.errorOnFlavorChange:
+        if self.errorOnFlavorChange and not targetVersion.isOnLocalHost():
             self._checkFlavors(repos, groupNames, targetVersion, groupFlavors)
 
     def _checkFlavors(self, repos, groupNames, targetVersion, groupFlavors):
