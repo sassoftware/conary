@@ -1146,7 +1146,6 @@ def updateSrc(repos, versionStr = None, callback = None):
     localVer = state.getVersion().createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
-                                 conarycfg.CfgLabelList(),
                                  flags = update.UpdateFlags(ignoreUGids = True,
                                                             merge = True) )
     errList = fsJob.getErrorList()
