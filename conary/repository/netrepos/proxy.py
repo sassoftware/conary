@@ -478,7 +478,10 @@ class ChangesetFilter(BaseProxy):
                 size = sizes[0]
 
                 if cachable:
-                    inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+                    try:
+                        inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+                    except transport.TransportError, e:
+                        raise ProxyRepositoryError(("RepositoryError", e.args[0]))
                     csPath =_addToCache(fingerprint, inF, wireCsVersion,
                                 (trovesNeeded, filesNeeded, removedTroves),
                                 size)
