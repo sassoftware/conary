@@ -1009,6 +1009,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return rc[0]
 
     def getTroves(self, troves, withFiles = True, callback = None):
+        """
+        @param troves: List of troves to be retrieved
+        @type troves: list
+        @param withFiles: If set (default), retrieve files.
+        @type withFiles: bool
+        @raise RepositoryError: if a repository error occurred.
+        """
         if not troves:
             return []
 	chgSetList = []
@@ -1040,6 +1047,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         withFileContents = True,
                         excludeAutoSource = False, recurse = True,
                         primaryTroveList = None, callback = None):
+        """
+        @raise RepositoryError: if a repository error occurred.
+        """
         allJobs = [ (jobList, False) ]
         mergeTarget = None
 
@@ -1098,6 +1108,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             version from the server. The value is one of the FILE_CONTAINER_*
             constants defined in the NetworkRepositoryClient class.
         @raise FilesystemError: if the destination file is not writable
+        @raise RepositoryError: if a repository error occurred.
         """
 
         # mirrorMode forces contents to be included whenever the fileId
