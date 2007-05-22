@@ -2,10 +2,12 @@ Changes in @NEW@:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook action
       instead of one-by-one. (CNY-1303)
-    * Group flavors are much shorter by default. Extra flags can be added to 
+    * Group flavors are much shorter by default. Extra flags can be added to
       the group by calling "SetFlavor" in the group recipe.  Some flags, like
       vmware and xen and architecture flags, are always included in a group
-      flavor.  (CNY-1641)
+      flavor. (CNY-1641)
+    * The Conary client is now able to access the network using
+      authenticated HTTP proxies. (CNY-1687)
 
   o Internal Changes:
     * Flags for update jobs changed from a bitmask to a class
