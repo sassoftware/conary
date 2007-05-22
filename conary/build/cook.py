@@ -268,6 +268,9 @@ class GroupCookOptions(object):
         if latest:
             maxVersion = max([x[1] for x in latest])
             latest = [ x for x in latest if x[1] == maxVersion ]
+        else:
+            # nothing cooked on this label yet!
+            return
         newNamesByFlavor = dict(zip(groupFlavors, groupNames))
         oldNamesByFlavor = {}
         addedNames = {}
@@ -306,13 +309,15 @@ With the latest conary, you must now cook all versions of a group at the same ti
             raise builderrors.GroupFlavorChangedError(errMsg)
 
     def shortenFlavors(self, keyFlavor, builtGroups):
-        if keyFlavor is None and len(builtGroups) == 1:
-            keyFlavor = deps.Flavor()
-        # how do we make kernel.smp a platform Flags
-        if keyFlavor is not None:
-            keyFlavors = [ keyFlavor, use.platformFlagsToFlavor()]
+        if isinstance(keyFlavor, list):
+            keyFlavors = keyFlavor
         else:
-            keyFlavors = [ use.platformFlagsToFlavor() ]
+            if keyFlavor is None and len(builtGroups) == 1:
+                keyFlavor = deps.Flavor()
+            if keyFlavor is not None:
+                keyFlavors = [ keyFlavor, use.platformFlagsToFlavor()]
+            else:
+                keyFlavors = [ use.platformFlagsToFlavor() ]
 
         newBuiltGroups = []
         for recipeObj, flavor in builtGroups:
@@ -320,7 +325,7 @@ With the latest conary, you must now cook all versions of a group at the same ti
                                         deps.InstructionSetDependency))
             shortenedFlavor = deps.filterFlavor(flavor, keyFlavors)
             if archFlags:
-                shortenedFlavor.addDeps(deps.InstructionSetDependency, 
+                shortenedFlavor.addDeps(deps.InstructionSetDependency,
                                         archFlags)
             newBuiltGroups.append((recipeObj, shortenedFlavor))
 
@@ -328,11 +333,17 @@ With the latest conary, you must now cook all versions of a group at the same ti
         if len(set(groupFlavors)) == len(groupFlavors):
             return newBuiltGroups
 
-        fDict = deps.flavorDifferences([x[1] for x in builtGroups])
-        for ((recipeObj, fullFlavor), (_, shortenedFlavor)) in \
-                                            zip(builtGroups, newBuiltGroups):
-            shortenedFlavor.union(fDict[fullFlavor])
-        return newBuiltGroups
+        duplicates = {}
+        for idx, (recipeObj, groupFlavor) in enumerate(newBuiltGroups):
+            duplicates.setdefault(groupFlavor, []).append(idx)
+        duplicates = [ x[1] for x in duplicates.items() if len(x[1]) > 1 ]
+        for duplicateIdxs in duplicates:
+            fullFlavors = [ builtGroups[x][1] for x in duplicateIdxs ]
+            fDict = deps.flavorDifferences(fullFlavors)
+            # add to keyFlavors everything that's needed to distinguish these
+            # groups.
+            keyFlavors.extend(fDict.values())
+        return self.shortenFlavors(keyFlavors, builtGroups)
 
 def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={},
@@ -718,7 +729,9 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         builtGroups.append((recipeObj, grpFlavor))
         groupNames.append(recipeObj.getGroupNames())
 
-    keyFlavor = recipeObj.keyFlavor
+    keyFlavor = getattr(recipeObj, 'keyFlavor', None)
+    if isinstance(keyFlavor, str):
+        keyFlavor = deps.parseFlavor(keyFlavor, raiseError=True)
     groupFlavors = []
     newBuiltGroups = []
     builtGroups = groupOptions.shortenFlavors(keyFlavor, builtGroups)

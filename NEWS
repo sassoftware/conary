@@ -2,8 +2,7 @@ Changes in @NEW@:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook action
       instead of one-by-one. (CNY-1303)
-    * Group flavors are much shorter by default. Extra flags can be added to 
-      the group by calling "SetFlavor" in the group recipe.  Some flags, like
+    * Group flavors are much shorter by default.  Some flags, like
       vmware and xen and architecture flags, are always included in a group
       flavor.  (CNY-1641)
 
