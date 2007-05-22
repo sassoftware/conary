@@ -76,10 +76,10 @@ class Flag(dict):
         self._shortDoc = doc
 
     def setRequired(self, value=True):
-        self._required = value 
+        self._required = value
 
     def setPlatform(self, value=True):
-        self._platform = platform
+        self._platform = value
 
     def isPlatformFlag(self):
         return self._platform
@@ -674,7 +674,6 @@ class LocalFlagCollection(Collection):
 
 ####################### Package Local Flags Here ###################
 
-
 class PackageFlagCollection(Collection):
 
     def __init__(self, track=False):
@@ -706,7 +705,7 @@ class PackageFlagPackageCollection(Collection):
         self._addFlag(key)
         return self[key]
 
-class PackageFlag(Flag):
+class PackageFlag(LocalFlag):
     pass
 
 def allowUnknownFlags(value=True):
@@ -765,7 +764,7 @@ def localFlagsToFlavor(recipeName):
 
 def platformFlagsToFlavor():
     flags = []
-    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll()):
+    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), LocalFlags._iterAll()):
         if flag.isPlatformFlag():
             flags.append(flag)
     return createFlavor(None, flags)
@@ -800,6 +799,8 @@ def createFlavor(recipeName, *flagIterables, **kw):
         elif flagType == LocalFlag:
             assert(recipeName)
             set.union(flag._toDependency(recipeName))
+        elif flagType == PackageFlag:
+            set.union(flag._toDependency(flag._parent._name))
     return set
 
 def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
