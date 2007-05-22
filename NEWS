@@ -4,7 +4,9 @@ Changes in @NEW@:
       instead of one-by-one. (CNY-1303)
     * Group flavors are much shorter by default.  Some flags, like
       vmware and xen and architecture flags, are always included in a group
-      flavor.  (CNY-1641)
+      flavor. (CNY-1641)
+    * The Conary client is now able to access the network using
+      authenticated HTTP proxies. (CNY-1687)
 
   o Internal Changes:
     * Flags for update jobs changed from a bitmask to a class
