@@ -468,6 +468,7 @@ class FilesystemJob:
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
                         updatePtrs(ptrId, pathId, ptrTargets, override,
                                    contents, target)
+                        continue
                 else:
                     if (lastRestored.pathId, lastRestored.fileId) == \
                                     (pathId, fileId):

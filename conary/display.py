@@ -669,7 +669,7 @@ class TroveFormatter(TroveTupFormatter):
                                  bool(trove.troveInfo.incomplete())),
                                 ("TroveVer  : %s" %
                                             trove.troveInfo.troveVersion()))
-            yield "%-30s" % (("Cloned    : %s" % trove.troveInfo.clonedFrom()))
+            yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
 
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):
