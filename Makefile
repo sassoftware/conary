@@ -77,6 +77,8 @@ tag:
 
 clean: clean-subdirs default-clean
 
+check: check-subdirs
+
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
 	sed -i 's,version = ".*",version = "$(VERSION)",' \

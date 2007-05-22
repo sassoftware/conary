@@ -16,6 +16,7 @@ from conary import files
 from conary.errors import ParseError
 from conary.build import action, source
 from conary.build.errors import RecipeFileError
+from conary.lib import log
 
 import os
 

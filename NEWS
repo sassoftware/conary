@@ -18,6 +18,7 @@ Changes in @NEW@:
       improper checks for None. (CNY-1678)
     * Errors in the changeset downloading code are no longer ignored by the
       client. (CNY-1682)
+    * An error in the resumption of a build has been fixed. (CNY-1684)
 
 Changes in 1.1.26:
   o New Features:
