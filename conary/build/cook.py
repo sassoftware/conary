@@ -309,15 +309,16 @@ With the latest conary, you must now cook all versions of a group at the same ti
             raise builderrors.GroupFlavorChangedError(errMsg)
 
     def shortenFlavors(self, keyFlavor, builtGroups):
+        groupName = builtGroups[0][0].name
         if isinstance(keyFlavor, list):
             keyFlavors = keyFlavor
         else:
             if keyFlavor is None and len(builtGroups) == 1:
                 keyFlavor = deps.Flavor()
             if keyFlavor is not None:
-                keyFlavors = [ keyFlavor, use.platformFlagsToFlavor()]
+                keyFlavors = [ keyFlavor, use.platformFlagsToFlavor(groupName)]
             else:
-                keyFlavors = [ use.platformFlagsToFlavor() ]
+                keyFlavors = [ use.platformFlagsToFlavor(groupName) ]
 
         newBuiltGroups = []
         for recipeObj, flavor in builtGroups:

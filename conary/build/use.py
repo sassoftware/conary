@@ -762,12 +762,12 @@ def allFlagsToFlavor(recipeName):
 def localFlagsToFlavor(recipeName):
     return createFlavor(recipeName, LocalFlags._iterAll())
 
-def platformFlagsToFlavor():
+def platformFlagsToFlavor(recipeName=None):
     flags = []
     for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), LocalFlags._iterAll()):
         if flag.isPlatformFlag():
             flags.append(flag)
-    return createFlavor(None, flags)
+    return createFlavor(recipeName, flags, error=False)
 
 def createFlavor(recipeName, *flagIterables, **kw):
     """ create a dependency set consisting of all of the flags in the 
