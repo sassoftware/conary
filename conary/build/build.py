@@ -3469,7 +3469,7 @@ class IncludeLicense(BuildAction):
             if isinstance(arg,tuple):
                 if not os.isfile(arg[0]):
                     raise RuntimeError, arg[0]+' is not a normal file'
-                text = arg[0].read()
+                text = open(arg[0]).read()
                 self.writeLicenses(text,arg[1])
 
             # directory of directories of licenses
