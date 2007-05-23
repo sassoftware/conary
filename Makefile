@@ -58,7 +58,7 @@ dist:
 archive:
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
-	hg archive -t tbz2 conary-$(VERSION).tar.bz2
+	hg archive -t tbz2 -r conary-$(VERSION) conary-$(VERSION).tar.bz2
 
 smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
