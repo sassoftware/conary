@@ -31,7 +31,6 @@ from conary import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util
-from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
@@ -110,12 +109,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def doCall(self, clientVersion, *args):
         try:
-            try:
-                return self.__doCall(clientVersion, args)
-            except Exception, err:
-                log.debug('Raised %s: %s' % (err.__class__.__name__, str(err)))
-                raise
-        except errors.InsufficientPermission, err:
+            return self.__doCall(clientVersion, args)
+        except errors.InsufficientPermission:
             # no password was specified -- prompt for it
             if not self.__pwCallback():
                 # It's possible we switched to anonymous
@@ -245,8 +240,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
             return False
 
     def __getattr__(self, name):
-        from conary.lib import log
-        log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
+        #from conary.lib import log
+        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.__protocolVersion)
