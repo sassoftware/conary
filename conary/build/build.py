@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -3480,4 +3480,53 @@ class IncludeLicense(BuildAction):
             else:
                 raise RuntimeError, arg+' is unknown input'
 
+class MakeFIFO(_FileAction):
+    """
+    NAME
+    ====
+
+    B{C{r.MakeFIFO()}} - Creates a FIFO (named pipe)
+
+    SYNOPSIS
+    ========
+
+    C{r.MakeFIFO(I{path}, [I{mode}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.MakeFIFO()} class is called from within a Conary recipe to create a
+    named pipe.
+
+    KEYWORDS
+    ========
+
+    The C{r.MakeFIFO()} class accepts the following keywords:
+
+    B{mode} : The mode of the file (defaults to 0644)
+
+    EXAMPLES
+    ========
+
+    C{r.Create('%(localstatedir)s/log/acpid', mode=0640)}
+
+    Demonstrates calling C{r.Create()} specifying the creation of
+    C{%(localstatedir)s/log/acpid} with mode C{0640}.
+    """
+    keywords = {'mode': 0644}
+    def do(self, macros):
+        bracepath = action._expandOnePath(self.path, macros, braceGlob=False)
+        for fullpath in util.braceExpand(bracepath):
+            log.info('creating fifo %s' % fullpath)
+            util.mkdirChain(os.path.dirname(fullpath))
+            os.mkfifo(fullpath)
+            self.setComponents(macros.destdir, fullpath)
+            self.chmod(macros.destdir, fullpath)
+
+    def __init__(self, recipe, *args, **keywords):
+        """
+        @keyword mode: The mode of the file (defaults to 0644)
+        """
+        _FileAction.__init__(self, recipe, *args, **keywords)
+        self.path = args[0] 
 
