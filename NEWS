@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
       action instead of one-by-one. (CNY-1303)
