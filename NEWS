@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Build Changes:
+    * A new recipe method, r.MakeFIFO(), is available which will create a named
+      pipe at a specified location. (CNY-1597).
+
 Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
@@ -11,10 +16,6 @@ Changes in 1.1.27:
   o Internal Changes:
     * Flags for update jobs changed from a bitmask to a class.
     * Removed vestigial support for file label priority paths.
-
-  o Build Changes:
-    * A new recipe method, r.MakeFIFO(), is available which will create a named
-      pipe at a specified location. (CNY-1597).
 
   o Bug fixes:
     * Patch code no longer fails when trailing context is missing at
