@@ -396,20 +396,30 @@ class ClientClone:
                                   % (sourceTup[0], sourceTup[1]))
             targetBranch = targetSourceVersion.branch()
 
-            byFlavor = {}
+            byVersion = {}
             for binaryTup in binaryList:
+                byFlavor = byVersion.setdefault(binaryTup[1], {})
                 byFlavor.setdefault(binaryTup[2], []).append(binaryTup)
 
-            for flavor, binaryList in byFlavor.iteritems():
-                # Binary list is a list of binaries all created from the
-                # same cook command.
-                newVersion = leafMap.isAlreadyCloned(binaryList,
-                                                     targetBranch)
-                if newVersion:
-                    for binaryTup in binaryList:
-                        cloneMap.target(binaryTup, newVersion)
+            for version, byFlavor in byVersion.iteritems():
+                finalNewVersion = None
+                for flavor, binaryList in byFlavor.iteritems():
+                    # Binary list is a list of binaries all created from the
+                    # same cook command.
+                    newVersion = leafMap.isAlreadyCloned(binaryList,
+                                                         targetBranch)
+                    if (newVersion and 
+                        (not finalNewVersion or finalNewVersion == newVersion)):
+                        finalNewVersion = newVersion
+                    else:
+                        finalNewVersion = None
+                        break
+                if finalNewVersion:
+                    for binaryTup in itertools.chain(*byFlavor.itervalues()):
+                        cloneMap.target(binaryTup, finalNewVersion)
                         cloneJob.alreadyCloned(binaryTup)
                 else:
+                    binaryList = list(itertools.chain(*byFlavor.itervalues()))
                     versionsToGet.append((targetSourceVersion, binaryList))
         if not versionsToGet:
             return
@@ -1086,10 +1096,12 @@ class LeafMap(object):
 
     def createBinaryVersions(self, repos, sourceBinaryList):
         # takes a (sourceVersion, troveTupList) ->
-        #         (sourceVersion, pkgNames, flavor) list.
-        return nextVersions(repos, None, [(x[0], [y[0] for y in x[1]],
-                                           x[1][0][2])
-                                           for x in sourceBinaryList])
+        #         (sourceVersion, pkgNames, flavorList) list.
+        troveList = [(x[0],  # sourceVersion
+                     set([y[0] for y in x[1]]), # all names
+                     set([y[2] for y in x[1]])) # all flavors
+                        for x in sourceBinaryList]
+        return nextVersions(repos, None, troveList)
 
 class CloneError(errors.ClientError):
     pass
