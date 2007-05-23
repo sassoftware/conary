@@ -60,6 +60,10 @@ archive:
 	mkdir $(DISTDIR)
 	hg archive -t tbz2 -r conary-$(VERSION) conary-$(VERSION).tar.bz2
 
+version:
+	sed -i 's/@NEW@/$(VERSION)/g' NEWS
+	$(MAKE) -C extra VERSION=$(VERSION)
+
 smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
 	tar jxf $(DISTDIR).tar.bz2 ; \
@@ -72,7 +76,6 @@ smoketest: archive
 forcedist: $(dist_files) smoketest
 
 tag:
-	$(MAKE) tag -C extra VERSION=$(VERSION)
 	hg tag conary-$(VERSION)
 
 clean: clean-subdirs default-clean

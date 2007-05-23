@@ -26,10 +26,6 @@ install :
 
 dist : $(dist_files) default-dist
 
-tag : $(gen_files)
-	hg add $^
-	hg commit -m "rebuild $^ by make dist" $^
-
 clean : default-clean
 
 include $(TOPDIR)/Make.rules
