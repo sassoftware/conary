@@ -534,7 +534,7 @@ def getServer():
         protocol = 'https'
     else:
         protocol = 'http'
-    baseUrl="%s://%s:%s/" % (protocol, os.uname()[1], cfg.port)
+    baseUrl="%s://%s:%s/conary/" % (protocol, os.uname()[1], cfg.port)
 
     # start the logging
     if 'migrate' in argSet:
