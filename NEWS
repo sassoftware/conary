@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Build Changes:
+    * A new recipe method, r.MakeFIFO(), is available which will create a named
+      pipe at a specified location. (CNY-1597).
+
 Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
