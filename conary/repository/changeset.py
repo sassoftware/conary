@@ -1364,15 +1364,17 @@ def fileChangeSet(pathId, old, new):
 
     return (diff, contentsHash)
 
-def fileContentsUseDiff(oldFile, newFile):
+def fileContentsUseDiff(oldFile, newFile, mirrorMode = False):
     # Don't use diff's for config files when the autosource flag changes
     # because the client may not have anything around it can apply the diff 
     # to.
-    return oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig() \
-           and (oldFile.flags.isAutoSource() == newFile.flags.isAutoSource())
+    return ((not mirrorMode) and
+                oldFile and oldFile.flags.isConfig() and
+                newFile.flags.isConfig() and
+                (oldFile.flags.isAutoSource() == newFile.flags.isAutoSource()) )
 
-def fileContentsDiff(oldFile, oldCont, newFile, newCont):
-    if fileContentsUseDiff(oldFile, newFile):
+def fileContentsDiff(oldFile, oldCont, newFile, newCont, mirrorMode = False):
+    if fileContentsUseDiff(oldFile, newFile, mirrorMode = mirrorMode):
 	first = oldCont.get().readlines()
 	second = newCont.get().readlines()
 

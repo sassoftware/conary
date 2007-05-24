@@ -1602,8 +1602,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     newContents = contentList[i]
                     i += 1
 
-                    (contType, cont) = changeset.fileContentsDiff(fileObj, 
-                                            contents, newFileObj, newContents)
+                    (contType, cont) = changeset.fileContentsDiff(fileObj,
+                                            contents, newFileObj, newContents,
+                                            mirrorMode = mirrorMode)
                     internalCs.addFileContents(pathId, fileId, contType,
                                                cont, True)
 

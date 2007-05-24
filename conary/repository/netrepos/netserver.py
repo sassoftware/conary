@@ -1714,7 +1714,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         header = "".join( ('0', "%d" % recurse, "%d" % withFiles,
                     "%d" % withFileContents, "%d" % excludeAutoSource ) )
         if mirrorMode:
-            header += '1'
+            header += '2'
 
         sigCount = 0
         fingerprints = []

@@ -20,6 +20,10 @@ Changes in 1.1.27:
     * Errors in the changeset downloading code are no longer ignored
       by the client. (CNY-1682)
     * An error in the resumption of a build has been fixed. (CNY-1684)
+    * The introduction of mirrorMode during changeset cration (CNY-1570)
+      caused the generation of empty diffs in some cases. mirrorMode now
+      includes full contents for all files instead of generating diffs
+      (CNY-1699)
 
 Changes in 1.1.26:
   o New Features:

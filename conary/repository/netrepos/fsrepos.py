@@ -413,7 +413,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                             [ (newFileId, newFileVersion, newFile) ])[0]
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile,
-						oldCont, newFile, newCont)
+                                                oldCont, newFile, newCont,
+                                                mirrorMode = mirrorMode)
 
                     # we don't let config files be ptr types; if they were
                     # they could be ptrs to things which aren't config files,
