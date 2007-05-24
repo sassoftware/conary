@@ -343,6 +343,7 @@ class ConaryContext(ConfigSection):
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
+    shortenGroupFlavors   =  CfgBool
     # Upstream Conary proxy
     conaryProxy           =  CfgProxy
     # HTTP proxy
