@@ -241,16 +241,18 @@ def getRecursiveRequirements(db, troveList, flavorPath):
 
 class GroupCookOptions(object):
 
-    def __init__(self, alwaysBumpCount=False, errorOnFlavorChange=False):
-        self.alwaysBumpCount = alwaysBumpCount
-        self.errorOnFlavorChange = errorOnFlavorChange
+    def __init__(self, alwaysBumpCount=False, errorOnFlavorChange=False,
+                 shortenFlavors=False):
+        self._alwaysBumpCount = alwaysBumpCount
+        self._errorOnFlavorChange = errorOnFlavorChange
+        self._shortenFlavors = shortenFlavors
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
-    def _checkCook(self, repos, recipeObj, groupNames, targetVersion,
+    def checkCook(self, repos, recipeObj, groupNames, targetVersion,
                    groupFlavors):
-        if self.errorOnFlavorChange and not targetVersion.isOnLocalHost():
+        if self._errorOnFlavorChange and not targetVersion.isOnLocalHost():
             self._checkFlavors(repos, groupNames, targetVersion, groupFlavors)
 
     def _checkFlavors(self, repos, groupNames, targetVersion, groupFlavors):
@@ -309,6 +311,8 @@ With the latest conary, you must now cook all versions of a group at the same ti
             raise builderrors.GroupFlavorChangedError(errMsg)
 
     def shortenFlavors(self, keyFlavor, builtGroups):
+        if not self._shortenFlavors:
+            return builtGroups
         groupName = builtGroups[0][0].name
         if isinstance(keyFlavor, list):
             keyFlavors = keyFlavor
@@ -674,7 +678,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     normal trove.
     """
     if groupOptions is None:
-        groupOptions = GroupCookOptions()
+        groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
     troveCache = grouprecipe.TroveCache(repos, callback)
     lcache = lookaside.RepositoryCache(repos)
@@ -742,8 +746,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     allGroupNames = list(itertools.chain(*groupNames))
     targetVersion = nextVersion(repos, db, allGroupNames, sourceVersion,
                                 groupFlavors, targetLabel,
-                                alwaysBumpCount=groupOptions.alwaysBumpCount)
-    groupOptions._checkCook(repos, recipeObj, groupNames, targetVersion, 
+                                alwaysBumpCount=groupOptions._alwaysBumpCount)
+    groupOptions.checkCook(repos, recipeObj, groupNames, targetVersion, 
                             groupFlavors)
     buildTime = time.time()
 

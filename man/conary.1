@@ -856,6 +856,13 @@ contrib.rpath.org@rpl:1 if one could not be found in group-os.  If frob has
 any dependencies that need to be resolved, they will be resolved first
 against group-os; then contrib.rpath.org@rpl:1 will be searched.
 .TP
+.TP
+.B shortenGroupFlavors
+Descreases the number of items in group flavors to the bare minimum needed
+to differentiate between cooks.  This is done by starting with any platform
+flavors (determined by the presence of a "platform True" line in the definition
+of the flavor in one the useDirs), and if necessary, adding in additional distinguishing
+flavors to make all of flavors of the group being cooked unique.
 .B signatureKey
 Specifies the OpenPGP Key from a local keyring to be used when generating trove
 signatures. \fBNOTE:\fR When this option is processed, it clears all entries in

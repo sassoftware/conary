@@ -517,7 +517,8 @@ class CookCommand(CvcCommand):
         if argSet: return self.usage()
 
         groupOptions = cook.GroupCookOptions(alwaysBumpCount=True,
-                                 errorOnFlavorChange=not allowFlavorChange)
+                                 errorOnFlavorChange=not allowFlavorChange,
+                                 shortenFlavors=cfg.shortenGroupFlavors)
 
         try:
             cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
