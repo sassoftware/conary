@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug fixes:
+
+  o Documentation Changes:
+    * Incorrect references to createGroup have been fixed. (CNY-1700)
+
 Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
