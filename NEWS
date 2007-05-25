@@ -8,7 +8,8 @@ Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
       action instead of one-by-one. (CNY-1303)
-    * Group flavors are much shorter by default.  Some flags, like
+    * Group flavors are much shorter if you turn on the config item
+      "shortenGroupFlavors".  Some flags, like
       vmware and xen and architecture flags, are always included in a
       group flavor. (CNY-1641)
     * The Conary client is now able to access the network using
