@@ -4,6 +4,11 @@ Changes in @NEW@:
   o Documentation Changes:
     * Incorrect references to createGroup have been fixed. (CNY-1700)
 
+  o Build Changes:
+    * Files added with in the repository and locally no longer cause
+      'cvc update' to fail as long as the files have the same fileId
+      (CNY-1428)
+
 Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
