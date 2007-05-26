@@ -8,6 +8,8 @@ Changes in @NEW@:
     * Files added with in the repository and locally no longer cause
       'cvc update' to fail as long as the files have the same fileId
       (CNY-1428)
+    * r.Link allows full paths to be specified for the target of the link
+      as long as the directory matches the source of the link (CNY-751)
 
 Changes in 1.1.27:
   o New Features:
