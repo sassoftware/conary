@@ -658,7 +658,7 @@ class addPatch(_Source):
 
     def patchme(self, patch, f, destDir, patchlevels):
         logFiles = []
-        log.info('attempting to apply %s with to %s with patch level(s) %s'
+        log.info('attempting to apply %s to %s with patch level(s) %s'
                  %(f, destDir, ', '.join(str(x) for x in patchlevels)))
         for patchlevel in patchlevels:
             patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
