@@ -628,7 +628,7 @@ class RemoveCommand(CvcCommand):
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):
-    commands = ['rename']
+    commands = ['rename', 'mv']
     paramHelp = "<oldfile> <newfile>"
     help = 'Rename a file that is under Conary control'
     commandGroup = 'File Operations'

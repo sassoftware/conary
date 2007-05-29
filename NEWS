@@ -10,6 +10,7 @@ Changes in @NEW@:
       (CNY-1428)
     * r.Link allows full paths to be specified for the target of the link
       as long as the directory matches the source of the link (CNY-751)
+    * "cvc mv" has been added as a synonym for "cvc rename"
 
 Changes in 1.1.27:
   o New Features:
