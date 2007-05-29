@@ -404,7 +404,8 @@ class MigrateTo_15(SchemaMigration):
     def migrate5(self):
         # drop the index in case a user created it by hand (CNY-1704)
         self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
-        return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx', 'itemId, branchId')
+        return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
+                                   'itemId, branchId')
 
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
