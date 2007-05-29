@@ -1,6 +1,4 @@
 Changes in @NEW@:
-  o Bug fixes:
-
   o Documentation Changes:
     * Incorrect references to createGroup have been fixed. (CNY-1700)
 
@@ -11,6 +9,10 @@ Changes in @NEW@:
     * r.Link allows full paths to be specified for the target of the link
       as long as the directory matches the source of the link (CNY-751)
     * "cvc mv" has been added as a synonym for "cvc rename"
+
+  o Bug fixes:
+    * An index has been added to improve the performance of various
+      file stream related queries in a Conary repository. (CNY-1704)
 
 Changes in 1.1.27:
   o New Features:
