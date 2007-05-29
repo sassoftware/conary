@@ -942,6 +942,10 @@ class addSource(_Source):
         return f
 
     def do(self):
+        # make sure the user gave a valid source, and not a directory
+        if not os.path.basename(self.sourcename):
+            raise SourceError('cannot specify a directory as input to '
+                'addSource')
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
