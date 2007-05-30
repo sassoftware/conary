@@ -45,6 +45,9 @@ Changes in 1.1.27:
       caused the generation of empty diffs in some cases. mirrorMode now
       includes full contents for all files instead of generating diffs
       (CNY-1699)
+    * If you're promoting two flavors of the same version of the same trove,
+      they will now always have the same version on the target branch.
+      (CNY-1692)
 
 Changes in 1.1.26:
   o New Features:
