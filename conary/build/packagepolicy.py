@@ -2123,8 +2123,9 @@ class Provides(_dependency):
         # paths.  However, within a trove, a file does provide its name.
         # Furthermore, non-regular files can be path dependency targets
         # Therefore, we have to handle this case a bit differently.
-        if dirpath in self.binDirs:
+        if dirpath in self.binDirs and not isinstance(f, files.Directory):
             # CNY-930: automatically export paths in bindirs
+            # CNY-1721: but not directories in bindirs
             f.flags.isPathDependencyTarget(True)
 
         if f.flags.isPathDependencyTarget():
