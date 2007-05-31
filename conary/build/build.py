@@ -3515,10 +3515,10 @@ class MakeFIFO(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Create('%(localstatedir)s/log/acpid', mode=0640)}
+    C{r.MakeFIFO('/path/to/fifo', mode=0640)}
 
-    Demonstrates calling C{r.Create()} specifying the creation of
-    C{%(localstatedir)s/log/acpid} with mode C{0640}.
+    Demonstrates calling C{r.MakeFIFO()} specifying the creation of
+    C{/path/to/fifo} with mode C{0640}.
     """
     keywords = {'mode': 0644}
     def do(self, macros):
