@@ -64,6 +64,9 @@ version:
 	sed -i 's/@NEW@/$(VERSION)/g' NEWS
 	$(MAKE) -C extra VERSION=$(VERSION)
 
+show-version:
+	@echo $(VERSION)
+
 smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
 	tar jxf $(DISTDIR).tar.bz2 ; \
