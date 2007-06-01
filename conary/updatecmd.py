@@ -330,7 +330,7 @@ def doUpdate(cfg, changeSpecs, **kwargs):
     # Look for items which look like files in the applyList and convert
     # them into fromChangesets w/ the primary sets
     for item in changeSpecs[:]:
-        if os.access(item, os.W_OK):
+        if os.access(item, os.R_OK):
             try:
                 cs = changeset.ChangeSetFromFile(item)
             except:

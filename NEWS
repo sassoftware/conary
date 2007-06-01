@@ -13,6 +13,7 @@ Changes in @NEW@:
   o Bug fixes:
     * An index has been added to improve the performance of various
       file stream related queries in a Conary repository. (CNY-1704)
+    * "conary update" now works with read-only changesets. (CNY-1681)
 
 Changes in 1.1.27:
   o New Features:
