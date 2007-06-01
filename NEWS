@@ -15,6 +15,7 @@ Changes in @NEW@:
       file stream related queries in a Conary repository. (CNY-1704)
     * Directories in binary directories are no longer (incorrectly)
       provided.  (CNY-1721)
+    * "conary update" now works with read-only changesets. (CNY-1681)
 
 Changes in 1.1.27:
   o New Features:
