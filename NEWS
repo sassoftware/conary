@@ -17,6 +17,15 @@ Changes in @NEW@:
       provided.  (CNY-1721)
     * "conary update" now works with read-only changesets. (CNY-1681)
 
+  o Server Changes:
+    * getChangeSet call now returns supplemental information (trovesNeeded,
+      filesNeeded, and removedTroves) for each individual job separately
+      instead of combining them for the entire job list
+    * proxy now combines all upstream changeset requests into a single
+      job request for servers running this version or later (CNY-1716)
+    * mirrorMode wasn't passed through to changeset fingerprint calls
+      from the caching code
+
 Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook

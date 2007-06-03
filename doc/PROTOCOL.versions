@@ -1,4 +1,12 @@
 # this file documents the wire protocol changes for conary.
+Version 50:
+  - getChangeSet keeps (troveNeeded, filesNeeded, troveRemoved) information
+    separate for each element of the job list
+
+Version 49:
+  - added mirrorMode to getChangeSet and getFingerprints which forces files
+    to be included in changesets whenever the changeset is across hosts
+
 Version 48: Conary 1.1.25
   - Added extra argument to getChangeSet to force the creation of a specific
     changeset version.
