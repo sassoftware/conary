@@ -414,9 +414,6 @@ class ChangesetFilter(BaseProxy):
                 iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
                 verPath.append(iterV)
 
-        if (verPath[-1] != wireCsVersion):
-            import epdb
-            epdb.st()
         assert(verPath[-1] == wireCsVersion)
 
         fingerprints = [ '' ] * len(chgSetList)
