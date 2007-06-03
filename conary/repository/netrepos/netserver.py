@@ -44,7 +44,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36,50)
+SERVER_VERSIONS = range(36,51)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1457,7 +1457,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource,
-                     mirrorMode = False):
+                     changeSetVersion = None, mirrorMode = False):
 
         def _cvtTroveList(l):
             new = []
@@ -1510,6 +1510,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             return new
 
+        assert(len(chgSetList) == 1)
+
         sizes = []
         newChgSetList = []
         allFilesNeeded = []
@@ -1554,22 +1556,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             os.unlink(retpath)
             raise
 
-        # client versions >= 44 use strings instead of ints for size
-        # because xmlrpclib can't marshal ints > 2GiB
-        if clientVersion >= 44:
-            sizes = [ str(x) for x in sizes ]
-        else:
-            for size in sizes:
-                if size >= 0x80000000:
-                    raise errors.InvalidClientVersion(
-                        'This version of Conary does not support downloading '
-                        'changesets larger than 2 GiB.  Please install a new '
-                        'Conary client.')
+        sizes = [ str(x) for x in sizes ]
 
-        # versions < 38 omit allRemoved troves, but the caching front end
-        # will omit that for us
-        return url, sizes, newChgSetList, allFilesNeeded, \
-               _cvtTroveList(allRemovedTroves)
+        return url, [ (sizes[0], newChgSetList, allFilesNeeded,
+                       _cvtTroveList(allRemovedTroves) ) ]
 
 
     @accessReadOnly

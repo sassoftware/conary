@@ -51,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36,50)
+CLIENT_VERSIONS = range(36,51)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -1272,7 +1272,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 args += (changesetVersion, )
 
             l = server.getChangeSet(*args)
-            if serverVersion < 38:
+            if serverVersion >= 50:
+                url = l[0]
+                sizes = [ x[0] for x in l[1] ]
+                extraTroveList = [ x for x in itertools.chain(
+                                    *[ x[1] for x in l[1] ] ) ]
+                extraFileList = [ x for x in itertools.chain(
+                                    *[ x[2] for x in l[1] ] ) ]
+                removedTroveList = [ x for x in itertools.chain(
+                                    *[ x[3] for x in l[1] ] ) ]
+            elif serverVersion < 38:
                 (url, sizes, extraTroveList, extraFileList) = l
                 removedTroveList = []
             else:
