@@ -431,7 +431,7 @@ class addArchive(_Source):
                 _unpack = "tar -C '%s' -xvvS%sf -" % (destDir, preserve)
                 ownerParser = self._tarOwners
             elif True in [f.endswith(x) for x in _cpioSuffix]:
-                _unpack = "( cd '%s' ; cpio -iumd --quiet )" % (destDir,)
+                _unpack = "( cd '%s' && cpio -iumd --quiet )" % (destDir,)
                 ownerListCmd = "cpio -tv --quiet"
                 ownerParser = self._cpioOwners
             elif _uncompress != 'cat':
@@ -1183,12 +1183,12 @@ class addMercurialSnapshot(_RevisionControl):
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
-        util.execute("cd '%s'; hg -q pull %s" % (lookasideDir, self.url))
+        util.execute("cd '%s' && hg -q pull %s" % (lookasideDir, self.url))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
                  self.tag)
-        util.execute("cd '%s'; hg archive -r %s -t tbz2 '%s'" %
+        util.execute("cd '%s' && hg archive -r %s -t tbz2 '%s'" %
                         (lookasideDir, self.tag, target))
 
     def __init__(self, recipe, url, tag = 'tip', **kwargs):
@@ -1253,12 +1253,12 @@ class addCvsSnapshot(_RevisionControl):
         log.info('Checking out project %s from %s', self.project, self.root)
         # don't use cvs co -d <dir> as it is fragile
         util.mkdirChain(lookasideDir)
-        util.execute('cd %s ; cvs -Q -d \'%s\' checkout \'%s\'' %
+        util.execute('cd %s && cvs -Q -d \'%s\' checkout \'%s\'' %
                   (lookasideDir, self.root, self.project))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.project)
-        util.execute("cd '%s'; cvs -Q -d '%s' update" % (lookasideDir, self.root))
+        util.execute("cd '%s' && cvs -Q -d '%s' update" % (lookasideDir, self.root))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.project,
@@ -1266,7 +1266,7 @@ class addCvsSnapshot(_RevisionControl):
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + self.tag
         os.mkdir(stagePath)
-        util.execute("cvs -Q -d '%s' export -d '%s' -r '%s' '%s'; cd '%s'; "
+        util.execute("cvs -Q -d '%s' export -d '%s' -r '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
                         (self.root, stagePath, self.tag, self.project,
                          tmpPath, target, os.path.basename(stagePath)))
@@ -1338,14 +1338,14 @@ class addSvnSnapshot(_RevisionControl):
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.project)
-        util.execute("cd '%s'; svn -q update" % lookasideDir)
+        util.execute("cd '%s' && svn -q update" % lookasideDir)
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s', self.url)
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
-        util.execute("svn -q export '%s' '%s'; cd '%s'; "
+        util.execute("svn -q export '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
                         (self.url, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
