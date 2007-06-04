@@ -78,7 +78,8 @@ class ProxyCaller:
     def __getattr__(self, method):
         return lambda *args: self.callByName(method, *args)
 
-    def __init__(self, proxy, transport):
+    def __init__(self, url, proxy, transport):
+        self.url = url
         self.proxy = proxy
         self._transport = transport
 
@@ -113,7 +114,7 @@ class ProxyCallFactory:
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
 
-        return ProxyCaller(proxy, transporter)
+        return ProxyCaller(url, proxy, transporter)
 
 class RepositoryCaller:
 
@@ -139,6 +140,7 @@ class RepositoryCaller:
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
+        self.url = None
 
 class RepositoryCallFactory:
 
@@ -168,6 +170,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
         self.proxies = conarycfg.getProxyFromConfig(cfg)
+        self.versionsByUrl = {}
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -243,6 +246,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                          set(parentVersions)))
         else:
             commonVersions = parentVersions
+
+        if caller.url is not None:
+            self.versionsByUrl[caller.url] = max(commonVersions)
 
         return useAnon, commonVersions
 
@@ -478,11 +484,20 @@ class ChangesetFilter(BaseProxy):
         # internal server as well (since internal servers only support
         # single jobs!)
         while changeSetsNeeded:
-            if self.forceSingleCsJob or getCsVersion < 50:
+            if self.forceSingleCsJob:
+                # calling internal changeset generation, which only supports
+                # a single job
                 neededHere = [ changeSetsNeeded.pop(0) ]
-            else:
+            elif self.versionsByUrl.get(caller.url, 0) >= 50:
+                # calling a server which supports both neededCsVersion and
+                # returns per-job supplmental information
+                getCsVersion = self.versionsByUrl[caller.url]
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
+            else:
+                # calling a server which does not support per-job supplemental
+                # information (and may not support neededCsVersion)
+                neededHere = [ changeSetsNeeded.pop(0) ]
 
             # the changeset isn't in the cache.  create it
             if getCsVersion >= 49:
