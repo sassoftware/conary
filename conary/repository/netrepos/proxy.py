@@ -378,7 +378,6 @@ class ChangesetFilter(BaseProxy):
                                                suffix = '.ccs-new')
             outF = os.fdopen(fd, "w")
             util.copyfileobj(inF, outF, sizeLimit = sizeLimit)
-            inF.close()
             # closes the underlying fd opened by mkstemp
             outF.close()
 
