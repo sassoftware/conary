@@ -578,17 +578,17 @@ class ChangesetFilter(BaseProxy):
                     outF.close()
                     path = tmpPath
 
-            inF.close()
+                # path points to a wire version of the changeset (possibly
+                # in the cache)
+                csInfo.path = path
+                # make a note if this path has been stored in the cache or not
+                csInfo.cached = cachable
+                changeSetList[jobIdx] = csInfo
 
             if url.startswith('file://localhost/'):
                 os.unlink(url[17:])
 
-            # path points to a wire version of the changeset (possibly
-            # in the cache)
-            csInfo.path = path
-            # make a note if this path has been stored in the cache or not
-            csInfo.cached = cachable
-            changeSetList[jobIdx] = csInfo
+            inF.close()
 
         # Handle format conversions
         for csInfo in changeSetList:
