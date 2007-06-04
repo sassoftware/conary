@@ -314,8 +314,6 @@ class ChangesetFilter(BaseProxy):
         return newCsPath, size + delta
 
     def _convertChangeSetV1V0(self, cspath, size, destCsVersion):
-        # check to make sure that this user has access to see all
-        # the troves included in a recursive changeset.
         cs = changeset.ChangeSetFromFile(cspath)
         newCs = changeset.ChangeSet()
 
