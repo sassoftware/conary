@@ -244,7 +244,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
-                       self.__altHostCallback, self.__protocolVersion)
+                       self.__altHostCallback, self.getProtocolVersion())
 
     def usedProxy(self):
         return self.__transport.usedProxy
