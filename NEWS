@@ -9,6 +9,11 @@ Changes in @NEW@:
     * r.Link allows full paths to be specified for the target of the link
       as long as the directory matches the source of the link (CNY-751)
     * "cvc mv" has been added as a synonym for "cvc rename"
+    * r.addCvsSnapshot() now works correctly with anon pserver-based servers.
+      Previously, cvs checkout would fail due to strange characters being in
+      the destination directory
+    * r.add*Snapshot() will now raise errors if the shell commands they are
+      executing fail for any reason
 
   o Bug fixes:
     * An index has been added to improve the performance of various
