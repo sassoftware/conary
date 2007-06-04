@@ -1251,8 +1251,10 @@ class addCvsSnapshot(_RevisionControl):
     def createArchive(self, lookasideDir):
         os.mkdir(lookasideDir)
         log.info('Checking out project %s from %s', self.project, self.root)
-        util.execute('cvs -Q -d \'%s\' checkout -d \'%s\' \'%s\'' %
-                  (self.root, lookasideDir, self.project))
+        # don't use cvs co -d <dir> as it is fragile
+        util.mkdirChain(lookasideDir)
+        util.execute('cd %s ; cvs -Q -d \'%s\' checkout \'%s\'' %
+                  (lookasideDir, self.root, self.project))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.project)
