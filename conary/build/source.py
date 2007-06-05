@@ -1266,9 +1266,11 @@ class addCvsSnapshot(_RevisionControl):
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + self.tag
         os.mkdir(stagePath)
-        util.execute("cvs -Q -d '%s' export -d '%s' -r '%s' '%s' && cd '%s' && "
+        # don't use cvs export -d <dir> as it is fragile
+        util.mkdirChain(stagePath)
+        util.execute("cd %s && cvs -Q -d '%s' export -r '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
-                        (self.root, stagePath, self.tag, self.project,
+                        (stagePath, self.root, self.tag, self.project,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
