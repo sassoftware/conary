@@ -1,17 +1,50 @@
 Changes in @NEW@:
+  o Documentation Changes:
+    * Incorrect references to createGroup have been fixed. (CNY-1700)
+
   o Build Changes:
-    * A new recipe method, r.MakeFIFO(), is available which will create a named
-      pipe at a specified location. (CNY-1597).
+    * Files added with in the repository and locally no longer cause
+      'cvc update' to fail as long as the files have the same fileId
+      (CNY-1428)
+    * r.Link allows full paths to be specified for the target of the link
+      as long as the directory matches the source of the link (CNY-751)
+    * "cvc mv" has been added as a synonym for "cvc rename"
+    * r.addCvsSnapshot() now works correctly with anon pserver-based servers.
+      Previously, cvs checkout would fail due to strange characters being in
+      the destination directory
+    * r.add*Snapshot() will now raise errors if the shell commands they are
+      executing fail for any reason
+
+  o Bug fixes:
+    * An index has been added to improve the performance of various
+      file stream related queries in a Conary repository. (CNY-1704)
+    * Directories in binary directories are no longer (incorrectly)
+      provided.  (CNY-1721)
+    * "conary update" now works with read-only changesets. (CNY-1681)
+
+  o Server Changes:
+    * getChangeSet call now returns supplemental information (trovesNeeded,
+      filesNeeded, and removedTroves) for each individual job separately
+      instead of combining them for the entire job list
+    * proxy now combines all upstream changeset requests into a single
+      job request for servers running this version or later (CNY-1716)
+    * mirrorMode wasn't passed through to changeset fingerprint calls
+      from the caching code
 
 Changes in 1.1.27:
   o New Features:
     * All group cooks for one source must be done as a large cvc cook
       action instead of one-by-one. (CNY-1303)
-    * Group flavors are much shorter by default.  Some flags, like
+    * Group flavors are much shorter if you turn on the config item
+      "shortenGroupFlavors".  Some flags, like
       vmware and xen and architecture flags, are always included in a
       group flavor. (CNY-1641)
     * The Conary client is now able to access the network using
       authenticated HTTP proxies. (CNY-1687)
+
+  o Build Changes:
+    * A new recipe method, r.MakeFIFO(), is available which will create
+      a named pipe at a specified location. (CNY-1597).
 
   o Internal Changes:
     * Flags for update jobs changed from a bitmask to a class.
@@ -29,6 +62,9 @@ Changes in 1.1.27:
       caused the generation of empty diffs in some cases. mirrorMode now
       includes full contents for all files instead of generating diffs
       (CNY-1699)
+    * If you're promoting two flavors of the same version of the same trove,
+      they will now always have the same version on the target branch.
+      (CNY-1692)
 
 Changes in 1.1.26:
   o New Features:

@@ -152,7 +152,7 @@ class GroupRecipe(_BaseGroupRecipe):
     PARAMETERS
     ==========
     Several parameters may be set at the time of group creation.  Although
-    these parameters are typically passed to C{r.createNewGroup()} for the
+    these parameters are typically passed to C{r.createGroup()} for the
     base group, they should be set as variables in the recipe class.
 
     Note: Setting these parameters affects not only the value for the base
@@ -344,9 +344,9 @@ class GroupRecipe(_BaseGroupRecipe):
         The C{r.add()} command accepts the following parameters, with
         default values shown in parentheses:
 
-        B{byDefault} : (None, or value of B{createNewGroup}) Specifies whether
+        B{byDefault} : (None, or value of B{createGroup}) Specifies whether
         to include a trove  by default. Defaults to the B{byDefault} setting
-        as  defined with B{createNewGroup}.
+        as  defined with B{createGroup}.
 
         B{components} : (None) Specify a set of trove components to include.
         Only relevant when adding packages.  Specified as a list,
@@ -955,7 +955,7 @@ class GroupRecipe(_BaseGroupRecipe):
         entries followed by C{r.addCopy('group-foo')} would be
         equivalent to adding the C{r.add} lines:
 
-        C{r.createNewGroup('group-foo')}
+        C{r.createGroup('group-foo')}
         C{r.add('foo1', <version>, groupName='group-foo')}
         C{r.add('foo2', <version>, groupName='group-foo')}
         C{r.addNewGroup('group-foo')}.

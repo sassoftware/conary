@@ -78,7 +78,8 @@ class ProxyCaller:
     def __getattr__(self, method):
         return lambda *args: self.callByName(method, *args)
 
-    def __init__(self, proxy, transport):
+    def __init__(self, url, proxy, transport):
+        self.url = url
         self.proxy = proxy
         self._transport = transport
 
@@ -113,7 +114,7 @@ class ProxyCallFactory:
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
 
-        return ProxyCaller(proxy, transporter)
+        return ProxyCaller(url, proxy, transporter)
 
 class RepositoryCaller:
 
@@ -139,6 +140,7 @@ class RepositoryCaller:
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
+        self.url = None
 
 class RepositoryCallFactory:
 
@@ -168,6 +170,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
         self.proxies = conarycfg.getProxyFromConfig(cfg)
+        self.versionsByUrl = {}
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -244,11 +247,29 @@ class BaseProxy(xmlshims.NetworkConvertors):
         else:
             commonVersions = parentVersions
 
+        if caller.url is not None:
+            self.versionsByUrl[caller.url] = max(commonVersions)
+
         return useAnon, commonVersions
+
+class ChangeSetInfo(object):
+
+    __slots__ = [ 'size', 'trovesNeeded', 'removedTroves', 'filesNeeded',
+                  'path', 'cached', 'version' ]
+
+    def pickle(self):
+        return cPickle.dumps(((self.trovesNeeded, self.filesNeeded,
+                               self.removedTroves), self.size))
+
+    def __init__(self, pickled = None):
+        if pickled is not None:
+            ((self.trovesNeeded, self.filesNeeded, self.removedTroves),
+                    self.size) = cPickle.loads(pickled)
 
 class ChangesetFilter(BaseProxy):
 
     forceGetCsVersion = None
+    forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
@@ -293,8 +314,6 @@ class ChangesetFilter(BaseProxy):
         return newCsPath, size + delta
 
     def _convertChangeSetV1V0(self, cspath, size, destCsVersion):
-        # check to make sure that this user has access to see all
-        # the troves included in a recursive changeset.
         cs = changeset.ChangeSetFromFile(cspath)
         newCs = changeset.ChangeSet()
 
@@ -355,22 +374,21 @@ class ChangesetFilter(BaseProxy):
                      recurse, withFiles, withFileContents, excludeAutoSource,
                      changesetVersion = None, mirrorMode = False):
 
-        def _addToCache(fingerPrint, inF, csVersion, returnVal, size):
+        def _addToCache(fingerPrint, inF, csVersion, csInfo, sizeLimit):
             csPath = self.csCache.hashToPath(fingerPrint + '-%d' % csVersion)
             csDir = os.path.dirname(csPath)
             util.mkdirChain(csDir)
             (fd, csTmpPath) = tempfile.mkstemp(dir = csDir,
                                                suffix = '.ccs-new')
             outF = os.fdopen(fd, "w")
-            util.copyfileobj(inF, outF)
-            inF.close()
+            util.copyfileobj(inF, outF, sizeLimit = sizeLimit)
             # closes the underlying fd opened by mkstemp
             outF.close()
 
             (fd, dataTmpPath) = tempfile.mkstemp(dir = csDir,
                                                  suffix = '.data-new')
             data = os.fdopen(fd, 'w')
-            data.write(cPickle.dumps((returnVal, size)))
+            data.write(csInfo.pickle())
             # closes the underlying fd
             data.close()
 
@@ -378,12 +396,6 @@ class ChangesetFilter(BaseProxy):
             os.rename(dataTmpPath, csPath + '.data')
 
             return csPath
-
-        pathList = []
-        allTrovesNeeded = []
-        allFilesNeeded = []
-        allTrovesRemoved = []
-        allSizes = []
 
         if self.forceGetCsVersion is not None:
             getCsVersion = self.forceGetCsVersion
@@ -413,7 +425,7 @@ class ChangesetFilter(BaseProxy):
                 if mirrorMode:
                     useAnon, fingerprints = caller.getChangeSetFingerprints(49,
                             chgSetList, recurse, withFiles, withFileContents,
-                            excludeAutoSource)
+                            excludeAutoSource, mirrorMode)
                 else:
                     useAnon, fingerprints = caller.getChangeSetFingerprints(43,
                             chgSetList, recurse, withFiles, withFileContents,
@@ -426,145 +438,234 @@ class ChangesetFilter(BaseProxy):
                 else:
                     raise
 
-        for rawJob, fingerprint in itertools.izip(chgSetList, fingerprints):
-            path = None
+        changeSetList = [ None ] * len(chgSetList)
+
+        for jobIdx, (rawJob, fingerprint) in \
+                    enumerate(itertools.izip(chgSetList, fingerprints)):
             # if we have both a cs fingerprint and a cache, then we will
             # cache the cs for this job
             cachable = bool(fingerprint and self.csCache)
-            if fingerprint:
-                # look up the changeset in the cache
-                # empty fingerprint means "do not cache"
-                fullPrint = fingerprint + '-%d' % neededCsVersion
-                csPath = self.csCache.hashToPath(fullPrint)
-                dataPath = csPath + '.data'
-                if os.path.exists(csPath) and os.path.exists(dataPath):
-                    # touch to refresh atime; try/except protects against race
-                    # with someone removing the entry during the time it took
-                    # you to read this comment
-                    try:
-                        fd = os.open(csPath, os.O_RDONLY)
-                        os.close(fd)
-                    except:
-                        pass
+            if not cachable:
+                continue
 
-                    data = open(dataPath)
-                    (trovesNeeded, filesNeeded, removedTroves), size = \
-                        cPickle.loads(data.read())
-                    sizes = [ size ]
-                    data.close()
+            # look up the changeset in the cache
+            # empty fingerprint means "do not cache"
+            fullPrint = fingerprint + '-%d' % neededCsVersion
+            csPath = self.csCache.hashToPath(fullPrint)
+            dataPath = csPath + '.data'
+            if os.path.exists(csPath) and os.path.exists(dataPath):
+                # touch to refresh atime; try/except protects against race
+                # with someone removing the entry during the time it took
+                # you to read this comment
+                try:
+                    fd = os.open(csPath, os.O_RDONLY)
+                    os.close(fd)
+                except:
+                    pass
 
-                    path = csPath
+                data = open(dataPath)
+                csInfo = ChangeSetInfo(pickled = data.read())
+                csInfo.version = neededCsVersion
+                data.close()
 
-            if path is None:
-                # the changeset isn't in the cache.  create it
-                if mirrorMode:
-                    rc = caller.getChangeSet(getCsVersion, [ rawJob ],
-                                         recurse, withFiles, withFileContents,
-                                         excludeAutoSource, mirrorMode)[1]
-                else:
-                    rc = caller.getChangeSet(getCsVersion, [ rawJob ],
-                                         recurse, withFiles, withFileContents,
-                                         excludeAutoSource)[1]
+                csInfo.path = csPath
+                csInfo.cached = True
+                changeSetList[jobIdx] = csInfo
 
-                removedTroves = []
+        changeSetsNeeded = \
+            [ x for x in
+                    enumerate(itertools.izip(chgSetList, fingerprints))
+                    if changeSetList[x[0]] is None ]
+
+        # This is a loop to make supporting single-request changeset generation
+        # easy; we need that not only for old servers we proxy, but for an
+        # internal server as well (since internal servers only support
+        # single jobs!)
+        while changeSetsNeeded:
+            if self.forceSingleCsJob:
+                # calling internal changeset generation, which only supports
+                # a single job
+                neededHere = [ changeSetsNeeded.pop(0) ]
+            elif self.versionsByUrl.get(caller.url, 0) >= 50:
+                # calling a server which supports both neededCsVersion and
+                # returns per-job supplmental information
+                getCsVersion = self.versionsByUrl[caller.url]
+                neededHere = changeSetsNeeded
+                changeSetsNeeded = []
+            else:
+                # calling a server which does not support per-job supplemental
+                # information (and may not support neededCsVersion)
+                neededHere = [ changeSetsNeeded.pop(0) ]
+
+            # the changeset isn't in the cache.  create it
+            if getCsVersion >= 49:
+                rc = caller.getChangeSet(getCsVersion,
+                                     [ x[1][0] for x in neededHere ],
+                                     recurse, withFiles, withFileContents,
+                                     excludeAutoSource,
+                                     neededCsVersion, mirrorMode)[1]
+            else:
+                rc = caller.getChangeSet(getCsVersion,
+                                     [ x[1][0] for x in neededHere ],
+                                     recurse, withFiles, withFileContents,
+                                     excludeAutoSource)[1]
+
+            csInfoList = []
+            if getCsVersion < 50:
                 if getCsVersion < 38:
                     url, sizes, trovesNeeded, filesNeeded = rc
+                    removedTroves = []
                 else:
                     url, sizes, trovesNeeded, filesNeeded, removedTroves = rc
-                assert(len(sizes) == 1)
+
+                csInfo = ChangeSetInfo()
                 # ensure that the size is an integer -- protocol version
                 # 44 returns a string to avoid XML-RPC marshal limits
-                sizes = [ int(x) for x in sizes ]
-                size = sizes[0]
+                assert(len(sizes) == 1)
+                csInfo.size = int(sizes[0])
+                csInfo.trovesNeeded = trovesNeeded
+                csInfo.filesNeeded = filesNeeded
+                csInfo.removedTroves = removedTroves
+                csInfo.version = wireCsVersion
+                csInfoList.append(csInfo)
+                del sizes
+            else:
+                csInfoList = []
+                url = rc[0]
+                for (size, trovesNeeded, filesNeeded, removedTroves) in rc[1]:
+                    csInfo = ChangeSetInfo()
+                    csInfo.size = int(size)
+                    csInfo.trovesNeeded = trovesNeeded
+                    csInfo.filesNeeded = filesNeeded
+                    csInfo.removedTroves = removedTroves
+                    csInfo.version = wireCsVersion
+                    csInfoList.append(csInfo)
+
+            del trovesNeeded
+            del filesNeeded
+            del removedTroves
+
+            try:
+                inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            except transport.TransportError, e:
+                raise ProxyRepositoryError(("RepositoryError", e.args[0]))
+
+            for (jobIdx, (rawJob, fingerprint)), csInfo in \
+                            itertools.izip(neededHere, csInfoList):
+                if url.startswith('file://'):
+                    # don't enforce the size limit for local files; we need
+                    # the whole thing anyway, and the size on disk won't
+                    # be equal to csInfo.size due to external references
+                    # to the content store within the change set
+                    sizeLimit = None
+                else:
+                    sizeLimit = csInfo.size
+
+                cachable = bool(fingerprint and self.csCache)
 
                 if cachable:
-                    try:
-                        inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
-                    except transport.TransportError, e:
-                        raise ProxyRepositoryError(("RepositoryError", e.args[0]))
-                    csPath =_addToCache(fingerprint, inF, wireCsVersion,
-                                (trovesNeeded, filesNeeded, removedTroves),
-                                size)
-                    if url.startswith('file://localhost/'):
-                        os.unlink(url[17:])
-                elif url.startswith('file://localhost/'):
-                    csPath = url[17:]
+                    path =_addToCache(fingerprint, inF, wireCsVersion, csInfo,
+                                      sizeLimit = sizeLimit)
                 else:
-                    inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+                    # If only one file was requested, and it's already
+                    # a file://, this is unnecessary :-(
                     (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                   suffix = '.ccs-out')
                     outF = os.fdopen(fd, "w")
-                    size = util.copyfileobj(inF, outF)
-                    assert(size == sizes[0])
-                    inF.close()
+                    util.copyfileobj(inF, outF, sizeLimit = sizeLimit)
                     outF.close()
+                    path = tmpPath
 
-                    csPath = tmpPath
-
-                # csPath points to a wire version of the changeset (possibly
+                # path points to a wire version of the changeset (possibly
                 # in the cache)
+                csInfo.path = path
+                # make a note if this path has been stored in the cache or not
+                csInfo.cached = cachable
+                changeSetList[jobIdx] = csInfo
 
-                # Now walk the precedence list backwards for conversion
-                oldV = wireCsVersion
-                for iterV in reversed(verPath[:-1]):
-                    # Convert the changeset - not the first time around
-                    path, size = self._convertChangeSet(csPath, size,
-                                                        iterV, oldV)
-                    sizes = [ size ]
+            if url.startswith('file://localhost/'):
+                os.unlink(url[17:])
 
-                    if not cachable:
-                        # we're not caching; erase the old version
-                        os.unlink(csPath)
-                        csPath = path
-                    else:
-                        csPath = _addToCache(fingerprint, open(path), iterV,
-                                (trovesNeeded, filesNeeded, removedTroves),
-                                size)
+            inF.close()
 
-                    oldV = iterV
+        # Handle format conversions
+        for csInfo in changeSetList:
+            if csInfo.version == neededCsVersion:
+                continue
 
-                path = csPath
+            # Now walk the precedence list backwards for conversion
+            assert(csInfo.version == wireCsVersion)
+            oldV = csInfo.version
+            csPath = csInfo.path
 
-            # make a note if this path has been stored in the cache or not
-            pathList.append((path, size, cachable))
-            allTrovesNeeded += trovesNeeded
-            allFilesNeeded += filesNeeded
-            allTrovesRemoved += removedTroves
-            allSizes += sizes
+            for iterV in reversed(verPath[:-1]):
+                # Convert the changeset - not the first time around
+                path, newSize = self._convertChangeSet(csPath, csInfo.size,
+                                                       iterV, oldV)
+                csInfo.size = newSize
+                csInfo.version = iterV
+
+                if not cachable:
+                    # we're not caching; erase the old version
+                    os.unlink(csPath)
+                    csPath = path
+                else:
+                    csPath = _addToCache(fingerprint, open(path), iterV,
+                                         csInfo, sizeLimit = None)
+
+                oldV = iterV
+
+            csInfo.version = neededCsVersion
+            csInfo.path = csPath
 
         (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir, suffix = '.cf-out')
         url = os.path.join(self.urlBase(),
                            "changeset?%s" % os.path.basename(path[:-4]))
         f = os.fdopen(fd, 'w')
 
-        for path, size, cached in pathList:
+        for csInfo in changeSetList:
             # the hard-coded 1 means it's a changeset and needs to be walked 
             # looking for files to include by reference
-            f.write("%s %d 1 %d\n" % (path, size, cached))
+            f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size, csInfo.cached))
 
         f.close()
 
-        # client versions >= 44 use strings instead of ints for size
-        # because xmlrpclib can't marshal ints > 2GiB
-        if clientVersion >= 44:
-            allSizes = [ str(x) for x in allSizes ]
-        else:
-            for size in allSizes:
-                if size >= 0x80000000:
-                    raise ProxyRepositoryError(('InvalidClientVersion',
-                        'This version of Conary does not support downloading '
-                        'changesets larger than 2 GiB.  Please install a new '
-                        'Conary client.'))
+        if clientVersion < 50:
+            allSizes = [ x.size for x in changeSetList ]
+            allTrovesNeeded = [ x for x in itertools.chain(
+                                 *[ x.trovesNeeded for x in changeSetList ] ) ]
+            allFilesNeeded = [ x for x in itertools.chain(
+                                 *[ x.filesNeeded for x in changeSetList ] ) ]
+            allTrovesRemoved = [ x for x in itertools.chain(
+                                 *[ x.removedTroves for x in changeSetList ] ) ]
 
-        if clientVersion < 38:
-            return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
+            # client versions >= 44 use strings instead of ints for size
+            # because xmlrpclib can't marshal ints > 2GiB
+            if clientVersion >= 44:
+                allSizes = [ str(x) for x in allSizes ]
+            else:
+                for size in allSizes:
+                    if size >= 0x80000000:
+                        raise ProxyRepositoryError(('InvalidClientVersion',
+                         'This version of Conary does not support downloading '
+                         'changesets larger than 2 GiB.  Please install a new '
+                         'Conary client.'))
 
-        return False, (url, allSizes, allTrovesNeeded, allFilesNeeded, 
-                      allTrovesRemoved)
+            if clientVersion < 38:
+                return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
+
+            return False, (url, allSizes, allTrovesNeeded, allFilesNeeded,
+                          allTrovesRemoved)
+
+        # clientVersion >= 50
+        return False, (url, (
+                [ (x.size, x.trovesNeeded, x.filesNeeded, x.removedTroves)
+                    for x in changeSetList ] ) )
 
 class SimpleRepositoryFilter(ChangesetFilter):
 
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
+    forceSingleCsJob = True
 
     def __init__(self, cfg, basicUrl, repos):
         if cfg.changesetCacheDir:
@@ -578,7 +679,8 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49 ]
+    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49, 50 ]
+    forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)

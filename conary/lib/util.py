@@ -58,25 +58,18 @@ def mkdirChain(*paths):
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
-            
-        paths = path.split(os.sep)
-            
-        for n in (range(2,len(paths) + 1)):
-            p = string.join(paths[0:n], os.sep)
-            if not os.path.exists(p):
-                # don't die in case of the race condition where someone
-                # made the directory after we stat'ed for it.
-                try:
-                    os.mkdir(p)
-                except OSError, exc:
-                    if exc.errno == errno.EEXIST:
-                        s = os.lstat(p)
-                        if stat.S_ISDIR(s.st_mode):
-                            pass
-                        else:
-                            raise
-                    else:
-                        raise
+
+        # don't die in case the dir already exists
+        try:
+            os.makedirs(path)
+        except OSError, exc:
+            if exc.errno == errno.EEXIST:
+                if os.path.isdir(path):
+                    continue
+                else:
+                    raise
+            else:
+                raise
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]

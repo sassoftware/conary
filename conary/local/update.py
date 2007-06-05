@@ -960,23 +960,14 @@ class FilesystemJob:
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
                 continue
 
-            if isSrcTrove:
-                # in source operations we could have a file which was added
-                # manually also be added in the repository. the pathId's
-                # would be different, but paths conflicting is a bad idea
-                if [ x for x in fsTrove.iterFileList() if x[1] == headPath ]:
-                    self.errors.append(
-                        DuplicatePath(headPath))
-                    continue
+            headRealPath = rootFixup + headPath
+            headFile = files.ThawFile(
+                            changeSet.getFileChange(None, headFileId), pathId)
 
             if headPath in pathsMoved:
                 # this file looks new, but it's actually moved over from
                 # another trove. treat it as an update later on.
                 continue
-
-            headRealPath = rootFixup + headPath
-
-	    headFile = files.ThawFile(changeSet.getFileChange(None, headFileId), pathId)
 
             # these files are placed directly into the lookaside at build
             # time; we don't worry about them.  We still need to put them
@@ -987,6 +978,31 @@ class FilesystemJob:
                                 isConfig = headFile.flags.isConfig(),
                                 isAutoSource = True)
                 continue
+
+            if isSrcTrove:
+                # in source operations we could have a file which was added
+                # manually also be added in the repository. the pathId's
+                # would be different, but paths conflicting is a bad idea.
+                # If the file really is new and the sha1's are the same, let
+                # the file from the repository win out
+                dup = [ x for x in fsTrove.iterFileList() if x[1] == headPath ]
+                if dup:
+                    fsFile = files.FileFromFilesystem(headRealPath, pathId)
+                    fsFile.flags.thaw(headFile.flags.freeze())
+                    if (isinstance(dup[0][3], versions.NewVersion) and
+                            fsFile.__eq__(headFile, ignoreOwnerGroup = True)):
+                        self._restore(headFile, headRealPath, newTroveInfo,
+                                      "creating %s", replaceFiles = True,
+                                      fileId = headFileId)
+                        fsTrove.removeFile(dup[0][0])
+                        fsTrove.addFile(pathId, headPath, headFileVersion,
+                                headFileId,
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = headFile.flags.isAutoSource())
+                    else:
+                        self.errors.append(DuplicatePath(headPath))
+
+                    continue
 
             restoreFile = True
 

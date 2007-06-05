@@ -125,7 +125,7 @@ class MigrateTo_14(SchemaMigration):
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 4)
+    Version = (15, 5)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -400,6 +400,12 @@ class MigrateTo_15(SchemaMigration):
     # conary 1.1.22 went out with a busted definition of LabelMap - we need to fix it
     def migrate4(self):
         return createLabelMap(self.db)
+    # 15.5
+    def migrate5(self):
+        # drop the index in case a user created it by hand (CNY-1704)
+        self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
+        return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
+                                   'itemId, branchId')
 
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(

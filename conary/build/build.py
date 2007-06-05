@@ -2018,13 +2018,20 @@ class Link(_FileAction):
 	    self.Link(newname, [newname, ...,] existingpath)
         """
         _FileAction.__init__(self, recipe, *args, **keywords)
-	self.newnames = args[:-1]
 	self.existingpath = args[-1]
+        dirPath = os.path.dirname(self.existingpath)
 
 	# raise error while we can still tell what is wrong...
-	for name in self.newnames:
-	    if name.find('/') != -1:
+        self.newnames = []
+        for name in args[:-1]:
+            if os.path.dirname(name) == dirPath:
+                # it's okay if the directories match; just fix it up to
+                # look like standard syntax
+                name = os.path.basename(name)
+            elif name.find('/') != -1:
 		self.init_error(TypeError, 'hardlink %s crosses directories' %name)
+            self.newnames.append(name)
+
 	self.basedir = os.path.dirname(self.existingpath)
 
 class Remove(BuildAction):
@@ -3508,10 +3515,10 @@ class MakeFIFO(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Create('%(localstatedir)s/log/acpid', mode=0640)}
+    C{r.MakeFIFO('/path/to/fifo', mode=0640)}
 
-    Demonstrates calling C{r.Create()} specifying the creation of
-    C{%(localstatedir)s/log/acpid} with mode C{0640}.
+    Demonstrates calling C{r.MakeFIFO()} specifying the creation of
+    C{/path/to/fifo} with mode C{0640}.
     """
     keywords = {'mode': 0644}
     def do(self, macros):
