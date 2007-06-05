@@ -1264,14 +1264,15 @@ class addCvsSnapshot(_RevisionControl):
         log.info('Creating repository snapshot for %s tag %s', self.project,
                  self.tag)
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
-        stagePath = tmpPath + '/' + self.project + '--' + self.tag
+        dirName = self.project + '--' + self.tag
+        stagePath = tmpPath + os.path.sep + dirName
         os.mkdir(stagePath)
         # don't use cvs export -d <dir> as it is fragile
         util.mkdirChain(stagePath)
-        util.execute("cd %s && cvs -Q -d '%s' export -r '%s' '%s' && cd '%s' && "
+        util.execute("cd %s && cvs -Q -d '%s' export -r '%s' '%s' && cd '%s/%s' && "
                   "tar cjf '%s' '%s'" %
                         (stagePath, self.root, self.tag, self.project,
-                         tmpPath, target, os.path.basename(stagePath)))
+                         tmpPath, dirName, target, self.project))
         shutil.rmtree(stagePath)
 
     def __init__(self, recipe, root, project, tag = 'HEAD', **kwargs):
