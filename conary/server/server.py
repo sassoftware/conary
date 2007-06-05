@@ -208,6 +208,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             try:
                 entitlement = entitlement.split()
                 entitlement[1] = base64.decodestring(entitlement[1])
+                if entitlement[0] == '*':
+                    entitlement[0] = None
             except:
                 self.send_error(400)
                 return None

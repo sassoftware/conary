@@ -402,8 +402,11 @@ class Transport(xmlrpclib.Transport):
         self.responseProtocol = None
         self.usedProxy = False
         if entitlement is not None:
-            self.entitlement = "%s %s" % (entitlement[0],
-                                          base64.b64encode(entitlement[1]))
+            if entitlement[0] is None:
+                self.entitlement = "* %s" % (base64.b64encode(entitlement[1]))
+            else:
+                self.entitlement = "%s %s" % (entitlement[0],
+                                              base64.b64encode(entitlement[1]))
         else:
             self.entitlement = None
 

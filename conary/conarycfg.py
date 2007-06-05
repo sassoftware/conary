@@ -506,11 +506,16 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
-def emitEntitlement(serverName, className, key):
+def emitEntitlement(serverName, className = None, key = None):
 
     # XXX This probably should be emitted using a real XML DOM writer,
     # but this will probably do for now. And yes, all that mess is required
     # to be well-formed and valid XML.
+    if className is None:
+        classInfo = ""
+    else:
+        classInfo = "<class>%s</class>" % className
+
     return """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <!DOCTYPE entitlement [
     <!ELEMENT entitlement (server, class, key)>
@@ -520,10 +525,10 @@ def emitEntitlement(serverName, className, key):
 ]>
 <entitlement>
     <server>%s</server>
-    <class>%s</class>
+    %s
     <key>%s</key>
 </entitlement>
-""" % (serverName, className, key)
+""" % (serverName, classInfo, key)
 
 def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
     p = EntitlementParser()
@@ -541,7 +546,7 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
 
         try:
             entServer = p['server']
-            entClass = p['class']
+            entClass = p.get('class', None)
             entKey = p['key']
         except KeyError:
             raise errors.ConaryError("Entitlement incomplete.  Entitlements"
@@ -628,8 +633,6 @@ def loadEntitlementFromProgram(fullPath, serverName):
 
 
 def loadEntitlement(dirName, serverName):
-    # XXX this should be replaced with a real xml parser
-
     if not dirName:
         # XXX
         # this is a hack for the repository server which doesn't support

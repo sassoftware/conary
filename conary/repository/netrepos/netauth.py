@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -179,11 +179,17 @@ class EntitlementAuthorization:
                 return userGroupIds
 
         if self.entCheckUrl:
-            try:
+            if entitlementGroup is not None:
                 url = "%s?server=%s;class=%s;key=%s" \
                         % (self.entCheckUrl, urllib.quote(serverName),
                            urllib.quote(entitlementGroup),
                            urllib.quote(entitlement))
+            else:
+                url = "%s?server=%s;key=%s" \
+                        % (self.entCheckUrl, urllib.quote(serverName),
+                           urllib.quote(entitlement))
+
+            try:
                 f = urllib2.urlopen(url)
                 xmlResponse = f.read()
             except Exception, e:
@@ -204,11 +210,10 @@ class EntitlementAuthorization:
 
         # look up entitlements
         cu.execute("""
-        SELECT userGroupId FROM EntitlementGroups
-        JOIN Entitlements USING (entGroupId)
+        SELECT userGroupId FROM Entitlements USING (entGroupId)
         JOIN EntitlementAccessMap USING (entGroupId)
-        WHERE entGroup=? AND entitlement=?
-        """, entitlementGroup, entitlement)
+        WHERE entitlement=?
+        """, entitlement)
 
         userGroupIds = set(x[0] for x in cu)
 
@@ -252,11 +257,14 @@ class NetworkAuthorization:
 
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
-        if authToken[2] is not None:
-            for serverName in self.serverNameList:
-                groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
-                    cu, serverName, authToken[2], authToken[3])
-                groupSet.update(groupsFromEntitlement)
+        if authToken[3] is not None:
+            # XXX serverName is passed only for compatibility with the server
+            # and entitlement class based entitlement design; it's only used
+            # here during external authentication (which may be completely
+            # unused?)
+            groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
+                cu, self.serverNameList[0], authToken[2], authToken[3])
+            groupSet.update(groupsFromEntitlement)
 
         return groupSet
 
