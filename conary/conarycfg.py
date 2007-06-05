@@ -29,14 +29,14 @@ from conary import versions
 from conary import flavorcfg
 
 # ----------- conary specific types
-    
 
-class UserInformation(list):
+class ServerGlobList(list):
+
     def find(self, server):
-        for (serverGlob, user, password) in self:
+        for (serverGlob, item) in self:
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
-                return user, password
+                return item
 
         return None
 
@@ -50,7 +50,7 @@ class UserInformation(list):
     def append(self, newItem):
         location = None
         removeOld = False
-        for i, (serverGlob, user, password) in enumerate(self):
+        for i, (serverGlob, (info)) in enumerate(self):
             if fnmatch.fnmatch(newItem[0], serverGlob):
                 if serverGlob == newItem[0]:
                     removeOld = True
@@ -63,6 +63,12 @@ class UserInformation(list):
             self[location] = newItem
         else:
             self.insert(location, newItem)
+
+class UserInformation(ServerGlobList):
+
+    def append(self, newItem):
+        newItem = (newItem[0], (newItem[1], newItem[2]))
+        ServerGlobList.append(self, newItem)
 
     def addServerGlob(self, serverGlob, user, password):
         self.append((serverGlob, user, password))
@@ -78,7 +84,7 @@ class CfgUserInfoItem(CfgType):
             return tuple(val)
 
     def format(self, val, displayOptions=None):
-        serverGlob, user, password = val
+        serverGlob, (user, password) = val
         if password is None: 
             return '%s %s' % (serverGlob, user)
         elif displayOptions.get('hidePasswords'):
