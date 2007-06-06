@@ -1,35 +1,36 @@
-Changes in @NEW@:
+Changes in 1.1.28:
   o Documentation Changes:
     * Incorrect references to createGroup have been fixed. (CNY-1700)
 
   o Build Changes:
     * Files added with in the repository and locally no longer cause
-      'cvc update' to fail as long as the files have the same fileId
+      'cvc update' to fail as long as the files have the same fileId.
       (CNY-1428)
-    * r.Link allows full paths to be specified for the target of the link
-      as long as the directory matches the source of the link (CNY-751)
-    * "cvc mv" has been added as a synonym for "cvc rename"
-    * r.addCvsSnapshot() now works correctly with anon pserver-based servers.
-      Previously, cvs checkout would fail due to strange characters being in
-      the destination directory
-    * r.add*Snapshot() will now raise errors if the shell commands they are
-      executing fail for any reason
+    * r.Link allows full paths to be specified for the target of the
+      link as long as the directory matches the source of the link.
+      (CNY-751)
+    * "cvc mv" has been added as a synonym for "cvc rename".
+    * r.addCvsSnapshot() now works correctly with anonymous,
+      pserver-based, servers. Previously, cvs checkout would fail due
+      to strange characters being in the destination directory.
+    * r.add*Snapshot() will now raise errors if the shell commands they
+      are executing fail for any reason
 
   o Bug fixes:
     * An index has been added to improve the performance of various
       file stream related queries in a Conary repository. (CNY-1704)
     * Directories in binary directories are no longer (incorrectly)
-      provided.  (CNY-1721)
+      provided. (CNY-1721)
     * "conary update" now works with read-only changesets. (CNY-1681)
 
   o Server Changes:
-    * getChangeSet call now returns supplemental information (trovesNeeded,
-      filesNeeded, and removedTroves) for each individual job separately
-      instead of combining them for the entire job list
+    * getChangeSet call now returns supplemental information
+      (trovesNeeded, filesNeeded, and removedTroves) for each individual
+      job separately, instead of combining them for the entire job list.
     * proxy now combines all upstream changeset requests into a single
-      job request for servers running this version or later (CNY-1716)
+      job request for servers running this version or later. (CNY-1716)
     * mirrorMode wasn't passed through to changeset fingerprint calls
-      from the caching code
+      from the caching code.
 
 Changes in 1.1.27:
   o New Features:
