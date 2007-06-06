@@ -3134,11 +3134,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Flavors on Instances.flavorId = Flavors.flavorId
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
-        ret = [ [] for x in range(len(troveInfoList)) ]
+        ret = [ set() for x in range(len(troveInfoList)) ]
         for i, n,v,f, pattern in cu:
-            l = ret[i-minIdx]
+            s = ret[i-minIdx]
             if self.auth.checkTrove(pattern, n):
-                l.append((n,v,f))
+                s.add((n,v,f))
+
+        ret = [ list(x) for x in ret ]
+
         return ret
 
     @accessReadOnly
