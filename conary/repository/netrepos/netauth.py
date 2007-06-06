@@ -116,7 +116,7 @@ class UserAuthorization:
         sql = "DELETE from Users WHERE userId=?"
         cu.execute(sql, userId)
 
-    def getAuthorizedGroups(self, cu, user, password):
+    def getAuthorizedGroups(self, cu, user, password, allowAnonymous = True):
         cu.execute("""
         SELECT salt, password, userGroupId, userName FROM Users
         JOIN UserGroupMembers USING(userId)
@@ -133,12 +133,15 @@ class UserAuthorization:
         # password for 'anonymous'. Using a bad passwords still allows
         # anonymous access
         userPasswords = [ x for x in result if x[3] != 'anonymous' ]
+        if not allowAnonymous:
+            result = userPasswords
+
         if userPasswords and not self._checkPassword(
                                         user,
                                         cu.frombinary(userPasswords[0][0]),
                                         userPasswords[0][1],
                                         password):
-            result = [ x for x in cu if x[3] == 'anonymous' ]
+            result = [ x for x in result if x[3] == 'anonymous' ]
 
         return set(x[2] for x in result)
 
@@ -248,7 +251,7 @@ class NetworkAuthorization:
         self.entitlementAuth = EntitlementAuthorization(
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
 
-    def getAuthGroups(self, cu, authToken):
+    def getAuthGroups(self, cu, authToken, allowAnonymous = True):
         self.log(4, authToken[0], authToken[2])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
@@ -258,7 +261,9 @@ class NetworkAuthorization:
         authToken = tuple(authToken)
 
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
-                                                           authToken[1])
+                                                     authToken[1],
+                                                     allowAnonymous =
+                                                            allowAnonymous)
 
         for entitlement in authToken[2]:
             # XXX serverName is passed only for compatibility with the server
@@ -334,7 +339,8 @@ class NetworkAuthorization:
         return retlist
 
     def check(self, authToken, write = False, admin = False, label = None,
-              trove = None, mirror = False, remove = False):
+              trove = None, mirror = False, remove = False,
+              allowAnonymous = True):
         self.log(3, authToken[0],
                  "entitlements=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror)),
@@ -349,7 +355,8 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         try:
-            groupIds = self.getAuthGroups(cu, authToken)
+            groupIds = self.getAuthGroups(cu, authToken,
+                                          allowAnonymous = allowAnonymous)
         except errors.InsufficientPermission:
             return False
 

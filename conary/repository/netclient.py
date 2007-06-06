@@ -287,7 +287,7 @@ class ServerCache:
         user, pw = self.pwPrompt(host, user)
         if user is None or pw is None:
             return None, None
-        self.userMap.append((host, user, pw))
+        self.userMap.addServerGlob(host, user, pw)
         return user, pw
 
     def _getServerName(self, item):
