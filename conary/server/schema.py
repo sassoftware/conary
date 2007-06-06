@@ -683,6 +683,7 @@ def createLabelMap(db):
         commit = True
     db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
+    db.createIndex("LabelMap", "LabelMapItemIdBranchIdIdx", "itemId, branchId")
     db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
     if commit:
         db.commit()

@@ -255,7 +255,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
 class ChangeSetInfo(object):
 
     __slots__ = [ 'size', 'trovesNeeded', 'removedTroves', 'filesNeeded',
-                  'path', 'cached', 'version' ]
+                  'path', 'cached', 'version', 'fingerprint' ]
 
     def pickle(self):
         return cPickle.dumps(((self.trovesNeeded, self.filesNeeded,
@@ -576,6 +576,7 @@ class ChangesetFilter(BaseProxy):
                     outF.close()
                     path = tmpPath
 
+                csInfo.fingerprint = fingerprint
                 # path points to a wire version of the changeset (possibly
                 # in the cache)
                 csInfo.path = path
@@ -610,7 +611,7 @@ class ChangesetFilter(BaseProxy):
                     os.unlink(csPath)
                     csPath = path
                 else:
-                    csPath = _addToCache(fingerprint, open(path), iterV,
+                    csPath = _addToCache(csInfo.fingerprint, open(path), iterV,
                                          csInfo, sizeLimit = None)
 
                 oldV = iterV
