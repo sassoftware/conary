@@ -465,8 +465,8 @@ class ConaryConfiguration(SectionedConfigFile):
             if os.path.isfile(os.path.join(self.entitlementDirectory,
                                            basename)):
                 ent = loadEntitlement(self.entitlementDirectory, basename)
-                self.entitlement.addEntitlement(basename, ent[1],
-                                                entClass = ent[0])
+                self.entitlement.addEntitlement(ent[0], ent[2],
+                                                entClass = ent[1])
 
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
@@ -587,7 +587,7 @@ def emitEntitlement(serverName, className = None, key = None):
 </entitlement>
 """ % (serverName, classInfo, key)
 
-def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
+def loadEntitlementFromString(xmlContent, source='<override>'):
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
@@ -602,7 +602,7 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
             p.parse(xmlContent)
 
         try:
-            entServer = p['server']
+            entServer = p.get('server', None)
             entClass = p.get('class', None)
             entKey = p['key']
         except KeyError:
@@ -610,14 +610,10 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
                                      " must include 'server', 'class', and"
                                      " 'key' values")
     except Exception, err:
-        raise errors.ConaryError("Malformed entitlement for %s at %s:"
-                                 " %s" % (serverName, source, err))
+        raise errors.ConaryError("Malformed entitlement at %s:"
+                                 " %s" % (source, err))
 
-    if entServer != serverName: 
-        raise errors.ConaryError("Entitlement at %s is for server '%s', "
-                         "should be for '%s'" % (source, entServer, serverName))
-
-    return (entClass, entKey)
+    return (p['server'], entClass, entKey)
 
 def loadEntitlementFromProgram(fullPath, serverName):
     """ Executes the given file to generate an entitlement.
@@ -686,7 +682,7 @@ def loadEntitlementFromProgram(fullPath, serverName):
     # looks like we generated an entitlement - they're still the possibility
     # that the entitlement is broken.
     xmlContent = ''.join(output)
-    return loadEntitlementFromString(xmlContent, serverName, fullPath)
+    return loadEntitlementFromString(xmlContent, fullPath)
 
 
 def loadEntitlement(dirName, serverName):
@@ -703,10 +699,10 @@ def loadEntitlement(dirName, serverName):
         return None
 
     if os.access(fullPath, os.X_OK):
-        return loadEntitlementFromProgram(fullPath, serverName)
+        return loadEntitlementFromProgram(fullPath,
+                                          '<executable %s>' % fullPath)
     elif os.access(fullPath, os.R_OK):
-        return loadEntitlementFromString(open(fullPath).read(), serverName,
-                                         fullPath)
+        return loadEntitlementFromString(open(fullPath).read(), fullPath)
     else:
         return None
 
