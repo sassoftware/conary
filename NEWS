@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * 'conary rblist' no longer produces a stack trace if the
       installLabelPath configuration option is not set. (CNY-1731)
+    * A bug that caused a "Error parsing label" error message when
+      invoking "cvc commit" on a group recipe that used
+      r.setSearchPath(str(r.labelPath[0]), ...) has been fixed. (CNY-1740)
 
 Changes in 1.1.28:
   o Documentation Changes:

@@ -336,7 +336,14 @@ def commit(repos, cfg, message, callback=None, test=False):
                 recipeObj = recipeClass(cfg, lcache, srcdirs,
                                         lightInstance=True)
             elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
-                recipeObj = recipeClass(repos, cfg, state.getVersion(),
+                v = state.getVersion()
+                if isinstance(v, versions.NewVersion):
+                    label = cfg.buildLabel
+                elif isinstance(v, versions.Version):
+                    label = v.trailingLabel()
+                else:
+                    raise RuntimeError('unable to determine which label to use when instantiating group recipe')
+                recipeObj = recipeClass(repos, cfg, label,
                                         None, lcache, srcdirs,
                                         lightInstance = True)
         except builderrors.RecipeFileError, msg:
