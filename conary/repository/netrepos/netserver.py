@@ -289,7 +289,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         # unless this was a commitChangeSet call, in which
                         # case the underlying changeset to commit has been
                         # erased already!
-                        r = method(('anonymous', 'anonymous', None, None), *args)
+                        r = method(('anonymous', 'anonymous', []), *args)
                         self.db.commit()
                         if self.callLog:
                             self.callLog.log(remoteIp, authToken, methodname, 

@@ -247,7 +247,7 @@ class NetworkAuthorization:
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
 
     def getAuthGroups(self, cu, authToken):
-        self.log(4, authToken[0], authToken[2], authToken[3])
+        self.log(4, authToken[0], authToken[2])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
@@ -257,13 +257,19 @@ class NetworkAuthorization:
 
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
-        if authToken[3] is not None:
+        try:
+            [ x for x in authToken[2] ]
+        except:
+            import epdb
+            epdb.st()
+
+        for entitlement in authToken[2]:
             # XXX serverName is passed only for compatibility with the server
             # and entitlement class based entitlement design; it's only used
             # here during external authentication (which may be completely
             # unused?)
             groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
-                cu, self.serverNameList[0], authToken[2], authToken[3])
+                cu, self.serverNameList[0], entitlement[0], entitlement[1])
             groupSet.update(groupsFromEntitlement)
 
         return groupSet
@@ -271,7 +277,7 @@ class NetworkAuthorization:
     # a faster way for batch checking access to a list of troves
     def batchCheck(self, authToken, troveTupList, write = False, remove = False):
         # troveTupList is a list of (name, VFS) tuples
-        self.log(3, authToken[0], "entitlement=%s write=%s remove=%s" %(
+        self.log(3, authToken[0], "entitlements=%s write=%s remove=%s" %(
             authToken[2], int(bool(write)), int(bool(remove))),
                  troveTupList)
         checkDict = {}
@@ -333,7 +339,7 @@ class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None,
               trove = None, mirror = False, remove = False):
         self.log(3, authToken[0],
-                 "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
+                 "entitlements=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror)),
             int(bool(remove))))
 

@@ -28,11 +28,15 @@ class CallLogEntry:
             (self.serverName, self.timeStamp, self.remoteIp,
              (self.user, self.entClass, self.entKey),
              self.methodName, self.args, self.exceptionStr) = info[1:]
+        elif (revision == 3):
+            (self.serverName, self.timeStamp, self.remoteIp,
+             (self.user, self.entitlements),
+             self.methodName, self.args, self.exceptionStr) = info[1:]
         else:
             assert(0)
 
 class CallLogger:
-    logFormatRevision = 2
+    logFormatRevision = 3
 
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
@@ -73,9 +77,9 @@ class CallLogger:
         if exception:
             exception = str(exception)
 
-        (user, entClass, entKey) = authToken[0], authToken[2], authToken[3]
+        (user, entitlements) = authToken[0], authToken[2]
         logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
-                                time.time(), remoteIp, (user, entClass, entKey),
+                                time.time(), remoteIp, (user, entitlements),
                                 methodName, args, exception))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
 

@@ -54,6 +54,7 @@ from conary.repository.netrepos import netserver, proxy
 from conary.repository.netrepos.proxy import ProxyRepositoryServer
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
+from conary.web import webauth
 
 sys.excepthook = util.genExcepthook(debug=True)
 
@@ -203,20 +204,15 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
             httpAuthToken = authString.split(":")
 
-        entitlement = self.headers.get('X-Conary-Entitlement', None)
-        if entitlement is not None:
-            try:
-                entitlement = entitlement.split()
-                entitlement[1] = base64.decodestring(entitlement[1])
-                if entitlement[0] == '*':
-                    entitlement[0] = None
-            except:
-                self.send_error(400)
-                return None
-        else:
-            entitlement = [ None, None ]
+        try:
+            entitlementList = webauth.parseEntitlement(
+                        self.headers.get('X-Conary-Entitlement', '') )
+        except:
+            self.send_error(400)
+            return None
 
-        return httpAuthToken + entitlement
+        httpAuthToken.append(entitlementList)
+        return httpAuthToken
 
     def checkAuth(self):
  	if not self.headers.has_key('Authorization'):

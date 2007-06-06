@@ -11,7 +11,6 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from mod_python import apache
 import base64
 
 from conary import errors
@@ -26,31 +25,26 @@ def getAuth(req):
     else:
         info = req.headers_in['Authorization'].split()
         if len(info) != 2 or info[0] != "Basic":
-            return apache.HTTP_BAD_REQUEST
+            return None
 
         try:
             authString = base64.decodestring(info[1])
         except:
-            return apache.HTTP_BAD_REQUEST
+            return None
 
         if authString.count(":") != 1:
-            return apache.HTTP_BAD_REQUEST
+            return None
 
         authToken = authString.split(":")
 
-    entitlement = req.headers_in.get('X-Conary-Entitlement', None)
-    if entitlement is not None:
-        try:
-            entitlement = entitlement.split()
-            entitlement[1] = base64.decodestring(entitlement[1])
-            if entitlement[0] == '*':
-                entitlement[0] = None
-        except:
-            return apache.HTTP_BAD_REQUEST
-    else:
-        entitlement = [ None, None ]
+    try:
+        entitlementList = parseEntitlement(
+                        req.headers_in.get('X-Conary-Entitlement', ''))
+    except:
+        return None
 
-    return authToken + entitlement
+    authToken.append(entitlementList)
+    return authToken
 
 class Authorization:
     def __init__(self, passwordOK=False, isInternal=False, userId=-1):
@@ -83,3 +77,16 @@ def externalOnly(func):
         else:
             raise PermissionDenied
     return wrapper
+
+def parseEntitlement(entHeader):
+    entitlementList = []
+
+    allEntitlements = entHeader.split()
+    for i in range(0, len(allEntitlements), 2):
+        ent = [ allEntitlements[i] ]
+        ent.append(base64.decodestring(allEntitlements[i + 1]))
+        if ent[0] == '*':
+            ent[0] = None
+        entitlementList.append(tuple(ent))
+
+    return entitlementList

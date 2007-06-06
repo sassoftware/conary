@@ -335,13 +335,13 @@ class ServerCache:
         if userInfo and userInfo[1] is None:
             userInfo = (userInfo[0], "")
 
-        # check for an entitlement for this server
-        ent = self.entitlements.find(serverName)
+        # look for any entitlements for this server
+        entList = self.entitlements.find(serverName, allMatches = True)
 
         usedMap = url is not None
         if url is None:
-            if ent or userInfo:
-                # if we have a username/password, use https
+            if entList or userInfo:
+                # if we have authentication information, use https
                 protocol = 'https'
             else:
                 # if we are using anonymous, use http
@@ -367,7 +367,7 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
-                                          entitlement = ent,
+                                          entitlementList = entList,
                                           proxies = self.proxies,
                                           serverName = serverName)
         transporter.setCompress(True)

@@ -32,13 +32,19 @@ from conary import flavorcfg
 
 class ServerGlobList(list):
 
-    def find(self, server):
+    def find(self, server, allMatches = False):
+        l = []
         for (serverGlob, item) in self:
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
-                return item
+                if not allMatches:
+                    return item
+                l.append(item)
 
-        return None
+        if not allMatches:
+            return None
+
+        return l
 
     def extend(self, itemList):
         # Look for the first item which globs to this, and insert the new
