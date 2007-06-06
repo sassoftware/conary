@@ -63,8 +63,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     including trove updates and erases.
     """
     def __init__(self, cfg = None, passwordPrompter = None,
-                 resolverClass=resolve.DependencySolver,
-                 entitlements = {}, updateCallback=None):
+                 resolverClass=resolve.DependencySolver, updateCallback=None):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
                     If None, the standard Conary configuration is loaded
@@ -82,8 +81,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
         self.repos = self.createRepos(self.db, cfg,
-                                      passwordPrompter = passwordPrompter,
-                                      entitlements = entitlements)
+                                      passwordPrompter = passwordPrompter)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 
         if not resolverClass:
@@ -91,8 +89,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         self.resolver = resolverClass(self, cfg, self.repos, self.db)
 
-    def createRepos(self, db, cfg, passwordPrompter=None, userMap=None,
-                    entitlements={}):
+    def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
         if self.repos:
             if passwordPrompter is None:
                 passwordPrompter = self.repos.getPwPrompt()
@@ -115,7 +112,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                           cfg.downloadRateLimit,
                                        uploadRateLimit =
                                           cfg.uploadRateLimit,
-                                       entitlements = entitlements,
+                                       entitlements = cfg.entitlement,
                                        proxy = proxy)
 
     def getRepos(self):

@@ -272,14 +272,12 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__protocolVersion = CLIENT_VERSIONS[-1]
 
 class ServerCache:
-    def __init__(self, repMap, userMap, pwPrompt=None,
-                 entitlementDir=None, entitlements={}, callback=None,
-                 proxies=None):
+    def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
+                 callback=None, proxies=None):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
-        self.entitlementDir = entitlementDir
         self.entitlements = entitlements
         self.proxies = proxies
 
@@ -338,9 +336,7 @@ class ServerCache:
             userInfo = (userInfo[0], "")
 
         # check for an entitlement for this server
-        ent = self.entitlements.get(serverName, None)
-        if ent is None:
-            ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
+        ent = self.entitlements.find(serverName)
 
         usedMap = url is not None
         if url is None:
@@ -438,7 +434,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def __init__(self, repMap, userMap,
                  localRepository = None, pwPrompt = None,
                  entitlementDir = None, downloadRateLimit = 0,
-                 uploadRateLimit = 0, entitlements = {},
+                 uploadRateLimit = 0, entitlements = None,
                  proxy = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
@@ -454,8 +450,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             self.proxies = None
 
-	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir,
-                             entitlements, proxies = self.proxies)
+        if entitlements is None:
+            entitlements = conarycfg.EntitlementList()
+
+	self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
+                             proxies = self.proxies)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)

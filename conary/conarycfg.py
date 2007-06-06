@@ -50,7 +50,7 @@ class ServerGlobList(list):
     def append(self, newItem):
         location = None
         removeOld = False
-        for i, (serverGlob, (info)) in enumerate(self):
+        for i, (serverGlob, info) in enumerate(self):
             if fnmatch.fnmatch(newItem[0], serverGlob):
                 if serverGlob == newItem[0]:
                     removeOld = True
@@ -66,12 +66,18 @@ class ServerGlobList(list):
 
 class UserInformation(ServerGlobList):
 
-    def append(self, newItem):
-        newItem = (newItem[0], (newItem[1], newItem[2]))
-        ServerGlobList.append(self, newItem)
+    #def append(self, newItem):
+    #    newItem = (newItem[0], (newItem[1], newItem[2]))
+    #    ServerGlobList.append(self, newItem)
 
     def addServerGlob(self, serverGlob, user, password):
-        self.append((serverGlob, user, password))
+        self.append((serverGlob, (user, password)))
+
+    def __init__(self, initVal = None):
+        ServerGlobList.__init__(self)
+        if initVal is not None:
+            for val in initVal:
+                self.append(val)
 
 class CfgUserInfoItem(CfgType):
     def parseString(self, str):
@@ -79,9 +85,9 @@ class CfgUserInfoItem(CfgType):
         if len(val) < 2 or len(val) > 3:
             raise ParseError("expected <hostglob> <user> [<password>]")
         elif len(val) == 2:
-            return (val[0], val[1], None)
+            return (val[0], (val[1], None))
         else:
-            return tuple(val)
+            return (val[0], (val[1], val[2]))
 
     def format(self, val, displayOptions=None):
         serverGlob, (user, password) = val
@@ -96,6 +102,35 @@ class CfgUserInfo(CfgList):
 
     def __init__(self, default=[]):
         CfgList.__init__(self, CfgUserInfoItem, UserInformation,
+                         default = default)
+
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
+
+class EntitlementList(ServerGlobList):
+
+    def addEntitlement(self, serverGlob, entitlement, entClass = None):
+        self.append((serverGlob, (entClass, entitlement)))
+
+class CfgEntitlementItem(CfgType):
+    def parseString(self, str):
+        val = str.split()
+        if len(val) != 2:
+            raise ParseError("expected <hostglob> <entitlement>")
+
+        return (val[0], (None, val[1]))
+
+    def format(self, val, displayOptions=None):
+        if val[0][0] is None:
+            return '%s %s' % (val[0], val[1][1])
+        else:
+            return '%s %s %s' % (val[0], val[1][0], val[1][1])
+
+class CfgEntitlement(CfgList):
+
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgEntitlementItem, EntitlementList,
                          default = default)
 
     def set(self, curVal, newVal):
@@ -327,6 +362,7 @@ class ConaryContext(ConfigSection):
                                             '~/.conary/macros'))
     emergeUser            =  (CfgString, 'emerge')
     enforceManagedPolicy  =  (CfgBool, True)
+    entitlement           =  CfgEntitlement
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     environment           =  CfgDict(CfgString)
     excludeTroves         =  CfgRegExpList
@@ -415,8 +451,23 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
+
+        self.readEntitlementDirectory()
+
         util.settempdir(self.tmpDir)
-  
+
+    def readEntitlementDirectory(self):
+        if not os.path.isdir(self.entitlementDirectory):
+            return
+
+        warn = False
+        for basename in os.listdir(self.entitlementDirectory):
+            if os.path.isfile(os.path.join(self.entitlementDirectory,
+                                           basename)):
+                ent = loadEntitlement(self.entitlementDirectory, basename)
+                self.entitlement.addEntitlement(basename, ent[1],
+                                                entClass = ent[0])
+
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
 	if os.environ.has_key("HOME"):
