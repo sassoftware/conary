@@ -281,22 +281,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     r = method(authToken, *args)
                 except sqlerrors.DatabaseLocked:
                     raise
-                except errors.InsufficientPermission, e:
-                    if methodname != 'commitChangeSet' and \
-                                authToken[0] is not None:
-                        # When we get InsufficientPermission w/ a
-                        # user/password, retry the operation as anonymous,
-                        # unless this was a commitChangeSet call, in which
-                        # case the underlying changeset to commit has been
-                        # erased already!
-                        r = method(('anonymous', 'anonymous', []), *args)
-                        self.db.commit()
-                        if self.callLog:
-                            self.callLog.log(remoteIp, authToken, methodname, 
-                                             args)
-
-                        return (True, False, r)
-                    raise
                 else:
                     self.db.commit()
 

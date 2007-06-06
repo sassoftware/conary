@@ -118,27 +118,29 @@ class UserAuthorization:
 
     def getAuthorizedGroups(self, cu, user, password):
         cu.execute("""
-        SELECT salt, password, userGroupId FROM Users
+        SELECT salt, password, userGroupId, userName FROM Users
         JOIN UserGroupMembers USING(userId)
-        WHERE userName = ?
+        WHERE userName == ? or userName ='anonymous'
         """, user)
 
-        groupsFromUser = [ x for x in cu ]
+        result = [ x for x in cu ]
 
-        if groupsFromUser:
-            # each user can only appear once (by constraint), so we only
-            # need to validate the password once
-            if not self._checkPassword(user,
-                                      cu.frombinary(groupsFromUser[0][0]),
-                                      groupsFromUser[0][1],
-                                      password):
-                return set()
-
-            groupsFromUser = set(x[2] for x in groupsFromUser)
-        else:
+        if not result:
             return set()
 
-        return groupsFromUser
+        # each user can only appear once (by constraint), so we only
+        # need to validate the password once. we don't validate the
+        # password for 'anonymous'. Using a bad passwords still allows
+        # anonymous access
+        userPasswords = [ x for x in result if x[3] != 'anonymous' ]
+        if userPasswords and not self._checkPassword(
+                                        user,
+                                        cu.frombinary(userPasswords[0][0]),
+                                        userPasswords[0][1],
+                                        password):
+            result = [ x for x in cu if x[3] == 'anonymous' ]
+
+        return set(x[2] for x in result)
 
     def getGroupsByUser(self, user):
         cu = self.db.cursor()
@@ -257,11 +259,6 @@ class NetworkAuthorization:
 
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
                                                            authToken[1])
-        try:
-            [ x for x in authToken[2] ]
-        except:
-            import epdb
-            epdb.st()
 
         for entitlement in authToken[2]:
             # XXX serverName is passed only for compatibility with the server
