@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * 'conary rblist' no longer produces a stack trace if the
+      installLabelPath configuration option is not set. (CNY-1731)
+
 Changes in 1.1.28:
   o Documentation Changes:
     * Incorrect references to createGroup have been fixed. (CNY-1700)
@@ -16,7 +21,7 @@ Changes in 1.1.28:
     * r.add*Snapshot() will now raise errors if the shell commands they
       are executing fail for any reason
 
-  o Bug fixes:
+  o Bug Fixes:
     * An index has been added to improve the performance of various
       file stream related queries in a Conary repository. (CNY-1704)
     * Directories in binary directories are no longer (incorrectly)
