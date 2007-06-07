@@ -21,6 +21,7 @@ Changes in @NEW@:
     * Directories in binary directories are no longer (incorrectly)
       provided.  (CNY-1721)
     * "conary update" now works with read-only changesets. (CNY-1681)
+    * the setTroveInfo call refuses to update missing troves (CNY-1741)
 
   o Server Changes:
     * getChangeSet call now returns supplemental information (trovesNeeded,
