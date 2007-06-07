@@ -71,10 +71,6 @@ class ServerGlobList(list):
 
 class UserInformation(ServerGlobList):
 
-    #def append(self, newItem):
-    #    newItem = (newItem[0], (newItem[1], newItem[2]))
-    #    ServerGlobList.append(self, newItem)
-
     def addServerGlob(self, serverGlob, user, password):
         self.append((serverGlob, (user, password)))
 
@@ -156,7 +152,11 @@ class CfgLabel(CfgType):
 class CfgRepoMapEntry(CfgType):
 
     def parseString(self, str):
-        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', str)
+        val = str.split()
+        if len(val) != 2:
+            raise ParseError("expected <hostglob> <url>")
+
+        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', val[1])
         if match is not None:
             user, server = match.groups()
             raise ParseError, ('repositoryMap entries should not contain '
@@ -164,16 +164,55 @@ class CfgRepoMapEntry(CfgType):
                                '"user %s %s <password>" instead' % 
                                (server, user))
 
-        return CfgType.parseString(self, str)
+        return (val[0], val[1])
 
-class RepoMap(dict):
+    def format(self, val, displayOptions=None):
+        return '%-25s %s' % val
 
-    pass
+class RepoMap(ServerGlobList):
 
-class CfgRepoMap(CfgDict):
-    def __init__(self, default={}):
-        CfgDict.__init__(self, CfgRepoMapEntry, dictType=RepoMap,
-                         default=default)
+    # Pretend to be a dict; repositorymap's used to be dicts and this should
+    # ease the transition.
+
+    def __setitem__(self, key, val):
+        if type(key) is int:
+            return ServerGlobList.__setitem__(self, key, val)
+
+        self.append((key, val))
+
+    def __getitem__(self, key):
+        if type(key) is int:
+            return ServerGlobList.__getitem__(self, key)
+
+        return self.find(key)
+
+    def clear(self):
+        del self[:]
+
+    def update(self, other):
+        for key, val in other.iteritems():
+            self.append((key, val))
+
+    def iteritems(self):
+        return iter(self)
+
+    def items(self):
+        return self
+
+    def get(self, key, default):
+        r = self.find(key)
+        if r is None:
+            return default
+
+        return r
+
+class CfgRepoMap(CfgList):
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgRepoMapEntry, RepoMap, default=default)
+
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
 
 class CfgFlavor(CfgType):
 
