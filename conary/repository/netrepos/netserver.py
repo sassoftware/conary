@@ -2819,7 +2819,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
-        """, start_transaction=False)
+        where Instances.isPresent in (?,?)
+          and Instances.troveType != ?
+        """, (instances.INSTANCE_PRESENT_NORMAL, instances.INSTANCE_PRESENT_HIDDEN,
+              trove.TROVE_TYPE_REMOVED),
+                   start_transaction=False)
         self.db.analyze("tmpInstanceId")
         # see what troves are missing, if any
         cu.execute("""
