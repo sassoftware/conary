@@ -1,3 +1,19 @@
+    * repositoryMap conaryrc entries can now use wildcards for the server name
+    * (Nearly) all repository operations are now performed using the
+      permissions of the anonymous user in addition to the permission set
+      for any user authentication information which is present.
+    * Multiple entitlements can be sent to each server now
+    * Path names in the entitlementsDirectory no longer have any meaning. All
+      entitlements are read, and the serverName in the XML for the entitlement
+      is used to determine which server to send the entitlement too.
+    * Server names in entitlements may include wildcads.
+    * Entitlement classes are no longer used as part of authentication; they
+      may still be specified, but repositorys now look up the class(es) for an
+      entitlement based on the key.
+    * Entitlements may be placed in conaryrc files now using
+      'entitlement server entitlement'. conary config displays entitlement
+      information.
+
 Changes in @NEW@:
   o Documentation Changes:
     * Incorrect references to createGroup have been fixed. (CNY-1700)
