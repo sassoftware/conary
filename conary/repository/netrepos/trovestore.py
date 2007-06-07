@@ -1011,7 +1011,7 @@ class TroveStore:
           left join Requires as r on a.depId = r.depId and r.instanceId != a.instanceId
           where r.depId is NULL
         ) as reqs
-        where prov.depId = reqs.depId
+        on prov.depId = reqs.depId
         """, instanceId = instanceId )
         depsToRemove = [ x[0] for x in cu ]
 
