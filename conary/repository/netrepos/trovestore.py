@@ -1011,7 +1011,7 @@ class TroveStore:
           left join Requires as r on a.depId = r.depId and r.instanceId != a.instanceId
           where r.depId is NULL
         ) as reqs
-        where prov.depId = reqs.depId
+        on prov.depId = reqs.depId
         """, instanceId = instanceId )
         depsToRemove = [ x[0] for x in cu ]
 
@@ -1052,7 +1052,7 @@ class TroveStore:
         # may need the same sha1
         filesToRemove = []
         for sha1 in candidateSha1sToRemove:
-            cu.execute("SELECT COUNT(*) FROM FileStreams WHERE sha1=?", sha1)
+            cu.execute("SELECT COUNT(*) FROM FileStreams WHERE sha1=?", cu.binary(sha1))
             if cu.next()[0] == 0:
                 filesToRemove.append(sha1)
 
