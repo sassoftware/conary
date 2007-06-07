@@ -1,3 +1,5 @@
+    * Adding redirects which pointed to otherwise-unused branches corrupted
+      the database by creating a branch without corresponding label information
     * repositoryMap conaryrc entries can now use wildcards for the server name
     * (Nearly) all repository operations are now performed using the
       permissions of the anonymous user in addition to the permission set

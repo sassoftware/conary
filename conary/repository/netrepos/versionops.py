@@ -228,14 +228,20 @@ class SqlVersioning:
 	# make sure the branch exists; we need the branchId in case we
 	# need to make this the latest version on the branch
 	branch = version.branch()
+        label = branch.label()
 	branchId = self.branchTable.get(branch, None)
 	if not branchId:
 	    # should we implicitly create these? it's certainly easier...
 	    #raise MissingBranchError(itemId, branch)
 	    branchId = self.createBranch(itemId, branch)
 	else:
-	    # make sure the branch exists for this itemId
-	    labelId = self.labels[branch.label()]
+	    # make sure the branch exists for this itemId; there are cases
+            # where the branch can exist but not the label (most notably
+            # if the branch was part of a redirect target)
+            labelId = self.labels.get(label, None)
+            if labelId is None:
+                self.labels.addId(label)
+                labelId = self.labels[label]
 
             existingBranchId = None
             for existingBranchId in self.labelMap.get((itemId, labelId), []):
