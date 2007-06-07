@@ -117,6 +117,8 @@ class URLOpener(urllib.FancyURLopener):
         self.compress = False
         self.abortCheck = None
         self.usedProxy = False
+        self.proxyHost = None
+        self.proxyProtocol = None
         # FIXME: this should go away in a future release.
         # forceProxy is used to ensure that if the proxy returns some
         # bogus address like "localhost" from a URL fetch, we can
@@ -145,7 +147,11 @@ class URLOpener(urllib.FancyURLopener):
         endpointHost, endpointPort = self._splitport(endpoint,
             httplib.HTTPS_PORT)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, port))
+        try:
+            sock.connect((host, port))
+        except socket.error, e:
+            self._processSocketError(e)
+            raise
 
         sock.sendall("CONNECT %s:%s HTTP/1.0\r\n" %
                                          (endpointHost, endpointPort))
@@ -228,6 +234,8 @@ class URLOpener(urllib.FancyURLopener):
             proxyUrlType, proxyhost = urllib.splittype(proxy)
             useConaryProxy = proxyUrlType in ('conary', 'conarys')
 
+            self.proxyProtocol = proxyUrlType
+
             host, selector = url
             proxyUserPasswd, host = urllib.splituser(host)
             urltype, rest = urllib.splittype(selector)
@@ -245,6 +253,9 @@ class URLOpener(urllib.FancyURLopener):
                     host = realhost
                 else:
                     self.usedProxy = True
+                    # To make it visible for users of this object 
+                    # that we're going through a proxy
+                    self.proxyHost = host
                     if useConaryProxy:
                         # override ssl setting to talk the right protocol to the
                         # proxy - the proxy will take the real url and communicate
@@ -253,7 +264,6 @@ class URLOpener(urllib.FancyURLopener):
                         # Other proxies will not support proxying ssl over !ssl
                         # or vice versa.
                         ssl = (proxyUrlType == 'conarys')
-
 
         if not host: raise IOError, ('http error', 'no host given')
         if user_passwd:
@@ -309,7 +319,12 @@ class URLOpener(urllib.FancyURLopener):
             h.putrequest('GET', selector)
         for args in itertools.chain(headers, self.addheaders):
             h.putheader(*args)
-        h.endheaders()
+        try:
+            h.endheaders()
+        except socket.error, e:
+            self._processSocketError(e)
+            raise
+
         if data is not None:
             h.send(data)
         # wait for a response
@@ -329,6 +344,17 @@ class URLOpener(urllib.FancyURLopener):
             return InfoURL(fp, headers, selector, protocolVersion)
         else:
             return self.http_error(selector, fp, errcode, errmsg, headers, data)
+
+    def _processSocketError(self, error):
+        if not self.proxyHost:
+            return
+        # Add the name of the real proxy
+        if self.proxyProtocol.startswith('http'):
+            pt = 'HTTP'
+        else:
+            pt = 'Conary'
+        error.args = (error[0], "%s (via %s proxy %s)" % 
+            (error[1], pt, self.proxyHost))
 
     def _wait(self, h):
         # wait for data if abortCheck is set
@@ -401,6 +427,8 @@ class Transport(xmlrpclib.Transport):
         self.responseHeaders = None
         self.responseProtocol = None
         self.usedProxy = False
+        self.proxyHost = None
+        self.proxyProtocol = None
         if entitlement is not None:
             self.entitlement = "%s %s" % (entitlement[0],
                                           base64.b64encode(entitlement[1]))
@@ -455,8 +483,14 @@ class Transport(xmlrpclib.Transport):
         url = ''.join([protocol, '://', host, handler])
         while tries < 5:
             try:
-                usedAnonymous, response = opener.open(url, body)
-                self.usedProxy = getattr(opener, 'usedProxy', False)
+                # Make sure we capture some useful information from the
+                # opener, even if we failed
+                try:
+                    usedAnonymous, response = opener.open(url, body)
+                finally:
+                    self.usedProxy = getattr(opener, 'usedProxy', False)
+                    self.proxyHost = getattr(opener, 'proxyHost', None)
+                    self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
                 break
             except IOError, e:
                 tries += 1

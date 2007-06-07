@@ -5,6 +5,8 @@ Changes in @NEW@:
     * A bug that caused a "Error parsing label" error message when
       invoking "cvc commit" on a group recipe that used
       r.setSearchPath(str(r.labelPath[0]), ...) has been fixed. (CNY-1740)
+    * Proxy errors are now reported in the client, for easier debugging.
+      (CNY-1313)
 
 Changes in 1.1.28:
   o Documentation Changes:
