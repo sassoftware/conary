@@ -29,7 +29,7 @@ from conary.repository import errors
 
 def jobKey(x):
     return (x[0], (str(x[1][0]), str(x[1][1])),
-                  (str(x[2][0]), str(x[2][1])), x[3])
+                  (str(x[2][0]), str(x[2][1]))) + x[3:]
 
 def displayTroves(dcfg, formatter, troveTups):
     """
