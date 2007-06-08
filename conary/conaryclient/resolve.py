@@ -16,7 +16,7 @@ import itertools
 from conary import errors
 from conary.lib import log
 from conary.repository import searchsource
-from conary.repository.resolvemethod import DepResolutionByTroveList
+from conary.repository.resolvemethod import DepResolutionByTroveList, ResolutionStack
 
 class DependencySolver(object):
 
