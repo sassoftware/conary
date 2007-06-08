@@ -18,7 +18,6 @@ Module implementing the "macro" dictionary class
 
 import re
 
-from conary.lib import util
 from conary.build.errors import MacroKeyError
 
 class Macros(dict):

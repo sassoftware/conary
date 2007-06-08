@@ -31,7 +31,6 @@ import traceback
 
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
-from conary import errors as conaryerrors
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
 from conary.build import recipe, grouprecipe, loadrecipe
 from conary.build import errors as builderrors

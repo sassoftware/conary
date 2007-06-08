@@ -43,14 +43,12 @@ import tempfile
 import time
 
 from conary import callbacks
-from conary import changelog
 from conary import errors
 from conary import trove
 from conary import versions
 from conary.build.nextversion import nextVersions
 from conary.deps import deps
 from conary.lib import log
-from conary.lib import sha1helper
 from conary.repository import changeset
 from conary.repository import errors as neterrors
 
@@ -391,7 +389,7 @@ class ClientClone:
         for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
             targetSourceVersion = cloneMap.getTargetVersion(sourceTup)
             if targetSourceVersion is None:
-                raise InternalConaryError(
+                raise errors.InternalConaryError(
                              "Cannot find cloned source for %s=%s" \
                                   % (sourceTup[0], sourceTup[1]))
             targetBranch = targetSourceVersion.branch()
@@ -1141,6 +1139,8 @@ class CloneIncomplete(CloneError):
 #start = time.time()
 def _logMe(msg):
     return
+    # Dead code
+    start = 0
     secs = int(time.time() - start)
     mins = secs / 60
     secs = secs % 60

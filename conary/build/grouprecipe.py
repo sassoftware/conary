@@ -27,7 +27,6 @@ from conary import callbacks
 from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
-from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
 from conary import trove
 from conary import versions

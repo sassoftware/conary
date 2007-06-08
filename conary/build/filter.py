@@ -21,7 +21,6 @@ file as it appears in the filesystem.
 import os
 import re
 import stat
-import types
 
 from conary.lib import log
 

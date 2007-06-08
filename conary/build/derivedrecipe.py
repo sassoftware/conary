@@ -15,7 +15,6 @@ from conary import errors as conaryerrors
 from conary.build import build, source
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import _AbstractPackageRecipe
-from conary.local import update
 from conary.lib import log, util
 from conary.repository import changeset, filecontents
 

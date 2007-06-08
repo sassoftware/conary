@@ -17,7 +17,7 @@ it, unpack it, and patch it in the correct directory.  Each of the
 public classes in this module is accessed from a recipe as addI{Name}.
 """
 
-import fcntl, itertools
+import itertools
 import gzip
 import os
 import re

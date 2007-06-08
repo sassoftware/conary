@@ -13,13 +13,10 @@
 
 from conary import trove, versions
 from conary.deps import deps
-from conary.lib import util
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use
 from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
-
-import itertools
 
 class _Redirect(object):
 

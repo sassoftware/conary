@@ -18,7 +18,7 @@ Module implementing tag file handling
 import os
 
 from conary.build import filter
-from conary.lib.cfg import *
+from conary.lib.cfg import CfgCallBack, CfgEnum, CfgList, CfgString, ConfigFile, ParseError
 
 EXCLUDE, INCLUDE = range(2)
 

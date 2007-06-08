@@ -12,14 +12,13 @@
 # full details.
 #
 
-import copy
 import glob
 import os
 import imp
 import inspect
 import sys
 
-from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, _sourceHelper
+from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
 from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
 
@@ -28,7 +27,6 @@ from conary.build import build
 from conary.build import errors
 from conary.build import macros
 from conary.build import policy
-from conary.build import source
 from conary.build import use
 from conary.conaryclient import cmdline
 from conary.deps import deps
