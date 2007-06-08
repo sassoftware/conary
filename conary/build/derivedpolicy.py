@@ -15,7 +15,7 @@
 import re, os
 
 from conary import files, trove
-from conary.build import buildpackage, destdirpolicy, filter, packagepolicy, policy
+from conary.build import destdirpolicy, filter, packagepolicy, policy
 from conary.deps import deps
 
 FixDirModes = destdirpolicy.FixDirModes
