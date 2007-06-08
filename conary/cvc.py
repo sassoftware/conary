@@ -826,8 +826,6 @@ class CvcMain(command.MainHandler):
 
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]
-        else:
-            cfg.buildLabel = None
 
         sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
                                             debugCtrlC=debugAll)
