@@ -25,11 +25,11 @@ from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.errors import DatabaseLockedError
 from conary.callbacks import UpdateCallback
-from conary.conarycfg import RegularExpressionList, CfgLabelList
+from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, util
 from conary.local import localrep, sqldb, schema, update, journal
-from conary.local.errors import *
+from conary.local.errors import DatabasePathConflictError, FileInWayError
 from conary.repository import changeset, datastore, errors, filecontents
 from conary.repository import repository, trovesource
 
