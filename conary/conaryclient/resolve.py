@@ -12,15 +12,10 @@
 # full details.
 
 import itertools
-import re
 
 from conary import errors
 from conary.lib import log
-from conary.repository import trovesource
 from conary.repository import searchsource
-from conary.repository import errors as repoerrors
-from conary.repository.resolvemethod import *
-from conary.deps import deps
 
 class DependencySolver(object):
 

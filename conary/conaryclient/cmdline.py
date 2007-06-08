@@ -12,7 +12,6 @@
 # full details.
 #
 #
-import sys
 import os
 
 from conary import errors
