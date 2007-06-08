@@ -68,13 +68,14 @@ def _cleanseUrl(protocol, url):
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
-                 altHostCallback, protocolVersion):
+                 altHostCallback, protocolVersion, transport):
         xmlrpclib._Method.__init__(self, send, name)
         self.__host = host
         self.__pwCallback = pwCallback
         self.__anonymousCallback = anonymousCallback
         self.__altHostCallback = altHostCallback
         self.__protocolVersion = protocolVersion
+        self._transport = transport
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -125,11 +126,23 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         except xmlrpclib.ProtocolError, err:
             if err.errcode == 500:
                 raise errors.InternalServerError(err)
+            self._postprocessProtocolError(err)
             raise
         except:
             raise
 
         return self.__doCall(clientVersion, args)
+
+    def _postprocessProtocolError(self, err):
+        proxyHost = getattr(self._transport, 'proxyHost', 'None')
+        if proxyHost is None:
+            return
+        proxyProtocol = self._transport.proxyProtocol
+        if proxyProtocol.startswith('http'):
+            pt = 'HTTP'
+        else:
+            pt = 'Conary'
+        err.url = "%s (via %s proxy %s)" % (err.url, pt, proxyHost)
 
     def handleError(self, result):
 	exceptionName = result[0]
@@ -244,7 +257,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
-                       self.__altHostCallback, self.getProtocolVersion())
+                       self.__altHostCallback, self.getProtocolVersion(),
+                       self.__transport)
 
     def usedProxy(self):
         return self.__transport.usedProxy
@@ -2389,7 +2403,11 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
 
     if chunked:
         c.putheader('Transfer-Encoding', 'chunked')
-        c.endheaders()
+        try:
+            c.endheaders()
+        except socket.error, e:
+            opener._processSocketError(e)
+            raise
 
         # keep track of the total amount of data sent so that the
         # callback passed in to copyfileobj can report progress correctly
@@ -2413,7 +2431,11 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
         c.send('0\r\n\r\n')
     else:
         c.putheader('Content-length', str(size))
-        c.endheaders()
+        try:
+            c.endheaders()
+        except socket.error, e:
+            opener._processSocketError(e)
+            raise
 
         util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
                          rateLimit = rateLimit, sizeLimit = size)
