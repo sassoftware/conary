@@ -4,7 +4,12 @@ Changes in @NEW@:
       installLabelPath configuration option is not set. (CNY-1731)
     * A bug that caused a "Error parsing label" error message when
       invoking "cvc commit" on a group recipe that used
-      r.setSearchPath(str(r.labelPath[0]), ...) has been fixed. (CNY-1740)
+      r.setSearchPath(str(r.labelPath[0]), ...) has been
+      fixed. (CNY-1740)
+    * A bug that caused an "Unknown error downloading changeset" error
+      when applying an update job that contained two different
+      versions of the same trove has been fixed. (CNY-1742)
+
 
 Changes in 1.1.28:
   o Documentation Changes:

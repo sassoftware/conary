@@ -27,6 +27,10 @@ from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary import metadata
 from conary.repository import errors
 
+def jobKey(x):
+    return (x[0], (str(x[1][0]), str(x[1][1])),
+                  (str(x[2][0]), str(x[2][1])), x[3])
+
 def displayTroves(dcfg, formatter, troveTups):
     """
     display the given list of source troves 
@@ -874,8 +878,8 @@ def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
 
     if jobNum and total:
         print formatter.formatJobNum(index, totalJobs)
-    
-    for job, comps in formatter.compressJobList(sorted(jobs)):
+
+    for job, comps in formatter.compressJobList(sorted(jobs, key=jobKey)):
         if dcfg.printTroveHeader():
             for ln in formatter.formatJobHeader(job, comps):
                 print ln
@@ -996,9 +1000,9 @@ class JobTupFormatter(TroveFormatter):
 
     def formatJobTups(self, jobs, indent=''):
         if self.dcfg.compressJobs():
-            iter = self.compressJobList(sorted(jobs))
+            iter = self.compressJobList(sorted(jobs, key=jobKey))
         else:
-            iter = ((x, []) for x in sorted(jobs))
+            iter = ((x, []) for x in sorted(jobs, key=jobKey))
 
         for job, comps in iter:
             yield self.formatJobTup(job, components=comps, indent=indent)
