@@ -497,12 +497,19 @@ class ConaryConfiguration(SectionedConfigFile):
             return
 
         warn = False
-        for basename in os.listdir(self.entitlementDirectory):
-            if os.path.isfile(os.path.join(self.entitlementDirectory,
-                                           basename)):
-                ent = loadEntitlement(self.entitlementDirectory, basename)
-                self.entitlement.addEntitlement(ent[0], ent[2],
-                                                entClass = ent[1])
+        try:
+            files = os.listdir(self.entitlementDirectory)
+        except OSError:
+            return
+        for basename in files:
+            try:
+                if os.path.isfile(os.path.join(self.entitlementDirectory,
+                                               basename)):
+                    ent = loadEntitlement(self.entitlementDirectory, basename)
+                    self.entitlement.addEntitlement(ent[0], ent[2],
+                                                    entClass = ent[1])
+            except OSError:
+                return
 
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
