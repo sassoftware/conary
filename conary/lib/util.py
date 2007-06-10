@@ -25,6 +25,7 @@ import shutil
 import signal
 import stat
 import string
+import subprocess
 import sys
 import tempfile
 import time
@@ -228,12 +229,18 @@ def _handle_rc(rc, cmd):
 	raise RuntimeError, info
 
 def execute(cmd, destDir=None, verbose=True):
+    """
+    similar to os.system, but raises errors if exit code != 0 and closes stdin
+    so processes can never block on user input
+    """
     if verbose:
 	log.info(cmd)
     if destDir:
-	rc = os.system('cd \'%s\'; %s' %(destDir, cmd))
+        dir = destdir
     else:
-	rc = os.system(cmd)
+        dir = '.'
+    p = subprocess.Popen('cd \'%s\'; %s' %(dir, cmd), shell=True, stdin=open(os.devnull, 'w'))
+    rc = os.waitpid(p.pid, 0)[1]
     _handle_rc(rc, cmd)
 
 class popen:
