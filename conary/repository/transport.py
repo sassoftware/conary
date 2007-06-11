@@ -427,7 +427,6 @@ class Transport(xmlrpclib.Transport):
         self.responseHeaders = None
         self.responseProtocol = None
         self.usedProxy = False
-<<<<<<< /home/ewt/c/1.1-head/conary/conary/repository/transport.py.orig.516117010
         if entitlementList is not None:
             l = []
             for entitlement in entitlementList:
