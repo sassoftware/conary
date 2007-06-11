@@ -439,11 +439,6 @@ class Transport(xmlrpclib.Transport):
 
         self.proxyHost = None
         self.proxyProtocol = None
-        if entitlement is not None:
-            self.entitlement = "%s %s" % (entitlement[0],
-                                          base64.b64encode(entitlement[1]))
-        else:
-            self.entitlement = None
 
     def setExtraHeaders(self, extraHeaders):
         self.extraHeaders = extraHeaders or {}
