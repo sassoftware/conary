@@ -199,6 +199,21 @@ class RepoMap(ServerGlobList):
     def items(self):
         return self
 
+    def keys(self):
+        return [ x[0] for x in self ]
+
+    def iterkeys(self):
+        return ( x[0] for x in self )
+
+    def values(self):
+        return [ x[1] for x in self ]
+
+    def itervalues(self):
+        return ( x[1] for x in self )
+
+    def __iter__(self):
+        return self.iterkeys()
+
     def get(self, key, default):
         r = self.find(key)
         if r is None:
