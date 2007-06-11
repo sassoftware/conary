@@ -281,22 +281,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     r = method(authToken, *args)
                 except sqlerrors.DatabaseLocked:
                     raise
-                except errors.InsufficientPermission, e:
-                    if methodname != 'commitChangeSet' and \
-                                authToken[0] is not None:
-                        # When we get InsufficientPermission w/ a
-                        # user/password, retry the operation as anonymous,
-                        # unless this was a commitChangeSet call, in which
-                        # case the underlying changeset to commit has been
-                        # erased already!
-                        r = method(('anonymous', 'anonymous', None, None), *args)
-                        self.db.commit()
-                        if self.callLog:
-                            self.callLog.log(remoteIp, authToken, methodname, 
-                                             args)
-
-                        return (True, False, r)
-                    raise
                 else:
                     self.db.commit()
 
@@ -561,7 +545,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def changePassword(self, authToken, clientVersion, user, newPassword):
         if (not self.auth.check(authToken, admin = True)
-            and not self.auth.check(authToken)):
+            and not self.auth.check(authToken, allowAnonymous = False)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         self.auth.changePassword(user, newPassword)
@@ -570,7 +554,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getUserGroups(self, authToken, clientVersion):
         if (not self.auth.check(authToken, admin = True)
-            and not self.auth.check(authToken)):
+            and not self.auth.check(authToken, allowAnonymous = False)):
             raise errors.InsufficientPermission
         self.log(2)
         r = self.auth.getUserGroups(authToken[0])
@@ -2502,7 +2486,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
         if (not self.auth.check(authToken, admin = True)
-            and (not self.auth.check(authToken) or
+            and (not self.auth.check(authToken, allowAnonymous = False) or
                      authToken[0] != user)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
@@ -2513,7 +2497,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def addNewPGPKey(self, authToken, label, user, encKeyData):
         if (not self.auth.check(authToken, admin = True)
-            and (not self.auth.check(authToken) or
+            and (not self.auth.check(authToken, allowAnonymous = False) or
                      authToken[0] != user)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
@@ -3154,11 +3138,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Flavors on Instances.flavorId = Flavors.flavorId
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
-        ret = [ [] for x in range(len(troveInfoList)) ]
+        ret = [ set() for x in range(len(troveInfoList)) ]
         for i, n,v,f, pattern in cu:
-            l = ret[i-minIdx]
+            s = ret[i-minIdx]
             if self.auth.checkTrove(pattern, n):
-                l.append((n,v,f))
+                s.add((n,v,f))
+
+        ret = [ list(x) for x in ret ]
+
         return ret
 
     @accessReadOnly

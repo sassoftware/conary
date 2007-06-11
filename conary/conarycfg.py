@@ -1,4 +1,3 @@
-
 # Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -29,16 +28,22 @@ from conary import versions
 from conary import flavorcfg
 
 # ----------- conary specific types
-    
 
-class UserInformation(list):
-    def find(self, server):
-        for (serverGlob, user, password) in self:
+class ServerGlobList(list):
+
+    def find(self, server, allMatches = False):
+        l = []
+        for (serverGlob, item) in self:
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
-                return user, password
+                if not allMatches:
+                    return item
+                l.append(item)
 
-        return None
+        if not allMatches:
+            return None
+
+        return l
 
     def extend(self, itemList):
         # Look for the first item which globs to this, and insert the new
@@ -50,7 +55,7 @@ class UserInformation(list):
     def append(self, newItem):
         location = None
         removeOld = False
-        for i, (serverGlob, user, password) in enumerate(self):
+        for i, (serverGlob, info) in enumerate(self):
             if fnmatch.fnmatch(newItem[0], serverGlob):
                 if serverGlob == newItem[0]:
                     removeOld = True
@@ -64,8 +69,16 @@ class UserInformation(list):
         else:
             self.insert(location, newItem)
 
+class UserInformation(ServerGlobList):
+
     def addServerGlob(self, serverGlob, user, password):
-        self.append((serverGlob, user, password))
+        self.append((serverGlob, (user, password)))
+
+    def __init__(self, initVal = None):
+        ServerGlobList.__init__(self)
+        if initVal is not None:
+            for val in initVal:
+                self.append(val)
 
 class CfgUserInfoItem(CfgType):
     def parseString(self, str):
@@ -73,12 +86,12 @@ class CfgUserInfoItem(CfgType):
         if len(val) < 2 or len(val) > 3:
             raise ParseError("expected <hostglob> <user> [<password>]")
         elif len(val) == 2:
-            return (val[0], val[1], None)
+            return (val[0], (val[1], None))
         else:
-            return tuple(val)
+            return (val[0], (val[1], val[2]))
 
     def format(self, val, displayOptions=None):
-        serverGlob, user, password = val
+        serverGlob, (user, password) = val
         if password is None: 
             return '%s %s' % (serverGlob, user)
         elif displayOptions.get('hidePasswords'):
@@ -90,6 +103,35 @@ class CfgUserInfo(CfgList):
 
     def __init__(self, default=[]):
         CfgList.__init__(self, CfgUserInfoItem, UserInformation,
+                         default = default)
+
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
+
+class EntitlementList(ServerGlobList):
+
+    def addEntitlement(self, serverGlob, entitlement, entClass = None):
+        self.append((serverGlob, (entClass, entitlement)))
+
+class CfgEntitlementItem(CfgType):
+    def parseString(self, str):
+        val = str.split()
+        if len(val) != 2:
+            raise ParseError("expected <hostglob> <entitlement>")
+
+        return (val[0], (None, val[1]))
+
+    def format(self, val, displayOptions=None):
+        if val[0][0] is None:
+            return '%s %s' % (val[0], val[1][1])
+        else:
+            return '%s %s %s' % (val[0], val[1][0], val[1][1])
+
+class CfgEntitlement(CfgList):
+
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgEntitlementItem, EntitlementList,
                          default = default)
 
     def set(self, curVal, newVal):
@@ -110,7 +152,11 @@ class CfgLabel(CfgType):
 class CfgRepoMapEntry(CfgType):
 
     def parseString(self, str):
-        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', str)
+        val = str.split()
+        if len(val) != 2:
+            raise ParseError("expected <hostglob> <url>")
+
+        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', val[1])
         if match is not None:
             user, server = match.groups()
             raise ParseError, ('repositoryMap entries should not contain '
@@ -118,24 +164,67 @@ class CfgRepoMapEntry(CfgType):
                                '"user %s %s <password>" instead' % 
                                (server, user))
 
-        return CfgType.parseString(self, str)
+        return (val[0], val[1])
 
     def format(self, val, displayOptions=None):
-        if displayOptions.get('hidePasswords'):
-            return re.sub('(https?://)[^:]*:[^@]*@(.*)', 
-                          r'\1<user>:<password>@\2', val)
-        else:
-            return val
+        return '%-25s %s' % val
 
-class RepoMap(dict):
+class RepoMap(ServerGlobList):
 
-    def getNoPass(self, key):
-        return re.sub('(https?://)[^:]*:[^@]*@(.*)', r'\1\2', self[key])
+    # Pretend to be a dict; repositorymap's used to be dicts and this should
+    # ease the transition.
 
-class CfgRepoMap(CfgDict):
-    def __init__(self, default={}):
-        CfgDict.__init__(self, CfgRepoMapEntry, dictType=RepoMap,
-                         default=default)
+    def __setitem__(self, key, val):
+        if type(key) is int:
+            return ServerGlobList.__setitem__(self, key, val)
+
+        self.append((key, val))
+
+    def __getitem__(self, key):
+        if type(key) is int:
+            return ServerGlobList.__getitem__(self, key)
+
+        return self.find(key)
+
+    def clear(self):
+        del self[:]
+
+    def update(self, other):
+        for key, val in other.iteritems():
+            self.append((key, val))
+
+    def iteritems(self):
+        return iter(self)
+
+    def items(self):
+        return self
+
+    def keys(self):
+        return [ x[0] for x in self ]
+
+    def iterkeys(self):
+        return ( x[0] for x in self )
+
+    def values(self):
+        return [ x[1] for x in self ]
+
+    def itervalues(self):
+        return ( x[1] for x in self )
+
+    def get(self, key, default):
+        r = self.find(key)
+        if r is None:
+            return default
+
+        return r
+
+class CfgRepoMap(CfgList):
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgRepoMapEntry, RepoMap, default=default)
+
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
 
 class CfgFlavor(CfgType):
 
@@ -321,6 +410,7 @@ class ConaryContext(ConfigSection):
                                             '~/.conary/macros'))
     emergeUser            =  (CfgString, 'emerge')
     enforceManagedPolicy  =  (CfgBool, True)
+    entitlement           =  CfgEntitlement
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     environment           =  CfgDict(CfgString)
     excludeTroves         =  CfgRegExpList
@@ -409,8 +499,30 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
+
+        self.readEntitlementDirectory()
+
         util.settempdir(self.tmpDir)
-  
+
+    def readEntitlementDirectory(self):
+        if not os.path.isdir(self.entitlementDirectory):
+            return
+
+        warn = False
+        try:
+            files = os.listdir(self.entitlementDirectory)
+        except OSError:
+            return
+        for basename in files:
+            try:
+                if os.path.isfile(os.path.join(self.entitlementDirectory,
+                                               basename)):
+                    ent = loadEntitlement(self.entitlementDirectory, basename)
+                    self.entitlement.addEntitlement(ent[0], ent[2],
+                                                    entClass = ent[1])
+            except OSError:
+                return
+
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
 	if os.environ.has_key("HOME"):
@@ -506,11 +618,16 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
-def emitEntitlement(serverName, className, key):
+def emitEntitlement(serverName, className = None, key = None):
 
     # XXX This probably should be emitted using a real XML DOM writer,
     # but this will probably do for now. And yes, all that mess is required
     # to be well-formed and valid XML.
+    if className is None:
+        classInfo = ""
+    else:
+        classInfo = "<class>%s</class>" % className
+
     return """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <!DOCTYPE entitlement [
     <!ELEMENT entitlement (server, class, key)>
@@ -520,12 +637,12 @@ def emitEntitlement(serverName, className, key):
 ]>
 <entitlement>
     <server>%s</server>
-    <class>%s</class>
+    %s
     <key>%s</key>
 </entitlement>
-""" % (serverName, className, key)
+""" % (serverName, classInfo, key)
 
-def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
+def loadEntitlementFromString(xmlContent, source='<override>'):
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
@@ -540,22 +657,18 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
             p.parse(xmlContent)
 
         try:
-            entServer = p['server']
-            entClass = p['class']
+            entServer = p.get('server', None)
+            entClass = p.get('class', None)
             entKey = p['key']
         except KeyError:
             raise errors.ConaryError("Entitlement incomplete.  Entitlements"
                                      " must include 'server', 'class', and"
                                      " 'key' values")
     except Exception, err:
-        raise errors.ConaryError("Malformed entitlement for %s at %s:"
-                                 " %s" % (serverName, source, err))
+        raise errors.ConaryError("Malformed entitlement at %s:"
+                                 " %s" % (source, err))
 
-    if entServer != serverName: 
-        raise errors.ConaryError("Entitlement at %s is for server '%s', "
-                         "should be for '%s'" % (source, entServer, serverName))
-
-    return (entClass, entKey)
+    return (p['server'], entClass, entKey)
 
 def loadEntitlementFromProgram(fullPath, serverName):
     """ Executes the given file to generate an entitlement.
@@ -624,12 +737,10 @@ def loadEntitlementFromProgram(fullPath, serverName):
     # looks like we generated an entitlement - they're still the possibility
     # that the entitlement is broken.
     xmlContent = ''.join(output)
-    return loadEntitlementFromString(xmlContent, serverName, fullPath)
+    return loadEntitlementFromString(xmlContent, fullPath)
 
 
 def loadEntitlement(dirName, serverName):
-    # XXX this should be replaced with a real xml parser
-
     if not dirName:
         # XXX
         # this is a hack for the repository server which doesn't support
@@ -643,10 +754,10 @@ def loadEntitlement(dirName, serverName):
         return None
 
     if os.access(fullPath, os.X_OK):
-        return loadEntitlementFromProgram(fullPath, serverName)
+        return loadEntitlementFromProgram(fullPath,
+                                          '<executable %s>' % fullPath)
     elif os.access(fullPath, os.R_OK):
-        return loadEntitlementFromString(open(fullPath).read(), serverName,
-                                         fullPath)
+        return loadEntitlementFromString(open(fullPath).read(), fullPath)
     else:
         return None
 

@@ -89,11 +89,7 @@ class ProxyCallFactory:
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
                      protocolString, headers):
         url = redirectUrl(authToken, rawUrl)
-
-        if authToken[2] is not None:
-            entitlement = authToken[2:4]
-        else:
-            entitlement = None
+        entitlementList = authToken[2]
 
         via = []
         # Via is a multi-valued header. Multiple occurences will be collapsed
@@ -107,7 +103,7 @@ class ProxyCallFactory:
             lheaders['Via'] = ', '.join(via)
 
         transporter = transport.Transport(https = url.startswith('https:'),
-                                          entitlement = entitlement,
+                                          entitlementList = entitlementList,
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
 

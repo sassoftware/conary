@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -116,29 +116,34 @@ class UserAuthorization:
         sql = "DELETE from Users WHERE userId=?"
         cu.execute(sql, userId)
 
-    def getAuthorizedGroups(self, cu, user, password):
+    def getAuthorizedGroups(self, cu, user, password, allowAnonymous = True):
         cu.execute("""
-        SELECT salt, password, userGroupId FROM Users
+        SELECT salt, password, userGroupId, userName FROM Users
         JOIN UserGroupMembers USING(userId)
-        WHERE userName = ?
+        WHERE userName == ? or userName ='anonymous'
         """, user)
 
-        groupsFromUser = [ x for x in cu ]
+        result = [ x for x in cu ]
 
-        if groupsFromUser:
-            # each user can only appear once (by constraint), so we only
-            # need to validate the password once
-            if not self._checkPassword(user,
-                                      cu.frombinary(groupsFromUser[0][0]),
-                                      groupsFromUser[0][1],
-                                      password):
-                return set()
-
-            groupsFromUser = set(x[2] for x in groupsFromUser)
-        else:
+        if not result:
             return set()
 
-        return groupsFromUser
+        # each user can only appear once (by constraint), so we only
+        # need to validate the password once. we don't validate the
+        # password for 'anonymous'. Using a bad passwords still allows
+        # anonymous access
+        userPasswords = [ x for x in result if x[3] != 'anonymous' ]
+        if not allowAnonymous:
+            result = userPasswords
+
+        if userPasswords and not self._checkPassword(
+                                        user,
+                                        cu.frombinary(userPasswords[0][0]),
+                                        userPasswords[0][1],
+                                        password):
+            result = [ x for x in result if x[3] == 'anonymous' ]
+
+        return set(x[2] for x in result)
 
     def getGroupsByUser(self, user):
         cu = self.db.cursor()
@@ -179,11 +184,17 @@ class EntitlementAuthorization:
                 return userGroupIds
 
         if self.entCheckUrl:
-            try:
+            if entitlementGroup is not None:
                 url = "%s?server=%s;class=%s;key=%s" \
                         % (self.entCheckUrl, urllib.quote(serverName),
                            urllib.quote(entitlementGroup),
                            urllib.quote(entitlement))
+            else:
+                url = "%s?server=%s;key=%s" \
+                        % (self.entCheckUrl, urllib.quote(serverName),
+                           urllib.quote(entitlement))
+
+            try:
                 f = urllib2.urlopen(url)
                 xmlResponse = f.read()
             except Exception, e:
@@ -204,11 +215,10 @@ class EntitlementAuthorization:
 
         # look up entitlements
         cu.execute("""
-        SELECT userGroupId FROM EntitlementGroups
-        JOIN Entitlements USING (entGroupId)
+        SELECT userGroupId FROM Entitlements USING (entGroupId)
         JOIN EntitlementAccessMap USING (entGroupId)
-        WHERE entGroup=? AND entitlement=?
-        """, entitlementGroup, entitlement)
+        WHERE entitlement=?
+        """, entitlement)
 
         userGroupIds = set(x[0] for x in cu)
 
@@ -241,8 +251,8 @@ class NetworkAuthorization:
         self.entitlementAuth = EntitlementAuthorization(
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
 
-    def getAuthGroups(self, cu, authToken):
-        self.log(4, authToken[0], authToken[2], authToken[3])
+    def getAuthGroups(self, cu, authToken, allowAnonymous = True):
+        self.log(4, authToken[0], authToken[2])
         # Find what group this user belongs to
         # anonymous users should come through as anonymous, not None
         assert(authToken[0])
@@ -251,19 +261,25 @@ class NetworkAuthorization:
         authToken = tuple(authToken)
 
         groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
-                                                           authToken[1])
-        if authToken[2] is not None:
-            for serverName in self.serverNameList:
-                groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
-                    cu, serverName, authToken[2], authToken[3])
-                groupSet.update(groupsFromEntitlement)
+                                                     authToken[1],
+                                                     allowAnonymous =
+                                                            allowAnonymous)
+
+        for entitlement in authToken[2]:
+            # XXX serverName is passed only for compatibility with the server
+            # and entitlement class based entitlement design; it's only used
+            # here during external authentication (which may be completely
+            # unused?)
+            groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
+                cu, self.serverNameList[0], entitlement[0], entitlement[1])
+            groupSet.update(groupsFromEntitlement)
 
         return groupSet
 
     # a faster way for batch checking access to a list of troves
     def batchCheck(self, authToken, troveTupList, write = False, remove = False):
         # troveTupList is a list of (name, VFS) tuples
-        self.log(3, authToken[0], "entitlement=%s write=%s remove=%s" %(
+        self.log(3, authToken[0], "entitlements=%s write=%s remove=%s" %(
             authToken[2], int(bool(write)), int(bool(remove))),
                  troveTupList)
         checkDict = {}
@@ -323,9 +339,10 @@ class NetworkAuthorization:
         return retlist
 
     def check(self, authToken, write = False, admin = False, label = None,
-              trove = None, mirror = False, remove = False):
+              trove = None, mirror = False, remove = False,
+              allowAnonymous = True):
         self.log(3, authToken[0],
-                 "entitlement=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
+                 "entitlements=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
             authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror)),
             int(bool(remove))))
 
@@ -338,7 +355,8 @@ class NetworkAuthorization:
         cu = self.db.cursor()
 
         try:
-            groupIds = self.getAuthGroups(cu, authToken)
+            groupIds = self.getAuthGroups(cu, authToken,
+                                          allowAnonymous = allowAnonymous)
         except errors.InsufficientPermission:
             return False
 

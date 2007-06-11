@@ -286,14 +286,12 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__protocolVersion = CLIENT_VERSIONS[-1]
 
 class ServerCache:
-    def __init__(self, repMap, userMap, pwPrompt=None,
-                 entitlementDir=None, entitlements={}, callback=None,
-                 proxies=None):
+    def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
+                 callback=None, proxies=None):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
-        self.entitlementDir = entitlementDir
         self.entitlements = entitlements
         self.proxies = proxies
 
@@ -303,7 +301,7 @@ class ServerCache:
         user, pw = self.pwPrompt(host, user)
         if user is None or pw is None:
             return None, None
-        self.userMap.append((host, user, pw))
+        self.userMap.addServerGlob(host, user, pw)
         return user, pw
 
     def _getServerName(self, item):
@@ -351,15 +349,13 @@ class ServerCache:
         if userInfo and userInfo[1] is None:
             userInfo = (userInfo[0], "")
 
-        # check for an entitlement for this server
-        ent = self.entitlements.get(serverName, None)
-        if ent is None:
-            ent = conarycfg.loadEntitlement(self.entitlementDir, serverName)
+        # look for any entitlements for this server
+        entList = self.entitlements.find(serverName, allMatches = True)
 
         usedMap = url is not None
         if url is None:
-            if ent or userInfo:
-                # if we have a username/password, use https
+            if entList or userInfo:
+                # if we have authentication information, use https
                 protocol = 'https'
             else:
                 # if we are using anonymous, use http
@@ -385,7 +381,7 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
-                                          entitlement = ent,
+                                          entitlementList = entList,
                                           proxies = self.proxies,
                                           serverName = serverName)
         transporter.setCompress(True)
@@ -452,7 +448,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def __init__(self, repMap, userMap,
                  localRepository = None, pwPrompt = None,
                  entitlementDir = None, downloadRateLimit = 0,
-                 uploadRateLimit = 0, entitlements = {},
+                 uploadRateLimit = 0, entitlements = None,
                  proxy = None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
@@ -468,8 +464,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             self.proxies = None
 
-	self.c = ServerCache(repMap, userMap, pwPrompt, entitlementDir,
-                             entitlements, proxies = self.proxies)
+        if entitlements is None:
+            entitlements = conarycfg.EntitlementList()
+
+	self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
+                             proxies = self.proxies)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)

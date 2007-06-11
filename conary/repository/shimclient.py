@@ -109,6 +109,10 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     """
     def __init__(self, server, protocol, port, authToken, repMap, userMap,
             conaryProxies=None):
+        if len(authToken) == 4:
+            # old-style [single entitlement] authToken
+            authToken = (authToken[0], authToken[1],
+                         [ ( authToken[2], authToken[3]) ] )
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap,
                 proxy=conaryProxies)
         proxy = ShimServerProxy(server, protocol, port, authToken)

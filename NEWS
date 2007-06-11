@@ -11,6 +11,27 @@ Changes in @NEW@:
     * A bug that caused an "Unknown error downloading changeset" error
       when applying an update job that contained two different
       versions of the same trove has been fixed. (CNY-1742)
+    * Adding redirects which pointed to otherwise-unused branches corrupted
+      the database by creating a branch without corresponding label information
+
+  o Client Changes:
+    * repositoryMap conaryrc entries can now use wildcards for the server name
+    * Multiple entitlements can be sent to each server now
+    * Server names in entitlements may include wildcads.
+    * Entitlements may be placed in conaryrc files now using
+      'entitlement server entitlement'. conary config displays entitlement
+      information.
+
+  o Server Changes:
+    * (Nearly) all repository operations are now performed using the
+      permissions of the anonymous user in addition to the permission set
+      for any user authentication information which is present.
+    * Path names in the entitlementsDirectory no longer have any meaning. All
+      entitlements are read, and the serverName in the XML for the entitlement
+      is used to determine which server to send the entitlement too.
+    * Entitlement classes are no longer used as part of authentication; they
+      may still be specified, but repositorys now look up the class(es) for an
+      entitlement based on the key.
 
 Changes in 1.1.28:
   o Documentation Changes:

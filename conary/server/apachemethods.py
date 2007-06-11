@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -30,8 +30,8 @@ BUFFER=1024 * 256
 
 def post(port, isSecure, repos, req):
     authToken = getAuth(req)
-    if type(authToken) is int:
-        return authToken
+    if authToken is None:
+        return apache.HTTP_BAD_REQUEST
 
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
@@ -164,8 +164,8 @@ def get(port, isSecure, repos, req):
 
     authToken = getAuth(req)
 
-    if type(authToken) is int:
-        return authToken
+    if authToken is None:
+        return apache.HTTP_BAD_REQUEST
 
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
