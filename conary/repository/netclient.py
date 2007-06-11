@@ -1682,7 +1682,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if target and cs:
             if cs.oldTroves or cs.newTroves:
                 os.unlink(target)
-                cs.writeToFile(target)
+                cs.writeToFile(target, versionOverride = changesetVersion)
 
             cs = None
         elif target:

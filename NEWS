@@ -13,6 +13,11 @@ Changes in @NEW@:
       versions of the same trove has been fixed. (CNY-1742)
     * Adding redirects which pointed to otherwise-unused branches corrupted
       the database by creating a branch without corresponding label information
+    * A bug in `conary rdiff' related to the re-construction of file
+      information using relative changes has been fixed. (CNY-1753)
+    * Specific changeset versions requested by the client using the
+      changesetVersion argument to createChangeSetFile() are saved using
+      the proper file container version. (CNY-1754)
 
   o Client Changes:
     * repositoryMap conaryrc entries can now use wildcards for the server name
