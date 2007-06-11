@@ -494,7 +494,6 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
     newTroveCsList = []
     for trvCs in cs.iterNewTroveList():
         trvName = trvCs.getName()
-        #if trvCs.isAbsolute():
         if trvCs.getOldVersion() is None:
             flavor = trvCs.getNewFlavor()
             if trvCs.isAbsolute():
@@ -860,10 +859,14 @@ def _diffFiles(changeset, oldTrv, newTrv):
         changeOld = changeset.getFileChange(None, fOldFId)
         changeNew = changeset.getFileChange(fOldFId, fNewFId)
         fObjOld = files.ThawFile(changeOld, fOldPId)
-        if files.fileStreamIsDiff(changeNew):
+        if changeNew and files.fileStreamIsDiff(changeNew):
             fObjNew = files.ThawFile(changeOld, fOldPId)
             fObjNew.twm(changeNew, fObjOld)
         else:
+            if changeNew is None:
+                changeNew = changeset.getFileChange(None, fNewFId)
+            if changeNew is None:
+                raise Exception("Unable to retrieve file")
             fObjNew = files.ThawFile(changeNew, fNewFId)
         # Diff the inodes
         idiff = []
