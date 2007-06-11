@@ -239,7 +239,7 @@ def execute(cmd, destDir=None, verbose=True):
         dir = destdir
     else:
         dir = '.'
-    p = subprocess.Popen('cd \'%s\'; %s' %(dir, cmd), shell=True, stdin=open(os.devnull, 'w'))
+    p = subprocess.Popen('cd \'%s\'; %s' %(dir, cmd), shell=True, stdin=open(os.devnull, 'r'))
     rc = os.waitpid(p.pid, 0)[1]
     _handle_rc(rc, cmd)
 
