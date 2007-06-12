@@ -233,6 +233,11 @@ class CfgRepoMap(CfgList):
         curVal.extend(newVal)
         return curVal
 
+    def getDefault(self, default=[]):
+        if hasattr(default, 'iteritems'):
+            return CfgList.getDefault(self, default.iteritems())
+        return CfgList.getDefault(self, default)
+
 class CfgFlavor(CfgType):
 
     default = deps.Flavor()
