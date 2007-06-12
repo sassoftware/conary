@@ -234,12 +234,8 @@ def execute(cmd, destDir=None, verbose=True):
     so processes can never block on user input
     """
     if verbose:
-	log.info(cmd)
-    if destDir:
-        dir = destdir
-    else:
-        dir = '.'
-    rc = subprocess.call('cd \'%s\'; %s' %(dir, cmd), shell=True, stdin=open(os.devnull, 'r'))
+        log.info(cmd)
+    rc = subprocess.call(cmd, shell=True, cwd=destDir, stdin=open(os.devnull))
     _handle_rc(rc, cmd)
 
 class popen:
