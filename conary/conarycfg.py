@@ -218,6 +218,13 @@ class RepoMap(ServerGlobList):
 
         return r
 
+    def __init__(self, repoMap=[]):
+        if hasattr(repoMap, 'iteritems'):
+            ServerGlobList.__init__(self)
+            self.update(repoMap)
+        else:
+            ServerGlobList.__init__(self, repoMap)
+
 class CfgRepoMap(CfgList):
     def __init__(self, default=[]):
         CfgList.__init__(self, CfgRepoMapEntry, RepoMap, default=default)
