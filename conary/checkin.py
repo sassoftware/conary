@@ -1021,6 +1021,8 @@ def diff(repos, versionStr = None):
             forceSha1=True, ignoreAutoSource = True)
     if not result: return 2
 
+    result = localAutoSourceChanges(oldTrove, result)
+
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return 0
     _showChangeSet(repos, changeSet, oldTrove, state,
@@ -2009,6 +2011,7 @@ def stat_(repos):
 	    [(state, oldTrove, versions.NewVersion(),
               update.UpdateFlags(ignoreUGids = True) )],
             forceSha1=True, ignoreAutoSource = True)
+    result = localAutoSourceChanges(oldTrove, result)
 
     (changeSet, ((isDifferent, newState),)) = result
 
@@ -2025,15 +2028,17 @@ troveCs.getNewFileList() ]
     results = []
 
     for (pathId, path, isNew, fileId, newVersion) in fileList:
+        if path in dirfilesHash:
+            # autosource files aren't in this dict
+            del dirfilesHash[path]
+
 	if isNew:
             results.append(('A', path))
-            del dirfilesHash[path]
             continue
 
 	# changed file
         if not path:
             path = oldTrove.getFile(pathId)[0]
-        del dirfilesHash[path]
         results.append(('M', path))
         continue
 
@@ -2068,3 +2073,24 @@ def _showStat(results):
         print "%s  %s" % (fstat, path)
 
     return results
+
+def localAutoSourceChanges(oldTrove, (changeSet, ((isDifferent, newState),))):
+    # look for autosource files which have changed from upstream; we don't
+    # use buildLocalChanges to do this because we don't want to download
+    # autosource'd files which haven't changed; a side affect is that
+    # changing, adding, or removing a url in a recipe won't show up here as a
+    # change to an autosource files; only changes due to refresh will be
+    # noticed
+    for (pathId, path, fileId, version) in newState.iterFileList():
+        if not newState.fileNeedsRefresh(pathId): continue
+        assert(newState.fileIsAutoSource(pathId))
+        assert(not newState.fileIsConfig(pathId))
+
+        # we don't need the real change; we just make one up
+        newState.updateFile(pathId, None, newState.getVersion(), '0' * 20)
+        isDifferent = True
+
+    d = newState.diff(oldTrove)[0]
+    changeSet.newTrove(d)
+
+    return (changeSet, ((isDifferent, newState),))
