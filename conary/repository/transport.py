@@ -436,6 +436,8 @@ class Transport(xmlrpclib.Transport):
                     l.append("%s %s" % (entitlement[0],
                                         base64.b64encode(entitlement[1])))
             self.entitlement = " ".join(l)
+        else:
+            self.entitlement = None
 
         self.proxyHost = None
         self.proxyProtocol = None
