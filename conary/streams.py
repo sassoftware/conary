@@ -403,6 +403,8 @@ class StreamCollection(InfoStream):
         for typeId, itemDict in sorted(self._items.iteritems()):
             for item in sorted(itemDict):
                 s = item.freeze()
+                if len(s) >= (1 << 16):
+                    raise OverflowError
                 l.append(struct.pack("!BH", typeId, len(s)))
                 l.append(s)
 
@@ -449,13 +451,19 @@ class StreamCollection(InfoStream):
             return None
 
         l = []
+        if len(removed) >= (1 << 16):
+            raise OverflowError
+        if len(added) >= (1 << 16):
+            raise OverflowError
         l.append(struct.pack("!HH", len(removed), len(added)))
 
         for typeId, item in itertools.chain(removed, added):
             s = item.freeze()
+            if len(s) >= (1 << 16):
+                raise OverflowError
             l.append(struct.pack("!BH", typeId, len(s)))
             l.append(s)
-        
+
         return "".join(l)
 
     def twm(self, diff, base):
@@ -492,6 +500,8 @@ class OrderedStreamCollection(StreamCollection):
         for typeId, itemList in (self._items.iteritems()):
             for item in itemList:
                 s = item.freeze()
+                if len(s) >= (1 << 16):
+                    raise OverflowError
                 l.append(struct.pack("!BH", typeId, len(s)))
                 l.append(s)
 
@@ -543,6 +553,8 @@ class OrderedStreamCollection(StreamCollection):
 
         for typeId, item in removed:
             s = item.freeze()
+            if len(s) >= (1 << 16):
+                raise OverflowError
             l.append(struct.pack("!BH", typeId, len(s)))
             l.append(s)
 
@@ -550,6 +562,8 @@ class OrderedStreamCollection(StreamCollection):
         for typeId, item in them:
             if (typeId, item) in added:
                 s = item.freeze()
+                if len(s) >= (1 << 16):
+                    raise OverflowError
                 l.append(struct.pack("!BH", typeId, len(s)))
                 l.append(s)
 

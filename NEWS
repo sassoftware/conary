@@ -37,6 +37,10 @@ Changes in @NEW@:
     * Specific changeset versions requested by the client using the
       changesetVersion argument to createChangeSetFile() are saved using
       the proper file container version. (CNY-1754)
+    * A bug in Python caused overflow conditions when storing unsigned
+      short integers in StreamCollection objects.  Manual overflow
+      checking has been added to avoid corrupting frozen
+      streams. (CNY-1746)
 
 Changes in 1.1.28:
   o Documentation Changes:
