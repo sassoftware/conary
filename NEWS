@@ -7,6 +7,10 @@ Changes in @NEW@:
       'entitlement server entitlement'. conary config displays entitlement
       information.
 
+  o Build Changes:
+    * Refreshed autosource files are now displayed by 'cvc revert' and 
+      'cvc diff' (CNY-1647)
+
   o Server Changes:
     * (Nearly) all repository operations are now performed using the
       permissions of the anonymous user in addition to the permission set
