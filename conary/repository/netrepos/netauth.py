@@ -215,7 +215,7 @@ class EntitlementAuthorization:
 
         # look up entitlements
         cu.execute("""
-        SELECT userGroupId FROM Entitlements USING (entGroupId)
+        SELECT userGroupId FROM Entitlements
         JOIN EntitlementAccessMap USING (entGroupId)
         WHERE entitlement=?
         """, entitlement)
