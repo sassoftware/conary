@@ -350,7 +350,10 @@ class ServerCache:
             userInfo = (userInfo[0], "")
 
         # look for any entitlements for this server
-        entList = self.entitlements.find(serverName, allMatches = True)
+        if self.entitlements:
+            entList = self.entitlements.find(serverName, allMatches = True)
+        else:
+            entList = []
 
         usedMap = url is not None
         if url is None:
