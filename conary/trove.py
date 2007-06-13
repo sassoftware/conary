@@ -538,6 +538,7 @@ _METADATA_ITEM_TAG_NOTES = 9
 
 _METADATA_ITEM_SIG_VER_ALL = [ 0 ]
 
+OBSS = streams.OrderedBinaryStringsStream
 class MetadataItem(streams.StreamSet):
     streamDict = {
         _METADATA_ITEM_TAG_ID:
@@ -547,19 +548,19 @@ class MetadataItem(streams.StreamSet):
         _METADATA_ITEM_TAG_LONGDESC:
                 (DYNAMIC, streams.StringStream,   'longDesc'     ),
         _METADATA_ITEM_TAG_LICENSES:
-                (DYNAMIC, streams.StringsStream,  'licenses'     ),
+                (DYNAMIC, OBSS,                   'licenses'     ),
         _METADATA_ITEM_TAG_CRYPTO:
-                (DYNAMIC, streams.StringsStream,  'crypto'       ),
+                (DYNAMIC, OBSS,                   'crypto'       ),
         _METADATA_ITEM_TAG_URL:
                 (DYNAMIC, streams.StringStream,   'url'          ),
         _METADATA_ITEM_TAG_CATEGORIES:
-                (DYNAMIC, streams.StringsStream,  'categories'   ),
+                (DYNAMIC, OBSS,                   'categories'   ),
         _METADATA_ITEM_TAG_BIBLIOGRAPHY:
-                (DYNAMIC, streams.StringsStream,  'bibliography' ),
+                (DYNAMIC, OBSS,                   'bibliography' ),
         _METADATA_ITEM_TAG_SIGNATURES:
                 (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
         _METADATA_ITEM_TAG_NOTES:
-                (DYNAMIC, streams.StringsStream,  'notes'        ),
+                (DYNAMIC, OBSS,                   'notes'        ),
         }
 
     _skipSet = { 'id' : True, 'signatures': True }
@@ -669,13 +670,14 @@ _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 # in v1 signatures as well
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
-_TROVEINFO_TAG_METADATA       = 17
+_TROVEINFO_TAG_OLD_METADATA   = 17  # Old format metadata, ignored
 _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through 
                                     # a fix for incompleteness. only used on
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
 _TROVEINFO_TAG_COMPAT_CLASS   = 19
-_TROVEINFO_TAG_LAST           = 19
+_TROVEINFO_TAG_METADATA       = 20
+_TROVEINFO_TAG_LAST           = 20
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()

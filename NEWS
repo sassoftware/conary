@@ -6,6 +6,13 @@ Changes in @NEW@:
     * Entitlements may be placed in conaryrc files now using
       'entitlement server entitlement'. conary config displays entitlement
       information.
+    * A bug that limited a single MetadataItem to less than 64 KiB has
+      been fixed.  Conary 1.1.29 will produce metadata that will not
+      be visible to older clients.  Likewise, metadata produced by
+      older clients will not be visible to Conary 1.1.29 and later
+      clients. (CNY-1746)
+    * Metadata items can now store strings with NUL characters in
+      them. (CNY-1750)
 
   o Build Changes:
     * Refreshed autosource files are now displayed by 'cvc revert' and 

@@ -33,6 +33,7 @@ static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
+static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
@@ -47,6 +48,7 @@ static PyMethodDef MiscMethods[] = {
 	"unlinks a file if it exists; silently fails if it does not exist. "
 	"returns a boolean indicating whether or not a file was removed" },
     { "unpack", unpack, METH_VARARGS },
+    { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
@@ -218,11 +220,12 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args) {
 
 static PyObject * unpack(PyObject *self, PyObject *args) {
     char * data, * format;
-    int dataLen;
     char * dataPtr, * formatPtr;
+    char b;
+    int dataLen;
     int offset;
     PyObject * retList, * dataObj;
-    int intVal;
+    unsigned int intVal;
     PyObject * formatArg, * offsetArg, * dataArg, * retVal;
 
     /* This avoids PyArg_ParseTuple because it's sloooow */
@@ -326,6 +329,43 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
             dataPtr += intVal;
             break;
 
+	case 'D':
+            /* extension -- extract a string based on the length which
+               preceeds it.  the length is dynamic based on the size */
+            formatPtr++;
+
+	    /* high bits of the first byte
+	       00: low 6 bits are value
+	       01: low 14 bits are value
+	       10: low 30 bits are value
+	       11: low 62 bits are value (unimplemented)
+	    */
+	    /* look at the first byte */
+	    b = *dataPtr;
+	    if ((b & 0xc0) == 0x80) {
+		/* 30 bit length */
+		intVal = ntohl(*((uint32_t *) dataPtr)) & 0x3fffffff;
+                dataPtr += sizeof(uint32_t);
+	    } else if ((b & 0xc0) == 0x40) {
+		/* 14 bit length */
+		intVal = ntohs(*((uint16_t *) dataPtr)) & 0x3fff;
+		dataPtr += sizeof(uint16_t);
+	    } else if ((b & 0xc0) == 0x00) {
+		/* 6 bit length */
+		intVal = *((uint8_t *) dataPtr) & ~(1 << 6);
+		dataPtr += sizeof(uint8_t);
+	    } else {
+		PyErr_SetString(PyExc_ValueError, 
+				"unimplemented dynamic size");
+		return NULL;
+	    }
+
+            dataObj = PyString_FromStringAndSize(dataPtr, intVal);
+            PyList_Append(retList, dataObj);
+            Py_DECREF(dataObj);
+            dataPtr += intVal;
+            break;
+
           default:
             Py_DECREF(retList);
             PyErr_SetString(PyExc_ValueError, "unknown character in format");
@@ -337,6 +377,43 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     Py_DECREF(retList);
 
     return retVal;
+}
+
+static PyObject * dynamicSize(PyObject *self, PyObject *args) {
+    PyObject * sizeArg;
+    char sizebuf[4];
+    uint32_t size;
+    int sizelen;
+
+    if (PyTuple_GET_SIZE(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "exactly one argument expected");
+        return NULL;
+    }
+
+    sizeArg = PyTuple_GET_ITEM(args, 0);
+    if (!PyInt_CheckExact(sizeArg)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be a string");
+        return NULL;
+    }
+
+    size = PyInt_AS_LONG(sizeArg);
+    if (size < (1 << 6)) {
+	*sizebuf = (char) size;
+	sizelen = sizeof(char);
+    } else if (size < (1 << 14)) {
+	/* mask top two bits and set them to 01 */
+	*((uint16_t *) sizebuf) = htons((size & 0x3fff) | 0x4000);
+	sizelen = sizeof(uint16_t);
+    } else if (size < (1 << 30)) {
+	/* mask top two bits and set them to 10 */
+	*((uint32_t *) sizebuf) = htonl((size & 0x3fffffff) | 0x80000000);
+	sizelen = sizeof(uint32_t);
+    } else {
+	PyErr_SetString(PyExc_ValueError, 
+			"unimplemented dynamic size");
+	return NULL;
+    }
+    return PyString_FromStringAndSize(sizebuf, sizelen);
 }
 
 static PyObject * py_pread(PyObject *self, PyObject *args) {
