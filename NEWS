@@ -33,6 +33,11 @@ Changes in @NEW@:
       may still be specified, but repositorys now look up the class(es) for an
       entitlement based on the key.
 
+  o Internal Changes:
+    * The restart information necessary for Conary to resume execution
+      after a critical update is applied now contains the original
+      command line. (CNY-1758)
+
 Changes in 1.1.28:
   o Documentation Changes:
     * Incorrect references to createGroup have been fixed. (CNY-1700)
