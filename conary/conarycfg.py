@@ -186,6 +186,15 @@ class RepoMap(ServerGlobList):
 
         return self.find(key)
 
+    def has_key(self, key):
+        r = self.find(key)
+        if r is None:
+            return False
+        return True
+
+    def __contains__(self, key):
+        return self.has_key(key)
+
     def clear(self):
         del self[:]
 
