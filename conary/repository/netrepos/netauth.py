@@ -120,7 +120,7 @@ class UserAuthorization:
         cu.execute("""
         SELECT salt, password, userGroupId, userName FROM Users
         JOIN UserGroupMembers USING(userId)
-        WHERE userName == ? or userName ='anonymous'
+        WHERE userName=? or userName='anonymous'
         """, user)
 
         result = [ x for x in cu ]
