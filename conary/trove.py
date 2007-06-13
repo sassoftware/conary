@@ -949,7 +949,10 @@ class Trove(streams.StreamSet):
                                                         'versionStrings' : True,
                                                         'incomplete' : True,
                                                         'metadata': True,
-                                                        'completeFixup' : True },
+                                                        'completeFixup' : True,
+                                                        # skip old metadata as well
+                                                        17: True,
+                                                        },
                                             freezeUnknown = True)
 
         raise NotImplementedError
