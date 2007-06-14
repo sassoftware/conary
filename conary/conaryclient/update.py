@@ -58,9 +58,9 @@ class CriticalUpdateInfo(object):
     def findFinalJobs(self, jobList):
         return self._match(self.finalTroveRegexps, jobList)
 
-    def addChangeSet(self, cs):
+    def addChangeSet(self, cs, includesFileContents):
         """ Store a changeset usable by the update determination code """
-        self.changeSetList.append(cs)
+        self.changeSetList.append((cs, includesFileContents))
 
     def iterChangeSets(self):
         return iter(self.changeSetList)
@@ -2432,8 +2432,8 @@ conary erase '%s=%s[%s]'
                             'cannot specify erases/relative updates with sync')
 
         # Add information from the stored update job, if available
-        for cs in restartChangeSets:
-            criticalUpdateInfo.addChangeSet(cs)
+        for cs, includesFileContents in restartChangeSets:
+            criticalUpdateInfo.addChangeSet(cs, includesFileContents)
 
         try:
             (updJob, suggMap) = self.updateChangeSet(itemList,
@@ -2584,9 +2584,17 @@ conary erase '%s=%s[%s]'
             uJob = database.UpdateJob(self.db)
 
         hasCriticalUpdateInfo = False
-        for changeSet in criticalUpdateInfo.iterChangeSets():
-            uJob.getTroveSource().addChangeSet(changeSet,
-                includesFileContents = True)
+        troveSource = uJob.getTroveSource()
+        first = True
+        for changeSet, incFConts in criticalUpdateInfo.iterChangeSets():
+            if first:
+                # Replace the trove source with one that can store
+                # dependencies
+                troveSource = trovesource.ChangesetFilesTroveSource(self.db,
+                                                             storeDeps=True)
+                uJob.troveSource = troveSource
+                first = False
+            troveSource.addChangeSet(changeSet, includesFileContents = incFConts)
             hasCriticalUpdateInfo = True
 
         forceJobClosure = False
@@ -3287,19 +3295,16 @@ def _storeJobInfo(remainingJobs, changeSetSource):
     restartDir = tempfile.mkdtemp(prefix='conary-restart-')
     csIndexPath = os.path.join(restartDir, 'changesets')
     csIndex = open(csIndexPath, "w")
-    for idx, cs in enumerate(changeSetSource.iterChangeSets()):
+    for idx, (cs, fname, incFConts) in enumerate(changeSetSource.iterChangeSetsFlags()):
         if isinstance(cs, changeset.ChangeSetFromFile):
             # Write the file name in the changesets file - when thawing we
             # will need this information
-            if cs.fileName:
-                csIndex.write(cs.fileName)
-                csIndex.write("\n")
-            # these will be picked up on restart by parsing the command line
-            # arguments
-            continue
-        cs.reset()
-        csFileName = os.path.join(restartDir, '%d.ccs' % idx)
-        cs.writeToFile(csFileName)
+            csFileName = cs.fileName
+        else:
+            cs.reset()
+            csFileName = os.path.join(restartDir, '%d.ccs' % idx)
+            cs.writeToFile(csFileName)
+        csIndex.write("%s %s\n" % (csFileName, int(incFConts)))
 
     csIndex.close()
 
@@ -3352,18 +3357,22 @@ def _loadRestartInfo(restartDir, lazyFileCache):
     # Skip files that are not changesets (.ccs).
     # This was the first attempt to fix CNY-1034, but it would break
     # old clients.
-    # Nevertheless the code now ignores files everything but .ccs files
-    filelist = set(x for x in os.listdir(restartDir) if x.endswith('.ccs'))
+    # Nevertheless the code now ignores everything but .ccs files
+
+    # Value of dictionary is includesFileContents
+    fileDict = dict((x, False) for x in os.listdir(restartDir) if x.endswith('.ccs'))
     # Add the changesets from the index file
     csIndexPath = os.path.join(restartDir, 'changesets')
     if os.path.exists(csIndexPath):
-        for cspath in open(csIndexPath):
-            filelist.add(cspath.strip())
+        for line in open(csIndexPath):
+            cspath, includesFileContents = line.strip().split()[:2]
+            includesFileContents = bool(int(includesFileContents))
+            fileDict[cspath] = includesFileContents
 
-    for path in filelist:
+    for path, includesFileContents in fileDict.iteritems():
         csFileName = os.path.join(restartDir, path)
         cs = changeset.ChangeSetFromFile(lazyFileCache.open(csFileName))
-        changeSetList.append(cs)
+        changeSetList.append((cs, includesFileContents))
     jobSetPath = os.path.join(restartDir, 'joblist')
     jobSet = cmdline.parseChangeList(x.strip() for x in open(jobSetPath))
     finalJobSet = []

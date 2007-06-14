@@ -576,7 +576,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         self.troveCsMap = {}
         self.jobMap = {}
         self.providesMap = {}
-        self.csList= []
+        self.csList = []
         self.invalidated = False
         self.erasuresMap = {}
         self.rooted = {}
@@ -615,11 +615,15 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             self.idMap[troveId] = info
 
             if trvCs.getOldVersion() is None:
+                jobMapKey = (info[0], (None, None), info[1:],
+                             trvCs.isAbsolute())
                 if info in self.troveCsMap:
-                    raise conaryerrors.InternalConaryError
+                    oldInc = int(self.jobMap.get(jobMapKey, (None, False))[1])
+                    if includesFileContents <= oldInc:
+                        # Refer to the older one, it's more complete
+                        continue
                 self.troveCsMap[info] = cs
-                self.jobMap[(info[0], (None, None), info[1:], 
-                             trvCs.isAbsolute())] = cs, includesFileContents
+                self.jobMap[jobMapKey] = cs, includesFileContents
                 continue
 
 
@@ -633,18 +637,21 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         if relative:
             for (trvCs, info) in relative:
+                jobMapKey = (info[0],
+                             (trvCs.getOldVersion(), trvCs.getOldFlavor()),
+                             info[1:], trvCs.isAbsolute())
+
                 if info in self.troveCsMap:
-                    # FIXME: there is no such exception in this context
-                    raise conaryerrors.InternalConaryError
+                    oldInc = int(self.jobMap.get(jobMapKey, (None, False))[1])
+                    if includesFileContents <= oldInc:
+                        # Refer to the older one, it's more complete
+                        continue
                 if not self.db.hasTrove(*trvCs.getOldNameVersionFlavor()):
                     # we don't has the old version of this trove, don't 
                     # use this changeset when updating this trove.
                     continue
                 self.troveCsMap[info] = cs
-                self.jobMap[(info[0], (trvCs.getOldVersion(), 
-                                       trvCs.getOldFlavor()), 
-                             info[1:], trvCs.isAbsolute())] = \
-                                                (cs, includesFileContents)
+                self.jobMap[jobMapKey] = (cs, includesFileContents)
 
         self.csList.append(cs)
         # Save file name too
@@ -807,6 +814,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
     def iterChangeSets(self):
         return iter(self.csList)
+
+    def iterChangeSetsFlags(self):
+        for cs, (fname, incFileConts) in zip(self.csList, self.csFileNameList):
+            yield cs, fname, incFileConts
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
         assert(self.storeDeps)
