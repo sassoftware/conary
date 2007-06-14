@@ -1,28 +1,9 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * 'conary rblist' no longer produces a stack trace if the
-      installLabelPath configuration option is not set. (CNY-1731)
-    * A bug that caused an "Error parsing label" error message when
-      invoking "cvc commit" on a group recipe that used
-      r.setSearchPath(str(r.labelPath[0]), ...) has been
-      fixed. (CNY-1740)
-    * Proxy errors are now reported in the client, for easier
-      debugging. (CNY-1313)
-    * A bug that caused an "Unknown error downloading changeset" error
-      when applying an update job that contained two different
-      versions of the same trove has been fixed. (CNY-1742)
-    * Adding redirects which pointed to otherwise-unused branches
-      corrupted the database by creating a branch without corresponding
-      label information
-    * When critical updates are present in an update job that has
-      previously downloaded all the changesets, Conary will no longer
-      unnecessarily re-download the troves. (CNY-1763)
-
   o Client Changes:
-    * repositoryMap conaryrc entries can now use wildcards for the
-      server name
+    * In conaryrc files, repositoryMap entries can now use wildcards
+      for the server name.
     * Multiple entitlements can now be sent to each server.
-    * Server names in entitlements may include wildcads.
+    * Server names in entitlements may include wildcards.
     * Entitlements may be placed in conaryrc files now using
       'entitlement server entitlement'. "conary config" displays
       entitlement information.
@@ -59,6 +40,25 @@ Changes in @NEW@:
       with very old versions of Conary.  Downgrading from Conary
       version 1.1.29 (or newer) to version 1.1.11 (or older) is known
       to fail. (CNY-1758)
+
+  o Bug Fixes:
+    * 'conary rblist' no longer produces a stack trace if the
+      installLabelPath configuration option is not set. (CNY-1731)
+    * A bug that caused an "Error parsing label" error message when
+      invoking "cvc commit" on a group recipe that used
+      r.setSearchPath(str(r.labelPath[0]), ...) has been
+      fixed. (CNY-1740)
+    * Proxy errors are now reported in the client, for easier
+      debugging. (CNY-1313)
+    * A bug that caused an "Unknown error downloading changeset" error
+      when applying an update job that contained two different
+      versions of the same trove has been fixed. (CNY-1742)
+    * Adding redirects which pointed to otherwise-unused branches
+      corrupted the database by creating a branch without corresponding
+      label information
+    * When critical updates are present in an update job that has
+      previously downloaded all the changesets, Conary will no longer
+      unnecessarily re-download the troves. (CNY-1763)
 
 Changes in 1.1.28:
   o Documentation Changes:
