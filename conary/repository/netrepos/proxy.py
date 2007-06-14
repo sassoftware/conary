@@ -303,8 +303,6 @@ class ChangesetFilter(BaseProxy):
             return self._convertChangeSetV2V1(csPath, size, destCsVersion)
         elif (csVersion, destCsVersion) == (_CSVER3, _CSVER2):
             return self._convertChangeSetV3V2(csPath, size, destCsVersion)
-        import epdb
-        epdb.st()
         assert False, "Unknown versions"
 
     def _convertChangeSetV3V2(self, cspath, size, destCsVersion):
