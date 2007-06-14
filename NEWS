@@ -17,6 +17,9 @@ Changes in @NEW@:
     * When critical updates are present in an update job that has
       previously downloaded all the changesets, Conary will no longer
       unnecessarily re-download the troves. (CNY-1763)
+    * TroveChangeSet.isRollbackFence() now returns the correct answer
+      if the trove changeset does not contain absolute trove
+      info. (CNY-1762)
 
   o Client Changes:
     * repositoryMap conaryrc entries can now use wildcards for the
