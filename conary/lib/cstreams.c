@@ -30,6 +30,7 @@
 
 static PyMethodDef CStreamsMethods[] = {
     { "splitFrozenStreamSet", StreamSet_split, METH_VARARGS },
+    { "whiteOutFrozenStreamSet", StreamSet_remove, METH_VARARGS },
     { NULL, NULL, NULL }  /* Sentinel */
 };
 

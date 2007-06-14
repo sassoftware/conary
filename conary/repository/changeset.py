@@ -189,6 +189,10 @@ class ChangeSet(streams.StreamSet):
 	    self.absolute = True
 	if (old and old.onLocalLabel()) or new.onLocalLabel():
 	    self.local = 1
+        metadata = trove.TroveInfo.find(trove._TROVEINFO_TAG_METADATA,
+                                        csTrove.absoluteTroveInfo())
+        if metadata:
+            self.hasMetadata |= 1
 
     def newPackage(self, csTrove):
         import warnings
@@ -350,6 +354,8 @@ class ChangeSet(streams.StreamSet):
 
             outFile = os.fdopen(outFileFd, "w+")
 
+            if self.hasMetadata:
+                versionOverride = filecontainer.FILE_CONTAINER_VERSION_METADATA
             csf = filecontainer.FileContainer(outFile,
                                               version = versionOverride)
 
@@ -748,6 +754,7 @@ class ChangeSet(streams.StreamSet):
 	self.fileContents = {}
 	self.absolute = False
 	self.local = 0
+        self.hasMetadata = 0
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
@@ -1506,6 +1513,27 @@ def _convertChangeSetV2V1(inPath, outPath):
 
     return size
 
+def _convertChangeSetV3V2(inPath, outPath):
+    cs = ChangeSetFromFile(inPath)
+    newCs = ChangeSet()
+    inFc = filecontainer.FileContainer(
+                        util.ExtendedFile(inPath, "r", buffering = False))
+    assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_METADATA)
+    for tcs in cs.iterNewTroveList():
+        frz = tcs.getFrozenTroveInfo()
+        frz = streams.whiteOutFrozenStreamSet(frz,
+                                              trove._TROVEINFO_TAG_METADATA)
+        tcs.absoluteTroveInfo.set(frz)
+        tiDiff = tcs.troveInfoDiff()
+        tiDiff = streams.whiteOutFrozenStreamSet(tiDiff,
+                                                 trove._TROVEINFO_TAG_METADATA)
+        tcs.troveInfoDiff.set(tiDiff)
+        newCs.newTrove(tcs)
+    cs.merge(newCs)
+    size = cs.writeToFile(outPath,
+                          versionOverride = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
+    return size
+
 def getNativeChangesetVersion(protocolVersion):
     """Return the native changeset version supported by a client speaking the
     supplied protocol version"""
@@ -1515,7 +1543,9 @@ def getNativeChangesetVersion(protocolVersion):
         return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
     elif protocolVersion < 43:
         return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
+    elif protocolVersion < 51:
+        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
     # Add more changeset versions here as the currently newest client is
     # replaced by a newer one
-    return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+    return filecontainer.FILE_CONTAINER_VERSION_METADATA
 

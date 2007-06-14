@@ -25,13 +25,15 @@ from conary.repository.netrepos import netserver, calllog
 _CSVER0 = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
 _CSVER1 = filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
 _CSVER2 = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+_CSVER3 = filecontainer.FILE_CONTAINER_VERSION_METADATA
 # The first in the list is the one the current generation clients understand
-CHANGESET_VERSIONS = [ _CSVER2, _CSVER1, _CSVER0 ]
+CHANGESET_VERSIONS = [ _CSVER3, _CSVER2, _CSVER1, _CSVER0 ]
 # Precedence list of versions - the version specified as key can be generated
 # from the version specified as value
 CHANGESET_VERSIONS_PRECEDENCE = {
     _CSVER0 : _CSVER1,
     _CSVER1 : _CSVER2,
+    _CSVER2 : _CSVER3,
 }
 
 class ProxyClient(xmlrpclib.ServerProxy):
@@ -299,7 +301,19 @@ class ChangesetFilter(BaseProxy):
             return self._convertChangeSetV1V0(csPath, size, destCsVersion)
         elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
             return self._convertChangeSetV2V1(csPath, size, destCsVersion)
+        elif (csVersion, destCsVersion) == (_CSVER3, _CSVER2):
+            return self._convertChangeSetV3V2(csPath, size, destCsVersion)
+        import epdb
+        epdb.st()
         assert False, "Unknown versions"
+
+    def _convertChangeSetV3V2(self, cspath, size, destCsVersion):
+        (fd, newCsPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                           suffix = '.tmp')
+        os.close(fd)
+        size = changeset._convertChangeSetV3V2(cspath, newCsPath)
+
+        return newCsPath, size
 
     def _convertChangeSetV2V1(self, cspath, size, destCsVersion):
         (fd, newCsPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
@@ -587,15 +601,21 @@ class ChangesetFilter(BaseProxy):
 
         # Handle format conversions
         for csInfo in changeSetList:
-            if csInfo.version == neededCsVersion:
+            fc = filecontainer.FileContainer(
+                util.ExtendedFile(csInfo.path, 'r', buffering = False))
+            csVersion = fc.version
+            fc.close()
+            if csVersion == neededCsVersion:
                 continue
 
             # Now walk the precedence list backwards for conversion
-            assert(csInfo.version == wireCsVersion)
-            oldV = csInfo.version
+            oldV = csVersion
             csPath = csInfo.path
 
             for iterV in reversed(verPath[:-1]):
+                # skip noop converstions
+                if iterV == oldV:
+                    continue
                 # Convert the changeset - not the first time around
                 path, newSize = self._convertChangeSet(csPath, csInfo.size,
                                                        iterV, oldV)
@@ -676,7 +696,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49, 50 ]
+    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 ]
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):

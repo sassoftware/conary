@@ -79,11 +79,13 @@ SUBFILE_MAGIC = 0x3FBB
 LARGE_SUBFILE_MAGIC = 0x40CD
 
 # File container versions. Add references to these in netclient too.
+FILE_CONTAINER_VERSION_METADATA     = 2007061301
 FILE_CONTAINER_VERSION_FILEID_IDX   = 2007022001
 FILE_CONTAINER_VERSION_WITH_REMOVES = 2006071301
 FILE_CONTAINER_VERSION_NO_REMOVES   = 2005101901
 
-READABLE_VERSIONS = [ FILE_CONTAINER_VERSION_FILEID_IDX,
+READABLE_VERSIONS = [ FILE_CONTAINER_VERSION_METADATA,
+                      FILE_CONTAINER_VERSION_FILEID_IDX,
                       FILE_CONTAINER_VERSION_WITH_REMOVES,
                       FILE_CONTAINER_VERSION_NO_REMOVES ]
 
@@ -238,6 +240,8 @@ class FileContainer:
 	self.file = file
 
         if version is None:
+            # note: this is not METADATA.  We only set METADATA
+            # if there is actually metadata
             version = FILE_CONTAINER_VERSION_FILEID_IDX
 
 	self.file.seek(0, SEEK_END)

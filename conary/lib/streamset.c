@@ -883,6 +883,53 @@ PyObject *StreamSet_split(PyObject *self, PyObject *args) {
     return l;
 }
 
+PyObject *StreamSet_remove(PyObject *self, PyObject *args) {
+    char *data, *chptr, *end, *newdata, *newchptr;
+    int size, sizeType, dataLen, rc, skipId, len;
+    unsigned int streamId;
+    PyObject *pydata, *pyskipid, *s;
+
+    if (PyTuple_GET_SIZE(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "exactly 2 arguments expected");
+        return NULL;
+    }
+    pydata = PyTuple_GET_ITEM(args, 0);
+    pyskipid = PyTuple_GET_ITEM(args, 1);
+    skipId = PyInt_AsLong(pyskipid);
+    data = PyString_AsString(pydata);
+    dataLen = PyString_Size(pydata);
+    newdata = malloc(dataLen);
+    if (NULL == newdata) {
+	PyErr_NoMemory();
+	return NULL;
+    }
+    end = data + dataLen;
+    chptr = data;
+    newchptr = newdata;
+    len = 0;
+    while (chptr < end) {
+	getTag(&chptr, &streamId, &sizeType, &size);
+	if (streamId == skipId) {
+	    chptr += size;
+	    continue;
+	}
+	rc = addTag(&newchptr, streamId, sizeType, size);
+	if (-1 == rc)
+	    goto error;
+	len += rc;
+	memcpy(newchptr, chptr, size);
+	chptr += size;
+	newchptr += size;
+	len += size;
+    }
+    s = PyString_FromStringAndSize(newdata, len);
+    free(newdata);
+    return s;
+ error:
+    free(newdata);
+    return NULL;
+}
+
 static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
                                 PyObject * kwargs) {
     char * kwlist[] = { "diff", "base", "skip", NULL };

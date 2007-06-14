@@ -30,7 +30,9 @@ StreamSet = cstreams.StreamSet
 StreamSetDef = cstreams.StreamSetDef
 ByteStream = cstreams.ByteStream
 LongLongStream = cstreams.LongLongStream
+
 splitFrozenStreamSet = cstreams.splitFrozenStreamSet
+whiteOutFrozenStreamSet = cstreams.whiteOutFrozenStreamSet
 
 SMALL = cstreams.SMALL
 LARGE = cstreams.LARGE
