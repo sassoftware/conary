@@ -539,6 +539,8 @@ class ConaryConfiguration(SectionedConfigFile):
                 if os.path.isfile(os.path.join(self.entitlementDirectory,
                                                basename)):
                     ent = loadEntitlement(self.entitlementDirectory, basename)
+                    if not ent:
+                        continue
                     self.entitlement.addEntitlement(ent[0], ent[2],
                                                     entClass = ent[1])
             except OSError:
