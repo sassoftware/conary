@@ -663,7 +663,23 @@ def emitEntitlement(serverName, className = None, key = None):
 </entitlement>
 """ % (serverName, classInfo, key)
 
-def loadEntitlementFromString(xmlContent, source='<override>'):
+def loadEntitlementFromString(xmlContent, *args, **kw):
+    # handle old callers
+    source=kw.get('source', '<override>')
+    serverName = kw.get('serverName', None)
+    if len(args):
+        if len(args) == 1:
+            source = args[0]
+        elif len(args) == 2:
+            serverName = args[0]
+            source = args[1]
+        else:
+            raise TypeError('loadEntitlementFromString() takes exactly 1 argument (%d given)' %len(args))
+
+    if serverName:
+        import warnings
+        warnings.warn("The serverName argument to loadEntitlementFromString "
+                      "has been deprecated")
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
