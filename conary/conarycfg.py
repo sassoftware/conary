@@ -93,6 +93,11 @@ class UserInformation(ServerGlobList):
             item = (item[0], (item[1], item[2]))
         ServerGlobList.remove(self, item)
 
+    def insert(self, pos, item):
+        if len(item) == 3:
+            item = (item[0], (item[1], item[2]))
+        ServerGlobList.insert(self, pos, item)
+
     def __init__(self, initVal = None):
         ServerGlobList.__init__(self)
         if initVal is not None:
