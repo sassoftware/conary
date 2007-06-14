@@ -14,6 +14,9 @@ Changes in @NEW@:
     * Adding redirects which pointed to otherwise-unused branches
       corrupted the database by creating a branch without corresponding
       label information
+    * When critical updates are present in an update job that has
+      previously downloaded all the changesets, Conary will no longer
+      unnecessarily re-download the troves. (CNY-1763)
 
   o Client Changes:
     * repositoryMap conaryrc entries can now use wildcards for the

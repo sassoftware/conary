@@ -101,6 +101,7 @@ class ClientUpdate:
     def __init__(self, callback=None):
         self.updateCallback = None
         self.setUpdateCallback(callback)
+        self.lzCache = util.LazyFileCache()
 
     def getUpdateCallback(self):
         return self.updateCallback
@@ -2292,7 +2293,7 @@ conary erase '%s=%s[%s]'
             cs.merge(newCs)
 
     def loadRestartInfo(self, restartInfo):
-        return _loadRestartInfo(restartInfo)
+        return _loadRestartInfo(restartInfo, self.lzCache)
 
     def saveRestartInfo(self, updJob, remainingJobs):
         return _storeJobInfo(remainingJobs, updJob.getTroveSource())
@@ -2308,7 +2309,7 @@ conary erase '%s=%s[%s]'
         thawing it from a frozen representation.
         @return: the new update job
         """
-        updJob = database.UpdateJob(self.db)
+        updJob = database.UpdateJob(self.db, lazyCache = self.lzCache)
         return updJob
 
     def prepareUpdateJob(self, updJob, itemList, keepExisting = False,
@@ -2422,6 +2423,7 @@ conary erase '%s=%s[%s]'
             recurse = False
             syncChildren = False    # we don't recalculate update info anyway
                                     # so we'll just revert to regular update.
+            migrate = False
 
         if syncChildren:
             for name, oldInf, newInfo, isAbs in itemList:
@@ -2432,7 +2434,6 @@ conary erase '%s=%s[%s]'
         # Add information from the stored update job, if available
         for cs in restartChangeSets:
             criticalUpdateInfo.addChangeSet(cs)
-
 
         try:
             (updJob, suggMap) = self.updateChangeSet(itemList,
@@ -2582,8 +2583,11 @@ conary erase '%s=%s[%s]'
         else:
             uJob = database.UpdateJob(self.db)
 
+        hasCriticalUpdateInfo = False
         for changeSet in criticalUpdateInfo.iterChangeSets():
-            uJob.getTroveSource().addChangeSet(changeSet)
+            uJob.getTroveSource().addChangeSet(changeSet,
+                includesFileContents = True)
+            hasCriticalUpdateInfo = True
 
         forceJobClosure = False
 
@@ -2620,6 +2624,9 @@ conary erase '%s=%s[%s]'
             troveSource = trovesource.stack(csSource, self.repos)
             mainSearchSource = self.getSearchSource(troveSource=troveSource)
             searchSource = mainSearchSource
+        elif hasCriticalUpdateInfo:
+            # Use the trove source as a search source too
+            searchSource = uJob.getTroveSource()
         else:
             mainSearchSource = self.getSearchSource()
             searchSource = mainSearchSource
@@ -2846,7 +2853,7 @@ conary erase '%s=%s[%s]'
                               + '\n    '.join('%s=%s[%s]' % ((x[0],) + x[1]) 
                                               for x in sorted(extraTroves)))
 
-    def _createCs(self, repos, db, jobSet, uJob, standalone = False):
+    def _createCs(self, repos, db, jobSet, uJob):
         baseCs = changeset.ReadOnlyChangeSet()
 
         cs, remainder = uJob.getTroveSource().createChangeSet(jobSet,
@@ -2936,12 +2943,26 @@ conary erase '%s=%s[%s]'
         csFiles = []
         for i, job in enumerate(allJobs):
             self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
+            # Create the relative changeset
             newCs = self._createCs(self.repos, self.db, job, uJob)
+
             # Dump the changeset to disk
             path = os.path.join(destDir, "%04d.ccs" % i)
             newCs.writeToFile(path)
             csFiles.append(path)
+
         uJob.setJobsChangesetList(csFiles)
+        # Set the search source to use the downloaded troves
+        csSource = trovesource.ChangesetFilesTroveSource(self.db,
+                                                         storeDeps=True)
+        csSource.addChangeSets(
+            (changeset.ChangeSetFromFile(self.lzCache.open(x))
+                for x in csFiles),
+            includesFileContents = True)
+        uJob.setSearchSource(csSource)
+        uJob.troveSource = csSource
+        uJob.setChangesetsDownloaded(True)
+
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 
@@ -2975,7 +2996,6 @@ conary erase '%s=%s[%s]'
             self.setUpdateCallback(UpdateCallback())
 
         allJobs = uJob.getJobs()
-        jobsCsList = uJob.getJobsChangesetList()
 
         self._validateJob(list(itertools.chain(*allJobs)))
 
@@ -2993,12 +3013,11 @@ conary erase '%s=%s[%s]'
             localRollbacks=localRollbacks, autoPinList=autoPinList,
             keepJournal=keepJournal)
 
-        if len(allJobs) == 1 and len(jobsCsList) != 1:
+        if len(allJobs) == 1 and not uJob.getChangesetsDownloaded():
             # this handles change sets which include change set files
             # if we have the job already downloaded, skip this
             self.updateCallback.setChangesetHunk(0, 0)
-            newCs = self._createCs(self.repos, self.db, allJobs[0], uJob, 
-                              standalone = True)
+            newCs = self._createCs(self.repos, self.db, allJobs[0], uJob)
             self.updateCallback.setUpdateHunk(0, 0)
             self.updateCallback.setUpdateJob(allJobs[0])
             self._applyCs(newCs, uJob, **kwargs)
@@ -3013,17 +3032,7 @@ conary erase '%s=%s[%s]'
             removeHints.update([ ((x[0], x[1][0], x[1][1]), None)
                                     for x in job if x[1][0] is not None ])
 
-        if len(allJobs) == len(jobsCsList):
-            # We have everything already downloaded
-            for i, job in enumerate(allJobs):
-                cs = changeset.ChangeSetFromFile(jobsCsList[i])
-                self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
-                self.updateCallback.setUpdateJob(job)
-                self._applyCs(cs, uJob, removeHints = removeHints, **kwargs)
-                self.updateCallback.updateDone()
-            return
-
-        if not self.cfg.threaded:
+        if uJob.getChangesetsDownloaded() or not self.cfg.threaded:
             for i, job in enumerate(allJobs):
                 self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
                 newCs = self._createCs(self.repos, self.db, job, uJob)
@@ -3276,13 +3285,25 @@ class InstallPathConflicts(UpdateError):
 
 def _storeJobInfo(remainingJobs, changeSetSource):
     restartDir = tempfile.mkdtemp(prefix='conary-restart-')
+    csIndexPath = os.path.join(restartDir, 'changesets')
+    csIndex = open(csIndexPath, "w")
     for idx, cs in enumerate(changeSetSource.iterChangeSets()):
         if isinstance(cs, changeset.ChangeSetFromFile):
+            # Write the file name in the changesets file - when thawing we
+            # will need this information
+            if cs.fileName:
+                csIndex.write(cs.fileName)
+                csIndex.write("\n")
             # these will be picked up on restart by parsing the command line
             # arguments
             continue
         cs.reset()
-        cs.writeToFile(restartDir + '/%d.ccs' % idx)
+        csFileName = os.path.join(restartDir, '/%d.ccs' % idx)
+        cs.writeToFile(csFileName)
+        csIndex.write(cs.fileName)
+        csIndex.write("\n")
+
+    csIndex.close()
 
     jobSetPath = os.path.join(restartDir, 'joblist')
     jobFile = open(jobSetPath, 'w')
@@ -3320,17 +3341,30 @@ def _storeJobInfo(remainingJobs, changeSetSource):
     versionFile = open(versionFilePath, "w+")
     versionFile.write("version %s\n" % constants.version)
     versionFile.close()
+
+    # Save the version file in the regular directory too
+    versionFilePath = os.path.join(restartDir, "__version__")
+    versionFile = open(versionFilePath, "w+")
+    versionFile.write("version %s\n" % constants.version)
+    versionFile.close()
     return restartDir
 
-def _loadRestartInfo(restartDir):
+def _loadRestartInfo(restartDir, lazyFileCache):
     changeSetList = []
     # Skip files that are not changesets (.ccs).
     # This was the first attempt to fix CNY-1034, but it would break
     # old clients.
     # Nevertheless the code now ignores files everything but .ccs files
-    filelist = [ x for x in os.listdir(restartDir) if x.endswith('.ccs') ]
+    filelist = set(x for x in os.listdir(restartDir) if x.endswith('.ccs'))
+    # Add the changesets from the index file
+    csIndexPath = os.path.join(restartDir, 'changesets')
+    if os.path.exists(csIndexPath):
+        for cspath in open(csIndexPath):
+            filelist.add(cspath.strip())
+
     for path in filelist:
-        cs = changeset.ChangeSetFromFile(os.path.join(restartDir, path))
+        csFileName = os.path.join(restartDir, path)
+        cs = changeset.ChangeSetFromFile(lazyFileCache.open(csFileName))
         changeSetList.append(cs)
     jobSetPath = os.path.join(restartDir, 'joblist')
     jobSet = cmdline.parseChangeList(x.strip() for x in open(jobSetPath))
