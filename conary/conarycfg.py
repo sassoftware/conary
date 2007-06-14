@@ -679,7 +679,7 @@ def loadEntitlementFromString(xmlContent, *args, **kw):
     if serverName:
         import warnings
         warnings.warn("The serverName argument to loadEntitlementFromString "
-                      "has been deprecated")
+                      "has been deprecated", DeprecationWarning)
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
