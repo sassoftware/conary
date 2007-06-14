@@ -2712,6 +2712,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
         c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
                                          self.absoluteTroveInfo())
         if c is None:
+            # fall back to the trove info diff
+            c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
+                               self.troveInfoDiff())
+
+        if c is None:
             # no compatibility class has been set for this trove; treat that
             # as compatibility class 0
             c = 0
