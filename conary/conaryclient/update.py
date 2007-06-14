@@ -3300,8 +3300,6 @@ def _storeJobInfo(remainingJobs, changeSetSource):
         cs.reset()
         csFileName = os.path.join(restartDir, '%d.ccs' % idx)
         cs.writeToFile(csFileName)
-        csIndex.write(cs.fileName)
-        csIndex.write("\n")
 
     csIndex.close()
 
