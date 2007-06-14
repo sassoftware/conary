@@ -33,7 +33,7 @@ class ServerGlobList(list):
 
     def find(self, server, allMatches = False):
         l = []
-        for (serverGlob, item) in self:
+        for (serverGlob, item) in ServerGlobList.__iter__(self):
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
                 if not allMatches:
@@ -55,7 +55,7 @@ class ServerGlobList(list):
     def append(self, newItem):
         location = None
         removeOld = False
-        for i, (serverGlob, info) in enumerate(self):
+        for i, (serverGlob, info) in enumerate(ServerGlobList.__iter__(self)):
             if fnmatch.fnmatch(newItem[0], serverGlob):
                 if serverGlob == newItem[0]:
                     removeOld = True
@@ -71,14 +71,33 @@ class ServerGlobList(list):
 
 class UserInformation(ServerGlobList):
 
-    def addServerGlob(self, serverGlob, user, password):
-        self.append((serverGlob, (user, password)))
+    def __iter__(self):
+        for x in ServerGlobList.__iter__(self):
+            yield (x[0], x[1][0], x[1][1])
+
+    def addServerGlob(self, *args):
+        # handle (glob, name, passwd) and transform to (glob, (name, passwd))a
+        if len(args) == 3:
+            args = args[0], (args[1], args[2])
+        ServerGlobList.append(self, args)
+
+    def extend(self, other):
+        for item in other:
+            self.addServerGlob(*item)
+
+    def append(self, item):
+        self.addServerGlob(*item)
+
+    def remove(self, item):
+        if len(item) == 3:
+            item = (item[0], (item[1], item[2]))
+        ServerGlobList.remove(self, item)
 
     def __init__(self, initVal = None):
         ServerGlobList.__init__(self)
         if initVal is not None:
             for val in initVal:
-                self.append(val)
+                self.addServerGlob(*val)
 
 class CfgUserInfoItem(CfgType):
     def parseString(self, str):
@@ -86,12 +105,12 @@ class CfgUserInfoItem(CfgType):
         if len(val) < 2 or len(val) > 3:
             raise ParseError("expected <hostglob> <user> [<password>]")
         elif len(val) == 2:
-            return (val[0], (val[1], None))
+            return (val[0], val[1], None)
         else:
-            return (val[0], (val[1], val[2]))
+            return tuple(val)
 
     def format(self, val, displayOptions=None):
-        serverGlob, (user, password) = val
+        serverGlob, user, password = val
         if password is None: 
             return '%s %s' % (serverGlob, user)
         elif displayOptions.get('hidePasswords'):
@@ -681,7 +700,7 @@ def loadEntitlementFromString(xmlContent, *args, **kw):
     if serverName:
         import warnings
         warnings.warn("The serverName argument to loadEntitlementFromString "
-                      "has been deprecated")
+                      "has been deprecated", DeprecationWarning)
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
