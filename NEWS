@@ -62,6 +62,8 @@ Changes in @NEW@:
     * TroveChangeSet.isRollbackFence() now returns the correct answer
       if the trove changeset does not contain absolute trove
       info. (CNY-1762)
+    * A bug related to entitlement directories containing unreadable
+      files has been fixed. (CNY-1765)
 
 Changes in 1.1.28:
   o Documentation Changes:
