@@ -193,6 +193,7 @@ class UpdateJob:
         drep['keywordArguments'] = self.getKeywordArguments()
         drep['invalidateRollbackStack'] = int(self._invalidateRollbackStack)
         drep['jobPreScripts'] = list(self._freezeJobPreScripts())
+        drep['changesetsDownloaded'] = int(self._changesetsDownloaded)
 
         # Save the Conary version
         drep['conaryVersion'] = constants.version
@@ -213,8 +214,7 @@ class UpdateJob:
 
         # Need to keep a reference to the lazy cache, or else the changesets
         # are invalid
-        self._lazyFileCache = self._thawChangesetFilesTroveSource(
-                                                        drep.get('troveSource'))
+        self._thawChangesetFilesTroveSource(drep.get('troveSource'))
 
         self.setJobs(list(self._thawJobs(drep['jobs'])))
         self.setPrimaryJobs(set(self._thawJobList(drep['primaryJobs'])))
@@ -228,6 +228,7 @@ class UpdateJob:
                                         drep.get('invalidateRollbackStack'))
         self._jobPreScripts = self._thawJobPreScripts(
             list(drep.get('jobPreScripts', [])))
+        self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
 
     def _freezeJobs(self, jobs):
         for jobList in jobs:
@@ -314,17 +315,16 @@ class UpdateJob:
         assert frzrepr.get('type') == 'ChangesetFilesTroveSource'
 
         troveSource = self.getTroveSource()
-        lazycache = util.LazyFileCache()
         csList = frzrepr['changesets']
         try:
             for (csFileName, includesFileContents) in csList:
-                cs = changeset.ChangeSetFromFile(lazycache.open(csFileName))
+                cs = changeset.ChangeSetFromFile(self.lzCache.open(csFileName))
                 troveSource.addChangeSet(cs, bool(includesFileContents))
         except IOError, e:
             raise errors.InternalConaryError("Missing changeset file %s" % 
                                              e.filename)
 
-        return lazycache
+        return self.lzCache
 
     def __freezeVF(self, tup):
         ver = tup[0]
@@ -402,7 +402,19 @@ class UpdateJob:
         self.setCriticalJobs([])
         return remainingJobs
 
-    def __init__(self, db, searchSource = None):
+    def getChangesetsDownloaded(self):
+        return self._changesetsDownloaded
+
+    def setChangesetsDownloaded(self, downloaded):
+        self._changesetsDownloaded = downloaded
+
+    def __init__(self, db, searchSource = None, lazyCache = None):
+        # 20070714: lazyCache can be None for the users of the old API (when
+        # an update job was instantiated directly, instead of using the
+        # client's newUpdateJob(). At some point we should deprecate that.
+        if lazyCache is None:
+            lazyCache = util.LazyFileCache()
+        self.lzCache = lazyCache
         self.jobs = []
         self.pinMapping = set()
         self.rollback = None
@@ -423,6 +435,8 @@ class UpdateJob:
         self._invalidateRollbackStack = False
         # List of pre scripts to run for a particular job. This is ordered.
         self._jobPreScripts = []
+        # Changesets have been downloaded
+        self._changesetsDownloaded = False
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,

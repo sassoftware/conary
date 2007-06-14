@@ -1298,6 +1298,8 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                     warnings.warn('ChangeSetFromFile() requires open file objects have a pread() method.  Use util.ExtendedFile() to create such a file object')
                     fileName = util.PreadWrapper(fileName)
                 csf = filecontainer.FileContainer(fileName)
+                if hasattr(fileName, 'path'):
+                    self.fileName = fileName.path
 
             (name, tagInfo, control) = csf.getNextFile()
             assert(name == "CONARYCHANGESET")

@@ -483,6 +483,12 @@ def _updateTroves(cfg, applyList, **kwargs):
     if restartDir:
         params = sys.argv
 
+        # Write command line to disk
+        import xmlrpclib
+        cmdlinefile = open(os.path.join(restartDir, 'cmdline'), "w")
+        cmdlinefile.write(xmlrpclib.dumps((params, ), methodresponse = True))
+        cmdlinefile.close()
+
         # CNY-980: we should have the whole script of changes to perform in
         # the restart directory (in the job list); if in migrate mode, re-exec
         # as regular update

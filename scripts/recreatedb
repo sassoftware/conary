@@ -149,7 +149,8 @@ def addConfigFileContents(client, cs):
         #                      %(path, sha1helper.md5ToString(pathid))
         # all the contents here are config files, so the isConfig parameter
         # is always true
-        cs.addFileContents(pathid, changeset.ChangedFileTypes.file, cont, True)
+        cs.addFileContents(pathid, fileid, changeset.ChangedFileTypes.file,
+                           cont, True)
 
 def main(argv):
     sys.excepthook = util.genExcepthook()
@@ -177,6 +178,8 @@ def main(argv):
                                 callback = callback,
                                 recurse = False)
     del csList
+    # cs is a read-only change set, and files cannot be added to it
+    cs = changeset.ChangeSet(cs.freeze())
 
     # add the config file contents
     addConfigFileContents(client, cs)
@@ -187,7 +190,8 @@ def main(argv):
 
     try:
         updatecmd.doUpdate(cfg, [ path ], depCheck = False,
-                           recurse = False, justDatabase = True)
+                           recurse = False, justDatabase = True,
+                           noRestart = True)
     finally:
         os.unlink(path)
 

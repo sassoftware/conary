@@ -1,11 +1,31 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * 'conary rblist' no longer produces a stack trace if the
+      installLabelPath configuration option is not set. (CNY-1731)
+    * A bug that caused an "Error parsing label" error message when
+      invoking "cvc commit" on a group recipe that used
+      r.setSearchPath(str(r.labelPath[0]), ...) has been
+      fixed. (CNY-1740)
+    * Proxy errors are now reported in the client, for easier
+      debugging. (CNY-1313)
+    * A bug that caused an "Unknown error downloading changeset" error
+      when applying an update job that contained two different
+      versions of the same trove has been fixed. (CNY-1742)
+    * Adding redirects which pointed to otherwise-unused branches
+      corrupted the database by creating a branch without corresponding
+      label information
+    * When critical updates are present in an update job that has
+      previously downloaded all the changesets, Conary will no longer
+      unnecessarily re-download the troves. (CNY-1763)
+
   o Client Changes:
-    * repositoryMap conaryrc entries can now use wildcards for the server name
-    * Multiple entitlements can be sent to each server now
+    * repositoryMap conaryrc entries can now use wildcards for the
+      server name
+    * Multiple entitlements can now be sent to each server.
     * Server names in entitlements may include wildcads.
     * Entitlements may be placed in conaryrc files now using
-      'entitlement server entitlement'. conary config displays entitlement
-      information.
+      'entitlement server entitlement'. "conary config" displays
+      entitlement information.
     * A bug that limited a single MetadataItem to less than 64 KiB has
       been fixed.  Conary 1.1.29 will produce metadata that will not
       be visible to older clients.  Likewise, metadata produced by
@@ -16,44 +36,29 @@ Changes in @NEW@:
 
   o Build Changes:
     * Refreshed autosource files are now displayed by 'cvc revert' and 
-      'cvc diff' (CNY-1647)
+      'cvc diff'. (CNY-1647)
     * Support for the Bazaar revision control system has been added via
-      r.addBzrSnapshot() (requires bzr >= 0.16).
+      r.addBzrSnapshot(). (requires bzr >= 0.16).
 
   o Server Changes:
     * (Nearly) all repository operations are now performed using the
-      permissions of the anonymous user in addition to the permission set
-      for any user authentication information which is present.
-    * Path names in the entitlementsDirectory no longer have any meaning. All
-      entitlements are read, and the serverName in the XML for the entitlement
-      is used to determine which server to send the entitlement too.
-    * Entitlement classes are no longer used as part of authentication; they
-      may still be specified, but repositorys now look up the class(es) for an
-      entitlement based on the key.
+      permissions of the anonymous user in addition to the permission
+      set for any user authentication information which is present.
+    * Path names in the entitlementsDirectory no longer have any
+      meaning. All entitlements are read, and the serverName in the
+      XML for the entitlement is used to determine which server to
+      send the entitlement too.
+    * Entitlement classes are no longer used as part of authentication;
+      they may still be specified, but repositorys now look up the
+      class(es) for an entitlement based on the key.
 
-  o Bug Fixes:
-    * 'conary rblist' no longer produces a stack trace if the
-      installLabelPath configuration option is not set. (CNY-1731)
-    * A bug that caused an "Error parsing label" error message when
-      invoking "cvc commit" on a group recipe that used
-      r.setSearchPath(str(r.labelPath[0]), ...) has been
-      fixed. (CNY-1740)
-    * Proxy errors are now reported in the client, for easier
-      debugging.  (CNY-1313)
-    * A bug that caused an "Unknown error downloading changeset" error
-      when applying an update job that contained two different
-      versions of the same trove has been fixed. (CNY-1742)
-    * Adding redirects which pointed to otherwise-unused branches corrupted
-      the database by creating a branch without corresponding label information
-    * A bug in "conary rdiff" related to the re-construction of file
-      information using relative changes has been fixed. (CNY-1753)
-    * Specific changeset versions requested by the client using the
-      changesetVersion argument to createChangeSetFile() are saved using
-      the proper file container version. (CNY-1754)
-    * A bug in Python can cause overflow conditions when storing
-      unsigned short integers in StreamCollection objects.  Manual
-      overflow checking has been added to avoid corrupting frozen
-      streams. (CNY-1746)
+  o Internal Changes:
+    * The restart information necessary for Conary to resume execution
+      after a critical update is applied now includes the original
+      command line. The way this information is stored is incompatible
+      with very old versions of Conary.  Downgrading from Conary
+      version 1.1.29 (or newer) to version 1.1.11 (or older) is known
+      to fail. (CNY-1758)
 
 Changes in 1.1.28:
   o Documentation Changes:
