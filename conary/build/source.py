@@ -1365,6 +1365,74 @@ class addSvnSnapshot(_RevisionControl):
 
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
+class addBzrSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addBzrSnapshot()}} - Adds a snapshot from a bzr repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addBzrSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addBzrSnapshot()} class extracts sources from a
+    bzr repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addBzrSnapshot}:
+
+    B{tag} : Specify a specific tagged revision to checkout.
+    """
+
+    name = 'bzr'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag or '')
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        util.execute('bzr branch \'%s\' \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        util.execute("cd '%s' && bzr pull %s --overwrite %s && bzr update" % \
+                (lookasideDir, self.url, self.tagArg))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s %s', self.url,
+                 self.tag and 'tag %s' % self.tag or '')
+        util.execute("cd '%s' && bzr export %s '%s'" %
+                        (lookasideDir, self.tagArg, target))
+
+    def __init__(self, recipe, url, tag = None, **kwargs):
+        self.url = url % recipe.macros
+        if tag:
+            self.tag = tag % recipe.macros
+            self.tagArg = '-r tag:%s' % self.tag
+        else:
+            self.tag = tag
+            self.tagArg = ''
+        sourceName = self.getFilename()
+
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
 class TroveScript(_AnySource):
 
     keywords = { 'contents' : None,

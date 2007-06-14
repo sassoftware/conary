@@ -17,6 +17,8 @@ Changes in @NEW@:
   o Build Changes:
     * Refreshed autosource files are now displayed by 'cvc revert' and 
       'cvc diff' (CNY-1647)
+    * Support for the Bazaar revision control system has been added via
+      r.addBzrSnapshot() (requires bzr >= 0.16).
 
   o Server Changes:
     * (Nearly) all repository operations are now performed using the
