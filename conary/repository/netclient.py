@@ -289,6 +289,7 @@ class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
                  callback=None, proxies=None, entitlementDir = None):
 	self.cache = {}
+        self.shareCache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
@@ -333,6 +334,17 @@ class ServerCache:
 
     def keys(self):
         return self.cache.keys()
+
+    def singleServer(self, *items):
+        foundServer = None
+        for item in items:
+            server = self[item]
+            if foundServer is None:
+                foundServer = server
+            elif foundServer is not server:
+                return False
+
+        return True
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)
@@ -393,6 +405,12 @@ class ServerCache:
             url = '/'.join(s)
             usedMap = True
 
+        shareTuple = (url, userInfo, tuple(entList))
+        server = self.shareCache.get(shareTuple, None)
+        if server is not None:
+            self.cache[serverName] = server
+            return server
+
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlementList = entList,
@@ -438,6 +456,7 @@ class ServerCache:
         server.setProtocolVersion(max(intersection))
 
         self.cache[serverName] = server
+        self.shareCache[shareTuple] = server
 
 	return server
 
@@ -1204,7 +1223,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     ourJobList.append((troveName, (old, oldFlavor),
                                        (new, newFlavor), absolute))
                 elif old:
-                    if old.getHost() == serverName:
+                    if self.c.singleServer(old, new):
                         l = serverJobs.setdefault(serverName, [])
                         l.append((troveName, 
                                   (self.fromVersion(old), 
