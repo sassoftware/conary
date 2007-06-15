@@ -240,9 +240,7 @@ class FileContainer:
 	self.file = file
 
         if version is None:
-            # note: this is not METADATA.  We only set METADATA
-            # if there is actually metadata
-            version = FILE_CONTAINER_VERSION_FILEID_IDX
+            version = FILE_CONTAINER_VERSION_METADATA
 
 	self.file.seek(0, SEEK_END)
 	if not self.file.tell():

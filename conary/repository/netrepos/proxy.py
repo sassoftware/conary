@@ -425,6 +425,10 @@ class ChangesetFilter(BaseProxy):
                 iterV = CHANGESET_VERSIONS_PRECEDENCE[iterV]
                 verPath.append(iterV)
 
+        # This is important; if it doesn't work out the cache is likely
+        # not working.
+        assert(verPath[-1] == wireCsVersion)
+
         fingerprints = [ '' ] * len(chgSetList)
         if self.csCache:
             try:

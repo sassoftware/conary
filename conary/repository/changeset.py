@@ -189,10 +189,6 @@ class ChangeSet(streams.StreamSet):
 	    self.absolute = True
 	if (old and old.onLocalLabel()) or new.onLocalLabel():
 	    self.local = 1
-        metadata = trove.TroveInfo.find(trove._TROVEINFO_TAG_METADATA,
-                                        csTrove.absoluteTroveInfo())
-        if metadata:
-            self.hasMetadata |= 1
 
     def newPackage(self, csTrove):
         import warnings
@@ -354,8 +350,6 @@ class ChangeSet(streams.StreamSet):
 
             outFile = os.fdopen(outFileFd, "w+")
 
-            if self.hasMetadata:
-                versionOverride = filecontainer.FILE_CONTAINER_VERSION_METADATA
             csf = filecontainer.FileContainer(outFile,
                                               version = versionOverride)
 
@@ -754,7 +748,6 @@ class ChangeSet(streams.StreamSet):
 	self.fileContents = {}
 	self.absolute = False
 	self.local = 0
-        self.hasMetadata = 0
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 

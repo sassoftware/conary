@@ -354,6 +354,8 @@ class ServerCache:
         if self.entitlementDir is not None:
             singleEnt = conarycfg.loadEntitlement(self.entitlementDir,
                                                   serverName)
+        else:
+            singleEnt = None
 
         # look for any entitlements for this server
         if self.entitlements:
