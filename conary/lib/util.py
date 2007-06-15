@@ -236,6 +236,13 @@ def execute(cmd, destDir=None, verbose=True):
     if verbose:
         log.info(cmd)
     rc = subprocess.call(cmd, shell=True, cwd=destDir, stdin=open(os.devnull))
+    # form the rc into a standard exit status
+    if rc < 0:
+        # turn rc positive
+        rc = rc * -1
+    else:
+        # shift the return code into the high bits
+        rc = rc << 8
     _handle_rc(rc, cmd)
 
 class popen:
