@@ -915,6 +915,10 @@ class DependencySet(object):
     def __eq__(self, other):
         if other is None:
             return False
+        # No much sense in comparing stuff that is not the same class as ours;
+        # it also breaks epydoc (CNY-1772)
+        if not hasattr(other, 'members'):
+            return False
         if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
