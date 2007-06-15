@@ -469,6 +469,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if entitlements is None:
             entitlements = conarycfg.EntitlementList()
+        elif type(entitlements) == dict:
+            newEnts = conarycfg.EntitlementList()
+            for (server, (entClass, ent)) in entitlements.iteritems():
+                newEnts.addEntitlement(server, ent, entClass = entClass)
+            entitlements = newEnts
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
                              proxies = self.proxies)
