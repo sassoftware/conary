@@ -64,6 +64,8 @@ Changes in @NEW@:
       info. (CNY-1762)
     * A bug related to entitlement directories containing unreadable
       files has been fixed. (CNY-1765)
+    * A bug that prevented epydoc from producing documentation on
+      the Conary code has been fixed. (CNY-1772)
 
 Changes in 1.1.28:
   o Documentation Changes:
