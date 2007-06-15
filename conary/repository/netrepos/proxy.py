@@ -703,8 +703,7 @@ class ProxyRepositoryServer(ChangesetFilter):
                         authCheckOnly = False):
         if clientVersion < 42:
             # server doesn't support auth checks through getFileContents
-            return caller(getFileContents,
-                                clientVersion, fileList, authCheckOnly)
+            return caller.getFileContents(clientVersion, fileList, authCheckOnly)
 
         hasFiles = []
         neededFiles = []
