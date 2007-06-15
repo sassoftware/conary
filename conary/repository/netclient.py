@@ -287,13 +287,14 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
-                 callback=None, proxies=None):
+                 callback=None, proxies=None, entitlementDir = None):
 	self.cache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
         self.entitlements = entitlements
         self.proxies = proxies
+        self.entitlementDir = entitlementDir
 
     def __getPassword(self, host, user=None):
         if not self.pwPrompt:
@@ -349,11 +350,19 @@ class ServerCache:
         if userInfo and userInfo[1] is None:
             userInfo = (userInfo[0], "")
 
+        # look for an exact match for the server before letting globs match
+        if self.entitlementDir is not None:
+            singleEnt = conarycfg.loadEntitlement(self.entitlementDir,
+                                                  serverName)
+
         # look for any entitlements for this server
         if self.entitlements:
             entList = self.entitlements.find(serverName, allMatches = True)
         else:
             entList = []
+
+        if singleEnt and singleEnt[1:] not in entList:
+            entList.append(singleEnt[1:])
 
         usedMap = url is not None
         if url is None:
@@ -476,7 +485,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             entitlements = newEnts
 
 	self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
-                             proxies = self.proxies)
+                             proxies = self.proxies,
+                             entitlementDir = entitlementDir)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
