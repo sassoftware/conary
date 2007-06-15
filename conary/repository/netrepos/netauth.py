@@ -265,13 +265,25 @@ class NetworkAuthorization:
                                                      allowAnonymous =
                                                             allowAnonymous)
 
-        for entitlement in authToken[2]:
+        if len(authToken) == 4:
+            # this code is for compatibility with old callers who
+            # form up an old (user, pass, entclass, entkey) authToken.
+            # rBuilder is one such caller.
+            entList = []
+            entClass = authToken[2]
+            entKey = authToken[3]
+            if entClass is not None and entKey is not None:
+                entList.append((entClass, entKey))
+        else:
+            entList = authToken[2]
+
+        for entClass, entKey in entList:
             # XXX serverName is passed only for compatibility with the server
             # and entitlement class based entitlement design; it's only used
-            # here during external authentication (which may be completely
-            # unused?)
+            # here during external authentication (used by some rPath
+            # customers)
             groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
-                cu, self.serverNameList[0], entitlement[0], entitlement[1])
+                cu, self.serverNameList[0], entClass, entKey)
             groupSet.update(groupsFromEntitlement)
 
         return groupSet
