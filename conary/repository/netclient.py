@@ -2340,6 +2340,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             url = server.prepareChangeSet()
 
+        if server.getProtocolVersion() <= 50:
+            (outFd, tmpName) = util.mkstemp()
+            os.close(outFd)
+            changeset._convertChangeSetV3V2(fName, tmpName)
+            autoUnlink = True
+            fName = tmpName
+
         if server.getProtocolVersion() <= 42:
             (outFd, tmpName) = util.mkstemp()
             os.close(outFd)
