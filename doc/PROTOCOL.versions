@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Version 52:
+  - getChangeSet supports infoOnly parameter
+
 Version 51:
   - indicates that the client can handle changeset version 2007061301
 
