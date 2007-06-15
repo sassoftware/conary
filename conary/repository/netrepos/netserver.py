@@ -2153,8 +2153,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, troveList)
         cu = self.db.cursor()
         userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        results = [ False ] * len(troveList)
         if not userGroupIds:
-            return {}
+            return results
         schema.resetTable(cu, "tmpNVF")
         for i, item in enumerate(troveList):
             cu.execute("INSERT INTO tmpNVF (idx, name, version, flavor) "
