@@ -2682,16 +2682,35 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getFrozenTroveInfo(self):
         return self.absoluteTroveInfo()
 
-    def _getScript(self, kind):
+    def _getScriptObj(self, kind):
         scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
                                        self.absoluteTroveInfo())
+
+        if scriptStream is None:
+            # fall back to the trove info diff - this is deprecated
+            scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
+                                          self.troveInfoDiff())
+            if scriptStream:
+                import warnings
+                warnings.warn("Obtaining unsigned script information from "
+                              "an old changeset.  In the future, unsigned "
+                              "script information will not be retreived. "
+                              "Use a new version of Conary to generate "
+                              "compatible changesets.", FutureWarning)
+
         if scriptStream is None:
             return None
 
         # this is horrid, but it's just looking up the script stream we're
         # looking for
         script = scriptStream.__getattribute__(scriptStream.streamDict[kind][2])
-        return script.script()
+        return script
+
+    def _getScript(self, kind):
+        scriptObj = self._getScriptObj(kind)
+        if scriptObj:
+            return scriptObj.script()
+        return None
 
     def getPostInstallScript(self):
         return self._getScript(_TROVESCRIPTS_POSTINSTALL)
@@ -2709,9 +2728,17 @@ class AbstractTroveChangeSet(streams.StreamSet):
         c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
                                          self.absoluteTroveInfo())
         if c is None:
-            # fall back to the trove info diff
+            # fall back to the trove info diff - this is deprecated
             c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
                                self.troveInfoDiff())
+            if c:
+                import warnings
+                warnings.warn("Obtaining unsigned script information from "
+                              "an old changeset.  In the future, unsigned "
+                              "script information will not be retreived. "
+                              "Use a new version of Conary to generate "
+                              "compatible changesets.", FutureWarning)
+
 
         if c is None or c() is None:
             # no compatibility class has been set for this trove; treat that
@@ -2738,16 +2765,16 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if oldCompatibilityClass == thisCompatClass:
             return False
 
-        scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
-                                       self.absoluteTroveInfo())
+        rollbackScript = self.getPostRollbackScript()
+        postRollback = self._getScriptObj(_TROVESCRIPTS_POSTROLLBACK)
 
-        if scriptStream is None or not scriptStream.postRollback.script():
+        if postRollback is None or not postRollback.script():
             # there is no rollback script; use a strict compatibility class
             # check
             return oldCompatibilityClass != thisCompatClass
 
         # otherwise see if the rollback script is valid for this case
-        for cvt in list(scriptStream.postRollback.conversions.iter()):
+        for cvt in list(postRollback.conversions.iter()):
             # this may look backwards, but it's a rollback script
             if (cvt.new() == oldCompatibilityClass and
                                 cvt.old() == thisCompatClass):

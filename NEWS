@@ -66,6 +66,10 @@ Changes in @NEW@:
       files has been fixed. (CNY-1765)
     * A bug that prevented epydoc from producing documentation on
       the Conary code has been fixed. (CNY-1772)
+    * Conary will temporarily fall back to reading unsigned group
+      script information from changeset files that are created by
+      Conary < 1.1.24.  Once rBuilder creates changesets with a newer
+      version of Conary, this change will be reverted. (CNY-1762)
 
 Changes in 1.1.28:
   o Documentation Changes:
