@@ -670,14 +670,13 @@ _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 # in v1 signatures as well
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
-_TROVEINFO_TAG_OLD_METADATA   = 17  # Old format metadata, ignored
+_TROVEINFO_TAG_METADATA       = 17  # Old format metadata, ignored
 _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through 
                                     # a fix for incompleteness. only used on
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
 _TROVEINFO_TAG_COMPAT_CLASS   = 19
-_TROVEINFO_TAG_METADATA       = 20
-_TROVEINFO_TAG_LAST           = 20
+_TROVEINFO_TAG_LAST           = 19
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -950,8 +949,6 @@ class Trove(streams.StreamSet):
                                                         'incomplete' : True,
                                                         'metadata': True,
                                                         'completeFixup' : True,
-                                                        # skip old metadata as well
-                                                        17: True,
                                                         },
                                             freezeUnknown = True)
 

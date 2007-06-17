@@ -1508,27 +1508,6 @@ def _convertChangeSetV2V1(inPath, outPath):
 
     return size
 
-def _convertChangeSetV3V2(inPath, outPath):
-    cs = ChangeSetFromFile(inPath)
-    newCs = ChangeSet()
-    inFc = filecontainer.FileContainer(
-                        util.ExtendedFile(inPath, "r", buffering = False))
-    assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_METADATA)
-    for tcs in cs.iterNewTroveList():
-        frz = tcs.getFrozenTroveInfo()
-        frz = streams.whiteOutFrozenStreamSet(frz,
-                                              trove._TROVEINFO_TAG_METADATA)
-        tcs.absoluteTroveInfo.set(frz)
-        tiDiff = tcs.troveInfoDiff()
-        tiDiff = streams.whiteOutFrozenStreamSet(tiDiff,
-                                                 trove._TROVEINFO_TAG_METADATA)
-        tcs.troveInfoDiff.set(tiDiff)
-        newCs.newTrove(tcs)
-    cs.merge(newCs)
-    size = cs.writeToFile(outPath,
-                          versionOverride = filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
-    return size
-
 def getNativeChangesetVersion(protocolVersion):
     """Return the native changeset version supported by a client speaking the
     supplied protocol version"""
