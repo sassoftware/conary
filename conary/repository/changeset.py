@@ -1517,9 +1517,6 @@ def getNativeChangesetVersion(protocolVersion):
         return filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
     elif protocolVersion < 43:
         return filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES
-    elif protocolVersion < 51:
-        return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
     # Add more changeset versions here as the currently newest client is
     # replaced by a newer one
-    return filecontainer.FILE_CONTAINER_VERSION_METADATA
-
+    return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
