@@ -462,6 +462,7 @@ class ChangesetFilter(BaseProxy):
                 csInfo = self.csCache.get((fingerprint, iterV))
                 if csInfo:
                     # Found in the cache (possibly with an older version)
+                    csInfo.fingerprint = fingerprint
                     changeSetList[jobIdx] = csInfo
                     break
 
