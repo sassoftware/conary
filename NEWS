@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.29:
   o Client Changes:
     * In conaryrc files, repositoryMap entries can now use wildcards
       for the server name.
@@ -19,7 +19,7 @@ Changes in @NEW@:
       not allowing access. (CNY-1738)
 
   o Build Changes:
-    * Refreshed autosource files are now displayed by 'cvc revert' and 
+    * Refreshed autosource files are now displayed by 'cvc revert' and
       'cvc diff'. (CNY-1647)
     * Support for the Bazaar revision control system has been added via
       r.addBzrSnapshot(). (requires bzr >= 0.16).
@@ -33,12 +33,12 @@ Changes in @NEW@:
       XML for the entitlement is used to determine which server to
       send the entitlement too.
     * Entitlement classes are no longer used as part of authentication;
-      they may still be specified, but repositorys now look up the
+      they may still be specified, but repositories now look up the
       class(es) for an entitlement based on the key.
 
   o Internal Changes:
-    * The restart information necessary for Conary to resume execution
-      after a critical update is applied now includes the original
+    * The restart information, necessary for Conary to resume execution
+      after a critical update is applied, now includes the original
       command line. The way this information is stored is incompatible
       with very old versions of Conary.  Downgrading from Conary
       version 1.1.29 (or newer) to version 1.1.11 (or older) is known
@@ -58,7 +58,7 @@ Changes in @NEW@:
       versions of the same trove has been fixed. (CNY-1742)
     * Adding redirects which pointed to otherwise-unused branches
       corrupted the database by creating a branch without corresponding
-      label information
+      label information.
     * When critical updates are present in an update job that has
       previously downloaded all the changesets, Conary will no longer
       unnecessarily re-download the troves. (CNY-1763)
