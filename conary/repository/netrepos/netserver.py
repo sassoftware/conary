@@ -1441,7 +1441,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource,
-                     changeSetVersion = None, mirrorMode = False):
+                     changeSetVersion = None, mirrorMode = False,
+                     infoOnly = False):
+
+        # infoOnly is for compatibilit with the network call; it's ignored
+        # here (but implemented in the front-side proxy)
 
         def _cvtTroveList(l):
             new = []

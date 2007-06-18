@@ -376,7 +376,8 @@ class ChangesetFilter(BaseProxy):
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource,
-                     changesetVersion = None, mirrorMode = False):
+                     changesetVersion = None, mirrorMode = False,
+                     infoOnly = False):
 
         # This is how the caching algorithm works:
         # - Produce verPath, a path in the digraph of possible version
@@ -492,7 +493,18 @@ class ChangesetFilter(BaseProxy):
                 # information (and may not support neededCsVersion)
                 neededHere = [ changeSetsNeeded.pop(0) ]
 
-            if getCsVersion >= 49:
+            # the changeset isn't in the cache.  create it
+            if getCsVersion >= 51 and wireCsVersion == neededCsVersion:
+                # We may be able to get proper size information for this from
+                # underlying server without fetcing the changeset (this isn't
+                # true for internal servers or old protocols)
+                rc = caller.getChangeSet(getCsVersion,
+                                     [ x[1][0] for x in neededHere ],
+                                     recurse, withFiles, withFileContents,
+                                     excludeAutoSource,
+                                     neededCsVersion, mirrorMode,
+                                     infoOnly)[1]
+            elif getCsVersion >= 49:
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
@@ -539,6 +551,14 @@ class ChangesetFilter(BaseProxy):
             del trovesNeeded
             del filesNeeded
             del removedTroves
+
+            if (getCsVersion >= 51 and wireCsVersion == neededCsVersion 
+                        and infoOnly and not url):
+                # We only got size information from the repository; there
+                # is no changeset to fetch/cache
+                csInfo.path = None
+                changeSetList[jobIdx] = csInfo
+                continue
 
             try:
                 inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
@@ -590,6 +610,15 @@ class ChangesetFilter(BaseProxy):
 
         # Handle format conversions
         for csInfo in changeSetList:
+            if infoOnly and csInfo.path is None:
+                assert(neededCsVersion == wireCsVersion)
+                # the changeset isn't present
+                continue
+
+            fc = filecontainer.FileContainer(
+                util.ExtendedFile(csInfo.path, 'r', buffering = False))
+            csVersion = fc.version
+            fc.close()
             if csInfo.version == neededCsVersion:
                 # We already have the right version
                 continue
@@ -621,17 +650,22 @@ class ChangesetFilter(BaseProxy):
             csInfo.version = neededCsVersion
             csInfo.path = csPath
 
-        (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir, suffix = '.cf-out')
-        url = os.path.join(self.urlBase(),
-                           "changeset?%s" % os.path.basename(path[:-4]))
-        f = os.fdopen(fd, 'w')
+        if not infoOnly:
+            (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                          suffix = '.cf-out')
+            url = os.path.join(self.urlBase(),
+                               "changeset?%s" % os.path.basename(path[:-4]))
+            f = os.fdopen(fd, 'w')
 
-        for csInfo in changeSetList:
-            # the hard-coded 1 means it's a changeset and needs to be walked 
-            # looking for files to include by reference
-            f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size, csInfo.cached))
+            for csInfo in changeSetList:
+                # the hard-coded 1 means it's a changeset and needs to be walked 
+                # looking for files to include by reference
+                f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size,
+                csInfo.cached))
 
-        f.close()
+            f.close()
+        else:
+            url = ''
 
         if clientVersion < 50:
             allSizes = [ x.size for x in changeSetList ]
