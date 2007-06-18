@@ -1095,6 +1095,57 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return l
 
+    def getChangeSetSize(self, jobList):
+        # make sure all of the jobs are on the same server
+        verSet = set()
+        wireJobs = []
+        for name, (oldVersion, oldFlavor), (newVersion, newFlavor), abs \
+                                                            in jobList:
+            if newVersion is None:
+                continue
+
+            if oldVersion:
+                verSet.add(oldVersion)
+                oldVersion = oldVersion.asString()
+                oldFlavor = oldFlavor.freeze()
+            else:
+                oldVersion = 0
+                oldFlavor = 0
+
+            verSet.add(newVersion)
+            newVersion = newVersion.asString()
+            newFlavor = newFlavor.freeze()
+
+            wireJobs.append( (name, (oldVersion, oldFlavor),
+                                    (newVersion, newFlavor), abs) )
+
+        if not self.c.singleServer(*verSet):
+            raise errors.CannotCalculateDownloadSize('job on multiple servers')
+
+        server = self.c[jobList[0][2][0]]
+
+        if server.getProtocolVersion() >= 51:
+            infoList = server.getChangeSet(wireJobs, False, True, True,
+                           False, filecontainer.FILE_CONTAINER_VERSION_LATEST,
+                           False, True)
+        elif server.getProtocolVersion() < 50:
+            raise errors.CannotCalculateDownloadSize('repository too old')
+        else:
+            infoList = server.getChangeSet(wireJobs, False, True, True,
+                           False, filecontainer.FILE_CONTAINER_VERSION_LATEST,
+                           False)
+
+        sizeList = [ x[0] for x in infoList[1] ]
+        jobSizes = []
+        for singleJob in jobList:
+            totalSize = 0
+            if singleJob[2][0] is not None:
+                totalSize += sizeList.pop(0)
+
+            jobSizes.append(totalSize)
+
+        return jobSizes
+
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
                         excludeAutoSource = False, recurse = True,
