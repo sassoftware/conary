@@ -2683,11 +2683,13 @@ class AbstractTroveChangeSet(streams.StreamSet):
         return self.absoluteTroveInfo()
 
     def _getScriptObj(self, kind):
+        troveInfo = self.absoluteTroveInfo()
         scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
-                                       self.absoluteTroveInfo())
+                                      troveInfo)
 
-        if scriptStream is None:
-            # fall back to the trove info diff - this is deprecated
+        if not troveInfo and scriptStream is None:
+            # fall back to the trove info diff - _only_ if there is no
+            # absolute trove info.  this is deprecated
             scriptStream = TroveInfo.find(_TROVEINFO_TAG_SCRIPTS,
                                           self.troveInfoDiff())
             if scriptStream:
@@ -2725,9 +2727,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
         return self._getScript(_TROVESCRIPTS_POSTROLLBACK)
 
     def getNewCompatibilityClass(self):
-        c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
-                                         self.absoluteTroveInfo())
-        if c is None:
+        troveInfo = self.absoluteTroveInfo()
+        c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS, troveInfo)
+        if not troveInfo and c is None:
             # fall back to the trove info diff - this is deprecated
             c = TroveInfo.find(_TROVEINFO_TAG_COMPAT_CLASS,
                                self.troveInfoDiff())
