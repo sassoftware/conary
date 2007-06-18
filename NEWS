@@ -70,6 +70,8 @@ Changes in @NEW@:
       script information from changeset files that are created by
       Conary < 1.1.24.  Once rBuilder creates changesets with a newer
       version of Conary, this change will be reverted. (CNY-1762)
+    * Changeset files are now written as absolute paths in the
+      changeset index file. (CNY-1776)
 
 Changes in 1.1.28:
   o Documentation Changes:

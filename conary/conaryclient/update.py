@@ -3299,7 +3299,7 @@ def _storeJobInfo(remainingJobs, changeSetSource):
         if isinstance(cs, changeset.ChangeSetFromFile):
             # Write the file name in the changesets file - when thawing we
             # will need this information
-            csFileName = cs.fileName
+            csFileName = util.normpath(os.path.abspath(cs.fileName))
         else:
             cs.reset()
             csFileName = os.path.join(restartDir, '%d.ccs' % idx)
