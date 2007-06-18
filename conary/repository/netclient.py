@@ -406,6 +406,8 @@ class ServerCache:
 
         try:
             serverVersions = server.checkVersion()
+        except errors.InsufficientPermission:
+            raise
         except Exception, e:
             if isinstance(e, socket.error):
                 errmsg = e[1]
