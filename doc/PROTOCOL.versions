@@ -1,7 +1,4 @@
 # this file documents the wire protocol changes for conary.
-Version 51:
-  - indicates that the client can handle changeset version 2007061301
-
 Version 50:
   - getChangeSet keeps (troveNeeded, filesNeeded, troveRemoved) information
     separate for each element of the job list
