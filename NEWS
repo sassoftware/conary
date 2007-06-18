@@ -14,6 +14,9 @@ Changes in @NEW@:
       clients. (CNY-1746)
     * Metadata items can now store strings with NUL characters in
       them. (CNY-1750)
+    * The client API will now raise an InsufficientPermission error
+      instead of an OpenError when the client's entitlements are
+      not allowing access. (CNY-1738)
 
   o Build Changes:
     * Refreshed autosource files are now displayed by 'cvc revert' and 
