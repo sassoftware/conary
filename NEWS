@@ -75,6 +75,8 @@ Changes in 1.1.29:
       version of Conary, this change will be reverted. (CNY-1762)
     * Changeset files are now written as absolute paths in the
       changeset index file. (CNY-1776)
+    * Entitlement configuratioon lines continue to accept an entitlement
+      class for backwards compatibility purposes. (CNY-1786)
 
 Changes in 1.1.28:
   o Documentation Changes:
