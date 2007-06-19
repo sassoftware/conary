@@ -19,6 +19,7 @@ import re
 import sys
 import tempfile
 import time
+import types
 
 from conary import files, trove, versions, streams
 from conary.conarycfg import CfgProxy, CfgRepoMap
@@ -83,84 +84,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALL_FLAVORS      = 2     # all flavors (no scoring)
     _GET_TROVE_BEST_FLAVOR      = 3     # the best flavor for flavorFilter
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
-
-    publicCalls = set([ 'addUser',
-                        'addUserByMD5',
-                        'deleteUserByName',
-                        'addAccessGroup',
-                        'deleteAccessGroup',
-                        'listAccessGroups',
-                        'updateAccessGroupMembers',
-                        'setUserGroupCanMirror',
-                        'listAcls',
-                        'addAcl',
-                        'editAcl',
-                        'deleteAcl',
-                        'changePassword',
-                        'getUserGroups',
-                        'addEntitlement',
-                        'addEntitlements',
-                        'addEntitlementGroup',
-                        'deleteEntitlementGroup',
-                        'addEntitlementOwnerAcl',
-                        'deleteEntitlementOwnerAcl',
-                        'deleteEntitlement',
-                        'deleteEntitlements',
-                        'listEntitlements',
-                        'listEntitlementGroups',
-                        'getEntitlementClassAccessGroup',
-                        'setEntitlementClassAccessGroup',
-                        'updateMetadata',
-                        'getMetadata',
-                        'troveNames',
-                        'getTroveVersionList',
-                        'getTroveVersionFlavors',
-                        'getAllTroveLeaves',
-                        'getTroveVersionsByBranch',
-                        'getTroveLeavesByBranch',
-                        'getTroveLeavesByLabel',
-                        'getTroveVersionsByLabel',
-                        'getTrovesByPaths',
-                        'getFileContents',
-                        'getTroveLatestVersion',
-                        'getChangeSet',
-                        'getChangeSetFingerprints',
-                        'getDepSuggestions',
-                        'getDepSuggestionsByTroves',
-                        'prepareChangeSet',
-                        'presentHiddenTroves',
-                        'commitChangeSet',
-                        'getFileVersions',
-                        'getFileVersion',
-                        'getPackageBranchPathIds',
-                        'hasTroves',
-                        'getCollectionMembers',
-                        'getTrovesBySource',
-                        'addMetadataItems',
-                        'addDigitalSignature',
-                        'addNewAsciiPGPKey',
-                        'addNewPGPKey',
-                        'changePGPKeyOwner',
-                        'getAsciiOpenPGPKey',
-                        'listUsersMainKeys',
-                        'listSubkeys',
-                        'getOpenPGPKeyUserIds',
-                        'getConaryUrl',
-                        'getMirrorMark',
-                        'setMirrorMark',
-                        'getNewSigList',
-                        'getTroveSigs',
-                        'setTroveSigs',
-                        'getNewPGPKeys',
-                        'addPGPKeyList',
-                        'getNewTroveInfo',
-                        'setTroveInfo',
-                        'getNewTroveList',
-                        'getTroveInfo',
-                        'getTroveReferences',
-                        'getTroveDescendants',
-                        'checkVersion' ])
-
 
     def __init__(self, cfg, basicUrl, db = None):
         # FIXME: remove after deprecation period
@@ -3221,6 +3144,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         return SERVER_VERSIONS
+
+# this has to be at the end to get the publicCalls list correct; the proxy
+# uses the publicCalls list, so maintaining it 
+NetworkRepositoryServer.publicCalls = set()
+for attr, val in NetworkRepositoryServer.__dict__.iteritems():
+    if type(val) == types.FunctionType:
+        if hasattr(val, '_accessType'):
+            NetworkRepositoryServer.publicCalls.add(attr)
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args, **kw):
