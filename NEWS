@@ -8,6 +8,8 @@ Changes in @NEW@:
   o Server Changes:
     * Added infoOnly parameter to getChangeSet call in protocol version 51
       (CNY-1757)
+    * Changed list of repository methods to be automatically generated instead
+      of statically listed (CNY-1781)
 
   o Bug Fixes:
     * addSvnSnapshot now uses the lookaside directory for generating the
