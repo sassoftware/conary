@@ -9,6 +9,10 @@ Changes in @NEW@:
     * Added infoOnly parameter to getChangeSet call in protocol version 51
       (CNY-1757)
 
+  o Bug Fixes:
+    * addSvnSnapshot now uses the lookaside directory for generating the
+      snapshot, instead of using the remote repository. (CNY-1777)
+
 Changes in 1.1.29:
   o Client Changes:
     * In conaryrc files, repositoryMap entries can now use wildcards
