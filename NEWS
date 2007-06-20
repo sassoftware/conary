@@ -5,6 +5,8 @@ Changes in @NEW@:
       KeyErrors when users were switched to anonymous. (CNY-1787)
     * An issue related to the formatting of repository map entries
       has been fixed. (CNY-1788)
+    * Proxy doesn't support protocol version 41 (and hasn't for a few
+      releases)
 
 Changes in 1.1.29:
   o Client Changes:
