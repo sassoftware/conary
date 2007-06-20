@@ -1350,7 +1350,7 @@ class addSvnSnapshot(_RevisionControl):
                             self.url.split('/')[-1]
         util.execute("svn -q export '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
-                        (self.url, stagePath,
+                        (lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
