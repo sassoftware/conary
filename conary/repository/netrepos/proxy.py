@@ -79,7 +79,7 @@ class ProxyCaller:
         return lambda *args: self.callByName(method, *args)
 
     def __init__(self, url, proxy, transport):
-        self.url = url
+        self.url = util.stripUserPassFromUrl(url)
         self.proxy = proxy
         self._transport = transport
 

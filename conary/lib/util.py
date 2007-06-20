@@ -30,6 +30,7 @@ import sys
 import tempfile
 import time
 import traceback
+import urllib
 import urlparse
 import weakref
 
@@ -1043,3 +1044,10 @@ class Flags(object):
         return "%s(%s)" % (self.__class__.__name__,
                 "".join( flag for flag in self.__slots__
                             if getattr(self, flag) ) )
+
+def stripUserPassFromUrl(url):
+    arr = list(urlparse.urlparse(url))
+    hostUserPass = arr[1]
+    userPass, host = urllib.splituser(hostUserPass)
+    arr[1] = host
+    return urlparse.urlunparse(arr)

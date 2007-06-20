@@ -1,3 +1,11 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * The version cache for upstream servers in the Conary proxy
+      incorrectly included user information in the URL, causing
+      KeyErrors when users were switched to anonymous. (CNY-1787)
+    * An issue related to the formatting of repository map entries
+      has been fixed. (CNY-1788)
+
 Changes in 1.1.29:
   o Client Changes:
     * In conaryrc files, repositoryMap entries can now use wildcards
