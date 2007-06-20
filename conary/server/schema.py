@@ -22,7 +22,7 @@ TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
 # This is the major number of the schema we need
-VERSION = sqllib.DBversion(15)
+VERSION = sqllib.DBversion(16)
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -716,6 +716,109 @@ def createIdTables(db):
         db.commit()
         db.loadSchema()
 
+# cached access map for (userGroupId, instanceId)
+def createAccessMaps(db):
+    commit = False
+    cu = db.cursor()
+    # permissions by group. This only expresses/implies read
+    # permissions; for write and remove the acls in Permissions are
+    # controlling
+    if "UserGroupTroves" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupTroves(
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT UserGroupTroves_ugid_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UserGroupTroves_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupTroves"] = []
+        commit = True
+    db.createIndex("UserGroupTroves", "UserGroupTroves_userGroupIdIdx", "userGroupId,instanceId",
+                   unique=True)
+    db.createIndex("UserGroupTroves", "UserGroupTroves_instanceId_fk", "instanceId")
+    if createTrigger(db, "UserGroupTroves"):
+        commit = True
+
+    # cache of what troves a usergroup can see. Based on acls in
+    # Permissions and the recursive group grants from UserGroupTroves
+    if "UserGroupInstancesCache" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupInstancesCache(
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
+            canRemove       INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT UGIC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGIC_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupInstancesCache"] = []
+        commit = True
+    db.createIndex("UserGroupInstancesCache", "UGIC_userGroupIdIdx", "userGroupId,instanceId",
+                   unique=True)
+    db.createIndex("UserGroupInstancesCache", "UGIC_instanceId_fk", "instanceId")
+    # Latest, as seen by each usergroup
+    if "UserGroupLatestCache" not in db.tables:
+        assert("Items" in db.tables)
+        assert("Branches" in db.tables)
+        assert("Flavors" in db.tables)
+        assert("Versions" in db.tables)
+        assert("UserGroups" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupLatestCache(
+            userGroupId     INTEGER NOT NULL,
+            itemId          INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            flavorId        INTEGER NOT NULL,
+            versionId       INTEGER NOT NULL,
+            latestType      INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT UGLC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGLC_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGLC_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT UGLC_flavorId_fk
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT UGLC_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupLatestCache"] = []
+        commit = True
+    # sanity index that isn't very useful as an index due to its size...
+    db.createIndex("UserGroupLatestCache", "UGLC_userGroupId_uniq",
+                   "userGroupId,itemId,branchId,flavorId,latestType",
+                   unique=True)
+    # create needed FKs
+    db.createIndex("UserGroupLatestCache", "UGLC_itemId_fk", "itemId,branchId,userGroupId")
+    db.createIndex("UserGroupLatestCache", "UGLC_branchId_fk", "branchId,userGroupId")
+    db.createIndex("UserGroupLatestCache", "UGLC_flavorId_fk", "flavorId")
+    db.createIndex("UserGroupLatestCache", "UGLC_versionId_fk", "versionId")
+    if createTrigger(db, "UserGroupLatestCache"):
+        commit = True
+    
+    if commit:
+        db.commit()
+        db.loadSchema()
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     logMe(3)
@@ -895,14 +998,15 @@ def createSchema(db):
         db.loadSchema()
     createIdTables(db)
     createLabelMap(db)
+    createFlavors(db)
+    createInstances(db)
+    createNodes(db)
 
     createUsers(db)
     createEntitlements(db)
     createPGPKeys(db)
-
-    createFlavors(db)
-    createInstances(db)
-    createNodes(db)
+    createAccessMaps(db)
+    
     createChangeLog(db)
     createLatest(db)
 
