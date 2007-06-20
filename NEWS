@@ -1,19 +1,20 @@
 Changes in @NEW@:
   o Client Changes:
-    * Added getDownloadSizes() to the ConaryClient object to determint
+    * Added getDownloadSizes() to the ConaryClient object to determine
       the over-the-wire transfer size of the jobs in an UpdateJob object.
       Call requires a single repository be the source of the entire
-      update and protocol version 50 or later (CNY-1757)
+      update and to support protocol version 50 or later. (CNY-1757)
 
   o Server Changes:
-    * Added infoOnly parameter to getChangeSet call in protocol version 51
-      (CNY-1757)
-    * Changed list of repository methods to be automatically generated instead
-      of statically listed (CNY-1781)
+    * Added infoOnly parameter to getChangeSet call in protocol version
+      51. (CNY-1757)
+    * Changed list of repository methods to be automatically generated
+      instead of statically listed. (CNY-1781)
 
   o Bug Fixes:
-    * addSvnSnapshot now uses the lookaside directory for generating the
-      snapshot, instead of using the remote repository. (CNY-1777)
+    * The addSvnSnapshot() source action now uses the lookaside directory
+      for generating the snapshot, instead of using the remote repository.
+      (CNY-1777)
 
 Changes in 1.1.29:
   o Client Changes:
@@ -92,6 +93,8 @@ Changes in 1.1.29:
       version of Conary, this change will be reverted. (CNY-1762)
     * Changeset files are now written as absolute paths in the
       changeset index file. (CNY-1776)
+    * Entitlement configuratioon lines continue to accept an entitlement
+      class for backwards compatibility purposes. (CNY-1786)
 
 Changes in 1.1.28:
   o Documentation Changes:

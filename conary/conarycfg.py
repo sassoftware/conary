@@ -141,13 +141,22 @@ class EntitlementList(ServerGlobList):
 class CfgEntitlementItem(CfgType):
     def parseString(self, str):
         val = str.split()
-        if len(val) != 2:
+        if len(val) == 3:
+            # Output from an entitlement file, which still has a class
+            import warnings
+            warnings.warn("\nExpected an entitlement line with no entitlement "
+                "class.\nEntitlement classes will be ignored in the future.\n"
+                "Please change the 'entitlement %s' config line to\n"
+                "'entitlement %s %s'" % (str, val[0], val[2]),
+                DeprecationWarning)
+            return (val[0], (val[1], val[2]))
+        elif len(val) != 2:
             raise ParseError("expected <hostglob> <entitlement>")
 
         return (val[0], (None, val[1]))
 
     def format(self, val, displayOptions=None):
-        if val[0][0] is None:
+        if val[1][0] is None:
             return '%s %s' % (val[0], val[1][1])
         else:
             return '%s %s %s' % (val[0], val[1][0], val[1][1])
@@ -544,8 +553,8 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
-
-        self.readEntitlementDirectory()
+            # Entitlement files are config files
+            self.readEntitlementDirectory()
 
         util.settempdir(self.tmpDir)
 
