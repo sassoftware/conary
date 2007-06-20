@@ -34,6 +34,22 @@ CHANGESET_VERSIONS_PRECEDENCE = {
     _CSVER1 : _CSVER2,
 }
 
+class RepositoryVersionCache:
+
+    def get(self, caller):
+        basicUrl = util.stripUserPassFromUrl(caller.url)
+        uri = basicUrl.split(':', 1)[1]
+
+        if uri not in self.d:
+            useAnon, parentVersions = caller.checkVersion(self.protocolVersion)
+            self.d[uri] = max(parentVersions)
+
+        return self.d[uri]
+
+    def __init__(self):
+        self.d = {}
+        self.protocolVersion = netserver.SERVER_VERSIONS[-1]
+
 class ProxyClient(xmlrpclib.ServerProxy):
 
     pass
@@ -79,7 +95,7 @@ class ProxyCaller:
         return lambda *args: self.callByName(method, *args)
 
     def __init__(self, url, proxy, transport):
-        self.url = url
+        self.url = util.stripUserPassFromUrl(url)
         self.proxy = proxy
         self._transport = transport
 
@@ -166,7 +182,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
         self.proxies = conarycfg.getProxyFromConfig(cfg)
-        self.versionsByUrl = {}
+        self.repositoryVersionCache = RepositoryVersionCache()
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -242,9 +258,6 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                          set(parentVersions)))
         else:
             commonVersions = parentVersions
-
-        if caller.url is not None:
-            self.versionsByUrl[caller.url] = max(commonVersions)
 
         return useAnon, commonVersions
 
@@ -401,7 +414,7 @@ class ChangesetFilter(BaseProxy):
         if caller.url is None:
             serverVersion = ChangesetFilter.SERVER_VERSIONS[-1]
         else:
-            serverVersion = self.versionsByUrl[caller.url]
+            serverVersion = self.repositoryVersionCache.get(caller)
 
         wireCsVersion = self._getChangeSetVersion(serverVersion)
         # Use this protocol version when talking upstream
@@ -482,10 +495,10 @@ class ChangesetFilter(BaseProxy):
                 # calling internal changeset generation, which only supports
                 # a single job
                 neededHere = [ changeSetsNeeded.pop(0) ]
-            elif self.versionsByUrl.get(caller.url, 0) >= 50:
+            elif self.repositoryVersionCache.get(caller) >= 50:
                 # calling a server which supports both neededCsVersion and
                 # returns per-job supplmental information
-                getCsVersion = self.versionsByUrl[caller.url]
+                getCsVersion = self.repositoryVersionCache.get(caller)
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
             else:
@@ -716,7 +729,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 ]
+    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50 ]
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):
