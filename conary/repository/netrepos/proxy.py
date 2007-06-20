@@ -413,7 +413,7 @@ class ChangesetFilter(BaseProxy):
         if caller.url is None:
             serverVersion = ChangesetFilter.SERVER_VERSIONS[-1]
         else:
-            serverVersion = self.versionsByUrl[caller.url]
+            serverVersion = self.repositoryVersionCache.get(caller)
 
         wireCsVersion = self._getChangeSetVersion(serverVersion)
         # Use this protocol version when talking upstream
