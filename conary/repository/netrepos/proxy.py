@@ -397,18 +397,13 @@ class ChangesetFilter(BaseProxy):
         # Changeset version we expect the server to produce for us
         # If we're a proxy, we can look in the cache to find the server's
         # version, otherwise use the repository version
-        if caller.url is None:
-            serverVersion = ChangesetFilter.SERVER_VERSIONS[-1]
-        else:
-            serverVersion = self.versionsByUrl[caller.url]
-
-        wireCsVersion = self._getChangeSetVersion(serverVersion)
         # Use this protocol version when talking upstream
         if self.forceGetCsVersion is not None:
             # Talking to a repository
             maskClientVersion = self.forceGetCsVersion
         else:
             maskClientVersion = clientVersion
+        wireCsVersion = self._getChangeSetVersion(maskClientVersion)
 
         # Make sure we have a way to get from here to there
         iterV = neededCsVersion
