@@ -200,7 +200,7 @@ class CfgRepoMapEntry(CfgType):
         return (val[0], val[1])
 
     def format(self, val, displayOptions=None):
-        return '%-25s %s' % val
+        return '%-25s %s' % (val[0], val[1])
 
 class RepoMap(ServerGlobList):
 
