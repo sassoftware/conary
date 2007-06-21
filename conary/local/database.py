@@ -911,6 +911,8 @@ class Database(SqlDbRepository):
                                      deferredScripts = deferredScripts)
 
         if rollbackPhase is None:
+            # this is the rollback for files which the user is forcing the
+            # removal of (probably due to removeFiles)
             removeRollback = fsJob.createRemoveRollback()
 
             # We now have two rollbacks we need to merge together, localRollback
@@ -925,9 +927,10 @@ class Database(SqlDbRepository):
 
                 localCs = localRollback.getNewTroveVersion(*newInfo)
 
-                if localCs.getOldVersion() != removeCs.getOldVersion() or \
-                   localCs.getOldFlavor() != removeCs.getOldFlavor():
-                    contine
+                # troves can only be removed for one reason (either an update
+                # to one thing or erased)
+                assert(localCs.getOldVersion() == removeCs.getOldVersion() and
+                       localCs.getOldFlavor() == removeCs.getOldFlavor())
 
                 removeRollback.delNewTrove(*newInfo)
 
