@@ -45,17 +45,22 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36,52)
+SERVER_VERSIONS = range(36,51 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
 # Decorators for method access
-def accessReadOnly(f):
-    f._accessType = 'readOnly'
+
+def _methodAccess(f, accessType):
+    f._accessType = accessType
     return f
 
-def accessReadWrite(f):
-    f._accessType = 'readWrite'
+def accessReadOnly(f, paramList = []):
+    _methodAccess(f, 'readOnly')
+    return f
+
+def accessReadWrite(f, paramList = []):
+    _methodAccess(f, 'readWrite')
     return f
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -172,7 +177,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    self.troveStore = self.repos = self.auth = None
             self.open(connect=False)
 
-    def callWrapper(self, protocol, port, methodname, authToken, args,
+    def callWrapper(self, protocol, port, methodname, authToken, 
+                    orderedArgs, kwArgs,
                     remoteIp = None, rawUrl = None):
         """
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
@@ -201,14 +207,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             try:
                 # the first argument is a version number
                 try:
-                    r = method(authToken, *args)
+                    r = method(authToken, *orderedArgs, **kwArgs)
                 except sqlerrors.DatabaseLocked:
                     raise
                 else:
                     self.db.commit()
 
                     if self.callLog:
-                        self.callLog.log(remoteIp, authToken, methodname, args)
+                        self.callLog.log(remoteIp, authToken, methodname,
+                                         orderedArgs)
 
                     return (False, False, r)
             except sqlerrors.DatabaseLocked, e:
@@ -233,11 +240,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if self.callLog:
             if isinstance(e, HiddenException):
-                self.callLog.log(remoteIp, authToken, methodname, args,
+                self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  exception = e.forLog)
                 e = e.forReturn
             else:
-                self.callLog.log(remoteIp, authToken, methodname, args,
+                self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  exception = e)
 
         if isinstance(e, errors.TroveMissing):
