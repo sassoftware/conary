@@ -15,6 +15,9 @@ Changes in @NEW@:
     * The addSvnSnapshot() source action now uses the lookaside directory
       for generating the snapshot, instead of using the remote repository.
       (CNY-1777)
+    * A bug that prevented unused entries in the Versions table of the
+      system Conary database from being cleaned up after erasures has
+      been fixed.
 
 Changes in 1.1.30:
   o Bug Fixes:
