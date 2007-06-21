@@ -338,6 +338,9 @@ class ServerCache:
     def singleServer(self, *items):
         foundServer = None
         for item in items:
+            if item.branch().getHost() == 'local':
+                return False
+
             server = self[item]
             if foundServer is None:
                 foundServer = server
