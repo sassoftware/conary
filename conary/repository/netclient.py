@@ -51,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36,52)
+CLIENT_VERSIONS = range(36,51 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -88,7 +88,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         # protocol version
         protocolVersion = (kwargs.get('protocolVersion', None) or
             self.__protocolVersion)
-        return self.doCall(protocolVersion, *args)
+        if protocolVersion < 51:
+            assert(not kwargs)
+            return self.doCall(protocolVersion, *args)
+
+        return self.doCall(protocolVersion, args, kwargs)
 
     def __doCall(self, clientVersion, argList):
         newArgs = ( clientVersion, ) + argList
@@ -341,7 +345,12 @@ class ServerCache:
             if item.branch().getHost() == 'local':
                 return False
 
-            server = self[item]
+            try:
+                server = self[item]
+            except errors.OpenError:
+                # can't get to a server; fall back to hostname checking
+                return (len(set( self._getServerName(x) for x in items )) == 1)
+
             if foundServer is None:
                 foundServer = server
             elif foundServer is not server:

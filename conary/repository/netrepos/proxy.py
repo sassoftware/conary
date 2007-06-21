@@ -69,7 +69,14 @@ class ExtraInfo(object):
 
 class ProxyCaller:
 
-    def callByName(self, methodname, *args):
+    def callByName(self, methodname, *args, **kwargs):
+        # args[0] is protocolVersion
+        if args[0] < 51:
+            # older protocol versions didn't allow keyword arguments
+            assert(not kwargs)
+        else:
+            args = [ args[0], args[1:], kwargs ]
+
         try:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
@@ -92,7 +99,7 @@ class ProxyCaller:
                          self._transport.responseProtocol)
 
     def __getattr__(self, method):
-        return lambda *args: self.callByName(method, *args)
+        return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, url, proxy, transport):
         self.url = util.stripUserPassFromUrl(url)
@@ -130,9 +137,9 @@ class ProxyCallFactory:
 
 class RepositoryCaller:
 
-    def callByName(self, methodname, *args):
+    def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
-                                    self.authToken, args)
+                                    self.authToken, args, kwargs)
 
         if rc[1]:
             # exception occured
@@ -145,7 +152,7 @@ class RepositoryCaller:
         return None
 
     def __getattr__(self, method):
-        return lambda *args: self.callByName(method, *args)
+        return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, protocol, port, authToken, repos):
         self.repos = repos
@@ -220,15 +227,24 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                localAddr, protocolString,
                                                headers)
 
+        # args[0] is the protocol version
+        if args[0] < 51:
+            kwargs = {}
+        else:
+            assert(len(args) == 3)
+            kwargs = args[2]
+            args = [ args[0], ] + args[1]
+
         try:
             if hasattr(self, methodname):
                 # handled internally
                 method = self.__getattribute__(methodname)
 
                 if self.callLog:
-                    self.callLog.log(remoteIp, authToken, methodname, args)
+                    self.callLog.log(remoteIp, authToken, methodname, args,
+                                     kwargs)
 
-                anon, r = method(caller, authToken, *args)
+                anon, r = method(caller, authToken, *args, **kwargs)
                 return (anon, False, r, caller.getExtraInfo())
 
             r = caller.callByName(methodname, *args)
@@ -729,7 +745,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50 ]
+    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 ]
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):

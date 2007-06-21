@@ -1,6 +1,7 @@
 # this file documents the wire protocol changes for conary.
 Version 51:
   - getChangeSet supports infoOnly parameter
+  - parameters are passed as (args, kwArgs) instead of individually
 
 Version 50:
   - getChangeSet keeps (troveNeeded, filesNeeded, troveRemoved) information
