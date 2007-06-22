@@ -1943,41 +1943,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.db.analyze("tmpFileId")
         q = """
         SELECT DISTINCT
-            tmpFileId.itemId, FileStreams.stream, UP.permittedTrove, Items.item
+            tmpFileId.itemId, FileStreams.stream
         FROM tmpFileId
         JOIN FileStreams USING (fileId)
         JOIN TroveFiles USING (streamId)
-        JOIN Instances USING (instanceId)
-        JOIN Nodes ON
-            Instances.itemId = Nodes.itemId AND
-            Instances.versionId = Nodes.versionId
-        JOIN LabelMap ON
-            Nodes.itemId = LabelMap.itemId AND
-            Nodes.branchId = LabelMap.branchId
-        JOIN ( SELECT
-                   Permissions.labelId as labelId,
-                   PerItems.item as permittedTrove,
-                   Permissions.permissionId as aclId
-               FROM Permissions
-               JOIN Items as PerItems USING (itemId)
-               WHERE Permissions.userGroupId IN (%(ugid)s)
-             ) as UP
-                 ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN UserGroupInstancesCache ON
+            TroveFiles.instanceId = UserGroupInstancesCache.instanceId
         WHERE FileStreams.stream IS NOT NULL
+          AND UserGroupInstancesCache.userGroupId IN (%(ugid)s)
         """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
         cu.execute(q)
 
-        for (i, stream, troveNamePattern, troveName) in cu:
+        for (i, stream) in cu:
             fileId = uniqIdList[i]
             if fileId is None:
                  # we've already found this one
                  continue
-            if not self.auth.checkTrove(troveNamePattern, troveName):
-                # Insufficient permission to see a stream looks just
-                # like a missing stream (as missing items do in most
-                # of Conary)
-                continue
             if stream is None:
                 continue
             for streamIdx in fileIdMap[fileId]:
@@ -2163,55 +2144,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                        start_transaction=False)
         self.db.analyze("tmpNVF")
         if hidden:
-            hiddenClause = ("OR (Instances.isPresent = %d AND UP.canWrite = 1)"
+            hiddenClause = ("OR (Instances.isPresent = %d AND ugi.canWrite > 0)"
                         % instances.INSTANCE_PRESENT_HIDDEN)
         else:
             hiddenClause = ""
 
         results = [ False ] * len(troveList)
 
-        query = """SELECT idx, name, UP.permittedTrove FROM tmpNVF
-                        JOIN Items ON tmpNVF.name = Items.item
-                        JOIN Versions ON
-                            tmpNVF.version = Versions.version
-                        JOIN Flavors ON
-                            (tmpNVF.flavor = Flavors.flavor) OR
-                            (tmpNVF.flavor is NULL AND
-                             Flavors.flavor is NULL)
-                        JOIN Instances ON
-                            Instances.itemId = Items.itemId AND
-                            Instances.versionId = Versions.versionId AND
-                            Instances.flavorId = Flavors.flavorId
-                        JOIN Nodes ON
-                            Nodes.itemId = Instances.itemId AND
-                            Nodes.versionId = Instances.versionId
-                        JOIN LabelMap ON
-                            Nodes.itemId = LabelMap.itemId AND
-                            Nodes.branchId = LabelMap.branchId
-                        JOIN (SELECT
-                               Permissions.labelId as labelId,
-                               PerItems.item as permittedTrove,
-                               Permissions.permissionId as aclId,
-                               Permissions.canWrite as canWrite,
-                               Permissions.admin as admin
-                           FROM
-                               Permissions
-                               join Items as PerItems using (itemId)
-                           WHERE
-                               Permissions.userGroupId in (%s)
-                           ) as UP ON
-                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                        WHERE
-                            (Instances.isPresent = ?)
-                            %s
-                    """ % \
-                (",".join("%d" % x for x in userGroupIds), hiddenClause)
+        query = """
+        SELECT idx
+        FROM tmpNVF
+        JOIN Items ON
+            tmpNVF.name = Items.item
+        JOIN Versions ON
+            tmpNVF.version = Versions.version
+        JOIN Flavors ON
+            (tmpNVF.flavor is NOT NULL AND tmpNVF.flavor = Flavors.flavor) OR
+            (tmpNVF.flavor is NULL AND Flavors.flavorId = 0)
+        JOIN Instances ON
+            Instances.itemId = Items.itemId AND
+            Instances.versionId = Versions.versionId AND
+            Instances.flavorId = Flavors.flavorId
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        WHERE ugi.userGroupId in (%s)
+        AND Instances.isPresent = ?
+        %s """ % (",".join("%d" % x for x in userGroupIds), hiddenClause)
         cu.execute(query, instances.INSTANCE_PRESENT_NORMAL)
-
-        for row, name, pattern in cu:
-            if results[row]: continue
-            results[row]= self.auth.checkTrove(pattern, name)
-
+        for (row,) in cu:
+            results[row] = True
         return results
 
     @accessReadOnly
