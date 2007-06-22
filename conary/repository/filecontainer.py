@@ -238,7 +238,7 @@ class FileContainer:
 	self.file = file
 
         if version is None:
-            version = FILE_CONTAINER_VERSION_FILEID_IDX
+            version = FILE_CONTAINER_VERSION_LATEST
 
 	self.file.seek(0, SEEK_END)
 	if not self.file.tell():
