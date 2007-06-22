@@ -416,12 +416,16 @@ class ChangesetFilter(BaseProxy):
             serverVersion = self.repositoryVersionCache.get(caller)
 
         wireCsVersion = self._getChangeSetVersion(serverVersion)
-        # Use this protocol version when talking upstream
+
+        # forceGetCsVersion is set when this proxy object is sitting
+        # in front of a repository object in the same server instance
         if self.forceGetCsVersion is not None:
             # Talking to a repository
-            maskClientVersion = self.forceGetCsVersion
+            getCsVersion = self.forceGetCsVersion
         else:
-            maskClientVersion = clientVersion
+            # This is a standalone proxy talking to a repository.  Talk
+            # the latest common protocol version
+            getCsVersion = serverVersion
 
         # Make sure we have a way to get from here to there
         iterV = neededCsVersion
@@ -489,7 +493,6 @@ class ChangesetFilter(BaseProxy):
         # internal server as well (since internal servers only support
         # single jobs!)
         while changeSetsNeeded:
-            getCsVersion = maskClientVersion
             if self.forceSingleCsJob:
                 # calling internal changeset generation, which only supports
                 # a single job
@@ -497,7 +500,6 @@ class ChangesetFilter(BaseProxy):
             elif serverVersion >= 50:
                 # calling a server which supports both neededCsVersion and
                 # returns per-job supplmental information
-                getCsVersion = serverVersion
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
             else:
