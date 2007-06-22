@@ -494,10 +494,10 @@ class ChangesetFilter(BaseProxy):
                 # calling internal changeset generation, which only supports
                 # a single job
                 neededHere = [ changeSetsNeeded.pop(0) ]
-            elif self.repositoryVersionCache.get(caller) >= 50:
+            elif serverVersion >= 50:
                 # calling a server which supports both neededCsVersion and
                 # returns per-job supplmental information
-                getCsVersion = self.repositoryVersionCache.get(caller)
+                getCsVersion = serverVersion
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
             else:
