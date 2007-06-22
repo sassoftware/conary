@@ -42,7 +42,7 @@ class RepositoryVersionCache:
 
         if uri not in self.d:
             useAnon, parentVersions = caller.checkVersion(self.protocolVersion)
-            self.d[uri] = max(parentVersions)
+            self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
 
@@ -433,12 +433,16 @@ class ChangesetFilter(BaseProxy):
             serverVersion = self.repositoryVersionCache.get(caller)
 
         wireCsVersion = self._getChangeSetVersion(serverVersion)
-        # Use this protocol version when talking upstream
+
+        # forceGetCsVersion is set when this proxy object is sitting
+        # in front of a repository object in the same server instance
         if self.forceGetCsVersion is not None:
             # Talking to a repository
-            maskClientVersion = self.forceGetCsVersion
+            getCsVersion = self.forceGetCsVersion
         else:
-            maskClientVersion = clientVersion
+            # This is a standalone proxy talking to a repository.  Talk
+            # the latest common protocol version
+            getCsVersion = serverVersion
 
         # Make sure we have a way to get from here to there
         iterV = neededCsVersion
@@ -506,23 +510,17 @@ class ChangesetFilter(BaseProxy):
         # internal server as well (since internal servers only support
         # single jobs!)
         while changeSetsNeeded:
-            getCsVersion = maskClientVersion
-            if self.forceSingleCsJob:
+            if serverVersion < 50 or self.forceSingleCsJob:
                 # calling internal changeset generation, which only supports
-                # a single job
+                # a single job or calling an upstream repository that does not
+                # support protocol version 50 (needed to send all jobs at once)
                 neededHere = [ changeSetsNeeded.pop(0) ]
-            elif self.repositoryVersionCache.get(caller) >= 50:
+            else:
                 # calling a server which supports both neededCsVersion and
                 # returns per-job supplmental information
-                getCsVersion = self.repositoryVersionCache.get(caller)
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
-            else:
-                # calling a server which does not support per-job supplemental
-                # information (and may not support neededCsVersion)
-                neededHere = [ changeSetsNeeded.pop(0) ]
 
-            # the changeset isn't in the cache.  create it
             if getCsVersion >= 51 and wireCsVersion == neededCsVersion:
                 # We may be able to get proper size information for this from
                 # underlying server without fetcing the changeset (this isn't
@@ -547,35 +545,28 @@ class ChangesetFilter(BaseProxy):
                                      excludeAutoSource)[1]
 
             csInfoList = []
+            url = rc[0]
             if getCsVersion < 50:
+                # convert pre-protocol 50 returns into a protocol 50 return
+                # turn list of sizes back into a single size
+                assert(len(rc[1]) == 1)
+                rc[1] = rc[1][0]
+                rc = rc[1:]
                 if getCsVersion < 38:
-                    url, sizes, trovesNeeded, filesNeeded = rc
-                    removedTroves = []
-                else:
-                    url, sizes, trovesNeeded, filesNeeded, removedTroves = rc
-
+                    # protocol version 38 does not return removedTroves.
+                    # tack an empty list on it
+                    rc.append([])
+                info = [ rc ]
+            else:
+                info = rc[1]
+            for (size, trovesNeeded, filesNeeded, removedTroves) in info:
                 csInfo = ChangeSetInfo()
-                # ensure that the size is an integer -- protocol version
-                # 44 returns a string to avoid XML-RPC marshal limits
-                assert(len(sizes) == 1)
-                csInfo.size = int(sizes[0])
+                csInfo.size = int(size)
                 csInfo.trovesNeeded = trovesNeeded
                 csInfo.filesNeeded = filesNeeded
                 csInfo.removedTroves = removedTroves
                 csInfo.version = wireCsVersion
                 csInfoList.append(csInfo)
-                del sizes
-            else:
-                csInfoList = []
-                url = rc[0]
-                for (size, trovesNeeded, filesNeeded, removedTroves) in rc[1]:
-                    csInfo = ChangeSetInfo()
-                    csInfo.size = int(size)
-                    csInfo.trovesNeeded = trovesNeeded
-                    csInfo.filesNeeded = filesNeeded
-                    csInfo.removedTroves = removedTroves
-                    csInfo.version = wireCsVersion
-                    csInfoList.append(csInfo)
 
             del trovesNeeded
             del filesNeeded
