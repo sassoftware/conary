@@ -10,9 +10,11 @@ Changes in @NEW@:
       51. (CNY-1757)
     * Changed list of repository methods to be automatically generated
       instead of statically listed. (CNY-1781)
+  
+  o Build Changes:
+    * The addArchive() source action now handles xpi archives. (CNY-1793)
 
   o Bug Fixes:
-    * The addArchive() source action now handles xpi archives. (CNY-1793)
     * The addSvnSnapshot() source action now uses the lookaside directory
       for generating the snapshot, instead of using the remote repository.
       (CNY-1777)
