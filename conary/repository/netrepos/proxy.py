@@ -42,7 +42,7 @@ class RepositoryVersionCache:
 
         if uri not in self.d:
             useAnon, parentVersions = caller.checkVersion(self.protocolVersion)
-            self.d[uri] = max(parentVersions)
+            self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
 
