@@ -18,6 +18,8 @@ Changes in @NEW@:
     * A bug that prevented unused entries in the Versions table of the
       system Conary database from being cleaned up after erasures has
       been fixed.
+    * A bug that caused changes in the byDefault status of a trove to
+      be omitted from rollbacks has been fixed. (CNY-1796)
 
 Changes in 1.1.31:
   o Bug Fix:
