@@ -94,7 +94,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         # to talk to a pre-protocol-version 51 server, we will make it
         # trace back with too many arguments if we try to pass kwargs
         if self.__name == 'checkVersion':
-            protocolVersion = 50
+            protocolVersion = min(protocolVersion, 50)
 
         if protocolVersion < 51:
             assert(not kwargs)
