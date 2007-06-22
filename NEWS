@@ -1,3 +1,10 @@
+Changes in 1.1.31:
+  o Bug Fix:
+    * A bug that caused an Internal Server Error when a Conary proxy
+      attempted to convert a changeset for an older client when the
+      upstream Conary repository was not running 1.1.29 or later has
+      been fixed. (CNY-1792)
+
 Changes in 1.1.30:
   o Bug Fixes:
     * The version cache for upstream servers in the Conary proxy
