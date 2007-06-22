@@ -70,6 +70,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
                  altHostCallback, protocolVersion, transport):
         xmlrpclib._Method.__init__(self, send, name)
+        self.__name = name
         self.__host = host
         self.__pwCallback = pwCallback
         self.__anonymousCallback = anonymousCallback
@@ -88,6 +89,13 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         # protocol version
         protocolVersion = (kwargs.get('protocolVersion', None) or
             self.__protocolVersion)
+
+        # always use protocol version 50 for checkVersion.  If we're about
+        # to talk to a pre-protocol-version 51 server, we will make it
+        # trace back with too many arguments if we try to pass kwargs
+        if self.__name == 'checkVersion':
+            protocolVersion = 50
+
         if protocolVersion < 51:
             assert(not kwargs)
             return self.doCall(protocolVersion, *args)
