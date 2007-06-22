@@ -493,21 +493,18 @@ class ChangesetFilter(BaseProxy):
         # internal server as well (since internal servers only support
         # single jobs!)
         while changeSetsNeeded:
-            if self.forceSingleCsJob:
+            if serverVersion < 50 or self.forceSingleCsJob:
                 # calling internal changeset generation, which only supports
-                # a single job
+                # a single job or calling an upstream repository that does not
+                # support protocol version 50 (needed to send all jobs at once)
                 neededHere = [ changeSetsNeeded.pop(0) ]
-            elif serverVersion >= 50:
+            else:
                 # calling a server which supports both neededCsVersion and
                 # returns per-job supplmental information
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
-            else:
-                # calling a server which does not support per-job supplemental
-                # information (and may not support neededCsVersion)
-                neededHere = [ changeSetsNeeded.pop(0) ]
 
-            if getCsVersion >= 49:
+            if getCsVersion < 50:
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
