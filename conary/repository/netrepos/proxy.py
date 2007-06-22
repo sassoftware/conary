@@ -42,7 +42,7 @@ class RepositoryVersionCache:
 
         if uri not in self.d:
             useAnon, parentVersions = caller.checkVersion(self.protocolVersion)
-            self.d[uri] = max(parentVersions)
+            self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
 
@@ -69,7 +69,14 @@ class ExtraInfo(object):
 
 class ProxyCaller:
 
-    def callByName(self, methodname, *args):
+    def callByName(self, methodname, *args, **kwargs):
+        # args[0] is protocolVersion
+        if args[0] < 51:
+            # older protocol versions didn't allow keyword arguments
+            assert(not kwargs)
+        else:
+            args = [ args[0], args[1:], kwargs ]
+
         try:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
@@ -92,7 +99,7 @@ class ProxyCaller:
                          self._transport.responseProtocol)
 
     def __getattr__(self, method):
-        return lambda *args: self.callByName(method, *args)
+        return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, url, proxy, transport):
         self.url = util.stripUserPassFromUrl(url)
@@ -130,9 +137,9 @@ class ProxyCallFactory:
 
 class RepositoryCaller:
 
-    def callByName(self, methodname, *args):
+    def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
-                                    self.authToken, args)
+                                    self.authToken, args, kwargs)
 
         if rc[1]:
             # exception occured
@@ -145,7 +152,7 @@ class RepositoryCaller:
         return None
 
     def __getattr__(self, method):
-        return lambda *args: self.callByName(method, *args)
+        return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, protocol, port, authToken, repos):
         self.repos = repos
@@ -220,15 +227,24 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                localAddr, protocolString,
                                                headers)
 
+        # args[0] is the protocol version
+        if args[0] < 51:
+            kwargs = {}
+        else:
+            assert(len(args) == 3)
+            kwargs = args[2]
+            args = [ args[0], ] + args[1]
+
         try:
             if hasattr(self, methodname):
                 # handled internally
                 method = self.__getattribute__(methodname)
 
                 if self.callLog:
-                    self.callLog.log(remoteIp, authToken, methodname, args)
+                    self.callLog.log(remoteIp, authToken, methodname, args,
+                                     kwargs)
 
-                anon, r = method(caller, authToken, *args)
+                anon, r = method(caller, authToken, *args, **kwargs)
                 return (anon, False, r, caller.getExtraInfo())
 
             r = caller.callByName(methodname, *args)
@@ -389,7 +405,8 @@ class ChangesetFilter(BaseProxy):
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource,
-                     changesetVersion = None, mirrorMode = False):
+                     changesetVersion = None, mirrorMode = False,
+                     infoOnly = False):
 
         # This is how the caching algorithm works:
         # - Produce verPath, a path in the digraph of possible version
@@ -416,12 +433,16 @@ class ChangesetFilter(BaseProxy):
             serverVersion = self.repositoryVersionCache.get(caller)
 
         wireCsVersion = self._getChangeSetVersion(serverVersion)
-        # Use this protocol version when talking upstream
+
+        # forceGetCsVersion is set when this proxy object is sitting
+        # in front of a repository object in the same server instance
         if self.forceGetCsVersion is not None:
             # Talking to a repository
-            maskClientVersion = self.forceGetCsVersion
+            getCsVersion = self.forceGetCsVersion
         else:
-            maskClientVersion = clientVersion
+            # This is a standalone proxy talking to a repository.  Talk
+            # the latest common protocol version
+            getCsVersion = serverVersion
 
         # Make sure we have a way to get from here to there
         iterV = neededCsVersion
@@ -489,23 +510,28 @@ class ChangesetFilter(BaseProxy):
         # internal server as well (since internal servers only support
         # single jobs!)
         while changeSetsNeeded:
-            getCsVersion = maskClientVersion
-            if self.forceSingleCsJob:
+            if serverVersion < 50 or self.forceSingleCsJob:
                 # calling internal changeset generation, which only supports
-                # a single job
+                # a single job or calling an upstream repository that does not
+                # support protocol version 50 (needed to send all jobs at once)
                 neededHere = [ changeSetsNeeded.pop(0) ]
-            elif self.repositoryVersionCache.get(caller) >= 50:
+            else:
                 # calling a server which supports both neededCsVersion and
                 # returns per-job supplmental information
-                getCsVersion = self.repositoryVersionCache.get(caller)
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
-            else:
-                # calling a server which does not support per-job supplemental
-                # information (and may not support neededCsVersion)
-                neededHere = [ changeSetsNeeded.pop(0) ]
 
-            if getCsVersion >= 49:
+            if getCsVersion >= 51 and wireCsVersion == neededCsVersion:
+                # We may be able to get proper size information for this from
+                # underlying server without fetcing the changeset (this isn't
+                # true for internal servers or old protocols)
+                rc = caller.getChangeSet(getCsVersion,
+                                     [ x[1][0] for x in neededHere ],
+                                     recurse, withFiles, withFileContents,
+                                     excludeAutoSource,
+                                     neededCsVersion, mirrorMode,
+                                     infoOnly)[1]
+            elif getCsVersion >= 49:
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
@@ -519,39 +545,40 @@ class ChangesetFilter(BaseProxy):
                                      excludeAutoSource)[1]
 
             csInfoList = []
+            url = rc[0]
             if getCsVersion < 50:
+                # convert pre-protocol 50 returns into a protocol 50 return
+                # turn list of sizes back into a single size
+                assert(len(rc[1]) == 1)
+                rc[1] = rc[1][0]
+                rc = rc[1:]
                 if getCsVersion < 38:
-                    url, sizes, trovesNeeded, filesNeeded = rc
-                    removedTroves = []
-                else:
-                    url, sizes, trovesNeeded, filesNeeded, removedTroves = rc
-
+                    # protocol version 38 does not return removedTroves.
+                    # tack an empty list on it
+                    rc.append([])
+                info = [ rc ]
+            else:
+                info = rc[1]
+            for (size, trovesNeeded, filesNeeded, removedTroves) in info:
                 csInfo = ChangeSetInfo()
-                # ensure that the size is an integer -- protocol version
-                # 44 returns a string to avoid XML-RPC marshal limits
-                assert(len(sizes) == 1)
-                csInfo.size = int(sizes[0])
+                csInfo.size = int(size)
                 csInfo.trovesNeeded = trovesNeeded
                 csInfo.filesNeeded = filesNeeded
                 csInfo.removedTroves = removedTroves
                 csInfo.version = wireCsVersion
                 csInfoList.append(csInfo)
-                del sizes
-            else:
-                csInfoList = []
-                url = rc[0]
-                for (size, trovesNeeded, filesNeeded, removedTroves) in rc[1]:
-                    csInfo = ChangeSetInfo()
-                    csInfo.size = int(size)
-                    csInfo.trovesNeeded = trovesNeeded
-                    csInfo.filesNeeded = filesNeeded
-                    csInfo.removedTroves = removedTroves
-                    csInfo.version = wireCsVersion
-                    csInfoList.append(csInfo)
 
             del trovesNeeded
             del filesNeeded
             del removedTroves
+
+            if (getCsVersion >= 51 and wireCsVersion == neededCsVersion 
+                        and infoOnly and not url):
+                # We only got size information from the repository; there
+                # is no changeset to fetch/cache
+                csInfo.path = None
+                changeSetList[jobIdx] = csInfo
+                continue
 
             try:
                 inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
@@ -603,6 +630,15 @@ class ChangesetFilter(BaseProxy):
 
         # Handle format conversions
         for csInfo in changeSetList:
+            if infoOnly and csInfo.path is None:
+                assert(neededCsVersion == wireCsVersion)
+                # the changeset isn't present
+                continue
+
+            fc = filecontainer.FileContainer(
+                util.ExtendedFile(csInfo.path, 'r', buffering = False))
+            csVersion = fc.version
+            fc.close()
             if csInfo.version == neededCsVersion:
                 # We already have the right version
                 continue
@@ -634,17 +670,22 @@ class ChangesetFilter(BaseProxy):
             csInfo.version = neededCsVersion
             csInfo.path = csPath
 
-        (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir, suffix = '.cf-out')
-        url = os.path.join(self.urlBase(),
-                           "changeset?%s" % os.path.basename(path[:-4]))
-        f = os.fdopen(fd, 'w')
+        if not infoOnly:
+            (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                          suffix = '.cf-out')
+            url = os.path.join(self.urlBase(),
+                               "changeset?%s" % os.path.basename(path[:-4]))
+            f = os.fdopen(fd, 'w')
 
-        for csInfo in changeSetList:
-            # the hard-coded 1 means it's a changeset and needs to be walked 
-            # looking for files to include by reference
-            f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size, csInfo.cached))
+            for csInfo in changeSetList:
+                # the hard-coded 1 means it's a changeset and needs to be walked 
+                # looking for files to include by reference
+                f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size,
+                csInfo.cached))
 
-        f.close()
+            f.close()
+        else:
+            url = ''
 
         if clientVersion < 50:
             allSizes = [ x.size for x in changeSetList ]
@@ -695,7 +736,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50 ]
+    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 ]
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):

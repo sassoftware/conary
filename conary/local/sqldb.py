@@ -1229,14 +1229,14 @@ order by
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT DBTroveFiles.versionId FROM DBTroveFiles
                         WHERE
-                            DBTroveFiles.instanceId = ?""")
+                            DBTroveFiles.instanceId = ?""", troveInstanceId)
         cu.execute("""
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT Instances.versionId FROM
                         TroveTroves JOIN Instances ON
-                            TroveTroves.instanceId = Instances.instanceId
+                            TroveTroves.includedId = Instances.instanceId
                         WHERE
-                            TroveTroves.instanceId = ?""")
+                            TroveTroves.instanceId = ?""", troveInstanceId)
 
         wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ]
 

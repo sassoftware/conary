@@ -1,3 +1,33 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Added getDownloadSizes() to the ConaryClient object to determine
+      the over-the-wire transfer size of the jobs in an UpdateJob object.
+      Call requires a single repository be the source of the entire
+      update and to support protocol version 50 or later. (CNY-1757)
+
+  o Server Changes:
+    * Added infoOnly parameter to getChangeSet call in protocol version
+      51. (CNY-1757)
+    * Changed list of repository methods to be automatically generated
+      instead of statically listed. (CNY-1781)
+
+  o Bug Fixes:
+    * The addSvnSnapshot() source action now uses the lookaside directory
+      for generating the snapshot, instead of using the remote repository.
+      (CNY-1777)
+    * A bug that prevented unused entries in the Versions table of the
+      system Conary database from being cleaned up after erasures has
+      been fixed.
+    * A bug that caused changes in the byDefault status of a trove to
+      be omitted from rollbacks has been fixed. (CNY-1796)
+
+Changes in 1.1.31:
+  o Bug Fix:
+    * A bug that caused an Internal Server Error when a Conary proxy
+      attempted to convert a changeset for an older client when the
+      upstream Conary repository was not running 1.1.29 or later has
+      been fixed. (CNY-1792)
+
 Changes in 1.1.30:
   o Bug Fixes:
     * The version cache for upstream servers in the Conary proxy
