@@ -2589,7 +2589,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # Since signatures are small blobs, it doesn't make a lot
         # of sense to use a LIMIT on this query...
         query = """
-        SELECT distinct item, version, flavor, Instances.changed
+        SELECT item, version, flavor, Instances.changed
         FROM Instances
         JOIN TroveInfo USING (instanceId)
         JOIN UserGroupInstancesCache as ugi ON
@@ -2611,8 +2611,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # the fewer query parameters passed in, the better PostgreSQL optimizes the query
         # so we embed the constants in the query and bind the user supplied data
         cu.execute(query, (mark, mark))
-        return [ (m, (n,v,f)) for n,v,f,m in cu ]
-
+        l = [ (m, (n,v,f)) for n,v,f,m in cu ]
+        return list(set(l))
+    
     @accessReadOnly
     def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
                         labels):
@@ -2646,50 +2647,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not labelIds:
                 # no labels matched, short circuit
                 return []
-            labelLimit = 'AND LabelMap.labelId in (%s)' % (','.join(labelIds))
+            labelLimit = """
+            JOIN Permissions ON
+                Permissions.userGroupId = ugi.userGroupId
+            JOIN LabelMap ON
+                (Permissions.labelId = 0 OR Permissions.labelId = LabelMap.LabelId)
+                AND Instances.itemId = LabelMap.itemId
+                AND LabelMap.labelId in (%s)
+            """ % (','.join(labelIds))
         else:
             labelLimit = ''
         query = """
-        SELECT UP.permittedTrove, item, version, flavor,
+        SELECT item, version, flavor,
                TroveInfo.infoType, TroveInfo.data, TroveInfo.changed
         FROM Instances
         JOIN TroveInfo USING (instanceId)
-        JOIN Nodes ON
-             Instances.itemId = Nodes.itemId AND
-             Instances.versionId = Nodes.versionId
-        JOIN LabelMap ON
-             Nodes.itemId = LabelMap.itemId AND
-             Nodes.branchId = LabelMap.branchId
-        JOIN (SELECT
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove,
-                  Permissions.permissionId as aclId
-              FROM Permissions
-              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
-              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
-              WHERE Permissions.userGroupId in (%s)
-                AND UserGroups.canMirror = 1
-             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN UserGroups ON
+            ugi.userGroupId = UserGroups.userGroupId
+            AND UserGroups.canMirror = 1
+        %(labelLimit)s
         JOIN Items ON Instances.itemId = Items.itemId
         JOIN Versions ON Instances.versionId = Versions.versionId
         JOIN Flavors ON Instances.flavorId = flavors.flavorId
-        WHERE Instances.changed <= ?
-          AND Instances.isPresent = ?
+        WHERE ugi.userGroupId IN (%(ugids)s)
+          AND Instances.changed <= ?
+          AND Instances.isPresent = %(present)d
           AND TroveInfo.changed >= ?
-          %s
-          %s
-        ORDER BY instanceId, TroveInfo.changed
-        """ % (",".join("%d" % x for x in userGroupIds), infoTypeLimiter,
-               labelLimit)
-        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark))
+          %(infoType)s
+        ORDER BY Instances.instanceId, TroveInfo.changed
+        """ % {
+            "ugids" : ",".join("%d" % x for x in userGroupIds),
+            "present" : instances.INSTANCE_PRESENT_NORMAL,
+            "infoType" : infoTypeLimiter,
+            "labelLimit" : labelLimit,
+            }
+        cu.execute(query, (mark, mark))
 
         l = set()
         currentTrove = None
         currentTroveInfo = None
         currentMark = None
-        for pattern, name, version, flavor, tag, data, tmark in cu:
-            if not self.auth.checkTrove(pattern, name):
-                continue
+        for name, version, flavor, tag, data, tmark in cu:
             t = (name, version, flavor)
             if currentTrove != t:
                 if currentTroveInfo != None:
