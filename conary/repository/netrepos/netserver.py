@@ -2752,10 +2752,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
-        where Instances.isPresent in (?,?)
-          and Instances.troveType != ?
-        """, (instances.INSTANCE_PRESENT_NORMAL, instances.INSTANCE_PRESENT_HIDDEN,
-              trove.TROVE_TYPE_REMOVED),
+        where Instances.isPresent in (%d, %d)
+          and Instances.troveType != %d
+        """ % (instances.INSTANCE_PRESENT_NORMAL,
+               instances.INSTANCE_PRESENT_HIDDEN,
+               trove.TROVE_TYPE_REMOVED),
                    start_transaction=False)
         self.db.analyze("tmpInstanceId")
         # see what troves are missing, if any
@@ -2926,46 +2927,47 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # elimination we are sure to return at least 'lim' troves
         # back to the client
         query = """
-        SELECT DISTINCT UP.permittedTrove, item, version, flavor,
-            timeStamps, Instances.changed, Instances.troveType
+        select distinct * from (
+        SELECT
+            item, version, flavor,
+            Nodes.timeStamps,
+            Instances.changed, Instances.troveType
         FROM Instances
-        JOIN Nodes USING (itemId, versionId)
-        JOIN LabelMap USING (itemId, branchId)
-        JOIN (SELECT
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove,
-                  Permissions.permissionId as aclId
-              FROM Permissions
-              JOIN UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-              JOIN Items as PerItems ON Permissions.itemId = PerItems.itemId
-              WHERE Permissions.userGroupId in (%s)
-                AND UserGroups.canMirror = 1
-              ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN UserGroups ON
+            ugi.userGroupId = UserGroups.userGroupId AND
+            UserGroups.canMirror = 1
         JOIN Items ON Items.itemId = Instances.itemId
         JOIN Versions ON Versions.versionId = Instances.versionId
         JOIN Flavors ON Flavors.flavorId = Instances.flavorId
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
         WHERE Instances.changed >= ?
-          AND Instances.isPresent = ?
+          AND Instances.isPresent = %d
+          AND ugi.userGroupId in (%s)
         ORDER BY Instances.changed
         LIMIT %d
-        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
-        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL))
-        self.log(4, "executing query", query, mark, instances.INSTANCE_PRESENT_NORMAL)
-        l = set()
-
-        for pattern, name, version, flavor, timeStamps, mark, troveType in cu:
-            if self.auth.checkTrove(pattern, name):
-                version = versions.strToFrozen(version,
-                    [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
-                l.add((mark, (name, version, flavor), troveType))
-            if len(l) >= lim:
+        ) as inq
+        """ % ( instances.INSTANCE_PRESENT_NORMAL,
+                ",".join("%d" % x for x in userGroupIds),
+                lim * permCount)
+        cu.execute(query, mark)
+        self.log(4, "executing query", query, mark)
+        ret = []
+        for name, version, flavor, timeStamps, mark, troveType in cu:
+            version = versions.strToFrozen(version, [
+                "%.3f" % (float(x),) for x in timeStamps.split(":") ])
+            ret.append( (mark, (name, version, flavor), troveType) )
+            if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
                 junk = cu.fetchall()
                 break
         # older mirror clients do not support getting the troveType values
         if clientVersion < 40:
-            return [ (x[0], x[1]) for x in list(l) ]
-        return list(l)
+            return [ (x[0], x[1]) for x in ret ]
+        return ret
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
