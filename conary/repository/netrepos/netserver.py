@@ -1087,39 +1087,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, labelStr)
         # now get them troves
         args = [ ]
-        query = """
-        select distinct
-            Items.Item as trove, UP.pattern as pattern
-        from
-	    ( select
-	        Permissions.labelId as labelId,
-	        PerItems.item as pattern
-	      from
-                Permissions
-                join Items as PerItems using (itemId)
-	      where
-	            Permissions.userGroupId in (%s)
-	    ) as UP
-            join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Items using (itemId) """ % \
-                (",".join("%d" % x for x in groupIds))
-        where = [ "Items.hasTrove = 1" ]
+        labelQ = ""
         if labelStr:
-            query = query + """
-            join Labels on LabelMap.labelId = Labels.labelId """
-            where.append("Labels.label = ?")
+            labelQ = "and Labels.label = ?"
             args.append(labelStr)
-        query = """%s
-        where %s
-        """ % (query, " AND ".join(where))
-        self.log(4, "query", query, args)
+        query = """
+        select distinct Items.Item
+        from Items
+        join CheckTroveCache as ctc using (itemId)
+        join Permissions on ctc.patternId = Permissions.itemId
+        join LabelMap on
+            (Permissions.labelId = LabelMap.labelId or Permissions.labelId = 0)
+            and Items.itemId = LabelMap.itemId
+        join Labels on LabelMap.labelId = Labels.labelId
+        where Permissions.userGroupId in (%s)
+          and Items.hasTrove = 1
+          %s
+        """ % (",".join("%d" % x for x in groupIds),labelQ)
         cu.execute(query, args)
-        names = set()
-        for (trove, pattern) in cu:
-            if not self.auth.checkTrove(pattern, trove):
-                continue
-            names.add(trove)
-        return list(names)
+        names = [ x[0] for x in cu ]
+        return names
 
     @accessReadOnly
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs,
