@@ -3070,33 +3070,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # tmpInstanceId now has instanceIds of the parents. retrieve the data we need
         cu.execute("""
         select
-            tmpInstanceId.idx, Items.item, Versions.version, Flavors.flavor,
-            UP.permittedTrove as pattern
+            tmpInstanceId.idx, Items.item, Versions.version, Flavors.flavor
         from tmpInstanceId
         join Instances on tmpInstanceId.instanceId = Instances.instanceId
-        join Nodes USING (itemId, versionId)
-        join LabelMap USING (itemId, branchId)
-        join (select
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove
-              from Permissions
-              join UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-              join Items as PerItems ON Permissions.itemId = PerItems.itemId
-              where Permissions.userGroupId in (%s)
-              ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
+        join UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
         join Items on Instances.itemId = Items.itemId
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
+        where ugi.userGroupId in (%s)
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
         ret = [ set() for x in range(len(troveInfoList)) ]
         for i, n,v,f, pattern in cu:
             s = ret[i-minIdx]
-            if self.auth.checkTrove(pattern, n):
-                s.add((n,v,f))
-
+            s.add((n,v,f))
         ret = [ list(x) for x in ret ]
-
         return ret
 
     @accessReadOnly
@@ -3126,33 +3115,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 d["flavor"] = "and Flavors.flavor = ?"
                 args.append(f)
             cu.execute("""
-            select
-            Versions.version, Flavors.flavor, UP.permittedTrove
+            select Versions.version, Flavors.flavor
             from Items
             join Nodes on Items.itemId = Nodes.itemId
             join Instances on
                 Nodes.versionId = Instances.versionId and
                 Nodes.itemId = Instances.itemId
-            join Flavors on Instances.flavorId = Flavors.flavorId
-            join LabelMap on
-                Nodes.itemId = LabelMap.itemId and
-                Nodes.branchId = LabelMap.branchId
-            join ( select Permissions.labelId as labelId,
-                          PerItems.item as permittedTrove
-                   from Permissions
-                   join UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-                   join Items as PerItems ON Permissions.itemId = PerItems.itemId
-                   where Permissions.userGroupId in (%(gids)s)
-                 ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
+            join UserGroupInstancesCache as ugi on
+                Instances.instanceId = ugi.instanceId
             join Branches on Nodes.branchId = Branches.branchId
             join Versions on Nodes.versionId = Versions.versionId
+            join Flavors on Instances.flavorId = Flavors.flavorId
             where Items.item = ?
               and Branches.branch like ?
+              and ugi.userGroupId in (%(gids)s)
               %(flavor)s
             """ % d, args)
-            for verStr, flavStr, pattern in cu:
-                if self.auth.checkTrove(pattern, n):
-                    ret[i].append((verStr,flavStr))
+            for verStr, flavStr in cu:
+                ret[i].append((verStr,flavStr))
         return ret
 
     @accessReadOnly
