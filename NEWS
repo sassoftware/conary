@@ -1,14 +1,14 @@
 Changes in @NEW@:
   o Client Changes:
-    * Added getDownloadSizes() to the ConaryClient object to determine
-      the over-the-wire transfer size of the jobs in an UpdateJob object.
-      Call requires a single repository be the source of the entire
-      update and to support protocol version 50 or later. (CNY-1757)
+    * A getDownloadSizes() method has been added to the ConaryClient
+      object to determine the over-the-wire transfer size of the jobs
+      in an UpdateJob object.  Call requires a single repository be
+      the source of the entire update. (CNY-1757)
 
   o Server Changes:
-    * Added infoOnly parameter to getChangeSet call in protocol version
-      51. (CNY-1757)
-    * Changed list of repository methods to be automatically generated
+    * A "infoOnly" parameter to has been added to the getChangeSet()
+      repository method in protocol version 51. (CNY-1757)
+    * The list of repository methods is now automatically generated
       instead of statically listed. (CNY-1781)
 
   o Bug Fixes:
