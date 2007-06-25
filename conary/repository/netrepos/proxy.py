@@ -573,11 +573,12 @@ class ChangesetFilter(BaseProxy):
             del removedTroves
 
             if (getCsVersion >= 51 and wireCsVersion == neededCsVersion 
-                        and infoOnly and not url):
+                and infoOnly and not url):
                 # We only got size information from the repository; there
-                # is no changeset to fetch/cache
-                csInfo.path = None
-                changeSetList[jobIdx] = csInfo
+                # is no changeset to fetch/cache.  We can bail out early.
+                for jobIdx, csInfo in enumerate(csInfoList):
+                    csInfo.path = None
+                    changeSetList[jobIdx] = csInfo
                 continue
 
             try:
