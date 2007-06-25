@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.32:
   o Client Changes:
     * A getDownloadSizes() method has been added to the ConaryClient
       object to determine the over-the-wire transfer size of the jobs
