@@ -41,14 +41,15 @@ class RepositoryVersionCache:
         uri = basicUrl.split(':', 1)[1]
 
         if uri not in self.d:
-            useAnon, parentVersions = caller.checkVersion(self.protocolVersion)
+            # checkVersion protocol is stopped at 50; we don't support kwargs
+            # for that call, ever
+            useAnon, parentVersions = caller.checkVersion(50)
             self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
 
     def __init__(self):
         self.d = {}
-        self.protocolVersion = netserver.SERVER_VERSIONS[-1]
 
 class ProxyClient(xmlrpclib.ServerProxy):
 
