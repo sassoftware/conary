@@ -929,6 +929,85 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                 troveTypes = troveTypes))
         return self._mergeTroveQuery({}, d)
 
+    def getTroveLatestByLabel(self, troveSpecs, bestFlavor = False,
+                              troveTypes = TROVE_QUERY_PRESENT):
+        leaves = self.getTroveLeavesByLabel(troveSpecs, bestFlavor = bestFlavor,
+                                            troveTypes = TROVE_QUERY_PRESENT)
+
+        # These results could have multiple versions on the same label;
+        # we need to collapse those (taking bestFlavor into account)
+        result = {}
+        for name, versionDict in leaves.iteritems():
+            byLabel = {}
+            for version, flavorList in versionDict.iteritems():
+                s = byLabel.setdefault(version.trailingLabel(), set())
+                s.update( (version, x) for x in flavorList )
+
+            result[name] = {}
+
+            for label, reqFlavorList in \
+                  troveSpecs.get(name, troveSpecs.get(None, None)).iteritems():
+                byFlavor = {}
+                for version, flavor in byLabel[label]:
+                    byFlavor.setdefault(flavor, []).append(version)
+
+                if reqFlavorList is None:
+                    # return the latest for each flavor
+                    for flavor, versionList in byFlavor.iteritems():
+                        versionList.sort()
+                        l = result[name].setdefault(versionList[-1], set())
+                        l.add(flavor)
+
+                    continue
+
+                for reqFlavor in reqFlavorList:
+                    flavorScores = [ (reqFlavor.score(flavor), i)
+                                        for i, flavor in
+                                            enumerate(byFlavor) ]
+                    # Filter out incompatible flavors
+                    flavorScores = [ x for x in flavorScores if
+                                        x[0] is not False ]
+
+                    if bestFlavor:
+                        # Find the flavor with highest score for this
+                        # reqFlavor, and return the oldest version with that
+                        # flavor (gotta pick one; at least this isn't random)
+                        flavorScores.sort()
+                        bestFlavors = [ x for x in flavorScores if
+                                            x[0] == flavorScores[-1][0] ]
+                    else:
+                        # Find the newest version on this label as long as
+                        # the flavor is compatible
+                        bestFlavors = flavorScores
+
+                    # strip away the flavor scores
+                    bestFlavors = set( x[1] for x in bestFlavors )
+                    # look up the flavors by index
+                    bestFlavors = set( x[1] for x in enumerate(byFlavor)
+                                              if x[0] in bestFlavors )
+
+                    # now lookup the versions which exist for the flavors
+                    # we've identified
+                    bestVersions = \
+                        [ ver for ver, flavorList in versionDict.iteritems()
+                            if set(flavorList) & bestFlavors ]
+
+                    # and find the latest version which works
+                    bestVersions.sort()
+                    latestVersion = bestVersions[-1]
+
+                    # for the version we want find the flavors we should
+                    # return
+                    result[name].setdefault(latestVersion, set())
+                    result[name][latestVersion].update(
+                            [ x for x in bestFlavors if latestVersion
+                                            in byFlavor[x] ] )
+
+            for version, flavorSet in result[name].iteritems():
+                result[name][version] = list(flavorSet)
+
+        return result
+
     def getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False,
                               troveTypes = TROVE_QUERY_PRESENT):
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
