@@ -2756,11 +2756,13 @@ conary erase '%s=%s[%s]'
                 startNew = False
                 count = 0
                 newJobIsInfo = False
+                inGroup = False
 
             isCritical = jobList in criticalJobs
 
 
             foundCollection = False
+            foundGroup = False
 
             count += len(jobList)
             isInfo = None                 # neither true nor false
@@ -2769,7 +2771,9 @@ conary erase '%s=%s[%s]'
                 (name, (oldVersion, oldFlavor),
                        (newVersion, newFlavor), absolute) = job
 
-                if newVersion is not None and ':' not in name:
+                if name.startswith('group-'):
+                    foundGroup = True
+                elif newVersion is not None and ':' not in name:
                     foundCollection = True
 
                 if name.startswith('info-'):
@@ -2781,7 +2785,8 @@ conary erase '%s=%s[%s]'
                     assert(isInfo is False or isInfo is None)
                     isInfo = False
 
-            if (not isInfo or infoName != name) and newJobIsInfo is True:
+            if (((not isInfo or infoName != name) and newJobIsInfo is True)
+                or foundGroup != inGroup):
                 # We switched from installing info components to
                 # installing fresh components. This has to go into
                 # a separate job from the last one.
@@ -2794,12 +2799,14 @@ conary erase '%s=%s[%s]'
                 count = len(jobList)
                 newJob = list(jobList)             # make a copy
                 newJobIsInfo = False
+                if foundGroup:
+                    inGroup = True
             else:
                 newJobIsInfo = isInfo
                 newJob += jobList
 
-            if (foundCollection or isCritical or
-                (updateThreshold and (count >= updateThreshold))): 
+            if (foundCollection or isCritical
+                or (updateThreshold and (count >= updateThreshold))): 
                 if isCritical:
                     finalCriticalJobs.append(len(uJob.getJobs()))
                 uJob.addJob(newJob)
