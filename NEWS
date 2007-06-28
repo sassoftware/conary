@@ -1,3 +1,7 @@
+Changes in 1.1.31.1:
+  o Bug Fix:
+    * Proxies used wrong getChangeSet call for old protocol versions (CNY-1803)
+
 Changes in 1.1.31:
   o Bug Fix:
     * A bug that caused an Internal Server Error when a Conary proxy

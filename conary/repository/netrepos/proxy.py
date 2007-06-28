@@ -504,7 +504,7 @@ class ChangesetFilter(BaseProxy):
                 neededHere = changeSetsNeeded
                 changeSetsNeeded = []
 
-            if getCsVersion < 50:
+            if getCsVersion >= 50:
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
