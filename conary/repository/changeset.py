@@ -433,6 +433,10 @@ class ChangeSet(streams.StreamSet):
                             invertedTrove.newTroveVersion(name, version, flavor,
                                trv.includeTroveByDefault(name, version, flavor),
                                weakRef = weak)
+                        elif oper == "~":
+                            # invert byDefault flag
+                            invertedTrove.changedTrove(name, version, flavor, not byDef,
+                                                       weakRef = weak)
 
 	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)

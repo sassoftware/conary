@@ -2946,6 +2946,18 @@ conary erase '%s=%s[%s]'
 
         # returning terminates the thread
 
+    def getDownloadSizes(self, uJob):
+        allJobs = uJob.getJobs()
+        flatJobs = [ x for x in itertools.chain(*allJobs) ]
+        flatSizes = self.repos.getChangeSetSize(flatJobs)
+
+        sizes = []
+        for job in allJobs:
+            sizes.append(sum(flatSizes[0:len(job)]))
+            flatSizes = flatSizes[len(job):]
+
+        return sizes
+
     def downloadUpdate(self, uJob, destDir):
         allJobs = uJob.getJobs()
         csFiles = []
