@@ -1017,7 +1017,6 @@ class LazyFileCache:
         # No need to call fd's close(), we're destroying this object
         for fd in self._fdMap.values():
             fd._close()
-            fd._cache = None
         self._fdMap.clear()
 
     __del__ = close
