@@ -41,14 +41,15 @@ class RepositoryVersionCache:
         uri = basicUrl.split(':', 1)[1]
 
         if uri not in self.d:
-            useAnon, parentVersions = caller.checkVersion(self.protocolVersion)
+            # checkVersion protocol is stopped at 50; we don't support kwargs
+            # for that call, ever
+            useAnon, parentVersions = caller.checkVersion(50)
             self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
 
     def __init__(self):
         self.d = {}
-        self.protocolVersion = netserver.SERVER_VERSIONS[-1]
 
 class ProxyClient(xmlrpclib.ServerProxy):
 
@@ -573,11 +574,12 @@ class ChangesetFilter(BaseProxy):
             del removedTroves
 
             if (getCsVersion >= 51 and wireCsVersion == neededCsVersion 
-                        and infoOnly and not url):
+                and infoOnly and not url):
                 # We only got size information from the repository; there
-                # is no changeset to fetch/cache
-                csInfo.path = None
-                changeSetList[jobIdx] = csInfo
+                # is no changeset to fetch/cache.  We can bail out early.
+                for jobIdx, csInfo in enumerate(csInfoList):
+                    csInfo.path = None
+                    changeSetList[jobIdx] = csInfo
                 continue
 
             try:
