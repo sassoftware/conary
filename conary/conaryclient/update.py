@@ -2795,12 +2795,12 @@ conary erase '%s=%s[%s]'
                 # have info-foo and info-bar in the same update job
                 # because info-foo might depend on info-bar being
                 # installed already.  This should be fixed.
-                uJob.addJob(newJob)
+                if newJob:
+                    uJob.addJob(newJob)
                 count = len(jobList)
                 newJob = list(jobList)             # make a copy
                 newJobIsInfo = False
-                if foundGroup:
-                    inGroup = True
+                inGroup = foundGroup
             else:
                 newJobIsInfo = isInfo
                 newJob += jobList
