@@ -77,7 +77,7 @@ class AbstractTroveSource:
     def getTroveLatestByLabel(self, troveSpecs, bestFlavor = False,
                               troveTypes = TROVE_QUERY_PRESENT):
         leaves = self.getTroveLeavesByLabel(troveSpecs, bestFlavor = bestFlavor,
-                                            troveTypes = TROVE_QUERY_PRESENT)
+                                            troveTypes = troveTypes)
 
         # These results could have multiple versions on the same label;
         # we need to collapse those (taking bestFlavor into account)
@@ -93,6 +93,9 @@ class AbstractTroveSource:
             for label, reqFlavorList in \
                   troveSpecs.get(name, troveSpecs.get(None, None)).iteritems():
                 byFlavor = {}
+                if label not in byLabel:
+                    continue
+
                 for version, flavor in byLabel[label]:
                     byFlavor.setdefault(flavor, []).append(version)
 
@@ -135,7 +138,8 @@ class AbstractTroveSource:
                     # we've identified
                     bestVersions = \
                         [ ver for ver, flavorList in versionDict.iteritems()
-                            if set(flavorList) & bestFlavors ]
+                            if set(flavorList) & bestFlavors and
+                               ver.trailingLabel() == label ]
 
                     # and find the latest version which works
                     bestVersions.sort()
