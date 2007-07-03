@@ -553,14 +553,14 @@ def commit(repos, cfg, message, callback=None, test=False):
         print '\t%s=%s' % (troveName, newVersion.asString())
         print
     if conflicts:
-        print 'WARNING: performing this commit will create label conflicts:'
+        print 'WARNING: performing this commit will switch the active branch:'
         print
         print 'New version %s=%s' % (troveName, newVersion)
         for otherVersion in conflicts:
-            print '   conflicts with existing %s=%s' % (troveName, otherVersion)
+            print '   obsoletes existing %s=%s' % (troveName, otherVersion)
 
         if not cfg.interactive:
-            print 'error: interactive mode is required when creating label conflicts'
+            print 'error: interactive mode is required when changing active branch'
             return
 
     if cfg.interactive:
@@ -1117,13 +1117,19 @@ def updateSrc(repos, versionStr = None, callback = None):
         return
 
     if not versionStr:
-	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
+        r = repos.getTroveLatestByLabel({ pkgName :
+                                            { state.getBranch().label() :
+                                                    [ deps.deps.Flavor() ] } } )
+        headVersion = r[pkgName].keys()[0]
 	head = repos.getTrove(pkgName, headVersion, deps.deps.Flavor())
 	newBranch = None
 	headVersion = head.getVersion()
 	if headVersion == baseVersion:
 	    log.info("working directory is already based on head of branch")
 	    return
+
+        if headVersion.branch() != state.getBranch():
+            log.info("switching to branch %s" % headVersion.branch())
     else:
 	versionStr = state.expandVersionStr(versionStr)
 
@@ -1604,7 +1610,7 @@ def newTrove(repos, cfg, name, dir = None, template = None,
     sourceState = SourceState(component, versions.NewVersion(), branch)
     conaryState = ConaryState(cfg.context, sourceState)
 
-    # see if this package exists on our build branch
+    # see if this package exists on our build label
     if repos and repos.getTroveLeavesByLabel(
                         { component : { label : None } },
                         ).get(component, []):
