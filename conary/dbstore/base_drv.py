@@ -361,15 +361,15 @@ class BaseDatabase:
         cu = self.dbh.cursor()
         cu.execute(sql)
     def dropIndex(self, table, name, check = True):
-        remove = False
         if check:
             assert(table in self.tables)
             if name not in self.tables[table]:
                 return False
-            remove = True
         self._dropIndexSql(table, name)
-        if remove:
+        try:
             self.tables[table].remove(name)
+        except ValueError, e:
+            pass
         return True
 
     # since not all databases handle renaming and dropping columns the
