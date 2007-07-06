@@ -2154,80 +2154,53 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         schema.resetTable(cu, 'tmpPath')
         for row, path in enumerate(pathList):
-            cu.execute("INSERT INTO tmpPath (row, path) "
-                       "VALUES (?, ?)", (row, path),
-                       start_transaction=False)
+            cu.execute("INSERT INTO tmpPath (row, path) VALUES (?, ?)",
+                       (row, path), start_transaction=False)
         self.db.analyze("tmpPath")
 
-        # FIXME: MySQL 5.0.18 does not like "SELECT row, ..." so we are
-        # explicit
-        query = """SELECT Matches.row, item, version, flavor,
-                          timeStamps, UP.permittedTrove 
-                        FROM Instances
-                        -- # Do the actual matching in a subselect
-                        -- # to prevent MySQL from doing a full join
-                        -- # between TroveFiles and Instances
-                        JOIN (SELECT tmpPath.row AS row, instanceId
-			      FROM tmpPath JOIN TroveFiles ON
-                                  TroveFiles.path = tmpPath.path)
-                              AS Matches ON
-                            Instances.instanceId = Matches.instanceId
-                        JOIN Nodes ON
-                            Nodes.itemId = Instances.itemId AND
-                            Nodes.versionId = Instances.versionId
-                        JOIN LabelMap ON
-                            Nodes.itemId = LabelMap.itemId AND
-                            Nodes.branchId = LabelMap.branchId
-                        JOIN Labels ON
-                            Labels.labelId = LabelMap.labelId
-                        JOIN (SELECT
-                               Permissions.labelId as labelId,
-                               PerItems.item as permittedTrove,
-                               Permissions.permissionId as aclId
-                           FROM
-                               Permissions
-                               join Items as PerItems using (itemId)
-                           WHERE
-                               Permissions.userGroupId in (%s)
-                           ) as UP ON
-                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                        JOIN Items ON 
-                            (Instances.itemId = Items.itemId)
-                        JOIN Versions ON 
-                            (Instances.versionId = Versions.versionId)
-                        JOIN Flavors ON
-                            (Instances.flavorId = Flavors.flavorId)
-                        WHERE
-                            Instances.isPresent = ?
-                            AND Labels.label = ?
-                        ORDER BY
-                            Nodes.finalTimestamp DESC
-                    """ % ",".join("%d" % x for x in userGroupIds)
-        cu.execute(query, instances.INSTANCE_PRESENT_NORMAL, label)
-
-        if all:
-            results = [[] for x in pathList]
-            for idx, name, versionStr, flavor, timeStamps, pattern in cu:
-                if not self.auth.checkTrove(pattern, name):
-                    continue
-                version = versions.VersionFromString(versionStr, 
-                        timeStamps=[float(x) for x in timeStamps.split(':')])
-                branch = version.branch()
-                results[idx].append((name, self.freezeVersion(version), flavor))
-            return results
+        query = """
+        SELECT tmpPath.row, Items.item, Versions.version, Flavors.flavor,
+            Nodes.timeStamps
+        FROM tmpPath
+        JOIN TroveFiles using(path)
+        JOIN Instances using(instanceId)
+        JOIN Nodes on
+            Instances.itemId = Nodes.itemId
+            and Instances.versionId = Nodes.versionId
+        JOIN LabelMap on
+            Nodes.itemId = LabelMap.itemId
+            and Nodes.branchId = LabelMap.branchId
+        JOIN Labels on LabelMap.labelId = Labels.labelId
+        JOIN UserGroupInstancesCache as ugi on
+            Instances.instanceId = ugi.instanceId
+        JOIN Items on Instances.itemId = Items.itemId
+        JOIN Versions on Instances.versionId = Versions.versionId
+        JOIN Flavors on Instances.flavorId = Flavors.flavorId
+        WHERE ugi.userGroupId in (%s)
+          AND Instances.isPresent = %d
+          AND Labels.label = ?
+        ORDER BY Nodes.finalTimestamp DESC
+        """ % (",".join("%d" % x for x in userGroupIds),
+               instances.INSTANCE_PRESENT_NORMAL)
+        cu.execute(query, label)
 
         results = [ {} for x in pathList ]
-        for idx, name, versionStr, flavor, timeStamps, pattern in cu:
-            if not self.auth.checkTrove(pattern, name):
-                continue
-
-            version = versions.VersionFromString(versionStr, 
-                        timeStamps=[float(x) for x in timeStamps.split(':')])
+        for idx, name, versionStr, flavor, timeStamps in cu:
+            version = versions.VersionFromString(versionStr, timeStamps=[
+                float(x) for x in timeStamps.split(':')])
             branch = version.branch()
-            results[idx].setdefault((name, branch, flavor), 
-                                    self.freezeVersion(version))
-        return [ [ (y[0][0], y[1], y[0][2]) for y in x.iteritems()] 
-                                                            for x in results ]
+            retl = results[idx].setdefault((name, branch, flavor), [])
+            retl.append(self.freezeVersion(version))
+        def _iterAll(resList):
+            for (n,b,f), verList in resList.iteritems():
+                for v in verList:
+                    yield (n,v,f)
+        if all:
+            return [ list(_iterAll(x)) for x in results ]
+        # otherwise, the version stored first is the most recent and
+        # is the one that needs to be returned
+        return [ [ (n, vl[0], f) for (n,b,f),vl in x.iteritems() ]
+                 for x in results ]
 
     @accessReadOnly
     def getCollectionMembers(self, authToken, clientVersion, troveName,
