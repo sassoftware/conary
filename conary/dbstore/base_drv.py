@@ -356,6 +356,10 @@ class BaseDatabase:
         cu = self.dbh.cursor()
         cu.execute(sql)
         return True
+    def _dropIndexSql(self, table, name):
+        sql = "DROP INDEX %s" % (name,)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
     def dropIndex(self, table, name, check = True):
         remove = False
         if check:
@@ -363,9 +367,7 @@ class BaseDatabase:
             if name not in self.tables[table]:
                 return False
             remove = True
-        sql = "DROP INDEX %s" % (name,)
-        cu = self.dbh.cursor()
-        cu.execute(sql)
+        self._dropIndexSql(table, name)
         if remove:
             self.tables[table].remove(name)
         return True
