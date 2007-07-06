@@ -1,6 +1,8 @@
 Changes in @NEW@:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)
+    * Unknown flags are now ignored when calling loadRecipe w/ a flavor
+      (before this would result in a traceback).
   o Update Changes:
     * Updates to groups are now allowed to be merged with other groups in 
       update jobs, reducing the number of jobs that are used for updates.
