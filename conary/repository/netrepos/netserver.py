@@ -1152,10 +1152,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   latestFilter = self._GET_TROVE_VERY_LATEST,
                                   withFlavors = True, troveTypes = troveTypes)
 
-        cu = self.db.cursor()
-
         # faster version for the "get-all" case
         # authenticate this user first
+        cu = self.db.cursor()
         groupIds = self.auth.getAuthGroups(cu, authToken)
         if not groupIds:
             return {}
@@ -1167,39 +1166,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Items.item as trove,
             Versions.version as version,
             Flavors.flavor as flavor,
-            Nodes.timeStamps as timeStamps,
-            UP.pattern as pattern
+            Nodes.timeStamps as timeStamps
         from Latest
-        join Nodes using (itemId, branchId, versionId)
-        join LabelMap using (itemId, branchId)
-        join ( select
-                Permissions.labelId as labelId,
-                PerItems.item as pattern
-            from
-                Permissions
-                join Items as PerItems using (itemId)
-            where
-                Permissions.userGroupId in (%s)
-            ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        join Nodes using (versionId, itemId, branchId)
+        join Instances using (versionId, itemId, flavorId)
+        join UserGroupInstancesCache as ugi on Instances.instanceId = ugi.instanceId
         join Items on Latest.itemId = Items.itemId
         join Flavors on Latest.flavorId = Flavors.flavorId
         join Versions on Latest.versionId = Versions.versionId
-        where
-            Latest.latestType = %d
+        where ugi.userGroupId in (%s)
+          and Latest.latestType = %d
         """ % (",".join("%d" % x for x in groupIds), latestType)
-        self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
-        for (trove, version, flavor, timeStamps, pattern) in cu:
-            if not self.auth.checkTrove(pattern, trove):
-                continue
-            # NOTE: this is the "safe' way of doing it. It is very, very slow.
-            # version = versions.VersionFromString(version)
-            # version.setTimeStamps([float(x) for x in timeStamps.split(":")])
-            # version = self.freezeVersion(version)
-
-            # FIXME: prolly should use some standard thaw/freeze calls instead of
-            # hardcoding the "%.3f" format. One day I'll learn about all these calls.
+        for (trove, version, flavor, timeStamps) in cu:
+            # FIXME: we hardcode the timestamp format here for speed reasons
             version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
                                                       for x in timeStamps.split(":") ])
             retname = ret.setdefault(trove, {})
