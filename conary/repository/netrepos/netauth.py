@@ -23,6 +23,7 @@ from conary import conarycfg
 from conary.repository import errors
 from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
+from conary.repository.netrepos import items, versionops
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists
@@ -62,7 +63,6 @@ class UserAuthorization:
 
         cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
                    "VALUES (?, ?)", (ugid, uid))
-
         return uid
 
     def changePassword(self, cu, user, salt, password):
@@ -151,7 +151,6 @@ class UserAuthorization:
                         JOIN UserGroupMembers USING (userId)
                         JOIN UserGroups USING (userGroupId)
                         WHERE Users.userName = ?""", user)
-
         return [ x[0] for x in cu ]
 
     def getUserIdByName(self, userName):
@@ -250,7 +249,9 @@ class NetworkAuthorization:
             self.db, passwordURL, cacheTimeout = cacheTimeout)
         self.entitlementAuth = EntitlementAuthorization(
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
-
+        self.items = items.Items(db)
+        self.ugi = versionops.UserGroupInstancesCache(db)
+        
     def getAuthGroups(self, cu, authToken, allowAnonymous = True):
         self.log(4, authToken[0], authToken[2])
         # Find what group this user belongs to
@@ -427,16 +428,8 @@ class NetworkAuthorization:
 
         return False
 
-    _cacheRe = {}
     def checkTrove(self, pattern, trove):
-        if pattern == 'ALL' or trove is None:
-            return True
-        regExp = self._cacheRe.get(pattern, None)
-        if regExp is None:
-            regExp = self._cacheRe[pattern] = re.compile(pattern + '$')
-        if regExp.match(trove):
-            return True
-        return False
+        return items.checkTrove(pattern, trove)
 
     def addAcl(self, userGroup, trovePattern, label, write = False,
                capped = False, admin = False, remove = False):
@@ -454,13 +447,7 @@ class NetworkAuthorization:
         # XXX This functionality is available in the TroveStore class
         #     refactor so that the code is not in two places
         if trovePattern:
-            cu.execute("SELECT * FROM Items WHERE item=?", trovePattern)
-            itemId = cu.fetchone()
-            if itemId:
-                itemId = itemId[0]
-            else:
-                cu.execute("INSERT INTO Items (item) VALUES(?)", trovePattern)
-                itemId = cu.lastrowid
+            itemId = self.items.addPattern(trovePattern)
         else:
             itemId = 0
 
@@ -486,7 +473,7 @@ class NetworkAuthorization:
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
-
+        self.ugi.updateUserGroupId(userGroupId)
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
@@ -518,7 +505,7 @@ class NetworkAuthorization:
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, troveId)
-
+        self.ugi.updateUserGroupId(userGroupId)
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
@@ -537,6 +524,7 @@ class NetworkAuthorization:
           AND labelId = (SELECT labelId FROM Labels WHERE label=?)
           AND itemId = (SELECT itemId FROM Items WHERE item=?)
         """, (userGroupId, label, item))
+        self.ugi.updateUserGroupId(userGroupId)
         self.db.commit()
 
     def addUser(self, user, password):
@@ -745,11 +733,13 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM EntitlementAccessMap WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
-        cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
+        cu.execute("DELETE FROM UserGroupInstancesCache WHERE userGroupId = ?", userGroupId)
+        cu.execute("DELETE FROM UserGroupTroves WHERE userGroupId = ?", userGroupId)
         #Note, there could be a user left behind with no associated group
         #if the group being deleted was created with a user.  This user is not
         #deleted because it is possible for this user to be a member of
         #another group.
+        cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
         if commit:
             self.db.commit()
 

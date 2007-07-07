@@ -812,64 +812,59 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             coreQdict["spec"] = ""
 
-        # we establish the execution domain out into the Nodes table
-        # keep in mind: "leaves" == Latest ; "all" == Instances
+        # because we need to filter through UserGroupInstancesCache
+        # table, we need to go through the Instances and Nodes tables
+        # all the time
+        where = []
+        where.append(
+            "Permissions.userGroupId IN (%s)" % (
+            ", ".join("%d" % x for x in userGroupIds),))
+        # "leaves" == Latest ; "all" == Instances
+        coreQdict["latest"] = ""
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            coreQdict["domain"] = """
-            JOIN Latest AS Domain ON
-                Items.itemId = Domain.itemId AND
-                Domain.latestType = :ltype
-            JOIN Nodes ON
-                Domain.itemId = Nodes.itemId AND
-                Domain.branchId = Nodes.branchId AND
-                Domain.versionId = Nodes.versionId """
+            coreQdict["latest"] = """JOIN Latest ON
+            Latest.itemId = Nodes.itemId AND
+            Latest.versionId = Nodes.versionId AND
+            Latest.branchId = Nodes.branchId AND
+            Latest.flavorId = Instances.flavorId """
+            where.append("Latest.latestType = :ltype")
             argDict["ltype"] = self._latestType(troveTypes)
-        else:
-            if troveTypes == TROVE_QUERY_ALL:
-                coreQdict["domain"] = """
-                JOIN Instances AS Domain USING (itemId)"""
+        elif troveTypes != TROVE_QUERY_ALL:
+            if troveTypes == TROVE_QUERY_PRESENT:
+                s = "!= :ttype"
+                argDict["ttype"] = trove.TROVE_TYPE_REMOVED
             else:
-                if troveTypes == TROVE_QUERY_PRESENT:
-                    s = "!= :ttype"
-                    argDict["ttype"] = trove.TROVE_TYPE_REMOVED
-                else:
-                    assert(troveTypes == TROVE_QUERY_NORMAL)
-                    s = "= :ttype"
-                    argDict["ttype"] = trove.TROVE_TYPE_NORMAL
-                coreQdict["domain"] = """
-                JOIN Instances AS Domain ON
-                    Items.itemId = Domain.itemId AND
-                    Domain.troveType %s AND
-                    Domain.isPresent=%d""" % \
-                        (s, instances.INSTANCE_PRESENT_NORMAL)
-            coreQdict["domain"] += """
-            JOIN Nodes ON
-                Domain.itemId = Nodes.itemId AND
-                Domain.versionId = Nodes.versionId """
-
-        coreQdict["ugid"] = ", ".join("%d" % x for x in userGroupIds)
+                assert(troveTypes == TROVE_QUERY_NORMAL)
+                s = "= :ttype"
+                argDict["ttype"] = trove.TROVE_TYPE_NORMAL
+            where.append("Instances.isPresent = %d " % (
+                instances.INSTANCE_PRESENT_NORMAL,))
+            where.append("Instances.troveType %s" % (s,))
+        coreQdict["where"] = """
+          AND """.join(where)
+        
         coreQuery = """
         SELECT DISTINCT
             Nodes.nodeId as nodeId,
-            Domain.flavorId as flavorId,
-            %(localFlavor)s as localFlavorId,
-            UP.acl as acl
+            Instances.flavorId as flavorId,
+            %(localFlavor)s as localFlavorId
         FROM %(trove)s
-        %(domain)s
+        JOIN Instances ON
+            Items.itemId = Instances.itemId
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        %(latest)s
+        JOIN UserGroupInstancesCache AS ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN Permissions ON
+            Permissions.userGroupId = ugi.userGroupId
         JOIN LabelMap ON
-            Nodes.itemId = LabelMap.itemId AND
-            Nodes.branchId = LabelMap.branchId
-        JOIN ( SELECT
-                   Permissions.labelId as labelId,
-                   PerItems.item as acl,
-                   Permissions.permissionId as aclId
-               FROM
-                   Permissions JOIN Items as PerItems ON
-                       Permissions.itemId = PerItems.itemId
-               WHERE
-                   Permissions.userGroupId IN (%(ugid)s)
-            ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+            LabelMap.itemId = Nodes.itemId AND
+            LabelMap.branchId = Nodes.branchId AND
+            ( Permissions.labelId = 0 OR Permissions.labelId = LabelMap.labelId )
         %(spec)s
+        WHERE %(where)s
         """ % coreQdict
 
         # build the outer query around the coreQuery
@@ -893,7 +888,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 gtlTmp.nodeId as nodeId,
                 gtlTmp.flavorId as flavorId,
                 %(flavor)s as localFlavorId,
-                gtlTmp.acl as acl,
                 SUM(coalesce(FlavorScores.value, 0)) as flavorScore
             FROM ( %(core)s ) as gtlTmp
             LEFT OUTER JOIN FlavorMap ON
@@ -905,7 +899,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             LEFT OUTER JOIN FlavorScores ON
                 FlavorScores.present = FlavorMap.sense
                 AND FlavorScores.request = coalesce(tmpFlavorMap.sense, 0)
-            GROUP BY gtlTmp.nodeId, gtlTmp.flavorId, gtlTmp.acl %(group)s
+            GROUP BY gtlTmp.nodeId, gtlTmp.flavorId %(group)s
             HAVING SUM(coalesce(FlavorScores.value, 0)) > -500000
             """ % { "core" : coreQuery,
                     "extra" : extraJoin,
@@ -918,7 +912,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mainQdict["score"] = "NULL"
 
         mainQdict["select"] = """I.item as trove,
-            tmpQ.acl as acl,
             tmpQ.localFlavorId as localFlavorId,
             V.version as version,
             N.timeStamps as timeStamps,
@@ -946,7 +939,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ORDER BY I.item, N.finalTimestamp
         """ % mainQdict
 
-        self.log(4, "execute query", fullQuery, argDict)
+        self.log(3, "execute query", fullQuery, argDict)
         cu.execute(fullQuery, argDict)
         self.log(3, "executed query")
 
@@ -962,23 +955,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # That is because the loop below is dependent on the order in
         # which this data is provided, even though it is the same
         # dataset with and without "ORDER BY" -- gafton
-        for (troveName, troveNamePattern, localFlavorId, versionStr,
-             timeStamps, branchId, finalTimestamp, flavor, flavorScore) in cu:
+        for (troveName, localFlavorId, versionStr, timeStamps,
+             branchId, finalTimestamp, flavor, flavorScore) in cu:
             if flavorScore is None:
                 flavorScore = 0
 
             #self.log(4, troveName, versionStr, flavor, flavorScore, finalTimestamp)
             if (troveName, versionStr, flavor, localFlavorId) in allowed:
                 continue
-
-            if not self.auth.checkTrove(troveNamePattern, troveName):
-                continue
-
             allowed.add((troveName, versionStr, flavor, localFlavorId))
 
-            # FIXME: since troveNames is no longer traveling through
-            # here, this withVersions check has become superfluous.
-            # Now we're always dealing with versions -- gafton
             if latestFilter == self._GET_TROVE_VERY_LATEST:
                 d = troveVersions.setdefault(troveName, {})
 
@@ -1167,13 +1153,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Versions.version as version,
             Flavors.flavor as flavor,
             Nodes.timeStamps as timeStamps
-        from Latest
+        from UserGroupInstancesCache as ugi
+        join Instances using (instanceId)
+        join Latest using (versionId, itemId, flavorId)
         join Nodes using (versionId, itemId, branchId)
-        join Instances using (versionId, itemId, flavorId)
-        join UserGroupInstancesCache as ugi on Instances.instanceId = ugi.instanceId
-        join Items on Latest.itemId = Items.itemId
-        join Flavors on Latest.flavorId = Flavors.flavorId
-        join Versions on Latest.versionId = Versions.versionId
+        join Items on Instances.itemId = Items.itemId
+        join Flavors on Instances.flavorId = Flavors.flavorId
+        join Versions on Instances.versionId = Versions.versionId
         where ugi.userGroupId in (%s)
           and Latest.latestType = %d
         """ % (",".join("%d" % x for x in groupIds), latestType)

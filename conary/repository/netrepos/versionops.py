@@ -94,13 +94,12 @@ class LatestTable:
                     Nodes.itemId = ? AND
                     Nodes.branchId = ? AND
                     flavorId = ? AND
-                    isPresent = ?
+                    isPresent = %d
                     %s
                 ORDER BY finalTimestamp DESC
                 LIMIT 1
-        """ % troveTypeFilter, itemId, branchId, flavorId,
-              instances.INSTANCE_PRESENT_NORMAL)
-
+        """ % (instances.INSTANCE_PRESENT_NORMAL, troveTypeFilter),
+                   (itemId, branchId, flavorId))
         try:
             latestVersionId, troveType = cu.next()
         except StopIteration:
@@ -117,8 +116,10 @@ class LatestTable:
 
     def update(self, itemId, branchId, flavorId):
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Latest WHERE itemId=? AND branchId=? AND "
-                   "flavorId=?", itemId, branchId, flavorId)
+        cu.execute("""
+        DELETE FROM Latest
+        WHERE itemId=? AND branchId=? AND flavorId=?
+        """, (itemId, branchId, flavorId))
 
         versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId)
 
@@ -133,7 +134,6 @@ class LatestTable:
             self._add(cu, itemId, branchId, flavorId, versionId,
                       LATEST_TYPE_NORMAL)
             return
-
 
         presentVersionId, troveType = \
             self._findLatest(cu, itemId, branchId, flavorId,
@@ -192,7 +192,62 @@ class Nodes:
 
 	return nodeId[0]
 
+class UserGroupInstancesCache:
+    def __init__(self, db):
+        self.db = db
+
+    def _updateUGI(self, cu, instanceId = None, userGroupId = None):
+        where = []
+        args = []
+        if instanceId is not None:
+            where.append("Instances.instanceId = ?")
+            args.append(instanceId)
+        if userGroupId is not None:
+            where.append("Permissions.userGroupId = ?")
+            args.append(userGroupId)
+        cu.execute("""
+        insert into UserGroupInstancesCache (instanceId, userGroupId, canWrite, canRemove)
+        select
+            Instances.instanceId as instanceId,
+            Permissions.userGroupId as userGroupId,
+            case when sum(Permissions.canWrite) = 0 then 0 else 1 end as canWrite,
+            case when sum(Permissions.canRemove) = 0 then 0 else 1 end as canRemove
+        from Instances
+        join Nodes using(itemId, versionId)
+        join LabelMap using(itemId, branchId)
+        join Permissions on
+            Permissions.labelId = 0 or
+            Permissions.labelId = LabelMap.labelId
+        join CheckTroveCache on
+            Permissions.itemId = CheckTroveCache.patternId and
+            Instances.itemId = CheckTroveCache.itemId
+        where %s
+        group by Instances.instanceId, Permissions.userGroupId
+        """ % (' and '.join(where),), args)
+
+    def updateInstanceId(self, instanceId):
+        cu = self.db.cursor()
+        cu.execute("delete from UserGroupInstancesCache where instanceId = ?",
+                   instanceId)
+        self._updateUGI(cu, instanceId = instanceId)
+
+    def updateUserGroupId(self, userGroupId):
+        cu = self.db.cursor()
+        cu.execute("delete from UserGroupInstancesCache where userGroupId = ?",
+                   userGroupId)
+        self._updateUGI(cu, userGroupId = userGroupId)
+        
 class SqlVersioning:
+    def __init__(self, db, versionTable, branchTable):
+        self.items = items.Items(db)
+	self.labels = LabelTable(db)
+	self.latest = LatestTable(db)
+	self.labelMap = LabelMap(db)
+	self.versionTable = versionTable
+        self.branchTable = branchTable
+	self.needsCleanup = False
+	self.nodes = Nodes(db)
+	self.db = db
 
     def versionsOnBranch(self, itemId, branchId):
 	cu = self.db.cursor()
@@ -219,8 +274,7 @@ class SqlVersioning:
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
-    def createVersion(self, itemId, version, flavorId, sourceName,
-                      updateLatest = True):
+    def createVersion(self, itemId, version, flavorId, sourceName):
 	"""
 	Creates a new versionId for itemId. The branch must already exist
 	for the given itemId.
@@ -289,17 +343,6 @@ class SqlVersioning:
 	self.labelMap.addItem((itemId, labelId), branchId)
 
 	return branchId
-
-    def __init__(self, db, versionTable, branchTable):
-        self.items = items.Items(db)
-	self.labels = LabelTable(db)
-	self.latest = LatestTable(db)
-	self.labelMap = LabelMap(db)
-	self.versionTable = versionTable
-        self.branchTable = branchTable
-	self.needsCleanup = False
-	self.nodes = Nodes(db)
-	self.db = db
 
 class SqlVersionsError(Exception):
     pass
