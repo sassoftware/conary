@@ -690,18 +690,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavorSet[flavor] = flavorId
             if flavor is '':
                 # empty flavor yields a dummy dep on a null flag
-                cu.execute("INSERT INTO tmpFlavorMap VALUES(?, 'use', ?, NULL)",
-                           flavorId, deps.FLAG_SENSE_REQUIRED,
+                cu.execute("""INSERT INTO tmpFlavorMap
+                (flavorId, base, sense, depClass, flag)
+                VALUES(?, 'use', ?, ?, NULL)""",(
+                    flavorId, deps.FLAG_SENSE_REQUIRED, deps.DEP_CLASS_USE),
                            start_transaction = False)
                 continue
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
-                    cu.execute("INSERT INTO tmpFlavorMap VALUES (?, ?, ?, NULL)",
-                               flavorId, dep.name, deps.FLAG_SENSE_REQUIRED,
+                    cu.execute("""INSERT INTO tmpFlavorMap
+                    (flavorId, base, sense, depClass) VALUES (?, ?, ?, ?)""", (
+                        flavorId, dep.name, deps.FLAG_SENSE_REQUIRED, depClass.tag),
                                start_transaction = False)
                     for (flag, sense) in dep.flags.iteritems():
-                        cu.execute("INSERT INTO tmpFlavorMap VALUES (?, ?, ?, ?)",
-                                   flavorId, dep.name, sense, flag,
+                        cu.execute("""INSERT INTO tmpFlavorMap
+                        (flavorId, base, sense, depClass, flag)
+                        VALUES (?, ?, ?, ?, ?)""", (
+                            flavorId, dep.name, sense, depClass.tag, flag),
                                    start_transaction = False)
         self.db.analyze("tmpFlavorMap")
 
@@ -894,6 +899,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 FlavorMap.flavorId = gtlTmp.flavorId
             LEFT OUTER JOIN tmpFlavorMap ON
                 %(extra)s tmpFlavorMap.base = FlavorMap.base
+                AND tmpFlavorMap.depClass = FlavorMap.depClass
                 AND ( tmpFlavorMap.flag = FlavorMap.flag OR
                       (tmpFlavorMap.flag is NULL AND FlavorMap.flag is NULL) )
             LEFT OUTER JOIN FlavorScores ON

@@ -16,7 +16,7 @@ from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, sqllib
 from conary.lib.tracelog import logMe
 from conary.deps import deps
-from conary.repository.netrepos import versionops, trovestore, netauth
+from conary.repository.netrepos import versionops, trovestore, netauth, flavors
 from conary.server import schema
 
 # SCHEMA Migration
@@ -477,7 +477,7 @@ def updateLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16,1)
+    Version = (16,2)
     # migrate to 16.0
     # create a primary key for labelmap
     def migrate(self):
@@ -490,7 +490,18 @@ class MigrateTo_16(SchemaMigration):
         if not createUserGroupInstances(self.db):
             return False
         return True
-    
+    def migrate2(self):
+        # need to rebuild flavormap
+        cu = self.db.cursor()
+        cu.execute("drop table FlavorMap")
+        self.db.loadSchema()
+        schema.createFlavors(self.db)
+        cu.execute("select flavorId, flavor from Flavors")
+        flavTable = flavors.Flavors(self.db)
+        for (flavorId, flavorStr) in cu.fetchall():
+            flavor = deps.ThawFlavor(flavorStr)
+            flavTable.createFlavorMap(flavorId, flavor, cu)
+        return True
 
 def _getMigration(major):
     try:

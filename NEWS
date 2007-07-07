@@ -1,3 +1,7 @@
+Changes in @NEW2.0@
+  o Server Changes:
+    * fixed scoring for target flavor sets (CNY-1539)
+
 Changes in @NEW@:
   o Client Changes:
     * In conaryrc files, repositoryMap entries can now use wildcards

@@ -91,8 +91,9 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE FlavorMap(
             flavorId        INTEGER NOT NULL,
-            base            VARCHAR(254),
+            base            VARCHAR(254) NOT NULL,
             sense           INTEGER,
+            depClass        INTEGER NOT NULL,
             flag            VARCHAR(254),
             CONSTRAINT FlavorMap_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
@@ -100,7 +101,7 @@ def createFlavors(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FlavorMap"] = []
         commit = True
-    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId")
+    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId, depClass, base")
 
     if "FlavorScores" not in db.tables:
         from conary.deps import deps
@@ -847,13 +848,14 @@ def setupTempTables(db):
     if "tmpFlavorMap" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpFlavorMap(
-            flavorId    INTEGER,
-            base        VARCHAR(254),
+            flavorId    INTEGER NOT NULL,
+            base        VARCHAR(254) NOT NULL,
             sense       INTEGER,
+            depClass    INTEGER NOT NULL,
             flag        VARCHAR(254)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpFlavorMap"] = True
-        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,base",
+        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,depClass,base",
                        check = False)
         db.createIndex("tmpFlavorMap", "tmpFlavorMapSenseIdx", "flavorId,sense",
                        check = False)
