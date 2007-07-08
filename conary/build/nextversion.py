@@ -71,6 +71,7 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
     # search for all the packages that are being created by this cook -
     # we take the max of all of these versions as our latest.
     query = {}
+    d = {}
     if repos:
         for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
             if sourceVersion.isOnLocalHost():
@@ -81,11 +82,8 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
                     query[pkgName] = {}
                 query[pkgName][sourceVersion.getBinaryVersion().branch()] = None
 
-    if repos and not sourceVersion.isOnLocalHost():
         d = repos.getTroveVersionsByBranch(query,
                                            troveTypes = repos.TROVE_QUERY_ALL)
-    else:
-        d = {}
     nextVersions = []
     for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
         if not isinstance(troveFlavors, (list, tuple, set)):
@@ -93,7 +91,7 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
         else:
             troveFlavors = set(troveFlavors)
         newVersion = _nextVersionFromQuery(d, db, troveNames, sourceVersion,
-                                           troveFlavors, 
+                                           troveFlavors,
                                            alwaysBumpCount=alwaysBumpCount)
         nextVersions.append(newVersion)
     return nextVersions
