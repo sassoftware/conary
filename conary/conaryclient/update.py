@@ -2497,6 +2497,12 @@ conary erase '%s=%s[%s]'
         @autoPinList: A list of troves that will not change. Defaults to the
         value from self.cfg.pinList
         @type autoPinList: list
+        @keepJournal: If set, the conary journal file will be left behind
+        (useful only for debugging journal cleanup routines)
+        @type keepJournal: bool
+        @noRestart: If set, suppresses the restart after critical updates
+        behavior default to conary.
+        @type noRestart: bool
         @return: None if the update was fully applied, or restart information
         if a critical update was applied and a restart is necessary to make it
         active.
@@ -2756,11 +2762,13 @@ conary erase '%s=%s[%s]'
                 startNew = False
                 count = 0
                 newJobIsInfo = False
+                inGroup = False
 
             isCritical = jobList in criticalJobs
 
 
             foundCollection = False
+            foundGroup = False
 
             count += len(jobList)
             isInfo = None                 # neither true nor false
@@ -2769,7 +2777,9 @@ conary erase '%s=%s[%s]'
                 (name, (oldVersion, oldFlavor),
                        (newVersion, newFlavor), absolute) = job
 
-                if newVersion is not None and ':' not in name:
+                if name.startswith('group-'):
+                    foundGroup = True
+                elif newVersion is not None and ':' not in name:
                     foundCollection = True
 
                 if name.startswith('info-'):
@@ -2781,7 +2791,8 @@ conary erase '%s=%s[%s]'
                     assert(isInfo is False or isInfo is None)
                     isInfo = False
 
-            if (not isInfo or infoName != name) and newJobIsInfo is True:
+            if (((not isInfo or infoName != name) and newJobIsInfo is True)
+                or foundGroup != inGroup):
                 # We switched from installing info components to
                 # installing fresh components. This has to go into
                 # a separate job from the last one.
@@ -2790,16 +2801,18 @@ conary erase '%s=%s[%s]'
                 # have info-foo and info-bar in the same update job
                 # because info-foo might depend on info-bar being
                 # installed already.  This should be fixed.
-                uJob.addJob(newJob)
+                if newJob:
+                    uJob.addJob(newJob)
                 count = len(jobList)
                 newJob = list(jobList)             # make a copy
                 newJobIsInfo = False
+                inGroup = foundGroup
             else:
                 newJobIsInfo = isInfo
                 newJob += jobList
 
-            if (foundCollection or isCritical or
-                (updateThreshold and (count >= updateThreshold))): 
+            if (foundCollection or isCritical
+                or (updateThreshold and (count >= updateThreshold))): 
                 if isCritical:
                     finalCriticalJobs.append(len(uJob.getJobs()))
                 uJob.addJob(newJob)

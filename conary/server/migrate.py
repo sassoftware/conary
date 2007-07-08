@@ -403,9 +403,11 @@ class MigrateTo_15(SchemaMigration):
     # 15.5
     def migrate5(self):
         # drop the index in case a user created it by hand (CNY-1704)
+        self.db.loadSchema()
         self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
-        return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
-                                   'itemId, branchId')
+        self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
+                            'itemId, branchId')
+        return True
 
 # populate the CheckTroveCache table
 def createCheckTroveCache(db):
