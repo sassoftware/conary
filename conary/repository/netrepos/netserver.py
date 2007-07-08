@@ -620,18 +620,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavorSet[flavor] = flavorId
             if flavor is '':
                 # empty flavor yields a dummy dep on a null flag
-                cu.execute("INSERT INTO tmpFlavorMap VALUES(?, 'use', ?, NULL)",
-                           flavorId, deps.FLAG_SENSE_REQUIRED,
+                cu.execute("""INSERT INTO tmpFlavorMap
+                (flavorId, base, sense, depClass, flag)
+                VALUES(?, 'use', ?, ?, NULL)""",(
+                    flavorId, deps.FLAG_SENSE_REQUIRED, deps.DEP_CLASS_USE),
                            start_transaction = False)
                 continue
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
-                    cu.execute("INSERT INTO tmpFlavorMap VALUES (?, ?, ?, NULL)",
-                               flavorId, dep.name, deps.FLAG_SENSE_REQUIRED,
+                    cu.execute("""INSERT INTO tmpFlavorMap
+                    (flavorId, base, sense, depClass) VALUES (?, ?, ?, ?)""", (
+                        flavorId, dep.name, deps.FLAG_SENSE_REQUIRED, depClass.tag),
                                start_transaction = False)
                     for (flag, sense) in dep.flags.iteritems():
-                        cu.execute("INSERT INTO tmpFlavorMap VALUES (?, ?, ?, ?)",
-                                   flavorId, dep.name, sense, flag,
+                        cu.execute("""INSERT INTO tmpFlavorMap
+                        (flavorId, base, sense, depClass, flag)
+                        VALUES (?, ?, ?, ?, ?)""", (
+                            flavorId, dep.name, sense, depClass.tag, flag),
                                    start_transaction = False)
         self.db.analyze("tmpFlavorMap")
 
@@ -742,64 +747,59 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             coreQdict["spec"] = ""
 
-        # we establish the execution domain out into the Nodes table
-        # keep in mind: "leaves" == Latest ; "all" == Instances
+        # because we need to filter through UserGroupInstancesCache
+        # table, we need to go through the Instances and Nodes tables
+        # all the time
+        where = []
+        where.append(
+            "Permissions.userGroupId IN (%s)" % (
+            ", ".join("%d" % x for x in userGroupIds),))
+        # "leaves" == Latest ; "all" == Instances
+        coreQdict["latest"] = ""
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
-            coreQdict["domain"] = """
-            JOIN Latest AS Domain ON
-                Items.itemId = Domain.itemId AND
-                Domain.latestType = :ltype
-            JOIN Nodes ON
-                Domain.itemId = Nodes.itemId AND
-                Domain.branchId = Nodes.branchId AND
-                Domain.versionId = Nodes.versionId """
+            coreQdict["latest"] = """JOIN Latest ON
+            Latest.itemId = Nodes.itemId AND
+            Latest.versionId = Nodes.versionId AND
+            Latest.branchId = Nodes.branchId AND
+            Latest.flavorId = Instances.flavorId """
+            where.append("Latest.latestType = :ltype")
             argDict["ltype"] = self._latestType(troveTypes)
-        else:
-            if troveTypes == TROVE_QUERY_ALL:
-                coreQdict["domain"] = """
-                JOIN Instances AS Domain USING (itemId)"""
+        elif troveTypes != TROVE_QUERY_ALL:
+            if troveTypes == TROVE_QUERY_PRESENT:
+                s = "!= :ttype"
+                argDict["ttype"] = trove.TROVE_TYPE_REMOVED
             else:
-                if troveTypes == TROVE_QUERY_PRESENT:
-                    s = "!= :ttype"
-                    argDict["ttype"] = trove.TROVE_TYPE_REMOVED
-                else:
-                    assert(troveTypes == TROVE_QUERY_NORMAL)
-                    s = "= :ttype"
-                    argDict["ttype"] = trove.TROVE_TYPE_NORMAL
-                coreQdict["domain"] = """
-                JOIN Instances AS Domain ON
-                    Items.itemId = Domain.itemId AND
-                    Domain.troveType %s AND
-                    Domain.isPresent=%d""" % \
-                        (s, instances.INSTANCE_PRESENT_NORMAL)
-            coreQdict["domain"] += """
-            JOIN Nodes ON
-                Domain.itemId = Nodes.itemId AND
-                Domain.versionId = Nodes.versionId """
-
-        coreQdict["ugid"] = ", ".join("%d" % x for x in userGroupIds)
+                assert(troveTypes == TROVE_QUERY_NORMAL)
+                s = "= :ttype"
+                argDict["ttype"] = trove.TROVE_TYPE_NORMAL
+            where.append("Instances.isPresent = %d " % (
+                instances.INSTANCE_PRESENT_NORMAL,))
+            where.append("Instances.troveType %s" % (s,))
+        coreQdict["where"] = """
+          AND """.join(where)
+        
         coreQuery = """
         SELECT DISTINCT
             Nodes.nodeId as nodeId,
-            Domain.flavorId as flavorId,
-            %(localFlavor)s as localFlavorId,
-            UP.acl as acl
+            Instances.flavorId as flavorId,
+            %(localFlavor)s as localFlavorId
         FROM %(trove)s
-        %(domain)s
+        JOIN Instances ON
+            Items.itemId = Instances.itemId
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
+        %(latest)s
+        JOIN UserGroupInstancesCache AS ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN Permissions ON
+            Permissions.userGroupId = ugi.userGroupId
         JOIN LabelMap ON
-            Nodes.itemId = LabelMap.itemId AND
-            Nodes.branchId = LabelMap.branchId
-        JOIN ( SELECT
-                   Permissions.labelId as labelId,
-                   PerItems.item as acl,
-                   Permissions.permissionId as aclId
-               FROM
-                   Permissions JOIN Items as PerItems ON
-                       Permissions.itemId = PerItems.itemId
-               WHERE
-                   Permissions.userGroupId IN (%(ugid)s)
-            ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+            LabelMap.itemId = Nodes.itemId AND
+            LabelMap.branchId = Nodes.branchId AND
+            ( Permissions.labelId = 0 OR Permissions.labelId = LabelMap.labelId )
         %(spec)s
+        WHERE %(where)s
         """ % coreQdict
 
         # build the outer query around the coreQuery
@@ -823,19 +823,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 gtlTmp.nodeId as nodeId,
                 gtlTmp.flavorId as flavorId,
                 %(flavor)s as localFlavorId,
-                gtlTmp.acl as acl,
                 SUM(coalesce(FlavorScores.value, 0)) as flavorScore
             FROM ( %(core)s ) as gtlTmp
             LEFT OUTER JOIN FlavorMap ON
                 FlavorMap.flavorId = gtlTmp.flavorId
             LEFT OUTER JOIN tmpFlavorMap ON
                 %(extra)s tmpFlavorMap.base = FlavorMap.base
+                AND tmpFlavorMap.depClass = FlavorMap.depClass
                 AND ( tmpFlavorMap.flag = FlavorMap.flag OR
                       (tmpFlavorMap.flag is NULL AND FlavorMap.flag is NULL) )
             LEFT OUTER JOIN FlavorScores ON
                 FlavorScores.present = FlavorMap.sense
                 AND FlavorScores.request = coalesce(tmpFlavorMap.sense, 0)
-            GROUP BY gtlTmp.nodeId, gtlTmp.flavorId, gtlTmp.acl %(group)s
+            GROUP BY gtlTmp.nodeId, gtlTmp.flavorId %(group)s
             HAVING SUM(coalesce(FlavorScores.value, 0)) > -500000
             """ % { "core" : coreQuery,
                     "extra" : extraJoin,
@@ -848,7 +848,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mainQdict["score"] = "NULL"
 
         mainQdict["select"] = """I.item as trove,
-            tmpQ.acl as acl,
             tmpQ.localFlavorId as localFlavorId,
             V.version as version,
             N.timeStamps as timeStamps,
@@ -876,7 +875,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ORDER BY I.item, N.finalTimestamp
         """ % mainQdict
 
-        self.log(4, "execute query", fullQuery, argDict)
+        self.log(3, "execute query", fullQuery, argDict)
         cu.execute(fullQuery, argDict)
         self.log(3, "executed query")
 
@@ -892,23 +891,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # That is because the loop below is dependent on the order in
         # which this data is provided, even though it is the same
         # dataset with and without "ORDER BY" -- gafton
-        for (troveName, troveNamePattern, localFlavorId, versionStr,
-             timeStamps, branchId, finalTimestamp, flavor, flavorScore) in cu:
+        for (troveName, localFlavorId, versionStr, timeStamps,
+             branchId, finalTimestamp, flavor, flavorScore) in cu:
             if flavorScore is None:
                 flavorScore = 0
 
             #self.log(4, troveName, versionStr, flavor, flavorScore, finalTimestamp)
             if (troveName, versionStr, flavor, localFlavorId) in allowed:
                 continue
-
-            if not self.auth.checkTrove(troveNamePattern, troveName):
-                continue
-
             allowed.add((troveName, versionStr, flavor, localFlavorId))
 
-            # FIXME: since troveNames is no longer traveling through
-            # here, this withVersions check has become superfluous.
-            # Now we're always dealing with versions -- gafton
             if latestFilter == self._GET_TROVE_VERY_LATEST:
                 d = troveVersions.setdefault(troveName, {})
 
@@ -1017,39 +1009,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, labelStr)
         # now get them troves
         args = [ ]
-        query = """
-        select distinct
-            Items.Item as trove, UP.pattern as pattern
-        from
-	    ( select
-	        Permissions.labelId as labelId,
-	        PerItems.item as pattern
-	      from
-                Permissions
-                join Items as PerItems using (itemId)
-	      where
-	            Permissions.userGroupId in (%s)
-	    ) as UP
-            join LabelMap on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-            join Items using (itemId) """ % \
-                (",".join("%d" % x for x in groupIds))
-        where = [ "Items.hasTrove = 1" ]
+        labelQ = ""
         if labelStr:
-            query = query + """
-            join Labels on LabelMap.labelId = Labels.labelId """
-            where.append("Labels.label = ?")
+            labelQ = "and Labels.label = ?"
             args.append(labelStr)
-        query = """%s
-        where %s
-        """ % (query, " AND ".join(where))
-        self.log(4, "query", query, args)
+        query = """
+        select distinct Items.Item
+        from Items
+        join CheckTroveCache as ctc using (itemId)
+        join Permissions on ctc.patternId = Permissions.itemId
+        join LabelMap on
+            (Permissions.labelId = LabelMap.labelId or Permissions.labelId = 0)
+            and Items.itemId = LabelMap.itemId
+        join Labels on LabelMap.labelId = Labels.labelId
+        where Permissions.userGroupId in (%s)
+          and Items.hasTrove = 1
+          %s
+        """ % (",".join("%d" % x for x in groupIds),labelQ)
         cu.execute(query, args)
-        names = set()
-        for (trove, pattern) in cu:
-            if not self.auth.checkTrove(pattern, trove):
-                continue
-            names.add(trove)
-        return list(names)
+        names = [ x[0] for x in cu ]
+        return names
 
     @accessReadOnly
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs,
@@ -1095,10 +1074,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   latestFilter = self._GET_TROVE_VERY_LATEST,
                                   withFlavors = True, troveTypes = troveTypes)
 
-        cu = self.db.cursor()
-
         # faster version for the "get-all" case
         # authenticate this user first
+        cu = self.db.cursor()
         groupIds = self.auth.getAuthGroups(cu, authToken)
         if not groupIds:
             return {}
@@ -1110,39 +1088,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Items.item as trove,
             Versions.version as version,
             Flavors.flavor as flavor,
-            Nodes.timeStamps as timeStamps,
-            UP.pattern as pattern
-        from Latest
-        join Nodes using (itemId, branchId, versionId)
-        join LabelMap using (itemId, branchId)
-        join ( select
-                Permissions.labelId as labelId,
-                PerItems.item as pattern
-            from
-                Permissions
-                join Items as PerItems using (itemId)
-            where
-                Permissions.userGroupId in (%s)
-            ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        join Items on Latest.itemId = Items.itemId
-        join Flavors on Latest.flavorId = Flavors.flavorId
-        join Versions on Latest.versionId = Versions.versionId
-        where
-            Latest.latestType = %d
+            Nodes.timeStamps as timeStamps
+        from UserGroupInstancesCache as ugi
+        join Instances using (instanceId)
+        join Latest using (versionId, itemId, flavorId)
+        join Nodes using (versionId, itemId, branchId)
+        join Items on Instances.itemId = Items.itemId
+        join Flavors on Instances.flavorId = Flavors.flavorId
+        join Versions on Instances.versionId = Versions.versionId
+        where ugi.userGroupId in (%s)
+          and Latest.latestType = %d
         """ % (",".join("%d" % x for x in groupIds), latestType)
-        self.log(4, "executing query", query)
         cu.execute(query)
         ret = {}
-        for (trove, version, flavor, timeStamps, pattern) in cu:
-            if not self.auth.checkTrove(pattern, trove):
-                continue
-            # NOTE: this is the "safe' way of doing it. It is very, very slow.
-            # version = versions.VersionFromString(version)
-            # version.setTimeStamps([float(x) for x in timeStamps.split(":")])
-            # version = self.freezeVersion(version)
-
-            # FIXME: prolly should use some standard thaw/freeze calls instead of
-            # hardcoding the "%.3f" format. One day I'll learn about all these calls.
+        for (trove, version, flavor, timeStamps) in cu:
+            # FIXME: we hardcode the timestamp format here for speed reasons
             version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
                                                       for x in timeStamps.split(":") ])
             retname = ret.setdefault(trove, {})
@@ -1877,41 +1837,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.db.analyze("tmpFileId")
         q = """
         SELECT DISTINCT
-            tmpFileId.itemId, FileStreams.stream, UP.permittedTrove, Items.item
+            tmpFileId.itemId, FileStreams.stream
         FROM tmpFileId
         JOIN FileStreams USING (fileId)
         JOIN TroveFiles USING (streamId)
-        JOIN Instances USING (instanceId)
-        JOIN Nodes ON
-            Instances.itemId = Nodes.itemId AND
-            Instances.versionId = Nodes.versionId
-        JOIN LabelMap ON
-            Nodes.itemId = LabelMap.itemId AND
-            Nodes.branchId = LabelMap.branchId
-        JOIN ( SELECT
-                   Permissions.labelId as labelId,
-                   PerItems.item as permittedTrove,
-                   Permissions.permissionId as aclId
-               FROM Permissions
-               JOIN Items as PerItems USING (itemId)
-               WHERE Permissions.userGroupId IN (%(ugid)s)
-             ) as UP
-                 ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-        JOIN Items ON Instances.itemId = Items.itemId
+        JOIN UserGroupInstancesCache ON
+            TroveFiles.instanceId = UserGroupInstancesCache.instanceId
         WHERE FileStreams.stream IS NOT NULL
+          AND UserGroupInstancesCache.userGroupId IN (%(ugid)s)
         """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
         cu.execute(q)
 
-        for (i, stream, troveNamePattern, troveName) in cu:
+        for (i, stream) in cu:
             fileId = uniqIdList[i]
             if fileId is None:
                  # we've already found this one
                  continue
-            if not self.auth.checkTrove(troveNamePattern, troveName):
-                # Insufficient permission to see a stream looks just
-                # like a missing stream (as missing items do in most
-                # of Conary)
-                continue
             if stream is None:
                 continue
             for streamIdx in fileIdMap[fileId]:
@@ -2097,55 +2038,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                        start_transaction=False)
         self.db.analyze("tmpNVF")
         if hidden:
-            hiddenClause = ("OR (Instances.isPresent = %d AND UP.canWrite = 1)"
+            hiddenClause = ("OR (Instances.isPresent = %d AND ugi.canWrite > 0)"
                         % instances.INSTANCE_PRESENT_HIDDEN)
         else:
             hiddenClause = ""
 
         results = [ False ] * len(troveList)
 
-        query = """SELECT idx, name, UP.permittedTrove FROM tmpNVF
-                        JOIN Items ON tmpNVF.name = Items.item
-                        JOIN Versions ON
-                            tmpNVF.version = Versions.version
-                        JOIN Flavors ON
-                            (tmpNVF.flavor = Flavors.flavor) OR
-                            (tmpNVF.flavor is NULL AND
-                             Flavors.flavor is NULL)
-                        JOIN Instances ON
-                            Instances.itemId = Items.itemId AND
-                            Instances.versionId = Versions.versionId AND
-                            Instances.flavorId = Flavors.flavorId
-                        JOIN Nodes ON
-                            Nodes.itemId = Instances.itemId AND
-                            Nodes.versionId = Instances.versionId
-                        JOIN LabelMap ON
-                            Nodes.itemId = LabelMap.itemId AND
-                            Nodes.branchId = LabelMap.branchId
-                        JOIN (SELECT
-                               Permissions.labelId as labelId,
-                               PerItems.item as permittedTrove,
-                               Permissions.permissionId as aclId,
-                               Permissions.canWrite as canWrite,
-                               Permissions.admin as admin
-                           FROM
-                               Permissions
-                               join Items as PerItems using (itemId)
-                           WHERE
-                               Permissions.userGroupId in (%s)
-                           ) as UP ON
-                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                        WHERE
-                            (Instances.isPresent = ?)
-                            %s
-                    """ % \
-                (",".join("%d" % x for x in userGroupIds), hiddenClause)
+        query = """
+        SELECT idx
+        FROM tmpNVF
+        JOIN Items ON
+            tmpNVF.name = Items.item
+        JOIN Versions ON
+            tmpNVF.version = Versions.version
+        JOIN Flavors ON
+            (tmpNVF.flavor is NOT NULL AND tmpNVF.flavor = Flavors.flavor) OR
+            (tmpNVF.flavor is NULL AND Flavors.flavorId = 0)
+        JOIN Instances ON
+            Instances.itemId = Items.itemId AND
+            Instances.versionId = Versions.versionId AND
+            Instances.flavorId = Flavors.flavorId
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        WHERE ugi.userGroupId in (%s)
+        AND Instances.isPresent = ?
+        %s """ % (",".join("%d" % x for x in userGroupIds), hiddenClause)
         cu.execute(query, instances.INSTANCE_PRESENT_NORMAL)
-
-        for row, name, pattern in cu:
-            if results[row]: continue
-            results[row]= self.auth.checkTrove(pattern, name)
-
+        for (row,) in cu:
+            results[row] = True
         return results
 
     @accessReadOnly
@@ -2159,80 +2080,53 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         schema.resetTable(cu, 'tmpPath')
         for row, path in enumerate(pathList):
-            cu.execute("INSERT INTO tmpPath (row, path) "
-                       "VALUES (?, ?)", (row, path),
-                       start_transaction=False)
+            cu.execute("INSERT INTO tmpPath (row, path) VALUES (?, ?)",
+                       (row, path), start_transaction=False)
         self.db.analyze("tmpPath")
 
-        # FIXME: MySQL 5.0.18 does not like "SELECT row, ..." so we are
-        # explicit
-        query = """SELECT Matches.row, item, version, flavor,
-                          timeStamps, UP.permittedTrove 
-                        FROM Instances
-                        -- # Do the actual matching in a subselect
-                        -- # to prevent MySQL from doing a full join
-                        -- # between TroveFiles and Instances
-                        JOIN (SELECT tmpPath.row AS row, instanceId
-			      FROM tmpPath JOIN TroveFiles ON
-                                  TroveFiles.path = tmpPath.path)
-                              AS Matches ON
-                            Instances.instanceId = Matches.instanceId
-                        JOIN Nodes ON
-                            Nodes.itemId = Instances.itemId AND
-                            Nodes.versionId = Instances.versionId
-                        JOIN LabelMap ON
-                            Nodes.itemId = LabelMap.itemId AND
-                            Nodes.branchId = LabelMap.branchId
-                        JOIN Labels ON
-                            Labels.labelId = LabelMap.labelId
-                        JOIN (SELECT
-                               Permissions.labelId as labelId,
-                               PerItems.item as permittedTrove,
-                               Permissions.permissionId as aclId
-                           FROM
-                               Permissions
-                               join Items as PerItems using (itemId)
-                           WHERE
-                               Permissions.userGroupId in (%s)
-                           ) as UP ON
-                           ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
-                        JOIN Items ON 
-                            (Instances.itemId = Items.itemId)
-                        JOIN Versions ON 
-                            (Instances.versionId = Versions.versionId)
-                        JOIN Flavors ON
-                            (Instances.flavorId = Flavors.flavorId)
-                        WHERE
-                            Instances.isPresent = ?
-                            AND Labels.label = ?
-                        ORDER BY
-                            Nodes.finalTimestamp DESC
-                    """ % ",".join("%d" % x for x in userGroupIds)
-        cu.execute(query, instances.INSTANCE_PRESENT_NORMAL, label)
-
-        if all:
-            results = [[] for x in pathList]
-            for idx, name, versionStr, flavor, timeStamps, pattern in cu:
-                if not self.auth.checkTrove(pattern, name):
-                    continue
-                version = versions.VersionFromString(versionStr, 
-                        timeStamps=[float(x) for x in timeStamps.split(':')])
-                branch = version.branch()
-                results[idx].append((name, self.freezeVersion(version), flavor))
-            return results
+        query = """
+        SELECT tmpPath.row, Items.item, Versions.version, Flavors.flavor,
+            Nodes.timeStamps
+        FROM tmpPath
+        JOIN TroveFiles using(path)
+        JOIN Instances using(instanceId)
+        JOIN Nodes on
+            Instances.itemId = Nodes.itemId
+            and Instances.versionId = Nodes.versionId
+        JOIN LabelMap on
+            Nodes.itemId = LabelMap.itemId
+            and Nodes.branchId = LabelMap.branchId
+        JOIN Labels on LabelMap.labelId = Labels.labelId
+        JOIN UserGroupInstancesCache as ugi on
+            Instances.instanceId = ugi.instanceId
+        JOIN Items on Instances.itemId = Items.itemId
+        JOIN Versions on Instances.versionId = Versions.versionId
+        JOIN Flavors on Instances.flavorId = Flavors.flavorId
+        WHERE ugi.userGroupId in (%s)
+          AND Instances.isPresent = %d
+          AND Labels.label = ?
+        ORDER BY Nodes.finalTimestamp DESC
+        """ % (",".join("%d" % x for x in userGroupIds),
+               instances.INSTANCE_PRESENT_NORMAL)
+        cu.execute(query, label)
 
         results = [ {} for x in pathList ]
-        for idx, name, versionStr, flavor, timeStamps, pattern in cu:
-            if not self.auth.checkTrove(pattern, name):
-                continue
-
-            version = versions.VersionFromString(versionStr, 
-                        timeStamps=[float(x) for x in timeStamps.split(':')])
+        for idx, name, versionStr, flavor, timeStamps in cu:
+            version = versions.VersionFromString(versionStr, timeStamps=[
+                float(x) for x in timeStamps.split(':')])
             branch = version.branch()
-            results[idx].setdefault((name, branch, flavor), 
-                                    self.freezeVersion(version))
-        return [ [ (y[0][0], y[1], y[0][2]) for y in x.iteritems()] 
-                                                            for x in results ]
+            retl = results[idx].setdefault((name, branch, flavor), [])
+            retl.append(self.freezeVersion(version))
+        def _iterAll(resList):
+            for (n,b,f), verList in resList.iteritems():
+                for v in verList:
+                    yield (n,v,f)
+        if all:
+            return [ list(_iterAll(x)) for x in results ]
+        # otherwise, the version stored first is the most recent and
+        # is the one that needs to be returned
+        return [ [ (n, vl[0], f) for (n,b,f),vl in x.iteritems() ]
+                 for x in results ]
 
     @accessReadOnly
     def getCollectionMembers(self, authToken, clientVersion, troveName,
@@ -2562,43 +2456,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # Since signatures are small blobs, it doesn't make a lot
         # of sense to use a LIMIT on this query...
         query = """
-        SELECT UP.permittedTrove, item, version, flavor, Instances.changed
+        SELECT item, version, flavor, Instances.changed
         FROM Instances
         JOIN TroveInfo USING (instanceId)
-        JOIN Nodes ON
-             Instances.itemId = Nodes.itemId AND
-             Instances.versionId = Nodes.versionId
-        JOIN LabelMap ON
-             Nodes.itemId = LabelMap.itemId AND
-             Nodes.branchId = LabelMap.branchId
-        JOIN (SELECT
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove,
-                  Permissions.permissionId as aclId
-              FROM Permissions
-              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
-              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
-              WHERE Permissions.userGroupId in (%s)
-                AND UserGroups.canMirror = 1
-             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN UserGroups ON
+            ugi.userGroupId = UserGroups.userGroupId AND
+            UserGroup.canMirror = 1
         JOIN Items ON Instances.itemId = Items.itemId
         JOIN Versions ON Instances.versionId = Versions.versionId
         JOIN Flavors ON Instances.flavorId = flavors.flavorId
-        WHERE Instances.changed <= ?
-          AND Instances.isPresent = ?
+        WHERE ugi.userGroupId in (%s)
+          AND Instances.changed <= ?
+          AND Instances.isPresent = %d
           AND TroveInfo.changed >= ?
-          AND TroveInfo.infoType = ?
+          AND TroveInfo.infoType = %d
         ORDER BY TroveInfo.changed
-        """ % (",".join("%d" % x for x in userGroupIds), )
-        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark,
-                           trove._TROVEINFO_TAG_SIGS))
-
-        l = set()
-        for pattern, name, version, flavor, mark in cu:
-            if self.auth.checkTrove(pattern, name):
-                l.add((mark, (name, version, flavor)))
-        return list(l)
-
+        """ % (",".join("%d" % x for x in userGroupIds),
+               instances.INSTANCE_PRESENT_NORMAL, trove._TROVEINFO_TAG_SIGS)
+        # the fewer query parameters passed in, the better PostgreSQL optimizes the query
+        # so we embed the constants in the query and bind the user supplied data
+        cu.execute(query, (mark, mark))
+        l = [ (m, (n,v,f)) for n,v,f,m in cu ]
+        return list(set(l))
+    
     @accessReadOnly
     def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
                         labels):
@@ -2632,50 +2514,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if not labelIds:
                 # no labels matched, short circuit
                 return []
-            labelLimit = 'AND LabelMap.labelId in (%s)' % (','.join(labelIds))
+            labelLimit = """
+            JOIN Permissions ON
+                Permissions.userGroupId = ugi.userGroupId
+            JOIN LabelMap ON
+                (Permissions.labelId = 0 OR Permissions.labelId = LabelMap.LabelId)
+                AND Instances.itemId = LabelMap.itemId
+                AND LabelMap.labelId in (%s)
+            """ % (','.join(labelIds))
         else:
             labelLimit = ''
         query = """
-        SELECT UP.permittedTrove, item, version, flavor,
+        SELECT item, version, flavor,
                TroveInfo.infoType, TroveInfo.data, TroveInfo.changed
         FROM Instances
         JOIN TroveInfo USING (instanceId)
-        JOIN Nodes ON
-             Instances.itemId = Nodes.itemId AND
-             Instances.versionId = Nodes.versionId
-        JOIN LabelMap ON
-             Nodes.itemId = LabelMap.itemId AND
-             Nodes.branchId = LabelMap.branchId
-        JOIN (SELECT
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove,
-                  Permissions.permissionId as aclId
-              FROM Permissions
-              JOIN UserGroups ON Permissions.userGroupId = userGroups.userGroupId
-              JOIN Items AS PerItems ON Permissions.itemId = PerItems.itemId
-              WHERE Permissions.userGroupId in (%s)
-                AND UserGroups.canMirror = 1
-             ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN UserGroups ON
+            ugi.userGroupId = UserGroups.userGroupId
+            AND UserGroups.canMirror = 1
+        %(labelLimit)s
         JOIN Items ON Instances.itemId = Items.itemId
         JOIN Versions ON Instances.versionId = Versions.versionId
         JOIN Flavors ON Instances.flavorId = flavors.flavorId
-        WHERE Instances.changed <= ?
-          AND Instances.isPresent = ?
+        WHERE ugi.userGroupId IN (%(ugids)s)
+          AND Instances.changed <= ?
+          AND Instances.isPresent = %(present)d
           AND TroveInfo.changed >= ?
-          %s
-          %s
-        ORDER BY instanceId, TroveInfo.changed
-        """ % (",".join("%d" % x for x in userGroupIds), infoTypeLimiter,
-               labelLimit)
-        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL, mark))
+          %(infoType)s
+        ORDER BY Instances.instanceId, TroveInfo.changed
+        """ % {
+            "ugids" : ",".join("%d" % x for x in userGroupIds),
+            "present" : instances.INSTANCE_PRESENT_NORMAL,
+            "infoType" : infoTypeLimiter,
+            "labelLimit" : labelLimit,
+            }
+        cu.execute(query, (mark, mark))
 
         l = set()
         currentTrove = None
         currentTroveInfo = None
         currentMark = None
-        for pattern, name, version, flavor, tag, data, tmark in cu:
-            if not self.auth.checkTrove(pattern, name):
-                continue
+        for name, version, flavor, tag, data, tmark in cu:
             t = (name, version, flavor)
             if currentTrove != t:
                 if currentTroveInfo != None:
@@ -2738,10 +2619,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
-        where Instances.isPresent in (?,?)
-          and Instances.troveType != ?
-        """, (instances.INSTANCE_PRESENT_NORMAL, instances.INSTANCE_PRESENT_HIDDEN,
-              trove.TROVE_TYPE_REMOVED),
+        where Instances.isPresent in (%d, %d)
+          and Instances.troveType != %d
+        """ % (instances.INSTANCE_PRESENT_NORMAL,
+               instances.INSTANCE_PRESENT_HIDDEN,
+               trove.TROVE_TYPE_REMOVED),
                    start_transaction=False)
         self.db.analyze("tmpInstanceId")
         # see what troves are missing, if any
@@ -2912,46 +2794,47 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # elimination we are sure to return at least 'lim' troves
         # back to the client
         query = """
-        SELECT DISTINCT UP.permittedTrove, item, version, flavor,
-            timeStamps, Instances.changed, Instances.troveType
+        select distinct * from (
+        SELECT
+            item, version, flavor,
+            Nodes.timeStamps,
+            Instances.changed, Instances.troveType
         FROM Instances
-        JOIN Nodes USING (itemId, versionId)
-        JOIN LabelMap USING (itemId, branchId)
-        JOIN (SELECT
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove,
-                  Permissions.permissionId as aclId
-              FROM Permissions
-              JOIN UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-              JOIN Items as PerItems ON Permissions.itemId = PerItems.itemId
-              WHERE Permissions.userGroupId in (%s)
-                AND UserGroups.canMirror = 1
-              ) as UP ON ( UP.labelId = 0 or UP.labelId = LabelMap.labelId )
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
+        JOIN UserGroups ON
+            ugi.userGroupId = UserGroups.userGroupId AND
+            UserGroups.canMirror = 1
         JOIN Items ON Items.itemId = Instances.itemId
         JOIN Versions ON Versions.versionId = Instances.versionId
         JOIN Flavors ON Flavors.flavorId = Instances.flavorId
+        JOIN Nodes ON
+            Instances.itemId = Nodes.itemId AND
+            Instances.versionId = Nodes.versionId
         WHERE Instances.changed >= ?
-          AND Instances.isPresent = ?
+          AND Instances.isPresent = %d
+          AND ugi.userGroupId in (%s)
         ORDER BY Instances.changed
         LIMIT %d
-        """ % (",".join("%d" % x for x in userGroupIds), lim * permCount)
-        cu.execute(query, (mark, instances.INSTANCE_PRESENT_NORMAL))
-        self.log(4, "executing query", query, mark, instances.INSTANCE_PRESENT_NORMAL)
-        l = set()
-
-        for pattern, name, version, flavor, timeStamps, mark, troveType in cu:
-            if self.auth.checkTrove(pattern, name):
-                version = versions.strToFrozen(version,
-                    [ "%.3f" % (float(x),) for x in timeStamps.split(":") ])
-                l.add((mark, (name, version, flavor), troveType))
-            if len(l) >= lim:
+        ) as inq
+        """ % ( instances.INSTANCE_PRESENT_NORMAL,
+                ",".join("%d" % x for x in userGroupIds),
+                lim * permCount)
+        cu.execute(query, mark)
+        self.log(4, "executing query", query, mark)
+        ret = []
+        for name, version, flavor, timeStamps, mark, troveType in cu:
+            version = versions.strToFrozen(version, [
+                "%.3f" % (float(x),) for x in timeStamps.split(":") ])
+            ret.append( (mark, (name, version, flavor), troveType) )
+            if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
                 junk = cu.fetchall()
                 break
         # older mirror clients do not support getting the troveType values
         if clientVersion < 40:
-            return [ (x[0], x[1]) for x in list(l) ]
-        return list(l)
+            return [ (x[0], x[1]) for x in ret ]
+        return ret
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
@@ -3054,33 +2937,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # tmpInstanceId now has instanceIds of the parents. retrieve the data we need
         cu.execute("""
         select
-            tmpInstanceId.idx, Items.item, Versions.version, Flavors.flavor,
-            UP.permittedTrove as pattern
+            tmpInstanceId.idx, Items.item, Versions.version, Flavors.flavor
         from tmpInstanceId
         join Instances on tmpInstanceId.instanceId = Instances.instanceId
-        join Nodes USING (itemId, versionId)
-        join LabelMap USING (itemId, branchId)
-        join (select
-                  Permissions.labelId as labelId,
-                  PerItems.item as permittedTrove
-              from Permissions
-              join UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-              join Items as PerItems ON Permissions.itemId = PerItems.itemId
-              where Permissions.userGroupId in (%s)
-              ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
+        join UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
         join Items on Instances.itemId = Items.itemId
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
+        where ugi.userGroupId in (%s)
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
         ret = [ set() for x in range(len(troveInfoList)) ]
         for i, n,v,f, pattern in cu:
             s = ret[i-minIdx]
-            if self.auth.checkTrove(pattern, n):
-                s.add((n,v,f))
-
+            s.add((n,v,f))
         ret = [ list(x) for x in ret ]
-
         return ret
 
     @accessReadOnly
@@ -3110,33 +2982,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 d["flavor"] = "and Flavors.flavor = ?"
                 args.append(f)
             cu.execute("""
-            select
-            Versions.version, Flavors.flavor, UP.permittedTrove
+            select Versions.version, Flavors.flavor
             from Items
             join Nodes on Items.itemId = Nodes.itemId
             join Instances on
                 Nodes.versionId = Instances.versionId and
                 Nodes.itemId = Instances.itemId
-            join Flavors on Instances.flavorId = Flavors.flavorId
-            join LabelMap on
-                Nodes.itemId = LabelMap.itemId and
-                Nodes.branchId = LabelMap.branchId
-            join ( select Permissions.labelId as labelId,
-                          PerItems.item as permittedTrove
-                   from Permissions
-                   join UserGroups ON Permissions.userGroupId = UserGroups.userGroupId
-                   join Items as PerItems ON Permissions.itemId = PerItems.itemId
-                   where Permissions.userGroupId in (%(gids)s)
-                 ) as UP on ( UP.labelId = 0 or UP.labelId = LabelMap.labelId)
+            join UserGroupInstancesCache as ugi on
+                Instances.instanceId = ugi.instanceId
             join Branches on Nodes.branchId = Branches.branchId
             join Versions on Nodes.versionId = Versions.versionId
+            join Flavors on Instances.flavorId = Flavors.flavorId
             where Items.item = ?
               and Branches.branch like ?
+              and ugi.userGroupId in (%(gids)s)
               %(flavor)s
             """ % d, args)
-            for verStr, flavStr, pattern in cu:
-                if self.auth.checkTrove(pattern, n):
-                    ret[i].append((verStr,flavStr))
+            for verStr, flavStr in cu:
+                ret[i].append((verStr,flavStr))
         return ret
 
     @accessReadOnly

@@ -16,7 +16,7 @@ from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, sqllib
 from conary.lib.tracelog import logMe
 from conary.deps import deps
-from conary.repository.netrepos import versionops, trovestore
+from conary.repository.netrepos import versionops, trovestore, netauth, flavors
 from conary.server import schema
 
 # SCHEMA Migration
@@ -399,7 +399,7 @@ class MigrateTo_15(SchemaMigration):
         return True
     # conary 1.1.22 went out with a busted definition of LabelMap - we need to fix it
     def migrate4(self):
-        return createLabelMap(self.db)
+        return updateLabelMap(self.db)
     # 15.5
     def migrate5(self):
         # drop the index in case a user created it by hand (CNY-1704)
@@ -407,10 +407,65 @@ class MigrateTo_15(SchemaMigration):
         return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
                                    'itemId, branchId')
 
+# populate the CheckTroveCache table
+def createCheckTroveCache(db):
+    db.loadSchema()
+    logMe(2, "creating the CheckTroveCache table...")
+    assert("CheckTroveCache" in db.tables)
+    cu = db.cursor()
+    cu.execute("""
+    select distinct
+        P.itemId as patternId, Items.itemId as itemId,
+        PI.item as pattern, Items.item as trove
+    from Permissions as P
+    join Items as PI using(itemId)
+    cross join Items
+    """)
+    cu2 = db.cursor()
+    auth = netauth.NetworkAuthorization(db, None)
+    for (patternId, itemId, pattern, troveName) in cu:
+        if not auth.checkTrove(pattern, troveName):
+            continue
+        cu2.execute("insert into CheckTroveCache (patternId, itemId) values (?,?)",
+                    (patternId, itemId))
+    db.analyze("CheckTroveCache")
+    logMe(2, "done with CheckTroveCache")
+    return True
+        
+# populate (and create if not exists) the UserGroupInstances table
+def createUserGroupInstances(db):
+    db.loadSchema()
+    logMe(2, "creating UserGroupInstances table")
+    assert("UserGroupInstancesCache" in db.tables)
+    assert("CheckTroveCache" in db.tables)
+    cu = db.cursor()
+    # select all instances that each usergroupid has access to
+    # this query needs the CheckTroveCache table to be fully populated
+    cu.execute("""
+    insert into UserGroupInstancesCache (instanceId, userGroupId, canWrite, canRemove)
+    select
+        Instances.instanceId as instanceId,
+        Permissions.userGroupId as userGroupId,
+        case when sum(Permissions.canWrite) = 0 then 0 else 1 end as canWrite,
+        case when sum(Permissions.canRemove) = 0 then 0 else 1 end as canRemove
+    from Instances
+    join Nodes using(itemId, versionId)
+    join LabelMap using(itemId, branchId)
+    join Permissions on
+        Permissions.labelId = 0 or
+        Permissions.labelId = LabelMap.labelId
+    join CheckTroveCache on Permissions.itemId = CheckTroveCache.patternId
+    where Instances.itemId = CheckTroveCache.itemId
+    group by Instances.instanceId, Permissions.userGroupId
+    """)
+    db.analyze("UserGroupInstancesCache")
+    return True
+
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
-def createLabelMap(db):
+def updateLabelMap(db):
     cu = db.cursor()
+    logMe(2, "updating LabelMap")
     cu.execute("create table OldLabelMap as select * from LabelMap")
     cu.execute("drop table LabelMap")
     db.loadSchema()
@@ -422,10 +477,31 @@ def createLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16.0)
+    Version = (16,2)
+    # migrate to 16.0
     # create a primary key for labelmap
     def migrate(self):
-        return createLabelMap(self.db)
+        return updateLabelMap(self.db)
+    # populate the UserGroupInstances map
+    def migrate1(self):
+        schema.createAccessMaps(self.db)
+        if not createCheckTroveCache(self.db):
+            return False
+        if not createUserGroupInstances(self.db):
+            return False
+        return True
+    def migrate2(self):
+        # need to rebuild flavormap
+        cu = self.db.cursor()
+        cu.execute("drop table FlavorMap")
+        self.db.loadSchema()
+        schema.createFlavors(self.db)
+        cu.execute("select flavorId, flavor from Flavors")
+        flavTable = flavors.Flavors(self.db)
+        for (flavorId, flavorStr) in cu.fetchall():
+            flavor = deps.ThawFlavor(flavorStr)
+            flavTable.createFlavorMap(flavorId, flavor, cu)
+        return True
 
 def _getMigration(major):
     try:

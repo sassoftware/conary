@@ -69,6 +69,7 @@ class TroveStore:
 	self.versionOps = versionops.SqlVersioning(
             self.db, self.versionTable, self.branchTable)
 	self.instances = instances.InstanceTable(self.db)
+        self.ugi = versionops.UserGroupInstancesCache(self.db)
 
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         self.depTables = deptable.DependencyTables(self.db)
@@ -233,6 +234,7 @@ class TroveStore:
     def addTrove(self, trv, hidden = False):
 	cu = self.db.cursor()
         schema.resetTable(cu, 'tmpNewFiles')
+        schema.resetTable(cu, 'tmpNewRedirects')
 	return (cu, trv, hidden)
 
     def addTroveDone(self, troveInfo):
@@ -343,11 +345,10 @@ class TroveStore:
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
         troveBranchId = self.branchTable[troveVersion.branch()]
-        self.versionOps.updateLatest(troveItemId, troveBranchId,
-                                     troveFlavorId)
-
+        self.versionOps.updateLatest(troveItemId, troveBranchId, troveFlavorId)
         self.depTables.add(cu, trv, troveInstanceId)
-
+        self.ugi.updateInstanceId(troveInstanceId)
+        
         # Fold tmpNewFiles into FileStreams
         #
         # tmpNewFiles can contain duplicate entries for the same fileId,
@@ -435,13 +436,16 @@ class TroveStore:
                        start_transaction=False)
         self.db.analyze("tmpTroves")
         
+        # need to use self.items.addId to keep the CheckTroveCache in
+        # sync for any new items we might add
         cu.execute("""
-        INSERT INTO Items (item)
         SELECT DISTINCT tmpTroves.item
         FROM tmpTroves
         LEFT JOIN Items USING (item)
         WHERE Items.itemId is NULL
         """)
+        for (newItem,) in cu.fetchall():
+            self.items.addId(newItem)
 
         # look for included troves with no instances yet; we make those
         # entries manually here
@@ -470,15 +474,12 @@ class TroveStore:
 		if nodeId is None:
 		    (nodeId, versionId) = self.versionOps.createVersion(
 						    itemId, version,
-						    flavorId, sourceName,
-						    updateLatest = False)
+						    flavorId, sourceName)
 		del nodeId
             else:
                 (nodeId, versionId) = self.versionOps.createVersion(
                                                 itemId, version,
-                                                flavorId, sourceName,
-                                                updateLatest = False)
-
+                                                flavorId, sourceName)
             instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                 clonedFromId, trv.getType(),
                                 isPresent = instances.INSTANCE_PRESENT_MISSING)
@@ -499,7 +500,6 @@ class TroveStore:
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
         # now add the redirects
-        cu.execute("DELETE FROM tmpNewRedirects")
         for (name, branch, flavor) in trv.iterRedirects():
             if flavor is None:
                 frz = None
@@ -508,14 +508,18 @@ class TroveStore:
             cu.execute("INSERT INTO tmpNewRedirects (item, branch, flavor) "
                        "VALUES (?, ?, ?)", (name, str(branch), frz),
                        start_transaction=False)
-
+        self.db.analyze("tmpNewRedirects")
+        
+        # again need to pay attention to CheckTrovesCache and use items.addId()
         cu.execute("""
-        INSERT INTO Items (item)
         SELECT tmpNewRedirects.item
         FROM tmpNewRedirects
         LEFT JOIN Items USING (item)
         WHERE Items.itemId is NULL
         """)
+        for (newItem,) in cu.fetchall():
+            self.items.addId(newItem)
+        
         cu.execute("""
         INSERT INTO Branches (branch)
         SELECT tmpNewRedirects.branch
@@ -1093,6 +1097,12 @@ class TroveStore:
         """, instanceId, start_transaction=False)
         self.db.analyze("tmpRemovals")
 
+        # removing this instanceId removes access to all troves included by it
+        cu.execute("""
+        DELETE FROM UserGroupInstancesCache WHERE instanceId in (
+        SELECT includedId from TroveTroves WHERE instanceId = ? )
+        """, instanceId)
+        
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM TroveRedirects WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM Instances WHERE instanceId IN "
@@ -1104,6 +1114,10 @@ class TroveStore:
                        trove.TROVE_TYPE_REMOVED, instanceId)
             self.versionOps.updateLatest(itemId, branchId, flavorId)
         else:
+            cu.execute("DELETE FROM UserGroupInstancesCache WHERE instanceId = ?",
+                       instanceId)
+            cu.execute("DELETE FROM UserGroupTroves WHERE instanceId = ?",
+                       instanceId)
             cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
         # look for troves referenced by this one

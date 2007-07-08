@@ -2,6 +2,9 @@ Changes in 2.0.0:
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
 
+  o Server Changes:
+    * fixed scoring for target flavor sets (CNY-1539)
+
 Changes in 1.1.32:
   o Client Changes:
     * A getDownloadSizes() method has been added to the ConaryClient
