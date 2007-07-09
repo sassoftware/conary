@@ -858,6 +858,23 @@ class MigrateTo_20(SchemaMigration):
 # index, so there is no need to do a full blown migration and stop
 # conary from working until a schema migration is done
 def optSchemaUpdate(db):
+    # drop any ANALYZE information, because it makes sqlite go
+    # very slow.
+    cu = db.cursor()
+    cu.execute("select count(*) from sqlite_master where name='sqlite_stat1'")
+    count = cu.fetchall()[0][0]
+    if count != 0:
+        cu.execute('select count(*) from sqlite_stat1')
+        count = cu.fetchall()[0][0]
+        if count != 0:
+            try:
+                # go - read-only
+                cu.execute('BEGIN IMMEDIATE')
+                cu.execute('delete from sqlite_stat1')
+            except sqlerrors.ReadOnlyDatabase:
+                # the database will go slow, but it should work.
+                pass
+
     # Create DatabaseAttributes (if it doesn't exist yet)
     createDatabaseAttributes(db)
     #do we have the index we need?
