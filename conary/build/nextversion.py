@@ -50,7 +50,6 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         # this is a direct shadow of a binary that is non-existant
         # we look at binary numbers on the target label.
         sourceVersion = sourceVersion.createShadow(targetLabel)
-        targetLabel = None
 
     # search for all the packages that are being created by this cook - 
     # we take the max of all of these versions as our latest.
@@ -63,7 +62,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     else:
         d = {}
     return _nextVersionFromQuery(d, db, pkgNames, sourceVersion,
-                                 troveFlavorSet, targetLabel=targetLabel,
+                                 troveFlavorSet,
                                  alwaysBumpCount=alwaysBumpCount)
 
 
@@ -99,8 +98,7 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
     return nextVersions
 
 def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
-                          troveFlavorSet, targetLabel=None,
-                          alwaysBumpCount=False):
+                          troveFlavorSet, alwaysBumpCount=False):
     pkgNames = set([x.split(':')[-1] for x in troveNames])
     latest = None
     relVersions = []
@@ -121,9 +119,6 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
                                           b[0].trailingRevision().buildCount))
         latest, flavors = relVersions[-1]
         latest = latest.copy()
-
-        if targetLabel:
-            latest = latest.createShadow(targetLabel)
 
         if alwaysBumpCount:
             # case 1.  There is a binary trove with this source
