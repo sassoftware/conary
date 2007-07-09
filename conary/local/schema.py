@@ -859,7 +859,7 @@ class MigrateTo_20(SchemaMigration):
 # conary from working until a schema migration is done
 def optSchemaUpdate(db):
     # drop any ANALYZE information, because it makes sqlite go
-    # very slow.
+    # very slowly.
     cu = db.cursor()
     cu.execute("select count(*) from sqlite_master where name='sqlite_stat1'")
     count = cu.fetchall()[0][0]
@@ -872,7 +872,7 @@ def optSchemaUpdate(db):
                 cu.execute('BEGIN IMMEDIATE')
                 cu.execute('delete from sqlite_stat1')
             except sqlerrors.ReadOnlyDatabase:
-                # the database will go slow, but it should work.
+                # the database will go slowly, but it should work.
                 pass
 
     # Create DatabaseAttributes (if it doesn't exist yet)
