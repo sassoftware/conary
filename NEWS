@@ -4,6 +4,8 @@ Changes in 1.1.32:
       object to determine the over-the-wire transfer size of the jobs
       in an UpdateJob object.  Call requires a single repository be
       the source of the entire update. (CNY-1757)
+    * cvc reports a more accurate error message when the CONARY file in
+      the current directory is not a regular file
 
   o Server Changes:
     * A "infoOnly" parameter to has been added to the getChangeSet()
