@@ -271,8 +271,8 @@ Sources are always cloned with binaries.
 
 There are limits to the promotes one can make - one can clone between siblings - from /A//B to /A//C, for example, or uphill to parents - from /A//B to /A, or to siblings of parents - from /A//B/C to /A//D, or from /A//B//C to /D. One cannot clone from branch /A//B to /C//D, because there is no relationship between the parents of these two branches, /A != /C.  All promotes other than sibling promotes must be specified via branches.
 .TP 4
-.B \-\-all-flavors
-Clone all flavors for the latest versions of the specified troves.
+.B \-\-all-flavors (deprecated)
+Clone all flavors for the latest versions of the specified troves.  Now on by default.
 .TP 4
 .B \-\-without-sources
 Do not automatically clone the source for every package you are cloning.  This 

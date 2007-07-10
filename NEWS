@@ -8,6 +8,11 @@ Changes in @NEW@:
     * Updates to groups are now allowed to be merged with other groups in 
       update jobs, reducing the number of jobs that are used for updates.
   o Client Changes:
+    * Cloning now always increments group version counts, mimicing
+      the behavior of group cooking. (CNY-1724)
+    * When promoting, --all-flavors is now on by default.  However, if you
+      specify a flavor to promote or clone, promotes will be limited by
+      that flavor.
     * Several commands, such as promote, update and rq, now take an
       --exact-flavors flag.  If specified, the flavors for each trove must
       match exactly - no system flavor or heuristic is used to find the trove
@@ -19,6 +24,7 @@ Changes in @NEW@:
       removed from the local database unless it is being accessed
       read-only.  Database performance is poor on databases with
       "ANALYZE" data in them. (CNY-778)
+>>>>>>> /tmp/NEWS~other._yFHBZ
 
 Changes in 1.1.32:
   o Client Changes:

@@ -121,9 +121,18 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
         targetMap[fromLoc] = toLoc
 
     troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
-
-    if allFlavors:
+    if exactFlavors:
+        allFlavors = False
+    elif allFlavors:
         cfg.flavor = []
+        troveSpecFlavors =  {}
+        for troveSpec in troveSpecs:
+            troveSpecFlavors.setdefault(
+                        (troveSpec[0], troveSpec[1], None),
+                            []).append(troveSpec[2])
+        troveSpecs = list(troveSpecFlavors)
+
+
     client = ConaryClient(cfg)
     searchSource = client.getSearchSource()
     results = searchSource.findTroves(troveSpecs,
@@ -131,13 +140,20 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                                       exactFlavors=exactFlavors)
     if allFlavors:
         trovesToClone = []
-        # we only clone the latest version for all troves.
-        # bestFlavor=False resturns the leaves for all flavors, so 
-        # we may need to cut some out.
         for troveSpec, troveTups in results.items():
-            latest = max([x[1] for x in troveTups])
-            troveTups = [ x for x in troveTups if x[1] == latest ]
-            trovesToClone.extend(troveTups)
+            specFlavors = troveSpecFlavors[troveSpec]
+            for specFlavor in specFlavors:
+                if specFlavor is None:
+                    matchingTups = troveTups
+                else:
+                    matchingTups = [ x for x in troveTups
+                                     if x[2].stronglySatisfies(specFlavor)]
+                # we only clone the latest version for all troves.
+                # bestFlavor=False resturns the leaves for all flavors, so
+                # we may need to cut some out.
+                latest = max([x[1] for x in matchingTups])
+                matchingTups = [ x for x in matchingTups if x[1] == latest ]
+                trovesToClone.extend(matchingTups)
     else:
         trovesToClone = itertools.chain(*results.itervalues())
     trovesToClone = list(set(trovesToClone))

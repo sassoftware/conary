@@ -247,7 +247,12 @@ class PromoteCommand(CvcCommand):
                                    ' that are installed by default.'),
              'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
                                            ' to the repository'),
-             'exact-flavors' : (VERBOSE_HELP, 'Only promote troves whose flavor matches exactly what is specified'),
+             'all-flavors' : (VERBOSE_HELP, 'Promote all flavors of a'
+                                            ' package/group at the same time'
+                                            ' (now the default)'),
+             'exact-flavors' : (VERBOSE_HELP, 'Specified flavors must match'
+                                              'the package/group flavors'
+                                              'exactly to promote')
            }
 
     def addParameters(self, argDef):
@@ -257,6 +262,7 @@ class PromoteCommand(CvcCommand):
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
         argDef["all-flavors"] = NO_PARAM
+        argDef["exact-flavors"] = NO_PARAM
         argDef["without-sources"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
         argDef["default-only"] = NO_PARAM
@@ -281,7 +287,7 @@ class PromoteCommand(CvcCommand):
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        allFlavors = argSet.pop("all-flavors", False)
+        allFlavors = argSet.pop("all-flavors", True)
         cloneSources = not argSet.pop("without-sources", False)
         argSet.pop("with-sources", False)
         targetFile = argSet.pop("to-file", False)
