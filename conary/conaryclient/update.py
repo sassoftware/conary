@@ -1366,7 +1366,8 @@ conary erase '%s=%s[%s]'
                          useAffinity = True, checkPrimaryPins = True,
                          forceJobClosure = False, ineligible = set(),
                          syncChildren=False, updateOnly=False,
-                         installMissing = False, removeNotByDefault = False):
+                         installMissing = False, removeNotByDefault = False,
+                         exactFlavors = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1527,16 +1528,19 @@ conary erase '%s=%s[%s]'
         searchSource = uJob.getSearchSource()
 
         if not useAffinity:
-            results.update(searchSource.findTroves(toFind), useAffinity=False)
+            results.update(searchSource.findTroves(toFind, useAffinity=False,
+                                                   exactFlavors=exactFlavors))
         else:
             if toFind:
                 results.update(searchSource.findTroves(toFind,
-                                                       useAffinity=True))
+                                                    useAffinity=True,
+                                                    exactFlavors=exactFlavors))
                 log.lowlevel("looking up troves w/ database affinity")
             if toFindNoDb:
                 log.lowlevel("looking up troves w/o database affinity")
                 results.update(searchSource.findTroves(toFindNoDb,
-                                                       useAffinity=False))
+                                                   useAffinity=False,
+                                                   exactFlavors=exactFlavors))
         for troveSpec, (oldTroveInfo, isAbsolute) in \
                 itertools.chain(toFind.iteritems(), toFindNoDb.iteritems()):
             resultList = results[troveSpec]
@@ -2323,7 +2327,8 @@ conary erase '%s=%s[%s]'
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
-                        applyCriticalOnly = False, restartInfo = None):
+                        applyCriticalOnly = False, restartInfo = None,
+                        exactFlavors = False):
         """
         Populates an update job based on a set of trove update and erase
         operations.If self.cfg.autoResolve is set, dependencies
@@ -2457,7 +2462,7 @@ conary erase '%s=%s[%s]'
                     migrate = migrate,
                     criticalUpdateInfo = criticalUpdateInfo,
                     resolveSource = resolveSource,
-                    updateJob = updJob)
+                    updateJob = updJob, exactFlavors = exactFlavors)
         except DependencyFailure, e:
             if e.hasCriticalUpdates() and not applyCriticalOnly:
                 e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
@@ -2558,7 +2563,7 @@ conary erase '%s=%s[%s]'
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
-                        updateJob = None):
+                        updateJob = None, exactFlavors = False):
         """Create an update job. DEPRECATED, use newUpdateJob and
         prepareUpdateJob instead"""
         # FIXME: this API has gotten far out of hand.  Refactor when 
@@ -2656,7 +2661,8 @@ conary erase '%s=%s[%s]'
             if not mainSearchSource:
                 mainSearchSource = self.getSearchSource()
             result = mainSearchSource.findTroves(resolveGroupList,
-                                                 useAffinity=useAffinity)
+                                                 useAffinity=useAffinity,
+                                                 exactFlavors=exactFlavors)
             groupTups = list(itertools.chain(*result.itervalues()))
             groupTroves = self.repos.getTroves(groupTups, withFiles=False)
             resolveSource = resolve.DepResolutionByTroveList(self.cfg, self.db,
@@ -2677,7 +2683,8 @@ conary erase '%s=%s[%s]'
                                        syncChildren = syncChildren,
                                        updateOnly = updateOnly,
                                        installMissing = installMissing,
-                                       removeNotByDefault = removeNotByDefault)
+                                       removeNotByDefault = removeNotByDefault,
+                                       exactFlavors = exactFlavors)
 
         self._validateJob(jobSet)
 

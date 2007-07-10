@@ -238,6 +238,11 @@ Perform all actions up to the point of writing to the filesystem.
 If the given update involves critical updates, apply only those critical 
 updates and then stop.
 .TP
+.B \-\-exact-flavor
+Match only the exact flavors specified at the command line. This turns off
+conary's automatic merging of your system flavor with any flavor specified at
+the command line and only uses the flavors you explicitly specify.
+.TP
 .B updateall
 Iterates through all the top-level troves installed on the system
 and updates to the most recent version in the repository.
@@ -430,6 +435,9 @@ Return all troves that match the system flavor + any specified flavors
 .TP
 .B \-\-best-flavors [default]
 Return the best trove flavor based on your system flavor,
+.TP
+.B \-\-exact-flavors
+Return only troves that have exactly the flavor you specify.
 .TP
 .B \-\-affinity
 Turn on flavor and branch affinity.  For example, when  using --best-flavors 

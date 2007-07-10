@@ -244,9 +244,10 @@ class PromoteCommand(CvcCommand):
                                      ' being cloned'),
              'default-only'    : (VERBOSE_HELP, 'EXPERIMENTAL - '
                                    ' Clones only those components'
-                                   'that are installed by default.'),
+                                   ' that are installed by default.'),
              'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
-                                           ' to the repository')
+                                           ' to the repository'),
+             'exact-flavors' : (VERBOSE_HELP, 'Only promote troves whose flavor matches exactly what is specified'),
            }
 
     def addParameters(self, argDef):
@@ -260,6 +261,7 @@ class PromoteCommand(CvcCommand):
         argDef["with-sources"] = NO_PARAM
         argDef["default-only"] = NO_PARAM
         argDef["to-file"] = ONE_PARAM
+        argDef["exact-flavors"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -284,12 +286,13 @@ class PromoteCommand(CvcCommand):
         argSet.pop("with-sources", False)
         targetFile = argSet.pop("to-file", False)
         defaultOnly = argSet.pop("default-only", False)
+        exactFlavors = argSet.pop("exact-flavors", False)
         clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test,
                             cloneSources=cloneSources, allFlavors=allFlavors,
                             cloneOnlyByDefaultTroves=defaultOnly,
-                            targetFile=targetFile)
+                            targetFile=targetFile, exactFlavors=exactFlavors)
 _register(PromoteCommand)
 
 

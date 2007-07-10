@@ -39,7 +39,8 @@ def displayCloneJob(cs):
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                info = False, cloneSources = False, message = None, 
-               test = False, fullRecurse = False, ignoreConflicts = False):
+               test = False, fullRecurse = False, ignoreConflicts = False,
+               exactFlavors = False):
     client = ConaryClient(cfg)
     repos = client.getRepos()
 
@@ -56,7 +57,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
 
     trovesToClone = repos.findTroves(cfg.installLabelPath, 
-                                    troveSpecs, cfg.flavor)
+                                    troveSpecs, cfg.flavor,
+                                    exactFlavors = exactFlavors)
     trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
 
     if not client.cfg.quiet:
@@ -105,7 +107,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
                   cloneSources = False, allFlavors = False, client=None, 
-                  targetFile = None):
+                  targetFile = None, exactFlavors = None):
     targetMap = {}
     for fromLoc, toLoc in targetList:
         context = cfg.buildLabel
@@ -125,7 +127,8 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
     client = ConaryClient(cfg)
     searchSource = client.getSearchSource()
     results = searchSource.findTroves(troveSpecs,
-                                      bestFlavor=not allFlavors)
+                                      bestFlavor=not allFlavors,
+                                      exactFlavors=exactFlavors)
     if allFlavors:
         trovesToClone = []
         # we only clone the latest version for all troves.

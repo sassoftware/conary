@@ -289,9 +289,11 @@ Normally, cvc tried to rewrite any build information stored with the trove, such
 .TP
 .B \-\-test
 Go through the entire process of creating the clone changeset, but do not commit it to the repository.
+.TP
+.B \-\-exact\-flavors
+Only promote exactly the packages with the flavors you specify, without merging in your system flavor.
 .RE
 .TP
-
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
 source directory.  It creates a diff between two versions of

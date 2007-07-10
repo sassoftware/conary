@@ -6,6 +6,11 @@ Changes in @NEW@:
   o Update Changes:
     * Updates to groups are now allowed to be merged with other groups in 
       update jobs, reducing the number of jobs that are used for updates.
+  o Client Changes:
+    * Several commands, such as promote, update and rq, now take an
+      --exact-flavors flag.  If specified, the flavors for each trove must
+      match exactly - no system flavor or heuristic is used to find the trove
+      you want.  (CNY-1829)
 
 Changes in 1.1.32:
   o Client Changes:
