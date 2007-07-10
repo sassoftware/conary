@@ -3,6 +3,7 @@ Changes in @NEW@:
     * The addArchive() source action now handles xpi archives. (CNY-1793)
     * Unknown flags are now ignored when calling loadRecipe w/ a flavor
       (before this would result in a traceback).
+
   o Update Changes:
     * Updates to groups are now allowed to be merged with other groups in 
       update jobs, reducing the number of jobs that are used for updates.
@@ -11,6 +12,13 @@ Changes in @NEW@:
       --exact-flavors flag.  If specified, the flavors for each trove must
       match exactly - no system flavor or heuristic is used to find the trove
       you want.  (CNY-1829)
+
+  o Bug Fixes:
+    * The SQLite "ANALYZE" command is no longer run on local SQLite
+      databases.  Any data stored by the "ANALYZE" command will be
+      removed from the local database unless it is being accessed
+      read-only.  Database performance is poor on databases with
+      "ANALYZE" data in them. (CNY-778)
 
 Changes in 1.1.32:
   o Client Changes:
