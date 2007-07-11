@@ -931,9 +931,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             newCs.newTrove(newTrv.diff(oldTrv)[0])
 
-        # we can't combine these (yet; we should work on that)
-        assert(not changeSetJobs or not needsRooting)
-
         rootMap = {}
         for (relJob, absJob) in needsRooting:
             assert(relJob[0] == absJob[0])
@@ -962,6 +959,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             # in this trove (we don't reset() the underlying changesets
             # because this isn't a good place to coordinate that reset when
             # multiple threads are in use)
+            jobsToFind = list(changeSetJobs)
             for subCs in self.csList:
                 keep = False
                 for trvCs in subCs.iterNewTroveList():
@@ -976,10 +974,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                   (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 trvCs.isAbsolute())
 
-                    if job in changeSetJobs:
+                    if job in jobsToFind:
                         newCs.newTrove(trvCs)
+                        jobsToFind.remove(job)
                         keep = True
-
                 if keep:
                     subCs.reset()
                     mergedCs.merge(subCs)
