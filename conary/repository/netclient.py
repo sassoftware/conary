@@ -1629,7 +1629,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 # if the old version is marked removed, pretend as though
                 # it doesn't exist.
-                if old.isRemoved():
+                if old and old.isRemoved():
                     old = None
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute)
