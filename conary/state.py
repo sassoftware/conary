@@ -298,10 +298,10 @@ class ConaryStateFromFile(ConaryState):
         elif not os.path.isfile(path):
             raise CONARYNotFile
 
-	versionUpdated = self.parseFile(file, repos=repos,
+	versionUpdated = self.parseFile(path, repos=repos,
                                         parseSource=parseSource)
-        if versionUpdated and os.access(file, os.W_OK):
-            self.write(file)
+        if versionUpdated and os.access(path, os.W_OK):
+            self.write(path)
 
 class SourceStateFromLines(SourceState):
 
