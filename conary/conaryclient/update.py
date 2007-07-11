@@ -26,7 +26,7 @@ from conary.errors import ClientError, ConaryError, InternalConaryError, Missing
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
-from conary.repository.errors import TroveMissing
+from conary.repository.errors import TroveMissing, OpenError
 from conary import trove, versions
 
 class CriticalUpdateInfo(object):
@@ -1425,11 +1425,26 @@ conary erase '%s=%s[%s]'
                     if oldTrv is None:
                         # XXX batching these would be much more efficient
                         oldTrv = troveSource.getTrove(job[0], job[1][0],
-                                                      job[1][1], 
+                                                      job[1][1],
                                                       withFiles = False)
 
-                newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                              withFiles = False)
+                try:
+                    newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                                  withFiles = False)
+                except (TroveMissing, OpenError), err:
+                    # In the case where we're getting transitive closure
+                    # for a relative changeset and hit a trove that is
+                    # not included in the relative changeset (because it's
+                    # already installed locally), grab it from the local 
+                    # database instead.
+                    newTrv = db.getTroves([(job[0], job[2][0], job[2][1])],
+                                           withFiles = False,
+                                           pristine = True)[0]
+                    # If it not there, maybe we're not installing it anyway.
+                    # We'll let the troveMissing error occur when we actually
+                    # try to install this trove.
+                    if newTrv is None:
+                        continue
 
                 recursiveJob = newTrv.diff(oldTrv, absolute = job[3])[2]
                 for x in recursiveJob:
