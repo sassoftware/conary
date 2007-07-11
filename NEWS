@@ -17,6 +17,9 @@ Changes in @NEW@:
       --exact-flavors flag.  If specified, the flavors for each trove must
       match exactly - no system flavor or heuristic is used to find the trove
       you want.  (CNY-1829)
+    * If there's a problem w/ dep resolution, conary will retry 5 times,
+      but if the connection fails, conary will not retry 5 times in the future,
+      instead giving up immediately. (CNY-1814)
 
   o Bug Fixes:
     * The SQLite "ANALYZE" command is no longer run on local SQLite
@@ -24,7 +27,6 @@ Changes in @NEW@:
       removed from the local database unless it is being accessed
       read-only.  Database performance is poor on databases with
       "ANALYZE" data in them. (CNY-778)
->>>>>>> /tmp/NEWS~other._yFHBZ
 
 Changes in 1.1.32:
   o Client Changes:
