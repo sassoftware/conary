@@ -27,6 +27,9 @@ Changes in @NEW@:
       removed from the local database unless it is being accessed
       read-only.  Database performance is poor on databases with
       "ANALYZE" data in them. (CNY-778)
+    * Fixed some bugs relating to installing relative changesets.
+      These bugs would manifest themselves by making relative changesets
+      not installable when the network was down. (CNY-1814)
 
 Changes in 1.1.32:
   o Client Changes:

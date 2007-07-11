@@ -279,11 +279,19 @@ class ClientUpdate:
                 return result
             else:
                 troveSource = uJob.getTroveSource()
-                for info in infoList:
-                    ph = troveSource.getTrove(withFiles = False, *info).\
-                                    getPathHashes()
-                    result.append(ph)
-
+                # we can't assume that the troveSource has all
+                # of the child troves for packages we can see.
+                # Specifically, the troveSource could have come from
+                # a relative changeset that only contains byDefault True
+                # components - here we're looking at both byDefault 
+                # True and False components (in trove.diff)
+                hasTroveList = troveSource.hasTroves(infoList)
+                for info, hasTrove in itertools.izip(infoList, hasTroveList):
+                    if hasTrove:
+                        ph = troveSource.getTrove(withFiles = False, *info).\
+                                        getPathHashes()
+                        result.append(ph)
+                    result.append(set())
             return result
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse,
@@ -1115,15 +1123,18 @@ followLocalChanges: %s
                 try:
                     trv = troveSource.getTrove(withFiles = False, *newInfo)
                 except TroveMissing:
-                    # it's possible that the trove source we're using
-                    # contains references to troves that it does not 
-                    # actually contain.  That's okay as long as the
-                    # excluded trove is not actually trying to be
-                    # installed.
-                    if jobAdded:
-                        raise
+                    if self.db.hasTrove(*newInfo):
+                        trv = self.db.getTrove(withFiles = False, *newInfo)
                     else:
-                        continue
+                        # it's possible that the trove source we're using
+                        # contains references to troves that it does not 
+                        # actually contain.  That's okay as long as the
+                        # excluded trove is not actually trying to be
+                        # installed.
+                        if jobAdded:
+                            raise
+                        else:
+                            continue
 
             if isPrimary:
                 # byDefault status of troves is determined by the primary
@@ -1655,11 +1666,17 @@ conary erase '%s=%s[%s]'
 
             csSource = trovesource.stack(uJob.getSearchSource(),
                                          self.repos)
-            cs, notFound = csSource.createChangeSet(reposChangeSetList, 
+            trovesExist = csSource.hasTroves(
+                            [(x[0], x[2][0], x[2][1]) for x in reposChangeSetList])
+            reposChangeSetList = [ x[1] for x in
+                                   itertools.izip(trovesExist, reposChangeSetList)
+                                   if x[0] is True ]
+            cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                     withFiles = False,
                                                     recurse = recurse)
             self._replaceIncomplete(cs, csSource, self.db, self.repos)
-            #NOTE: we allow any missing recursive bits to be skipped.
+            #NOTE: we allow any missing bits (recursive or not) to be skipped.
+            # We may not install then anyways
             #They'll show up in notFound.
             #assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
