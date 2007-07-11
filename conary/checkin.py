@@ -553,14 +553,14 @@ def commit(repos, cfg, message, callback=None, test=False):
         print '\t%s=%s' % (troveName, newVersion.asString())
         print
     if conflicts:
-        print 'WARNING: performing this commit will create label conflicts:'
+        print 'WARNING: performing this commit will switch the active branch:'
         print
         print 'New version %s=%s' % (troveName, newVersion)
         for otherVersion in conflicts:
-            print '   conflicts with existing %s=%s' % (troveName, otherVersion)
+            print '   obsoletes existing %s=%s' % (troveName, otherVersion)
 
         if not cfg.interactive:
-            print 'error: interactive mode is required when creating label conflicts'
+            print 'error: interactive mode is required when changing active branch'
             return
 
     if cfg.interactive:
@@ -1117,13 +1117,21 @@ def updateSrc(repos, versionStr = None, callback = None):
         return
 
     if not versionStr:
-	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
+        r = repos.getTroveLatestByLabel({ pkgName :
+                                            { state.getBranch().label() :
+                                                    [ deps.deps.Flavor() ] } } )
+        headVersion = r[pkgName].keys()[0]
 	head = repos.getTrove(pkgName, headVersion, deps.deps.Flavor())
 	newBranch = None
 	headVersion = head.getVersion()
 	if headVersion == baseVersion:
 	    log.info("working directory is already based on head of branch")
 	    return
+
+        if headVersion.branch() != state.getBranch():
+            log.info("switching to branch %s" % headVersion.branch())
+            newBranch = fullLabel(None, headVersion, str(headVersion))
+            newBranch = headVersion.branch()
     else:
 	versionStr = state.expandVersionStr(versionStr)
 
@@ -1218,9 +1226,12 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         return
 
     # make sure the current version is at head
-    shadowHeadVersion = repos.getTroveLatestVersion(troveName, troveBranch)
+    r = repos.getTroveLatestByLabel(
+            { troveName : { troveBranch.label() : [ deps.deps.Flavor() ] } } )
+    shadowHeadVersion = r[troveName].keys()[0]
     if state.getVersion() != shadowHeadVersion:
-        log.info("working directory is not at the tip of the shadow")
+        log.info("working directory is not the latest on label %s" %
+                            troveBranch.label())
         return
 
     # safe to call parentBranch() b/c a shadow will always have a parent branch
@@ -1244,20 +1255,20 @@ def merge(cfg, repos, versionSpec=None, callback=None):
                     return
         versionList = repos.findTrove(parentLabel,
                                      (troveName, versionSpec, None), None)
-        # we can only use findTrove by label, not by branch, but if there
-        # are multiple branches with the same label they'll all be returned
-        # in the result, we can filter them here.
         # we use findTrove so we can support both upstream version and 
         # upstream version + release.
-        versionList = [ x[1] for x in versionList
-                         if x[1].branch() == parentBranch ]
         if not versionList:
             log.error("Revision %s of %s not found on branch %s" % (versionSpec, troveName, parentBranch))
             return
-        parentHeadVersion = versionList[0]
+        assert(len(versionList) == 1)
+        parentHeadVersion = versionList[0][1]
     else:
-        parentHeadVersion = repos.getTroveLatestVersion(troveName,
-                                      troveBranch.parentBranch())
+        r = repos.getTroveLatestByLabel(
+                { troveName : { troveBranch.parentBranch().label() :
+                                [ deps.deps.Flavor() ] } } )
+        assert(len(r[troveName]) == 1)
+        parentHeadVersion = r[troveName].keys()[0]
+
     parentRootVersion = _determineRootVersion(repos, state)
 
     if parentHeadVersion < parentRootVersion:
@@ -1271,6 +1282,19 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         log.error("No changes have been made on the parent branch; nothing "
                   "to merge.")
         return
+    elif parentRootVersion.branch() != parentHeadVersion.branch():
+        targetBranch = parentHeadVersion.branch().createShadow(
+                            shadowHeadVersion.trailingLabel())
+        r = repos.getTroveLeavesByBranch(
+                    { troveName : { targetBranch : [ deps.deps.Flavor() ] } } )
+        if r:
+            log.info("Merging from %s onto %s", parentRootVersion.branch(),
+                     parentHeadVersion.branch())
+        else:
+            log.info("Merging from %s onto new shadow %s",
+                     parentRootVersion.branch(), parentHeadVersion.branch())
+    else:
+        targetBranch = shadowHeadVersion.branch()
 
     if os.path.exists(state.getRecipeFileName()):
         use.allowUnknownFlags(True)
@@ -1340,6 +1364,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     if newState.getVersion() == troveCs.getNewVersion():
         newState.setLastMerged(parentHeadVersion)
         newState.changeVersion(shadowHeadVersion)
+        newState.changeBranch(targetBranch)
 
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
@@ -1604,7 +1629,7 @@ def newTrove(repos, cfg, name, dir = None, template = None,
     sourceState = SourceState(component, versions.NewVersion(), branch)
     conaryState = ConaryState(cfg.context, sourceState)
 
-    # see if this package exists on our build branch
+    # see if this package exists on our build label
     if repos and repos.getTroveLeavesByLabel(
                         { component : { label : None } },
                         ).get(component, []):

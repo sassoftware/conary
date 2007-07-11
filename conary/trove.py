@@ -1724,7 +1724,7 @@ class Trove(streams.StreamSet):
         """
             Matches up the list of troves that have been added to those
             that were removed.  Matches are done by name first,
-            then by heuristics based on branches, flavors, and path hashes.
+            then by heuristics based on labels, flavors, and path hashes.
         """
         # NOTE: the matches are actually created by _makeMatch.
         # Most functions deal with lists that are (version, flavor)
@@ -1998,24 +1998,24 @@ class Trove(streams.StreamSet):
 
         def _versionMatch(oldInfoSet, newInfoSet):
             # Match by version; use the closeness measure for items on
-            # different branches and the timestamps for the same branch. If the
+            # different labels and the timestamps for the same label. If the
             # same version exists twice here, it means the flavors are
             # incompatible or tied; in either case the flavor won't help us
             # much.
             matches = []
-            byBranch = {}
+            byLabel = {}
             # we need copies we can update
             oldInfoSet = set(oldInfoSet)
             newInfoSet = set(newInfoSet)
 
             for newInfo in newInfoSet:
                 for oldInfo in oldInfoSet:
-                    if newInfo[0].branch() == oldInfo[0].branch():
-                        l = byBranch.setdefault(newInfo, [])
+                    if newInfo[0].trailingLabel() == oldInfo[0].trailingLabel():
+                        l = byLabel.setdefault(newInfo, [])
                         l.append(((oldInfo[0].trailingRevision(), oldInfo)))
 
             # pass 1, find things on the same branch
-            for newInfo, oldInfoList in sorted(byBranch.items(), reverse=True):
+            for newInfo, oldInfoList in sorted(byLabel.items(), reverse=True):
                 # take the newest (by timestamp) item from oldInfoList which
                 # hasn't been matched to anything else 
                 oldInfoList.sort(reverse=True)
@@ -2027,10 +2027,10 @@ class Trove(streams.StreamSet):
                     newInfoSet.remove(newInfo)
                     break
 
-            del byBranch
+            del byLabel
 
-            # pass 2, match across branches -- we know there is nothing left
-            # on the same branch anymore
+            # pass 2, match across labels -- we know there is nothing left
+            # on the same label anymore
             scored = []
             for newInfo in newInfoSet:
                 for oldInfo in oldInfoSet:
@@ -2246,42 +2246,42 @@ class Trove(streams.StreamSet):
                 overlaps = {}
 
 
-            addedByBranch = {}
-            removedByBranch = {}
+            addedByLabel = {}
+            removedByLabel = {}
             for version, flavor in addedDict[name]:
-                addedByBranch.setdefault(version.branch(), []).append(
+                addedByLabel.setdefault(version.trailingLabel(), []).append(
                                                             (version, flavor))
             for version, flavor in removedDict[name]:
-                removedByBranch.setdefault(version.branch(), []).append(
+                removedByLabel.setdefault(version.trailingLabel(), []).append(
                                                             (version, flavor))
-            for branch, branchAdded in addedByBranch.iteritems():
-                branchRemoved = removedByBranch.get(branch, [])
-                if not branchRemoved:
+            for label, labelAdded in addedByLabel.iteritems():
+                labelRemoved = removedByLabel.get(label, [])
+                if not labelRemoved:
                     continue
-                # 1. match troves on the same branch with compatible flavors.
-                _matchList(name, branchAdded, branchRemoved, trvList,
+                # 1. match troves on the same label with compatible flavors.
+                _matchList(name, labelAdded, labelRemoved, trvList,
                            overlaps, scoreCache, requireCompatible=True)
 
             # 2. match troves with compatible flavors on different
-            #    branches
+            #    labels
             _matchList(name, addedDict[name], removedDict[name], trvList,
                        overlaps, scoreCache, requireCompatible=True)
 
-            addedByBranch = {}
-            removedByBranch = {}
+            addedByLabel = {}
+            removedByLabel = {}
             for version, flavor in addedDict[name]:
-                addedByBranch.setdefault(version.branch(), []).append(
+                addedByLabel.setdefault(version.trailingLabel(), []).append(
                                                             (version, flavor))
             for version, flavor in removedDict[name]:
-                removedByBranch.setdefault(version.branch(), []).append(
+                removedByLabel.setdefault(version.trailingLabel(), []).append(
                                                (version, flavor))
 
-            for branch, branchAdded in addedByBranch.iteritems():
-                branchRemoved = removedByBranch.get(branch, [])
-                if not branchRemoved:
+            for label, labelAdded in addedByLabel.iteritems():
+                labelRemoved = removedByLabel.get(label, [])
+                if not labelRemoved:
                     continue
-                # 3. match troves on the same branch without compatible flavors.
-                _matchList(name, branchAdded, branchRemoved, trvList,
+                # 3. match troves on the same label without compatible flavors.
+                _matchList(name, labelAdded, labelRemoved, trvList,
                            overlaps, scoreCache, requireCompatible=False)
 
             # 4. match remaining troves.
