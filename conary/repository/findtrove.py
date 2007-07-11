@@ -50,18 +50,20 @@ VERSION_STR_HOST                 = 8 # host@
 class Query:
     def __init__(self, defaultFlavorPath, labelPath, 
                  acrossLabels, acrossFlavors, getLeaves, bestFlavor,
-                 troveTypes):
+                 troveTypes, exactFlavors):
         self.map = {}
         self.defaultFlavorPath = defaultFlavorPath
         if not self.defaultFlavorPath:
             self.query = [{}]
         else:
             self.query = [{} for x in defaultFlavorPath ]
+        self.exactFlavorMap = {}
         self.labelPath = labelPath
         self.acrossLabels = acrossLabels
         self.acrossFlavors = acrossFlavors
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
+        self.exactFlavors = exactFlavors
         self.troveTypes = troveTypes
 
     def reset(self):
@@ -79,7 +81,21 @@ class Query:
         raise NotImplementedError
 
     def filterTroveMatches(self, name, versionFlavorDict):
-        return versionFlavorDict
+        if not self.exactFlavors or name not in self.exactFlavorMap:
+            return versionFlavorDict
+
+        theFlavors = self.exactFlavorMap[name]
+        if theFlavors is None:
+            theFlavors = [deps.parseFlavor('')]
+        newDict = {}
+        for version, flavorList in versionFlavorDict.items():
+            for flavor in flavorList:
+                if (flavor in theFlavors
+                    or (flavor.isEmpty() and None in theFlavors)):
+                    if version not in newDict:
+                        newDict[version] = []
+                    newDict[version].append(flavor)
+        return newDict
 
     def overrideFlavors(self, flavor):
         """ override the flavors in the defaultFlavorPath with flavor,
@@ -116,11 +132,12 @@ class QueryByVersion(Query):
     def addQuery(self, troveTup, version, flavorList):
         name = troveTup[0]
         self.map[name] = [troveTup]
-        if not flavorList:
+        self.exactFlavorMap[name] = flavorList
+        if not flavorList or self.exactFlavors:
             self.queryNoFlavor[name] = { version : None }
         else:
             for i, flavor in enumerate(flavorList):
-                self.query[i][name] = {version : [flavor] } 
+                self.query[i][name] = {version : [flavor] }
 
     def addQueryWithAffinity(self, troveTup, version, affinityTroves):
         flavors = [x[2] for x in affinityTroves]
@@ -198,9 +215,10 @@ class QueryByLabelPath(Query):
     def addQuery(self, troveTup, labelPath, flavorList):
         name = troveTup[0]
         self.map[name] = [troveTup, labelPath]
+        self.exactFlavorMap[name] = flavorList
 
         if self.acrossLabels or isinstance(labelPath, set):
-            if not flavorList:
+            if not flavorList or self.exactFlavors:
                 self.query[name] = [ dict.fromkeys(labelPath, None)]
             elif self.acrossFlavors:
                 # create one big query: {name : [{label  : [flavor1, flavor2],
@@ -225,7 +243,7 @@ class QueryByLabelPath(Query):
                         d[label] = [flavor]
         else:
             self.query[name] = []
-            if not flavorList:
+            if not flavorList or self.exactFlavors:
                 for label in labelPath:
                     self.query[name].append({label : None})
             elif self.acrossFlavors:
@@ -371,7 +389,8 @@ class QueryByBranch(Query):
 
     def addQuery(self, troveTup, branch, flavorList):
         name = troveTup[0]
-        if not flavorList:
+        self.exactFlavorMap[name] = flavorList
+        if not flavorList or self.exactFlavors:
             self.queryNoFlavor[name] = { branch : None }
         else:
             for i, flavor in enumerate(flavorList):
@@ -547,7 +566,7 @@ class QueryRevisionByBranch(QueryByBranch):
                 return { version: versionFlavorDict[version] }
             else:
                 results[version] = versionFlavorDict[version]
-        return results
+        return QueryByBranch.filterTroveMatches(self, name, results)
 
     def missingMsg(self, name):
         branch = self.query[0][name].keys()[0]
@@ -599,7 +618,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
                     continue
                 matchingLabels.add(label)
             matching[version] = versionFlavorDict[version]
-        return matching
+        return QueryByLabelPath.filterTroveMatches(self, name, matching)
 
     def missingMsg(self, name):
         labelPath = self.map[name][1]
@@ -934,7 +953,8 @@ class TroveFinder:
     def __init__(self, troveSource, labelPath, defaultFlavorPath, 
                  acrossLabels, acrossFlavors, affinityDatabase, 
                  getLeaves=True, bestFlavor=True,
-                 allowNoLabel=False, troveTypes=None):
+                 allowNoLabel=False, troveTypes=None, 
+                 exactFlavors=False):
 
         self.troveSource = troveSource
         self.affinityDatabase = affinityDatabase
@@ -946,6 +966,9 @@ class TroveFinder:
             # if you don't pass in a label, we may have to generate a label
             # list.  In that case, we should always return all results.
             acrossLabels = True
+        if exactFlavors:
+            bestFlavor = False
+            defaultFlavorPath = None
         self.labelPath = labelPath
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
@@ -960,7 +983,6 @@ class TroveFinder:
             defaultFlavorPath = [defaultFlavorPath]
         self.defaultFlavorPath = defaultFlavorPath
 
-
         self.remaining = []
         self.query = {}
         for queryType in queryTypes:
@@ -970,7 +992,8 @@ class TroveFinder:
                                                              acrossFlavors,
                                                              getLeaves,
                                                              bestFlavor,
-                                                             troveTypes)
+                                                             troveTypes,
+                                                             exactFlavors)
     # class variable for TroveFinder
     #
     # set up map from a version string type to the source fn to use

@@ -30,6 +30,7 @@ VERSION_FILTER_LEAVES = 2
 FLAVOR_FILTER_ALL    = 0
 FLAVOR_FILTER_AVAIL  = 1
 FLAVOR_FILTER_BEST   = 2
+FLAVOR_FILTER_EXACT  = 3
 
 
 def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
@@ -256,6 +257,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         else:
             assert(0)
 
+        exactFlavors = False
         if flavorFilter == FLAVOR_FILTER_ALL:
             searchFlavor = None 
             bestFlavor = False 
@@ -284,6 +286,10 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
             # return best match.
             bestFlavor = True
             acrossFlavors = False
+        elif flavorFilter == FLAVOR_FILTER_EXACT:
+            exactFlavors = True
+            acrossFlavors = False
+            bestFlavor = False
 
         if not affinityDb:
             acrossLabels = True
@@ -296,7 +302,8 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
                                    allowMissing = False,
                                    bestFlavor = bestFlavor,
                                    getLeaves = getLeaves,
-                                   troveTypes = troveTypes)
+                                   troveTypes = troveTypes,
+                                   exactFlavors = exactFlavors)
 
         # do post processing on the result if necessary
         if (flavorFilter == FLAVOR_FILTER_ALL 
@@ -329,6 +336,9 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         else:
             troveTups.extend(itertools.chain(*results.itervalues()))
     else:
+        if flavorFilter == FLAVOR_FILTER_EXACT:
+            flavorFilter = FLAVOR_FILTER_BEST
+
         # no troves specified, use generic fns with no names given.
         if versionFilter == VERSION_FILTER_ALL:
             queryFn = repos.getTroveVersionsByLabel

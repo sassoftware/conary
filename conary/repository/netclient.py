@@ -459,6 +459,8 @@ class ServerCache:
             else:
                 errmsg = str(e)
             url = _cleanseUrl(protocol, url)
+            if not errmsg:
+                errmsg = '%r' % e
             raise errors.OpenError('Error occurred opening repository '
                         '%s: %s' % (url, errmsg))
 
@@ -1627,7 +1629,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 # if the old version is marked removed, pretend as though
                 # it doesn't exist.
-                if old.isRemoved():
+                if old and old.isRemoved():
                     old = None
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute)
@@ -2276,7 +2278,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
-                  getLeaves = True, bestFlavor = True, troveTypes=TROVE_QUERY_PRESENT):
+                  getLeaves = True, bestFlavor = True, 
+                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors = False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
@@ -2333,17 +2336,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
-                                            getLeaves, bestFlavor, troveTypes=troveTypes)
+                                            getLeaves, bestFlavor,
+                                            troveTypes=troveTypes,
+                                            exactFlavors=exactFlavors)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossLabels = False, 
                   acrossFlavors = False, affinityDatabase = None,
-                  getLeaves = True, bestFlavor = True, troveTypes = TROVE_QUERY_PRESENT):
+                  getLeaves = True, bestFlavor = True, 
+                  troveTypes = TROVE_QUERY_PRESENT, exactFlavors = False):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossLabels, acrossFlavors,
-                              affinityDatabase, False, getLeaves, bestFlavor, 
-                              troveTypes=troveTypes)
+                              affinityDatabase, False, getLeaves, bestFlavor,
+                              troveTypes=troveTypes,
+                              exactFlavors=exactFlavors)
         return res[(name, versionStr, flavor)]
 
     def getConaryUrl(self, version, flavor):

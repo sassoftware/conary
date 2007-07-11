@@ -56,8 +56,6 @@ from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
 from conary.web import webauth
 
-sys.excepthook = util.genExcepthook(debug=True)
-
 class HttpRequests(SimpleHTTPRequestHandler):
 
     outFiles = {}
@@ -663,5 +661,5 @@ def main():
     serve(server)
 
 if __name__ == '__main__':
+    sys.excepthook = util.genExcepthook(debug=True)
     main()
-
