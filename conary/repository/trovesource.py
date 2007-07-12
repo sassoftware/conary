@@ -1036,7 +1036,10 @@ class SourceStack(object):
 
         for source in self.sources:
             newTroveList = []
-            hasTroves = source.hasTroves([x[1] for x in troveList])
+            try:
+                hasTroves = source.hasTroves([x[1] for x in troveList])
+            except errors.OpenError:
+                hasTroves = [ False] * len(troveList)
             if isinstance(hasTroves, list):
                 hasTroves = dict(itertools.izip([x[1] for x in troveList], 
                                                 hasTroves))
