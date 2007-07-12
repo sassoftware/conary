@@ -1,33 +1,36 @@
-Changes in @NEW@:
+Changes in 1.1.33:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)
-    * Unknown flags are now ignored when calling loadRecipe w/ a flavor
-      (before this would result in a traceback).
+    * Unknown flags are now ignored when calling loadRecipe with a
+      flavor, instead of printing a traceback.
 
   o Update Changes:
-    * Updates to groups are now allowed to be merged with other groups in 
-      update jobs, reducing the number of jobs that are used for updates.
+    * Updates to groups are now allowed to be merged with other groups
+      in update jobs, reducing the number of jobs that are used for
+      updates.
+
   o Client Changes:
     * Cloning now always increments group version counts, mimicing
       the behavior of group cooking. (CNY-1724)
-    * When promoting, --all-flavors is now on by default.  However, if you
-      specify a flavor to promote or clone, promotes will be limited by
-      that flavor.
+    * When promoting, --all-flavors is now on by default.  However, if
+      a flavor to promote or clone is specified, promotes will be
+      limited by that flavor. (CNY-1535)
     * Several commands, such as promote, update and rq, now take an
-      --exact-flavors flag.  If specified, the flavors for each trove must
-      match exactly - no system flavor or heuristic is used to find the trove
-      you want.  (CNY-1829)
-    * If there's a problem w/ dep resolution, conary will retry 5 times,
-      but if the connection fails, conary will not retry 5 times in the future,
-      instead giving up immediately. (CNY-1814)
+      --exact-flavors flag.  If specified, the flavors for each trove
+      must match exactly - no system flavor or heuristic is used to
+      find the trove you want. (CNY-1829)
+    * If there is a problem with domain name resolution, conary will
+      retry 5 times. However, if the connection fails after those
+      attempts, future connection requests will now fail after one try.
+      (CNY-1814)
 
   o Bug Fixes:
     * The SQLite "ANALYZE" command is no longer run on local SQLite
-      databases.  Any data stored by the "ANALYZE" command will be
+      databases. Any data stored by the "ANALYZE" command will be
       removed from the local database unless it is being accessed
-      read-only.  Database performance is poor on databases with
+      read-only. Database performance is poor on databases with
       "ANALYZE" data in them. (CNY-778)
-    * Fixed some bugs relating to installing relative changesets.
+    * Some bugs related to installing relative changesets were fixed.
       These bugs would manifest themselves by making relative changesets
       not installable when the network was down. (CNY-1814)
 
