@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Fix a bug in commit code that made r.macros.buildlabel unusable because
+      you could not commit recipes that used it.  (CNY-1752)
+
 Changes in 1.1.33:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)
@@ -33,8 +38,6 @@ Changes in 1.1.33:
     * Some bugs related to installing relative changesets were fixed.
       These bugs would manifest themselves by making relative changesets
       not installable when the network was down. (CNY-1814)
-    * Fix a bug in commit code that made r.macros.buildlabel unusable because
-      you could not commit recipes that used it.  (CNY-1752)
 
 Changes in 1.1.32:
   o Client Changes:
