@@ -90,8 +90,15 @@ class AbstractTroveSource:
 
             result[name] = {}
 
-            for label, reqFlavorList in \
-                  troveSpecs.get(name, troveSpecs.get(None, None)).iteritems():
+            if name in troveSpecs:
+                labelDict = troveSpecs[name]
+            elif '' in troveSpecs:
+                labelDict = troveSpecs['']
+            elif None in troveSpecs:
+                labelDict = troveSpecs['']
+            else:
+                assert False, "Could not find query for %s" % name
+            for label, reqFlavorList in labelDict.iteritems():
                 byFlavor = {}
                 if label not in byLabel:
                     continue
@@ -134,23 +141,37 @@ class AbstractTroveSource:
                     bestFlavors = set( x[1] for x in enumerate(byFlavor)
                                               if x[0] in bestFlavors )
 
-                    # now lookup the versions which exist for the flavors
-                    # we've identified
-                    bestVersions = \
-                        [ ver for ver, flavorList in versionDict.iteritems()
-                            if set(flavorList) & bestFlavors and
-                               ver.trailingLabel() == label ]
+   
+                    if bestFlavor:
+                        # now lookup the versions which exist for the flavors
+                        # we've identified
+                        bestVersions = \
+                            [ ver for ver, flavorList in versionDict.iteritems()
+                                if set(flavorList) & bestFlavors and
+                                   ver.trailingLabel() == label ]
 
-                    # and find the latest version which works
-                    bestVersions.sort()
-                    latestVersion = bestVersions[-1]
+                        # and find the latest version which works
+                        bestVersions.sort()
+                        latestVersion = bestVersions[-1]
+                        versionFlavors = [ (latestVersion,x)
+                                           for x in bestFlavors
+                                           if latestVersion in byFlavor[x] ]
+                    else:
+                        versionFlavors = []
+                        for flavor in bestFlavors:
+                            bestVersions = \
+                            [ ver for ver, flavorList in versionDict.iteritems()
+                                if  flavor in flavorList and
+                                   ver.trailingLabel() == label ]
+                            bestVersions.sort()
+                            latestVersion = bestVersions[-1]
+                            versionFlavors.append((latestVersion, flavor))
 
                     # for the version we want find the flavors we should
                     # return
-                    result[name].setdefault(latestVersion, set())
-                    result[name][latestVersion].update(
-                            [ x for x in bestFlavors if latestVersion
-                                            in byFlavor[x] ] )
+                    for version, flavor in versionFlavors:
+                        result[name].setdefault(version, set())
+                        result[name][version].add(flavor)
 
             for version, flavorSet in result[name].iteritems():
                 result[name][version] = list(flavorSet)
