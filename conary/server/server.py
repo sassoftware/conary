@@ -233,8 +233,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	contentLength = int(self.headers['Content-Length'])
         data = self.rfile.read(contentLength)
 
-        targetServerName = self.headers.get('X-Conary-Servername', None)
-
         encoding = self.headers.get('Content-Encoding', None)
         if encoding == 'deflate':
             data = zlib.decompress(data)

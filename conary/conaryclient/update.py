@@ -291,7 +291,8 @@ class ClientUpdate:
                         ph = troveSource.getTrove(withFiles = False, *info).\
                                         getPathHashes()
                         result.append(ph)
-                    result.append(set())
+                    else:
+                        result.append(set())
             return result
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse,
