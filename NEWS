@@ -1,8 +1,10 @@
-Changes in 2.0.0:
+Changes in @NEW@:
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
+    * Label lookups pick the latest version which matches instead of the
+      latest version on each branch
+    * Replaced label affinity with branch affinity
 
-Changes in @NEW@:
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
       you could not commit recipes that used it.  (CNY-1752)
