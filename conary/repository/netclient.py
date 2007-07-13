@@ -51,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36,51)
+CLIENT_VERSIONS = range(36,51 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -70,6 +70,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
                  altHostCallback, protocolVersion, transport):
         xmlrpclib._Method.__init__(self, send, name)
+        self.__name = name
         self.__host = host
         self.__pwCallback = pwCallback
         self.__anonymousCallback = anonymousCallback
@@ -88,7 +89,18 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         # protocol version
         protocolVersion = (kwargs.get('protocolVersion', None) or
             self.__protocolVersion)
-        return self.doCall(protocolVersion, *args)
+
+        # always use protocol version 50 for checkVersion.  If we're about
+        # to talk to a pre-protocol-version 51 server, we will make it
+        # trace back with too many arguments if we try to pass kwargs
+        if self.__name == 'checkVersion':
+            protocolVersion = min(protocolVersion, 50)
+
+        if protocolVersion < 51:
+            assert(not kwargs)
+            return self.doCall(protocolVersion, *args)
+
+        return self.doCall(protocolVersion, args, kwargs)
 
     def __doCall(self, clientVersion, argList):
         newArgs = ( clientVersion, ) + argList
@@ -289,6 +301,7 @@ class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
                  callback=None, proxies=None, entitlementDir = None):
 	self.cache = {}
+        self.shareCache = {}
 	self.map = repMap
 	self.userMap = userMap
 	self.pwPrompt = pwPrompt
@@ -333,6 +346,25 @@ class ServerCache:
 
     def keys(self):
         return self.cache.keys()
+
+    def singleServer(self, *items):
+        foundServer = None
+        for item in items:
+            if item.branch().getHost() == 'local':
+                return False
+
+            try:
+                server = self[item]
+            except errors.OpenError:
+                # can't get to a server; fall back to hostname checking
+                return (len(set( self._getServerName(x) for x in items )) == 1)
+
+            if foundServer is None:
+                foundServer = server
+            elif foundServer is not server:
+                return False
+
+        return True
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)
@@ -393,6 +425,12 @@ class ServerCache:
             url = '/'.join(s)
             usedMap = True
 
+        shareTuple = (url, userInfo, tuple(entList))
+        server = self.shareCache.get(shareTuple, None)
+        if server is not None:
+            self.cache[serverName] = server
+            return server
+
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
                                           entitlementList = entList,
@@ -421,6 +459,8 @@ class ServerCache:
             else:
                 errmsg = str(e)
             url = _cleanseUrl(protocol, url)
+            if not errmsg:
+                errmsg = '%r' % e
             raise errors.OpenError('Error occurred opening repository '
                         '%s: %s' % (url, errmsg))
 
@@ -440,6 +480,7 @@ class ServerCache:
         server.setProtocolVersion(max(intersection))
 
         self.cache[serverName] = server
+        self.shareCache[shareTuple] = server
 
 	return server
 
@@ -1078,6 +1119,57 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return l
 
+    def getChangeSetSize(self, jobList):
+        # make sure all of the jobs are on the same server
+        verSet = set()
+        wireJobs = []
+        for name, (oldVersion, oldFlavor), (newVersion, newFlavor), abs \
+                                                            in jobList:
+            if newVersion is None:
+                continue
+
+            if oldVersion:
+                verSet.add(oldVersion)
+                oldVersion = oldVersion.asString()
+                oldFlavor = oldFlavor.freeze()
+            else:
+                oldVersion = 0
+                oldFlavor = 0
+
+            verSet.add(newVersion)
+            newVersion = newVersion.asString()
+            newFlavor = newFlavor.freeze()
+
+            wireJobs.append( (name, (oldVersion, oldFlavor),
+                                    (newVersion, newFlavor), abs) )
+
+        if not self.c.singleServer(*verSet):
+            raise errors.CannotCalculateDownloadSize('job on multiple servers')
+
+        server = self.c[jobList[0][2][0]]
+
+        if server.getProtocolVersion() >= 51:
+            infoList = server.getChangeSet(wireJobs, False, True, True,
+                           False, filecontainer.FILE_CONTAINER_VERSION_LATEST,
+                           False, True)
+        elif server.getProtocolVersion() < 50:
+            raise errors.CannotCalculateDownloadSize('repository too old')
+        else:
+            infoList = server.getChangeSet(wireJobs, False, True, True,
+                           False, filecontainer.FILE_CONTAINER_VERSION_LATEST,
+                           False)
+
+        sizeList = [ x[0] for x in infoList[1] ]
+        jobSizes = []
+        for singleJob in jobList:
+            totalSize = 0
+            if singleJob[2][0] is not None:
+                totalSize += sizeList.pop(0)
+
+            jobSizes.append(totalSize)
+
+        return jobSizes
+
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
                         excludeAutoSource = False, recurse = True,
@@ -1206,7 +1298,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     ourJobList.append((troveName, (old, oldFlavor),
                                        (new, newFlavor), absolute))
                 elif old:
-                    if old.getHost() == serverName:
+                    if self.c.singleServer(old, new):
                         l = serverJobs.setdefault(serverName, [])
                         l.append((troveName, 
                                   (self.fromVersion(old), 
@@ -1537,7 +1629,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 # if the old version is marked removed, pretend as though
                 # it doesn't exist.
-                if old.isRemoved():
+                if old and old.isRemoved():
                     old = None
                 (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute)
@@ -2186,7 +2278,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
-                  getLeaves = True, bestFlavor = True, troveTypes=TROVE_QUERY_PRESENT):
+                  getLeaves = True, bestFlavor = True, 
+                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors = False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
@@ -2243,17 +2336,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
-                                            getLeaves, bestFlavor, troveTypes=troveTypes)
+                                            getLeaves, bestFlavor,
+                                            troveTypes=troveTypes,
+                                            exactFlavors=exactFlavors)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossLabels = False, 
                   acrossFlavors = False, affinityDatabase = None,
-                  getLeaves = True, bestFlavor = True, troveTypes = TROVE_QUERY_PRESENT):
+                  getLeaves = True, bestFlavor = True, 
+                  troveTypes = TROVE_QUERY_PRESENT, exactFlavors = False):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossLabels, acrossFlavors,
-                              affinityDatabase, False, getLeaves, bestFlavor, 
-                              troveTypes=troveTypes)
+                              affinityDatabase, False, getLeaves, bestFlavor,
+                              troveTypes=troveTypes,
+                              exactFlavors=exactFlavors)
         return res[(name, versionStr, flavor)]
 
     def getConaryUrl(self, version, flavor):

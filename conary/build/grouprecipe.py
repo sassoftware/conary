@@ -229,7 +229,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self.cfg = cfg
         self.flavor = flavor
         self.keyFlavor = None
-        self.macros = macros.Macros()
+        self.macros = macros.Macros(ignoreUnknown=lightInstance)
         self.macros.update(extraMacros)
         self.defaultSource = None
         if not lightInstance:

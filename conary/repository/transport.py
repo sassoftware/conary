@@ -415,6 +415,9 @@ class Transport(xmlrpclib.Transport):
 
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
+    # make this a class variable so that across all attempts to transport we'll only
+    # spew messages once per host.
+    failedHosts = set()
 
     def __init__(self, https = False, entitlementList = None, proxies = None,
                  serverName = None, extraHeaders = None):
@@ -501,7 +504,8 @@ class Transport(xmlrpclib.Transport):
                 break
             except IOError, e:
                 tries += 1
-                if tries >= 5:
+                if tries >= 5 or host in self.failedHosts:
+                    self.failedHosts.add(host)
                     raise
                 if e.args[0] == 'socket error':
                     e = e.args[1]
