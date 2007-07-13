@@ -56,8 +56,6 @@ from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
 from conary.web import webauth
 
-sys.excepthook = util.genExcepthook(debug=True)
-
 class HttpRequests(SimpleHTTPRequestHandler):
 
     outFiles = {}
@@ -234,8 +232,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
         data = self.rfile.read(contentLength)
-
-        targetServerName = self.headers.get('X-Conary-Servername', None)
 
         encoding = self.headers.get('Content-Encoding', None)
         if encoding == 'deflate':
@@ -663,5 +659,5 @@ def main():
     serve(server)
 
 if __name__ == '__main__':
+    sys.excepthook = util.genExcepthook(debug=True)
     main()
-

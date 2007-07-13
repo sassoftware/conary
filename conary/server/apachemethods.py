@@ -77,6 +77,7 @@ def post(port, isSecure, repos, req):
             # local_addr.
             localAddr = "%s:%s" % (req.connection.local_ip,
                                    req.connection.local_addr[1])
+
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
@@ -174,11 +175,6 @@ def get(port, isSecure, repos, req):
         if not req.args:
             # the client asked for a changeset, but there is no
             # ?tmpXXXXXX.cf after /conary/changeset (CNY-1142)
-            import sys
-            print >> sys.stderr, "sys.modules", str(sys.modules)
-            sys.stderr.flush()
-            from conary.server.apachehooks import logAndEmail
-            logAndEmail(req, repos.cfg, 'Bad GET request to /changeset', '')
             return apache.HTTP_BAD_REQUEST
         if '/' in req.args:
             return apache.HTTP_FORBIDDEN

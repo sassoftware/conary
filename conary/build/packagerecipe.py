@@ -722,7 +722,7 @@ class _AbstractPackageRecipe(Recipe):
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
-	self.macros = macros.Macros()
+	self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()

@@ -408,6 +408,7 @@ class _AbstractQueryCommand(ConaryCommand):
             'troves'        : (VERBOSE_HELP, 
                                'Display one level of child troves'),
             'trove-flags'   : (VERBOSE_HELP, 'Display trove flags (see man page)'),
+            'exact-flavors' : 'Return only troves that match the flavors specified exactly',
             'trove-headers' : (VERBOSE_HELP,
                                'Display current trove name when listing info'
                               ' from multiple troves'),
@@ -450,6 +451,10 @@ class _AbstractQueryCommand(ConaryCommand):
         d["weak-refs"] = NO_PARAM
         argDef['Child Display'] = d
 
+        d = {}
+        d["exact-flavors"] = NO_PARAM
+        argDef['Trove Selection'] = d
+
     def runCommand(self, cfg, argSet, otherArgs):
         raise NotImplementedError
 
@@ -467,7 +472,7 @@ class QueryCommand(_AbstractQueryCommand):
         d["no-pristine"] = NO_PARAM
         d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
-        argDef['Trove Selection'] = d
+        argDef['Trove Selection'].update(d)
 
     def runCommand(self, cfg, argSet, otherArgs):
         kw = {}
@@ -481,7 +486,8 @@ class QueryCommand(_AbstractQueryCommand):
                 ('troves', 'showTroves'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
                 ('trove-flags', 'showTroveFlags'),
-                ('deps', 'showDeps'), 'info'):
+                ('deps', 'showDeps'), ('exact-flavors', 'exactFlavors'),
+                'info'):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
@@ -509,7 +515,7 @@ class RepQueryCommand(_AbstractQueryCommand):
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
     help = 'Query one or more Conary repositories'
     commandGroup = 'Information Display'
-    docs = { 'affinity'    : ('Use branch and flavor affinity when searching'
+    docs = {'affinity'    : ('Use branch and flavor affinity when searching'
                              ' for troves (behave like conary update)'),
             'all-troves'   : 'Display byDefault False troves',
             'all-flavors'  : 'Return all flavors of troves matching the query',
@@ -539,7 +545,7 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["what-provides"] = MULT_PARAM
         d["show-removed"] = NO_PARAM
         #d["show-redirects"] = NO_PARAM
-        argDef['Trove Selection'] = d
+        argDef['Trove Selection'].update(d)
 
     def runCommand(self, cfg, argSet, otherArgs):
         versionOpts = [argSet.pop(x, False) for x in ['all-versions',
@@ -559,18 +565,20 @@ class RepQueryCommand(_AbstractQueryCommand):
 
         flavorOpts = [argSet.pop(x, False) for x in ['all-flavors',
                                                      'available-flavors',
-                                                     'best-flavors']]
+                                                     'best-flavors',
+                                                     'exact-flavors']]
 
         if flavorOpts.count(True) > 1:
             log.error('only one of --all-flavors, --available-flavors, '
-                      ' --best-flavors may be'
+                      ' --best-flavors, --exact-flavors may be'
                       ' specified')
             return 1
         if True in flavorOpts:
             flavorFilterIdx = flavorOpts.index(True)
             flavorFilter = [queryrep.FLAVOR_FILTER_ALL,
                             queryrep.FLAVOR_FILTER_AVAIL,
-                            queryrep.FLAVOR_FILTER_BEST][flavorFilterIdx]
+                            queryrep.FLAVOR_FILTER_BEST,
+                            queryrep.FLAVOR_FILTER_EXACT][flavorFilterIdx]
         else: # default
             flavorFilter = queryrep.FLAVOR_FILTER_BEST
 
@@ -721,7 +729,8 @@ class ShowChangesetCommand(_AbstractQueryCommand):
                 ('trove-flags', 'showTroveFlags'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
                 ('recurse-repository', 'recurseRepos'),
-                'deps', 'info', 'all', ('show-changes', 'showChanges')):
+                'deps', 'info', 'all', ('show-changes', 'showChanges'),
+                ('exact-flavors', 'exactFlavors')):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
@@ -760,6 +769,7 @@ class _UpdateCommand(ConaryCommand):
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
         'keep-required' : 'Do not erase troves which are needed by troves '
                           'which will remain installed',
+        'exact-flavors' : 'Only match troves whose flavors match exactly',
         'info'          : 'Display what update would have done',
         'no-deps'       : 'Do not raise errors due to dependency failures',
         'no-recurse'    : (VERBOSE_HELP, 
@@ -805,6 +815,7 @@ class _UpdateCommand(ConaryCommand):
         d["test"] = NO_PARAM
 
         d["restart-info"] = ONE_PARAM
+        d["exact-flavors"] = NO_PARAM
 
         argDef['Update Options'] = d
 
@@ -849,6 +860,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
         kwargs['updateOnly'] = argSet.pop('update-only', False)
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
+        kwargs['exactFlavors'] = argSet.pop('exact-flavors', False)
 
         kwargs['updateByDefault']    = otherArgs[1] != 'erase'
         kwargs['migrate']            = otherArgs[1] == 'migrate'

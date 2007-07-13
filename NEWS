@@ -1,6 +1,49 @@
-Changes in 2.0.0:
+Changes in @NEW@:
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
+    * Label lookups pick the latest version which matches instead of the
+      latest version on each branch
+    * Replaced label affinity with branch affinity
+
+  o Bug Fixes:
+    * Fix a bug in commit code that made r.macros.buildlabel unusable because
+      you could not commit recipes that used it.  (CNY-1752)
+
+Changes in 1.1.33:
+  o Build Changes:
+    * The addArchive() source action now handles xpi archives. (CNY-1793)
+    * Unknown flags are now ignored when calling loadRecipe with a
+      flavor, instead of printing a traceback.
+
+  o Update Changes:
+    * Updates to groups are now allowed to be merged with other groups
+      in update jobs, reducing the number of jobs that are used for
+      updates.
+
+  o Client Changes:
+    * Cloning now always increments group version counts, mimicing
+      the behavior of group cooking. (CNY-1724)
+    * When promoting, --all-flavors is now on by default.  However, if
+      a flavor to promote or clone is specified, promotes will be
+      limited by that flavor. (CNY-1535)
+    * Several commands, such as promote, update and rq, now take an
+      --exact-flavors flag.  If specified, the flavors for each trove
+      must match exactly - no system flavor or heuristic is used to
+      find the trove you want. (CNY-1829)
+    * If there is a problem with domain name resolution, conary will
+      retry 5 times. However, if the connection fails after those
+      attempts, future connection requests will now fail after one try.
+      (CNY-1814)
+
+  o Bug Fixes:
+    * The SQLite "ANALYZE" command is no longer run on local SQLite
+      databases. Any data stored by the "ANALYZE" command will be
+      removed from the local database unless it is being accessed
+      read-only. Database performance is poor on databases with
+      "ANALYZE" data in them. (CNY-778)
+    * Some bugs related to installing relative changesets were fixed.
+      These bugs would manifest themselves by making relative changesets
+      not installable when the network was down. (CNY-1814)
 
 Changes in 1.1.32:
   o Client Changes:
@@ -8,13 +51,15 @@ Changes in 1.1.32:
       object to determine the over-the-wire transfer size of the jobs
       in an UpdateJob object.  Call requires a single repository be
       the source of the entire update. (CNY-1757)
+    * cvc reports a more accurate error message when the CONARY file in
+      the current directory is not a regular file
 
   o Server Changes:
     * A "infoOnly" parameter to has been added to the getChangeSet()
       repository method in protocol version 51. (CNY-1757)
     * The list of repository methods is now automatically generated
       instead of statically listed. (CNY-1781)
-
+  
   o Bug Fixes:
     * The addSvnSnapshot() source action now uses the lookaside directory
       for generating the snapshot, instead of using the remote repository.
@@ -24,6 +69,15 @@ Changes in 1.1.32:
       been fixed.
     * A bug that caused changes in the byDefault status of a trove to
       be omitted from local rollbacks has been fixed. (CNY-1796)
+
+Changes in 1.1.31.2:
+  o Proxy changes:
+    * Proxy can now inject entitlements and user authentication on behalf
+      of clients (CNY-1836)
+
+Changes in 1.1.31.1:
+  o Bug Fix:
+    * Proxies used wrong getChangeSet call for old protocol versions (CNY-1803)
 
 Changes in 1.1.31:
   o Bug Fix:

@@ -90,8 +90,15 @@ class AbstractTroveSource:
 
             result[name] = {}
 
-            for label, reqFlavorList in \
-                  troveSpecs.get(name, troveSpecs.get(None, None)).iteritems():
+            if name in troveSpecs:
+                labelDict = troveSpecs[name]
+            elif '' in troveSpecs:
+                labelDict = troveSpecs['']
+            elif None in troveSpecs:
+                labelDict = troveSpecs['']
+            else:
+                assert False, "Could not find query for %s" % name
+            for label, reqFlavorList in labelDict.iteritems():
                 byFlavor = {}
                 if label not in byLabel:
                     continue
@@ -134,23 +141,37 @@ class AbstractTroveSource:
                     bestFlavors = set( x[1] for x in enumerate(byFlavor)
                                               if x[0] in bestFlavors )
 
-                    # now lookup the versions which exist for the flavors
-                    # we've identified
-                    bestVersions = \
-                        [ ver for ver, flavorList in versionDict.iteritems()
-                            if set(flavorList) & bestFlavors and
-                               ver.trailingLabel() == label ]
+   
+                    if bestFlavor:
+                        # now lookup the versions which exist for the flavors
+                        # we've identified
+                        bestVersions = \
+                            [ ver for ver, flavorList in versionDict.iteritems()
+                                if set(flavorList) & bestFlavors and
+                                   ver.trailingLabel() == label ]
 
-                    # and find the latest version which works
-                    bestVersions.sort()
-                    latestVersion = bestVersions[-1]
+                        # and find the latest version which works
+                        bestVersions.sort()
+                        latestVersion = bestVersions[-1]
+                        versionFlavors = [ (latestVersion,x)
+                                           for x in bestFlavors
+                                           if latestVersion in byFlavor[x] ]
+                    else:
+                        versionFlavors = []
+                        for flavor in bestFlavors:
+                            bestVersions = \
+                            [ ver for ver, flavorList in versionDict.iteritems()
+                                if  flavor in flavorList and
+                                   ver.trailingLabel() == label ]
+                            bestVersions.sort()
+                            latestVersion = bestVersions[-1]
+                            versionFlavors.append((latestVersion, flavor))
 
                     # for the version we want find the flavors we should
                     # return
-                    result[name].setdefault(latestVersion, set())
-                    result[name][latestVersion].update(
-                            [ x for x in bestFlavors if latestVersion
-                                            in byFlavor[x] ] )
+                    for version, flavor in versionFlavors:
+                        result[name].setdefault(version, set())
+                        result[name][version].add(flavor)
 
             for version, flavorSet in result[name].iteritems():
                 result[name][version] = list(flavorSet)
@@ -190,7 +211,8 @@ class AbstractTroveSource:
                    acrossLabels=False, acrossFlavors=True, 
                    affinityDatabase=None, allowMissing=False, 
                    bestFlavor=None, getLeaves=None, 
-                   troveTypes=TROVE_QUERY_PRESENT):
+                   troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
+                   **kw):
 
         if bestFlavor is None:
             bestFlavor = self._bestFlavor
@@ -202,18 +224,20 @@ class AbstractTroveSource:
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=self._allowNoLabel,
                                             bestFlavor=bestFlavor,
-                                            getLeaves=getLeaves)
+                                            getLeaves=getLeaves,
+                                            exactFlavors=exactFlavors, **kw)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossSources = True, 
                   acrossFlavors = True, affinityDatabase = None,
                   bestFlavor = None, getLeaves = None, 
-                  troveTypes=TROVE_QUERY_PRESENT):
+                  troveTypes=TROVE_QUERY_PRESENT, **kw):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossSources, acrossFlavors,
                               affinityDatabase, bestFlavor=bestFlavor,
-                              getLeaves=getLeaves, troveTypes=troveTypes)
+                              getLeaves=getLeaves, troveTypes=troveTypes,
+                              **kw)
         return res[(name, versionStr, flavor)]
 
     def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
@@ -1011,9 +1035,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             newCs.newTrove(newTrv.diff(oldTrv)[0])
 
-        # we can't combine these (yet; we should work on that)
-        assert(not changeSetJobs or not needsRooting)
-
         rootMap = {}
         for (relJob, absJob) in needsRooting:
             assert(relJob[0] == absJob[0])
@@ -1042,6 +1063,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             # in this trove (we don't reset() the underlying changesets
             # because this isn't a good place to coordinate that reset when
             # multiple threads are in use)
+            jobsToFind = list(changeSetJobs)
             for subCs in self.csList:
                 keep = False
                 for trvCs in subCs.iterNewTroveList():
@@ -1056,10 +1078,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                   (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 trvCs.isAbsolute())
 
-                    if job in changeSetJobs:
+                    if job in jobsToFind:
                         newCs.newTrove(trvCs)
+                        jobsToFind.remove(job)
                         keep = True
-
                 if keep:
                     subCs.reset()
                     mergedCs.merge(subCs)
@@ -1118,7 +1140,10 @@ class SourceStack(object):
 
         for source in self.sources:
             newTroveList = []
-            hasTroves = source.hasTroves([x[1] for x in troveList])
+            try:
+                hasTroves = source.hasTroves([x[1] for x in troveList])
+            except errors.OpenError:
+                hasTroves = [ False] * len(troveList)
             if isinstance(hasTroves, list):
                 hasTroves = dict(itertools.izip([x[1] for x in troveList], 
                                                 hasTroves))
@@ -1267,10 +1292,10 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
         return True
 
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
-                   acrossLabels=False, acrossFlavors=True, 
+                   acrossLabels=False, acrossFlavors=True,
                    affinityDatabase=None, allowMissing=False,
                    bestFlavor=None, getLeaves=None,
-                   troveTypes=TROVE_QUERY_PRESENT):
+                   troveTypes=TROVE_QUERY_PRESENT, **kw):
 
         sourceBestFlavor = bestFlavor
         sourceGetLeaves = getLeaves
@@ -1308,7 +1333,8 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                                             allowNoLabel=source._allowNoLabel,
                                             bestFlavor=sourceBestFlavor,
                                             getLeaves=sourceGetLeaves,
-                                            troveTypes=sourceTroveTypes)
+                                            troveTypes=sourceTroveTypes, 
+                                            **kw)
 
             foundTroves = troveFinder.findTroves(troveSpecs, allowMissing=True)
 
@@ -1345,7 +1371,8 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                                         allowNoLabel=source._allowNoLabel,
                                         bestFlavor=sourceBestFlavor,
                                         getLeaves=sourceGetLeaves,
-                                        troveTypes=sourceTroveTypes)
+                                        troveTypes=sourceTroveTypes,
+                                        **kw)
 
         results.update(troveFinder.findTroves(troveSpecs,
                                               allowMissing=allowMissing))

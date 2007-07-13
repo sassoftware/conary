@@ -26,7 +26,7 @@ from conary.errors import ClientError, ConaryError, InternalConaryError, Missing
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
-from conary.repository.errors import TroveMissing
+from conary.repository.errors import TroveMissing, OpenError
 from conary import trove, versions
 
 class CriticalUpdateInfo(object):
@@ -279,11 +279,20 @@ class ClientUpdate:
                 return result
             else:
                 troveSource = uJob.getTroveSource()
-                for info in infoList:
-                    ph = troveSource.getTrove(withFiles = False, *info).\
-                                    getPathHashes()
-                    result.append(ph)
-
+                # we can't assume that the troveSource has all
+                # of the child troves for packages we can see.
+                # Specifically, the troveSource could have come from
+                # a relative changeset that only contains byDefault True
+                # components - here we're looking at both byDefault 
+                # True and False components (in trove.diff)
+                hasTroveList = troveSource.hasTroves(infoList)
+                for info, hasTrove in itertools.izip(infoList, hasTroveList):
+                    if hasTrove:
+                        ph = troveSource.getTrove(withFiles = False, *info).\
+                                        getPathHashes()
+                        result.append(ph)
+                    else:
+                        result.append(set())
             return result
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse,
@@ -1115,15 +1124,18 @@ followLocalChanges: %s
                 try:
                     trv = troveSource.getTrove(withFiles = False, *newInfo)
                 except TroveMissing:
-                    # it's possible that the trove source we're using
-                    # contains references to troves that it does not 
-                    # actually contain.  That's okay as long as the
-                    # excluded trove is not actually trying to be
-                    # installed.
-                    if jobAdded:
-                        raise
+                    if self.db.hasTrove(*newInfo):
+                        trv = self.db.getTrove(withFiles = False, *newInfo)
                     else:
-                        continue
+                        # it's possible that the trove source we're using
+                        # contains references to troves that it does not 
+                        # actually contain.  That's okay as long as the
+                        # excluded trove is not actually trying to be
+                        # installed.
+                        if jobAdded:
+                            raise
+                        else:
+                            continue
 
             if isPrimary:
                 # byDefault status of troves is determined by the primary
@@ -1366,7 +1378,8 @@ conary erase '%s=%s[%s]'
                          useAffinity = True, checkPrimaryPins = True,
                          forceJobClosure = False, ineligible = set(),
                          syncChildren=False, updateOnly=False,
-                         installMissing = False, removeNotByDefault = False):
+                         installMissing = False, removeNotByDefault = False,
+                         exactFlavors = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -1424,11 +1437,26 @@ conary erase '%s=%s[%s]'
                     if oldTrv is None:
                         # XXX batching these would be much more efficient
                         oldTrv = troveSource.getTrove(job[0], job[1][0],
-                                                      job[1][1], 
+                                                      job[1][1],
                                                       withFiles = False)
 
-                newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                              withFiles = False)
+                try:
+                    newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
+                                                  withFiles = False)
+                except (TroveMissing, OpenError), err:
+                    # In the case where we're getting transitive closure
+                    # for a relative changeset and hit a trove that is
+                    # not included in the relative changeset (because it's
+                    # already installed locally), grab it from the local 
+                    # database instead.
+                    newTrv = db.getTroves([(job[0], job[2][0], job[2][1])],
+                                           withFiles = False,
+                                           pristine = True)[0]
+                    # If it not there, maybe we're not installing it anyway.
+                    # We'll let the troveMissing error occur when we actually
+                    # try to install this trove.
+                    if newTrv is None:
+                        continue
 
                 recursiveJob = newTrv.diff(oldTrv, absolute = job[3])[2]
                 for x in recursiveJob:
@@ -1528,16 +1556,19 @@ conary erase '%s=%s[%s]'
 
         import epdb; epdb.st('f')
         if not useAffinity:
-            results.update(searchSource.findTroves(toFind), useAffinity=False)
+            results.update(searchSource.findTroves(toFind, useAffinity=False,
+                                                   exactFlavors=exactFlavors))
         else:
             if toFind:
                 results.update(searchSource.findTroves(toFind,
-                                                       useAffinity=True))
+                                                    useAffinity=True,
+                                                    exactFlavors=exactFlavors))
                 log.lowlevel("looking up troves w/ database affinity")
             if toFindNoDb:
                 log.lowlevel("looking up troves w/o database affinity")
                 results.update(searchSource.findTroves(toFindNoDb,
-                                                       useAffinity=False))
+                                                   useAffinity=False,
+                                                   exactFlavors=exactFlavors))
         for troveSpec, (oldTroveInfo, isAbsolute) in \
                 itertools.chain(toFind.iteritems(), toFindNoDb.iteritems()):
             resultList = results[troveSpec]
@@ -1637,11 +1668,17 @@ conary erase '%s=%s[%s]'
 
             csSource = trovesource.stack(uJob.getSearchSource(),
                                          self.repos)
-            cs, notFound = csSource.createChangeSet(reposChangeSetList, 
+            trovesExist = csSource.hasTroves(
+                            [(x[0], x[2][0], x[2][1]) for x in reposChangeSetList])
+            reposChangeSetList = [ x[1] for x in
+                                   itertools.izip(trovesExist, reposChangeSetList)
+                                   if x[0] is True ]
+            cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                     withFiles = False,
                                                     recurse = recurse)
             self._replaceIncomplete(cs, csSource, self.db, self.repos)
-            #NOTE: we allow any missing recursive bits to be skipped.
+            #NOTE: we allow any missing bits (recursive or not) to be skipped.
+            # We may not install then anyways
             #They'll show up in notFound.
             #assert(not notFound)
             uJob.getTroveSource().addChangeSet(cs)
@@ -2324,7 +2361,8 @@ conary erase '%s=%s[%s]'
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
-                        applyCriticalOnly = False, restartInfo = None):
+                        applyCriticalOnly = False, restartInfo = None,
+                        exactFlavors = False):
         """
         Populates an update job based on a set of trove update and erase
         operations.If self.cfg.autoResolve is set, dependencies
@@ -2458,7 +2496,7 @@ conary erase '%s=%s[%s]'
                     migrate = migrate,
                     criticalUpdateInfo = criticalUpdateInfo,
                     resolveSource = resolveSource,
-                    updateJob = updJob)
+                    updateJob = updJob, exactFlavors = exactFlavors)
         except DependencyFailure, e:
             if e.hasCriticalUpdates() and not applyCriticalOnly:
                 e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
@@ -2498,6 +2536,12 @@ conary erase '%s=%s[%s]'
         @autoPinList: A list of troves that will not change. Defaults to the
         value from self.cfg.pinList
         @type autoPinList: list
+        @keepJournal: If set, the conary journal file will be left behind
+        (useful only for debugging journal cleanup routines)
+        @type keepJournal: bool
+        @noRestart: If set, suppresses the restart after critical updates
+        behavior default to conary.
+        @type noRestart: bool
         @return: None if the update was fully applied, or restart information
         if a critical update was applied and a restart is necessary to make it
         active.
@@ -2553,7 +2597,7 @@ conary erase '%s=%s[%s]'
                         installMissing = False, removeNotByDefault = False,
                         keepRequired = False, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
-                        updateJob = None):
+                        updateJob = None, exactFlavors = False):
         """Create an update job. DEPRECATED, use newUpdateJob and
         prepareUpdateJob instead"""
         # FIXME: this API has gotten far out of hand.  Refactor when 
@@ -2651,7 +2695,8 @@ conary erase '%s=%s[%s]'
             if not mainSearchSource:
                 mainSearchSource = self.getSearchSource()
             result = mainSearchSource.findTroves(resolveGroupList,
-                                                 useAffinity=useAffinity)
+                                                 useAffinity=useAffinity,
+                                                 exactFlavors=exactFlavors)
             groupTups = list(itertools.chain(*result.itervalues()))
             groupTroves = self.repos.getTroves(groupTups, withFiles=False)
             resolveSource = resolve.DepResolutionByTroveList(self.cfg, self.db,
@@ -2672,7 +2717,8 @@ conary erase '%s=%s[%s]'
                                        syncChildren = syncChildren,
                                        updateOnly = updateOnly,
                                        installMissing = installMissing,
-                                       removeNotByDefault = removeNotByDefault)
+                                       removeNotByDefault = removeNotByDefault,
+                                       exactFlavors = exactFlavors)
 
         self._validateJob(jobSet)
 
@@ -2757,11 +2803,13 @@ conary erase '%s=%s[%s]'
                 startNew = False
                 count = 0
                 newJobIsInfo = False
+                inGroup = False
 
             isCritical = jobList in criticalJobs
 
 
             foundCollection = False
+            foundGroup = False
 
             count += len(jobList)
             isInfo = None                 # neither true nor false
@@ -2770,7 +2818,9 @@ conary erase '%s=%s[%s]'
                 (name, (oldVersion, oldFlavor),
                        (newVersion, newFlavor), absolute) = job
 
-                if newVersion is not None and ':' not in name:
+                if name.startswith('group-'):
+                    foundGroup = True
+                elif newVersion is not None and ':' not in name:
                     foundCollection = True
 
                 if name.startswith('info-'):
@@ -2782,7 +2832,8 @@ conary erase '%s=%s[%s]'
                     assert(isInfo is False or isInfo is None)
                     isInfo = False
 
-            if (not isInfo or infoName != name) and newJobIsInfo is True:
+            if (((not isInfo or infoName != name) and newJobIsInfo is True)
+                or foundGroup != inGroup):
                 # We switched from installing info components to
                 # installing fresh components. This has to go into
                 # a separate job from the last one.
@@ -2791,16 +2842,18 @@ conary erase '%s=%s[%s]'
                 # have info-foo and info-bar in the same update job
                 # because info-foo might depend on info-bar being
                 # installed already.  This should be fixed.
-                uJob.addJob(newJob)
+                if newJob:
+                    uJob.addJob(newJob)
                 count = len(jobList)
                 newJob = list(jobList)             # make a copy
                 newJobIsInfo = False
+                inGroup = foundGroup
             else:
                 newJobIsInfo = isInfo
                 newJob += jobList
 
-            if (foundCollection or isCritical or
-                (updateThreshold and (count >= updateThreshold))): 
+            if (foundCollection or isCritical
+                or (updateThreshold and (count >= updateThreshold))): 
                 if isCritical:
                     finalCriticalJobs.append(len(uJob.getJobs()))
                 uJob.addJob(newJob)

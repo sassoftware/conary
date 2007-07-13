@@ -404,9 +404,6 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        if not readOnly:
-            self.db.analyze()
-
         self.needsCleanup = False
         self.addVersionCache = {}
         self.flavorsNeeded = {}

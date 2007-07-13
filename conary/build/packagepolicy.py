@@ -3133,20 +3133,20 @@ class reportMissingBuildRequires(policy.Policy):
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
-	self.warnings = set()
+	self.errors = set()
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
         for arg in args:
             if type(arg) in (list, tuple, set):
-                self.warnings.update(arg)
+                self.errors.update(arg)
             else:
-                self.warnings.add(arg)
+                self.errors.add(arg)
 
     def do(self):
-	if self.warnings:
+	if self.errors:
             self.warn('Suggested buildRequires additions: %s',
-                      str(sorted(list(self.warnings))))
+                      str(sorted(list(self.errors))))
 
 
 class reportErrors(policy.Policy):
@@ -3159,15 +3159,15 @@ class reportErrors(policy.Policy):
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
-	self.warnings = []
+	self.errors = []
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
 	"""
 	Called once, with printf-style arguments, for each warning.
 	"""
-	self.warnings.append(args[0] %tuple(args[1:]))
+	self.errors.append(args[0] %tuple(args[1:]))
 
     def do(self):
-	if self.warnings:
-	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)
+	if self.errors:
+	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.errors)

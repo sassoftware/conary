@@ -22,7 +22,7 @@ import time
 import types
 
 from conary import files, trove, versions, streams
-from conary.conarycfg import CfgProxy, CfgRepoMap
+from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
@@ -3141,6 +3141,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def checkVersion(self, authToken, clientVersion):
+        if clientVersion > 50:
+            raise errors.InvalidClientVersion(
+                    'checkVersion call only supports protocol versions 50 '
+                    'and lower')
+
 	if not self.auth.check(authToken, write = False):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
@@ -3185,6 +3190,8 @@ class ServerConfig(ConfigFile):
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
+    deadlockRetry           = (CfgInt, 5)
+    entitlement             = CfgEntitlement
     entitlementCheckURL     = CfgString
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
@@ -3200,4 +3207,4 @@ class ServerConfig(ConfigFile):
     staticPath              = (CfgPath, '/conary-static')
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
-    deadlockRetry           = (CfgInt, 5)
+    user                    = CfgUserInfo
