@@ -1,3 +1,8 @@
+Changes in 1.1.31.2:
+  o Proxy changes:
+    * Proxy can now inject entitlements and user authentication on behalf
+      of clients (CNY-1836)
+
 Changes in 1.1.31.1:
   o Bug Fix:
     * Proxies used wrong getChangeSet call for old protocol versions (CNY-1803)

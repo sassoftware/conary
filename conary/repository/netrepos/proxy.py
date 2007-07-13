@@ -103,9 +103,17 @@ class ProxyCallFactory:
 
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
-                     protocolString, headers):
+                     protocolString, headers, cfg, targetServerName):
+        entitlementList = authToken[2][:]
+        entitlementList += cfg.entitlement.find(targetServerName,
+                                                allMatches = True)
+
+        userOverride = cfg.user.find(targetServerName)
+        if userOverride:
+            authToken = authToken[:]
+            authToken[0], authToken[1] = userOverride
+
         url = redirectUrl(authToken, rawUrl)
-        entitlementList = authToken[2]
 
         via = []
         # Via is a multi-valued header. Multiple occurences will be collapsed
@@ -161,7 +169,8 @@ class RepositoryCallFactory:
         self.log = logger
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
-                     localAddr, protocolString, headers):
+                     localAddr, protocolString, headers, cfg,
+                     targetServerName):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos)
@@ -204,12 +213,16 @@ class BaseProxy(xmlshims.NetworkConvertors):
         the client used to talk to us.
         @param protocolString: if set, the protocol version the client used
         (i.e. HTTP/1.0)
+        @param targetServerName: if set, the conary server name the
+        request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""), None)
 
         self._port = port
         self._protocol = protocol
+
+        targetServerName = headers.get('X-Conary-Servername', None)
 
         # simple proxy. FIXME: caching these might help; building all
         # of this framework for every request seems dumb. it seems like
@@ -218,7 +231,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
                                                self.proxies, authToken,
                                                localAddr, protocolString,
-                                               headers)
+                                               headers, self.cfg,
+                                               targetServerName)
 
         try:
             if hasattr(self, methodname):
