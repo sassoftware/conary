@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -84,16 +84,18 @@ def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.build.derivedrecipe', 'DerivedPackageRecipe')
     localImport(d, 'conary.build.packagerecipe', 
                                   ('clearBuildReqs',
+                                   'clearCrossReqs',
                                    'PackageRecipe', 
                                    'BuildPackageRecipe',
                                    'CPackageRecipe',
                                    'AutoPackageRecipe'))
-    localImport(d, 'conary.build.inforecipe',  ('UserInfoRecipe', 
+    localImport(d, 'conary.build.inforecipe',  ('UserInfoRecipe',
                                                 'GroupInfoRecipe'))
     localImport(d, 'conary.lib', ('util',))
     for x in ('os', 're', 'sys', 'stat'):
         localImport(d, x)
-    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
+    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                        'PackageFlags'))
     d['filename'] = filename
     if not directory:
         directory = os.path.dirname(filename)
@@ -125,24 +127,27 @@ def _copyReusedRecipes(moduleDict):
         recipeCopy = new.classobj(name, tuple(newMro),
                                  recipeClass.__dict__.copy())
         recipeCopy.buildRequires = recipeCopy.buildRequires[:]
+        recipeCopy.crossRequires = recipeCopy.crossRequires[:]
         moduleDict[name] = recipeCopy
 
 class RecipeLoader:
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
-                 buildFlavor=None):
+                 buildFlavor=None, db=None,
+                 overrides = None):
         try:
             self._load(filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
-                       buildFlavor=buildFlavor)
+                       buildFlavor=buildFlavor, db=db,
+                       overrides=overrides)
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
     def _load(self, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
-              buildFlavor=None):
+              buildFlavor=None, db=None, overrides=None):
         self.recipes = {}
 
         if filename[0] != "/":
@@ -165,6 +170,7 @@ class RecipeLoader:
         # recipes out of the repository
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
+        self.module.__dict__['db'] = db
         self.module.__dict__['component'] = component
         self.module.__dict__['branch'] = branch
         self.module.__dict__['name'] = pkgname
@@ -172,7 +178,7 @@ class RecipeLoader:
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
         self.module.__dict__['buildFlavor'] = buildFlavor
-
+        self.module.__dict__['overrides'] = overrides
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -218,6 +224,7 @@ class RecipeLoader:
 
         # all recipes that could be loaded by loadRecipe are loaded;
         # get rid of our references to cfg and repos
+        del self.module.__dict__['db']
         del self.module.__dict__['cfg']
         del self.module.__dict__['repos']
         del self.module.__dict__['component']
@@ -225,6 +232,7 @@ class RecipeLoader:
         del self.module.__dict__['name']
         del self.module.__dict__['ignoreInstalled']
         del self.module.__dict__['buildFlavor']
+        del self.module.__dict__['overrides']
 
         found = False
         for (name, obj) in self.module.__dict__.items():
@@ -260,14 +268,15 @@ class RecipeLoader:
             # inherit any tracked flags that we found while loading parent
             # classes.  Also inherit the list of recipes classes needed to load
             # this recipe.
-            self.recipe._loadedTroves = self.module.__dict__['loadedTroves']
-            self.recipe._loadedSpecs = self.module.__dict__['loadedSpecs']
+            self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
+            self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
 
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)
             self.recipe._trackedFlags = use.getUsed()
             if buildFlavor is not None:
                 self.recipe._buildFlavor = buildFlavor
+            self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
         else:
             # we'll get this if the recipe file is empty 
             raise builderrors.RecipeFileError(
@@ -341,7 +350,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     filterVersions=False, 
                                     parentDir=None, 
                                     defaultToLatest = False,
-                                    buildFlavor = None):
+                                    buildFlavor = None, 
+                                    db = None, overrides = None):
     # FIXME parentDir specifies the directory to look for 
     # local copies of recipes called with loadRecipe.  If 
     # empty, we'll look in the tmp directory where we create the recipe
@@ -375,7 +385,7 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                          "Picking latest: \n       %s\n\n"
                          "Not using:\n      %s"
                           %(component,
-                            ', '.join(x.asString() for x in sorted(labelPath)),
+                           ', '.join(x.asString() for x in labelPath),
                             '%s=%s' % pkgs[0][:2],
                             '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
         else:
@@ -414,7 +424,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
         loader = RecipeLoader(recipeFile, cfg, repos, component, 
                               sourceComponent.getVersion().branch(),
                               ignoreInstalled=ignoreInstalled,
-                              directory=parentDir, buildFlavor=buildFlavor)
+                              directory=parentDir, buildFlavor=buildFlavor,
+                              db=db, overrides=overrides)
     finally:
         os.unlink(recipeFile)
     recipe = loader.getRecipe()
@@ -473,15 +484,28 @@ def loadInstalled(troveSpec, label=None):
     the default C{labelPath} that would be constructed would be:
     C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
     """
-
     callerGlobals = sys._getframe(1).f_globals
     _loadRecipe(troveSpec, label, callerGlobals, True)
+
+def _pickLatest(component, troves, labelPath=None):
+    troves.sort(reverse=True)
+    err = "source component %s has multiple versions" % component
+    if labelPath:
+        err += " on labelPath %s:" % ', '.join(x.asString() for x in labelPath)
+    else:
+        err += ':'
+    err += ("\nPicking latest:\n      %s\n\n"
+            "Not using:\n      %s\n"
+              %('%s=%s' % troves[0][:2],
+                '\n       '.join('%s=%s' % x[:2] for x in troves[1:])))
+    log.warning(err)
+    return troves[0]
 
 
 def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     """ See docs for loadInstalledPackage and loadSuperClass.  """
 
-    def _findInstalledVersion(db, labelPath, name, versionStr, flavor):
+    def _findInstalledVersion(db, labelPath, name, versionStr, flavor, repos):
         """ Specialized search of the installed system along a labelPath, 
             defaulting to searching the whole system if the trove is not
             found along the label path.
@@ -490,40 +514,57 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             returned, or C{None} if no trove is found.
         """
         # first search on the labelPath.  
+        troves = []
         try:
             troves = db.findTrove(labelPath, (name, versionStr, flavor))
             if len(troves) > 1:
                 troves = getBestLoadRecipeChoices(labelPath, troves)
                 if len(troves) > 1:
-                    raise builderrors.RecipeFileError(
-                                    'Multiple troves could match loadInstalled'
-                                    ' request %s: %s' %(troveSpec, troves))
-            if troves:
-                return troves[0][1].getSourceVersion(), troves[0][2]
+                    # sort by timeStamp even though they're across
+                    # branches.  This will give us _some_ result to move
+                    # forward with, which is better than blowing up.
+                    troves = [_pickLatest(name, troves, labelPath)]
         except errors.TroveNotFound:
             pass
-        if labelPath is None:
+        if not troves:
+            if labelPath is None:
+                return None
+            try:
+                troves = db.findTrove(None, (name, versionStr, flavor))
+                troves = getBestLoadRecipeChoices(None, troves)
+            except errors.TroveNotFound:
+                pass
+        if not troves:
             return None
-        try:
-            troves = db.findTrove(None, (name, versionStr, flavor))
-            troves = getBestLoadRecipeChoices(None, troves)
-            if len(troves) > 1:
-                raise RuntimeError, (
-                                'Multiple troves could match loadRecipe' 
-                                ' request for %s' % name)
-            if troves:
-                return troves[0][1].getSourceVersion(), troves[0][2]
-        except errors.TroveNotFound:
-            pass
+
+        if len(troves) > 1:
+            troves = [_pickLatest(name, troves)]
+        if troves:
+            sourceVersion =  troves[0][1].getSourceVersion(False)
+            flavor = troves[0][2]
+            sourceName = name.split(':')[0] + ':source'
+            noFlavor = deps.parseFlavor('')
+            if not repos.hasTrove(sourceName, sourceVersion, noFlavor):
+                while sourceVersion.hasParentVersion():
+                    sourceVersion = sourceVersion.parentVersion()
+                    if repos.hasTrove(sourceName, sourceVersion, noFlavor):
+                        break
+            return sourceVersion, flavor
         return None
 
 
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
+    db = callerGlobals.get('db', None)
     branch = callerGlobals['branch']
     parentPackageName = callerGlobals['name']
     parentDir = callerGlobals['directory']
     buildFlavor = callerGlobals.get('buildFlavor', None)
+    overrides = callerGlobals.get('overrides', None)
+    if overrides is None:
+        overrides = {}
+    if db is None:
+        db = database.Database(cfg.root, cfg.dbPath)
 
     if 'ignoreInstalled' in callerGlobals:
         alwaysIgnoreInstalled = callerGlobals['ignoreInstalled']
@@ -540,10 +581,25 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     else:
         file = name + '.recipe'
 
+    if label and not versionSpec:
+        # If they used the old-style specification of label, we should 
+        # convert to new style for purposes of storing in troveInfo
+        troveSpec = '%s=%s' % (name, label)
+        if flavorSpec is not None and not troveSpec.isEmpty():
+            troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
+
+    if troveSpec in overrides:
+        recipeToLoad, newOverrideDict = overrides[troveSpec]
+        if hasattr(newOverrideDict, '_loadedSpecs'):
+            # handle case where loadSpec is passed directly back in
+            newOverrideDict = newOverrideDict._loadedSpecs
+    else:
+        recipeToLoad = newOverrideDict = None
+
     #first check to see if a filename was specified, and if that 
     #recipe actually exists.   
     loader = None
-    if not (label or versionStr or (flavor is not None)):
+    if not (recipeToLoad or label or versionStr or (flavor is not None)):
         if name[0] != '/':
             localfile = parentDir + '/' + file
         else:
@@ -558,10 +614,11 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 else:
                     oldBuildFlavor = buildFlavor
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, buildFlavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
             loader = RecipeLoader(localfile, cfg, repos=repos,
                                   ignoreInstalled=alwaysIgnoreInstalled,
-                                  buildFlavor=buildFlavor)
+                                  buildFlavor=buildFlavor,
+                                  db=db)
 
     if not loader:
         if label:
@@ -573,17 +630,29 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             labelPath.reverse()
         else:
             labelPath = None
-        if findInstalled and not alwaysIgnoreInstalled:
+
+        if cfg.installLabelPath:
+            if labelPath:
+                for label in cfg.installLabelPath:
+                    if label not in labelPath:
+                        labelPath.append(label)
+            else:
+                labelPath = cfg.installLabelPath
+
+        if not recipeToLoad and findInstalled and not alwaysIgnoreInstalled:
             # look on the local system to find a trove that is installed that
             # matches this loadrecipe request.  Use that trove's version
             # and flavor information to grab the source out of the repository
-            db = database.Database(cfg.root, cfg.dbPath)
-            parts = _findInstalledVersion(db, labelPath, name, versionStr, flavor)
+            parts = _findInstalledVersion(db, labelPath, name, versionStr, 
+                                          flavor, repos)
             if parts:
                 version, flavor = parts
                 while version.isOnLocalHost():
                     version = version.parentVersion()
                 versionStr = str(version)
+
+        if recipeToLoad:
+            name, versionStr, flavor = recipeToLoad
 
         if flavor is not None:
             # override the current flavor with the flavor found in the 
@@ -592,25 +661,19 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             if buildFlavor is None:
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor, error=False)
             else:
                 oldBuildFlavor = buildFlavor
                 buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, buildFlavor)
-        loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
+                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+        loader = recipeLoaderFromSourceComponent(name, cfg, repos,
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
                                      ignoreInstalled=alwaysIgnoreInstalled,
                                      filterVersions=True,
                                      parentDir=parentDir,
-                                     defaultToLatest=True)[0]
-
-    if label and not versionSpec:
-        # If they used the old-style specification of label, we should 
-        # convert to new style for purposes of storing in troveInfo
-        troveSpec = '%s=%s' % (name, label)
-        if flavorSpec is not None and not troveSpec.isEmpty():
-            troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
+                                     defaultToLatest=True, 
+                                     db=db, overrides=newOverrideDict)[0]
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return
@@ -638,7 +701,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         else:
             buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
-        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor)
+        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor, error=False)
 
     # stash a reference to the module in the namespace
     # of the recipe that loaded it, or else it will be destroyed
@@ -674,11 +737,13 @@ def validateRecipe(recipeClass, packageName, fileName):
         if not recipeClass.name.startswith(prefixes[packageType]):
             raise builderrors.BadRecipeNameError(
                     'recipe name must start with "%s"' % prefixes[packageType])
-    else:   
+    elif packageType == recipe.RECIPE_TYPE_REDIRECT:
+        # redirects are allowed to have any format
+        pass
+    else:
         for prefix in prefixes.itervalues():
             if recipeClass.name.startswith(prefix):
                 raise builderrors.BadRecipeNameError(
                                 'recipe name cannot start with "%s"' % prefix)
-                
     recipeClass.validateClass()
 

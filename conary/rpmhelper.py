@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -16,7 +16,7 @@
 Contains functions to assist in dealing with rpm files.
 """
 
-import struct
+import itertools, struct
 
 NAME            = 1000
 VERSION         = 1001
@@ -108,6 +108,16 @@ class RpmHeader:
                 yield baseName
 
     def __getitem__(self, tag):
+        if tag == OLDFILENAMES and tag not in self.entries:
+            # mimic OLDFILENAMES using DIRNAMES and BASENAMES
+            dirs = dict(enumerate(self[DIRNAMES]))
+            paths = []
+            for dirIndex, baseName in itertools.izip(self[DIRINDEXES],
+                                                     self[BASENAMES]):
+                paths.append(dirs[dirIndex] + baseName)
+
+            return paths
+
         (dataType, offset, count) = self.entries[tag]
 
         items = []

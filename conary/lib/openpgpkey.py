@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -15,6 +15,8 @@
 import os
 import sys
 import getpass
+import tempfile
+import subprocess
 from time import time
 
 from conary import callbacks
@@ -80,10 +82,9 @@ class OpenPGPKey:
         return r
 
     def _getRelPrime(self, q):
-        # We /dev/random instead of /dev/urandom. This was not a mistake;
-        # we want the most random data available. use os module to ensure
-        # reads are unbuffered.
-        randFD = os.open('/dev/random', os.O_RDONLY)
+        # Use os module to ensure reads are unbuffered so as not to
+        # artifically deflate entropy
+        randFD = os.open('/dev/urandom', os.O_RDONLY)
         b = self._bitLen(q)/8 + 1
         r = 0L
         while r < 2:
@@ -129,6 +130,9 @@ class OpenPGPKey:
             return self.trustLevel
         else:
             return -1
+
+class _KeyNotFound(KeyNotFound):
+    errorIsUncatchable = True
 
 class OpenPGPKeyCache:
     """
@@ -271,13 +275,28 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 #OpenPGPKeyFinder: download missing keys from conary servers.
 #-----#
 class KeyCacheCallback(callbacks.KeyCacheCallback):
-    def findOpenPGPKey(self, server, keyId, warn=True):
-        # if we can't exec gpg, go ahead and bail
-        if not self.hasGPG:
-            return
+    gpgBin = 'gpg'
+    def _getGPGCommonArgs(self, homeDir):
+        return [self.gpgBin, '-q', '--no-tty',
+                '--homedir', homeDir,
+                '--no-greeting', '--no-secmem-warning',
+                '--no-verbose', '--no-mdc-warning',
+                '--no-default-keyring',
+                '--keyring', os.path.basename(self.pubRing),
+                '--batch', '--no-permission-warning',
+                ]
+    def _getGPGExtraArgs(self, source, keyId, warn=True):
+        """Returns extra arguments to pass to GPG, and an optional stream to
+        be used as standard input"""
+        return [
+                '--keyserver', '%sgetOpenPGPKey?search=%s' %(source, keyId),
+                '--keyserver-options', 'timeout=3',
+                '--recv-key', keyId,
+        ], None
 
-        pubRingPath = os.path.dirname(self.pubRing)
-
+    def _normalizeKeySource(self, source):
+        """Munge the source before passing it to GPG"""
+        server = source
         # don't depend on repoMap entries ending with /
         if server[-1] != '/':
             server += '/'
@@ -286,48 +305,45 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         # that can access https:// servers.
         if server.startswith('https://'):
             server = server.replace('https://', 'http://')
+        return server
+
+    def findOpenPGPKey(self, source, keyId, warn=True):
+        # if we can't exec gpg, go ahead and bail
+        if not self.hasGPG:
+            return
+
+        pubRingPath = os.path.dirname(self.pubRing)
+
+        source = self._normalizeKeySource(source)
 
         # check to see if there's an existing secret key.  If it was
         # already there, don't remove it.  Otherwise we should clean
         # it up.
-        secringExists = False
-        try:
-            if 'secring.gpg' in os.listdir(pubRingPath):
-                secringExists = True
-        except:
-            log.warning("Can't stat directory: %s" % pubRingPath)
+        secringExists = os.path.exists(os.path.join(pubRingPath, 'secring.gpg'))
 
-        pid = os.fork()
-        if pid == 0:
-            # we don't care about any of the possible output from this process.
-            # gpg is pretty cavalier about dumping random garbage to stdout/err
-            # regardless of the command line options admonishing it not to.
-            fd = os.open(os.devnull, os.W_OK)
-            os.dup2(fd, sys.stdout.fileno())
-            os.dup2(fd, sys.stderr.fileno())
-            os.close(fd)
-            try:
-                os.execlp('gpg', 'gpg', '-q', '--no-tty',
-                          '--homedir', pubRingPath,
-                          '--no-greeting', '--no-secmem-warning',
-                          '--no-verbose', '--no-mdc-warning',
-                          '--no-default-keyring',
-                          '--keyring', os.path.basename(self.pubRing),
-                          '--batch', '--no-permission-warning',
-                          '--keyserver',
-                          '%sgetOpenPGPKey?search=%s' %(server, keyId),
-                          '--keyserver-options', 'timeout=3',
-                          '--recv-key', keyId)
-            except:
-                os._exit(-1)
-        pid, status = os.waitpid(pid, 0)
-        if os.WEXITSTATUS(status) == 255:
-            self.hasGPG = False
-            if warn:
-                log.warning('gpg does not appear to be installed.  gpg '
-                            'is required to import keys into the '
-                            'conary public keyring.  Use "conary '
-                            'update gnupg" to install gpg.')
+        # we don't care about any of the possible output from this process.
+        # gpg is pretty cavalier about dumping random garbage to stdout/err
+        # regardless of the command line options admonishing it not to.
+        devnull = open(os.devnull, "w")
+        gpgArgs = self._getGPGCommonArgs(pubRingPath)
+        extraArgs, stdin = self._getGPGExtraArgs(source, keyId, warn=warn)
+        gpgArgs.extend(extraArgs)
+        try:
+            p = subprocess.Popen(gpgArgs,
+                                 stdin=stdin, stdout=devnull, stderr=devnull)
+            p.communicate()
+            # One should check p.returncode here
+        except OSError, e:
+            if e.errno == 2: # No such file or directory
+                self.hasGPG = False
+                if warn:
+                    log.warning('gpg does not appear to be installed.  gpg '
+                                'is required to import keys into the '
+                                'conary public keyring.  Use "conary '
+                                'update gnupg" to install gpg.')
+            else:
+                # Raise everything else
+                raise
 
         if not secringExists:
             try:
@@ -335,20 +351,28 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
             except:
                 pass
 
-    def getPublicKey(self, keyId, serverName, warn=True):
+    def _formatSource(self, serverName):
+        """Network-aware source formatter"""
         server = None
         if self.repositoryMap and serverName not in self.repositoryMap:
             server = "http://%s/conary/" % serverName
         else:
-            # get the repositoryMap entry without username/password,
-            # since we're going to use it on a gpg command line and
-            # we don't want to expose them to other users on the system.
-            # The getPublicKey method is not authenticated anyway.
             if serverName in self.repositoryMap:
-                server = self.repositoryMap.getNoPass(serverName)
-        if server == None:
+                server = self.repositoryMap[serverName]
+        return server
+
+    def getPublicKey(self, keyId, serverName, warn=True):
+        keySource = self._formatSource(serverName)
+        if keySource == None:
             return False
-        self.findOpenPGPKey(server, keyId, warn=warn)
+
+        # findOpenPGPKey can be smart enough to raise exceptions if the key
+        # cannot be found
+        try:
+            self.findOpenPGPKey(keySource, keyId, warn=warn)
+        except _KeyNotFound:
+            return False
+
         # decide if we found the key or not.
         try:
             keyRing = open(self.pubRing)
@@ -365,6 +389,85 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
     def __init__(self, *args, **kw):
         callbacks.KeyCacheCallback.__init__(self, *args, **kw)
         self.hasGPG = True
+
+class DiskKeyCacheCallback(KeyCacheCallback):
+    """Retrieve keys from a directory - keys are saved as <keyid>.asc"""
+    def _formatSource(self, source):
+        """For the disk case, this is a no-op"""
+        return source
+
+    def _normalizeKeySource(self, source):
+        """For the disk case, this is a no-op"""
+        return source
+
+    def _getGPGExtraArgs(self, source, keyId, warn=True):
+        keyFile = os.path.join(self.dirSource, "%s.asc" % keyId.lower())
+        if not os.access(keyFile, os.R_OK):
+            raise _KeyNotFound(keyId)
+        return ["--import", keyFile], None
+
+    def __init__(self, dirSource, pubRing=''):
+        KeyCacheCallback.__init__(self, pubRing=pubRing)
+        self.dirSource = dirSource
+
+class KeyringCacheCallback(KeyCacheCallback):
+    """Retrieve keys from a keyring"""
+    def _formatSource(self, source):
+        """For the keyring case, this is a no-op"""
+        return source
+
+    def _normalizeKeySource(self, source):
+        """For the keyring case, this is a no-op"""
+        return source
+
+    def _getGPGExtraArgs(self, source, keyId, warn=True):
+        # Use gpg to fetch the key from a keyring
+
+        if not os.access(self.srcKeyring, os.R_OK):
+            # Keyring doesn't exist
+            raise _KeyNotFound(keyId)
+
+        cmd = [self.gpgBin,
+               "--no-default-keyring",
+               "--keyring", self.srcKeyring,
+               "--armor",
+               "--export", keyId]
+        # Redirect stderr to /dev/null
+        devnull = open(os.devnull, "w")
+        try:
+            p = subprocess.Popen(cmd, stdout = subprocess.PIPE, 
+                                 stderr = devnull)
+        except OSError, e:
+            if e.errno == 2: # No such file or directory
+                if warn:
+                    log.warning('gpg does not appear to be installed.  gpg '
+                                'is required to import keys into the '
+                                'conary public keyring.  Use "conary '
+                                'update gnupg" to install gpg.')
+            raise _KeyNotFound(keyId)
+        except Exception, e:
+            if warn:
+                log.warning('Error while executing gpg: %s' % e)
+            raise _KeyNotFound(keyId)
+        stdout, stderr = p.communicate()
+        if p.returncode != 0:
+            raise _KeyNotFound(keyId)
+
+        if not stdout.startswith('-' * 5 + "BEGIN"):
+            raise _KeyNotFound(keyId)
+
+        # Redirect stdout to a temporary file
+        fd, tempf = tempfile.mkstemp()
+        os.unlink(tempf)
+        sio = os.fdopen(fd, "w")
+        sio.write(stdout)
+        sio.seek(0)
+
+        return [ "--import" ], sio
+
+    def __init__(self, keyring, pubRing=''):
+        KeyCacheCallback.__init__(self, pubRing=pubRing)
+        self.srcKeyring = keyring
 
 _keyCache = OpenPGPKeyFileCache()
 

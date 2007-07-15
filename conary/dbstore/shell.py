@@ -1,9 +1,9 @@
-# Copyright (C) 2006 rPath, Inc.
+# Copyright (C) 2006,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -175,13 +175,18 @@ type ".quit" to exit, ".help" for help"""
             return self.format_column_rows(cu.fields(), rows, widths)
         return self.format_column_rows(cu.fields(), cu)
 
+    def format_val(self, col):
+        if isinstance(col, float):
+            return '%f' %col
+        return str(col)
+
     def format_list(self, cu):
         fields = None
         for row in cu:
             if self.show_headers and not fields:
                 fields = cu.fields()
                 yield 0, '|'.join(fields)
-            yield 1, '|'.join(str(x) for x in row)
+            yield 1, '|'.join(self.format_val(x) for x in row)
 
     def display(self, cu):
         lines = self.format(cu)
@@ -242,13 +247,15 @@ type ".quit" to exit, ".help" for help"""
             print 'Error:', str(e)
             return False
 
-        # display the results (if any)
-        rows, end = self.display(self.cu)
-        if self.show_stats and rows != -1:
-            print '%d rows in set (%.2f sec)' %(rows, end - start)
-
-        # reload the schema, in case there was a change
-        self.db.loadSchema()
+        # check for no rows
+        if not len(self.cu.fields()):
+            print "Query OK"
+            # reload the schema, in case there was a change
+            self.db.loadSchema()
+        else: # display the results (if any)
+            rows, end = self.display(self.cu)
+            if self.show_stats and rows != -1:
+                print '%d rows in set (%.2f sec)' %(rows, end - start)
         return False
 
     def cmdloop(self):

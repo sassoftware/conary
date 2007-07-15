@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -111,14 +111,16 @@ CfgString = CfgType
 
 _pathCache = {}
 def Path(str):
+    if str in ["stdin", "stdout", "stderr"]:
+        return _Path(str)
     if str not in _pathCache:
-        if '~' not in str and '$' not in str:
+        if '~' not in str and '$' not in str and str[0] == '/':
             p = _Path(str)
         else:
             p = _ExpandedPath(str)
         _pathCache[str] = p
         return p
-    elif '~' in str or '$' in str:
+    elif '~' in str or '$' in str or str[0] != '/':
         p = _ExpandedPath(str)
         if p != _pathCache[str]:
             _pathCache[str] = p
@@ -139,7 +141,7 @@ class _Path(str):
 class _ExpandedPath(_Path):
 
     def __new__(cls, origString):
-        string = os.path.expanduser(os.path.expandvars(origString))
+        string = os.path.abspath(os.path.expanduser(os.path.expandvars(origString)))
         return str.__new__(cls, string)
 
     def __init__(self, origString):
@@ -346,7 +348,7 @@ class CfgQuotedLineList(CfgLineList):
             displayOptions = {}
         if value:
             yield "'" + "' '".join(
-                    self.valueType.format(x, displayOptions) for x in value) + "'"
+                    [self.valueType.format(x, displayOptions) for x in value]) + "'"
 
 class CfgList(CfgType):
 
@@ -364,6 +366,8 @@ class CfgList(CfgType):
         return self.listType([self.valueType.parseString(val)])
 
     def updateFromString(self, val, str):
+        if str == '[]':
+            return self.listType()
         val.extend(self.parseString(str))
         return val
 
@@ -398,7 +402,7 @@ class CfgDict(CfgType):
         self.default = default
 
     def setFromString(self, val, str):
-        return self.dictType(self.parseString(str))
+        return self.updateFromString(self.dictType(), str)
 
     def set(self, curVal, newVal):
         curVal.update(newVal)
@@ -420,15 +424,7 @@ class CfgDict(CfgType):
         return val
 
     def parseString(self, val):
-        vals = val.split(None, 1)
-
-        if len(vals) == 1:
-            dkey, dvalue = val, ''
-        else:
-            (dkey, dvalue) = vals
-
-        dvalue = self.parseValueString(dkey, dvalue)
-        return {dkey : dvalue}
+        return self.updateFromString({}, val)
 
     def parseValueString(self, key, value):
         return self.valueType.parseString(value)

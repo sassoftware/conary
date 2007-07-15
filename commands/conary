@@ -6,7 +6,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -48,6 +48,7 @@ from conary import trove, updatecmd, verify, versions
 from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
+from conary.repository import trovesource
 
 sys.excepthook = util.genExcepthook(debug=True)
 
@@ -347,13 +348,16 @@ class RollbackCommand(ConaryCommand):
     help = 'Roll back operations stored in the rollback stack'
     commandGroup = 'System Modification'
 
-    docs = {'replace-files' : ('replace files on system with files from'
+    docs = {'just-db'       : (VERBOSE_HELP,
+                          'Update db only - Do not modify rest of file system'),
+            'replace-files' : ('replace files on system with files from'
                                ' rollback if conflict'),
             'tag-script': ('Output commands to run tag-script to PATH', 'PATH')
            }
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        argDef["just-db"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
         argDef["tag-script"] = ONE_PARAM
 
@@ -364,12 +368,13 @@ class RollbackCommand(ConaryCommand):
             del argSet['replace-files']
 
         kwargs['tagScript'] = argSet.pop('tag-script', None)
+        kwargs['justDatabase'] = argSet.pop('just-db', False)
 
         kwargs['callback'] = updatecmd.UpdateCallback(cfg)
         if argSet or len(otherArgs) != 3: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
-        args = [db, cfg] + otherArgs[2:]
-        rollbacks.apply(db, cfg, otherArgs[2], **kwargs)
+        client = conaryclient.ConaryClient(cfg)
+        client.applyRollback(otherArgs[2], **kwargs)
 _register(RollbackCommand)
 
 
@@ -381,6 +386,8 @@ class _AbstractQueryCommand(ConaryCommand):
                                ' of this trove'),
             'deps'          : 'Display trove dependencies',
             'file-deps'     : 'Display dependencies for individual files',
+            'file-flavors'  : (VERBOSE_HELP,
+                               'Display flavors for individual files'),
             'file-versions' : (VERBOSE_HELP, 'Display file versions'),
             'ids'           : (VERBOSE_HELP,
                                'Display path and file ids for files'),
@@ -401,6 +408,7 @@ class _AbstractQueryCommand(ConaryCommand):
             'troves'        : (VERBOSE_HELP, 
                                'Display one level of child troves'),
             'trove-flags'   : (VERBOSE_HELP, 'Display trove flags (see man page)'),
+            'exact-flavors' : 'Return only troves that match the flavors specified exactly',
             'trove-headers' : (VERBOSE_HELP,
                                'Display current trove name when listing info'
                               ' from multiple troves'),
@@ -421,6 +429,7 @@ class _AbstractQueryCommand(ConaryCommand):
         d["lsl"] = NO_PARAM
         d["tags"] = NO_PARAM
         d["file-deps"] = NO_PARAM
+        d["file-flavors"] = NO_PARAM
         d["file-versions"] = NO_PARAM
         d["sha1s"] = NO_PARAM
         argDef['File Display'] = d
@@ -442,6 +451,10 @@ class _AbstractQueryCommand(ConaryCommand):
         d["weak-refs"] = NO_PARAM
         argDef['Child Display'] = d
 
+        d = {}
+        d["exact-flavors"] = NO_PARAM
+        argDef['Trove Selection'] = d
+
     def runCommand(self, cfg, argSet, otherArgs):
         raise NotImplementedError
 
@@ -459,20 +472,22 @@ class QueryCommand(_AbstractQueryCommand):
         d["no-pristine"] = NO_PARAM
         d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
-        argDef['Trove Selection'] = d
+        argDef['Trove Selection'].update(d)
 
     def runCommand(self, cfg, argSet, otherArgs):
         kw = {}
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
                 ('troves', 'showTroves'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
                 ('trove-flags', 'showTroveFlags'),
-                ('deps', 'showDeps'), 'info'):
+                ('deps', 'showDeps'), ('exact-flavors', 'exactFlavors'),
+                'info'):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
@@ -500,7 +515,7 @@ class RepQueryCommand(_AbstractQueryCommand):
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
     help = 'Query one or more Conary repositories'
     commandGroup = 'Information Display'
-    docs = { 'affinity'    : ('Use branch and flavor affinity when searching'
+    docs = {'affinity'    : ('Use branch and flavor affinity when searching'
                              ' for troves (behave like conary update)'),
             'all-troves'   : 'Display byDefault False troves',
             'all-flavors'  : 'Return all flavors of troves matching the query',
@@ -510,8 +525,11 @@ class RepQueryCommand(_AbstractQueryCommand):
                                   ' and the query (and affinity if specified)'),
             'best-flavors' : optparse.SUPPRESS_HELP, # default
             'latest-versions': optparse.SUPPRESS_HELP, # default
-            'leaves'         : 'Return latest version for each unique flavor'}
-
+            'leaves'         : 'Return latest version for each unique flavor',
+            'show-removed'   : 'Display troves that have been removed from the repos',
+            #'show-redirects' : 'Display redirect troves'
+            # turned off for now.
+            }
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
@@ -523,8 +541,11 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["best-flavors"] = NO_PARAM
         d["latest-versions"] = NO_PARAM
         d["leaves"] = NO_PARAM
+        d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
-        argDef['Trove Selection'] = d
+        d["show-removed"] = NO_PARAM
+        #d["show-redirects"] = NO_PARAM
+        argDef['Trove Selection'].update(d)
 
     def runCommand(self, cfg, argSet, otherArgs):
         versionOpts = [argSet.pop(x, False) for x in ['all-versions',
@@ -544,18 +565,20 @@ class RepQueryCommand(_AbstractQueryCommand):
 
         flavorOpts = [argSet.pop(x, False) for x in ['all-flavors',
                                                      'available-flavors',
-                                                     'best-flavors']]
+                                                     'best-flavors',
+                                                     'exact-flavors']]
 
         if flavorOpts.count(True) > 1:
             log.error('only one of --all-flavors, --available-flavors, '
-                      ' --best-flavors may be'
+                      ' --best-flavors, --exact-flavors may be'
                       ' specified')
             return 1
         if True in flavorOpts:
             flavorFilterIdx = flavorOpts.index(True)
             flavorFilter = [queryrep.FLAVOR_FILTER_ALL,
                             queryrep.FLAVOR_FILTER_AVAIL,
-                            queryrep.FLAVOR_FILTER_BEST][flavorFilterIdx]
+                            queryrep.FLAVOR_FILTER_BEST,
+                            queryrep.FLAVOR_FILTER_EXACT][flavorFilterIdx]
         else: # default
             flavorFilter = queryrep.FLAVOR_FILTER_BEST
 
@@ -563,6 +586,7 @@ class RepQueryCommand(_AbstractQueryCommand):
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
@@ -582,12 +606,91 @@ class RepQueryCommand(_AbstractQueryCommand):
             del argSet['no-recurse']
         whatProvidesList = argSet.pop('what-provides', [])
 
-        if argSet: return self.usage()
-        troveList = otherArgs[2:]
+        pathList = argSet.pop('path', [])
 
-        queryrep.displayTroves(cfg, troveList, whatProvidesList, versionFilter,
-                               flavorFilter, **kw)
+        if argSet.pop('show-removed', False):
+            argSet.pop('show-redirects', False)
+            troveTypes = trovesource.TROVE_QUERY_ALL
+        #elif argSet.pop('show-redirects', False):
+        #    troveTypes = trovesource.TROVE_QUERY_PRESENT
+        #else:
+        #    troveTypes = trovesource.TROVE_QUERY_NORMAL
+        else:
+            troveTypes = trovesource.TROVE_QUERY_PRESENT
+        kw['troveTypes'] = troveTypes
+
+        troveList = otherArgs[2:]
+        queryrep.displayTroves(cfg, troveList, pathList, whatProvidesList,
+                               versionFilter, flavorFilter, **kw)
 _register(RepQueryCommand)
+
+
+class RdiffCommand(ConaryCommand):
+
+    commands = [ 'rdiff' ]
+    paramHelp = "<pkgname>=<version1>[[flavor1]]--<version2>[[flavor]]"
+    help = 'Display differences between troves'
+    commandGroup = 'Information Display'
+    docs = { 'show-empty'  : 'Show troves even if they did not change',
+             'buildreqs'  : 'Show build requirements changes',
+             'deps'        : 'Show changes in overall dependencies',
+             'ls'          : 'Show file changes',
+             'lsl'         : 'Show detailed file changes',
+             'tags'        : 'Show changes in file tags',
+             'file-versions' : 'Show file versions',
+             'file-deps'   : 'Show file dependency changes',
+             'file-contents' : 'Show file content changes (non-binary)',
+           }
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        d = {}
+        #d["components"] = NO_PARAM
+        d["deps"] = NO_PARAM
+        d["show-empty"] = NO_PARAM
+        d["buildreqs"] = NO_PARAM
+        argDef['Trove-related Changes'] = d
+
+        d = {}
+        d["ls"] = NO_PARAM
+        d["lsl"] = NO_PARAM
+        d["tags"] = NO_PARAM
+        d["file-versions"] = NO_PARAM
+        d["file-deps"] = NO_PARAM
+        d["file-contents"] = NO_PARAM
+        argDef['File-related Changes'] = d
+
+    def runCommand(self, cfg, argSet, otherArgs):
+
+        args = otherArgs[2:]
+        if len(args) != 1:
+            return self.usage()
+
+        diffSpec = args[0]
+        troveSpec = cmdline.parseChangeList(diffSpec)[0]
+        if troveSpec[1][0] is None:
+            # Most likely, syntax did not specify <old>--<new>
+            return self.usage()
+
+        kw = {}
+        kw['fullFlavors'] = cfg.fullFlavors
+        kw['fullVersions'] = cfg.fullVersions
+        kw['showLabels'] = cfg.showLabels
+        kw['showEmptyDiffs'] = argSet.pop('show-empty', False)
+        kw['withBuildReqs'] = argSet.pop('buildreqs', False)
+        kw['withFileContents'] = argSet.pop('file-contents', False)
+        kw['withFileDeps'] = argSet.pop('file-deps', False)
+        kw['withFiles'] = argSet.pop('ls', False)
+        kw['withFilesStat'] = argSet.pop('lsl', False)
+        kw['withFileTags'] = argSet.pop('tags', False)
+        kw['withFileVersions'] = argSet.pop('file-versions', False)
+        kw['withTroveDeps'] = argSet.pop('deps', False)
+        if argSet:
+            raise Exception(argSet)
+
+        queryrep.diffTroves(cfg, troveSpec, **kw)
+_register(RdiffCommand)
+
 
 class ShowChangesetCommand(_AbstractQueryCommand):
 
@@ -618,6 +721,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
                 ('all-troves', 'showAllTroves'),
                 ('weak-refs', 'weakRefs'),
@@ -625,7 +729,8 @@ class ShowChangesetCommand(_AbstractQueryCommand):
                 ('trove-flags', 'showTroveFlags'),
                 ('trove-headers', 'alwaysDisplayHeaders'),
                 ('recurse-repository', 'recurseRepos'),
-                'deps', 'info', 'all', ('show-changes', 'showChanges')):
+                'deps', 'info', 'all', ('show-changes', 'showChanges'),
+                ('exact-flavors', 'exactFlavors')):
             if isinstance(opt, tuple):
                 kw[opt[1]] = argSet.pop(opt[0], False)
             else:
@@ -664,6 +769,7 @@ class _UpdateCommand(ConaryCommand):
         'keep-existing' : 'Install new troves as new, leaving existing troves.',
         'keep-required' : 'Do not erase troves which are needed by troves '
                           'which will remain installed',
+        'exact-flavors' : 'Only match troves whose flavors match exactly',
         'info'          : 'Display what update would have done',
         'no-deps'       : 'Do not raise errors due to dependency failures',
         'no-recurse'    : (VERBOSE_HELP, 
@@ -672,6 +778,9 @@ class _UpdateCommand(ConaryCommand):
                            'Do not attempt to solve dependency problems'),
         'no-conflict-check' : (VERBOSE_HELP,
                                'Ignore potential path conflicts'),
+        'no-restart'    : (VERBOSE_HELP,
+                           'Do not restart after applying a critical update. '
+                           'Requires --root'),
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found',
         'resolve'       : 'Add troves to update to solve dependency problems',
@@ -696,6 +805,7 @@ class _UpdateCommand(ConaryCommand):
         d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
+        d["no-restart"] = NO_PARAM
         d["no-conflict-check"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["replace-files"] = NO_PARAM
@@ -705,6 +815,7 @@ class _UpdateCommand(ConaryCommand):
         d["test"] = NO_PARAM
 
         d["restart-info"] = ONE_PARAM
+        d["exact-flavors"] = NO_PARAM
 
         argDef['Update Options'] = d
 
@@ -722,6 +833,11 @@ class _UpdateCommand(ConaryCommand):
         if argSet.has_key('resolve'):
             cfg.autoResolve = True
             del argSet['resolve']
+
+        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if noRestart and cfg.root == '/':
+            raise conary.errors.ConaryError(
+                "--no-restart has to be used with --root")
 
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
@@ -744,6 +860,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
         kwargs['updateOnly'] = argSet.pop('update-only', False)
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
+        kwargs['exactFlavors'] = argSet.pop('exact-flavors', False)
 
         kwargs['updateByDefault']    = otherArgs[1] != 'erase'
         kwargs['migrate']            = otherArgs[1] == 'migrate'
@@ -782,6 +899,14 @@ _register(UpdateCommand)
 class EraseCommand(_UpdateCommand):
     commands = [ "erase" ]
     help = 'Erase software from the system'
+
+    def addParameters(self, argDef):
+        # rename Update Options to Erase Options (CNY-1090)
+        _UpdateCommand.addParameters(self, argDef)
+        d = argDef['Erase Options'] = argDef.pop('Update Options')
+        # --no-restart doesn't make sense in the erase context
+        del d['no-restart']
+
 _register(EraseCommand)
 
 
@@ -839,6 +964,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
+        argDef["no-restart"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
@@ -847,6 +973,11 @@ class UpdateAllCommand(_UpdateCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
+
+        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if noRestart and cfg.root == '/':
+            raise conary.errors.ConaryError(
+                "--no-restart has to be used with --root")
 
         if argSet.has_key('info'):
             kwargs['info'] = True
@@ -947,6 +1078,8 @@ class ConaryMain(command.MainHandler):
 
         if cfg.installLabelPath:
             cfg.installLabel = cfg.installLabelPath[0]
+        else:
+            cfg.installLabel = None
 
         cfg.initializeFlavors()
 

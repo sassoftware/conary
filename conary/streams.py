@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -21,15 +21,25 @@ from conary import versions
 
 from conary.deps import deps
 
-from conary.lib import cstreams, misc
+from conary.lib import cstreams, misc, sha1helper
+
 IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
 StreamSet = cstreams.StreamSet
 StreamSetDef = cstreams.StreamSetDef
+ByteStream = cstreams.ByteStream
+LongLongStream = cstreams.LongLongStream
+
+splitFrozenStreamSet = cstreams.splitFrozenStreamSet
+whiteOutFrozenStreamSet = cstreams.whiteOutFrozenStreamSet
+
 SMALL = cstreams.SMALL
 LARGE = cstreams.LARGE
 DYNAMIC = cstreams.DYNAMIC
+
+SKIP_UNKNOWN = cstreams.SKIP_UNKNOWN
+PRESERVE_UNKNOWN = cstreams.PRESERVE_UNKNOWN
 
 class InfoStream(object):
 
@@ -65,69 +75,7 @@ class InfoStream(object):
     def __ne__(self, them):
 	return not self.__eq__(them)
 
-class NumericStream(InfoStream):
-
-    __slots__ = "val"
-
-    def __deepcopy__(self, mem):
-        return self.__class__.thaw(self, self.freeze())
-
-    def __call__(self):
-	return self.val
-
-    def set(self, val):
-	self.val = val
-
-    def freeze(self, skipSet = None):
-        if self.val is None:
-            return ""
-
-	return struct.pack(self.format, self.val)
-
-    def diff(self, them):
-	if self.val != them.val:
-            if self.val is None:
-                return ''
-	    return struct.pack(self.format, self.val)
-
-	return None
-
-    def thaw(self, frz):
-        if frz == "":
-            self.val = None
-        else:
-            self.val = struct.unpack(self.format, frz)[0]
-
-    def twm(self, diff, base):
-        if diff == '':
-            newVal = None
-        else:
-            newVal = struct.unpack(self.format, diff)[0]
-	if self.val == base.val:
-	    self.val = newVal
-	    return False
-	elif self.val != newVal:
-	    return True
-
-	return False
-
-    def __eq__(self, other, skipSet = None):
-	return other.__class__ == self.__class__ and \
-	       self.val == other.val
-
-    def __init__(self, val = None):
-	if type(val) == str:
-	    self.thaw(val)
-	else:
-	    self.val = val
-
-class ByteStream(NumericStream):
-
-    format = "!B"
-
-class MtimeStream(NumericStream):
-
-    format = "!I"
+class MtimeStream(IntStream):
 
     def __eq__(self, other, skipSet = None):
 	# don't ever compare mtimes
@@ -135,12 +83,8 @@ class MtimeStream(NumericStream):
 
     def twm(self, diff, base):
 	# and don't let merges fail
-	NumericStream.twm(self, diff, base)
+	IntStream.twm(self, diff, base)
 	return False
-
-class LongLongStream(NumericStream):
-
-    format = "!Q"
 
 class Md5Stream(StringStream):
 
@@ -186,11 +130,14 @@ class Sha1Stream(StringStream):
 	assert(len(val) in self.allowedSize)
         StringStream.set(self, val)
 
-    def setFromString(self, val):
-	s = struct.pack("!5I", int(val[ 0: 8], 16), 
-			       int(val[ 8:16], 16), int(val[16:24], 16), 
-			       int(val[24:32], 16), int(val[32:40], 16))
-        StringStream.set(self, s)
+    def compute(self, message):
+        self.set(sha1helper.sha1String(message))
+
+    def verify(self, message):
+        return self() == sha1helper.sha1String(message)
+
+    def setFromString(self, hexdigest):
+        StringStream.set(self, sha1helper.sha1FromString(hexdigest))
 
 class AbsoluteSha1Stream(Sha1Stream):
     """
@@ -203,6 +150,28 @@ class AbsoluteSha1Stream(Sha1Stream):
     def diff(self, them):
         # always return ourself, since this is an absolute stream
         return self.freeze()
+
+class Sha256Stream(StringStream):
+    allowedSize = (32,)
+    def freeze(self, skipSet = None):
+	assert(len(self()) in self.allowedSize)
+	return StringStream.freeze(self, skipSet = skipSet)
+
+    def twm(self, diff, base):
+        raise NotImplementedError
+
+    def set(self, val):
+	assert(len(val) in self.allowedSize)
+        StringStream.set(self, val)
+
+    def compute(self, message):
+        self.set(sha1helper.sha256String(message))
+
+    def verify(self, message):
+        return self() == sha1helper.sha256String(message)
+
+    def setFromString(self, hexdigest):
+        StringStream.set(self, sha1helper.sha256FromString(hexdigest))
 
 class FrozenVersionStream(InfoStream):
 
@@ -355,6 +324,9 @@ class StringsStream(list, InfoStream):
         self.thaw(diff)
         return False
 
+    def __call__(self):
+        return self
+
     def __init__(self, frz = ''):
 	self.thaw(frz)
 
@@ -363,6 +335,26 @@ class OrderedStringsStream(StringsStream):
 	assert(type(val) is str)
         self.append(val)
         # like StringsStream except not sorted
+
+class OrderedBinaryStringsStream(StringsStream):
+    # same as OrderedStringsStream, but stores length of each string
+    def freeze(self, skipSet = None):
+        if not self:
+            return ''
+        l = []
+        for s in self:
+            l.append(misc.dynamicSize(len(s)))
+            l.append(s)
+        return ''.join(l)
+
+    def thaw(self, frz):
+	del self[:]
+        if not frz:
+            return
+        i = 0
+        while i < len(frz):
+            i, (s,) = misc.unpack("!D", i, frz)
+            self.append(s)
 
 class ReferencedTroveList(list, InfoStream):
 
@@ -433,6 +425,8 @@ class StreamCollection(InfoStream):
         for typeId, itemDict in sorted(self._items.iteritems()):
             for item in sorted(itemDict):
                 s = item.freeze()
+                if len(s) >= (1 << 16):
+                    raise OverflowError
                 l.append(struct.pack("!BH", typeId, len(s)))
                 l.append(s)
 
@@ -479,13 +473,19 @@ class StreamCollection(InfoStream):
             return None
 
         l = []
+        if len(removed) >= (1 << 16):
+            raise OverflowError
+        if len(added) >= (1 << 16):
+            raise OverflowError
         l.append(struct.pack("!HH", len(removed), len(added)))
 
         for typeId, item in itertools.chain(removed, added):
             s = item.freeze()
+            if len(s) >= (1 << 16):
+                raise OverflowError
             l.append(struct.pack("!BH", typeId, len(s)))
             l.append(s)
-        
+
         return "".join(l)
 
     def twm(self, diff, base):
@@ -510,6 +510,109 @@ class StreamCollection(InfoStream):
         else:
             self._data = None
             self._thawedItems = dict([ (x, {}) for x in self.streamDict ])
+
+
+class OrderedStreamCollection(StreamCollection):
+    # same as StreamCollection, but ordered and can holder bigger stuff
+
+    def freeze(self, skipSet = {}):
+        if self._data is not None:
+            return self._data
+
+        l = []
+        for typeId, itemList in (self._items.iteritems()):
+            for item in itemList:
+                s = item.freeze()
+                l.append(struct.pack('!B', typeId))
+                l.append(misc.dynamicSize(len(s)))
+                l.append(s)
+
+        return "".join(l)
+
+    def _thaw(self):
+        i = 0
+        self._thawedItems = dict([ (x, []) for x in self.streamDict ])
+
+        while (i < len(self._data)):
+            i, (typeId, s) = misc.unpack('!BD', i, self._data)
+            item = self.streamDict[typeId](s)
+            self._thawedItems[typeId].append(item)
+
+        assert(i == len(self._data))
+        self._data = None
+
+    def addStream(self, typeId, item):
+        assert(item.__class__ == self.streamDict[typeId])
+        self._items[typeId].append(item)
+
+    def delStream(self, typeId, item):
+        l = self._items[typeId]
+        del l[l.index(item)]
+
+    def getStreams(self, typeId):
+        return self._items[typeId]
+
+    def iterAll(self):
+        for typeId, l in self._items.iteritems():
+            for item in l:
+                yield (typeId, item)
+
+    def count(self, typeId):
+        return len(self._items[typeId])
+
+    def diff(self, other):
+        assert(self.__class__ == other.__class__)
+        us = set(self.iterAll()) 
+        them = set(other.iterAll())
+        added = us - them
+        removed = them - us
+
+        if not added and not removed:
+            return None
+
+        l = []
+        if len(removed) >= (1 << 16):
+            raise OverflowError
+        if len(added) >= (1 << 16):
+            raise OverflowError
+        l.append(struct.pack("!HH", len(removed), len(added)))
+
+        for typeId, item in removed:
+            s = item.freeze()
+            l.append(struct.pack('!B', typeId))
+            l.append(misc.dynamicSize(len(s)))
+            l.append(s)
+
+        # make sure the additions are ordered
+        for typeId, item in self.iterAll():
+            if (typeId, item) in added:
+                s = item.freeze()
+                l.append(struct.pack('!B', typeId))
+                l.append(misc.dynamicSize(len(s)))
+                l.append(s)
+
+        return "".join(l)
+
+    def twm(self, diff, base):
+        assert(self == base)
+        numRemoved, numAdded = struct.unpack("!HH", diff[0:4])
+        i = 4
+
+        for x in xrange(numRemoved + numAdded):
+            i, (typeId, s) = misc.unpack("!BD", i, diff)
+            item = self.streamDict[typeId](s)
+            if x < numRemoved:
+                l = self._items[typeId]
+                del l[l.index(item)]
+            else:
+                self._items[typeId].append(item)
+
+    def __init__(self, data = None):
+        if data is not None:
+            self.thaw(data)
+        else:
+            self._data = None
+            self._thawedItems = dict([ (x, []) for x in self.streamDict ])
 
 class AbsoluteStreamCollection(StreamCollection):
     """

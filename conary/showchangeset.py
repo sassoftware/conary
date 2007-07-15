@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -35,12 +35,15 @@ def usage():
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg,
+                     # selection options
+                     exactFlavors = False,
                      # trove options
                      info = False, digSigs = False, deps = False,
                      showBuildReqs = False, all = False,
                      # file options
-                     ls = False, lsl = False, ids = False, sha1s = False, 
+                     ls = False, lsl = False, ids = False, sha1s = False,
                      tags = False, fileDeps = False, fileVersions = False,
+                     fileFlavors = False,
                      # collection options
                      showTroves = False, recurse = None, showAllTroves = False,
                      weakRefs = False, showTroveFlags = False,
@@ -75,8 +78,9 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                 troveTups = [(x.getName(), x.getNewVersion(), x.getNewFlavor())\
                                             for x in cs.iterNewTroveList()]
         else:
-            troveTups, primary  = query.getTrovesToDisplay(changeSetSource, 
-                                                           troveSpecs)
+            troveTups, primary  = query.getTrovesToDisplay(changeSetSource,
+                                                           troveSpecs,
+                                                     exactFlavors=exactFlavors)
         if recurseRepos:
             querySource = trovesource.stack(changeSetSource, client.getRepos())
         else:
@@ -89,14 +93,15 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                              fullVersions=cfg.fullVersions, 
                              )
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
-                            fileDeps=fileDeps, fileVersions=fileVersions)
+                            fileDeps=fileDeps, fileVersions=fileVersions,
+                            fileFlavors=fileFlavors)
 
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:
             # if we didn't explicitly set recurse and we're not recursing one
             # level explicitly 
             recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
-                               fileVersions)
+                               fileVersions, fileFlavors)
 
         dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = showAllTroves,
@@ -127,7 +132,8 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
 
 
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
-                            fileDeps=fileDeps, fileVersions=fileVersions)
+                            fileDeps=fileDeps, fileVersions=fileVersions,
+                            fileFlavors=fileFlavors)
 
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:
@@ -135,7 +141,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
             # level explicitly and we specified troves (so everything won't 
             # show up at the top level anyway), guess at whether to recurse
             recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
-                               fileVersions)
+                               fileVersions, fileFlavors)
 
         dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = showAllTroves,

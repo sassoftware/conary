@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -31,10 +31,12 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   # file options
                   ls = False, lsl = False, ids = False, sha1s = False, 
                   tags = False, fileDeps = False, fileVersions = False,
+                  fileFlavors = False,
                   # collection options
                   showTroves = False, recurse = None, showAllTroves = False,
                   weakRefs = False, showTroveFlags = False,
-                  pristine = True, alwaysDisplayHeaders = False):
+                  pristine = True, alwaysDisplayHeaders = False,
+                  exactFlavors = False):
     """Displays troves after finding them on the local system
 
        @param db: Database instance to search for troves in
@@ -95,7 +97,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     whatProvidesList = [ deps.parseDep(x) for x in whatProvidesList ]
 
     troveTups, primary = getTrovesToDisplay(db, troveSpecs, pathList,
-                                            whatProvidesList)
+                                            whatProvidesList,
+                                            exactFlavors=exactFlavors)
 
     dcfg = LocalDisplayConfig(db, affinityDb=db)
     # it might seem weird to use the same source we're querying as
@@ -110,7 +113,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                          baseFlavors = cfg.flavor)
 
     dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
-                        fileDeps=fileDeps, fileVersions=fileVersions)
+                        fileDeps=fileDeps, fileVersions=fileVersions,
+                        fileFlavors=fileFlavors)
 
 
     recurseOne = showTroves or showAllTroves or weakRefs or showTroveFlags
@@ -120,7 +124,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
         # level explicitly and we specified troves (so everything won't 
         # show up at the top level anyway), guess at whether to recurse
         recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps, 
-                           fileVersions)
+                           fileVersions, fileFlavors)
 
     displayHeaders = alwaysDisplayHeaders or showTroveFlags 
 
@@ -141,7 +145,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
+def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
+                       exactFlavors=False):
     """ Finds the given trove and path specifiers, and returns matching
         (n,v,f) tuples.
         @param db: database to search
@@ -184,7 +189,7 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
         troveTups = sorted(db.iterAllTroves())
         primary = False
     else:
-        results = db.findTroves(None, troveSpecs)
+        results = db.findTroves(None, troveSpecs, exactFlavors=exactFlavors)
 
         for troveSpec in troveSpecs:
             troveTups.extend(results.get(troveSpec, []))

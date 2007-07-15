@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -13,6 +13,7 @@
 #
 
 from base_drv import BaseDatabase as Database
+import sqllib, sqlerrors
 
 # retrieve the Database version
 def getDatabaseVersion(db):
@@ -20,40 +21,76 @@ def getDatabaseVersion(db):
         return db.getVersion()
     cu = db.cursor()
     try:
-        cu.execute("select max(version) as version from DatabaseVersion")
+        cu.execute("select * from DatabaseVersion")
     except:
-        return 0
-    return cu.next()[0]
+        return sqllib.DBversion(0)
+    ret = cu.fetchone_dict()
+    if ret.has_key("minor"):
+        return sqllib.DBversion(ret["version"], ret["minor"])
+    return sqllib.DBversion(ret["version"])
 
 class SchemaMigration:
-    Version = 0
+    Version = 0              # this current migration's version
     def __init__(self, db):
         self.db = db
         self.cu = db.cursor()
-        self.msg = "Converting database schema to version %d..." % self.Version
         self.version = db.getVersion()
-
+        self.Version = self._dbVersion(self.Version)
+        self.msg = "Converting database schema to version %s..." % self.Version
+        # enforce strict pecking order on major schema revisions
+        assert (self.canUpgrade())
+        
+    def _dbVersion(self, v):
+        if isinstance(v, sqllib.DBversion):
+            return v
+        elif isinstance(v, int):
+            return sqllib.DBversion(v)
+        elif isinstance(v, tuple):
+            return sqllib.DBversion(*v)
+        raise RuntimeError("Invalid DBversion specification", DBversion)
+    
     # likely candidates for overrides
-    def check(self):
-        return self.version == self.Version - 1
+    def canUpgrade(self):
+        # comparing db version vs our Version
+        if self.version.major == self.Version.major:
+            return self.version.minor <= self.Version.minor
+        if self.version.major == self.Version.major - 1:
+            return True
+        return False
+    
+    # "migrate" function handles major scham changes (ie, (14,7) -> (15,0)
+    # for minor schema updates we will look up migrate1, migrate2, etc
     def migrate(self):
-        pass
+        return False
     def message(self, msg = None):
         pass
 
+    def __migrate(self, toVer, func):
+        self.message("converting from schema %s to schema %s..." % (self.version, toVer))
+        if not func():
+            raise sqlerrors.SchemaVersionError(
+                "schema version migration failed from %s to %s" %(
+                self.version, toVer), self.version, self.Version)
+        self.db.setVersion(toVer)
+        return toVer
+    
     def __call__(self):
-        if not self.check():
+        if not self.canUpgrade():
             return self.version
-        self.__start()
-        self.version = self.migrate()
-        if self.version == self.Version:
-            self.__end()
-        return self.version
+        # is a major schema update needed?
+        if self.version.major < self.Version.major:
+            # we can perform the major schema update
+            toVer = self._dbVersion(self.Version.major)
+            self.version = self.__migrate(toVer, self.migrate)
+        assert(self.version.major == self.Version.major)
 
-    def __start(self):
-        self.message()
-
-    def __end(self):
-        self.db.setVersion(self.Version)
+        # perform minor version upgrades, if needed
+        while self.version.minor < self.Version.minor:
+            nextmin = self.version.minor + 1
+            toVer = self._dbVersion((self.version.major, nextmin))
+            func = getattr(self, "migrate%d" % (nextmin,))
+            self.version = self.__migrate(toVer, func)
         self.message("")
+        # all done migrating
+        return self.version
 

@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -16,7 +16,7 @@
 
 from conary.repository import changeset, errors, filecontents
 from conary import files, trove
-from conary.lib import log, patch, openpgpkey, openpgpfile
+from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper
 
 class AbstractTroveDatabase:
 
@@ -247,6 +247,40 @@ class AbstractRepository(IdealRepository):
 	"""
 	raise NotImplementedError
 
+    def getTroveInfo(self, infoType, troveList):
+        """
+        Returns a list of trove infoType streams for a list of (name, version, flavor)
+        troves. if the trove does not exist, a TroveMissing exception is raised. If the
+        requested infoType does not exist for a trove the returned list will have None at
+        the corresponding position.
+
+        @param infoType: trove._TROVE_INFO_*
+        @type infoType: integer
+        @param troveList: (name, versions.Version, deps.Flavor) of the troves needed.
+        @type troveList: list of tuples
+        @rtype: list of Stream objects or None
+        """
+        raise NotImplementedError
+
+    def getTroveReferences(self, troveInfoList):
+        """
+        troveInfoList is a list of (name, version, flavor) tuples. For
+        each (name, version, flavor) specied, return a list of the troves
+        (groups and packages) which reference it (either strong or weak)
+        (the user must have permission to see the referencing trove, but
+        not the trove being referenced).
+        """
+
+    def getTroveDescendants(self, troveList):
+        """
+        troveList is a list of (name, branch, flavor) tuples. For each
+        item, return the full version and flavor of each trove named
+        Name which exists on a downstream branch from the branch
+        passed in and is of the specified flavor. If the flavor is not
+        specified, all matches should be returned. Only troves the
+        user has permission to view should be returned.
+        """
+
     ### File functions
 
     def __init__(self):
@@ -263,14 +297,23 @@ class ChangeSetJob:
 
     storeOnlyConfigFiles = False
 
-    def addTrove(self, oldTroveSpec, trove):
-	return self.repos.addTrove(trove)
+    def addTrove(self, oldTroveSpec, trove, hidden = False):
+	return self.repos.addTrove(trove, hidden = hidden)
 
     def addTroveDone(self, troveId):
 	self.repos.addTroveDone(troveId)
 
     def oldTrove(self, *args):
 	pass
+
+    def markTroveRemoved(self, name, version, flavor):
+        raise NotImplementedError
+
+    def invalidateRollbacks(self, set = None):
+        if set is not None:
+            self.invalidateRollbacksFlag = set
+        else:
+            return self.invalidateRollbacksFlag
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
                         restoreContents, isConfig, precompressed = False):
@@ -295,9 +338,11 @@ class ChangeSetJob:
         return callback.verifyTroveSignatures(trv)
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
-                 resetTimestamps = False, allowIncomplete = False):
+                 resetTimestamps = False, allowIncomplete = False,
+                 hidden = False, mirror = False):
 	self.repos = repos
 	self.cs = cs
+        self.invalidateRollbacksFlag = False
 
 	configRestoreList = []
 	normalRestoreList = []
@@ -326,9 +371,17 @@ class ChangeSetJob:
 	# file objects which map up with them are created later, but
 	# we do need a map from pathId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	for i, csTrove in enumerate(newList):
+        i = 0
+	for csTrove in newList:
+            if csTrove.troveType() == trove.TROVE_TYPE_REMOVED:
+                # deal with these later on to ensure any changesets which
+                # are relative to removed troves can be processed
+                continue
+
+            i += 1
+
 	    if callback:
-		callback.creatingDatabaseTransaction(i + 1, len(newList))
+		callback.creatingDatabaseTransaction(i, len(newList))
 
 	    newVersion = csTrove.getNewVersion()
 	    oldTroveVersion = csTrove.getOldVersion()
@@ -342,11 +395,18 @@ class ChangeSetJob:
 			(newVersion.asString(), csTrove.getName())
 
 	    if oldTroveVersion:
-		newTrove = repos.getTrove(troveName, oldTroveVersion, 
-                                          oldTroveFlavor,
-                                          pristine = True).copy()
+                newTrove = repos.getTrove(troveName, oldTroveVersion, 
+                                          oldTroveFlavor, pristine = True,
+                                          hidden = hidden).copy()
                 self.oldTrove(newTrove, csTrove, troveName, oldTroveVersion,
                               oldTroveFlavor)
+
+                oldCompatClass = newTrove.getCompatibilityClass()
+
+                if csTrove.isRollbackFence(
+                                   oldCompatibilityClass = oldCompatClass,
+                                   update = True):
+                    self.invalidateRollbacks(set = True)
 	    else:
 		newTrove = trove.Trove(csTrove.getName(), newVersion,
                                        troveFlavor, csTrove.getChangeLog(),
@@ -371,7 +431,8 @@ class ChangeSetJob:
             self.checkTroveSignatures(newTrove, callback=callback)
 
 	    troveInfo = self.addTrove(
-                    (troveName, oldTroveVersion, oldTroveFlavor), newTrove)
+                    (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
+                    hidden = hidden)
 
 	    for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
 		tuple = newFileMap.get(pathId, None)
@@ -408,7 +469,8 @@ class ChangeSetJob:
                             except errors.FileStreamMissing:
                                 # Missing from the repo; raise exception
                                 raise errors.IntegrityError(
-                                    "Incomplete changeset specified")
+                                    "Incomplete changeset specified: missing pathId %s fileId %s" % (
+                                    sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
                         fileObj = None
                         fileStream = None
                     else:
@@ -418,18 +480,15 @@ class ChangeSetJob:
                                 # stored as a diff (the file type is the same
                                 # and (for *repository* commits) the file
                                 # is in the same repository between versions
-                                oldfile = repos.getFileVersion(pathId,
-                                                    oldFileId, oldVersion)
+                                oldfile = repos.getFileVersion(pathId, oldFileId, oldVersion)
                                 fileObj = oldfile.copy()
                                 fileObj.twm(diff, oldfile)
                                 assert(fileObj.pathId() == pathId)
                                 fileStream = fileObj.freeze()
 
-                                if (fileObj.hasContents and
-                                    fileObj.contents.sha1() ==
-                                        oldfile.contents.sha1() and
-                                    not (fileObj.flags.isConfig() and 
-                                            not oldfile.flags.isConfig())):
+                                if (not mirror) and (
+                                    fileObj.hasContents and fileObj.contents.sha1() == oldfile.contents.sha1()
+                                    and not (fileObj.flags.isConfig() and not oldfile.flags.isConfig())):
                                     restoreContents = 0
                             else:
                                 fileObj = files.ThawFile(diff, pathId)
@@ -478,26 +537,31 @@ class ChangeSetJob:
  					 fileContents, restoreContents, 
                                          fileFlags.isConfig())
                 elif fileFlags.isConfig():
-                    tup = (pathId, contentInfo.sha1(), oldPath, oldfile, 
-                           troveName, oldTroveVersion, troveFlavor, newVersion, 
-                           fileId, oldVersion, oldFileId, restoreContents)
+                    tup = (pathId, fileId, contentInfo.sha1(), oldPath,
+                           oldfile, troveName, oldTroveVersion, troveFlavor,
+                           newVersion, fileId, oldVersion, oldFileId,
+                           restoreContents)
 		    configRestoreList.append(tup)
 		else:
-                    tup = (pathId, contentInfo.sha1(), newVersion, 
-			   restoreContents)
+                    tup = (pathId, fileId, contentInfo.sha1(), newVersion,
+                           restoreContents)
 		    normalRestoreList.append(tup)
 
 	    del newFileMap
 	    self.addTroveDone(troveInfo)
 
-	configRestoreList.sort()
-	normalRestoreList.sort()
+        # use a key to select data up to, but not including, the first
+        # version.  We can't sort on version because we don't have timestamps
+        configRestoreList.sort(key=lambda x: x[0:5])
+        normalRestoreList.sort(key=lambda x: x[0:3])
 
-	for (pathId, sha1, oldPath, oldfile, troveName, oldTroveVersion,
-	     troveFlavor, newVersion, newFileId, oldVersion, 
+        # config files are cached, so we don't have to worry about not
+        # restoring the same fileId/pathId twice
+        for (pathId, newFileId, sha1, oldPath, oldfile, troveName,
+             oldTroveVersion, troveFlavor, newVersion, newFileId, oldVersion,
              oldFileId, restoreContents) in configRestoreList:
-            if cs.configFileIsDiff(pathId):
-                (contType, fileContents) = cs.getFileContents(pathId)
+            if cs.configFileIsDiff(pathId, newFileId):
+                (contType, fileContents) = cs.getFileContents(pathId, newFileId)
 
 		# the content for this file is in the form of a
 		# diff, which we need to apply against the file in
@@ -509,7 +573,10 @@ class ChangeSetJob:
                     f = self.repos.getFileContents(
                                     [(oldFileId, oldVersion, oldfile)])[0].get()
                 except KeyError:
-                    raise errors.IntegrityError
+                    raise errors.IntegrityError(
+                        "Missing file contents for pathId %s, fileId %s" % (
+                                        sha1helper.md5ToString(pathId),
+                                        sha1helper.sha1ToString(fileId)))
 
 		oldLines = f.readlines()
                 f.close()
@@ -524,20 +591,28 @@ class ChangeSetJob:
             else:
                 # config files are not always available compressed (due
                 # to the config file cache)
-                fileContents = filecontents.FromChangeSet(cs, pathId)
+                fileContents = filecontents.FromChangeSet(cs, pathId, newFileId)
 
 	    self.addFileContents(sha1, newVersion, fileContents, 
                                  restoreContents, 1)
 
-        # normalRestoreList is empty if storeOnlyConfigFiles
-	normalRestoreList.sort()
         ptrRestores = []
-	for (pathId, sha1, version, restoreContents) in normalRestoreList:
+        lastRestore = None         # restore each pathId,fileId combo once
+        for (pathId, fileId, sha1, version, restoreContents) in \
+                                                    normalRestoreList:
+            if (pathId, fileId) == lastRestore:
+                continue
+
+            lastRestore = (pathId, fileId)
+
             try:
-                (contType, fileContents) = cs.getFileContents(pathId,
+                (contType, fileContents) = cs.getFileContents(pathId, fileId,
                                                               compressed = True)
             except KeyError:
-                raise errors.IntegrityError
+                raise errors.IntegrityError(
+                        "Missing file contents for pathId %s, fileId %s" % (
+                                        sha1helper.md5ToString(pathId),
+                                        sha1helper.sha1ToString(fileId)))
             if contType == changeset.ChangedFileTypes.ptr:
                 ptrRestores.append(sha1)
                 continue
@@ -551,6 +626,18 @@ class ChangeSetJob:
 
 	del configRestoreList
 	del normalRestoreList
+
+        for csTrove in newList:
+            if csTrove.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
+
+            i += 1
+
+            if callback:
+                callback.creatingDatabaseTransaction(i, len(newList))
+
+            self.markTroveRemoved(csTrove.getName(), csTrove.getNewVersion(),
+                                  csTrove.getNewFlavor())
 
 	for (troveName, version, flavor) in cs.getOldTroveList():
 	    trv = self.repos.getTrove(troveName, version, flavor)

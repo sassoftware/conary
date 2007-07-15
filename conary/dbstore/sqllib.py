@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,6 +14,36 @@
 
 # Various stuff used by the dbstore drivers
 import time
+
+# class to aid in comparing database versions
+class DBversion:
+    def __init__(self, major, minor=0):
+        self.major = major
+        self.minor = minor
+
+    def __nonzero__(self):
+        return self != 0
+
+    def __cmp__(self, other):
+        if isinstance(other, int):
+            if self.major == other:
+                return cmp(self.minor, 0)
+            return cmp(self.major, other)
+        elif isinstance(other, tuple):
+            assert(len(other) == 2)
+            return cmp(self.major, other[0]) or cmp(self.minor, other[1])
+        elif isinstance(other, self.__class__):
+            return cmp(self.major, other.major) or cmp(self.minor, other.minor)
+        raise RuntimeError("incompatible type compare for DBversion",
+                           [(self.major, self.minor), other])
+    def __repr__(self):
+        return "DBversion(%d,%d)" % (self.major, self.minor)
+
+    def __str__(self):
+        if self.minor:
+            return '%d.%d' % (self.major, self.minor)
+        else:
+            return str(self.major)
 
 # a case-insensitive key dict
 class CaselessDict(dict):
@@ -32,6 +62,8 @@ class CaselessDict(dict):
         return dict.__getitem__(self, self.__l(key))[1]
     def __setitem__(self, key, value):
         dict.__setitem__(self, self.__l(key), (key, value))
+    def __delitem__(self, key):
+        dict.__delitem__(self, self.__l(key))
     def has_key(self, key):
         return dict.has_key(self, self.__l(key))
 

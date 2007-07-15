@@ -5,7 +5,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -33,6 +33,7 @@ from conary import state
 from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove
+from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
 from conary.lib import openpgpfile
@@ -223,6 +224,82 @@ class CloneCommand(CvcCommand):
                          test = test, fullRecurse = fullRecurse)
 _register(CloneCommand)
 
+class PromoteCommand(CvcCommand):
+
+    commands = ['promote']
+    paramHelp = '<trove>[=<version>][[flavor]]+ <label>--<label>+'
+    help = 'Copy troves from one label to another in a repository'
+    commandGroup = 'Repository Access'
+    hidden = True
+    docs = { 'info'            : 'Do not perform promotion',
+
+             'skip-build-info' : ('Do not attempt to rewrite version'
+                                 ' information about how this trove was built'),
+             'message'         : ('Use MESSAGE for the changelog entry for'
+                                  ' all cloned sources'),
+             'test'            : ('Runs through all the steps of committing'
+                                  ' but does not modify the repository'),
+             'without-sources'    : (VERBOSE_HELP,
+                                     'Do not clone sources for the binaries'
+                                     ' being cloned'),
+             'default-only'    : (VERBOSE_HELP, 'EXPERIMENTAL - '
+                                   ' Clones only those components'
+                                   ' that are installed by default.'),
+             'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
+                                           ' to the repository'),
+             'all-flavors' : (VERBOSE_HELP, 'Promote all flavors of a'
+                                            ' package/group at the same time'
+                                            ' (now the default)'),
+             'exact-flavors' : (VERBOSE_HELP, 'Specified flavors must match'
+                                              'the package/group flavors'
+                                              'exactly to promote')
+           }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["skip-build-info"] = NO_PARAM
+        argDef["info"] = '-i', NO_PARAM
+        argDef["message"] = '-m', ONE_PARAM
+        argDef["test"] = NO_PARAM
+        argDef["all-flavors"] = NO_PARAM
+        argDef["exact-flavors"] = NO_PARAM
+        argDef["without-sources"] = NO_PARAM
+        argDef["with-sources"] = NO_PARAM
+        argDef["default-only"] = NO_PARAM
+        argDef["to-file"] = ONE_PARAM
+        argDef["exact-flavors"] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[2:]
+        troveSpecs = []
+        labelList = []
+        for arg in args:
+            if '--' in arg:
+                labelList.append(arg.split('--', 1))
+            else:
+                troveSpecs.append(arg)
+        if not labelList or not troveSpecs:
+            return self.usage()
+
+        from conary import clone
+        skipBuildInfo = argSet.pop('skip-build-info', False)
+        info = argSet.pop('info', False)
+        message = argSet.pop("message", None)
+        test = argSet.pop("test", False)
+        allFlavors = argSet.pop("all-flavors", True)
+        cloneSources = not argSet.pop("without-sources", False)
+        argSet.pop("with-sources", False)
+        targetFile = argSet.pop("to-file", False)
+        defaultOnly = argSet.pop("default-only", False)
+        exactFlavors = argSet.pop("exact-flavors", False)
+        clone.promoteTroves(cfg, troveSpecs, labelList,
+                            skipBuildInfo=skipBuildInfo,
+                            info = info, message = message, test = test,
+                            cloneSources=cloneSources, allFlavors=allFlavors,
+                            cloneOnlyByDefaultTroves=defaultOnly,
+                            targetFile=targetFile, exactFlavors=exactFlavors)
+_register(PromoteCommand)
 
 
 class CommitCommand(CvcCommand):
@@ -353,6 +430,7 @@ class CookCommand(CvcCommand):
         argDef['download'] = NO_PARAM
         argDef['resume'] = STRICT_OPT_PARAM
         argDef['unknown-flags'] = NO_PARAM
+        argDef['allow-flavor-change'] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -364,10 +442,23 @@ class CookCommand(CvcCommand):
         resume = None
         buildBranch = None
         if argSet.has_key('flavor'):
-            buildFlavor = deps.deps.parseFlavor(argSet['flavor'])
+            buildFlavor = deps.deps.parseFlavor(argSet['flavor'],
+                                                raiseError=True)
             cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor,
                                                        buildFlavor)
             del argSet['flavor']
+
+        if argSet.has_key('macros'):
+            f = open(argSet['macros'])
+            for row in f:
+                row = row.strip()
+                if not row or row[0] == '#':
+                    continue
+                cfg.configLine('macros ' + row.strip())
+            f.close()
+            del f
+            del argSet['macros']
+
         if argSet.has_key('macro'):
             for macro in argSet['macro']:
                 cfg.configLine('macros ' + macro)
@@ -402,6 +493,8 @@ class CookCommand(CvcCommand):
             cfg.cleanAfterCook = False
             del argSet['no-clean']
 
+        allowFlavorChange = argSet.pop('allow-flavor-change', False)
+
         if argSet.has_key('resume'):
             resume = argSet['resume']
             del argSet['resume']
@@ -413,15 +506,6 @@ class CookCommand(CvcCommand):
         if argSet.has_key('debug-exceptions'):
             del argSet['debug-exceptions']
             cfg.debugRecipeExceptions = True
-        if argSet.has_key('macros'):
-            argSet['macros']
-            f = open(argSet['macros'])
-            # XXX sick hack
-            macroSrc = "macros =" + f.read()
-            exec macroSrc
-            f.close()
-            del f
-            del argSet['macros']
 
         crossCompile = argSet.pop('cross', None)
         if crossCompile:   
@@ -441,10 +525,20 @@ class CookCommand(CvcCommand):
 
         if argSet: return self.usage()
 
-        cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
+        groupOptions = cook.GroupCookOptions(alwaysBumpCount=True,
+                                 errorOnFlavorChange=not allowFlavorChange,
+                                 shortenFlavors=cfg.shortenGroupFlavors)
+
+        try:
+            cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
-                         crossCompile=crossCompile, downloadOnly=downloadOnly)
+                         crossCompile=crossCompile, downloadOnly=downloadOnly,
+                         groupOptions=groupOptions)
+        except builderrors.GroupFlavorChangedError, err:
+            err.args = (err.args[0] +
+                        '\n(Add the --allow-flavor-change flag to override this error)\n',)
+            raise
         log.setVerbosity(level)
 _register(CookCommand)
 
@@ -543,7 +637,7 @@ class RemoveCommand(CvcCommand):
 _register(RemoveCommand)
 
 class RenameCommand(CvcCommand):
-    commands = ['rename']
+    commands = ['rename', 'mv']
     paramHelp = "<oldfile> <newfile>"
     help = 'Rename a file that is under Conary control'
     commandGroup = 'File Operations'
@@ -556,6 +650,19 @@ class RenameCommand(CvcCommand):
         checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
 
+class RevertCommand(CvcCommand):
+    commands = ['revert']
+    help = 'Revert local changes to one or more files'
+    commandGroup = 'File Operations'
+    paramHelp = "[<file> <file2> <file3> ...]"
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        if argSet: return self.usage()
+
+        checkin.revert(repos, args[2:])
+_register(RevertCommand)
+
+_register(DiffCommand)
 class SignCommand(CvcCommand):
     commands = ['sign']
     paramHelp = "<newshadow> <trove>[=<version>][[flavor]]"
@@ -616,8 +723,20 @@ class MergeCommand(CvcCommand):
             kw = dict(versionSpec=args[1])
         else:
             kw = {}
-        checkin.merge(repos, **kw)
+        checkin.merge(cfg, repos, **kw)
 _register(MergeCommand)
+
+class MarkRemovedCommand(CvcCommand):
+    commands = [ 'markremoved' ]
+    commandGroup = 'Hidden Commands'
+    hidden = True
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or not args or len(args) != 2: return self.usage()
+        checkin.markRemoved(cfg, repos, args[1])
+_register(MarkRemovedCommand)
 
 class SetCommand(CvcCommand):
 
@@ -648,8 +767,20 @@ class SetCommand(CvcCommand):
         if len(args) < 2: return self.usage()
 
         checkin.setFileFlags(repos, args[1:], text = text, binary = binary)
-
 _register(SetCommand)
+
+class StatCommand(CvcCommand):
+    
+    commands = ['stat', 'st']
+    help = 'Show changed files in the working directory'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or not args or len(args) > 2: return self.usage()
+
+        args[0] = repos
+        checkin.stat_(*args)
+_register(StatCommand)
 
 class StatCommand(CvcCommand):
     
@@ -710,6 +841,8 @@ class CvcMain(command.MainHandler):
 
         if cfg.installLabelPath:
             cfg.installLabel = cfg.installLabelPath[0]
+        else:
+            cfg.installLabel = None
 
         cfg.initializeFlavors()
         log.setMinVerbosity(log.INFO)

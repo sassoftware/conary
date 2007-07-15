@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -356,10 +356,12 @@ class DBFlavorMap(idtable.IdMapping):
 
 
 class Database:
+    timeout = 30000
     def __init__(self, path):
         self.db = None
         try:
-            self.db = dbstore.connect(path, driver = "sqlite", timeout=30000)
+            self.db = dbstore.connect(path, driver = "sqlite",
+                                      timeout=self.timeout)
             self.schemaVersion = self.db.getVersion()
         except sqlerrors.DatabaseLocked:
             raise errors.DatabaseLockedError
@@ -385,11 +387,13 @@ class Database:
         self.db.loadSchema()
 
         newCursor = self.schemaVersion < schema.VERSION
+
         schema.checkVersion(self.db)
         if newCursor:
             cu = self.db.cursor()
 
-        schema.createSchema(self.db)
+        if self.schemaVersion == 0:
+            schema.createSchema(self.db)
         schema.setupTempDepTables(self.db, cu)
 
 	self.troveFiles = DBTroveFiles(self.db)
@@ -399,9 +403,6 @@ class Database:
 	self.flavorMap = DBFlavorMap(self.db)
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
-
-        if not readOnly:
-            self.db.analyze()
 
         self.needsCleanup = False
         self.addVersionCache = {}
@@ -902,8 +903,7 @@ order by
 
         return troveInstanceId
 
-    def checkPathConflicts(self, instanceIdList, filePriorityPath,
-                           replaceFiles):
+    def checkPathConflicts(self, instanceIdList, replaceFiles):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
         for instanceId in instanceIdList:
@@ -968,23 +968,15 @@ order by
                  existingVersion, existingFlavor,
                  addedInstanceId, addedPathId, addedTroveName, addedVersion,
                  addedFlavor) in cu:
-                pri = filePriorityPath.versionPriority(
-                            versions.VersionFromString(existingVersion),
-                            versions.VersionFromString(addedVersion))
-                if pri == -1:
-                    markNotPresent.append((addedInstanceId, addedPathId))
-                elif pri == 1:
-                    markNotPresent.append((existingInstanceId, existingPathId))
-                else:
-                    conflicts.append((path,
-                            (existingPathId,
-                             (existingTroveName,
-                              versions.VersionFromString(existingVersion),
-                              deps.deps.ThawFlavor(existingFlavor))),
-                            (addedPathId,
-                             (addedTroveName,
-                              versions.VersionFromString(addedVersion),
-                              deps.deps.ThawFlavor(addedFlavor)))))
+                conflicts.append((path,
+                        (existingPathId,
+                         (existingTroveName,
+                          versions.VersionFromString(existingVersion),
+                          deps.deps.ThawFlavor(existingFlavor))),
+                        (addedPathId,
+                         (addedTroveName,
+                          versions.VersionFromString(addedVersion),
+                          deps.deps.ThawFlavor(addedFlavor)))))
 
             for instanceId, pathId in markNotPresent:
                 cu.execute("UPDATE DBTroveFiles SET isPresent = 0 "
@@ -1234,14 +1226,14 @@ order by
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT DBTroveFiles.versionId FROM DBTroveFiles
                         WHERE
-                            DBTroveFiles.instanceId = ?""")
+                            DBTroveFiles.instanceId = ?""", troveInstanceId)
         cu.execute("""
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT Instances.versionId FROM
                         TroveTroves JOIN Instances ON
-                            TroveTroves.instanceId = Instances.instanceId
+                            TroveTroves.includedId = Instances.instanceId
                         WHERE
-                            TroveTroves.instanceId = ?""")
+                            TroveTroves.instanceId = ?""", troveInstanceId)
 
         wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ]
 
@@ -1779,7 +1771,35 @@ order by
 
         return r
 
+    def getTroveCompatibilityClass(self, name, version, flavor):
+        if flavor is None or flavor.isEmpty():
+            flavorClause = "IS NULL"
+        else:
+            flavorClause = "= '%s'" % flavor.freeze()
 
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT data FROM Instances
+                    JOIN Versions USING (versionId)
+                    JOIN Flavors ON Instances.flavorId = Flavors.flavorId
+                    LEFT OUTER JOIN TroveInfo ON
+                        Instances.instanceId = TroveInfo.instanceId AND
+                        TroveInfo.infoType = ?
+                    WHERE
+                        Instances.troveName = ? AND
+                        Versions.version = ? AND
+                        Flavors.flavor %s
+        """ % flavorClause, trove._TROVEINFO_TAG_COMPAT_CLASS,
+                            name, str(version))
+        l = cu.fetchall()
+        if not l:
+            # no match for the instance
+            raise KeyError
+        elif l[0][0] is None:
+            # instance match, but no entry in TroveInfo
+            return 0
+
+        return streams.ShortStream(l[0][0])()
 
     def findRemovedByName(self, name):
         """
@@ -1936,6 +1956,59 @@ order by
                 name, versionId, flavorId)
 
         return [ x[0] for x in cu ]
+
+    def _getTransactionCounter(self, field):
+        """Get transaction counter
+        Return (Boolean, value) with boolean being True if the counter was
+        found in the table"""
+        if 'DatabaseAttributes' not in self.db.tables:
+            # We should already have converted the schema to have the table in
+            # place. This may mean an update code path run with --info as
+            # non-root (or owner of the schema)
+            # incrementTransactionCounter should fail though.
+            return False, 0
+
+        cu = self.db.cursor()
+        cu.execute("SELECT value FROM DatabaseAttributes WHERE name = ?",
+                   field)
+        try:
+            row = cu.next()
+            counter = row[0]
+        except StopIteration:
+            return False, 0
+
+        try:
+            counter = int(counter)
+        except ValueError:
+            return True, 0
+
+        return True, counter
+
+    def getTransactionCounter(self):
+        """Get transaction counter"""
+        field = "transaction counter"
+        return self._getTransactionCounter(field)[1]
+
+    def incrementTransactionCounter(self):
+        """Increment the transaction counter.
+        To work reliably, you should already have the database locked, you
+        don't want the read and update to be interrupted by another update"""
+
+        field = "transaction counter"
+
+        exists, counter = self._getTransactionCounter(field)
+
+        cu = self.db.cursor()
+        if not exists:
+            # Row is not in the table
+            cu.execute("INSERT INTO DatabaseAttributes (name, value) "
+                       "VALUES (?, ?)", field, '1')
+            return 1
+
+        counter += 1
+        cu.execute("UPDATE DatabaseAttributes SET value = ? WHERE name = ?",
+                   str(counter), field)
+        return counter
 
     def close(self):
 	self.db.close()

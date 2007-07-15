@@ -13,8 +13,8 @@ and permissions, and so forth.  The \fIC\fPonary \fIv\fPersion
 \fIc\fPontrol program, called \fBcvc\fP, handles build and source
 management, and is responsible for all changes to the repository.
 .SH REFERENCE
-cvc has several common command-line arguments, all of which modify 
-configuration entries and are documented with other configuration
+cvc has several common command-line arguments which modify
+configuration entries and are documented with those configuration
 entries.  The rest of its command-line arguments are specific to
 which cvc \fBcommand\fP you are running, and are documented with
 the commands.
@@ -43,7 +43,7 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-download\fI] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
+.B \ \ \ \ \ [\fR\-\-resume[=(<linenums>|policy)]] \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-flavor <flavor>] \e
@@ -70,10 +70,11 @@ modify, and cook source components:
 Build a package.  If \fB\-\-prep\fP is specified, the source code is
 unpacked, but is not built. If \fB\-\-download\fP is specified, the source code
 is downloaded into your lookaside, but is not unpacked or built. If
-\fB\-\-macros\fP is specified, it names a file containing macro definitions to
-apply to the recipe macro set.  
+\fB\-\-macros\fP is specified, it names a file (containing one macro
+definition per line) to apply to the recipe macro set. Macro files can also
+contain comments starting with "#" and blank lines.
 .IP
-If \fB\-\-resume <linenums>\fP is specified, 
+If \fB\-\-resume=<linenums>\fP is specified, 
 conary will cook the specified line numbers of the recipe.  The format of
 <linenums> is any number of pairs of n or n:m 
 separated by commas, where n and m are line numbers in the recipe.  
@@ -81,19 +82,20 @@ If the initial line number in a pair is left off, leaving :m,
 conary will begin cooking from the beginning of the file.  
 If the final line number is left off, leaving n:, conary will cook
 until the end 
-of the file, run all the policy, and create a changeset.  A \-\-resume n without
+of the file, run all the policy, and create a changeset.  A \-\-resume=n without
 a colon is equivalent to n:n, if there are other ranges given to \-\-resume,
 or n: if it is the only argument given to \-\-resume.  All resume line 
 numbers must be provided in increasing order.
 
 If \fB\-\-resume\fP is specified with no parameter,
 the recipe will be recooked from the line of last failure.  
-If \fB\-\-resume policy\fP is specified, the policy will be rechecked 
+If \fB\-\-resume=policy\fP is specified, the policy will be rechecked 
 from the last build; this only works if the destdir still exists,
-either because of a policy error or because the \fB\-\-no-clean\fP option
-was provided.
+either because a policy error occurred during the previous build
+or because the \fB\-\-no-clean\fP option was provided to the previous
+\fBcook\fP command.
 
-Example: cvc cook \-\-resume 5:10,15,35:
+Example: cvc cook \-\-resume=5:10,15,35:
 
 Note that the \fB\-\-resume\fP option may
 be used only with local recipe files, not source components being
@@ -107,7 +109,9 @@ config option.
 .IP
 The \-\-macro option assigns the given string value to <macro>.  
 The value given overrides any attempt to reset the value later in the 
-recipe.  The macro and its boolean value must be enclosed in quotes.
+recipe.  The macro and its boolean value must be enclosed in quotes. Macros
+defined using \-\-macro override macros defined in a file specified by
+\-\-macros.
 .IP 
 The \-\-no-clean option does not clean up the build directories
 after the build is complete, even if the build is successful.
@@ -131,12 +135,15 @@ trove signature or the respective troves will be rejected. If
 \-\-signature\-key None is specified, generation of trove signatures will be 
 disabled.
 .IP
-
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
 the package will be cooked from the repository.  If a version is 
 specified, it must be a source version for that component.
+.IP
+Conary caches already-downloaded sources aggresively, both on the
+local system and in the repository.  To refresh either cache, see
+the \fBrefresh\fP command.
 .TP 4
 .B add \fIfile...\fP
 Adds all the files listed on the command line to the source
@@ -161,9 +168,8 @@ Clones a trove from one repository to another. This is similar to shadowing in
 that it creates a new trove with information from another. However, unlike
 shadowing, cloning will not create a new label on the target branch and it is
 not possible to merge changes (see "merge" later in this document) with clone.
-The commit will appear to originate from the individual who last committed the
-trove being cloned. Unlike shadowing, \fBnewclone\fP must be a full branch
-name. See the \fBExamples\fP section for more information.
+Unlike shadowing, \fBnewclone\fP must be a full branch name. See the
+\fBExamples\fP section for more information.
 .RS 4
 .TP
 .B \-\-with-sources
@@ -242,6 +248,52 @@ into the shadow.
 If <revision> is specified, changes made to the upstream branch up to that 
 revision will be made.  Revision may be specified as either as the upstream version or the <upstream version>-<source count>.  For convenience when cutting and pasting, a full version is accepted, but the full version must be on correct parent branch.
 .TP
+.B promote [\fIpackage/groupname\fP[=\fIversion\fP][\fI<flavor>\fP]]+ [\fIfromLoc\fP--\fItoLoc\fP]+
+Clones (copies) a set of packages from one set of labels to another.
+
+Clones a trove from one repository to another. This is similar to shadowing in
+that it creates a new trove with information from another. However, unlike
+shadowing, cloning will not create a new label on the target branch and it is
+not possible to merge changes (see "merge" later in this document) with clone.
+
+fromLoc and toLoc can be one of the following forms:
+<branch> - /conary.rpath.com@rpl:devel//1, e.g.
+<label> - conary.rpath.com@rpl:devel, e.g.
+<partial label> - @rpl:devel, :devel, e.g.
+
+If the partial label is used, the missing parts of the label are filled in 
+as follows: fromLoc uses the current buildLabel to fill in its missing components.  ToLoc uses the fromLoc to fill in the missing parts.  So, for example, if the buildLabel were conary.rpath.com@rpl:1, then :1--:2 would promot troves from conary.rpath.com@rpl:1 to conary.rpath.com@rpl:2, where raa.rpath.org@rpl:branch--@fl:1 would promote troves from raa.rpath.org@rpl:branch to raa.rpath.org@fl:1.
+
+If a group is specified, then the group will be searched through for packages that start on a fromLoc, and all such packages will be cloned to the matching
+toLoc.  If a package is specified and it matches a from label, then it will be cloned to the matching toLoc.
+
+Sources are always cloned with binaries.
+
+There are limits to the promotes one can make - one can clone between siblings - from /A//B to /A//C, for example, or uphill to parents - from /A//B to /A, or to siblings of parents - from /A//B/C to /A//D, or from /A//B//C to /D. One cannot clone from branch /A//B to /C//D, because there is no relationship between the parents of these two branches, /A != /C.  All promotes other than sibling promotes must be specified via branches.
+.TP 4
+.B \-\-all-flavors (deprecated)
+Clone all flavors for the latest versions of the specified troves.  Now on by default.
+.TP 4
+.B \-\-without-sources
+Do not automatically clone the source for every package you are cloning.  This 
+can be useful, for example, if the package you are cloning is a shadowed binary and the source is only available on the parent branch.
+.TP
+.B \-\-info, \-i
+Determine the packages and groups that would be created by the clone and display that information, without actually cloning.
+.TP 4
+.B \-\-message MESSAGE
+Allows you to specify the message to be given for source components.  If several source components are being cloned at the same time, the same message will be used for all of them if specified here.
+.TP
+.B \-\-skip-build-info
+Normally, cvc tried to rewrite any build information stored with the trove, such as what build requirements were used to build it, from the source branch to the target branch if necessary.  If this is not possible, cvc will exit with an error.  If this flag is given, cvc does not try to rewrite build information.
+.TP
+.B \-\-test
+Go through the entire process of creating the clone changeset, but do not commit it to the repository.
+.TP
+.B \-\-exact\-flavors
+Only promote exactly the packages with the flavors you specify, without merging in your system flavor.
+.RE
+.TP
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
 source directory.  It creates a diff between two versions of
@@ -264,6 +316,10 @@ Synonyms: \fBrm\fP
 Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
 and marks it to be removed from the repository at the next
 \fBcvc commit\fP.
+.TP
+.B revert [\fI<filename>...\fP]
+Any changes made to local files are reverted. If one or more filenames
+are passed as arguments, only the changes made to those files are reverted.
 .TP
 .B set \fI<filename>...>/fP \fI[--text]\fP \fI[--binary]\fP
 Binary and text files in source components are handled slightly differently

@@ -1,12 +1,12 @@
 #!/usr/bin/env python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -23,6 +23,8 @@ retrievable.
 
 import os
 import sys
+import tempfile
+
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
 	fullPath = os.path.dirname(sys.argv[0])
@@ -35,7 +37,7 @@ sys.path.append(os.path.dirname(fullPath))
 
 from conary.deps import deps
 from conary.lib import util, sha1helper
-from conary.repository import netclient, changeset
+from conary.repository import filecontents, netclient, changeset
 from conary import callbacks
 from conary import conarycfg
 from conary import conaryclient
@@ -61,11 +63,11 @@ def collectTroves(db):
     troveList = []
     cu = db.cursor()
     cu.execute('SELECT trovename, version, flavor from '
-               '       DBInstances, Versions, DBFlavors '
+               '       Instances, Versions, Flavors '
                '   WHERE '
-               '           DBInstances.versionid=Versions.versionid '
-               '       AND DBInstances.flavorid=DBFlavors.flavorid '
-               '       AND DBInstances.isPresent = 1')
+               '           Instances.versionid=Versions.versionid '
+               '       AND Instances.flavorid=Flavors.flavorid '
+               '       AND Instances.isPresent = 1')
     for name, versionStr, flavorStr in cu:
         flavor = deps.ThawFlavor(flavorStr)
         version = versions.VersionFromString(versionStr)
@@ -126,6 +128,8 @@ def addConfigFileContents(client, cs):
     @return: None
     """
     needed = []
+    empty = filecontents.FromString('')
+
     # collect info on all the needed config file contents
     for trove in cs.iterNewTroveList():
         for (pathid, path, fileid, version) in trove.getNewFileList():
@@ -145,7 +149,8 @@ def addConfigFileContents(client, cs):
         #                      %(path, sha1helper.md5ToString(pathid))
         # all the contents here are config files, so the isConfig parameter
         # is always true
-        cs.addFileContents(pathid, changeset.ChangedFileTypes.file, cont, True)
+        cs.addFileContents(pathid, fileid, changeset.ChangedFileTypes.file,
+                           cont, True)
 
 def main(argv):
     sys.excepthook = util.genExcepthook()
@@ -154,7 +159,7 @@ def main(argv):
         usage()
         sys.exit(1)
 
-    cfg = conarycfg.ConaryConfiguration()
+    cfg = conarycfg.ConaryConfiguration(True)
     cfg.root = sys.argv[2]
     client = conaryclient.ConaryClient(cfg)
     callback = updatecmd.UpdateCallback()
@@ -173,16 +178,22 @@ def main(argv):
                                 callback = callback,
                                 recurse = False)
     del csList
+    # cs is a read-only change set, and files cannot be added to it
+    cs = changeset.ChangeSet(cs.freeze())
 
     # add the config file contents
     addConfigFileContents(client, cs)
 
-    # retarget the changeset for the database, this shouldn't do much
-    # except give us an updJob to apply
-    updJob = client.updateChangeSet([cs], resolveDeps = False, recurse = False,
-                                    callback = callback, split = 1)[0]
-    # apply the update
-    client.applyUpdate(updJob, justDatabase = True, callback = callback)
+    (fd, path) = tempfile.mkstemp()
+    os.close(fd)
+    cs.writeToFile(path)
+
+    try:
+        updatecmd.doUpdate(cfg, [ path ], depCheck = False,
+                           recurse = False, justDatabase = True,
+                           noRestart = True)
+    finally:
+        os.unlink(path)
 
     # success!
     return 0

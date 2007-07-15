@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -23,6 +23,7 @@ import traceback
 from conary.lib import coveragehook
 from conary.lib import log
 from conary.repository.netrepos import netserver
+from conary.repository.netrepos import proxy
 from conary.server.apachemethods import get, post, putFile
 
 def writeTraceback(wfile, cfg):
@@ -129,24 +130,37 @@ def _handler(req):
         urlBase = "%%(protocol)s://%s:%%(port)d" % \
                         (req.server.server_hostname) + rest
 
-        if not cfg.repositoryDB:
-            log.error("repositoryDB is required in %s" % req.filename)
+        if not cfg.repositoryDB and not cfg.proxyContentsDir:
+            log.error("repositoryDB or proxyContentsDir is required in %s" % 
+                      req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
-        elif not cfg.contentsDir:
-            log.error("contentsDir is required in %s" % req.filename)
+        elif cfg.repositoryDB and cfg.proxyContentsDir:
+            log.error("only one of repositoryDB or proxyContentsDir may be specified "
+                      "in %s" % req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
-        elif not cfg.serverName:
-            log.error("serverName is required in %s" % req.filename)
-            return apache.HTTP_INTERNAL_SERVER_ERROR
+
+        if cfg.repositoryDB:
+            if not cfg.contentsDir:
+                log.error("contentsDir is required in %s" % req.filename)
+                return apache.HTTP_INTERNAL_SERVER_ERROR
+            elif not cfg.serverName:
+                log.error("serverName is required in %s" % req.filename)
+                return apache.HTTP_INTERNAL_SERVER_ERROR
+
+        if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
+            log.error("tmpDir cannot include symbolic links")
 
         if cfg.closed:
             repositories[repName] = netserver.ClosedRepositoryServer(cfg)
             repositories[repName].forceSecure = False
+        elif cfg.proxyContentsDir:
+            repositories[repName] = proxy.ProxyRepositoryServer(cfg, urlBase)
+            repositories[repName].forceSecure = False
         else:
-            repositories[repName] = netserver.NetworkRepositoryServer(
-                                                    cfg, urlBase)
-
-            repositories[repName].forceSecure = cfg.forceSSL
+            repos = netserver.NetworkRepositoryServer(cfg, urlBase)
+            repositories[repName] = proxy.SimpleRepositoryFilter(
+                                                cfg, urlBase, repos)
+            repositories[repName].forceSecure = False
             repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]

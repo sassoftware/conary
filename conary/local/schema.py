@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -181,6 +181,24 @@ def createDataStore(db):
         data    BLOB
     )""")
     cu.execute("CREATE INDEX DataStoreIdx ON DataStore(hash)")
+    db.commit()
+    db.loadSchema()
+
+def createDatabaseAttributes(db):
+    if "DatabaseAttributes" in db.tables:
+        return
+    cu = db.cursor()
+    cu.execute("""
+    CREATE TABLE DatabaseAttributes(
+        id      %(PRIMARYKEY)s,
+        name    STRING,
+        value   STRING
+    )
+    """ % db.keywords)
+    cu.execute("CREATE UNIQUE INDEX DatabaseAttributesNameIdx "
+               "ON DatabaseAttributes(name)")
+    cu.execute("INSERT INTO DatabaseAttributes (name, value) "
+               "VALUES ('transaction counter', '0')")
     db.commit()
     db.loadSchema()
 
@@ -371,6 +389,7 @@ def createSchema(db):
     createDependencies(db)
     createTroveInfo(db)
     createDataStore(db)
+    createDatabaseAttributes(db)
 
 # SCHEMA Migration
 
@@ -386,7 +405,7 @@ class SchemaMigration(migration.SchemaMigration):
 
 class MigrateTo_5(SchemaMigration):
     Version = 5
-    def check(self):
+    def canUpgrade(self):
         return self.version in [2,3,4]
 
     def migrate(self):
@@ -631,9 +650,13 @@ class MigrateTo_14(SchemaMigration):
     def migrate(self):
         # we need to rerun the MigrateTo_10 migration since we missed
         # some trovefiles the first time around
-        m10 = MigrateTo_10(self.db)
+        class M10(MigrateTo_10):
+            # override sanity checks to force the migration to run
+            # out of order
+            def canUpgrade(self):
+                return self.version == 13
+        m10 = M10(self.db)
         m10.migrate()
-
         # We need to make sure that loadedTroves and buildDeps troveinfo
         # isn't included in any commponent's trove.
         self.cu.execute("""
@@ -835,6 +858,25 @@ class MigrateTo_20(SchemaMigration):
 # index, so there is no need to do a full blown migration and stop
 # conary from working until a schema migration is done
 def optSchemaUpdate(db):
+    # drop any ANALYZE information, because it makes sqlite go
+    # very slowly.
+    cu = db.cursor()
+    cu.execute("select count(*) from sqlite_master where name='sqlite_stat1'")
+    count = cu.fetchall()[0][0]
+    if count != 0:
+        cu.execute('select count(*) from sqlite_stat1')
+        count = cu.fetchall()[0][0]
+        if count != 0:
+            try:
+                # go - read-only
+                cu.execute('BEGIN IMMEDIATE')
+                cu.execute('delete from sqlite_stat1')
+            except sqlerrors.ReadOnlyDatabase:
+                # the database will go slowly, but it should work.
+                pass
+
+    # Create DatabaseAttributes (if it doesn't exist yet)
+    createDatabaseAttributes(db)
     #do we have the index we need?
     if "TroveInfoInstTypeIdx" in db.tables["TroveInfo"]:
         return
@@ -856,8 +898,12 @@ def checkVersion(db):
     if version == VERSION:
         # the actions performed by this function should be integrated
         # in the next schema update, when we have a reason to block
-        # conary functionality...
-        optSchemaUpdate(db)
+        # conary functionality...  These schema changes *MUST* not be
+        # required for Read Only functionality
+        try:
+            optSchemaUpdate(db)
+        except sqlerrors.ReadOnlyDatabase:
+            pass
         return version
     if version > VERSION:
         raise NewDatabaseSchema
@@ -875,9 +921,9 @@ def checkVersion(db):
 
     # instantiate and call appropriate migration objects in succession.
     while version and version < VERSION:
-        version = (lambda x : sys.modules[__name__].__dict__[ \
-            'MigrateTo_' + str(x + 1)])(version)(db)()
-
+        fname = 'MigrateTo_' + str(version.major + 1)
+        migr = sys.modules[__name__].__dict__[fname](db)
+        version = migr()
     return version
 
 class OldDatabaseSchema(errors.DatabaseError):

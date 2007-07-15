@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -174,7 +174,7 @@ class SourceState(trove.Trove):
                                 sha1helper.sha1ToString(x[1][1]),
                                 self.fileInfo[x[0]],
                                 x[1][2].asString())
-                for x in self.idMap.iteritems() ]
+                for x in sorted(self.idMap.iteritems()) ]
 
 	f.write("".join(rc))
 
@@ -244,9 +244,9 @@ class SourceState(trove.Trove):
         return refreshPatterns
 
     def __init__(self, name, version, branch, changeLog = None,
-                 lastmerged = None, isRedirect = False, **kw):
-        assert(not isRedirect)
+                 lastmerged = None, troveType = 0, **kw):
         assert(not changeLog)
+        assert(troveType == trove.TROVE_TYPE_NORMAL)
 
 	trove.Trove.__init__(self, name, version, deps.Flavor(),
                              None, **kw)
@@ -292,14 +292,16 @@ class ConaryStateFromFile(ConaryState):
             self.source = None
         return False
 
-    def __init__(self, file, repos=None, parseSource=True):
-	if not os.path.isfile(file):
-	    raise CONARYFileMissing
+    def __init__(self, path, repos=None, parseSource=True):
+        if not os.path.exists(path):
+            raise CONARYFileMissing
+        elif not os.path.isfile(path):
+            raise CONARYNotFile
 
-	versionUpdated = self.parseFile(file, repos=repos,
+	versionUpdated = self.parseFile(path, repos=repos,
                                         parseSource=parseSource)
-        if versionUpdated and os.access(file, os.W_OK):
-            self.write(file)
+        if versionUpdated and os.access(path, os.W_OK):
+            self.write(path)
 
 class SourceStateFromLines(SourceState):
 
@@ -416,3 +418,11 @@ class CONARYFileMissing(ConaryStateError):
     """
     def __str__(self):
         return 'CONARY state file does not exist.'
+
+class CONARYNotFile(ConaryStateError):
+    """
+    This exception is raised when the CONARY file specified exists but
+    is not a regular file
+    """
+    def __str__(self):
+        return 'CONARY state file is not a normal file'

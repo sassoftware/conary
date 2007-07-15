@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -173,40 +173,20 @@ class InodeStream(streams.StreamSet):
 	return "".join(l)
 
     def timeString(self, now = None):
-	if not now:
-	    now = time.time()
-	timeSet = time.localtime(self.mtime())
-	nowSet = time.localtime(now)
-
-	# if this file is more then 6 months old, use the year
-	monthDelta = nowSet[1] - timeSet[1]
-	yearDelta = nowSet[0] - timeSet[0]
-
-	if monthDelta < 0:
-	    yearDelta = yearDelta - 1
-	    monthDelta = monthDelta + 12
-
-	monthDelta = monthDelta + 12 * yearDelta
-
-	if nowSet[2] < timeSet[2]:
-	    monthDelta = monthDelta - 1
-
-	if monthDelta < 6:
-	    return time.strftime("%b %e %H:%M", timeSet)
-	else:
-	    return time.strftime("%b %e  %Y", timeSet)
+        # We're ignoring now now
+        return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(self.mtime()))
 
     def __eq__(self, other, skipSet = { 'mtime' : True }):
         return streams.StreamSet.__eq__(self, other, skipSet = skipSet)
 
     def __init__(self, perms = None, mtime = None, owner = None, group = None):
-        if perms and mtime is None:
+        if perms is not None and mtime is None:
             # allow us to to pass in a frozen InodeStream as the 
             # first argument - mtime will be None in that case.
             streams.StreamSet.__init__(self, perms)
         else:
             streams.StreamSet.__init__(self)
-            if perms:
+            if perms is not None:
                 self.perms.set(perms)
                 self.mtime.set(mtime)
                 self.owner.set(owner)
@@ -214,10 +194,7 @@ class InodeStream(streams.StreamSet):
 
     eq = __eq__
 
-class FlagsStream(streams.NumericStream):
-
-    __slots__ = "val"
-    format = "!I"
+class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
@@ -239,14 +216,14 @@ class FlagsStream(streams.NumericStream):
 
     def _isFlag(self, flag, set):
 	if set != None:
-            if self.val is None:
-                self.val = 0x0
+            if self() is None:
+                self.set(0x0)
 	    if set:
-		self.val |= flag
+		self.set(self() | flag)
 	    else:
-		self.val &= ~(flag)
+		self.set(self() & ~(flag))
 
-	return (self.val and self.val & flag)
+	return (self() and self() & flag)
 
 class File(streams.StreamSet):
 
@@ -556,17 +533,17 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
         owner = 'root'
         group = 'root'
     else:
+        # + is not a valid char in user/group names; if the uid is not mapped
+        # to a user, prepend it with + and store it as a string
         try:
             owner = userCache.lookupId('/', s.st_uid)
-        except KeyError, msg:
-            raise FilesError("Error mapping uid %d to user name for "
-                             "file %s: %s" %(s.st_uid, path, msg))
+        except KeyError:
+            owner = '+%d' % s.st_uid
 
         try:
             group = groupCache.lookupId('/', s.st_gid)
-        except KeyError, msg:
-            raise FilesError("Error mapping gid %d to group name for "
-                             "file %s: %s" %(s.st_gid, path, msg))
+        except KeyError:
+            group = '+%d' % s.st_gid
 
     needsSha1 = 0
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)
@@ -762,11 +739,19 @@ class UserGroupIdCache:
             os.chdir('/')
 	    os.chroot(root)
 	
-	try:
-	    theId = self.nameLookupFn(name)[2]
-	except KeyError:
-	    log.warning('%s %s does not exist - using root', self.name, name)
-	    theId = 0
+        if name and name[0] == '+':
+            # An id mapped as a string
+            try:
+                theId = int(name)
+            except ValueError:
+                log.warning('%s %s does not exist - using root', self.name,
+                            name)
+        else:
+            try:
+                theId = self.nameLookupFn(name)[2]
+            except KeyError:
+                log.warning('%s %s does not exist - using root', self.name, name)
+                theId = 0
 
 	if getChrootIds:
 	    os.chroot(".")
@@ -801,6 +786,10 @@ class UserGroupIdCache:
 	self.name = name
 	self.nameCache = { 'root' : 0 }
 	self.idCache = { 0 : 'root' }
+        # Make sure that the resolver is initialized outside the chroot
+        # (if any) so that the correct configuration and libraries are
+        # loaded. (CNY-1515)
+        nameLookupFn('root')
 	
 userCache = UserGroupIdCache('user', pwd.getpwnam, pwd.getpwuid)
 groupCache = UserGroupIdCache('group', grp.getgrnam, grp.getgrgid)

@@ -5,7 +5,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -111,7 +111,7 @@ class ArchConfig(ConfigFile):
         if 'targetarch' not in self.macro:
             self.macro['targetarch'] = self.name
         use.Arch._addFlag(self.name, archProps = self.archProp, 
-                          macros=self.macro)
+                          macros=self.macro, platform=True)
         for subArchName in self._sections:
             subArch = self._sections[subArchName]
             subArch.name = subArchName
@@ -139,6 +139,7 @@ class UseFlagConfig(ConfigFile):
     sense            = (CfgFlagSense, deps.FLAG_SENSE_PREFERRED)
     shortDoc         = CfgString
     longDoc          = CfgString
+    platform         = (CfgBool, False)
 
     def __init__(self, name):
 	ConfigFile.__init__(self)
@@ -160,7 +161,7 @@ class UseFlagConfig(ConfigFile):
 
     def addUseFlag(self):
         use.Use._addFlag(self.name, required=self.buildRequired,
-                         path=self.path) 
+                         path=self.path, platform=self.platform)
         if self.buildName and self.buildName != self.name:
             use.Use._addAlias(self.name, self.buildName)
 

@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -21,7 +21,6 @@ file as it appears in the filesystem.
 import os
 import re
 import stat
-import types
 
 from conary.lib import log
 
@@ -89,7 +88,7 @@ class Filter:
                 except ValueError, msg:
                     log.error('invalid macro substitution in "%s", missing "s"?' %subre)
                     raise
-		tmplist.append('(' + subre + ')')
+		tmplist.append('(?:' + subre + ')')
 	    self.regexp = '|'.join(tmplist)
 	    self.re = re.compile(self.regexp)
 	else:

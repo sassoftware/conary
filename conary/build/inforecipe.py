@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -12,6 +12,7 @@
 # full details.
 #
 
+from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.packagerecipe import _AbstractPackageRecipe, _recipeHelper
 from conary.build.recipe import RECIPE_TYPE_INFO
 
@@ -21,7 +22,10 @@ from conary.deps import deps
 
 class UserGroupInfoRecipe(_AbstractPackageRecipe):
     _recipeType = RECIPE_TYPE_INFO
-    abstraceBaseClass = 1
+    internalAbstractBaseClass = 1
+    # we need to add this line because _AbstractPackageRecipe
+    # isn't copied in
+    buildRequires = _AbstractPackageRecipe.buildRequires[:]
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
                  crossCompile=None):
@@ -78,6 +82,7 @@ class UserGroupInfoRecipe(_AbstractPackageRecipe):
         if name in self.__dict__:
             return self.__dict__[name]
         raise AttributeError, name
+_addRecipeToCopy(UserGroupInfoRecipe)
 
 class UserInfoRecipe(UserGroupInfoRecipe):
     type = 'user'
@@ -90,6 +95,7 @@ class UserInfoRecipe(UserGroupInfoRecipe):
         depSet.addDep(deps.GroupInfoDependencies,
                       deps.Dependency(self.groupname, []))
         f.provides.set(depSet)
+_addRecipeToCopy(UserInfoRecipe)
 
 class GroupInfoRecipe(UserGroupInfoRecipe):
     type = 'group'
@@ -100,3 +106,4 @@ class GroupInfoRecipe(UserGroupInfoRecipe):
         depSet.addDep(deps.GroupInfoDependencies,
                       deps.Dependency(self.infoname, []))
         f.provides.set(depSet)
+_addRecipeToCopy(GroupInfoRecipe)

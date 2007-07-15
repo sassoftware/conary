@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -19,12 +19,15 @@ import copy
 import errno
 import inspect
 import os
+import socket
 import sys
 import textwrap
 import urllib2
 
 from conary.lib import cfgtypes,util
-from conary import errors
+from conary import constants, errors
+
+configVersion = 1
 
 # NOTE: programs expect to be able to access all of the cfg types from
 # lib.cfg, so we import them here.  At some point, we may wish to make this
@@ -136,6 +139,9 @@ class _Config:
         where value is whatever was after the directive in the config file.
         """
         self._directives[key.lower()] = fn
+
+    def addAlias(self, alias, realKey):
+        self._lowerCaseMap[alias.lower()] = self._lowerCaseMap[realKey.lower()]
 
     # --- Display options allow arbitrary display parameters to be set --
     # they can be picked up by the strings printing themselves
@@ -347,6 +353,10 @@ class ConfigFile(_Config):
         try:
             key = self._lowerCaseMap[key.lower()]
             self[key] = self._options[key].parseString(self[key], val)
+            if hasattr(self._options[key].valueType, 'overrides'):
+                overrides = self._options[key].valueType.overrides
+                if overrides and hasattr(self, overrides):
+                    self.resetToDefault(overrides)
         except KeyError, msg:
             if self._ignoreErrors:
                 pass
@@ -360,14 +370,41 @@ class ConfigFile(_Config):
                                                                lineno, msg, key)
 
     def _openUrl(self, url):
+        oldTimeout = socket.getdefaulttimeout()
+        timeout = 2
+        socket.setdefaulttimeout(timeout)
+        # Extra headers to send up
+        headers = {
+            'X-Conary-Version' : constants.version or "UNRELEASED",
+            'X-Conary-Config-Version' : int(configVersion),
+        }
+        req = urllib2.Request(url, headers = headers)
         try:
-            return urllib2.urlopen(url)
-        except urllib2.HTTPError, err:
-            raise CfgEnvironmentError(err.filename, err.msg)
-        except urllib2.URLError, err:
-            raise CfgEnvironmentError(url, err.reason.args[1])
-        except EnvironmentError, err:
-            raise CfgEnvironmentError(err.filename, err.msg)
+            for i in range(4):
+                try:
+                    return urllib2.urlopen(req)
+                except urllib2.HTTPError, err:
+                    raise CfgEnvironmentError(err.filename, err.msg)
+                except urllib2.URLError, err:
+                    if err.args and isinstance(err.args[0], socket.timeout):
+                        # CNY-1161
+                        # We double the socket time out after each run; this
+                        # should allow very slow links to catch up while
+                        # providing some feedback to the user. For now, only
+                        # on stderr since logging is not enabled yet.
+                        sys.stderr.write("Timeout reading configuration "
+                            "file %s; retrying...\n" % url)
+                        timeout *= 2
+                        socket.setdefaulttimeout(timeout)
+                        continue
+                    raise CfgEnvironmentError(url, err.reason.args[1])
+                except EnvironmentError, err:
+                    raise CfgEnvironmentError(err.filename, err.msg)
+            else: # for
+                # URL timed out
+                raise CfgEnvironmentError(url, "socket timeout")
+        finally:
+            socket.setdefaulttimeout(oldTimeout)
 
     def isUrl(self, val):
         return val.startswith("http://") or val.startswith("https://")
@@ -558,6 +595,7 @@ class ConfigOption:
         default = valueType.copy(self.default)
         new = self.__class__(self.name, valueType, default)
         listeners = list(self.listeners)
+        new._isDefault = self._isDefault
         new.listeners = listeners
         return new
 

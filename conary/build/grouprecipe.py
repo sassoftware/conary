@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -27,7 +27,7 @@ from conary import callbacks
 from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
-from conary.repository import trovesource
+from conary.repository import changeset, trovesource, searchsource
 from conary import trove
 from conary import versions
 
@@ -38,13 +38,25 @@ ADD_REASON_INCLUDED = 2 # added because it's in something else that was added
 ADD_REASON_ADDALL = 3   # added as part of an "addAll"
 ADD_REASON_REPLACE = 4  # added as part of a "replace" command.
 ADD_REASON_INCLUDED_GROUP = 5 # added because its in an included group
+ADD_REASON_COPIED = 6    # added because it was copied from another group
+
+ADDALL_NORECURSE = 0
+ADDALL_RECURSE   = 1
+ADDALL_FLATTEN   = 2
+
+class AddAllFlags(object):
+
+    __slots__ = [ 'ref', 'recurse', 'copyCompatibilityClass', 'copyScripts' ]
 
 class _BaseGroupRecipe(Recipe):
     """ Defines a group recipe as collection of groups and provides
         operations on those groups.
     """
     internalAbstractBaseClass = 1
-    def __init__(self):
+    def __init__(self, laReposCache = None, srcdirs = None,
+                 lightInstance = None):
+        Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs,
+                        lightInstance = lightInstance)
         self.groups = {}
         self.defaultGroup = None
 
@@ -98,6 +110,8 @@ class _BaseGroupRecipe(Recipe):
             unseen.difference_update([x[0] for x in group.iterNewGroupList()])
         return unseen
 
+    def loadSourceActions(self):
+        self._loadSourceActions(lambda item: item._groupAction is True)
 
 
 
@@ -137,7 +151,7 @@ class GroupRecipe(_BaseGroupRecipe):
     PARAMETERS
     ==========
     Several parameters may be set at the time of group creation.  Although
-    these parameters are typically passed to C{r.createNewGroup()} for the
+    these parameters are typically passed to C{r.createGroup()} for the
     base group, they should be set as variables in the recipe class.
 
     Note: Setting these parameters affects not only the value for the base
@@ -175,7 +189,7 @@ class GroupRecipe(_BaseGroupRecipe):
         - L{addNewGroup} : Adds one newly created group to another newly
         created group
 
-        - L{addReference} : Adds a reference to a trove
+        - L{addReference} : (Deprecated) Adds a reference to a trove
 
         - L{createGroup} : Creates a new group
 
@@ -192,7 +206,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
         - L{setDefaultGroup} : Defines default group
 
-        - L{setLabelPath} : Specify the labelPath to search for troves
+        - L{setSearchPath} : Specify the searchPath to search for troves
 
     """
     Flags = use.LocalFlags
@@ -204,24 +218,57 @@ class GroupRecipe(_BaseGroupRecipe):
     checkOnlyByDefaultDeps = True
     checkPathConflicts = True
 
-    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
-        self.repos = repos
-        self.cfg = cfg
+    def __init__(self, repos, cfg, label, flavor, laReposCache, srcdirs=None,
+                 extraMacros={}, lightInstance = False):
+        _BaseGroupRecipe.__init__(self, laReposCache = laReposCache,
+                                  srcdirs = srcdirs,
+                                  lightInstance = lightInstance)
+
+        self.troveSource = repos
         self.labelPath = [ label ]
+        self.cfg = cfg
         self.flavor = flavor
-        self.macros = macros.Macros()
+        self.keyFlavor = None
+        self.macros = macros.Macros(ignoreUnknown=lightInstance)
         self.macros.update(extraMacros)
+        self.defaultSource = None
+        if not lightInstance:
+            self.searchSource = self._getSearchSource()
+            self.defaultSource = self.searchSource
+        self.resolveSource = None
 
         self.replaceSpecs = []
         self.resolveTroveSpecs = []
 
-        _BaseGroupRecipe.__init__(self)
+        self.preUpdateScripts = {}
+        self.postInstallScripts = {}
+        self.postRollbackScripts = {}
+        self.postUpdateScripts = {}
+
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,
                          checkOnlyByDefaultDeps = self.checkOnlyByDefaultDeps,
                          checkPathConflicts = self.checkPathConflicts,
                          byDefault = True)
         self._setDefaultGroup(group)
+
+    def _findSources(self, repos, callback=None):
+        """
+            Method used to find all of the source components that would
+            need to be built to build this group, including their flavor.
+        """
+        return findSourcesForGroup(repos, self, callback)
+
+    def _getSearchSource(self):
+        if isinstance(self.defaultSource, (list, tuple)):
+            return searchsource.createSearchSourceStack(self.searchSource,
+                                                        self.defaultSource,
+                                                        self.getSearchFlavor())
+        else:
+            return searchsource.createSearchSourceStack(None,
+                                                [self.getLabelPath()],
+                                                self.getSearchFlavor(),
+                                                troveSource=self.troveSource)
 
     def _parseFlavor(self, flavor):
         assert(flavor is None or isinstance(flavor, str))
@@ -273,7 +320,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def add(self, name, versionStr = None, flavor = None, source = None,
             byDefault = None, ref = None, components = None, groupName = None,
-            use = True):
+            use = True, labelPath=None, searchPath=None):
         """
         NAME
         ====
@@ -283,7 +330,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName}])}
+        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName},] [I{searchPath}])}
 
         DESCRIPTION
         ===========
@@ -296,9 +343,9 @@ class GroupRecipe(_BaseGroupRecipe):
         The C{r.add()} command accepts the following parameters, with
         default values shown in parentheses:
 
-        B{byDefault} : (None, or value of B{createNewGroup}) Specifies whether
+        B{byDefault} : (None, or value of B{createGroup}) Specifies whether
         to include a trove  by default. Defaults to the B{byDefault} setting
-        as  defined with B{createNewGroup}.
+        as  defined with B{createGroup}.
 
         B{components} : (None) Specify a set of trove components to include.
         Only relevant when adding packages.  Specified as a list,
@@ -312,9 +359,6 @@ class GroupRecipe(_BaseGroupRecipe):
         B{name} : (None) Specifies the name of trove to add- This parameter is
         required.
 
-        B{ref} : (None) Trove reference to search for this trove in. See
-        C{r.addReference} for more information.
-
         B{source} : (None) Specifies the source from which this trove
         originates for programs which read group recipes.
         This parameter's explicit use is generally unnecessary.
@@ -322,10 +366,14 @@ class GroupRecipe(_BaseGroupRecipe):
         B{versionStr} : (None) A version specifier like that passed to
 
         B{repquery} which determines the trove returned.
-        
+
         B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the trove(s) are added to the
         group
+
+        B{searchPath} : (None) Set a specific searchPath to search for this
+        particular trove.  This overrides the B{ref} flag.  See setSearchPath
+        for a description of how the searchPath works.
 
         EXAMPLES
         ========
@@ -337,6 +385,12 @@ class GroupRecipe(_BaseGroupRecipe):
         if not use:
             return
         flavor = self._parseFlavor(flavor)
+        if labelPath:
+            searchPath = labelPath
+
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
+
         for group in self._getGroups(groupName):
             group.addSpec(name, versionStr = versionStr, flavor = flavor,
                           source = source, byDefault = byDefault, ref = ref,
@@ -362,17 +416,16 @@ class GroupRecipe(_BaseGroupRecipe):
         ===========
 
         The C{r.remove} command removes a trove from the group which was
-        previously added with C{r.addAll}, or C{addTrove} commands.
+        previously added with C{r.addAll} or C{add} commands.
 
         Note: If the trove is not included explicitly, such as by C{r.add()},
         but rather implicitly, as a component in a package which has been
         added, then removing the trove only changes its B{byDefault} setting,
         so that installing this group will not install the trove.
 
-        Troves may be removed from a super group which are present due to an
-        included subgroup. For example, the group I{group-os} is a top
-        level group, and includes I{group-dist}, which in turn, includes
-        package I{foo}.
+        Troves present due to an included subgroup can be removed from a
+        supergroup. For example, the group I{group-os} is a top level group,
+        and includes I{group-dist}, which in turn, includes package I{foo}.
 
         Using C{r.remove('foo', groupName='group-os')} prevents installation
         of package I{foo} during the installation of the group I{group-os}.
@@ -453,6 +506,169 @@ class GroupRecipe(_BaseGroupRecipe):
         for group in self._getGroups(groupName):
             group.removeComponents(componentList)
 
+    def moveComponents(self, componentList, fromGroup, toGroup, byDefault=None):
+        """
+        NAME
+        ====
+
+        B{C{r.moveComponents()}} - Add components to one group, removing them
+        from the other in the process.
+
+        SYNOPSIS
+        ========
+
+        C{r.moveComponents(I{componentList}, I{fromGroup}, I{toGroup}, [I{byDefault}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.moveComponents} removes components from the fromGroup, and adds
+        those components to the toGroup.
+
+        PARAMETERS
+        ==========
+
+        The C{r.moveComponents()} command accepts the following parameters,
+        with default values shown in parentheses where there is one:
+
+        B{componentList} : A list of components which should be moved
+        from fromGroup to toGroup.  Example: ['devel', 'devellib']
+
+        B{fromGroup} : The name of the group to move the components from
+
+        B{toGroup} : The name of the group to move the components to
+
+        B{byDefault} : (None) When specified, this ensures that all the 
+                       components that are added have the byDefault value
+                       specified (either True or False).  If not specified,
+                       the components get the byDefault value they had in the
+                       fromGroup.
+
+        EXAMPLES
+        ========
+
+        C{r.moveComponents(['devel', 'devellib'], 'group-core', 'group-devel')}
+
+        Uses C{r.moveComponents} to specify that those C{:devel} and
+        C{:devellib} components that exist in group-core should be 
+        removed from group-core and added to group-devel.
+        """
+        for group in self._getGroups(fromGroup):
+            group.moveComponents(self._getGroups(toGroup), componentList,
+                                 copy=False, byDefault=byDefault)
+
+    def copyComponents(self, componentList, fromGroupName, toGroupName,
+                       byDefault=None):
+        """
+        NAME
+        ====
+
+        B{C{r.copyComponents()}} - Add components to one group by copying them
+        from the components in another group.
+
+        SYNOPSIS
+        ========
+
+        C{r.copyComponents(I{componentList}, I{fromGroup}, I{toGroup}, [I{byDefault}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.copyComponents} copies the listed component types from
+        the fromGroup to the toGroup.
+
+        PARAMETERS
+        ==========
+
+        The C{r.copyComponents()} command accepts the following parameters,
+        with default values shown in parentheses where there is one:
+
+        B{componentList} : A list of components which should be copied
+        from fromGroup to toGroup.  Example: ['devel', 'devellib']
+
+        B{fromGroup} : The name of the group to copy the components from
+
+        B{toGroup} : The name of the group to copy the components to
+
+        B{byDefault} : (None) When specified, this ensures that all the 
+                       components that are added have the byDefault value
+                       specified (either True or False).  If not specified,
+                       the components get the byDefault value they had in the
+                       fromGroup.
+
+        EXAMPLES
+        ========
+
+        C{r.copyComponents(['devel', 'devellib'], 'group-core', 'group-devel')}
+
+        Uses C{r.copyComponents} to specify that those C{:devel} and
+        C{:devellib} components that exist in group-core should be added
+        to group-devel.
+        """
+        for group in self._getGroups(fromGroupName):
+            group.moveComponents(self._getGroups(toGroupName), componentList, 
+                                 copy=True, byDefault=byDefault)
+
+    def setSearchPath(self, *path):
+        """
+        NAME
+        ====
+
+        B{C{r.setSearchPath()}} - Specify the searchPath to search for troves
+
+        SYNOPSIS
+        ========
+
+        C{r.setSearchPath(I{pathspec})}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.setSearchPath} command specifies the searchPath used to search
+        for troves.
+
+        SearchPaths can currently consist of two types of items: labels and
+        troves.  Labels must be of the form <host>@<namespace>:<tag>,
+        while troves are of the form <name>[=version][[flavor]].
+
+        For example, a label might be myproject.rpath.org@rpl:1, while a trove
+        may be specified as::
+
+            group-dist, or group-dist=1.0, or group-dist=:1[!xen], or
+            group-dist=/myproject.rpath.org@rpl:1/1.0-1-1.
+
+        More formats for troves are allowed as well, see troveSpec
+        documentation for the full list of allowable specifications for 
+        troves.
+
+        setSearchPath will also determine how dependency resolution is done
+        when using autoResolve.  Dependency resolution will use the same
+        search path specified here.
+
+        AddResolutionSource (deprecated) overrides setSearchPath's control of 
+        dependency resolution.  If you use addResolutionSource, setSearchPath
+        will only control the search path for adding troves.
+
+        PARAMETERS
+        ==========
+
+        The C{r.setSearchPath()} command accepts the following parameters,
+        with default values shown in parentheses:
+
+        B{pathspec} : (None) The path to set as searchPath
+
+        EXAMPLES
+        ========
+
+        C{r.setSearchPath('myproject.rpath.org@rpl:1', 'group-dist=conary.rpath.com@rpl:1')}
+
+        Uses C{r.setSearchPath} to specify troves are to be sought in the
+        label myproject.rpath.org@rpl:1 first, and then fallback to
+        searching the group group-dist=conary.rpath.com@rpl:1.
+        """
+
+        self.defaultSource = searchsource.createSearchPathFromStrings(path)
+
     def setByDefault(self, byDefault = True, groupName = None):
         """
         NAME
@@ -493,7 +709,9 @@ class GroupRecipe(_BaseGroupRecipe):
             group.setByDefault(byDefault)
 
     def addAll(self, name, versionStr = None, flavor = None, ref = None,
-                           recurse=True, groupName = None, use = True):
+                           recurse=None, groupName = None, use = True,
+                           searchPath = None, flatten=False,
+                           copyScripts = False, copyCompatibilityClass = False):
         """
         NAME
         ====
@@ -504,19 +722,20 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.addAll(I{name}, [I{flavor},] [I{groupName},] [I{recurse},]
-        [I{ref},] [I{versionStr}])}
+        C{r.addAll(I{name}, [I{versionStr}], [I{flavor},] [I{ref},]
+        [I{recurse},] [I{groupName},] [I{use},] [I{searchPath},] [I{flatten},]
+        [I{copyScripts},] [I{copyCompatibilityClass}])}
 
         DESCRIPTION
         ===========
 
         The C{r.addAll()} command is used to add all troves directly contained
-        in a given reference to B{groupName} to the recipe.
+        in a given reference to B{name} to the recipe.
 
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addAll(name, versionStr, flavor)} would be
-        equivalent to adding the C{r.addTrove} lines:
+        equivalent to adding the C{r.add} lines:
 
         C{r.add('foo1', <version>)}
         C{r.add('foo2', <version>)}.
@@ -538,12 +757,27 @@ class GroupRecipe(_BaseGroupRecipe):
         groups will be used.  Otherwise, the default settings will be used
         when creating any new groups.
 
-        B{ref}: (None) Trove reference to search in for this trove. See
-        C{r.addReference()} for more information.
+        B{searchPath}: (None) searchPath to search in for this
+        trove. See C{r.setSearchPath()} for more information.
+
+        B{flatten}: (False) If True, acts like recurse=True but removes any
+        intermediate groups.  So if group-os includes group-dist, which includes
+        group-core, which includes openssh, you can use 
+        C{addAll('group-os', flatten=True)} to add openssh to your group.
 
         B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the trove(s) are added to the
         group
+
+        B{copyScripts}: (False) When True the scripts attached to the group
+        being copied are attached to this group.
+
+        B{copyCompatibilityClass}: (False) When True the compatibility
+        class for this group is set based on the class of the group being
+        copied.
+
+        B{ref}: (None) (deprecated) Trove reference to search in for this 
+        trove. See C{r.addReference()} for more information.
 
         EXAMPLES
         ========
@@ -557,12 +791,144 @@ class GroupRecipe(_BaseGroupRecipe):
             return
         flavor = self._parseFlavor(flavor)
 
-        for group in self._getGroups(groupName):
-            group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse)
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
 
+        for group in self._getGroups(groupName):
+            group.addAll(name, versionStr, flavor, ref = ref, recurse = recurse,
+                         flatten = flatten, copyScripts = copyScripts,
+                         copyCompatibilityClass = copyCompatibilityClass)
+
+    def removeItemsAlsoInNewGroup(self, name, groupName = None, use = True):
+        """
+        NAME
+        ====
+
+        B{C{r.removeItemsAlsoInNewGroup()}} - removes troves in the group
+        specified that are also in the current  group.
+
+        SYNOPSIS
+        ========
+
+        C{r.removeItemsAlsoInNewGroup(I{name}, [I{groupName},])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.removeItemsAlsoInNewGroup()} command is used to remove a set of         troves from the current group.  The first group name specified is the 
+        set of troves to remove, the second group name specified
+        is the group to remove troves from (the current default group is used
+        if the second group name is not specified).
+
+        All troves in the first group are removed from the second group.  This
+        can be compared to the "difference" operation in when using sets.
+
+        For example, if the cooked I{group-foo} contains references to the
+        troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, and
+        the current group contains references to the troves
+        C{foo1=<version>[flavor]}, and C{foo3=<version>[flavor]}, 
+        r.removeItesAlsoInNewGroup would remove foo1 from the current group.
+
+        PARAMETERS
+        ==========
+
+        The C{r.removeItemsAlsoInNewGroup()} command accepts the following 
+        parameters, with default values shown in parentheses:
+
+        B{name}      : (Required) The group that contains the trove to remove
+
+        B{groupName} : (None) The group to remove troves from (default current)
+
+        B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the trove(s) are removed from
+        the group
+
+        EXAMPLES
+        ========
+
+        C{r.removeItemsAlsoInNewGroup('group-core', groupName='group-extras')}
+
+        Removes troves from group-extras if they are contained in group-core.
+        (group-core must be another group defined in this recipe.)
+        """
+        if not use:
+            return
+
+        for group in self._getGroups(groupName):
+            group.differenceUpdateNewGroup(name)
+
+    def removeItemsAlsoInGroup(self, name, versionStr = None, flavor = None,
+                               groupName = None, searchPath = None, 
+                               use = True):
+        """
+        NAME
+        ====
+
+        B{C{r.removeItemsAlsoInGroup()}} - removes troves in the group
+        specified that are also in the current group.
+
+        SYNOPSIS
+        ========
+
+        C{r.removeItemsAlsoInGroup(I{name}, [I{versionStr}], [I{flavor},] [I{groupName},] [I{searchPath},])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.removeItemsAlsoInGroup()} command is used to remove a set of
+        troves from the current group.  The first group name specified is the 
+        set of troves to remove, the second group name specified
+        is the group to remove troves from (the current default group is used
+        if the second group name is not specified).
+
+        All troves in the first group are removed from the second group.  This
+        can be compared to the "difference" operation in when using sets.
+
+        For example, if the cooked I{group-foo} contains references to the
+        troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, and
+        the current group contains references to the troves
+        C{foo1=<version>[flavor]}, and C{foo3=<version>[flavor]}, 
+        r.removeItesAlsoInNewGroup would remove foo1 from the current group.
+
+        PARAMETERS
+        ==========
+
+        The C{r.removeItemsAlsoInNewGroup()} command accepts the following 
+        parameters, with default values shown in parentheses:
+
+        B{name}      : (Required) The group that contains the troves to remove
+
+        B{groupName} : (None) The group to remove troves from (default current)
+
+        B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
+        boolean values which determine whether the trove(s) are removed from
+        the group
+
+        B{searchPath}: (None) searchPath to search in for the group that 
+        contains the troves to remove. See C{r.setSearchPath()} for more 
+        information.
+
+        EXAMPLES
+        ========
+
+        C{r.removeItemsAlsoInGroup('group-core', 'conary.rpath.com@rpl:1', groupName='group-extras')}
+
+        Removes troves from group-extras if they are contained in group-core.
+        (group-core must already be cooked and exist at conaryr.rpath.com@rpl:1)
+        """
+        if not use:
+            return
+
+        if searchPath:
+            searchPath = searchsource.createSearchPathFromStrings(searchPath)
+        for group in self._getGroups(groupName):
+            group.differenceUpdate(name, versionStr = versionStr, 
+                                   flavor=flavor, ref=searchPath)
 
     def addCopy(self, name, versionStr = None, flavor = None, ref = None,
-                recurse=True, groupName = None, use = True):
+                recurse=True, groupName = None, use = True, 
+                searchPath = None, flatten = False, copyScripts = True,
+                copyCompatibilityClass = True):
         """
         NAME
         ====
@@ -574,7 +940,8 @@ class GroupRecipe(_BaseGroupRecipe):
         ========
 
         C{r.addCopy(I{name}, [I{flavor},] [I{groupName},] [I{recurse},]
-        [I{ref},] [I{versionStr}])}
+        [I{ref},] [I{versionStr},] [I{copyScripts},]
+        [I{copyCompatibilityClass}])}
 
         DESCRIPTION
         ===========
@@ -585,9 +952,9 @@ class GroupRecipe(_BaseGroupRecipe):
         For example, if the cooked I{group-foo} contains references to the
         troves  C{foo1=<version>[flavor]}, and C{foo2=<version>[flavor]}, the
         entries followed by C{r.addCopy('group-foo')} would be
-        equivalent to adding the C{r.addTrove} lines:
+        equivalent to adding the C{r.add} lines:
 
-        C{r.createNewGroup('group-foo')}
+        C{r.createGroup('group-foo')}
         C{r.add('foo1', <version>, groupName='group-foo')}
         C{r.add('foo2', <version>, groupName='group-foo')}
         C{r.addNewGroup('group-foo')}.
@@ -609,8 +976,18 @@ class GroupRecipe(_BaseGroupRecipe):
         groups will be used.  Otherwise, the default settings will be used
         when creating any new groups.
 
-        B{ref}: (None) Trove reference to search in for this trove. See
-        C{r.addReference()} for more information.
+        B{copyScripts}: (True) When True the scripts attached to the groups
+        being copied are attached to the newly created groups.
+
+        B{copyCompatibilityClass}: (True) When True the compatibility
+        class for the newly created groups are set to the compatibility
+        classes from the groups being copied.
+
+        B{ref}: (None) (Deprecated) Trove reference to search in for this 
+        trove. See C{r.addReference()} for more information.
+
+        B{searchPath}: (None) searchPath to search in for this
+        trove. See C{r.setSearchPath()} for more information.
 
         B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the trove(s) are added to the
@@ -630,8 +1007,12 @@ class GroupRecipe(_BaseGroupRecipe):
             return
         if name not in self.groups:
             self.createGroup(name)
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
         self.addAll(name, versionStr = versionStr, flavor = flavor, ref = ref,
-                    recurse=recurse, groupName = name)
+                    recurse=recurse, groupName = name, flatten = flatten,
+                    copyScripts = copyScripts,
+                    copyCompatibilityClass = copyCompatibilityClass)
         for group in self._getGroups(groupName):
             self.addNewGroup(name)
 
@@ -774,7 +1155,7 @@ class GroupRecipe(_BaseGroupRecipe):
         EXAMPLES
         ========
 
-        C{r.addResolveSource('foo.example.com@foo:devel')
+        C{r.addResolveSource('foo.example.com@foo:devel')}
 
         Uses C{r.addResolveSource} to specify dependency resolution should
         be performed against the labelPath I{foo.example.com@foo:devel}
@@ -838,7 +1219,7 @@ class GroupRecipe(_BaseGroupRecipe):
         return GroupReference(((name, versionStr, flavor),), ref)
 
     def replace(self, name, newVersionStr = None, newFlavor = None, ref = None,
-                groupName = None, allowNoMatch = False):
+                groupName = None, allowNoMatch = False, searchPath = None):
         """
         NAME
         ====
@@ -848,7 +1229,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}], [I{allowNoMatch}])}
+        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}], [I{allowNoMatch}], [I{searchPath}])}
 
         DESCRIPTION
         ===========
@@ -878,6 +1259,10 @@ class GroupRecipe(_BaseGroupRecipe):
         B{allowNoMatch} : (False) Silences the warning output if this replace
         did not match anything.
 
+        B{searchPath} : (None) Set a specific searchPath to search for this
+        particular trove.  This overrides the B{ref} flag.  See setSearchPath
+        for a description of how the searchPath works.
+
         EXAMPLES
         ========
 
@@ -886,6 +1271,8 @@ class GroupRecipe(_BaseGroupRecipe):
 	Uses C{r.replace} to remove all instances of the C{distro-release}
 	trove, and replaces them with a new version of C{distro-release}.
         """
+        if searchPath:
+            ref = searchsource.createSearchPathFromStrings(searchPath)
         newFlavor = self._parseFlavor(newFlavor)
         if groupName is None:
             self.replaceSpecs.append((((name, newVersionStr, newFlavor), ref),
@@ -934,6 +1321,60 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         self.labelPath = [ versions.Label(x) for x in path ]
 
+    def _addScript(self, contents, groupName, scriptName, fromClass = None):
+        if groupName is None:
+            group = self.defaultGroup
+        else:
+            group = self._getGroup(groupName)
+
+        if fromClass is not None:
+            if type(fromClass) != list and type(fromClass) != tuple:
+                fromClass = [ fromClass ]
+
+            for f in fromClass:
+                if type(f) is not int:
+                    raise RecipeFileError('group compatibility classes must be '
+                                          'integers')
+
+        group.addScript(scriptName, contents, fromClass)
+
+    def setCompatibilityClass(self, theClass, groupName = None):
+        """
+        NAME
+        ====
+
+        B{C{r.setCompatibilityClass()}} - Specify the compatibility class
+        for this trove.
+
+        SYNOPSIS
+        ========
+
+        C{r.setCompatibilityClass(I{class})}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.setCompatibilityClass} command specifies the compatibility
+        class for this trove. When a trove is updated from one compatibility
+        class to another, the rollback stack is invalidated unless the
+        newly-installed trove provides a postRollback script which supports
+        the old trove's compatibility class.
+
+        PARAMETERS
+        ==========
+
+        The C{r.setCompatibilityClass()} command accepts the following 
+        parameters.
+
+        B{theClass} : The compatibility class for this trove.
+        """
+        if groupName is None:
+            group = self.defaultGroup
+        else:
+            group = self._getGroup(groupName)
+
+        group.setCompatibilityClass(theClass)
+
     def getLabelPath(self):
         return self.labelPath
 
@@ -945,6 +1386,9 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def getChildGroups(self, groupName):
         return [ (self._getGroup(x[0]), x[1], x[2]) for x in self._getGroup(groupName).iterNewGroupList() ]
+
+    def getGroupMap(self):
+        return self.groups
 
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
                     byDefault = None, checkOnlyByDefaultDeps = None,
@@ -1042,16 +1486,31 @@ class SingleGroup(object):
         self.replaceTroveList = []
         self.newGroupList = {}
         self.addAllTroveList = []
-
+        self.newGroupDifferenceList = []
+        self.differenceSpecs = []
+        self.componentsToMove = []
         self.requires = deps.DependencySet()
+        self.compatibilityClass = None
 
-        self.troves ={}
+        self.troves = {}
         self.reasons = {}
         self.childTroves = {}
         self.size = None
 
+        self.postInstallScripts = None
+        self.postRollbackScripts = None
+        self.postUpdateScripts = None
+        self.preUpdateScripts = None
+
     def __repr__(self):
         return "<%s '%s'>" % (self.__class__.__name__, self.name)
+
+    def addScript(self, scriptName, contents, fromClass):
+        if getattr(self, scriptName, None) is not None:
+            raise RecipeFileError('script already set for group %s'
+                                        % self.name)
+
+        setattr(self, scriptName, (contents, fromClass))
 
     def addRequires(self, requirement):
         self.requires.addDep(deps.TroveDependencies,
@@ -1059,6 +1518,37 @@ class SingleGroup(object):
 
     def getRequires(self):
         return self.requires
+
+    def _makeLabelPathRef(self, labelPath):
+        if isinstance(labelPath, str):
+            labelPath = [ labelPath ]
+        path = []
+        for label in labelPath:
+            try:
+                label = versions.Label(label)
+                path.append(label)
+            except:
+                raise RecipeFileError("Invalid label '%s'" % label)
+        return tuple(path)
+
+    def differenceUpdate(self, newGroupName, versionStr = None, flavor = None,
+                         ref = None):
+        self.differenceSpecs.append(((newGroupName, versionStr, flavor), ref))
+
+    def differenceUpdateNewGroup(self, newGroupName):
+        self.newGroupDifferenceList.append(newGroupName)
+
+    def moveComponents(self, toGroups, componentList, copy=False, 
+                       byDefault = None):
+        if not isinstance(componentList, (list, tuple)):
+            componentList = [componentList]
+        finalComponentList = []
+        for component in componentList:
+            if component[0] == ':':
+                component = component[1:]
+            finalComponentList.append(component)
+        return self.componentsToMove.append((toGroups, finalComponentList,
+                                             copy, byDefault))
 
     def addSpec(self, name, versionStr = None, flavor = None, source = None,
                 byDefault = None, ref = None, components=None):
@@ -1077,11 +1567,53 @@ class SingleGroup(object):
         self.replaceTroveList.append((((name, newVersionStr, newFlavor), ref),
                                       (allowNoMatch, isGlobal)))
 
-    def addAll(self, name, versionStr, flavor, ref, recurse):
-        self.addReferenceList.append(((name, versionStr, flavor), ref, recurse))
+    def addAll(self, name, versionStr, flavor, ref, recurse, flatten,
+               copyScripts = False, copyCompatibilityClass = False):
+        if flatten:
+            if recurse:
+                raise RecipeFileError('Can only specify one of'
+                                      'flatten + recurse')
+            recurse = ADDALL_FLATTEN
+        elif recurse is None or recurse:
+            recurse = ADDALL_RECURSE
+        else:
+            recurse = ADDALL_NORECURSE
+
+        flags = AddAllFlags()
+        flags.ref = ref
+        flags.recurse = recurse
+        flags.copyCompatibilityClass = copyCompatibilityClass
+        flags.copyScripts = copyScripts
+        self.addReferenceList.append(((name, versionStr, flavor), flags))
 
     def getComponentsToRemove(self):
         return self.removeComponentList
+
+    def getComponentsToMove(self):
+        return self.componentsToMove
+
+    def getMoveComponentMap(self):
+        lst = [x for x in self.componentsToMove if not x[2]]
+        return self._getMoveComponentMap(lst)
+
+    def getCopyComponentMap(self):
+        lst = [x for x in self.componentsToMove if x[2]]
+        return self._getMoveComponentMap(lst)
+
+    def _getMoveComponentMap(self, movingComponents):
+        componentMap = {}
+        for (toGroupList, componentList, copy, byDefault) in movingComponents:
+            for component in componentList:
+                for toGroup in toGroupList:
+                    componentMap.setdefault(component, []).append((toGroup,
+                                                                   byDefault))
+        return componentMap
+
+    def iterNewGroupDifferenceList(self):
+        return iter(self.newGroupDifferenceList)
+
+    def iterDifferenceSpecs(self):
+        return iter(self.differenceSpecs)
 
     def iterAddSpecs(self):
         return iter(self.addTroveList)
@@ -1097,7 +1629,8 @@ class SingleGroup(object):
 
     def addNewGroup(self, name, byDefault = None, explicit = True,
                     childDefaults=None):
-
+        if name == self.name:
+            raise CookError('Tried to add %s to itself.  This would create a cycle.')
         if not childDefaults:
             childDefaults = []
         elif not isinstance(childDefaults, list):
@@ -1201,6 +1734,13 @@ class SingleGroup(object):
     def getSize(self):
         return self.size
 
+    def setCompatibilityClass(self, theClass):
+        if type(theClass) is not int:
+            raise RecipeFileError('group compatibility classes must be '
+                                  'integers')
+
+        self.compatibilityClass = theClass
+
     def iterTroveList(self, strongRefs=False, weakRefs=False):
         if not (strongRefs or weakRefs):
             strongRefs = weakRefs = True
@@ -1239,6 +1779,8 @@ class SingleGroup(object):
             return "Included by adding all from %s=%s[%s]" % reason[1]
         elif reasonType == ADD_REASON_REPLACE:
             return "Included by replace of %s=%s[%s]" % reason[1]
+        elif reasonType == ADD_REASON_COPIED:
+            return "Included due to copy/move of components from %s" % reason[1]
         else:
             raise errors.InternalConaryError("Unknown inclusion reason")
 
@@ -1274,18 +1816,17 @@ class GroupReference:
     def __hash__(self):
         return hash((self.troveSpecs, self.upstreamSource))
 
-    def findSources(self, repos, labelPath, flavorPath):
+    def findSources(self, searchSource, flavor):
         """ Find the troves that make up this trove reference """
         if self.upstreamSource is None:
-            source = repos
+            source = searchSource
         else:
             source = self.upstreamSource
 
-        results = source.findTroves(labelPath, self.troveSpecs, flavorPath)
+        results = source.findTroves(self.troveSpecs)
         troveTups = [ x for x in chain(*results.itervalues())]
         self.sourceTups = troveTups
-        self.source = trovesource.TroveListTroveSource(source, troveTups)
-        self.source.searchAsRepository()
+        self.source = searchsource.TroveSearchSource(source, troveTups, flavor)
 
     def findTroves(self, *args, **kw):
         return self.source.findTroves(*args, **kw)
@@ -1300,6 +1841,74 @@ class GroupReference:
         return self.getTroves(self.sourceTups, withFiles=False)
 
 
+class TroveCacheWrapper(object):
+    def __init__(self, cache):
+        self.repos = cache.repos
+        self.cache = cache
+
+    def __getattr__(self, key):
+        return getattr(self.repos, key)
+
+    def getDepsForTroveList(self, troveList):
+        return [ (x.getProvides(), x.getRequires())
+                 for x in self.getTroves(troveList) ]
+
+    def getPathHashesForTroveList(self, troveList):
+        return [ x.getPathHashes() for x in self.getTroves(troveList) ]
+
+    def getTroves(self, troveList, *args, **kw):
+        self.cache.cacheTroves(troveList)
+        return [self.cache[x] for x in troveList]
+
+    def getTrove(self, troveTup, *args, **kw):
+        self.cache.cacheTroves([troveTup])
+        return self.cache[troveTup]
+
+    def hasTroves(self, troveList):
+        d = {}
+        needed = []
+        for troveTup in troveList:
+            if troveTup in self.cache:
+                d[troveTup] = True
+            else:
+                needed.append(troveTup)
+        if needed:
+            d.update(self.repos.hasTroves(needed))
+        return d
+
+    def createChangeSet(self, jobList, withFiles = True, withFileContents=True,
+                        excludeAutoSource = False, recurse = True,
+                        primaryTroveList = None, callback = None):
+        if withFiles or withFileContents:
+            raise RuntimeError("Cannot use TroveCache wrapper for files or "
+                               " file contents")
+        if excludeAutoSource:
+            raise RuntimeError("Cannot use TroveCache wapper"
+                               " for excludeAutoSource")
+        needed = []
+        troves = []
+        for job in jobList:
+            if job[1][0]:
+                raise RuntimeError("Cannot use TroveWrapper cache for relative"
+                                   " jobs")
+            if job[3] and recurse:
+                raise RuntimeError("Cannot use TroveWrapper cache for recursive"
+                                   " jobs")
+            troveTup = job[0], job[2][0], job[2][1]
+            if troveTup in self.cache:
+                troves.append(self.cache[troveTup])
+            else:
+                needed.append(troveTup)
+        if needed:
+            troves.extend(self.cache.getTroves(needed))
+        cs = changeset.ChangeSet()
+        for trove in troves:
+            troveCs = trove.diff(None, absolute = True)[0]
+            cs.newTrove(troveCs)
+        if primaryTroveList:
+            cs.setPrimaryTroveList(primaryTroveList)
+        return cs
+
 class TroveCache(dict):
     """ Simple cache for relevant information about troves needed for
         recipes in case they are needed again for other recipes.
@@ -1309,6 +1918,10 @@ class TroveCache(dict):
         if not callback:
             callback = callbacks.CookCallback()
         self.callback = callback
+
+    def getTroves(self, troveList, *args, **kw):
+        self.cacheTroves(troveList)
+        return [self[x] for x in troveList]
 
     def cacheTroves(self, troveTupList):
         troveTupList = [x for x in troveTupList if x not in self]
@@ -1408,6 +2021,14 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
                 # this should ensure that the child is listed before
                 # this group.
                 g.addEdge(childName, group.name)
+            for childName in group.iterNewGroupDifferenceList():
+                g.addEdge(childName, group.name)
+            for (toGroupList, components, copy, byDefault) \
+                                                in group.getComponentsToMove():
+                for toGroup in toGroupList:
+                    # make sure this group is done before everything we're
+                    # copying to.
+                    g.addEdge(group.name, toGroup.name)
 
         cycles = [ x for x in g.getStronglyConnectedComponents() if len(x) > 1 ]
         if cycles:
@@ -1430,10 +2051,14 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     # find all the groups needed for all groups in a few massive findTroves
     # calls.
     replaceSpecs = dict(recipeObj.iterReplaceSpecs())
+    resolveSpecs = recipeObj.getResolveTroveSpecs()
     log.info('Getting initial set of troves for'
              ' building all %s groups' % (len(recipeObj.iterGroupList())))
-    resolveSpecs = recipeObj.getResolveTroveSpecs()
-    troveMap = findTrovesForGroups(repos, recipeObj.iterGroupList(),
+    defaultSource = recipeObj._getSearchSource()
+
+    troveMap = findTrovesForGroups(recipeObj.searchSource,
+                                   recipeObj._getSearchSource(),
+                                   recipeObj.iterGroupList(),
                                    replaceSpecs, resolveSpecs,
                                    labelPath, flavor, callback)
     troveTupList = list(chain(*chain(*(x.values() for x in troveMap.itervalues()))))
@@ -1441,10 +2066,12 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     log.info('Troves cached.')
 
     # get resolve source to be used for dependency resolution.
-    resolveSource = getResolveSource(recipeObj.getResolveTroveSpecs(),
-                                     troveMap, cache, cfg)
-
-
+    if resolveSpecs:
+        flavor = recipeObj.getSearchFlavor()
+        resolveSource = getResolveSource(recipeObj.searchSource, 
+                                         resolveSpecs, troveMap, cache, flavor)
+    else:
+        resolveSource = recipeObj._getSearchSource()
     groupsWithConflicts = {}
 
     newGroups = processAddAllDirectives(recipeObj, troveMap, cache, repos)
@@ -1464,6 +2091,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         callback.buildingGroup(group.name, groupIdx + 1, len(groupList))
 
         childGroups = recipeObj.getChildGroups(group.name)
+        groupMap = recipeObj.getGroupMap()
 
         # check to see if any of our children groups have conflicts,
         # if so, we won't bother building up this group since it's
@@ -1480,7 +2108,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
         # add troves to this group.
         unmatchedGlobalReplaceSpecs &= addTrovesToGroup(group, troveMap, cache,
-                                                    childGroups, repos)
+                                                    childGroups, repos, 
+                                                    groupMap)
 
         log.debug('Troves in %s:' % group.name)
         for troveTup, isStrong, byDefault, _ in sorted(group.iterTroveListInfo()):
@@ -1527,9 +2156,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         raise GroupPathConflicts(groupsWithConflicts, recipeObj.getGroupDict())
 
 
-
-def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
-                        labelPath, searchFlavor, callback):
+def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs, 
+                        resolveSpecs, labelPath, searchFlavor, callback):
     toFind = {}
     troveMap = {}
 
@@ -1544,26 +2172,30 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
              refSource, components) in group.iterAddSpecs():
             toFind.setdefault(refSource, set()).add(troveSpec)
 
-        for (troveSpec, ref, recurse) in group.iterAddAllSpecs():
-            toFind.setdefault(ref, set()).add(troveSpec)
+        for (troveSpec, flags) in group.iterAddAllSpecs():
+            toFind.setdefault(flags.ref, set()).add(troveSpec)
 
         for (troveSpec, ref), _ in group.iterReplaceSpecs():
+            toFind.setdefault(ref, set()).add(troveSpec)
+
+        for (troveSpec, ref) in group.iterDifferenceSpecs():
             toFind.setdefault(ref, set()).add(troveSpec)
 
     results = {}
 
     callback.findingTroves(len(list(chain(*toFind.itervalues()))))
-    for troveSource, troveSpecs in toFind.iteritems():
-        if troveSource is None:
-            source = repos
+    for item, troveSpecs in toFind.iteritems():
+        if item is None:
+            source = defaultSource
+        elif isinstance(item, (tuple, list)):
+            source = searchsource.createSearchSourceStack(searchSource,
+                                                      item, searchFlavor)
         else:
-            source = troveSource
-            troveSource.findSources(repos,  labelPath, searchFlavor),
-
+            source = item
+            if isinstance(item, GroupReference):
+                item.findSources(defaultSource, searchFlavor)
         try:
-            results[troveSource] = source.findTroves(labelPath,
-                                                     toFind[troveSource],
-                                                     searchFlavor)
+            results[item] = source.findTroves(troveSpecs)
         except errors.TroveNotFound, e:
             raise CookError, str(e)
 
@@ -1572,17 +2204,18 @@ def findTrovesForGroups(repos, groupList, replaceSpecs, resolveSpecs,
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
         groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
-        for troveSpec, refSource, recurse in group.iterAddAllSpecs():
-            for troveTup in troveMap[refSource][troveSpec]:
-                processOneAddAllDirective(group, troveTup,  recurse,
+        for troveSpec, flags in group.iterAddAllSpecs():
+            for troveTup in troveMap[flags.ref][troveSpec]:
+                processOneAddAllDirective(group, troveTup, flags,
                                           recipeObj, cache, repos)
 
 
-def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
+def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
+    topGroup = parentGroup
 
-    if recurse:
+    if flags.recurse:
         groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True,
                                                      weakRefs=True) \
                                         if x[0].startswith('group-') ]
@@ -1592,21 +2225,51 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
         groupTrvDict = dict(izip(groupTups, trvs))
 
         if len(set(x[0] for x in groupTups)) != len(groupTups):
+            # multiple groups with the same name were added.
+            # addAll can't handle that.
             raise GroupAddAllError(parentGroup, troveTup, groupTups)
 
 
     createdGroups = set()
     groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
 
-    stack = [(topTrove, parentGroup)]
+    stack = [(topTrove, topTrove, parentGroup)]
     troveTups = []
 
     while stack:
-        trv, parentGroup = stack.pop()
-        for troveTup in trv.iterTroveList(strongRefs=True):
-            byDefault = trv.includeTroveByDefault(*troveTup)
+        trv, byDefaultTrv, parentGroup = stack.pop()
 
-            if recurse and troveTup[0].startswith('group-'):
+        if flags.copyCompatibilityClass:
+            parentGroup.setCompatibilityClass(trv.getCompatibilityClass())
+
+        if flags.copyScripts:
+            for script in ('postInstall', 'preUpdate', 'postUpdate',
+                           'postRollback'):
+                contents = getattr(trv.troveInfo.scripts, script).script()
+                if not contents: continue
+
+                cvtList = []
+                for cvt in getattr(trv.troveInfo.scripts, script).conversions.iter():
+                    if script == 'postRollback':
+                        assert(cvt.old() == parentGroup.compatibilityClass)
+                        cvtList.append(cvt.new())
+                    else:
+                        assert(cvt.new() == parentGroup.compatibilityClass)
+                        cvtList.append(cvt.old())
+
+                if not cvtList:
+                    cvtList = None
+
+                parentGroup.addScript(script + 'Scripts',
+                                      contents, cvtList)
+
+        for troveTup in trv.iterTroveList(strongRefs=True):
+            byDefault = byDefaultTrv.includeTroveByDefault(*troveTup)
+            if flags.recurse and troveTup[0].startswith('group-'):
+                if flags.recurse == ADDALL_FLATTEN:
+                    stack.append((groupTrvDict[troveTup], trv, parentGroup))
+                    continue
+
                 name = troveTup[0]
                 childGroup = groupsByName.get(name, None)
                 if not childGroup:
@@ -1621,25 +2284,58 @@ def processOneAddAllDirective(parentGroup, troveTup, recurse, recipeObj, cache,
                     groupsByName[name] = childGroup
 
 
+                if parentGroup.name == name:
+                    raise CookError('Tried to addAll "%s=%s" into %s - which resulted in trying to add %s to itself.  This is not allowed.  You may wish to pass recurse=False to addAll.' % (topTrove.getName(), topTrove.getVersion(), topGroup.name, name))
                 parentGroup.addNewGroup(name, byDefault=byDefault,
-                                        explicit = True, childDefaults = trv)
+                                        explicit = True,
+                                        childDefaults = byDefaultTrv)
 
                 if troveTup not in createdGroups:
-                    stack.append((groupTrvDict[troveTup], childGroup))
+                    childTrove = groupTrvDict[troveTup]
+                    stack.append((childTrove, childTrove, childGroup))
                     createdGroups.add(troveTup)
             else:
                 parentGroup.addTrove(troveTup, True, byDefault, [],
-                                     childDefaults=trv, 
+                                     childDefaults=byDefaultTrv, 
                                      reason = (ADD_REASON_ADDALL, topTrove.getNameVersionFlavor()))
                 troveTups.append(troveTup)
 
     cache.cacheTroves(troveTups)
 
 
+def removeDifferences(group, differenceGroupList, differenceSpecs, troveMap,
+                      cache):
+    """
+        If the user has specified removeTrovesAlsoInNewGroup()
+        or removeTrovesAlsoInGroup(), this will go through and remove
+        troves listed in those groups.
+    """
+    for groupToRemove in differenceGroupList:
+        for troveTup in groupToRemove.iterTroveList(strongRefs=True,
+                                                    weakRefs=True):
+            if group.hasTrove(*troveTup):
+                group.delTrove(*troveTup)
 
-def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
+    for troveSpec, ref in differenceSpecs:
+        troveTups = troveMap[ref][troveSpec]
+        for troveTup in troveTups:
+            trv = cache[troveTup]
+            for childTrove in trv.iterTroveList(strongRefs=True,
+                                              weakRefs=True):
+                if group.hasTrove(*childTrove):
+                    group.delTrove(*childTrove)
+            if group.hasTrove(*troveTup):
+                group.delTrove(*troveTup)
+
+
+def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
     def _componentMatches(troveName, compList):
-        return ':' in troveName and troveName.split(':', 1)[1] in compList
+        if ':' not in troveName:
+            return False
+        comp = troveName.split(':', 1)[1]
+        if comp in compList:
+            return comp
+        return False
 
     # add explicit troves
     for (troveSpec, source, byDefault,
@@ -1656,12 +2352,14 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
     # remove/replace explicit troves
     removeSpecs = dict(group.iterRemoveSpecs())
     replaceSpecs = dict(group.iterReplaceSpecs())
+    differenceGroupList = [ groupMap[x] for x in
+                            group.iterNewGroupDifferenceList()]
+    differenceSpecs = list(group.iterDifferenceSpecs())
     unmatchedRemoveSpecs = set()
     unmatchedReplaceSpecs = set()
     unmatchedGlobalReplaceSpecs = set()
     if removeSpecs or replaceSpecs:
         groupAsSource = trovesource.GroupRecipeSource(repos, group)
-        groupAsSource.searchAsDatabase()
 
         unmatchedRemoveSpecs = set(x[0] for x in removeSpecs.items() 
                                    if not x[1])
@@ -1721,10 +2419,16 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                                    reason=(ADD_REASON_REPLACE, newTup))
                     groupAsSource.addTrove(*newTup)
 
+    removeDifferences(group, differenceGroupList, differenceSpecs, troveMap, 
+                      cache)
+
     # add implicit troves
     # first from children of explicit troves.
     componentsToRemove = group.getComponentsToRemove()
-
+    copyComponentMap = group.getCopyComponentMap()
+    moveComponentMap = group.getMoveComponentMap()
+    componentsToCopy = dict((x, []) for x in copyComponentMap)
+    componentsToMove = dict((x, []) for x in moveComponentMap)
 
     for (troveTup, explicit,
          byDefault, components) in list(group.iterTroveListInfo()):
@@ -1752,6 +2456,18 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                     childByDefault = byDefault
                 else:
                     childByDefault = False
+
+            comp = _componentMatches(childName, componentsToCopy)
+            if comp:
+                componentsToCopy[comp].append((childTup, childByDefault))
+
+            # lastly, we add the component as something to move,
+            # this will also remove this component at the same time.
+            comp = _componentMatches(childName, componentsToMove)
+            if comp:
+                componentsToMove[comp].append((childTup, childByDefault))
+                childByDefault = False
+
             reason = group.getReason(*troveTup)
             if reason[0] == ADD_REASON_ADDED:
                 reason = ADD_REASON_INCLUDED, troveTup
@@ -1834,6 +2550,8 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                                                   childGroups):
             group.delTrove(*troveTup)
 
+    removeDifferences(group, differenceGroupList, differenceSpecs, troveMap, 
+                      cache)
     # change packages to be by default False if all their components
     # are by default False - this avoids having a package being installed
     # w/o any components.
@@ -1853,12 +2571,29 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos):
                   " contain any byDefault True components" % (pkgTup))
         group.setTroveByDefault(byDefault=False, *pkgTup)
 
+    newExplicit = addCopiedComponents(group, componentsToMove, moveComponentMap)
+    newExplicit += addCopiedComponents(group, componentsToCopy,
+                                       copyComponentMap)
+    cache.cacheTroves(newExplicit)
     if unmatchedRemoveSpecs:
         log.warning(GroupUnmatchedRemoves(unmatchedRemoveSpecs, group))
 
     if unmatchedReplaceSpecs:
         log.warning(GroupUnmatchedReplaces(unmatchedReplaceSpecs, group))
     return unmatchedGlobalReplaceSpecs
+
+def addCopiedComponents(fromGroup, componentsToCopy, componentMap):
+    newExplicitTups = []
+    for component, groupList in componentMap.items():
+        for group, byDefaultSetting in groupList:
+            for troveTup, byDefault in componentsToCopy.get(component, []):
+                newExplicitTups.append(troveTup)
+                if byDefaultSetting is not None:
+                    byDefault = byDefaultSetting
+                group.addTrove(troveTup, explicit=True, byDefault=byDefault,
+                               components=[],
+                               reason=(ADD_REASON_COPIED, fromGroup.name))
+    return newExplicitTups
 
 def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
     # we only remove weak troves if either a) they are primary 
@@ -1973,8 +2708,12 @@ def addPackagesForComponents(group, repos, troveCache):
 
     # if the user mentions both foo and foo:runtime, don't remove
     # direct link to foo:runtime
-    troveTups = [ x for x in packages if not group.hasTrove(*x)]
+    troveTups = [ x for x in packages
+                    if not (group.hasTrove(*x) and group.isExplicit(*x)) ]
+    troveTups = packages.keys()
     hasTroves = repos.hasTroves(troveTups)
+    if isinstance(hasTroves, list):
+        hasTroves = dict(izip(troveTups, hasTroves))
     troveTups = [ x for x in troveTups if hasTroves[x] ]
 
     if not troveTups:
@@ -2002,21 +2741,17 @@ def addPackagesForComponents(group, repos, troveCache):
             group.addTrove(comp, False, byDefault, [],
                            reason=(ADD_REASON_ADDED,))
 
-def getResolveSource(troveSpecList, troveMap, cache, cfg):
+def getResolveSource(searchSource, troveSpecList, troveMap, cache, flavor):
     """
         Returns the resolveSource object to be used for dep resolution.
         If no resolveTroves have been added, then will return None.
     """
-    if troveSpecList:
-        resolveTups = []
-        for troveSpec, ref in troveSpecList:
-            resolveTups.extend(troveMap[ref][troveSpec])
-        resolveTroves = [ cache[x] for x in resolveTups ]
-        resolveSource = conaryclient.resolve.DepResolutionByTroveList(cfg,
-                                                None, resolveTroves)
-    else:
-        resolveSource = None
-    return resolveSource
+    resolveTups = []
+    for troveSpec, ref in troveSpecList:
+        resolveTups.extend(troveMap[ref][troveSpec])
+    resolveTroves = [ cache[x] for x in resolveTups ]
+    return searchsource.createSearchSourceStack(searchSource, [resolveTroves],
+                                                flavor)
 
 def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                              callback, resolveSource):
@@ -2047,16 +2782,20 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 
     # there's nothing worse than seeing a bunch of nice group debugging
     # information and then having your screen filled up with all 
-    # of the update code's debug mess.  Until that logging is moved
-    # to it's own private location, turn it off.
+    # of the update code's debug mess.
     resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
     if resetVerbosity:
         log.setVerbosity(log.DEBUG)
-    updJob, suggMap = client.updateChangeSet(troves, recurse = False,
-                                             resolveDeps = True,
-                                             test = True,
-                                             checkPathConflicts=False,
-                                             resolveSource=resolveSource)
+    oldRepos = client.getRepos()
+    client.setRepos(TroveCacheWrapper(cache))
+    try:
+        updJob, suggMap = client.updateChangeSet(troves, recurse = False,
+                                                 resolveDeps = True,
+                                                 test = True,
+                                                 checkPathConflicts=False,
+                                 resolveSource=resolveSource.getResolveMethod())
+    finally:
+        client.setRepos(oldRepos)
 
     if resetVerbosity:
         log.setVerbosity(log.LOWLEVEL)
@@ -2089,13 +2828,12 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                 flavorStr = ''
 
             log.info("\t%s=%s%s" % (provTroveTup[0], verStr, flavorStr))
+            explicit = True # always include this trove immediately
+                            # in the package, even if it used to be included
+                            # implicitly through a sub-package.
 
-            if group.hasTrove(*provTroveTup):
-                explicit = False
-            else:
-                explicit = True
-            group.addTrove(provTroveTup, explicit, byDefault, [],
-                           reason=(ADD_REASON_DEP, troveTup) )
+            group.addTrove(provTroveTup, explicit, True, [],
+                           reason=(ADD_REASON_DEP, troveTup))
             neededTups.append(provTroveTup)
 
     cache.cacheTroves(neededTups)
@@ -2104,9 +2842,10 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 def checkGroupDependencies(group, cfg, cache, callback):
     callback.groupCheckingDependencies()
     if group.checkOnlyByDefaultDeps:
-        troveList = group.iterDefaultTroveList()
+        troveList = list(group.iterDefaultTroveList())
     else:
-        troveList = group.iterTroveList()
+        troveList = list(group.iterTroveList())
+    cache.cacheTroves(troveList)
 
     jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList
                 if not ((n,v,f) in cache and cache.isRedirect((n,v,f))) ]
@@ -2116,18 +2855,8 @@ def checkGroupDependencies(group, cfg, cache, callback):
     cfg.root   = ':memory:'
 
     client = conaryclient.ConaryClient(cfg)
-    if group.checkOnlyByDefaultDeps:
-        cs = client.createChangeSet(jobSet, recurse = False, withFiles = False,
-                                    callback = callback)
-    else:
-        cs = client.repos.createChangeSet(jobSet, recurse = False,
-                                          withFiles = False,
-                                          callback = callback)
 
-    jobSet = cs.getJobSet()
-    trvSrc = trovesource.ChangesetFilesTroveSource(client.db)
-    trvSrc.addChangeSet(cs, includesFileContents = False)
-    failedDeps = client.db.depCheck(jobSet, trvSrc)[0]
+    failedDeps = client.db.depCheck(jobSet, TroveCacheWrapper(cache))[0]
     callback.done()
     return failedDeps
 
@@ -2223,3 +2952,88 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
             return conflicts
         else:
             callback.done()
+
+
+def findSourcesForGroup(repos, recipeObj, callback=None):
+    """
+    Method to find all the sources contained in the group.
+    """
+    def _sourceSpec(troveSpec, source=None):
+        if source:
+            source = source.split(':')[0] + ':source'
+        else:
+            source = troveSpec[0].split(':')[0] + ':source'
+        troveSpec = (source, troveSpec[1], None)
+        return troveSpec
+
+    def _addFlavors(refSource, sourceSpec, flavor, flavorMap):
+        flavorMap.setdefault(refSource, {})
+        flavorMap[refSource].setdefault(sourceSpec, set()).add(flavor)
+
+    if callback is None:
+        callback = callbacks.CookCallback()
+
+    labelPath = recipeObj.getLabelPath()
+    searchFlavor = recipeObj.getSearchFlavor()
+
+    toFind = {}
+    flavorMap = {}
+    groupList = list(recipeObj.iterGroupList())
+
+    for group in groupList:
+        for (troveSpec, source, byDefault,
+             refSource, components) in group.iterAddSpecs():
+            flavorMap.setdefault(refSource, {})
+
+            sourceSpec = _sourceSpec(troveSpec, source)
+            toFind.setdefault(refSource, set()).add(sourceSpec)
+            _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)
+
+        for (troveSpec, flags) in group.iterAddAllSpecs():
+            sourceSpec = _sourceSpec(troveSpec)
+            toFind.setdefault(flags.ref, set()).add(sourceSpec)
+            _addFlavors(flags.ref, sourceSpec, troveSpec[2], flavorMap)
+
+        for (troveSpec, ref), _ in group.iterReplaceSpecs():
+            sourceSpec = _sourceSpec(troveSpec)
+            flavorMap.setdefault(sourceSpec, []).append(troveSpec[2])
+            toFind.setdefault(ref, set()).add(sourceSpec)
+
+    results = {}
+
+    callback.findingTroves(len(list(chain(*toFind.itervalues()))))
+    for troveSource, troveSpecs in toFind.iteritems():
+        if troveSource is None:
+            source = repos
+            myLabelPath = labelPath
+            mySearchFlavor = searchFlavor
+        elif isinstance(troveSource, tuple):
+            source = repos
+            myLabelPath = troveSource
+            mySearchFlavor = searchFlavor
+        else:
+            source = troveSource
+            troveSource.findSources(repos,  labelPath, searchFlavor),
+            myLabelPath = None
+            mySearchFlavor = None
+        try:
+            # just drop missing troves.  They are probably packages
+            # created from another source, and if they didn't include a
+            # "source" line to point us to the right place, then they 
+            # should be including the original package anyway.
+            results[troveSource] = source.findTroves(myLabelPath,
+                                                     toFind[troveSource],
+                                                     mySearchFlavor,
+                                                     allowMissing=True)
+        except errors.TroveNotFound, e:
+            raise CookError, str(e)
+
+
+    finalResults = []
+    for troveSource, specMap in results.iteritems():
+        for troveSpec, tupList in specMap.iteritems():
+            flavors = flavorMap[troveSource][troveSpec]
+            for troveTup in tupList:
+                finalResults.extend((troveTup[0], troveTup[1], x)
+                                     for x in flavors)
+    return finalResults

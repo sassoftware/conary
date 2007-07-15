@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,27 +14,23 @@
 
 import sys
 
-from conary import conaryclient
 from conary.lib import log, util
 from conary.local import database
 
 def listRollbacks(db, cfg):
-    # Generator for the rollback data
-    def _generator():
-        for rollbackName in reversed(db.getRollbackList()):
-            rb = db.getRollback(rollbackName)
-            yield (rollbackName, rb)
+    return formatRollbacks(cfg, db.iterRollbacksList(), stream=sys.stdout)
 
-    return formatRollbacks(cfg, _generator(), stream=sys.stdout)
-
+def verStr(cfg, version, flavor):
+    ret = util.verFormat(cfg, version)
+    if cfg.fullFlavors:
+        return "%s[%s]" % (ret, str(flavor))
+    return ret
 
 def formatRollbacks(cfg, rollbacks, stream=None):
     # Formatter function
 
     if stream is None:
         stream = sys.stdout
-
-    verStr = util.verFormat
 
     # Display template
     templ = "\t%9s: %s %s\n"
@@ -48,44 +44,57 @@ def formatRollbacks(cfg, rollbacks, stream=None):
         for cs in rb.iterChangeSets():
             newList = []
             for pkg in cs.iterNewTroveList():
-                newList.append((pkg.getName(), pkg.getOldVersion(),
-                                pkg.getNewVersion()))
-            oldList = [ x[0:2] for x in cs.getOldTroveList() ]
+                newList.append((pkg.getName(),
+                                pkg.getOldVersion(), pkg.getOldFlavor(),
+                                pkg.getNewVersion(), pkg.getNewFlavor()))
+            oldList = [ x[0:3] for x in cs.getOldTroveList() ]
 
             newList.sort()
             oldList.sort()
-            for (name, oldVersion, newVersion) in newList:
+            for (name, oldVersion, oldFlavor, newVersion, newFlavor) in newList:
                 if newVersion.onLocalLabel():
                     # Don't display changes to local branch
                     continue
                 if not oldVersion:
-                    w_(templ % ('erased', name, verStr(cfg, newVersion)))
+                    w_(templ % ('erased', name, 
+                                verStr(cfg, newVersion, newFlavor)))
                 else:
                     ov = oldVersion.trailingRevision()
                     nv = newVersion.trailingRevision()
                     if newVersion.onRollbackLabel() and ov == nv:
                         # Avoid displaying changes to rollback branch
                         continue
-                    pn = "%s -> %s" % (verStr(cfg, newVersion),
-                                       verStr(cfg, oldVersion))
+                    pn = "%s -> %s" % (verStr(cfg, newVersion, newFlavor),
+                                       verStr(cfg, oldVersion, oldFlavor))
                     w_(templ % ('updated', name, pn))
 
-            for (name, version) in oldList:
-                w_(templ % ('installed', name, verStr(cfg, version)))
+            for (name, version, flavor) in oldList:
+                w_(templ % ('installed', name, verStr(cfg, version, flavor)))
 
         w_('\n')
 
 def apply(db, cfg, rollbackSpec, **kwargs):
+    import warnings
+    warnings.warn("rollbacks.apply is deprecated, use the client's "
+                    "applyRollback call", DeprecationWarning)
+    from conary import conaryclient
     client = conaryclient.ConaryClient(cfg)
+    return applyRollback(client, rollbackSpec, **kwargs)
+
+def applyRollback(client, rollbackSpec, **kwargs):
     client.checkWriteableRoot()
+    # Record the transaction counter, to make sure the state of the database
+    # didn't change while we were computing the rollback list.
+    transactionCounter = client.db.getTransactionCounter()
 
     log.syslog.command()
 
-    defaults = { 'replaceFiles': False }
+    defaults = dict(replaceFiles = False,
+                    transactionCounter = transactionCounter)
     defaults.update(kwargs)
 
-    db.readRollbackStatus()
-    rollbackList = db.getRollbackList()
+    client.db.readRollbackStatus()
+    rollbackList = client.db.getRollbackList()
 
     if rollbackSpec.startswith('r.'):
         try:
@@ -116,10 +125,10 @@ def apply(db, cfg, rollbackSpec, **kwargs):
         rollbacks.reverse()
 
     try:
-	db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
+        client.db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
     except database.RollbackError, e:
-	log.error("%s", e)
-	return 1
+        log.error("%s", e)
+        return 1
 
     log.syslog.commandComplete()
 

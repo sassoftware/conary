@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,24 +14,27 @@
 
 # implements a db-based repository
 
+import errno
 import traceback
 import sys
 
 from conary import files, trove, callbacks
 from conary.deps import deps
-from conary.lib import util, openpgpfile
+from conary.lib import util, openpgpfile, sha1helper, openpgpkey
 from conary.repository import changeset, errors, filecontents
 from conary.repository.datastore import DataStoreRepository, DataStore
 from conary.repository.datastore import DataStoreSet
-from conary.lib.openpgpfile import TRUST_FULL, TRUST_UNTRUSTED
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository import netclient
 
 class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, *args, **kw):
-        self.mirror = kw.pop('mirror', False)
+        self.mirror = kw.get('mirror', False)
         ChangeSetJob.__init__(self, *args, **kw)
+
+    def markTroveRemoved(self, name, version, flavor):
+        self.repos.markTroveRemoved(name, version, flavor)
 
     def checkTroveCompleteness(self, trv):
         if not self.mirror and not trv.troveInfo.sigs.sha1():
@@ -111,12 +114,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 					troveFlavor = flavor)
 
     def getTrove(self, pkgName, version, flavor, pristine = True,
-                 withFiles = True):
-        return self.troveStore.getTrove(pkgName, version, flavor,
-                                        withFiles = withFiles)
+                 withFiles = True, hidden = False):
+        return self.troveStore.getTrove(
+            pkgName, version, flavor, withFiles = withFiles,
+            hidden = hidden)
 
-    def addTrove(self, pkg):
-	return self.troveStore.addTrove(pkg)
+    def getParentTroves(self, troveList):
+        return self.troveStore.getParentTroves(troveList)
+
+    def addTrove(self, pkg, hidden = False):
+	return self.troveStore.addTrove(pkg, hidden = hidden)
 
     def addTroveDone(self, pkg):
 	self.troveStore.addTroveDone(pkg)
@@ -151,7 +158,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def commitChangeSet(self, cs, mirror=False):
+    def commitChangeSet(self, cs, mirror=False, hidden=False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -161,9 +168,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                          '%s label' %(label.asString()))
         self.troveStore.begin()
         if self.requireSigs:
-            threshold = TRUST_FULL
+            threshold = openpgpfile.TRUST_FULL
         else:
-            threshold = TRUST_UNTRUSTED
+            threshold = openpgpfile.TRUST_UNTRUSTED
         # Callback for signature verification
         callback = callbacks.UpdateCallback(trustThreshold=threshold,
                             keyCache=self.troveStore.keyTable.keyCache)
@@ -172,7 +179,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             FilesystemChangeSetJob(self, cs, self.serverNameList,
                                    resetTimestamps = not mirror,
                                    callback=callback,
-                                   mirror = mirror)
+                                   mirror = mirror,
+                                   hidden = hidden)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
@@ -185,6 +193,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             raise
         else:
             self.troveStore.commit()
+
+    def markTroveRemoved(self, name, version, flavor):
+        sha1s = self.troveStore.markTroveRemoved(name, version, flavor)
+        for sha1 in sha1s:
+            try:
+                self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
 
     def getFileContents(self, itemList):
         contents = []
@@ -216,7 +233,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return contents
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
-                        withFileContents = True, excludeAutoSource = False):
+                        withFileContents = True, excludeAutoSource = False,
+                        authCheck = None, mirrorMode = False):
 	"""
 	troveList is a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
@@ -230,98 +248,22 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         externalTroveList = []
         externalFileList = []
+        removedTroveList = []
 
 	dupFilter = {}
 
 	# make a copy to remove things from
 	troveList = troveList[:]
 
-        class troveListWrapper:
+        # def createChangeSet begins here
 
-            def next(self):
-                if not self.l and self.new:
-                    # self.l (and self.trvIterator) are empty; look to
-                    # self.new for new jobs we need
-
-                    troveList = []
-                    for job in self.new:
-                        # do we need the old trove?
-                        if job[1][0] is not None:
-                            troveList.append((job[0], job[1][0], job[1][1]))
-
-                        # do we need the new trove?
-                        if job[2][0] is not None:
-                            troveList.append((job[0], job[2][0], job[2][1]))
-
-                    # flip to the new job set and it's trove iterator, and
-                    # reset self.new for later additions
-                    self.trvIterator = self.troveStore.iterTroves(
-                                troveList, withFiles = self.withFiles,
-				withFileStreams = self.withFiles)
-                    self.l = self.new
-                    self.new = []
-
-                if self.l:
-                    job = self.l.pop(0)
-
-                    # Does it have an old job?
-                    if job[1][0] is None:
-                        old = None
-			oldStreams = {}
-                    else:
-                        old = self.trvIterator.next()
-                        if old is None:
-                            # drain the iterator, in order to complete
-                            # the sql queries
-                            for x in self.trvIterator: pass
-                            raise errors.TroveMissing(job[0], job[1][0])
-
-			if self.withFiles:
-			    old, oldStreams = old
-			else:
-			    oldStreams = {}
-
-                    # Does it have a new job
-                    if job[2][0] is None:
-                        new = None
-                        newStreams = {}
-                    else:
-                        new = self.trvIterator.next()
-                        if new is None:
-                            # drain the SQL query
-                            for x in self.trvIterator: pass
-                            raise errors.TroveMissing(job[0], job[2][0])
-
-                        if self.withFiles:
-                            new, newStreams = new
-			else:
-			    newStreams = {}
-
-		    newStreams.update(oldStreams)
-                    return job, old, new, newStreams
-                else:
-                    raise StopIteration
-
-            def __iter__(self):
-                while True:
-                    yield self.next()
-
-            def append(self, item):
-                self.new.append(item)
-
-            def __init__(self, l, troveStore, withFiles):
-                self.trvIterator = None
-                self.new = l
-                self.l = []
-                self.troveStore = troveStore
-                self.withFiles = withFiles
-
-        troveWrapper = troveListWrapper(troveList, self.troveStore, withFiles)
+        troveWrapper = _TroveListWrapper(troveList, self.troveStore, withFiles,
+                                         authCheck = authCheck)
 
         for job in troveWrapper:
-	    (troveName, (oldVersion, oldFlavor),
-		        (newVersion, newFlavor), absolute), \
-			old, new, streams = job
+	    ((troveName, (oldVersion, oldFlavor),
+                         (newVersion, newFlavor), absolute),
+             old, new, streams) = job
 
 	    # make sure we haven't already generated this changeset; since
 	    # troves can be included from other troves we could try
@@ -362,8 +304,25 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     for (name, version, flavor) in \
                                             old.iterTroveList(strongRefs=True):
                         troveWrapper.append((name, (version, flavor),
-                                                (None, None), absolute))
+                                                   (None, None), absolute),
+                                            False)
 		continue
+
+            if (newVersion.getHost() not in self.serverNameList
+                or (oldVersion and
+                    oldVersion.getHost() not in self.serverNameList)):
+                # don't try to make changesets between repositories; the
+                # client can do that itself
+
+                # we don't generate chagnesets between removed and
+                # present troves; that's up to the client
+                externalTroveList.append((troveName, (oldVersion, oldFlavor),
+                                     (newVersion, newFlavor), absolute))
+                continue
+            elif (oldVersion and old.type() == trove.TROVE_TYPE_REMOVED):
+                removedTroveList.append((troveName, (oldVersion, oldFlavor),
+                                        (newVersion, newFlavor), absolute))
+                continue
 
 	    (troveChgSet, filesNeeded, pkgsNeeded) = \
 				new.diff(old, absolute = absolute)
@@ -381,7 +340,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         # client can do that itself
                         externalTroveList.append(refJob)
                     else:
-                        troveWrapper.append(refJob)
+                        troveWrapper.append(refJob, True)
 
 	    cs.newTrove(troveChgSet)
 
@@ -443,7 +402,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if (contentsHash or (oldFile and newFile.flags.isConfig()
+		if ((mirrorMode and newFile.hasContents) or contentsHash or
+                             (oldFile and newFile.flags.isConfig()
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion and oldFile.hasContents:
 			oldCont = self.getFileContents(
@@ -453,7 +413,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                             [ (newFileId, newFileVersion, newFile) ])[0]
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile,
-						oldCont, newFile, newCont)
+                                                oldCont, newFile, newCont,
+                                                mirrorMode = mirrorMode)
 
                     # we don't let config files be ptr types; if they were
                     # they could be ptrs to things which aren't config files,
@@ -468,7 +429,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                             contType = changeset.ChangedFileTypes.ptr
                             cont = filecontents.FromString(ptr)
                         else:
-                            ptrTable[contentsHash] = pathId
+                            ptrTable[contentsHash] = pathId + newFileId
 
                     if not newFile.flags.isConfig() and \
                                 contType == changeset.ChangedFileTypes.file:
@@ -485,8 +446,105 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     if contType == changeset.ChangedFileTypes.ptr:
                         compressed = False
 
-		    cs.addFileContents(pathId, contType, cont,
+		    cs.addFileContents(pathId, newFileId, contType, cont,
 				       newFile.flags.isConfig(),
                                        compressed = compressed)
+	return (cs, externalTroveList, externalFileList, removedTroveList)
 
-	return (cs, externalTroveList, externalFileList)
+class _TroveListWrapper:
+    def _handleJob(self, job, recursed, idx):
+        t = self.trvIterator.next()
+
+        if t is not None:
+            if self.withFiles:
+                t, streams = t
+            else:
+                streams = {}
+
+            if not self.authCheck(*t.getNameVersionFlavor()):
+                # If we don't have perms to see the trove, act like it doesn't
+                # exist
+                t, streams = None, {}
+
+        if t is None:
+            if recursed:
+                # synthesize a removed trove for this missing
+                # trove
+                t = trove.Trove(job[0], job[idx][0], job[idx][1],
+                                type=trove.TROVE_TYPE_REMOVED)
+                t.setIsMissing(True)
+                t.computeDigests()
+
+                # synthesize empty filestreams
+                streams = {}
+            else:
+                # drain the iterator, in order to complete
+                # the sql queries
+                for x in self.trvIterator: pass
+                raise errors.TroveMissing(job[0], job[idx][0])
+
+        return t, streams
+
+    def next(self):
+        if not self.l and self.new:
+            # self.l (and self.trvIterator) are empty; look to
+            # self.new for new jobs we need
+
+            troveList = []
+            for job, recursed in self.new:
+                # do we need the old trove?
+                if job[1][0] is not None:
+                    troveList.append((job[0], job[1][0], job[1][1]))
+
+                # do we need the new trove?
+                if job[2][0] is not None:
+                    troveList.append((job[0], job[2][0], job[2][1]))
+
+            # flip to the new job set and it's trove iterator, and
+            # reset self.new for later additions
+            self.trvIterator = self.troveStore.iterTroves(
+                        troveList, withFiles = self.withFiles,
+                        withFileStreams = self.withFiles)
+            self.l = self.new
+            self.new = []
+
+        if self.l:
+            job, recursed = self.l.pop(0)
+
+            # Does it have an old job?
+            if job[1][0] is None:
+                old = None
+                oldStreams = {}
+            else:
+                old, oldStreams = self._handleJob(job, recursed, 1)
+
+            # Does it have a new job
+            if job[2][0] is None:
+                new = None
+                newStreams = {}
+            else:
+                new, newStreams = self._handleJob(job, recursed, 2)
+
+            newStreams.update(oldStreams)
+            return job, old, new, newStreams
+        else:
+            raise StopIteration
+
+    def __iter__(self):
+        while True:
+            yield self.next()
+
+    def append(self, item, recurse):
+        self.new.append((item, recurse))
+
+    def __init__(self, l, troveStore, withFiles, authCheck = None):
+        self.trvIterator = None
+        self.new = [ (x, False) for x in l ]
+        self.l = []
+        self.troveStore = troveStore
+        self.withFiles = withFiles
+        if authCheck is None:
+            self.authCheck = lambda *args: True
+        else:
+            self.authCheck = authCheck
+

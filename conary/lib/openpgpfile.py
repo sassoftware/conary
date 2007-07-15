@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -20,7 +20,10 @@ try:
     from Crypto.Hash import RIPEMD
 except ImportError:
     RIPEMD = 'RIPEMD'
-import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 from Crypto.Cipher import AES
 from Crypto.Cipher import DES3
 from Crypto.Cipher import Blowfish
@@ -1050,19 +1053,19 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
     return key
 
 def getPublicKeyFromString(keyId, data):
-    keyRing = StringIO.StringIO(data)
+    keyRing = StringIO(data)
     key = makeKey(getGPGKeyTuple(keyId, keyRing, 0, ''))
     keyRing.close()
     return key
 
 def getKeyEndOfLifeFromString(keyId, data):
-    keyRing = StringIO.StringIO(data)
+    keyRing = StringIO(data)
     revoked, timestamp = findEndOfLife(keyId, keyRing)
     keyRing.close()
     return revoked, timestamp
 
 def getUserIdsFromString(keyId, data):
-    keyRing = StringIO.StringIO(data)
+    keyRing = StringIO(data)
     seekKeyById(keyId, keyRing)
     startPoint = keyRing.tell()
     seekNextKey(keyRing)
@@ -1255,7 +1258,7 @@ def getFingerprints(keyRing):
     return r
 
 def parseAsciiArmorKey(asciiData):
-    data = StringIO.StringIO(asciiData)
+    data = StringIO(asciiData)
     nextLine=' '
 
     try:
@@ -1283,8 +1286,8 @@ def parseAsciiArmorKey(asciiData):
 # rules one and two are to prevent repo breakage
 # rule three is to enforce a modicum of sanity to the security posture
 def assertReplaceKeyAllowed(origKey, newKey):
-    origRing = StringIO.StringIO(origKey)
-    newRing = StringIO.StringIO(newKey)
+    origRing = StringIO(origKey)
+    newRing = StringIO(newKey)
     fingerprint = getKeyId(origRing)
     if fingerprint != getKeyId(newRing):
         origRing.close()

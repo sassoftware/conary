@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -194,11 +194,14 @@ class Database(BaseDatabase):
                 self.triggers.setdefault(name, tbl_name)
         return self.getVersion()
 
-    def analyze(self):
+    def analyze(self, table=""):
         if sqlite3._sqlite.sqlite_version_info() <= (3, 2, 2):
             # ANALYZE didn't appear until 3.2.3
             return
-
+        # sqlite's analyzer has not been tested yet for single table updates.
+        if table:
+            return
+        
         # perform table analysis to help the optimizer
         doAnalyze = False
         cu = self.cursor()
@@ -212,12 +215,18 @@ class Database(BaseDatabase):
                 doAnalyze = True
 
         if doAnalyze:
-            cu.execute('ANALYZE')
+            cu.execute('ANALYZE %s' % table)
             self.commit()
             self.loadSchema()
 
     # A trigger that syncs up the changed column
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the

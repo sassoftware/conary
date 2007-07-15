@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -26,6 +26,10 @@ from conary.lib import log
 from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary import metadata
 from conary.repository import errors
+
+def jobKey(x):
+    return (x[0], (str(x[1][0]), str(x[1][1])),
+                  (str(x[2][0]), str(x[2][1]))) + x[3:]
 
 def displayTroves(dcfg, formatter, troveTups):
     """
@@ -380,7 +384,7 @@ class DisplayConfig:
 
     def setFileDisplay(self, ls = False, lsl = False, ids = False, 
                        sha1s = False, tags = False, fileDeps = False,
-                       fileVersions = False):
+                       fileVersions = False, fileFlavors = False):
         ls = ls or lsl
         self.ls = ls or lsl
         self.lsl = lsl
@@ -388,6 +392,7 @@ class DisplayConfig:
         self.sha1s = sha1s
         self.tags = tags
         self.fileDeps = fileDeps
+        self.fileFlavors = fileFlavors
         self.fileVersions = fileVersions
 
     def setChildDisplay(self, recurseAll = False, recurseOne = False,
@@ -440,7 +445,7 @@ class DisplayConfig:
         return self.info
 
     def printFiles(self):
-        return self.ls or self.ids or self.sha1s or self.tags or self.fileDeps or self.fileVersions
+        return self.ls or self.ids or self.sha1s or self.tags or self.fileDeps or self.fileVersions or self.fileFlavors
 
     def isVerbose(self):
         return self.lsl
@@ -668,6 +673,7 @@ class TroveFormatter(TroveTupFormatter):
                                  bool(trove.troveInfo.incomplete())),
                                 ("TroveVer  : %s" %
                                             trove.troveInfo.troveVersion()))
+            yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
 
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):
@@ -693,7 +699,8 @@ class TroveFormatter(TroveTupFormatter):
                             flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch, 
                                                               rFlavor)
                         fmtFlags.append(flag)
-
+                if trove and trove.isRemoved():
+                    fmtFlags.append('Removed')
                 if fmtFlags:
                     ln += ' [%s]' % ','.join(fmtFlags)
             yield ln
@@ -768,6 +775,7 @@ class TroveFormatter(TroveTupFormatter):
         taglist = ''
         sha1 = ''
         id = ''
+        flavor = ''
 
         dcfg = self.dcfg
         verbose = dcfg.isVerbose()
@@ -776,6 +784,9 @@ class TroveFormatter(TroveTupFormatter):
             name = "%s -> %s" % (path, fileObj.target())
         else:
             name = path
+        if dcfg.fileFlavors:
+            if not fileObj.flavor().isEmpty():
+                flavor = '[%s]' % fileObj.flavor()
 
         if dcfg.tags:
             tags = []
@@ -787,8 +798,10 @@ class TroveFormatter(TroveTupFormatter):
                 tags.append('autosource')
             if fileObj.flags.isConfig():
                 tags.append('config')
+            if fileObj.flags.isTransient():
+                tags.append('transient')
             if tags:
-                taglist = ' [' + ' '.join(tags) + ']' 
+                taglist = ' {' + ' '.join(tags) + '}'
         if dcfg.sha1s:
             if hasattr(fileObj, 'contents') and fileObj.contents:
                 sha1 = sha1ToString(fileObj.contents.sha1()) + ' '
@@ -796,7 +809,7 @@ class TroveFormatter(TroveTupFormatter):
                 sha1 = ' '*41
 
         if dcfg.ids and pathId:
-            id = md5ToString(pathId) + ' ' + sha1ToString(fileObj.fileId()) + ', '
+            id = md5ToString(pathId) + ' ' + sha1ToString(fileId) + ', '
         if dcfg.fileVersions:
             if dcfg.useFullVersions():
                 verStr = '    %s' % version
@@ -809,14 +822,23 @@ class TroveFormatter(TroveTupFormatter):
 
         spacer = '  ' * indent
 
+        if fileObj:
+            owner = fileObj.inode.owner()
+            if owner[0] == '+':
+                owner = owner[1:]
+            group = fileObj.inode.group()
+            if group[0] == '+':
+                group = group[1:]
+
         if verbose: 
-            ln = "%s%s%s%s%s    1 %-8s %-8s %s %s %s%s%s" % \
+            ln = "%s%s%s%s%s    1 %-8s %-8s %s %s %s%s%s%s" % \
               (spacer,
-               prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), 
-               fileObj.inode.group(), fileObj.sizeString(), 
-               fileObj.timeString(), name, taglist, verStr)
+               prefix, id, sha1, fileObj.modeString(), owner,
+               group, fileObj.sizeString(), 
+               fileObj.timeString(), name, flavor, taglist, verStr)
         else:
-            ln = "%s%s%s%s%s%s" % (spacer, id, sha1, path, taglist, verStr)
+            ln = "%s%s%s%s%s%s%s" % (spacer, id, sha1, path, flavor,
+                                     taglist, verStr)
 
         yield ln
 
@@ -856,8 +878,8 @@ def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
 
     if jobNum and total:
         print formatter.formatJobNum(index, totalJobs)
-    
-    for job, comps in formatter.compressJobList(sorted(jobs)):
+
+    for job, comps in formatter.compressJobList(sorted(jobs, key=jobKey)):
         if dcfg.printTroveHeader():
             for ln in formatter.formatJobHeader(job, comps):
                 print ln
@@ -978,9 +1000,9 @@ class JobTupFormatter(TroveFormatter):
 
     def formatJobTups(self, jobs, indent=''):
         if self.dcfg.compressJobs():
-            iter = self.compressJobList(sorted(jobs))
+            iter = self.compressJobList(sorted(jobs, key=jobKey))
         else:
-            iter = ((x, []) for x in sorted(jobs))
+            iter = ((x, []) for x in sorted(jobs, key=jobKey))
 
         for job, comps in iter:
             yield self.formatJobTup(job, components=comps, indent=indent)
@@ -1138,7 +1160,7 @@ class JobFormatter(JobTupFormatter):
         if not dcfg.tags or not fileObj.tags:
             taglist = ''
         else:
-            taglist = ' [' + ' '.join(fileObj.tags) + ']' 
+            taglist = ' {' + ' '.join(fileObj.tags) + '}' 
 
         spacer = '  ' * indent
         yield "%s---> %s%s%-10s      %-8s %-8s %8s %11s %s%s" % \

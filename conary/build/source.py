@@ -1,10 +1,9 @@
-#
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -18,11 +17,11 @@ it, unpack it, and patch it in the correct directory.  Each of the
 public classes in this module is accessed from a recipe as addI{Name}.
 """
 
-import fcntl
+import itertools
 import gzip
 import os
 import re
-import subprocess
+import shutil, subprocess
 import sys
 import tempfile
 
@@ -31,9 +30,16 @@ from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import util
 from conary.build import action, errors
+from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest
 
-class _Source(action.RecipeAction):
+class _AnySource(action.RecipeAction):
+
+    # marks classes which have source files which need committing
+
+    pass
+
+class _Source(_AnySource):
     keywords = {'rpm': '',
                 'dir': '',
                 'keyid': None,
@@ -113,7 +119,7 @@ class _Source(action.RecipeAction):
         log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
     def _checkKeyID(self, filepath, keyid):
-	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"
+	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify '%s' '%s'"
 		      %(self.localgpgfile, filepath))
 	result = p.read()
 	found = result.find("key ID %s" % keyid)
@@ -165,16 +171,16 @@ class _Source(action.RecipeAction):
 	return f
 
     def fetchLocal(self):
+        # Used by rMake to find files that are not autosourced.
         if self.rpm:
             toFetch = self.rpm
         else:
             toFetch = self.sourcename
-
-        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                                toFetch, self.recipe.name,
-                                self.recipe.srcdirs, localOnly=True,
-                                allowNone=True)
-        return f
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                                  toFetch, self.recipe.name,
+                                  self.recipe.srcdirs, localOnly=True,
+                                  allowNone=True)
+            return f
 
     def getPath(self):
         if self.rpm:
@@ -188,6 +194,9 @@ class _Source(action.RecipeAction):
 
 
 class addArchive(_Source):
+    keywords = dict(_Source.keywords)
+    keywords['preserveOwnership'] = None
+
     """
     NAME
     ====
@@ -197,13 +206,13 @@ class addArchive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=}])}
 
     DESCRIPTION
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tar, cpio, or zip archive, or binary/source RPM,
+    optionally compressed tar, cpio, xpi or zip archive, or binary/source RPM,
     and unpacks it to the proper directory.
 
     If the specified I{archivename} is only a URL in the form of
@@ -236,6 +245,11 @@ class addArchive(_Source):
     search for a file named I{archivename}C{.{sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
+
+    B{preserveOwnership} : If C{preserveOwnership} is True and the files
+    are unpacked into the build directory, the packaged files are owned
+    by the same user and group which owned them in the archive. Only cpio,
+    rpm, and tar achives are allowed when C{preserveOwnership} is used.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
     looks in the file or URL specified by C{rpm} for a binary or
@@ -329,10 +343,32 @@ class addArchive(_Source):
 	self._checkSignature(f)
         return f
 
+    @staticmethod
+    def _cpioOwners(fullOutput):
+        lines = fullOutput.split('\n')
+        for line in lines:
+            if not line: continue
+            fields = line.split()
+            yield (fields[8], fields[2], fields[3])
+
+    @staticmethod
+    def _tarOwners(fullOutput):
+        lines = fullOutput.split('\n')
+        for line in lines:
+            if not line: continue
+            fields = line.split()
+            owner, group = fields[1].split('/')
+            yield (fields[5], owner, group)
+
     def do(self):
         f = self.doDownload()
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
+
+        if self.preserveOwnership and \
+           not(destDir.startswith(self.recipe.macros.destdir)):
+            raise SourceError, "preserveOwnership not allowed when " \
+                               "unpacking into build directory"
 
         guessMainDir = (not self.recipe.explicitMainDir and
                         not self.dir.startswith('/'))
@@ -348,20 +384,33 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
-	if f.endswith(".zip"):
-	    util.execute("unzip -q -o -d %s '%s'" % (destDir, f))
+	if f.endswith(".zip") or f.endswith(".xpi"):
+            if self.preserveOwnership:
+                raise SourceError('cannot preserveOwnership for xpi or zip archives')
+
+            util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
 
 	elif f.endswith(".rpm"):
             log.info("extracting %s into %s" % (f, destDir))
-	    _extractFilesFromRPM(f, directory=destDir)
-
+            ownerList = _extractFilesFromRPM(f, directory=destDir)
+            if self.preserveOwnership:
+                for (path, user, group) in ownerList:
+                    self.recipe.Ownership(user, group, re.escape(path))
         elif f.endswith(".iso"):
-            log.info("extracting %s into %s", f, destDir)
+            if self.preserveOwnership:
+                raise SourceError('cannot preserveOwnership for iso images')
+
             _extractFilesFromISO(f, directory=destDir)
 
 	else:
             m = magic.magic(f)
             _uncompress = "cat"
+            # command to run to get ownership info; if this isn't set, use
+            # stdout from the command
+            ownerListCmd = None
+            # function which parses the ownership string to get file ownership
+            # details
+            ownerParser = None
 
             # Question: can magic() ever get these wrong?!
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
@@ -379,19 +428,48 @@ class addArchive(_Source):
                 preserve = ''
                 if self.dir.startswith('/'):
                     preserve = 'p'
-                _unpack = "tar -C %s -xS%sf -" % (destDir, preserve)
+                _unpack = "tar -C '%s' -xvvS%sf -" % (destDir, preserve)
+                ownerParser = self._tarOwners
             elif True in [f.endswith(x) for x in _cpioSuffix]:
-                _unpack = "( cd %s ; cpio -iumd --quiet )" % (destDir,)
+                _unpack = "( cd '%s' && cpio -iumd --quiet )" % (destDir,)
+                ownerListCmd = "cpio -tv --quiet"
+                ownerParser = self._cpioOwners
             elif _uncompress != 'cat':
                 # if we know we've got an archive, we'll default to
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
-                _unpack = "tar -C %s -xSpf -" % (destDir,)
+                _unpack = "tar -C '%s' -xvvSpf -" % (destDir,)
+                ownerParser = self._tarOwners
             else:
                 raise SourceError, "unknown archive format: " + f
 
-            util.execute("%s < '%s' | %s" % (_uncompress, f, _unpack))
+            cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
+            fObj = os.popen(cmd)
+            s = fObj.read()
+            output = ""
+            while s:
+                output += s
+                s = fObj.read()
+
+            fObj.close()
+
+            if ownerListCmd:
+                cmd = "%s < '%s' | %s" % (_uncompress, f, ownerListCmd)
+                fObj = os.popen(cmd)
+                s = fObj.read()
+                output = ""
+                while s:
+                    output += s
+                    s = fObj.read()
+
+                fObj.close()
+
+            if ownerParser and self.preserveOwnership:
+                for (path, user, group) in ownerParser(output):
+                    if path[-1] == '/': path = path[:-1]
+
+                    self.recipe.Ownership(user, group, re.escape(path))
 
         if guessMainDir:
             bd = self.builddir
@@ -580,14 +658,17 @@ class addPatch(_Source):
 
     def patchme(self, patch, f, destDir, patchlevels):
         logFiles = []
-        log.info('attempting to apply %s with to %s with patch level(s) %s'
+        log.info('attempting to apply %s to %s with patch level(s) %s'
                  %(f, destDir, ', '.join(str(x) for x in patchlevels)))
         for patchlevel in patchlevels:
             patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
             if self.backup:
                 patchArgs.extend(['-b', '-z', self.backup])
             if self.extraArgs:
-                patchArgs.extend(self.extraArgs)
+                if isinstance(self.extraArgs, str):
+                    patchArgs.append(self.extraArgs)
+                else:
+                    patchArgs.extend(self.extraArgs)
 
             fd, path = tempfile.mkstemp()
             os.unlink(path)
@@ -861,6 +942,10 @@ class addSource(_Source):
         return f
 
     def do(self):
+        # make sure the user gave a valid source, and not a directory
+        if not os.path.basename(self.sourcename) and not self.contents:
+            raise SourceError('cannot specify a directory as input to '
+                'addSource')
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
@@ -995,6 +1080,540 @@ class addAction(action.RecipeAction):
 	return None
 Action = addAction
 
+class _RevisionControl(addArchive):
+
+    keywords = {'dir': '',
+                'package': None}
+
+    def fetch(self, refreshFilter=None):
+        fullPath = self.getFilename()
+        url = 'lookaside:/' + fullPath
+        reposPath = '/'.join(fullPath.split('/')[:-1] + [ self.name ])
+
+        # don't look in the lookaside for a snapshot if we need to refresh
+        # the lookaside
+        if not refreshFilter or not refreshFilter(os.path.basename(fullPath)):
+            path = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                url, self.recipe.name, self.recipe.srcdirs, allowNone = True,
+                autoSource = True, refreshFilter = refreshFilter)
+
+            if path:
+                return path
+
+        # the source doesn't exist; we need to create the snapshot
+        repositoryDir = lookaside.createCacheName(self.recipe.cfg,
+                                                  reposPath,
+                                                  self.recipe.name)
+        del reposPath
+
+        if not os.path.exists(repositoryDir):
+            # get a new archive
+            util.mkdirChain(os.path.dirname(repositoryDir))
+            self.createArchive(repositoryDir)
+        else:
+            self.updateArchive(repositoryDir)
+
+        path = lookaside.createCacheName(self.recipe.cfg, fullPath,
+                                         self.recipe.name)
+
+        self.createSnapshot(repositoryDir, path)
+
+        return path
+
+    def doDownload(self):
+        return self.fetch()
+
+class addMercurialSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addMercurialSnapshot()}} - Adds a snapshot from a mercurial
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addMercurialSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addMercurialSnapshot()} class extracts sources from a
+    mercurial repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}. 
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : Mercurial tag to use for the snapshot.
+    """
+
+    name = 'hg'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag)
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        util.execute('hg -q clone %s \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        util.execute("cd '%s' && hg -q pull %s" % (lookasideDir, self.url))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.url,
+                 self.tag)
+        util.execute("cd '%s' && hg archive -r %s -t tbz2 '%s'" %
+                        (lookasideDir, self.tag, target))
+
+    def __init__(self, recipe, url, tag = 'tip', **kwargs):
+        self.url = url % recipe.macros
+        self.tag = tag % recipe.macros
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+class addCvsSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addCvsSnapshot()}} - Adds a snapshot from a CVS
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addCvsSnapshot([I{root},] [I{project},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addCvsSnapshot()} class extracts sources from a
+    CVS repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : CVS tag to use for the snapshot.
+    """
+
+    name = 'cvs'
+
+    def getFilename(self):
+        s = '%s/%s--%s.tar.bz2' % (self.root, self.project, self.tag)
+        if s[0] == '/':
+            s = s[1:]
+
+        return s
+
+    def createArchive(self, lookasideDir):
+        os.mkdir(lookasideDir)
+        log.info('Checking out project %s from %s', self.project, self.root)
+        # don't use cvs co -d <dir> as it is fragile
+        util.mkdirChain(lookasideDir)
+        util.execute('cd %s && cvs -Q -d \'%s\' checkout \'%s\'' %
+                  (lookasideDir, self.root, self.project))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.project)
+        util.execute("cd '%s' && cvs -Q -d '%s' update" % (lookasideDir, self.root))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.project,
+                 self.tag)
+        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        dirName = self.project + '--' + self.tag
+        stagePath = tmpPath + os.path.sep + dirName
+        os.mkdir(stagePath)
+        # don't use cvs export -d <dir> as it is fragile
+        util.mkdirChain(stagePath)
+        util.execute("cd %s && cvs -Q -d '%s' export -r '%s' '%s' && cd '%s/%s' && "
+                  "tar cjf '%s' '%s'" %
+                        (stagePath, self.root, self.tag, self.project,
+                         tmpPath, dirName, target, self.project))
+        shutil.rmtree(stagePath)
+
+    def __init__(self, recipe, root, project, tag = 'HEAD', **kwargs):
+        self.root = root % recipe.macros
+        self.project = project % recipe.macros
+        self.tag = tag % recipe.macros
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+class addSvnSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addSvnSnapshot()}} - Adds a snapshot from a subversion
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addSvnSnapshot([I{url},] [I{project}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addSvnSnapshot()} class extracts sources from a
+    subversion repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}. 
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+    """
+
+    name = 'svn'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if urlBits[0] == 'file:':
+            dirPath = urlBits[1]
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.project,
+                                       self.url.split('/')[-1])
+
+    def createArchive(self, lookasideDir):
+        os.mkdir(lookasideDir)
+        log.info('Checking out %s', self.url)
+        util.execute('svn -q checkout \'%s\' \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.project)
+        util.execute("cd '%s' && svn -q update" % lookasideDir)
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s', self.url)
+        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        stagePath = tmpPath + '/' + self.project + '--' + \
+                            self.url.split('/')[-1]
+        util.execute("svn -q export '%s' '%s' && cd '%s' && "
+                  "tar cjf '%s' '%s'" %
+                        (lookasideDir, stagePath,
+                         tmpPath, target, os.path.basename(stagePath)))
+        shutil.rmtree(stagePath)
+
+    def __init__(self, recipe, url, project = None, **kwargs):
+        self.url = url % recipe.macros
+        if project is None:
+            self.project = recipe.name
+        else:
+            self.project = project % recipe.macros
+
+        sourceName = self.getFilename()
+
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+class addBzrSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addBzrSnapshot()}} - Adds a snapshot from a bzr repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addBzrSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addBzrSnapshot()} class extracts sources from a
+    bzr repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addBzrSnapshot}:
+
+    B{tag} : Specify a specific tagged revision to checkout.
+    """
+
+    name = 'bzr'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag or '')
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        util.execute('bzr branch \'%s\' \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        util.execute("cd '%s' && bzr pull %s --overwrite %s && bzr update" % \
+                (lookasideDir, self.url, self.tagArg))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s %s', self.url,
+                 self.tag and 'tag %s' % self.tag or '')
+        util.execute("cd '%s' && bzr export %s '%s'" %
+                        (lookasideDir, self.tagArg, target))
+
+    def __init__(self, recipe, url, tag = None, **kwargs):
+        self.url = url % recipe.macros
+        if tag:
+            self.tag = tag % recipe.macros
+            self.tagArg = '-r tag:%s' % self.tag
+        else:
+            self.tag = tag
+            self.tagArg = ''
+        sourceName = self.getFilename()
+
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+class TroveScript(_AnySource):
+
+    keywords = { 'contents' : None,
+                 'groupName' : None }
+    _packageAction = False
+    _groupAction = True
+    _scriptName = None
+    _compatibilityMap = None
+
+    def __init__(self, recipe, *args, **keywords):
+        _AnySource.__init__(self, recipe, *args, **keywords)
+        if args:
+            self.sourcename = args[0]
+        else:
+            self.sourcename = ''
+
+        if not self.sourcename and not self.contents:
+            raise RecipeFileError('no contents given for group script')
+        elif self.sourcename and self.contents:
+            raise RecipeFileError('both contents and filename given for '
+                                  'group script')
+
+    def fetch(self, refreshFilter=None):
+        if self.contents is None:
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                self.sourcename, self.recipe.name, self.recipe.srcdirs,
+                refreshFilter=refreshFilter, allowNone = True)
+            if f is None:
+                raise RecipeFileError('file "%s" not found for group script' %
+                                      self.sourcename)
+            self.contents = open(f).read()
+
+    def getPath(self):
+        return self.sourcename
+
+    def doDownload(self):
+        self.fetch()
+
+    def do(self):
+        self.doDownload()
+        self.recipe._addScript(self.contents, self.groupName, self._scriptName,
+                               fromClass = self._compatibilityMap)
+
+class addPostInstallScript(TroveScript):
+    _scriptName = 'postInstallScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostInstallScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostInstallScript} command specifies the post install script
+    for a group. This script is run after the group has been installed
+    for the first time (not when the group is being upgraded from a
+    previously installed version to version defining the script).
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostInstallScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+class addPostRollbackScript(TroveScript):
+
+    _scriptName = 'postRollbackScripts'
+    keywords = dict(TroveScript.keywords)
+    keywords['toClass'] = None
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostRollbackScript(I{sourcename}, I[{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostRollbackScript} command specifies the post rollback
+    script for a group. This script is run after the group defining the
+    script has been rolled back to a previous version of the group.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostRollbackScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    B{toClass} : (None) The trove compatibility classes this script
+    is able to support rollbacks to. This may be a single integer
+    or a list of integers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        TroveScript.__init__(self, *args, **kwargs)
+        if self.toClass:
+            self._compatibilityMap = self.toClass
+
+class addPostUpdateScript(TroveScript):
+
+    _scriptName = 'postUpdateScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPostUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPostUpdateScript} command specifies the post update script
+    for a group. This script is run after the group has been updated from
+    a previously-installed version to the version defining the script.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPostUpdateScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+class addPreUpdateScript(TroveScript):
+
+    _scriptName = 'preUpdateScripts'
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPreUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPreUpdateScript} command specifies the pre update script
+    for a group. This script is run before the group is updated from
+    a previously-installed version to the version defining the script.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPreUpdateScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
     if not directory:
@@ -1018,6 +1637,12 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
         compression = h[rpmhelper.PAYLOADCOMPRESSOR]
         if compression == 'bzip2':
             decompressor = lambda fobj: util.BZ2File(fobj)
+
+    # assemble the path/owner/group list
+    ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                    h[rpmhelper.FILEUSERNAME],
+                                    h[rpmhelper.FILEGROUPNAME]))
+
     # rewind the file to let seekToData do its job
     r.seek(0)
     rpmhelper.seekToData(r)
@@ -1057,9 +1682,10 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 	raise IOError, 'failed to extract source %s from RPM %s' \
 		       %(filename, os.path.basename(rpm))
 
+    return ownerList
 
 def _extractFilesFromISO(iso, directory):
-    isoInfo = util.popen("isoinfo -d -i %s" %iso).read()
+    isoInfo = util.popen("isoinfo -d -i '%s'" %iso).read()
     JolietRE = re.compile('Joliet.*found')
     RockRidgeRE = re.compile('Rock Ridge.*found')
     if JolietRE.search(isoInfo):
@@ -1071,11 +1697,11 @@ def _extractFilesFromISO(iso, directory):
                       %iso)
 
     errorMessage = 'extracting ISO %s' %os.path.basename(iso)
-    filenames = util.popen("isoinfo -i %s %s -f" %(iso, isoType)).readlines()
+    filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 
     for filename in filenames:
-        r = util.popen("isoinfo %s -i %s -x %s" %(isoType, iso, filename))
+        r = util.popen("isoinfo '%s' -i '%s' -x '%s'" %(isoType, iso, filename))
         fullpath = '/'.join((directory, filename))
         dirName = os.path.dirname(fullpath)
         if not util.exists(dirName):

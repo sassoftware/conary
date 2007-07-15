@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -20,36 +20,35 @@ from conary.lib import log
 from conary.local import update
 from conary.repository import errors
 
-def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
-                     callback = None):
-    client = conaryclient.ConaryClient(cfg)
-    repos = client.getRepos()
-    applyList = cmdline.parseChangeList(troveSpecs, allowChangeSets=False)
-
-    toFind = []
+def computeTroveList(client, applyList):
+    # As dumb as this may sound, the same trove may be present multiple times
+    # in applyList, so remove duplicates
+    toFind = set()
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
         if n[0] in ('-', '+'):
             n = n[1:]
 
         found = False
         if oldVer or (oldFla is not None):
-            toFind.append((n, oldVer,oldFla))
+            toFind.add((n, oldVer,oldFla))
             found = True
 
         if newVer or (newFla is not None):
-            toFind.append((n, newVer, newFla))
+            toFind.add((n, newVer, newFla))
             found = True
 
         if not found:
-            toFind.append((n, None, None))
+            toFind.add((n, None, None))
 
-    results = repos.findTroves(cfg.installLabelPath, toFind, cfg.flavor)
+    repos = client.getRepos()
+    results = repos.findTroves(client.cfg.installLabelPath, toFind, 
+                               client.cfg.flavor)
 
     for troveSpec, trovesFound in results.iteritems():
         if len(trovesFound) > 1:
             log.error("trove %s has multiple matches on "
                       "installLabelPath", troveSpec[0])
-            
+
     primaryCsList = []
 
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
@@ -60,7 +59,7 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
 
         if n[0] in ('-', '+'):
             n = n[1:]
-            
+
         found = False
         if oldVer or (oldFla is not None):
             oldVer, oldFla = results[n, oldVer, oldFla][0][1:]
@@ -77,6 +76,15 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
                 oldVer, oldFla = results[n, None, None][0][1:]
 
         primaryCsList.append((n, (oldVer, oldFla), (newVer, newFla), isAbs))
+
+    return primaryCsList
+
+def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
+                     callback = None):
+    client = conaryclient.ConaryClient(cfg)
+    applyList = cmdline.parseChangeList(troveSpecs, allowChangeSets=False)
+
+    primaryCsList = computeTroveList(client, applyList)
 
     client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 
                                callback = callback, 
@@ -96,7 +104,7 @@ def LocalChangeSetCommand(db, cfg, item, outFileName):
 	    origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
                                     pristine = True)
 	    ver = ver.createShadow(versions.LocalLabel())
-	    list.append((trove, origTrove, ver, 0))
+            list.append((trove, origTrove, ver, update.UpdateFlags()))
 
     incomplete = [ db.troveIsIncomplete(x[1].getName(), x[1].getVersion(), 
                                         x[1].getFlavor()) for x in list ]

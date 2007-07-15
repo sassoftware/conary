@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -611,7 +611,11 @@ class DependencyChecker:
             """ % substTable
 
             if restrictor:
-                joinRestrict, whereRestrict = restrictor(restrictBy)
+                if restrictBy is None:
+                    restrictBy = ()
+                elif not isinstance(restrictBy, (tuple, list)):
+                    restrictBy = (restrictBy,)
+                joinRestrict, whereRestrict = restrictor(*restrictBy)
                 subselect += joinRestrict % substTable
 
             subselect += """ %(depClause)s """ % substTable
@@ -1112,7 +1116,7 @@ class DependencyTables:
                  SELECT distinct depId AS depId1 FROM Provides))
         """)
 
-    def _restrictResolveByLabel(self, label):
+    def _restrictResolveByLabel(self, label, leavesOnly=False):
         """ Restrict resolution by label
             We move this out so that other dependency algorithms
             can restrict resolution by other criteria.  Not exactly providing
@@ -1128,12 +1132,24 @@ class DependencyTables:
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
+        
         JOIN LabelMap ON
             LabelMap.itemId = Nodes.itemId AND
             LabelMap.branchId = Nodes.branchId
         JOIN Labels ON Labels.labelId = LabelMap.labelId """
-        # FIXME: avoid sprintf() here
         restrictWhere = """ WHERE Labels.label = '%s' """ % label
+        # FIXME: avoid sprintf() here
+        if leavesOnly:
+            # this call only makes sense from the server.
+            # limit the import to server-side only to avoid extra deps.
+            from conary.repository.netrepos import versionops
+            restrictJoin += """
+                JOIN Latest ON (Instances.itemId = Latest.itemId
+                                AND Nodes.branchId = Latest.branchId
+                                AND Instances.flavorId = Latest.flavorId
+                                AND Instances.versionId = Latest.versionId
+                                AND Latest.latestType = %s)
+            """ % versionops.LATEST_TYPE_NORMAL
 
         return restrictJoin, restrictWhere
 
@@ -1176,7 +1192,7 @@ class DependencyTables:
         result.setdefault(depSet, []).append(value)
 
 
-    def resolve(self, label, depSetList, troveList=[]):
+    def resolve(self, label, depSetList, troveList=[], leavesOnly=False):
         """ Determine troves that provide the given dependencies,
             restricting by label and limiting to latest version for
             each (name, flavor) pair.
@@ -1205,7 +1221,7 @@ class DependencyTables:
             # troves
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpInstances")
-            schema.resetTable(cu, "tmpInstances2")
+            schema.resetTable(cu, "tmpId")
 
             cu.executemany("""
             INSERT INTO tmpInstances
@@ -1217,25 +1233,26 @@ class DependencyTables:
             WHERE Items.item = ? AND Versions.version = ? AND Flavors.flavor = ?
             """, ( (n, v.asString(), f.freeze()) for (n, v, f)
                            in troveList), start_transaction = False )
+            self.db.analyze("tmpInstances")
             # now grab the instanceIds of their included troves, avoiding duplicates
             cu.execute("""
-            INSERT INTO tmpInstances2
+            INSERT INTO tmpId(id)
                 SELECT DISTINCT TT.includedId
             FROM tmpInstances AS TI
             JOIN TroveTroves AS TT USING(instanceId)
             """, start_transaction=False)
             # drop the ones we already have
-            cu.execute("DELETE FROM tmpInstances2 WHERE instanceId IN "
+            cu.execute("DELETE FROM tmpId WHERE id IN "
                        "(SELECT instanceId FROM tmpInstances)",
                        start_transaction=False)
             # append the remaining instanceIds
-            cu.execute("INSERT INTO tmpInstances "
-                       "SELECT instanceId FROM tmpInstances2",
+            cu.execute("INSERT INTO tmpInstances SELECT id FROM tmpId",
                        start_transaction=False)
-            restrictBy = None
+            self.db.analyze("tmpInstances")
+            restrictBy = ()
             restrictor = self._restrictResolveByTrove
         else:
-            restrictBy = label.asString()
+            restrictBy = (label.asString(), leavesOnly)
             restrictor = self._restrictResolveByLabel
 
         depList, cu = self._resolve(depSetList, selectTemplate,
@@ -1369,5 +1386,5 @@ class DependencyDatabase(DependencyTables):
     def commit(self):
         self.db.commit()
 
-    def resolve(self, label, depSetList):
+    def resolve(self, label, depSetList, leavesOnly=False):
         return self.resolveToIds(list(depSetList))

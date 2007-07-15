@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -114,7 +114,7 @@ class DataStore(AbstractDataStore):
 
         outFileObj = os.fdopen(tmpFd, "w")
         contentSha1 = sha.new()
-        if precompressed:
+        if precompressed and integrityCheck:
             tee = Tee(fileObj, outFileObj)
             uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
             s = uncompObj.read(128 * 1024)
@@ -122,6 +122,8 @@ class DataStore(AbstractDataStore):
                 contentSha1.update(s)
                 s = uncompObj.read(128 * 1024)
             uncompObj.close()
+        elif precompressed:
+            util.copyfileobj(fileObj, outFileObj)
         else:
             dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
             util.copyfileobj(fileObj, dest, digest = contentSha1)
@@ -149,6 +151,10 @@ class DataStore(AbstractDataStore):
 	path = self.hashToPath(hash)
 	f = open(path, "r")
 	return f
+
+    def removeFile(self, hash):
+        path = self.hashToPath(hash)
+        os.unlink(path)
 
     def __init__(self, topPath):
 	self.top = topPath

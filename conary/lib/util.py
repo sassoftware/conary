@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -16,7 +16,6 @@ import bdb
 import bz2
 import debugger
 import errno
-import fcntl
 import log
 import misc
 import os
@@ -26,10 +25,12 @@ import shutil
 import signal
 import stat
 import string
+import subprocess
 import sys
 import tempfile
 import time
 import traceback
+import urllib
 import urlparse
 import weakref
 
@@ -59,25 +60,18 @@ def mkdirChain(*paths):
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
-            
-        paths = path.split(os.sep)
-            
-        for n in (range(2,len(paths) + 1)):
-            p = string.join(paths[0:n], os.sep)
-            if not os.path.exists(p):
-                # don't die in case of the race condition where someone
-                # made the directory after we stat'ed for it.
-                try:
-                    os.mkdir(p)
-                except OSError, exc:
-                    if exc.errno == errno.EEXIST:
-                        s = os.lstat(p)
-                        if stat.S_ISDIR(s.st_mode):
-                            pass
-                        else:
-                            raise
-                    else:
-                        raise
+
+        # don't die in case the dir already exists
+        try:
+            os.makedirs(path)
+        except OSError, exc:
+            if exc.errno == errno.EEXIST:
+                if os.path.isdir(path):
+                    continue
+                else:
+                    raise
+            else:
+                raise
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]
@@ -236,12 +230,20 @@ def _handle_rc(rc, cmd):
 	raise RuntimeError, info
 
 def execute(cmd, destDir=None, verbose=True):
+    """
+    similar to os.system, but raises errors if exit code != 0 and closes stdin
+    so processes can never block on user input
+    """
     if verbose:
-	log.info(cmd)
-    if destDir:
-	rc = os.system('cd %s; %s' %(destDir, cmd))
+        log.info(cmd)
+    rc = subprocess.call(cmd, shell=True, cwd=destDir, stdin=open(os.devnull))
+    # form the rc into a standard exit status
+    if rc < 0:
+        # turn rc positive
+        rc = rc * -1
     else:
-	rc = os.system(cmd)
+        # shift the return code into the high bits
+        rc = rc << 8
     _handle_rc(rc, cmd)
 
 class popen:
@@ -352,8 +354,8 @@ def copyfile(sources, dest, verbose=True):
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest, callback = None, digest = None,
-                abortCheck = None, bufSize = 128*1024, rateLimit = None):
-
+                abortCheck = None, bufSize = 128*1024, rateLimit = None,
+                sizeLimit = None, total=0):
     if hasattr(dest, 'send'):
         write = dest.send
     else:
@@ -372,7 +374,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
     starttime = time.time()
 
-    total = 0
+    copied = 0
 
     if abortCheck:
         sourceFd = source.fileno()
@@ -380,6 +382,9 @@ def copyfileobj(source, dest, callback = None, digest = None,
         sourceFd = None
 
     while True:
+        if sizeLimit and (sizeLimit - copied < bufSize):
+            bufSize = sizeLimit - copied
+
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time
             # read returns, and every five seconds
@@ -393,22 +398,27 @@ def copyfileobj(source, dest, callback = None, digest = None,
             break
 
         total += len(buf)
+        copied += len(buf)
         write(buf)
 
         now = time.time()
         if now == starttime:
             rate = 0 # don't bother limiting download until now > starttime.
         else:
-            rate = total / ((now - starttime)) 
+            rate = copied / ((now - starttime)) 
 
-        if rateLimit > 0 and rate > rateLimit:
-            time.sleep((total / rateLimit) - (total / rate))
-
-        if digest: digest.update(buf)
         if callback:
             callback(total, rate)
 
-    return total
+        if copied == sizeLimit:
+            break
+
+        if rateLimit > 0 and rate > rateLimit:
+            time.sleep((copied / rateLimit) - (copied / rate))
+
+        if digest: digest.update(buf)
+
+    return copied
 
 def rename(sources, dest):
     for source in braceGlob(sources):
@@ -639,48 +649,84 @@ def verFormat(cfg, version):
         return version.trailingRevision().asString()
     return version.asString()
 
-class NestedFile:
+class ExtendedFile(file):
 
-    def close(self):
-	pass
+    def __init__(self, path, mode = "r", buffering = True):
+        assert(not buffering)
+        file.__init__(self, path, mode, buffering)
 
-    def read(self, bytes = -1):
-        if self.needsSeek:
-            self.file.seek(self.pos + self.start, 0)
-            self.needsSeek = False
+    def pread(self, bytes, offset):
+        return misc.pread(self.fileno(), bytes, offset)
 
-	if bytes < 0 or (self.end - self.pos) <= bytes:
-	    # return the rest of the file
-	    count = self.end - self.pos
-	    self.pos = self.end
-	    return self.file.read(count)
-	else:
-	    self.pos = self.pos + bytes
-	    return self.file.read(bytes)
+class PreadWrapper(object):
+    # DEPRECATED. Will be removed in 1.1.23.
+    __slots__ = ('f', 'path')
 
-    def __init__(self, file, size):
-	self.file = file
-	self.size = size
-	self.end = self.size
-	self.pos = 0
-        self.start = 0
-        self.needsSeek = False
+    def __init__(self, f):
+        self.path = None
+        if not hasattr(f, 'mode'):
+            if hasattr(f, 'path'):
+                # this is an rMake LazyFile
+                self.path = f.path
+            else:
+                raise ValueError('PreadWrapper does not know how to handle this file object')
+        elif f.mode != 'r':
+            raise ValueError('PreadWrapper.__init__() requires a read-only file object')
+        self.f = f
 
-class SeekableNestedFile(NestedFile):
+    def __getattr__(self, attr):
+        if attr != 'pread':
+            return getattr(self.f, attr)
+        else:
+            return self.pread
+
+    def pread(self, bytes, offset):
+        if self.path:
+            # hack for rMake compatibility
+            f = open(self.path, 'r')
+            buf = misc.pread(f.fileno(), bytes, offset)
+            f.close()
+            return buf
+        return misc.pread(self.fileno(), bytes, offset)
+
+class SeekableNestedFile:
 
     def __init__(self, file, size, start = -1):
-        NestedFile.__init__(self, file, size)
+        self.file = file
+        self.size = size
+        self.end = self.size
+        self.pos = 0
 
         if start == -1:
             self.start = file.tell()
         else:
             self.start = start
 
-        self.needsSeek = True
+    def close(self):
+        pass
 
-    def read(self, bytes = -1):
-        self.needsSeek = True
-        return NestedFile.read(self, bytes)
+    def read(self, bytes = -1, offset = None):
+        if offset is None:
+            readPos = self.pos
+        else:
+            readPos = offset
+
+	if bytes < 0 or (self.end - readPos) <= bytes:
+	    # return the rest of the file
+	    count = self.end - readPos
+	    newPos = self.end
+	else:
+            count = bytes
+            newPos = readPos + bytes
+
+        buf = self.file.pread(count, readPos + self.start)
+
+        if offset is None:
+            self.pos = newPos
+
+        return buf
+
+    pread = read
 
     def seek(self, offset, whence = 0):
         if whence == 0:
@@ -689,12 +735,12 @@ class SeekableNestedFile(NestedFile):
             newPos = self.pos + offset
         else:
             newPos = self.size + offset
-            
+
         if newPos > self.size or newPos < 0:
             raise IOError
-        
+
         self.pos = newPos
-        self.needsSeek = True
+        return self.pos
 
     def tell(self):
         return self.pos
@@ -815,3 +861,193 @@ class LineReader:
 
 exists = misc.exists
 removeIfExists = misc.removeIfExists
+pread = misc.pread
+
+class _LazyFile(object):
+    __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
+                 '_timestamp']
+    def __init__(self, cache, path, mode):
+        self.path = path
+        self.mode = mode
+        self.marker = (0, 0)
+        self._hash = cache._getCounter()
+        self._cache = weakref.ref(cache, self._closeCallback)
+        self._realFd = None
+        self._timestamp = time.time()
+
+    def reopen(method):
+        """Decorator to perform the housekeeping of opening/closing of fds"""
+        def wrapper(self, *args, **kwargs):
+            if self._realFd is not None:
+                # Object is already open
+                # Mark it as being used
+                self._timestamp = time.time()
+                # Return the real method
+                return getattr(self._realFd, method.func_name)(*args, **kwargs)
+            if self._cache is None:
+                raise Exception("Cache object is closed")
+            try:
+                self._cache()._getSlot()
+            except ReferenceError:
+                # re-raise for now, until we decide what to do
+                raise
+            self._reopen()
+            return getattr(self._realFd, method.func_name)(*args, **kwargs)
+        return wrapper
+
+    def _reopen(self):
+        # Initialize the file descriptor
+        self._realFd = ExtendedFile(self.path, self.mode, buffering = False)
+        self._realFd.seek(*self.marker)
+        self._timestamp = time.time()
+
+    def _release(self):
+        assert self._realFd is not None, "Cannot release file descriptor"
+        self._close()
+
+    def _closeCallback(self, cache):
+        """Called when the cache object gets destroyed"""
+        self._close()
+        self._cache = None
+
+    @reopen
+    def read(self, bytes):
+        pass
+
+    @reopen
+    def pread(self, bytes, offset):
+        pass
+
+    @reopen
+    def seek(self, loc, type):
+        pass
+
+    @reopen
+    def trucate(self):
+        pass
+
+    def _close(self):
+        # Close only the file descriptor
+        if self._realFd is not None:
+            self.marker = (self._realFd.tell(), 0)
+            self._realFd.close()
+            self._realFd = None
+
+    def close(self):
+        self._close()
+        if self._cache is None:
+            return
+        cache = self._cache()
+        if cache is not None:
+            try:
+                cache._closeSlot(self)
+            except ReferenceError:
+                # cache object is already gone
+                pass
+        self._cache = None
+
+    @reopen
+    def tell(self):
+        pass
+
+    def __hash__(self):
+        return self._hash
+
+    def __del__(self):
+        self.close()
+
+class LazyFileCache:
+    """An object tracking open files. It will serve file-like objects that get
+    closed behind the scene (and reopened on demand) if the number of open 
+    files in the current process exceeds a threshold.
+    The objects will close automatically when they fall out of scope.
+    """
+    # Assuming maxfd is 1024, this should be ok
+    threshold = 900
+
+    def __init__(self, threshold=None):
+        if threshold:
+            self.threshold = threshold
+        # Counter used for hashing
+        self._fdCounter = 0
+        self._fdMap = {}
+    
+    def open(self, path, mode="r"):
+        fd = _LazyFile(self, path, mode=mode)
+        self._fdMap[fd._hash] = fd
+        # Try to open the fd, to push the errors up early
+        fd.tell()
+        return fd
+
+    def _getFdCount(self):
+        return len(os.listdir("/proc/self/fd"))
+
+    def _getCounter(self):
+        ret = self._fdCounter;
+        self._fdCounter += 1;
+        return ret;
+
+    def _getSlot(self):
+        if self._getFdCount() < self.threshold:
+            # We can open more file descriptors
+            return
+        # There are several ways we can obtain a slot if the object is full:
+        # 1. free one slot
+        # 2. free a batch of slots
+        # 3. free all slots
+        # Running tests which are not localized (i.e. walk over the list of
+        # files and do some operation on them) shows that 1. is extremely
+        # expensive. 2. and 3. are comparatively similar if we're freeing 10%
+        # of the threshold, so that's the current implementation.
+
+        # Sorting would be expensive for selecting just the oldest fd, but
+        # when selecting the oldest m fds, performance is m * n. For m large
+        # enough, log n will be smaller. For n = 5k, 10% is 500, while log n
+        # is about 12. Even factoring in other sorting constants, you're still
+        # winning.
+        l = sorted([ x for x in self._fdMap.values() if x._realFd is not None],
+                   lambda a, b: cmp(a._timestamp, b._timestamp))
+        for i in range(int(self.threshold / 10)):
+            l[i]._release()
+
+    def _closeSlot(self, fd):
+        del self._fdMap[fd._hash]
+
+    def close(self):
+        # No need to call fd's close(), we're destroying this object
+        for fd in self._fdMap.values():
+            fd._close()
+            fd._cache = None
+        self._fdMap.clear()
+
+    __del__ = close
+
+class Flags(object):
+
+    # set the slots to the names of the flags to support
+
+    __slots__ = []
+
+    def __init__(self, **kwargs):
+        for flag in self.__slots__:
+            setattr(self, flag, False)
+
+        for (flag, val) in kwargs.iteritems():
+            setattr(self, flag, val)
+
+    def __setattr__(self, flag, val):
+        if type(val) != bool:
+            raise TypeError, 'bool expected'
+        object.__setattr__(self, flag, val)
+
+    def __repr__(self):
+        return "%s(%s)" % (self.__class__.__name__,
+                "".join( flag for flag in self.__slots__
+                            if getattr(self, flag) ) )
+
+def stripUserPassFromUrl(url):
+    arr = list(urlparse.urlparse(url))
+    hostUserPass = arr[1]
+    userPass, host = urllib.splituser(hostUserPass)
+    arr[1] = host
+    return urlparse.urlunparse(arr)

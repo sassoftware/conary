@@ -3,7 +3,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -66,7 +66,6 @@ def _install():
     _run(coverage)
     return
 
-
 def _saveState(signal, f):
     save()
     os._exit(1)
@@ -74,8 +73,7 @@ def _saveState(signal, f):
 def _run(coverage):
     signal.signal(signal.SIGUSR2, _saveState)
     atexit.register(coverage.the_coverage.save)
-    coverage.the_coverage.get_ready()
-    coverage.c.enable()
+    coverage.the_coverage.start()
 
 origOsFork = os.fork
 origOsExit = os._exit

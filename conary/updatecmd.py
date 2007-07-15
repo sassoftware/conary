@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,13 +14,11 @@
 import os
 import itertools
 import sys
-import tempfile
-import thread
+import threading
 import urllib2
 
 from conary import callbacks
 from conary import conaryclient
-from conary import constants
 from conary import display
 from conary import errors
 from conary import versions
@@ -38,6 +36,24 @@ from conaryclient.cmdline import parseTroveSpec
 class CriticalUpdateInfo(conaryclient.CriticalUpdateInfo):
     criticalTroveRegexps = ['conary:.*']
 
+def locked(method):
+    # this decorator used to be defined in UpdateCallback
+    # The problem is you cannot subclass UpdateCallback and use the decorator
+    # because python complains it is an unbound function.
+    # And you can't define it as @staticmethod either, it would break the
+    # decorated functions.
+    # Somewhat related (staticmethod objects not callable) topic:
+    # http://mail.python.org/pipermail/python-dev/2006-March/061948.html
+
+    def wrapper(self, *args, **kwargs):
+        self.lock.acquire()
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self.lock.release()
+
+    return wrapper
+
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     def done(self):
@@ -47,7 +63,8 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         callbacks.LineOutput._message(self, text)
 
     def update(self):
-        self.lock.acquire()
+        # This method is not thread safe - you have to call it when you hold
+        # the lock
         t = ""
 
         if self.updateText:
@@ -72,12 +89,13 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 	    t += '...'
 
         self._message(t)
-        self.lock.release()
 
+    @locked
     def updateMsg(self, text):
         self.updateText = text
         self.update()
 
+    @locked
     def csMsg(self, text):
         self.csText = text
         self.update()
@@ -88,15 +106,18 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def resolvingDependencies(self):
         self.updateMsg("Resolving dependencies")
 
+    @locked
     def updateDone(self):
-        self.lock.acquire()
         self._message('')
         self.updateText = None
-        self.lock.release()
 
+    @locked
     def _downloading(self, msg, got, rate, need):
+        # This function acquires a lock just because it looks at self.csHunk
+        # and self.updateText directly. Otherwise, self.csMsg will acquire the
+        # lock (which is now reentrant)
         if got == need:
-            self.csText = None
+            self.csMsg(None)
         elif need != 0:
             if self.csHunk[1] < 2 or not self.updateText:
                 self.csMsg("%s %dKB (%d%%) of %dKB at %dKB/sec"
@@ -107,8 +128,6 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                               (got/1024, (got*100)/need, need/1024, rate/1024)))
         else: # no idea how much we need, just keep on counting...
             self.csMsg("%s (got %dKB at %dKB/s so far)" % (msg, got/1024, rate/1024))
-
-        self.update()
 
     def downloadingFileContents(self, got, need):
         self._downloading('Downloading files for changeset', got, self.rate, need)
@@ -135,7 +154,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateMsg("Preparing update (%d of %d)" % 
 		      (troveNum, troveCount))
 
+    @locked
     def restoreFiles(self, size, totalSize):
+        # Locked, because we modify self.restored
         if totalSize != 0:
             self.restored += size
             self.updateMsg("Writing %dk of %dk (%d%%)" 
@@ -160,15 +181,17 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def committingTransaction(self):
         self.updateMsg("Committing database transaction")
 
+    @locked
     def setChangesetHunk(self, num, total):
         self.csHunk = (num, total)
 
+    @locked
     def setUpdateHunk(self, num, total):
         self.restored = 0
         self.updateHunk = (num, total)
 
+    @locked
     def setUpdateJob(self, jobs):
-        self.lock.acquire()
         self._message('')
         if self.updateHunk[1] < 2:
             self.out.write('Applying update job:\n')
@@ -180,23 +203,32 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         for line in self.formatter.formatJobTups(jobs, indent='    '):
             self.out.write(line + '\n')
 
-        self.lock.release()
-
+    @locked
     def tagHandlerOutput(self, tag, msg, stderr = False):
-        self.lock.acquire()
         self._message('')
         self.out.write('[%s] %s\n' % (tag, msg))
-        self.lock.release()
+
+    @locked
+    def troveScriptOutput(self, typ, msg):
+        self._message('')
+        self.out.write("[%s] %s" % (typ, msg))
+
+    @locked
+    def troveScriptFailure(self, typ, errcode):
+        self._message('')
+        self.out.write("[%s] %s" % (typ, errcode))
 
     def __init__(self, cfg=None):
         callbacks.UpdateCallback.__init__(self)
+        if cfg:
+            self.setTrustThreshold(cfg.trustThreshold)
         callbacks.LineOutput.__init__(self)
         self.restored = 0
         self.csHunk = (0, 0)
         self.updateHunk = (0, 0)
         self.csText = None
         self.updateText = None
-        self.lock = thread.allocate_lock()
+        self.lock = threading.RLock()
 
         if cfg:
             fullVersions = cfg.fullVersions
@@ -269,36 +301,36 @@ def displayUpdateInfo(updJob, cfg):
         print '** The update will restart itself after job%s %s and continue updating' % (jobPlural, jobList)
     return
 
-def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None, 
-                               keepExisting = False, depCheck = True,
-                               test = False, justDatabase = False, 
-                               recurse = True, info = False, 
-                               updateByDefault = True, callback = None, 
-                               split = True, sync = False, fromFiles = [],
-                               checkPathConflicts = True, syncChildren = False,
-                               syncUpdate = False, updateOnly = False,
-                               migrate = False, keepRequired = False,
-                               removeNotByDefault = False, restartInfo = None,
-                               applyCriticalOnly = False, keepJournal = False):
+def doUpdate(cfg, changeSpecs, **kwargs):
+    callback = kwargs.get('callback', None)
     if not callback:
         callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
+        kwargs['callback'] = callback
     else:
         callback.setTrustThreshold(cfg.trustThreshold)
+
+    syncChildren = kwargs.get('syncChildren', False)
+    syncUpdate = kwargs.pop('syncUpdate', False)
+    restartInfo = kwargs.get('restartInfo', None)
 
     if syncChildren or syncUpdate:
         installMissing = True
     else:
         installMissing = False
 
+    kwargs['installMissing'] = installMissing
+
     fromChangesets = []
-    for path in fromFiles:
+    for path in kwargs.pop('fromFiles', []):
         cs = changeset.ChangeSetFromFile(path)
         fromChangesets.append(cs)
+
+    kwargs['fromChangesets'] = fromChangesets
 
     # Look for items which look like files in the applyList and convert
     # them into fromChangesets w/ the primary sets
     for item in changeSpecs[:]:
-        if os.access(item, os.W_OK):
+        if os.access(item, os.R_OK):
             try:
                 cs = changeset.ChangeSetFromFile(item)
             except:
@@ -310,117 +342,84 @@ def doUpdate(cfg, changeSpecs, replaceFiles = False, tagScript = None,
                 changeSpecs.append("%s=%s[%s]" % (trvInfo[0],
                       trvInfo[1].asString(), deps.formatFlavor(trvInfo[2])))
 
-    if restartInfo:
-        applyList, restartChangeSets = _loadRestartInfo(restartInfo)
-        recurse = False
-        syncChildren = False # we don't recalculate update info anyway
-                             # so we'll just revert to regular update.
+    if kwargs.get('restartInfo', None):
+        # We don't care about applyList, we will set it later
+        applyList = None
     else:
-        restartChangeSets = []
+        keepExisting = kwargs.get('keepExisting')
+        updateByDefault = kwargs.get('updateByDefault', True)
         applyList = cmdline.parseChangeList(changeSpecs, keepExisting,
                                             updateByDefault,
                                             allowChangeSets=True)
 
-    if syncChildren:
-        for name, oldInf, newInfo, isAbs in applyList:
-            if not isAbs:
-                raise errors.ConaryError(
-                        'cannot specify erases/relative updates with sync')
-                return
-
-    _updateTroves(cfg, applyList, replaceFiles = replaceFiles,
-                  tagScript = tagScript, keepRequired = keepRequired,
-                  keepExisting = keepExisting, depCheck = depCheck,
-                  test = test, justDatabase = justDatabase,
-                  recurse = recurse, info = info,
-                  updateByDefault = updateByDefault, callback = callback, 
-                  split = split, sync = sync,
-                  fromChangesets = fromChangesets,
-                  checkPathConflicts = checkPathConflicts,
-                  syncChildren = syncChildren,
-                  updateOnly = updateOnly,
-                  removeNotByDefault = removeNotByDefault,
-                  installMissing = installMissing,
-                  migrate = migrate, restartChangeSets = restartChangeSets,
-                  applyCriticalOnly = applyCriticalOnly,
-                  keepJournal = keepJournal)
+    _updateTroves(cfg, applyList, **kwargs)
+    # XXX fixme
     # Clean up after ourselves
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
 
 
-def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
-                                  keepExisting = False, depCheck = True,
-                                  test = False, justDatabase = False, 
-                                  recurse = True, info = False, 
-                                  updateByDefault = True, callback = None, 
-                                  split=True, sync = False, 
-                                  keepRequired = False,
-                                  fromChangesets = [],
-                                  checkPathConflicts = True, 
-                                  checkPrimaryPins = True, 
-                                  syncChildren = False, 
-                                  updateOnly = False, 
-                                  removeNotByDefault = False,
-                                  installMissing = False, migrate = False,
-                                  restartChangeSets = None,
-                                  applyCriticalOnly = False,
-                                  keepJournal = False):
+def _updateTroves(cfg, applyList, **kwargs):
+    # Take out the apply-related keyword arguments
+    applyDefaults = dict(
+                        replaceFiles = False,
+                        tagScript = None,
+                        justDatabase = False,
+                        info = False,
+                        keepJournal = False,
+                        noRestart = False,
+    )
+    applyKwargs = {}
+    for k in applyDefaults:
+        if k in kwargs:
+            applyKwargs[k] = kwargs.pop(k)
+    callback = kwargs.pop('callback')
+    applyKwargs['test'] = kwargs.get('test', False)
+    applyKwargs['localRollbacks'] = cfg.localRollbacks
+    applyKwargs['autoPinList'] = cfg.pinTroves
+
+    noRestart = applyKwargs.get('noRestart', False)
 
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
+    migrate = kwargs.get('migrate', False)
+    forceMigrate = kwargs.pop('forceMigrate', False)
+    restartInfo = kwargs.get('restartInfo', None)
 
+    # Initialize the critical update set
+    applyCriticalOnly = kwargs.get('applyCriticalOnly', False)
+    kwargs['criticalUpdateInfo'] = CriticalUpdateInfo(applyCriticalOnly)
+
+    info = applyKwargs.pop('info', False)
+
+    # Rename depCheck to resolveDeps
+    depCheck = kwargs.pop('depCheck', True)
+    kwargs['resolveDeps'] = depCheck
 
     if not info:
         client.checkWriteableRoot()
 
-    if migrate and not info and not cfg.interactive:
-        print ('As of conary 1.0.21, the migrate command has changed.'
-               '  Migrate must be run with --interactive '
+    if migrate and not info and not cfg.interactive and not forceMigrate:
+        print ('Migrate must be run with --interactive'
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
         return
 
-    criticalUpdateInfo = CriticalUpdateInfo(applyCriticalOnly)
-    if restartChangeSets:
-        for cs in restartChangeSets:
-            criticalUpdateInfo.addChangeSet(cs)
+    updJob = client.newUpdateJob()
 
     try:
-        (updJob, suggMap) = \
-        client.updateChangeSet(applyList, resolveDeps = depCheck,
-                               keepExisting = keepExisting,
-                               keepRequired = keepRequired,
-                               test = test, recurse = recurse,
-                               updateByDefault = updateByDefault,
-                               split = split, sync = sync,
-                               fromChangesets = fromChangesets,
-                               checkPathConflicts = checkPathConflicts,
-                               checkPrimaryPins = checkPrimaryPins,
-                               syncChildren = syncChildren,
-                               updateOnly = updateOnly,
-                               installMissing = installMissing,
-                               removeNotByDefault = removeNotByDefault,
-                               migrate = migrate,
-                               criticalUpdateInfo=criticalUpdateInfo)
-    except conaryclient.update.DependencyFailure, e:
-        callback.done()
-        if e.hasCriticalUpdates() and not applyCriticalOnly:
-            e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
-        raise
+        suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
         callback.done()
-        if restartChangeSets:
-            log.error('** NOTE: A critical update was applied - rerunning this command may resolve this error')
         raise
 
     if info:
         callback.done()
         displayUpdateInfo(updJob, cfg)
-        if restartChangeSets:
+        if restartInfo:
             callback.done()
             newJobs = set(itertools.chain(*updJob.getJobs()))
-            oldJobs = set(applyList)
+            oldJobs = set(updJob.getItemList())
             addedJobs = newJobs - oldJobs
             removedJobs = oldJobs - newJobs
             if addedJobs or removedJobs:
@@ -444,13 +443,12 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         items = sorted(set(formatter.formatNVF(*x)
                        for x in itertools.chain(*suggMap.itervalues())))
         print " ".join(items)
-        keepExisting = False
 
     askInteractive = cfg.interactive
-    if restartChangeSets:
+    if restartInfo:
         callback.done()
         newJobs = set(itertools.chain(*updJob.getJobs()))
-        oldJobs = set(applyList)
+        oldJobs = set(updJob.getItemList())
         addedJobs = newJobs - oldJobs
         removedJobs = oldJobs - newJobs
 
@@ -462,7 +460,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     elif askInteractive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
-    if migrate:
+    if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'
                ' specified.')
 
@@ -477,30 +475,19 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         if not okay:
             return
 
-    if updJob.getCriticalJobs():
+    if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
-        firstCritical = updJob.getCriticalJobs()[0]
-        remainingJobs = updJob.getJobs()[firstCritical + 1:]
-        updJob.setJobs(updJob.getJobs()[0:firstCritical + 1])
 
-    log.syslog.command()
-    client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
-                       justDatabase = justDatabase,
-                       localRollbacks = cfg.localRollbacks,
-                       autoPinList = cfg.pinTroves,
-                       keepJournal = keepJournal)
+    restartDir = client.applyUpdateJob(updJob, **applyKwargs)
 
-    log.syslog.commandComplete()
-
-    if updJob.getCriticalJobs():
-        restartDir = _storeJobInfo(remainingJobs, updJob.getTroveSource())
-        # FIXME: write the updJob.getTroveSource() changeset(s) to disk
-        # write the job set to disk
-        # Restart conary telling it to use those changesets and jobset
-        # (ignore ordering).
-        # do depresolution on that job set to compare contents and warn
-        # if contents have changed.
+    if restartDir:
         params = sys.argv
+
+        # Write command line to disk
+        import xmlrpclib
+        cmdlinefile = open(os.path.join(restartDir, 'cmdline'), "w")
+        cmdlinefile.write(xmlrpclib.dumps((params, ), methodresponse = True))
+        cmdlinefile.close()
 
         # CNY-980: we should have the whole script of changes to perform in
         # the restart directory (in the job list); if in migrate mode, re-exec
@@ -512,83 +499,6 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
         raise errors.ReexecRequired(
                 'Critical update completed, rerunning command...', params,
                 restartDir)
-
-def _storeJobInfo(remainingJobs, changeSetSource):
-    restartDir = tempfile.mkdtemp(prefix='conary-restart-')
-    for idx, cs in enumerate(changeSetSource.iterChangeSets()):
-        if isinstance(cs, changeset.ChangeSetFromFile):
-            # these will be picked up on restart by parsing the command line
-            # arguments
-            continue
-        cs.reset()
-        cs.writeToFile(restartDir + '/%d.ccs' % idx)
-
-    jobSetPath = os.path.join(restartDir, 'joblist')
-    jobFile = open(jobSetPath, 'w')
-    jobStrs = []
-    for job in itertools.chain(*remainingJobs): # flatten list
-        jobStr = []
-        if job[1][0]:
-            jobStr.append('%s=%s[%s]--' % (job[0], job[1][0], job[1][1]))
-        else:
-            jobStr.append('%s=--' % (job[0],))
-        if job[2][0]:
-            jobStr.append('%s[%s]' % (job[2][0], job[2][1]))
-        jobStrs.append(''.join(jobStr))
-    jobFile.write('\n'.join(jobStrs))
-    jobFile.close()
-    # Write the version of the conary client
-    # CNY-1034: we need to save more information about the currently running
-    # client; upon restart, the new client may later check the old client's
-    # version and recompute the update set if the old client was buggy.
-
-    # Unfortunately, _loadRestartInfo will only ignore joblist, so we can't
-    # drop a state file in the same restartDir. We'll create a new directory
-    # and save the version file there.
-    extraDir = restartDir + "misc"
-    try:
-        os.mkdir(extraDir)
-    except OSError, e:
-        # restartDir was a temporary directory, the likelyhood of extraDir
-        # existing is close to zero
-        # Just in case, remove the existing directory and re-create it
-        util.rmtree(extraDir, ignore_errors=True)
-        os.mkdir(extraDir)
-
-    versionFilePath = os.path.join(extraDir, "__version__")
-    versionFile = open(versionFilePath, "w+")
-    versionFile.write("version %s\n" % constants.version)
-    versionFile.close()
-    return restartDir
-
-def _loadRestartInfo(restartDir):
-    changeSetList = []
-    # Skip files that are not changesets (.ccs).
-    # This was the first attempt to fix CNY-1034, but it would break
-    # old clients.
-    # Nevertheless the code now ignores files everything but .ccs files
-    filelist = [ x for x in os.listdir(restartDir) if x.endswith('.ccs') ]
-    for path in filelist:
-        cs = changeset.ChangeSetFromFile(os.path.join(restartDir, path))
-        changeSetList.append(cs)
-    jobSetPath = os.path.join(restartDir, 'joblist')
-    jobSet = cmdline.parseChangeList(x.strip() for x in open(jobSetPath))
-    finalJobSet = []
-    for job in jobSet:
-        if job[1][0]:
-            oldVersion = versions.VersionFromString(job[1][0])
-        else:
-            oldVersion = None
-        if job[2][0]:
-            newVersion = versions.VersionFromString(job[2][0])
-        else:
-            newVersion = None
-        finalJobSet.append((job[0], (oldVersion, job[1][1]), 
-                            (newVersion, job[2][1]), job[3]))
-    # If there was something to be done with the version information, it would
-    # be performed by now. Clean up the misc directory
-    util.rmtree(restartDir + "misc", ignore_errors=True)
-    return finalJobSet, changeSetList
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
@@ -654,20 +564,21 @@ def updateConary(cfg, conaryVersion):
         raise
     return client.applyUpdate(job, localRollbacks = cfg.localRollbacks,
                               replaceFiles = True)
-    
-def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              test = False, showItems = False, checkPathConflicts = True,
-              migrate = False, keepRequired = False, applyCriticalOnly=False, 
-              restartInfo=None):
+
+def updateAll(cfg, **kwargs):
+    showItems = kwargs.pop('showItems', False)
+    restartInfo = kwargs.get('restartInfo', None)
+    migrate = kwargs.pop('migrate', False)
+    kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
+    kwargs['callback'] = UpdateCallback(cfg)
+
+    client = conaryclient.ConaryClient(cfg)
     if restartInfo:
-        applyList, restartChangeSets = _loadRestartInfo(restartInfo)
-        recurse = False
+        updateItems = []
+        applyList = None
     else:
-        client = conaryclient.ConaryClient(cfg)
         updateItems = client.fullUpdateItemList()
         applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
-        restartChangeSets = []
-        recurse = True
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
@@ -682,23 +593,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
         return
 
-    if migrate:
-        installMissing = True
-        removeNotByDefault = True
-    else:
-        installMissing = False
-        removeNotByDefault = False
-
-    callback = UpdateCallback(cfg)
-    _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
-                  depCheck = depCheck, test = test, info = info, 
-                  callback = callback, checkPrimaryPins = False,
-                  checkPathConflicts = checkPathConflicts,
-                  installMissing = installMissing, 
-                  removeNotByDefault = removeNotByDefault,
-                  keepRequired = keepRequired, 
-                  applyCriticalOnly=applyCriticalOnly,
-                  restartChangeSets=restartChangeSets, recurse=recurse)
+    _updateTroves(cfg, applyList, **kwargs)
     # Clean up after ourselves
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)

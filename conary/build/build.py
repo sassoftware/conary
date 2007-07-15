@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -31,6 +31,7 @@ the permissions on files in classes derived from _PutFile.
 
 import os
 import re
+import sha
 import shutil
 import stat
 import sys
@@ -241,7 +242,7 @@ class Run(BuildCommand):
         macros.envcmd = envStr
 
         if self.dir:
-            macros.cdcmd = 'cd %s; ' % (action._expandOnePath(self.dir, macros))
+            macros.cdcmd = 'cd \'%s\'; ' % (action._expandOnePath(self.dir, macros))
 	else:
 	    macros.cdcmd = ''
 
@@ -307,7 +308,7 @@ class Automake(BuildCommand):
     and C{--foreign} arguments to the C{automake} program.
     """
     # note: no use of %(args)s -- to which command would it apply?
-    template = ('cd %%(actionDir)s && '
+    template = ('cd \'%%(actionDir)s\' && '
                 'aclocal %%(m4DirArgs)s %(aclocalArgs)s && '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s && '
 		'automake%(automakeVer)s %(autoMakeArgs)s')
@@ -413,7 +414,7 @@ class Configure(BuildCommand):
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
     template = (
-	'cd %%(actionDir)s; '
+	'cd \'%%(actionDir)s\'; '
 	'%%(mkObjdir)s '
     'CLASSPATH="%%(classpath)s"'
 	' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -444,6 +445,7 @@ class Configure(BuildCommand):
                 'dir': '',
                 'skipMissingSubDir': False,
                 'skipMissingDir': False,
+                'local': False,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -464,7 +466,11 @@ class Configure(BuildCommand):
         BuildCommand.__init__(self, recipe, *args, **keywords)
 
     def do(self, macros):
-	macros = macros.copy()
+        macros = macros.copy(False)
+        if self.local:
+            # this will set CC, etc to be like a local build.
+            macros.update(self.recipe.buildmacros.itermacros())
+
         macros.actionDir = action._expandOnePath(self.dir, macros,
              macros.builddir, error=not self.skipMissingDir)
         if not os.path.exists(macros.actionDir):
@@ -473,33 +479,43 @@ class Configure(BuildCommand):
 
         if self.objDir:
 	    objDir = self.objDir %macros
-            macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
-            macros.cdObjdir = 'cd %s;' %objDir
+            macros.mkObjdir = 'mkdir -p \'%s\'; cd \'%s\';' %(objDir, objDir)
+            macros.cdObjdir = 'cd \'%s\';' %objDir
 	    macros.configure = '../%s' % self.configureName
         else:
             macros.mkObjdir = ''
             macros.cdObjdir = ''
             macros.configure = './%s' % self.configureName
-        # using the get method avoids adding bootstrap flag to tracked flags
-        # (if the flag is really significant, it will be checked elsewhere)
-        if Use.bootstrap._get():
+
+        if self.local:
+            oldPath = os.environ['PATH']
+            oldSite = os.environ['CONFIG_SITE']
+            macros.bootstrapFlags = ''
+            os.environ['PATH'] = self.recipe.buildmacros.env_path
+            os.environ['CONFIG_SITE'] = self.recipe.buildmacros.env_siteconfig
+        elif self.recipe.needsCrossFlags():
             macros.bootstrapFlags = self.bootstrapFlags
         else:
             macros.bootstrapFlags = ''
         try:
-            util.execute(self.command %macros)
-        except RuntimeError, info:
-            if not self.recipe.isatty():
-                # When conary is being scripted, logs might be
-                # redirected to a file, and it might be easier to
-                # see config.log output in that logfile than by
-                # inspecting the build directory
-                # Each file line will have the filename prepended
-                # The "|| :" makes it OK if there is no config.log
-                util.execute('cd %(actionDir)s; %(cdObjdir)s'
-                             'find . -name config.log | xargs grep -H . || :'
-                             %macros)
-            raise
+            try:
+                util.execute(self.command %macros)
+            except RuntimeError, info:
+                if not self.recipe.isatty():
+                    # When conary is being scripted, logs might be
+                    # redirected to a file, and it might be easier to
+                    # see config.log output in that logfile than by
+                    # inspecting the build directory
+                    # Each file line will have the filename prepended
+                    # The "|| :" makes it OK if there is no config.log
+                    util.execute('cd \'%(actionDir)s\'; %(cdObjdir)s'
+                                 'find . -name config.log | xargs grep -H . || :'
+                                 %macros)
+                raise
+        finally:
+            if self.local:
+                os.environ['PATH'] = oldPath
+                os.environ['CONFIG_SITE'] = oldSite
 
 class ManualConfigure(Configure):
     """
@@ -530,7 +546,7 @@ class ManualConfigure(Configure):
     Calls C{r.ManualConfigure()} and specifies the C{--prefix} and C{--shared}
     arguments to the configure script.
     """
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
                 '%%(mkObjdir)s '
                 'CLASSPATH="%%(classpath)s"'
                 ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -622,7 +638,7 @@ class Make(BuildCommand):
     # there is no makefile definition; if they are defined in the
     # makefile, then it takes a command-line argument to override
     # them.
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -634,6 +650,7 @@ class Make(BuildCommand):
                 'skipMissingSubDir': False,
                 'skipMissingDir': False,
 		'forceFlags': False,
+                'local': False,
                 'makeName': 'make'}
 
     def __init__(self, recipe, *args, **keywords):
@@ -658,6 +675,8 @@ class Make(BuildCommand):
 
     def do(self, macros):
 	macros = macros.copy()
+        if self.local:
+            macros.update(self.recipe.buildmacros.itermacros())
 	if self.forceFlags:
 	    # XXX should this be just '-e'?
 	    macros['overrides'] = ('CFLAGS="%(cflags)s"'
@@ -672,7 +691,17 @@ class Make(BuildCommand):
             assert(self.skipMissingDir)
             return
 
-	BuildCommand.do(self, macros)
+        if self.local:
+            oldPath = os.environ['PATH']
+            oldSite = os.environ['CONFIG_SITE']
+            os.environ['PATH'] = self.recipe.buildmacros.env_path
+            os.environ['CONFIG_SITE'] = self.recipe.buildmacros.env_siteconfig
+        try:
+            BuildCommand.do(self, macros)
+        finally:
+            if self.local:
+                os.environ['PATH'] = oldPath
+                os.environ['CONFIG_SITE'] = oldSite
 
 class MakeParallelSubdir(Make):
     """
@@ -698,7 +727,7 @@ class MakeParallelSubdir(Make):
     the top-level C{Makefile} does not work correctly with parallel C{make},
     but the lower-level Makefiles do work correctly with parallel C{make}.
     """
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -759,7 +788,7 @@ class MakeInstall(Make):
     Demonstrates using C{r.MakeInstall()}, and setting the environment variable
     C{LIBTOOL} to C{%(bindir)s/libtool}.
     """
-    template = ('cd %%(actionDir)s; '
+    template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -807,7 +836,7 @@ class MakePathsInstall(Make):
     make variable to C{%(destdir)s/%(mandir)s/man1}.
     """
     template = (
-	'cd %%(actionDir)s; '
+	'cd \'%%(actionDir)s\'; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -879,7 +908,7 @@ class Ant(BuildCommand):
 
     def do(self, macros):
         macros = macros.copy()
-        if self.dir: macros.cdcmd = 'cd %s;' % (self.dir % macros)
+        if self.dir: macros.cdcmd = 'cd \'%s\';' % (self.dir % macros)
         else: macros.cdcmd = ''
         if self.options: macros.antoptions = self.options
         if self.verbose: macros.antoptions += ' -v'
@@ -1112,7 +1141,7 @@ class PythonSetup(BuildCommand):
 	    macros.cdcmd = ''
 	else:
             rundir = action._expandOnePath(self.dir, macros)
-            macros.cdcmd = 'cd %s; ' % rundir
+            macros.cdcmd = 'cd \'%s\'; ' % rundir
 
         if self.rootDir == '%(destdir)s':
             macros.rootdir = '%(destdir)s'
@@ -1382,7 +1411,7 @@ class Desktopfile(BuildCommand, _FileAction):
     Demonstrates creation of the desktop file C{thunderbird.desktop} with
     C{r.Desktopfile()}.
     """
-    template = ('cd %%(builddir)s; '
+    template = ('cd \'%%(builddir)s\'; '
 		'desktop-file-validate %(args)s ; '
 		'desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
@@ -1590,7 +1619,7 @@ class _PutFiles(_FileAction):
 	mode = self.mode
 	if mode == -2:
 	    # any executable bit on in source means 0755 on target, else 0644
-	    sourcemode = os.lstat(source)[stat.ST_MODE]
+            sourcemode = os.lstat(source).st_mode
 	    if sourcemode & 0111:
 		mode = 0755
 	    else:
@@ -1600,6 +1629,9 @@ class _PutFiles(_FileAction):
             log.info('renaming %s to %s', source, dest)
             os.rename(source, dest)
 	else:
+            # remove old file (if any) so permission problems with the
+            # old file don't prevent the install
+            util.removeIfExists(dest)
             if os.path.islink(source) and self.preserveSymlinks:
                 # We have to copy the symlink
                 linksrc = os.readlink(source)
@@ -1614,7 +1646,6 @@ class _PutFiles(_FileAction):
 
         self.setComponents(destdir, dest)
         self.chmod(destdir, dest, mode=mode)
-
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
@@ -1959,10 +1990,10 @@ class Link(_FileAction):
     EXAMPLES
     ========
 
-    C{r.Link('mumble', 'passwd')}
+    C{r.Link('mumble', '%(bindir)s/passwd')}
 
     Demonstrates calling C{r.Link()} to create a hard link from the file
-    C{passwd} to the file C{mumble}.
+    C{%(bindir)s/passwd} to the file C{%(bindir)s/mumble}.
     """
     def do(self, macros):
 	d = macros['destdir']
@@ -1987,13 +2018,20 @@ class Link(_FileAction):
 	    self.Link(newname, [newname, ...,] existingpath)
         """
         _FileAction.__init__(self, recipe, *args, **keywords)
-	self.newnames = args[:-1]
 	self.existingpath = args[-1]
+        dirPath = os.path.dirname(self.existingpath)
 
 	# raise error while we can still tell what is wrong...
-	for name in self.newnames:
-	    if name.find('/') != -1:
+        self.newnames = []
+        for name in args[:-1]:
+            if os.path.dirname(name) == dirPath:
+                # it's okay if the directories match; just fix it up to
+                # look like standard syntax
+                name = os.path.basename(name)
+            elif name.find('/') != -1:
 		self.init_error(TypeError, 'hardlink %s crosses directories' %name)
+            self.newnames.append(name)
+
 	self.basedir = os.path.dirname(self.existingpath)
 
 class Remove(BuildAction):
@@ -2712,7 +2750,7 @@ exit $failed
 		    self.subdirs.append(fullpath[baselen:])
 		    self.buildMakeDependencies(fullpath, command)
 	util.execute(r"sed -i 's/^%s\s*:\(:\?\)\s*\(.*\)/conary-pre-%s:\1 \2\n\n%s:\1/' %s" % (makeTarget, makeTarget, makeTarget, makefile))
-	util.execute('cd %s; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
+	util.execute('cd \'%s\'; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
 
     def do(self, macros):
 	self.macros = macros.copy()
@@ -3350,3 +3388,152 @@ class SGMLCatalogEntry(BuildCommand):
 
         if cleanTemp:
             os.remove(tempPath)
+
+
+
+class IncludeLicense(BuildAction):
+    """
+    NAME
+    ====
+
+    B{C{r.IncludeLicense()}} - Adds entries to the licenses conary understands
+
+    SYNOPSIS
+    ========
+
+    C{r.IncludeLicense(I{directory} || I{(file, license)})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.IncludeLicense()} class is called from within a Conary recipe to add a
+    new license to the list of known licenses.
+
+    EXAMPLES
+    ========
+
+    C{r.IncludeLicense(('gpl.txt', 'GPL-2'), ('cpl', 'CPL-1.0'))}
+
+    Calls C{r.IncludeLicense()} to add the GPL and CPL licenses to the known
+    licenses.
+
+    C {r.IncludeLicense('licensedir')}
+
+    Calls C{r.IncludeLicense()} to add a directory of licenses to the known
+    licences. The format for this directory is the same format as
+    %(datadir)s/known-licenses. Note that all sha1sum values will be
+    recalculated after normalization of the license text, so the filename
+    inside the license directory is irrelevent.
+    """
+
+    def __init__(self, recipe, *args, **keywords):
+        BuildAction.__init__(self, recipe, **keywords)
+        self.args = args
+        self.macros = recipe.macros
+        self.licensePath = '%(datadir)s/known-licenses' % recipe.macros 
+        self.whitespace = re.compile(r'\s*$')
+        self.successiveLines = re.compile(r'\n\n+')
+
+    def sha1sum(self, text):
+        shaObj = sha.new(text)
+        return shaObj.hexdigest()
+
+    def normalize(self, text):
+        newtext = ''
+        # this convienently also converts to unix-style text
+        for line in text.split('\n'):
+            newtext += self.whitespace.sub('', line) + '\n'
+        dedup = self.successiveLines.sub('\n\n', newtext)
+        return dedup
+
+    def writeLicenses(self, text, license):
+        normal = self.normalize(text)
+        sha1 = self.sha1sum(normal)
+        outDir = os.path.join(self.macros.destdir, self.licensePath.lstrip('/'), license)
+        util.mkdirChain(outDir)
+        out = os.path.join(outDir, sha1)
+        open(out, 'w').write(normal)
+        return out
+
+    def walkLicenses(self, dir, write = False):
+        knownLicenses = {}
+        for license in os.listdir(dir):
+            fullPath = os.path.join(dir, license)
+            if os.path.isdir(fullPath):
+                for file in os.listdir(fullPath):
+                    fullFile = os.path.join(fullPath, file)
+                    if os.path.isfile(fullFile):
+                        if write:
+                            text = open(fullFile).read()
+                            dest = self.writeLicenses(text, license)
+                            file = dest
+                        knownLicenses[os.path.basename(file)] = license
+        return knownLicenses
+
+    def do(self, macros):
+        for arg in self.args:
+            # specified license and file
+            if isinstance(arg,tuple):
+                if not os.path.isfile(arg[0]):
+                    raise RuntimeError, arg[0]+' is not a normal file'
+                text = open(arg[0]).read()
+                self.writeLicenses(text,arg[1])
+
+            # directory of directories of licenses
+            elif os.path.isdir(arg):
+                self.walkLicenses(arg, write = True)
+
+            # invalid input
+            else:
+                raise RuntimeError, arg+' is unknown input'
+
+class MakeFIFO(_FileAction):
+    """
+    NAME
+    ====
+
+    B{C{r.MakeFIFO()}} - Creates a FIFO (named pipe)
+
+    SYNOPSIS
+    ========
+
+    C{r.MakeFIFO(I{path}, [I{mode}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.MakeFIFO()} class is called from within a Conary recipe to create a
+    named pipe.
+
+    KEYWORDS
+    ========
+
+    The C{r.MakeFIFO()} class accepts the following keywords:
+
+    B{mode} : The mode of the file (defaults to 0644)
+
+    EXAMPLES
+    ========
+
+    C{r.MakeFIFO('/path/to/fifo', mode=0640)}
+
+    Demonstrates calling C{r.MakeFIFO()} specifying the creation of
+    C{/path/to/fifo} with mode C{0640}.
+    """
+    keywords = {'mode': 0644}
+    def do(self, macros):
+        bracepath = action._expandOnePath(self.path, macros, braceGlob=False)
+        for fullpath in util.braceExpand(bracepath):
+            log.info('creating fifo %s' % fullpath)
+            util.mkdirChain(os.path.dirname(fullpath))
+            os.mkfifo(fullpath)
+            self.setComponents(macros.destdir, fullpath)
+            self.chmod(macros.destdir, fullpath)
+
+    def __init__(self, recipe, *args, **keywords):
+        """
+        @keyword mode: The mode of the file (defaults to 0644)
+        """
+        _FileAction.__init__(self, recipe, *args, **keywords)
+        self.path = args[0] 
+

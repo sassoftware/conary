@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -12,7 +12,10 @@
 # full details.
 #
 
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary.lib import sha1helper
 
@@ -83,22 +86,18 @@ class FromFilesystem(FileContents):
 
 class FromChangeSet(FileContents):
 
-    __slots__ = ( "cs", "pathId" )
+    __slots__ = ( "cs", "pathId", "fileId" )
 
     def copy(self):
         return self.__class__(self.cs, self.pathId)
 
     def get(self):
-	return self.cs.getFileContents(self.pathId)[1].get()
+	return self.cs.getFileContents(self.pathId, self.fileId)[1].get()
 
-    def __init__(self, cs, pathId):
+    def __init__(self, cs, pathId, fileId):
 	self.cs = cs
 	self.pathId = pathId
-
-class CompressedFromChangeSet(FromChangeSet):
-
-    def get(self):
-	return self.cs.getFileContents(self.pathId, compressed = True)[1].get()
+	self.fileId = fileId
 
 class FromString(FileContents):
 

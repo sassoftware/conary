@@ -3,7 +3,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -25,15 +25,16 @@ import termios
 
 BUFFER=1024*4096
 
-def startLog(path):
+def startLog(path, withStdin=True):
     """ Start the log.  Equivalent to Logger(path).startLog() """
-    return Logger(path)
+    return Logger(path, withStdin=withStdin)
 
 class Logger:
-    def __init__(self, path):
+    def __init__(self, path, withStdin=True):
         self.path = path
         self.logging = False
         self.closed = False
+        self.withStdin = withStdin
         self.startLog()
 
     def __del__(self):
@@ -74,7 +75,8 @@ class Logger:
         else:
             logFile = open(self.path, 'w')
         logger = _ChildLogger(masterFd, logFile, directRd, 
-                              controlTerminal=self.restoreTerminalControl)
+                              controlTerminal=self.restoreTerminalControl,
+                              withStdin=self.withStdin)
         try:
             logger.log()
         finally:
@@ -91,14 +93,17 @@ class Logger:
         self.directWr = directWr
         self.loggerPid = loggerPid
 
-        if sys.stdin.isatty():
+        if self.withStdin and sys.stdin.isatty():
             self.oldTermios = termios.tcgetattr(sys.stdin.fileno())
         else:
             self.oldTermios = None
         self.oldStderr = os.dup(sys.stderr.fileno())
         self.oldStdout = os.dup(sys.stdout.fileno())
-        self.oldStdin = os.dup(sys.stdin.fileno())
-        os.dup2(slaveFd, 0)
+        if self.withStdin:
+            self.oldStdin = os.dup(sys.stdin.fileno())
+            os.dup2(slaveFd, 0)
+        else:
+            self.oldStdin = sys.stdin.fileno()
         os.dup2(slaveFd, 1)
         os.dup2(slaveFd, 2)
         os.close(slaveFd)
@@ -113,12 +118,14 @@ class Logger:
         """
         self.closed = True
         # restore old terminal settings before quitting
-        os.dup2(self.oldStdin, 0)
+        if self.oldStdin != 0:
+            os.dup2(self.oldStdin, 0)
         os.dup2(self.oldStdout, 1)
         os.dup2(self.oldStderr, 2)
         if self.oldTermios is not None:
             termios.tcsetattr(0, termios.TCSADRAIN, self.oldTermios)
-        os.close(self.oldStdin)
+        if self.oldStdin != 0:
+            os.close(self.oldStdin)
         os.close(self.oldStdout)
         os.close(self.oldStderr)
         os.close(self.directWr)
@@ -134,7 +141,7 @@ class Logger:
         os.waitpid(self.loggerPid, 0)
 
 class _ChildLogger:
-    def __init__(self, ptyFd, logFile, directRd, controlTerminal):
+    def __init__(self, ptyFd, logFile, directRd, controlTerminal, withStdin):
         # ptyFd is the fd of the pseudo tty master 
         self.ptyFd = ptyFd
         # logFile is a python file-like object that supports the write
@@ -144,6 +151,7 @@ class _ChildLogger:
         # without being output to screen
         self.directRd = directRd
         self.shouldControlTerminal = controlTerminal
+        self.withStdin = withStdin
 
     def _controlTerminal(self):
         try:
@@ -190,7 +198,7 @@ class _ChildLogger:
         stdout = sys.stdout.fileno()
 
         fdList = [directRd, ptyFd]
-        if os.isatty(stdin):
+        if self.withStdin and os.isatty(stdin):
             fdList.append(stdin)
         
         # sigwinch is called when the window size is changed

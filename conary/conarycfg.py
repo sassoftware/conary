@@ -1,10 +1,9 @@
-#
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -29,16 +28,22 @@ from conary import versions
 from conary import flavorcfg
 
 # ----------- conary specific types
-    
 
-class UserInformation(list):
-    def find(self, server):
-        for (serverGlob, user, password) in self:
+class ServerGlobList(list):
+
+    def find(self, server, allMatches = False):
+        l = []
+        for (serverGlob, item) in ServerGlobList.__iter__(self):
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
-                return user, password
+                if not allMatches:
+                    return item
+                l.append(item)
 
-        return None
+        if not allMatches:
+            return None
+
+        return l
 
     def extend(self, itemList):
         # Look for the first item which globs to this, and insert the new
@@ -50,7 +55,7 @@ class UserInformation(list):
     def append(self, newItem):
         location = None
         removeOld = False
-        for i, (serverGlob, user, password) in enumerate(self):
+        for i, (serverGlob, info) in enumerate(ServerGlobList.__iter__(self)):
             if fnmatch.fnmatch(newItem[0], serverGlob):
                 if serverGlob == newItem[0]:
                     removeOld = True
@@ -64,16 +69,46 @@ class UserInformation(list):
         else:
             self.insert(location, newItem)
 
-    def addServerGlob(self, serverGlob, user, password):
-        self.append((serverGlob, user, password))
+class UserInformation(ServerGlobList):
+
+    def __iter__(self):
+        for x in ServerGlobList.__iter__(self):
+            yield (x[0], x[1][0], x[1][1])
+
+    def addServerGlob(self, *args):
+        # handle (glob, name, passwd) and transform to (glob, (name, passwd))a
+        if len(args) == 3:
+            args = args[0], (args[1], args[2])
+        ServerGlobList.append(self, args)
+
+    def extend(self, other):
+        for item in other:
+            self.addServerGlob(*item)
+
+    def append(self, item):
+        self.addServerGlob(*item)
+
+    def remove(self, item):
+        if len(item) == 3:
+            item = (item[0], (item[1], item[2]))
+        ServerGlobList.remove(self, item)
+
+    def insert(self, pos, item):
+        if len(item) == 3:
+            item = (item[0], (item[1], item[2]))
+        ServerGlobList.insert(self, pos, item)
+
+    def __init__(self, initVal = None):
+        ServerGlobList.__init__(self)
+        if initVal is not None:
+            for val in initVal:
+                self.addServerGlob(*val)
 
 class CfgUserInfoItem(CfgType):
     def parseString(self, str):
         val = str.split()
         if len(val) < 2 or len(val) > 3:
-            raise ParseError, ("%s:%s: expected <hostglob> <user> "
-                               "<password> for configuration value %s"
-                                            % (file, self.lineno, key))
+            raise ParseError("expected <hostglob> <user> [<password>]")
         elif len(val) == 2:
             return (val[0], val[1], None)
         else:
@@ -98,6 +133,44 @@ class CfgUserInfo(CfgList):
         curVal.extend(newVal)
         return curVal
 
+class EntitlementList(ServerGlobList):
+
+    def addEntitlement(self, serverGlob, entitlement, entClass = None):
+        self.append((serverGlob, (entClass, entitlement)))
+
+class CfgEntitlementItem(CfgType):
+    def parseString(self, str):
+        val = str.split()
+        if len(val) == 3:
+            # Output from an entitlement file, which still has a class
+            import warnings
+            warnings.warn("\nExpected an entitlement line with no entitlement "
+                "class.\nEntitlement classes will be ignored in the future.\n"
+                "Please change the 'entitlement %s' config line to\n"
+                "'entitlement %s %s'" % (str, val[0], val[2]),
+                DeprecationWarning)
+            return (val[0], (val[1], val[2]))
+        elif len(val) != 2:
+            raise ParseError("expected <hostglob> <entitlement>")
+
+        return (val[0], (None, val[1]))
+
+    def format(self, val, displayOptions=None):
+        if val[1][0] is None:
+            return '%s %s' % (val[0], val[1][1])
+        else:
+            return '%s %s %s' % (val[0], val[1][0], val[1][1])
+
+class CfgEntitlement(CfgList):
+
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgEntitlementItem, EntitlementList,
+                         default = default)
+
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
+
 class CfgLabel(CfgType):
 
     def format(self, val, displayOptions=None):
@@ -112,7 +185,11 @@ class CfgLabel(CfgType):
 class CfgRepoMapEntry(CfgType):
 
     def parseString(self, str):
-        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', str)
+        val = str.split()
+        if len(val) != 2:
+            raise ParseError("expected <hostglob> <url>")
+
+        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', val[1])
         if match is not None:
             user, server = match.groups()
             raise ParseError, ('repositoryMap entries should not contain '
@@ -120,24 +197,88 @@ class CfgRepoMapEntry(CfgType):
                                '"user %s %s <password>" instead' % 
                                (server, user))
 
-        return CfgType.parseString(self, str)
+        return (val[0], val[1])
 
     def format(self, val, displayOptions=None):
-        if displayOptions.get('hidePasswords'):
-            return re.sub('(https?://)[^:]*:[^@]*@(.*)', 
-                          r'\1<user>:<password>@\2', val)
+        return '%-25s %s' % (val[0], val[1])
+
+class RepoMap(ServerGlobList):
+
+    # Pretend to be a dict; repositorymap's used to be dicts and this should
+    # ease the transition.
+
+    def __setitem__(self, key, val):
+        if type(key) is int:
+            return ServerGlobList.__setitem__(self, key, val)
+
+        self.append((key, val))
+
+    def __getitem__(self, key):
+        if type(key) is int:
+            return ServerGlobList.__getitem__(self, key)
+
+        return self.find(key)
+
+    def has_key(self, key):
+        r = self.find(key)
+        if r is None:
+            return False
+        return True
+
+    def __contains__(self, key):
+        return self.has_key(key)
+
+    def clear(self):
+        del self[:]
+
+    def update(self, other):
+        for key, val in other.iteritems():
+            self.append((key, val))
+
+    def iteritems(self):
+        return iter(self)
+
+    def items(self):
+        return self
+
+    def keys(self):
+        return [ x[0] for x in self ]
+
+    def iterkeys(self):
+        return ( x[0] for x in self )
+
+    def values(self):
+        return [ x[1] for x in self ]
+
+    def itervalues(self):
+        return ( x[1] for x in self )
+
+    def get(self, key, default):
+        r = self.find(key)
+        if r is None:
+            return default
+
+        return r
+
+    def __init__(self, repoMap=[]):
+        if hasattr(repoMap, 'iteritems'):
+            ServerGlobList.__init__(self)
+            self.update(repoMap)
         else:
-            return val
+            ServerGlobList.__init__(self, repoMap)
 
-class RepoMap(dict):
+class CfgRepoMap(CfgList):
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgRepoMapEntry, RepoMap, default=default)
 
-    def getNoPass(self, key):
-        return re.sub('(https?://)[^:]*:[^@]*@(.*)', r'\1\2', self[key])
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
 
-class CfgRepoMap(CfgDict):
-    def __init__(self, default={}):
-        CfgDict.__init__(self, CfgRepoMapEntry, dictType=RepoMap,
-                         default=default)
+    def getDefault(self, default=[]):
+        if hasattr(default, 'iteritems'):
+            return CfgList.getDefault(self, default.iteritems())
+        return CfgList.getDefault(self, default)
 
 class CfgFlavor(CfgType):
 
@@ -228,7 +369,69 @@ class CfgLabelList(list):
 
         return cmp(firstIdx, secondIdx)
 
+class ProxyEntry(CfgType):
+
+    def parseString(self, str):
+        match = re.match('https?://.*', str)
+        if match is None:
+            raise ParseError('Invalid proxy url %s' % str)
+
+        return CfgType.parseString(self, str)
+
+class CfgProxy(CfgDict):
+
+    def updateFromString(self, val, str):
+        suppProtocols = ['http', 'https']
+        vlist = str.split()
+        if len(vlist) > 2:
+            raise ParseError("Too many arguments for proxy configuration '%s'"
+                             % str)
+        if not vlist:
+            raise ParseError("Arguments required for proxy configuration")
+        if len(vlist) == 2:
+            if vlist[0] not in suppProtocols:
+                raise ParseError('Unknown proxy procotol %s' % vlist[0])
+            if vlist[1] == "None":
+                # Special value to turn proxy values off
+                if vlist[0] in val:
+                    del val[vlist[0]]
+                return val
+            return CfgDict.updateFromString(self, val, str)
+
+        # At this point, len(vlist) == 1
+        # Fix it up
+        try:
+            protocol, rest = str.split(':', 1)
+        except ValueError:
+            # : not in the value
+            if str == "None":
+                # Special value that turns off the proxy
+                for protocol in suppProtocols:
+                    if protocol in val:
+                        del val[protocol]
+                return val
+            raise ParseError("Invalid proxy configuration value %s" % str)
+
+        # This next test duplicates the work done by ProxyEntry.parseString,
+        # but it's pretty cheap to do here since we already have the protocol
+        # parsed out
+        if protocol not in suppProtocols:
+                raise ParseError('Unknown proxy procotol %s' % protocol)
+
+        CfgDict.updateFromString(self, val, 'http http:' + rest)
+        CfgDict.updateFromString(self, val, 'https https:' + rest)
+        return val
+
+    def __init__(self, default={}):
+        CfgDict.__init__(self, ProxyEntry, default=default)
+
 CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
+
+
+class CfgSearchPathItem(CfgType):
+    def parseString(self, item):
+        return item
+CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
@@ -261,6 +464,7 @@ class ConaryContext(ConfigSection):
                                             '~/.conary/macros'))
     emergeUser            =  (CfgString, 'emerge')
     enforceManagedPolicy  =  (CfgBool, True)
+    entitlement           =  CfgEntitlement
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')
     environment           =  CfgDict(CfgString)
     excludeTroves         =  CfgRegExpList
@@ -283,6 +487,11 @@ class ConaryContext(ConfigSection):
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
+    shortenGroupFlavors   =  CfgBool
+    # Upstream Conary proxy
+    conaryProxy           =  CfgProxy
+    # HTTP proxy
+    proxy                 =  CfgProxy
     pubRing               =  (CfgPathList, [ \
         ('/etc/conary/pubring.gpg',
          '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
@@ -297,6 +506,7 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/recipeTemplates'))
     showLabels            =  CfgBool
     showComponents        =  CfgBool
+    searchPath            =  CfgSearchPath
     signatureKey          =  CfgFingerPrint
     signatureKeyMap       =  CfgFingerPrintMap
     siteConfigPath        =  (CfgPathList, ('/etc/conary/site',
@@ -343,8 +553,32 @@ class ConaryConfiguration(SectionedConfigFile):
 
 	if readConfigFiles:
 	    self.readFiles()
+            # Entitlement files are config files
+            self.readEntitlementDirectory()
+
         util.settempdir(self.tmpDir)
-  
+
+    def readEntitlementDirectory(self):
+        if not os.path.isdir(self.entitlementDirectory):
+            return
+
+        warn = False
+        try:
+            files = os.listdir(self.entitlementDirectory)
+        except OSError:
+            return
+        for basename in files:
+            try:
+                if os.path.isfile(os.path.join(self.entitlementDirectory,
+                                               basename)):
+                    ent = loadEntitlement(self.entitlementDirectory, basename)
+                    if not ent:
+                        continue
+                    self.entitlement.addEntitlement(ent[0], ent[2],
+                                                    entClass = ent[1])
+            except OSError:
+                return
+
     def readFiles(self):
 	self.read("/etc/conaryrc", exception=False)
 	if os.environ.has_key("HOME"):
@@ -440,11 +674,16 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
-def emitEntitlement(serverName, className, key):
+def emitEntitlement(serverName, className = None, key = None):
 
     # XXX This probably should be emitted using a real XML DOM writer,
     # but this will probably do for now. And yes, all that mess is required
     # to be well-formed and valid XML.
+    if className is None:
+        classInfo = ""
+    else:
+        classInfo = "<class>%s</class>" % className
+
     return """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <!DOCTYPE entitlement [
     <!ELEMENT entitlement (server, class, key)>
@@ -454,12 +693,28 @@ def emitEntitlement(serverName, className, key):
 ]>
 <entitlement>
     <server>%s</server>
-    <class>%s</class>
+    %s
     <key>%s</key>
 </entitlement>
-""" % (serverName, className, key)
+""" % (serverName, classInfo, key)
 
-def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
+def loadEntitlementFromString(xmlContent, *args, **kw):
+    # handle old callers
+    source=kw.get('source', '<override>')
+    serverName = kw.get('serverName', None)
+    if len(args):
+        if len(args) == 1:
+            source = args[0]
+        elif len(args) == 2:
+            serverName = args[0]
+            source = args[1]
+        else:
+            raise TypeError('loadEntitlementFromString() takes exactly 1 argument (%d given)' %len(args))
+
+    if serverName:
+        import warnings
+        warnings.warn("The serverName argument to loadEntitlementFromString "
+                      "has been deprecated", DeprecationWarning)
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
@@ -474,22 +729,18 @@ def loadEntitlementFromString(xmlContent, serverName, source='<override>'):
             p.parse(xmlContent)
 
         try:
-            entServer = p['server']
-            entClass = p['class']
+            entServer = p.get('server', None)
+            entClass = p.get('class', None)
             entKey = p['key']
         except KeyError:
             raise errors.ConaryError("Entitlement incomplete.  Entitlements"
                                      " must include 'server', 'class', and"
                                      " 'key' values")
     except Exception, err:
-        raise errors.ConaryError("Malformed entitlement for %s at %s:"
-                                 " %s" % (serverName, source, err))
+        raise errors.ConaryError("Malformed entitlement at %s:"
+                                 " %s" % (source, err))
 
-    if entServer != serverName: 
-        raise errors.ConaryError("Entitlement at %s is for server '%s', "
-                         "should be for '%s'" % (source, entServer, serverName))
-
-    return (entClass, entKey)
+    return (p['server'], entClass, entKey)
 
 def loadEntitlementFromProgram(fullPath, serverName):
     """ Executes the given file to generate an entitlement.
@@ -558,12 +809,10 @@ def loadEntitlementFromProgram(fullPath, serverName):
     # looks like we generated an entitlement - they're still the possibility
     # that the entitlement is broken.
     xmlContent = ''.join(output)
-    return loadEntitlementFromString(xmlContent, serverName, fullPath)
+    return loadEntitlementFromString(xmlContent, fullPath)
 
 
 def loadEntitlement(dirName, serverName):
-    # XXX this should be replaced with a real xml parser
-
     if not dirName:
         # XXX
         # this is a hack for the repository server which doesn't support
@@ -577,10 +826,10 @@ def loadEntitlement(dirName, serverName):
         return None
 
     if os.access(fullPath, os.X_OK):
-        return loadEntitlementFromProgram(fullPath, serverName)
+        return loadEntitlementFromProgram(fullPath,
+                                          '<executable %s>' % fullPath)
     elif os.access(fullPath, os.R_OK):
-        return loadEntitlementFromString(open(fullPath).read(), serverName,
-                                         fullPath)
+        return loadEntitlementFromString(open(fullPath).read(), fullPath)
     else:
         return None
 
@@ -611,3 +860,17 @@ class EntitlementParser(dict):
         self.p.CharacterDataHandler = self.CharacterDataHandler
         dict.__init__(self)
 
+def getProxyFromConfig(cfg):
+    """Get the proper proxy configuration variable from the supplied config
+    object"""
+
+    # Is there a conaryProxy defined?
+    proxy = {}
+    for k, v in cfg.conaryProxy.iteritems():
+        # Munge http.* to conary.* to flag the transport layer that
+        # we're using a Conary proxy
+        v = 'conary' + v[4:]
+        proxy[k] = v
+    if proxy:
+        return proxy
+    return cfg.proxy

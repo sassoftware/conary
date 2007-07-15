@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -28,6 +28,9 @@ def getConaryLogEventList(lines=None):
     #
 
     def _stripdate(logentry):
+        if not logentry.startswith('['):
+            # no date present (e.g. part of a traceback)
+            return logentry
         dateend = logentry.find(']')
         if dateend <= 0:
             return logentry
@@ -37,10 +40,23 @@ def getConaryLogEventList(lines=None):
         lines = getConaryLogLineList()
     eventStart = []
 
+    inTraceBack = False
     for n in range(len(lines)):
-        dateend = lines[n].find(']')
-        if dateend > 0 and lines[n][dateend+2] == ' ': continue
-        if lines[n].endswith('command complete'): continue
+        thisLine = lines[n]
+
+        if thisLine.startswith('Traceback '):
+            inTraceBack = True
+        if thisLine.startswith('['):
+            inTraceBack = False
+        if inTraceBack:
+            continue
+
+        dateend = thisLine.find(']')
+        if (dateend > 0 and len(thisLine) > dateend+2
+            and thisLine[dateend+2] == ' '):
+            continue
+        if lines[n].endswith('command complete'):
+            continue
         eventStart.append(n)
 
     slices = []

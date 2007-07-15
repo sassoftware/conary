@@ -3,7 +3,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -20,6 +20,9 @@ class TroveInfoTable:
     def addInfo(self, cu, trove, idNum):
         # c = True if the trove is a component
         n = trove.getName()
+        # complete fixup is internal to a single client run; it should never be stored
+        # anywhere
+        assert(trove.troveInfo.completeFixup() is None)
         c = ':' in n and not n.endswith(':source')
         for (tag, (size, streamType, name)) in trove.troveInfo.streamDict.iteritems():
             frz = trove.troveInfo.__getattribute__(name).freeze()
@@ -33,9 +36,18 @@ class TroveInfoTable:
                 cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
                            "VALUES (?, ?, ?)", (idNum, tag, cu.binary(frz)))
 
+        frz = trove.troveInfo.freeze(freezeKnown = False, freezeUnknown = True)
+        if frz:
+            cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
+                       "VALUES (?, ?, ?)", (idNum, -1, cu.binary(frz)))
+
+
     def getInfo(self, cu, trove, idNum):
         cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?",
                    idNum)
         for (tag, frz) in cu:
-            name = trove.troveInfo.streamDict[tag][2]
-            trove.troveInfo.__getattribute__(name).thaw(cu.frombinary(frz))
+            if tag == -1:
+                trove.troveInfo.thaw(cu.frombinary(frz))
+            else:
+                name = trove.troveInfo.streamDict[tag][2]
+                trove.troveInfo.__getattribute__(name).thaw(cu.frombinary(frz))

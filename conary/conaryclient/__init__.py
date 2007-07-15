@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -16,12 +16,14 @@ import os
 import pickle
 
 #conary imports
-from conary import conarycfg, metadata
+from conary import conarycfg, errors, metadata, rollbacks, trove
 from conary.conaryclient import clone, resolve, update
 from conary.lib import log, util
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import trovesource
+from conary.repository import searchsource
+from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
@@ -41,6 +43,8 @@ InstallPathConflicts = update.InstallPathConflicts
 
 CriticalUpdateInfo = update.CriticalUpdateInfo
 
+ChangeSetFromFile = update.changeset.ChangeSetFromFile
+
 class TroveNotFound(Exception):
     def __init__(self, troveName):
         self.troveName = troveName
@@ -59,8 +63,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     including trove updates and erases.
     """
     def __init__(self, cfg = None, passwordPrompter = None,
-                 resolverClass=resolve.DependencySolver,
-                 entitlements = {}, updateCallback=None):
+                 resolverClass=resolve.DependencySolver, updateCallback=None):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
                     If None, the standard Conary configuration is loaded
@@ -78,8 +81,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
         self.repos = self.createRepos(self.db, cfg,
-                                      passwordPrompter = passwordPrompter,
-                                      entitlements = entitlements)
+                                      passwordPrompter = passwordPrompter)
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 
         if not resolverClass:
@@ -87,8 +89,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         self.resolver = resolverClass(self, cfg, self.repos, self.db)
 
-    def createRepos(self, db, cfg, passwordPrompter=None, userMap=None,
-                    entitlements={}):
+    def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
         if self.repos:
             if passwordPrompter is None:
                 passwordPrompter = self.repos.getPwPrompt()
@@ -100,6 +101,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if userMap is None:
                 userMap = cfg.user
 
+        proxy = conarycfg.getProxyFromConfig(cfg)
+
         return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                                        pwPrompt = passwordPrompter,
                                        localRepository = db,
@@ -109,10 +112,17 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                           cfg.downloadRateLimit,
                                        uploadRateLimit =
                                           cfg.uploadRateLimit,
-                                       entitlements = entitlements)
+                                       entitlements = cfg.entitlement,
+                                       proxy = proxy)
 
     def getRepos(self):
         return self.repos
+
+    def setRepos(self, repos):
+        self.repos = repos
+
+    def disconnectRepos(self):
+        self.repos = None
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
@@ -140,6 +150,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         # if the cache missed any, grab from the repos
         if not cacheOnly and troveList:
+            if self.repos is None:
+                raise errors.RepositoryError("Repository not available")
             md.update(self.repos.getMetadata(troveList, label))
             if md and cacheFile:
                 try:
@@ -175,85 +187,29 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                              excludeList = conarycfg.RegularExpressionList(),
                              callback = None):
         primaryList = []
+        headerList = []
         for (name, (oldVersion, oldFlavor),
                    (newVersion, newFlavor), abstract) in csList:
             if newVersion:
                 primaryList.append((name, newVersion, newFlavor))
+                if oldVersion:
+                    headerList.append( (name, (None, None),
+                                              (oldVersion, oldFlavor), True) )
+
+                headerList.append( (name, (None, None),
+                                          (newVersion, newFlavor), True) )
             else:
                 primaryList.append((name, oldVersion, oldFlavor))
 
-        cs = self.repos.createChangeSet(csList, recurse = recurse, 
+        cs = self.repos.createChangeSet(headerList, recurse = recurse, 
                                         withFiles = False, callback = callback)
 
-        deleted = set()
-        # filter out non-defaults
-        if skipNotByDefault:
-            # Find out if troves were included w/ byDefault set (one
-            # byDefault beats any number of not byDefault)
-            inclusions = {}
-            for troveCs in cs.iterNewTroveList():
-                for (name, changeList) in troveCs.iterChangedTroves():
-                    for (changeType, version, flavor, byDef) in changeList:
-                        if changeType == '+':
-                            inclusions.setdefault((name, version, flavor), 0)
-                            if byDef:
-                                inclusions[(name, version, flavor)] +=1
-
-            # use a list comprehension here because we're modifying the
-            # underlying dict in the cs instance
-            for troveCs in [ x for x in cs.iterNewTroveList() ]:
-                if not troveCs.getNewVersion():
-                    # erases get to stay since they don't have a byDefault flag
-                    continue
-
-                item = (troveCs.getName(), troveCs.getNewVersion(),
-                        troveCs.getNewFlavor())
-                if item in primaryList: 
-                    # the item was explicitly asked for
-                    continue
-                elif inclusions[item] or item in deleted:
-                    # the item was included w/ byDefault set (or we might
-                    # have already erased it from the changeset)
-                    continue
-
-                # troveCs was not included byDefault True anywhere.
-                # It may include subcomponents with byDefault True, however.
-                # 
-                # Say troveCs represents an install of foo, byDefault False.
-
-                # If foo:runtime is only included by foo, 
-                # then we don't want foo:runtime either, even if foo:runtime
-                # is included in foo byDefault True.
-                # However, if foo:runtime is included in a higher-level group
-                # byDefault True, then foo:runtime should be included. 
-                # We track not-by-default references to foo:runtime in 
-                # inclusions, and delete foo:runtime only when its last
-                # byDefault referencer was deleted.
-
-                toDelete = [troveCs]
-                while toDelete:
-                    troveCs = toDelete.pop()
-                    item = (troveCs.getName(), troveCs.getNewVersion(),
-                            troveCs.getNewFlavor())
-
-                    deleted.add(item)
-                    cs.delNewTrove(*item)
-
-                    for (name, changeList) in troveCs.iterChangedTroves():
-                        for (changeType, version, flavor, byDef) in changeList:
-                            if changeType == '+' and byDef:
-                                item = (name, version, flavor)
-                                inclusions[item] -= 1
-                                if not inclusions[item]:
-                                    childCs = cs.getNewTroveVersion(*item)
-                                    toDelete.append(childCs)
-
-        # now filter excludeList
-        fullCsList = []
-        for troveCs in cs.iterNewTroveList():
-            name = troveCs.getName()
-            newVersion = troveCs.getNewVersion()
-            newFlavor = troveCs.getNewFlavor()
+        finalList = set()
+        jobList = csList[:]
+        while jobList:
+            job = jobList.pop(-1)
+            (name, (oldVersion, oldFlavor),
+                   (newVersion, newFlavor), abstract) = job
 
             skip = False
 
@@ -262,29 +218,47 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                 if excludeList.match(name):
                     skip = True
 
-            if not skip:
-                fullCsList.append((name, 
-                           (troveCs.getOldVersion(), troveCs.getOldFlavor()),
-                           (newVersion,              newFlavor),
-                       not troveCs.getOldVersion()))
+            if skip:
+                continue
 
-        # exclude packages that are being erased as well
-        for (name, oldVersion, oldFlavor) in cs.getOldTroveList():
-            skip = False
-            if (name, oldVersion, oldFlavor) not in primaryList:
-                for reStr, regExp in self.cfg.excludeTroves:
-                    if regExp.match(name):
-                        skip = True
-            if not skip:
-                fullCsList.append((name, (oldVersion, oldFlavor),
-                                   (None, None), False))
+            finalList.add(job)
+
+            if not recurse or not trove.troveIsCollection(name):
+                continue
+
+            if job[2][1] is None:
+                continue
+            elif job[1][0] is None:
+                oldTrove = None
+            else:
+                oldTrove = trove.Trove(cs.getNewTroveVersion(name, oldVersion,
+                                                             oldFlavor))
+
+            newTrove = trove.Trove(cs.getNewTroveVersion(name, newVersion,
+                                                         newFlavor))
+
+            trvCs, filesNeeded, trovesNeeded = newTrove.diff(
+                                            oldTrove, (oldTrove == None))
+
+            for subJob in trovesNeeded:
+                if not subJob[2][0]:
+                    jobList.append(subJob)
+                    continue
+
+                if skipNotByDefault and not newTrove.includeTroveByDefault(
+                                    subJob[0], subJob[2][0], subJob[2][1]):
+                    continue
+
+                jobList.append(subJob)
+
+        finalList = list(finalList)
 
         # recreate primaryList without erase-only troves for the primary trove 
         # list
-        primaryList = [ (x[0], x[2][0], x[2][1]) for x in csList 
+        primaryList = [ (x[0], x[2][0], x[2][1]) for x in csList
                         if x[2][0] is not None ]
 
-        return (fullCsList, primaryList)
+        return (finalList, primaryList)
 
     def createChangeSet(self, csList, recurse = True, 
                         skipNotByDefault = True, 
@@ -296,6 +270,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         withFiles and withFileContents are the same as for the underlying
         repository call.
         """
+        if self.repos is None:
+            raise errors.RepositoryError("Repository not available")
         (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
                 excludeList = excludeList, callback = callback)
@@ -331,6 +307,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @type callback: callbacks.UpdateCallback
         """
 
+        if self.repos is None:
+            raise errors.RepositoryError("Repository not available")
         (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
                 excludeList = excludeList, callback = callback)
@@ -359,11 +337,19 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         @param version: a conary client version object, L{versions.Version}
         @param flavor: a conary client flavor object, L{deps.deps.Flavor}
         """        
+        if self.repos is None:
+            raise errors.RepositoryError("Repository not available")
         return self.repos.getConaryUrl(version, flavor)
 
     def getRepos(self):
         return self.repos
 
+    def iterRollbacksList(self):
+        """
+        Iterate over rollback list.
+        Yield (rollbackName, rollback)
+        """
+        return self.db.iterRollbacksList()
 
     def _checkChangeSetForLabelConflicts(self, cs):
         source = trovesource.ChangesetFilesTroveSource(None)
@@ -403,3 +389,30 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if not foundPrevious and troveConflict:
                 conflicts.append(troveConflict)
         return conflicts
+
+    def getSearchSource(self, flavor=0, troveSource=None):
+        # a flavor of None is common in some cases so we use 0
+        # as our "unset" case.
+        if flavor is 0:
+            flavor = self.cfg.flavor
+
+        searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
+        if troveSource is None:
+            troveSource = self.getRepos()
+            if troveSource is None:
+                return None
+        searchSource = searchsource.NetworkSearchSource(troveSource,
+                            self.cfg.installLabelPath,
+                            flavor, self.db,
+                            resolveSearchMethod=searchMethod)
+        if self.cfg.searchPath:
+            return searchsource.createSearchSourceStackFromStrings(
+                                                         searchSource,
+                                                         self.cfg.searchPath, 
+                                                         flavor,
+                                                         db=self.db)
+        else:
+            return searchSource
+
+    def applyRollback(self, rollbackSpec, **kwargs):
+        return rollbacks.applyRollback(self, rollbackSpec, **kwargs)

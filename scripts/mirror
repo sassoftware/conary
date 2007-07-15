@@ -6,7 +6,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -17,7 +17,6 @@
 
 import os
 import sys
-import fcntl
 
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
@@ -29,97 +28,7 @@ else:
 
 sys.path.insert(0, os.path.dirname(fullPath))
 
-from conary.callbacks import ChangesetCallback as EmptyChangesetCallback
-from conary.conaryclient import mirror, callbacks
-from conary.repository import netclient
-from conary.lib import util, log
-import optparse
-
-#sys.excepthook = util.genExcepthook(debug=True)
-
-def parseArgs(argv):
-    parser = optparse.OptionParser(version = '%prog 0.1')
-    parser.add_option("--config-file", dest = "configFile",
-                      help = "configuration file", metavar = "FILE")
-    parser.add_option("--full-sig-sync", dest = "syncSigs",
-                      action = "store_true", default = False,
-                      help = "replace all of the trove signatures on "
-                             "the target repository")
-    parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
-                      default = False,
-                      help = "ignore the last-mirrored timestamp in the "
-                             "target repository")
-    parser.add_option("--test", dest = "test", action = "store_true",
-                      default = False,
-                      help = "skip commiting changes to the target repository")
-    parser.add_option("-v", "--verbose", dest = "verbose",
-                      action = "store_true", default = False,
-                      help = "display information on what is going on")
-
-    (options, args) = parser.parse_args(argv)
-
-    if options.configFile is None:
-        print >> sys.stderr, 'a mirror configuration must be provided'
-        sys.exit(1)
-    elif args:
-        print >> sys.stderr, 'unexpected arguments:', " ".join(args)
-        sys.exit(1)
-
-    return options
-
-class ChangesetCallback(callbacks.ChangesetCallback):
-    def done(self):
-        self._message('\r')
-
-def main(argv=sys.argv[1:]):
-    options = parseArgs(argv)
-    cfg = mirror.MirrorConfiguration()
-    cfg.read(options.configFile, exception = True)
-    callback = EmptyChangesetCallback()
-
-    if options.verbose:
-        log.setVerbosity(log.DEBUG)
-        callback = ChangesetCallback()
-
-    if cfg.lockFile:
-        try:
-            log.debug('checking for lock file')
-            lock = open(cfg.lockFile, 'w')
-            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except IOError:
-            log.debug('lock held by another process, exiting')
-            sys.exit(0)
-
-
-    # We need two repos clients, one for the server and one for the client. Since
-    # they have the same name (the repositorymap gets us to the right hosts).
-    sourceRepos = netclient.NetworkRepositoryClient(cfg.source.repositoryMap,
-                              cfg.source.user,
-                              uploadRateLimit = cfg.uploadRateLimit,
-                              downloadRateLimit = cfg.downloadRateLimit,
-                              entitlementDir = cfg.entitlementDirectory)
-
-    targetRepos = netclient.NetworkRepositoryClient(cfg.target.repositoryMap,
-                              cfg.target.user,
-                              uploadRateLimit = cfg.uploadRateLimit,
-                              downloadRateLimit = cfg.downloadRateLimit,
-                              entitlementDir = cfg.entitlementDirectory)
-
-    # we pass in the sync flag only the first time around, because after
-    # that we need the targetRepos mark to advance accordingly after being
-    # reset to -1
-    count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
-                                    test = options.test, sync = options.sync,
-                                    syncSigs = options.syncSigs,
-                                    callback = callback)
-    while count:
-        count = mirror.mirrorRepository(sourceRepos, targetRepos, cfg,
-                                        test = options.test, callback = callback)
-
-
-def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
-    sys.exit(main(argv))
-
+from conary.conaryclient import mirror
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(mirror.Main())

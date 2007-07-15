@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -28,7 +28,7 @@ from conary import files, trove
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.deps import deps
-from conary.lib import elf, util, log, pydeps, graph
+from conary.lib import elf, util, pydeps, graph
 from conary.local import database
 
 from elementtree import ElementTree
@@ -41,6 +41,7 @@ class _filterSpec(policy.Policy):
     are derived.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     def __init__(self, *args, **keywords):
 	self.extraFilters = []
 	policy.Policy.__init__(self, *args, **keywords)
@@ -65,6 +66,7 @@ class _addInfo(policy.Policy):
     requirements, and provision, to files.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -183,6 +185,7 @@ class Config(policy.Policy):
     it would not be automatically marked as a configuration file otherwise.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         # for :config component, ComponentSpec must run after Config
         # Otherwise, this policy would follow PackageSpec and just set isConfig
@@ -218,7 +221,8 @@ class Config(policy.Policy):
             if lastchar != '\n':
                 self.error("config file %s missing trailing newline" %filename)
         f.close()
-        self.recipe.ComponentSpec(_config=filename)
+        mode = os.lstat(fullpath)[stat.ST_MODE]
+        self.recipe.ComponentSpec(_config=(filename, mode))
 
 
 class ComponentSpec(_filterSpec):
@@ -278,13 +282,16 @@ class ComponentSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
         self.configFilters = []
+        self.derivedFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
-            config=keywords.pop('_config')
-            self.recipe.PackageSpec(_config=config)
-            if self.recipe.cfg.configComponent:
-                self.configFilters.append(('config', re.escape(config)))
+            configPath, mode=keywords.pop('_config')
+            self.recipe.PackageSpec(_config=configPath)
+            # :config component only if no executable bits set (CNY-1260)
+            nonExecutable = not (mode & 0111)
+            if self.recipe.cfg.configComponent and nonExecutable:
+                self.configFilters.append(('config', re.escape(configPath)))
 
         if args:
             name = args[0]
@@ -310,12 +317,16 @@ class ComponentSpec(_filterSpec):
         # specs that absolutely should not be overridden in recipes.
         for filteritem in itertools.chain(self.invariantFilters,
                                           self.extraFilters,
+                                          self.derivedFilters,
                                           self.configFilters,
                                           self.baseFilters):
-	    name = filteritem[0] % self.macros
-	    assert(name != 'source')
-            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
-            compFilters.append(filter.Filter(*args, **kwargs))
+            if not isinstance(filteritem, filter.Filter):
+                name = filteritem[0] % self.macros
+                assert(name != 'source')
+                args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+                filteritem = filter.Filter(*args, **kwargs)
+
+            compFilters.append(filteritem)
 
 	# by default, everything that hasn't matched a filter pattern yet
 	# goes in the catchall component ('runtime' by default)
@@ -461,6 +472,7 @@ class PackageSpec(_filterSpec):
         """
         _filterSpec.__init__(self, *args, **keywords)
         self.configFiles = []
+        self.derivedFilters = []
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
@@ -482,13 +494,19 @@ class PackageSpec(_filterSpec):
             # would have an effect only with exceptions listed, so no warning...
             self.inclusions = None
 
-	for (filteritem) in self.extraFilters:
-	    name = filteritem[0] % self.macros
-            if not trove.troveNameIsValid(name):
-                self.error('%s is not a valid package name', name)
+        # extras need to come before derived so that derived packages
+        # can change the package to which a file is assigned
+        for filteritem in itertools.chain(self.extraFilters,
+                                          self.derivedFilters):
+            if not isinstance(filteritem, filter.Filter):
+                name = filteritem[0] % self.macros
+                if not trove.troveNameIsValid(name):
+                    self.error('%s is not a valid package name', name)
 
-            args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
-            self.pkgFilters.append(filter.Filter(*args, **kwargs))
+                args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
+                self.pkgFilters.append(filter.Filter(*args, **kwargs))
+            else:
+                self.pkgFilters.append(filteritem)
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	self.pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
@@ -553,6 +571,7 @@ class InitialContents(policy.Policy):
         ('Config', policy.REQUIRED_PRIOR),
     )
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
 
     # change inclusions to default to none, instead of all files
     keywords = policy.Policy.keywords.copy()
@@ -615,6 +634,7 @@ class Transient(policy.Policy):
     having transient contents.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Config', policy.REQUIRED_PRIOR),
@@ -666,6 +686,7 @@ class TagDescription(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -703,6 +724,7 @@ class TagHandler(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -779,7 +801,7 @@ class TagSpec(_addInfo):
         if tag not in tags:
             self.info('%s: %s', name, path)
             tags.set(tag)
-            if tagFile:
+            if tagFile and self.db:
                 for trove in self.db.iterTrovesByPath(tagFile.tagFile):
                     troveName = trove.getName()
                     if troveName not in self.fullReqs:
@@ -865,6 +887,7 @@ class MakeDevices(policy.Policy):
     owner, and group are both the root user, and permissions are 0666.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Ownership', policy.REQUIRED_SUBSEQUENT),
@@ -906,6 +929,7 @@ class setModes(policy.Policy):
     and C{r.ParseManifest}
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('WarnWriteable', policy.REQUIRED_SUBSEQUENT),
@@ -945,7 +969,7 @@ class LinkType(policy.Policy):
     SYNOPSIS
     ========
 
-    C{LinkLinkType([I{filterexp}])}
+    C{r.LinkType([I{filterexp}])}
 
     DESCRIPTION
     ===========
@@ -960,6 +984,7 @@ class LinkType(policy.Policy):
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('Config', policy.REQUIRED_PRIOR),
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -1008,6 +1033,7 @@ class LinkCount(policy.Policy):
     hardlinks.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = False
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
@@ -1108,6 +1134,7 @@ class ExcludeDirectories(policy.Policy):
     directory will be included in the package.
     """
     bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Ownership', policy.REQUIRED_PRIOR),
@@ -1213,6 +1240,7 @@ class _UserGroup(policy.Policy):
         ('Requires', policy.REQUIRED_SUBSEQUENT),
     )
     filetree = policy.PACKAGE
+    processUnmodified = True
 
     def setUserGroupDep(self, path, info, depClass):
 	componentMap = self.recipe.autopkg.componentMap
@@ -1286,22 +1314,24 @@ class Ownership(_UserGroup):
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
+	pkgfile = self.recipe.autopkg.pathMap[path]
+        pkgOwner = pkgfile.inode.owner()
+        pkgGroup = pkgfile.inode.group()
+        bestOwner = pkgOwner
+        bestGroup = pkgGroup
 	for (f, owner, group) in self.fileFilters:
 	    if f.match(path):
-		self._markOwnership(path, owner, group)
-		return
-	self._markOwnership(path, 'root', 'root')
+                bestOwner, bestGroup = owner, group
+		break
 
-    def _markOwnership(self, filename, owner, group):
-	pkgfile = self.recipe.autopkg.pathMap[filename]
-	if owner:
-	    pkgfile.inode.owner.set(owner)
-            if owner not in self.systemusers:
-                self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
-	if group:
-	    pkgfile.inode.group.set(group)
-            if group not in self.systemgroups:
-                self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
+	if bestOwner != pkgOwner:
+	    pkgfile.inode.owner.set(bestOwner)
+        if bestOwner and bestOwner not in self.systemusers:
+            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
+	if bestGroup != pkgGroup:
+	    pkgfile.inode.group.set(bestGroup)
+	if bestGroup and bestGroup not in self.systemgroups:
+            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
 
 class _Utilize(_UserGroup):
@@ -1503,6 +1533,9 @@ class ComponentRequires(policy.Policy):
             self.depMap.update(d)
 
     def do(self):
+        flags = []
+        if self.recipe.isCrossCompileTool():
+            flags.append((_getTargetDepFlag(self.macros), deps.FLAG_SENSE_REQUIRED))
         components = self.recipe.autopkg.components
         for packageName in [x.name for x in self.recipe.autopkg.packageMap]:
             if packageName in self.overridesMap:
@@ -1515,12 +1548,21 @@ class ComponentRequires(policy.Policy):
                     wantName = ':'.join((packageName, requiringComponent))
                     if (reqName in components and wantName in components and
                         components[reqName] and components[wantName]):
+                        if (d == self.depMap and
+                            reqName in self.recipe._componentReqs and
+                            wantName in self.recipe._componentReqs):
+                            # this is an automatically generated dependency
+                            # which was not in the parent of a derived
+                            # pacakge. don't add it here either
+                            continue
+
                         # Note: this does not add dependencies to files;
                         # these dependencies are insufficiently specific
                         # to attach to files.
                         ds = deps.DependencySet()
                         depClass = deps.TroveDependencies
-                        ds.addDep(depClass, deps.Dependency(reqName))
+
+                        ds.addDep(depClass, deps.Dependency(reqName, flags))
                         p = components[wantName]
                         p.requires.union(ds)
 
@@ -1562,11 +1604,22 @@ class ComponentProvides(policy.Policy):
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
 
-    # frozenset to make sure we do not modify class data
-    flags = frozenset()
+    def __init__(self, *args, **keywords):
+        self.flags = set()
+        self.excepts = set()
+        policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
-        if len(args) == 2:
+        if 'exceptions' in keywords:
+            exceptions = keywords.pop('exceptions')
+            if type(exceptions) is str:
+                self.excepts.add(exceptions)
+            elif type(exceptions) in (tuple, list):
+                self.excepts.update(set(exceptions))
+
+        if not args:
+            return
+        if len(args) >= 2:
             # update the documentation if we ever support the
             # pkgname, flags calling convention
             #pkgname = args[0]
@@ -1575,120 +1628,29 @@ class ComponentProvides(policy.Policy):
             flags = args[0]
         if not isinstance(flags, (list, tuple, set)):
             flags=(flags,)
-        self.flags = frozenset(flags) | self.flags
+        self.flags |= set(flags)
 
     def do(self):
+        self.excepts = set(re.compile(x) for x in self.excepts)
+        self.flags = set(x for x in self.flags
+                         if not [y.match(x) for y in self.excepts])
+
         if self.flags:
             flags = [ (x % self.macros, deps.FLAG_SENSE_REQUIRED)
                       for x in self.flags ]
         else:
             flags = []
+        if self.recipe.isCrossCompileTool():
+            flags.append(('target-%s' % self.macros.target,
+                          deps.FLAG_SENSE_REQUIRED))
+
         for component in self.recipe.autopkg.components.values():
             component.provides.addDep(deps.TroveDependencies,
                 deps.Dependency(component.name, flags))
 
 
-
-def _getmonodis(macros, recipe, path):
-    # For bootstrapping purposes, prefer the just-built version if
-    # it exists
-    if os.access('%(destdir)s/%(monodis)s' %macros, os.X_OK):
-        return ('MONO_PATH=%(destdir)s%(prefix)s/lib'
-                ' LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
-                ' %(destdir)s/%(monodis)s' %macros)
-    elif os.access('%(monodis)s' %macros, os.X_OK):
-        return '%(monodis)s' %macros
-    else:
-        recipe.warn('%s not available for dependency discovery'
-                    ' for path %s' %(macros.monodis, path))
-    return None
-
-
-def _getperlincpath(perl):
-    """
-    Fetch the perl @INC path, and sort longest first for removing
-    prefixes from perl files that are provided.
-    """
-    if not perl:
-        return []
-    p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
-    perlIncPath = p.readlines()
-    # make sure that the command completed successfully
-    rc = p.close()
-    perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
-    return perlIncPath
-
-def _getperl(macros, recipe):
-    """
-    Find the preferred instance of perl to use, including setting
-    any environment variables necessary to use that perl.
-    Returns string for running it, and a separate string, if necessary,
-    for adding to @INC.
-    """
-    perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
-    # not %(bindir)s so that package modifications do not affect
-    # the search for system perl
-    perlPath = '/usr/bin/perl'
-
-    def _perlDestInc(destdir, perlDestInc):
-        return ' '.join(['-I' + destdir + x for x in perlDestInc])
-
-    if os.access(perlDestPath, os.X_OK):
-        # must use packaged perl if it exists
-        m = recipe.magic[perlPath]
-        if m and 'RPATH' in m.contents and m.contents['RPATH']:
-            # we need to prepend the destdir to each element of the RPATH
-            # in order to run perl in the destdir
-            perl = ''.join((
-                'export LD_LIBRARY_PATH=',
-                ':'.join([macros.destdir+x
-                          for x in m.contents['RPATH'].split(':')]),
-                ';',
-                perlDestPath
-            ))
-            perlDestInc = _getperlincpath(perl)
-            perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
-            return [perl, perlDestInc]
-        else:
-            # perl that does not need rpath?
-            perlDestInc = _getperlincpath(perlDestPath)
-            perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
-            return [perlDestPath, perlDestInc]
-    elif os.access(perlPath, os.X_OK):
-        # system perl if no packaged perl, needs no @INC mangling
-        return [perlPath, '']
-
-    # must be no perl at all
-    return ['', '']
-
-
-def _getpython(macros):
-    """
-    Returns the preferred instance of python to use.
-    """
-    pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
-    # not %(bindir)s so that package modifications do not affect
-    # the search for system python
-    pythonPath = '/usr/bin/python'
-
-    if os.access(pythonDestPath, os.X_OK):
-        return pythonDestPath
-    elif os.access(pythonPath, os.X_OK):
-        return pythonPath
-    # No python?  How is cvc running at all?
-    return None
-
-
-def _stripDestDir(pathList, destdir):
-    destDirLen = len(destdir)
-    pathElementList = []
-    for pathElement in pathList:
-        if pathElement.startswith(destdir):
-            pathElementList.append(pathElement[destDirLen:])
-        else:
-            pathElementList.append(pathElement)
-    return pathElementList
-
+def _getTargetDepFlag(macros):
+    return 'target-%s' % macros.target
 
 class _dependency(policy.Policy):
     """
@@ -1696,6 +1658,7 @@ class _dependency(policy.Policy):
     """
 
     def preProcess(self):
+        self.db = None
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
         # interpolate macros, using canonical path form with no trailing /
@@ -1739,10 +1702,11 @@ class _dependency(policy.Policy):
             f.inode.perms() & 0111 and m and m.name == 'script'
             and 'interpreter' in m.contents
             and '/bin/perl' in m.contents['interpreter'])
-        
+
+
     def _createELFDepSet(self, m, elfinfo, recipe=None, basedir=None,
                          soname=None, soflags=None,
-                         libPathMap={}, getRPATH=None):
+                         libPathMap={}, getRPATH=None, path=None):
         """
         Add dependencies from ELF information.
 
@@ -1793,9 +1757,13 @@ class _dependency(policy.Policy):
                     if requiredSet.issubset(providedSet):
                         main = provided.getName()[0]
                     else:
-                        self.warn('Not replacing %s with %s because of missing %s',
+                        pathString = ''
+                        if path:
+                            pathString = 'for path %s' %path
+                        self.warn('Not replacing %s with %s because of missing %s%s',
                                   main, provided.getName()[0],
-                                  sorted(list(requiredSet-providedSet)))
+                                  sorted(list(requiredSet-providedSet)),
+                                  pathString)
                     
                 curClass = deps.SonameDependencies
                 flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
@@ -1846,6 +1814,144 @@ class _dependency(policy.Policy):
             m = self.recipe.magic[contentsPath]
             contentsPath = macros.destdir + contentsPath
         return m, contentsPath[len(macros.destdir):]
+
+    def _getDb(self):
+        if self.db is None:
+            self.db = database.Database(self.recipe.cfg.root,
+                                        self.recipe.cfg.dbPath)
+        return self.db
+
+    def _enforceProvidedPath(self, path, fileType='interpreter',
+                             unmanagedError=False):
+        db = self._getDb()
+        troveNames = [ x.getName() for x in db.iterTrovesByPath(path) ]
+        if not troveNames:
+            talk = {True: self.error, False: self.warn}[unmanagedError]
+            talk('%s file %s not managed by conary' %(fileType, path))
+            return None
+        troveName = troveNames[0]
+
+        # prefer corresponding :devel to :devellib if it exists
+        if troveName.endswith(':devellib'):
+            troveSpec = (
+                troveName.replace(':devellib', ':devel'),
+                None, None
+            )
+            results = db.findTroves(None, [troveSpec],
+                                         allowMissing = True)
+            if troveSpec in results:
+                troveName = results[troveSpec][0][0]
+
+        if troveName not in self.recipe._getTransitiveBuildRequiresNames():
+            self.recipe.reportMissingBuildRequires(troveName)
+
+        return troveName
+
+
+    def _getmonodis(self, macros, path):
+        # For bootstrapping purposes, prefer the just-built version if
+        # it exists
+        monodis = '%(monodis)s' %macros
+        if os.access('%(destdir)s/%(monodis)s' %macros, os.X_OK):
+            return ('MONO_PATH=%(destdir)s%(prefix)s/lib'
+                    ' LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
+                    ' %(destdir)s/%(monodis)s' %macros)
+        elif os.access(monodis, os.X_OK):
+            # Enforce the build requirement, since it is not in the package
+            self._enforceProvidedPath(monodis)
+            return monodis
+        else:
+            self.warn('%s not available for dependency discovery'
+                      ' for path %s' %(monodis, path))
+        return None
+
+
+    def _getperlincpath(self, perl):
+        """
+        Fetch the perl @INC path, and sort longest first for removing
+        prefixes from perl files that are provided.
+        """
+        if not perl:
+            return []
+        p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
+        perlIncPath = p.readlines()
+        # make sure that the command completed successfully
+        rc = p.close()
+        perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
+        return perlIncPath
+
+    def _getperl(self, macros, recipe):
+        """
+        Find the preferred instance of perl to use, including setting
+        any environment variables necessary to use that perl.
+        Returns string for running it, and a separate string, if necessary,
+        for adding to @INC.
+        """
+        perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
+        # not %(bindir)s so that package modifications do not affect
+        # the search for system perl
+        perlPath = '/usr/bin/perl'
+
+        def _perlDestInc(destdir, perlDestInc):
+            return ' '.join(['-I' + destdir + x for x in perlDestInc])
+
+        if os.access(perlDestPath, os.X_OK):
+            # must use packaged perl if it exists
+            m = recipe.magic[perlPath]
+            if m and 'RPATH' in m.contents and m.contents['RPATH']:
+                # we need to prepend the destdir to each element of the RPATH
+                # in order to run perl in the destdir
+                perl = ''.join((
+                    'export LD_LIBRARY_PATH=',
+                    ':'.join([macros.destdir+x
+                              for x in m.contents['RPATH'].split(':')]),
+                    ';',
+                    perlDestPath
+                ))
+                perlDestInc = self._getperlincpath(perl)
+                perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
+                return [perl, perlDestInc]
+            else:
+                # perl that does not need rpath?
+                perlDestInc = self._getperlincpath(perlDestPath)
+                perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
+                return [perlDestPath, perlDestInc]
+        elif os.access(perlPath, os.X_OK):
+            # system perl if no packaged perl, needs no @INC mangling
+            self._enforceProvidedPath(perlPath)
+            return [perlPath, '']
+
+        # must be no perl at all
+        return ['', '']
+
+
+    def _getpython(self, macros):
+        """
+        Returns the preferred instance of python to use.
+        """
+        pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
+        # not %(bindir)s so that package modifications do not affect
+        # the search for system python
+        pythonPath = '/usr/bin/python'
+
+        if os.access(pythonDestPath, os.X_OK):
+            return pythonDestPath
+        elif os.access(pythonPath, os.X_OK):
+            self._enforceProvidedPath(pythonPath)
+            return pythonPath
+        # No python?  How is cvc running at all?
+        return None
+
+
+    def _stripDestDir(self, pathList, destdir):
+        destDirLen = len(destdir)
+        pathElementList = []
+        for pathElement in pathList:
+            if pathElement.startswith(destdir):
+                pathElementList.append(pathElement[destDirLen:])
+            else:
+                pathElementList.append(pathElement)
+        return pathElementList
 
 
 
@@ -2017,8 +2123,9 @@ class Provides(_dependency):
         # paths.  However, within a trove, a file does provide its name.
         # Furthermore, non-regular files can be path dependency targets
         # Therefore, we have to handle this case a bit differently.
-        if dirpath in self.binDirs:
+        if dirpath in self.binDirs and not isinstance(f, files.Directory):
             # CNY-930: automatically export paths in bindirs
+            # CNY-1721: but not directories in bindirs
             f.flags.isPathDependencyTarget(True)
 
         if f.flags.isPathDependencyTarget():
@@ -2056,7 +2163,8 @@ class Provides(_dependency):
         self._addDepSetToMap(path, pkg.providesMap,
             self._createELFDepSet(m, elfinfo,
                                   recipe=self.recipe, basedir=basedir,
-                                  soname=soname, soflags=soflags))
+                                  soname=soname, soflags=soflags,
+                                  path=path))
 
 
     def _generatePythonProvidesSysPath(self):
@@ -2070,7 +2178,7 @@ class Provides(_dependency):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = _getpython(self.macros)
+        pythonPath = self._getpython(self.macros)
         # conary is a python program...
         assert(pythonPath)
 
@@ -2082,7 +2190,7 @@ class Provides(_dependency):
                 r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
                 %pythonPath).read().split('\0')
                 if x)
-            systemPaths = set(_stripDestDir(systemPaths, destdir))
+            systemPaths = set(self._stripDestDir(systemPaths, destdir))
 
             # determine created destdir site-packages, and add them to
             # the list of acceptable provide paths
@@ -2090,7 +2198,7 @@ class Provides(_dependency):
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
             site.addsitepackages(None)
-            systemPaths.update(_stripDestDir(sys.path, destdir))
+            systemPaths.update(self._stripDestDir(sys.path, destdir))
 
             # later, we will need to truncate paths using longest path first
             self.sysPath = sorted(systemPaths, key=len, reverse=True)
@@ -2106,8 +2214,8 @@ class Provides(_dependency):
         if self.perlIncPath is not None:
             return
 
-        perl = _getperl(self.recipe.macros, self.recipe)[0]
-        self.perlIncPath = _getperlincpath(perl)
+        perl = self._getperl(self.recipe.macros, self.recipe)[0]
+        self.perlIncPath = self._getperlincpath(perl)
         self.perlIncPath.sort(key=len, reverse=True)
 
     def _addPythonProvides(self, path, m, pkg, macros):
@@ -2169,7 +2277,7 @@ class Provides(_dependency):
             return
         fullpath = macros.destdir + path
         if not self.monodisPath:
-            self.monodisPath = _getmonodis(macros, self, path)
+            self.monodisPath = self._getmonodis(macros, path)
             if not self.monodisPath:
                 return
         p = util.popen('%s --assembly %s' %(
@@ -2413,7 +2521,6 @@ class Requires(_addInfo, _dependency):
 
     def preProcess(self):
         macros = self.macros
-        self.db = None
         self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
         # anything that any buildreqs have caused to go into ld.so.conf
@@ -2478,7 +2585,7 @@ class Requires(_addInfo, _dependency):
 
         if self._isCIL(m):
             if not self.monodisPath:
-                self.monodisPath = _getmonodis(macros, self, path)
+                self.monodisPath = self._getmonodis(macros, path)
                 if not self.monodisPath:
                     return
             p = util.popen('%s --assemblyref %s' %(
@@ -2595,7 +2702,8 @@ class Requires(_addInfo, _dependency):
         self._addDepSetToMap(path, pkg.requiresMap,
             self._createELFDepSet(m, m.contents['requires'],
                 libPathMap=self._privateDepMap,
-                getRPATH=_findSonameInRpath))
+                getRPATH=_findSonameInRpath,
+                path=path))
 
 
     def _generatePythonRequiresSysPath(self):
@@ -2610,7 +2718,7 @@ class Requires(_addInfo, _dependency):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = _getpython(self.macros)
+        pythonPath = self._getpython(self.macros)
         # conary is a python program...
         assert(pythonPath)
 
@@ -2636,7 +2744,7 @@ class Requires(_addInfo, _dependency):
             sysPathForModuleFinder = list(systemPaths)
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath = sorted(set(_stripDestDir(systemPaths, destdir)),
+            self.sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
                                   key=len, reverse=True)
 
         finally:
@@ -2714,7 +2822,7 @@ class Requires(_addInfo, _dependency):
             return
 
         macros = self.recipe.macros
-        self.perlPath, self.perlIncPath = _getperl(macros, self.recipe)
+        self.perlPath, self.perlIncPath = self._getperl(macros, self.recipe)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
@@ -2777,9 +2885,6 @@ class Requires(_addInfo, _dependency):
 
         return reqlist
 
-    def _initializeDb(self):
-        self.db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
-        
     def _addPkgConfigRequirements(self, path, fullpath, pkg, macros):
         # parse pkgconfig file
         variables = {}
@@ -2842,31 +2947,12 @@ class Requires(_addInfo, _dependency):
                 self._addRequirement(path, troveName, [], pkg,
                                      deps.TroveDependencies)
             else:
-                if not self.db:
-                    self._initializeDb()
-                # find requirement on system
-                troveNames = [ x.getName() for x in 
-                               self.db.iterTrovesByPath(fileRequired) ]
-                if not troveNames:
-                    self.error('pkg-config file %s not managed by conary',
-                               fileRequired)
-                if len(troveNames) > 1:
-                    self.error('pkg-config file %s owned by more than one trove',
-                               fileRequired)
-                troveName = troveNames[0]
-                if troveName.endswith(':devellib'):
-                    # prefer corresponding :devel to :devellib
-                    # if it exists
-                    troveSpec = (
-                        troveName.replace(':devellib', ':devel'),
-                        None, None
-                    )
-                    results = self.db.findTroves(None, [troveSpec],
-                                                 allowMissing = True)
-                    if troveSpec in results:
-                        troveName = results[troveSpec][0][0]
-                self._addRequirement(path, troveName, [], pkg,
-                                     deps.TroveDependencies)
+                troveName = self._enforceProvidedPath(fileRequired,
+                                                      fileType='pkg-config',
+                                                      unmanagedError=True)
+                if troveName:
+                    self._addRequirement(path, troveName, [], pkg,
+                                         deps.TroveDependencies)
 
 
 
@@ -3043,23 +3129,24 @@ class reportMissingBuildRequires(policy.Policy):
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
+    processUnmodified = True
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
-	self.warnings = set()
+	self.errors = set()
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
         for arg in args:
             if type(arg) in (list, tuple, set):
-                self.warnings.update(arg)
+                self.errors.update(arg)
             else:
-                self.warnings.add(arg)
+                self.errors.add(arg)
 
     def do(self):
-	if self.warnings:
+	if self.errors:
             self.warn('Suggested buildRequires additions: %s',
-                      str(sorted(list(self.warnings))))
+                      str(sorted(list(self.errors))))
 
 
 class reportErrors(policy.Policy):
@@ -3068,18 +3155,19 @@ class reportErrors(policy.Policy):
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.ERROR_REPORTING
+    processUnmodified = True
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
-	self.warnings = []
+	self.errors = []
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
 	"""
 	Called once, with printf-style arguments, for each warning.
 	"""
-	self.warnings.append(args[0] %tuple(args[1:]))
+	self.errors.append(args[0] %tuple(args[1:]))
 
     def do(self):
-	if self.warnings:
-	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)
+	if self.errors:
+	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.errors)

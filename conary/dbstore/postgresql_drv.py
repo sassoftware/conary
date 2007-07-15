@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -26,7 +26,7 @@ class KeywordDict(BaseKeywordDict):
         'PRIMARYKEY' : 'SERIAL PRIMARY KEY',
         'BLOB'       : 'BYTEA',
         'MEDIUMBLOB' : 'BYTEA',
-        'PATHTYPE'   : 'BYTEA',
+        'PATHTYPE'   : 'VARCHAR',
         'STRING'     : 'VARCHAR'
         } )
 
@@ -283,7 +283,13 @@ class Database(BaseDatabase):
     # Postgresql's trigegr syntax kind of sucks because we have to
     # create a function first and then call that function from the
     # trigger
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # first create the trigger function
@@ -292,26 +298,15 @@ class Database(BaseDatabase):
             return False
         funcName = "%s_func" % triggerName
         cu = self.dbh.cursor()
-        if pinned:
-            cu.execute("""
-            CREATE OR REPLACE FUNCTION %s()
-            RETURNS trigger
-            AS $$
-            BEGIN
-                NEW.%s := OLD.%s ;
-                RETURN NEW;
-            END ; $$ LANGUAGE 'plpgsql';
-            """ % (funcName, column, column))
-        else:
-            cu.execute("""
-            CREATE OR REPLACE FUNCTION %s()
-            RETURNS trigger
-            AS $$
-            BEGIN
-                NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
-                RETURN NEW;
-            END ; $$ LANGUAGE 'plpgsql';
-            """ % (funcName, column))
+        cu.execute("""
+        CREATE OR REPLACE FUNCTION %s()
+        RETURNS trigger
+        AS $$
+        BEGIN
+            NEW.%s := TO_NUMBER(TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS'), '99999999999999') ;
+            RETURN NEW;
+        END ; $$ LANGUAGE 'plpgsql';
+        """ % (funcName, column))
         # now create the trigger based on the above function
         cu.execute("""
         CREATE TRIGGER %s
@@ -321,6 +316,17 @@ class Database(BaseDatabase):
         """ % (triggerName, onAction, table, funcName))
         self.triggers[triggerName] = table
         return True
+    def dropTrigger(self, table, onAction):
+        onAction = onAction.lower()
+        triggerName = "%s_%s" % (table, onAction)
+        if triggerName not in self.triggers:
+            return False
+        funcName = "%s_func" % triggerName
+        cu = self.dbh.cursor()
+        cu.execute("DROP TRIGGER %s ON %s" % (triggerName, table))
+        cu.execute("DROP FUNCTION %s()" % funcName)
+        del self.triggers[triggerName]
+        return True
 
     # avoid leaving around invalid transations when schema is not initialized
     def getVersion(self):
@@ -329,3 +335,9 @@ class Database(BaseDatabase):
             # need to rollback the last transaction
             self.dbh.rollback()
         return ret
+
+    def analyze(self, table=""):
+        cu = self.cursor()
+        assert (isinstance(table, str))
+        cu.execute("ANALYZE %s" %table)
+        

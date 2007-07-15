@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -12,6 +12,7 @@
 # full details.
 #
 
+import itertools
 import re
 from conary.lib import misc, util
 from conary.errors import ParseError
@@ -31,7 +32,8 @@ DEP_CLASS_PYTHON        = 11
 DEP_CLASS_PERL          = 12
 DEP_CLASS_RUBY          = 13
 DEP_CLASS_PHP           = 14
-DEP_CLASS_SENTINEL      = 15
+DEP_CLASS_TARGET_IS     = 15
+DEP_CLASS_SENTINEL      = 16
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -619,6 +621,16 @@ class InstructionSetDependency(DependencyClass):
     flags = DEP_CLASS_HAS_FLAGS
 _registerDepClass(InstructionSetDependency)
 
+class TargetInstructionSetDependency(DependencyClass):
+
+    tag = DEP_CLASS_TARGET_IS
+    tagName = "target"
+    justOne = False
+    depClass = Dependency
+    allowParseDep = False
+    flags = DEP_CLASS_HAS_FLAGS
+_registerDepClass(TargetInstructionSetDependency)
+
 class OldSonameDependencies(DependencyClass):
 
     tag = DEP_CLASS_OLD_SONAME
@@ -731,7 +743,7 @@ class TroveDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
-    depFormat = 'IDENT(?::IDENT)?' # trove[:comp] 
+    depFormat = 'WORD(?::IDENT)?' # trove[:comp] 
 
 _registerDepClass(TroveDependencies)
 
@@ -903,6 +915,10 @@ class DependencySet(object):
     def __eq__(self, other):
         if other is None:
             return False
+        # No much sense in comparing stuff that is not the same class as ours;
+        # it also breaks epydoc (CNY-1772)
+        if not hasattr(other, 'members'):
+            return False
         if set(other.members.iterkeys()) != set(self.members.iterkeys()):
             return False
 	for tag in other.members:
@@ -1032,18 +1048,20 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """
     flavor = oldFlavor.copy()
     ISD = InstructionSetDependency
-    if (flavor.hasDepClass(ISD) and newFlavor.hasDepClass(ISD)):
+    TISD = TargetInstructionSetDependency
+    for depClass in  (ISD, TISD):
+        if (flavor.hasDepClass(depClass) and newFlavor.hasDepClass(depClass)):
 
-        arches = set()
+            arches = set()
 
-        for dep in newFlavor.iterDepsByClass(ISD):
-            arches.add(dep.name)
+            for dep in newFlavor.iterDepsByClass(depClass):
+                arches.add(dep.name)
 
-        oldArches = []
-        for dep in oldFlavor.iterDepsByClass(ISD):
-            if dep.name not in arches:
-                oldArches.append(dep)
-        flavor.removeDeps(ISD, oldArches)
+            oldArches = []
+            for dep in oldFlavor.iterDepsByClass(depClass):
+                if dep.name not in arches:
+                    oldArches.append(dep)
+            flavor.removeDeps(depClass, oldArches)
             
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor
@@ -1174,6 +1192,34 @@ def mergeFlavor(flavor, mergeBase):
             mergedFlavor.addDeps(UseDependency, useSet)
     return mergedFlavor
 
+def filterFlavor(depSet, filters):
+    if not isinstance(filters, (list, tuple)):
+        filters = [filters]
+    finalDepSet = Flavor()
+    for depTag, depClass in depSet.members.items():
+        filterClasses = [ x.members.get(depClass.tag, None) for x in filters ]
+        filterClasses = [ x for x in filterClasses if x is not None ]
+        if not filterClasses:
+            continue
+        depList = []
+        for dep in depClass.getDeps():
+            filterDeps = [ x.members.get(dep.name, None) for x in filterClasses]
+            filterDeps = [ x for x in filterDeps if x is not None ]
+            if filterDeps:
+                finalDep = _filterDeps(depClass, dep, filterDeps)
+                if finalDep is not None:
+                    depList.append(finalDep)
+        if depList:
+            finalDepSet.addDeps(depClass.__class__, depList)
+    return finalDepSet
+
+def _filterDeps(depClass, dep, filterDeps):
+    filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
+    finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]
+    if not depClass.depNameSignificant and not finalFlags:
+        return None
+    return Dependency(dep.name, finalFlags)
+
 def formatFlavor(flavor):
     """
     Formats a flavor and returns a string which parseFlavor can 
@@ -1197,25 +1243,28 @@ def formatFlavor(flavor):
 
     classes = flavor.getDepClasses()
     insSet = list(flavor.iterDepsByClass(InstructionSetDependency))
+    targetSet = list(flavor.iterDepsByClass(TargetInstructionSetDependency))
     useFlags = list(flavor.iterDepsByClass(UseDependency))
 
     if insSet:
         insSet = _singleClass(insSet)
+    if targetSet:
+        targetSet = _singleClass(targetSet)
 
     if useFlags:
         # strip the use() bit
         useFlags = _singleClass(useFlags)[4:-1]
 
-    if insSet and useFlags:
-        return "%s is: %s" % (useFlags, insSet)
-    elif insSet:
-        return "is: %s" % insSet
-    elif useFlags:
-        return useFlags
+    flavors = []
+    if useFlags:
+        flavors.append(useFlags)
+    if insSet:
+        flavors.append('is: %s' % insSet)
+    if targetSet:
+        flavors.append('target: %s' % targetSet)
+    return ' '.join(flavors)
 
-    return ""
-
-def parseFlavor(s, mergeBase = None):
+def parseFlavor(s, mergeBase = None, raiseError = False):
     # return a Flavor dep set for the string passed. format is
     # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
     #
@@ -1244,6 +1293,8 @@ def parseFlavor(s, mergeBase = None):
     s = s.strip()
     match = flavorRegexp.match(s)
     if not match:
+        if raiseError:
+            raise ParseError, ("invalid flavor '%s'" % s)
         return None
 
     groups = match.groups()
@@ -1253,16 +1304,14 @@ def parseFlavor(s, mergeBase = None):
     if groups[3]:
         # groups[3] is base instruction set, groups[4] is the flags, and
         # groups[5] is the next instruction set
+        # groups[6] is a side effect of the matching groups, but isn't used
+        # for anything
 
         # set up the loop for the next pass
-        insGroups = groups[3:]
-        while insGroups[0]:
-            # group 0 is the base, group[1] is the flags, and group[2] is
-            # the next instruction set clause
-            baseInsSet = insGroups[0]
-
-            if insGroups[1]:
-                insSetFlags = insGroups[1].split(",")
+        baseInsSet, insSetFlags, nextGroup, _, _ = groups[3:8]
+        while baseInsSet:
+            if insSetFlags:
+                insSetFlags = insSetFlags.split(",")
                 for i, flag in enumerate(insSetFlags):
                     insSetFlags[i] = _fixup(flag)
             else:
@@ -1271,18 +1320,46 @@ def parseFlavor(s, mergeBase = None):
             set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
                                                             insSetFlags))
 
-            if not insGroups[2]:
+            if not nextGroup:
                 break
 
-            match = archGroupRegexp.match(insGroups[2])
+            match = archGroupRegexp.match(nextGroup)
             # this had to match, or flavorRegexp wouldn't have
             assert(match)
-            insGroups = match.groups()
+            baseInsSet, insSetFlags, nextGroup, _, _ = match.groups()
 
     elif groups[2]:
         # mark that the user specified "is:" without any instruction set
         # by adding a placeholder instruction set dep class here. 
         set.addEmptyDepClass(InstructionSetDependency)
+
+    # 8 is target: 9 is target architecture.  10 is target flags
+    # 11 is the next instruction set.  12 is just a side effect.
+    if groups[9]:
+        baseInsSet, insSetFlags, nextGroup = groups[9], groups[10], groups[11]
+        while baseInsSet:
+            if insSetFlags:
+                insSetFlags = insSetFlags.split(",")
+                for i, flag in enumerate(insSetFlags):
+                    insSetFlags[i] = _fixup(flag)
+            else:
+                insSetFlags = []
+
+            set.addDep(TargetInstructionSetDependency, Dependency(baseInsSet,
+                                                                  insSetFlags))
+            if not nextGroup:
+                break
+
+            match = archGroupRegexp.match(nextGroup)
+            # this had to match, or flavorRegexp wouldn't have
+            assert(match)
+            baseInsSet, insSetFlags, nextGroup, _, _ = match.groups()
+    elif groups[8]:
+        # mark that the user specified "target:" without any instruction set
+        # by adding a placeholder instruction set dep class here. 
+        set.addEmptyDepClass(TargetInstructionSetDependency)
+
+
 
     if groups[1]:
         useFlags = groups[1].split(",")
@@ -1296,8 +1373,6 @@ def parseFlavor(s, mergeBase = None):
         set.addEmptyDepClass(UseDependency)
 
     return mergeFlavor(set, mergeBase)
-
-    return set
 
 def parseDep(s):
     """ 
@@ -1387,8 +1462,8 @@ ident = '(?:[0-9A-Za-z_-]+)'
 flag = '(?:~?!?IDENT)'
 useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
 archFlags = '\(( *FLAG(?: *, *FLAG)*)\)'
-archClause = '(?:(IDENT)(?:ARCHFLAGS)?)?'
-archGroup = '(?:ARCHCLAUSE(?:  *(ARCHCLAUSE))*)'
+archClause = ' *(?:(IDENT)(?:ARCHFLAGS)?)?'
+archGroup = '(?:ARCHCLAUSE(?:((?:  *ARCHCLAUSE)*))?)'
 useClause = '(USEFLAG *(?:, *USEFLAG)*)?'
 
 
@@ -1397,7 +1472,7 @@ depName = r'(?:[^ (]+)' # anything except for a space or an opening paren
 depClause = depName + depFlags
 depRegexpStr = r'(IDENT): *(DEPCLAUSE) *'
 
-flavorRegexpStr = '^(use:)? *(?:USECLAUSE)? *(?:(is:) *ARCHGROUP)?$'
+flavorRegexpStr = '^(use:)? *(?:USECLAUSE)? *(?:(is:) *ARCHGROUP)? *(?:(target:) *ARCHGROUP)?$'
 
 flavorRegexpStr = flavorRegexpStr.replace('ARCHGROUP', archGroup)
 flavorRegexpStr = flavorRegexpStr.replace('ARCHCLAUSE', archClause)

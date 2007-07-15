@@ -4,7 +4,7 @@
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
  * source file in a file called LICENSE. If it is not present, the license
- * is always available at http://www.opensource.org/licenses/cpl.php.
+ * is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
  *
  * This program is distributed in the hope that it will be useful, but
  * without any warranty; without even the implied warranty of merchantability
@@ -185,19 +185,23 @@ static int StringStream_Init(PyObject * self, PyObject * args,
 
 static PyObject * StringStream_Set(StringStreamObject * self, 
 				   PyObject * args) {
-    PyObject * o;
+    PyObject * o, * newval;
 
     if (!PyArg_ParseTuple(args, "O", &o))
         return NULL;
 
-    if (o != Py_None && !PyString_CheckExact(o)) {
+    if (o == Py_None || PyString_CheckExact(o)) {
+	Py_INCREF(o);
+	newval = o;
+    } else if (PyUnicode_CheckExact(o)) {
+	newval = PyUnicode_AsUTF8String(o);
+    } else {
         PyErr_SetString(PyExc_TypeError, "invalid type for set");
 	return NULL;
     }
 
-    Py_INCREF(o);
     Py_DECREF(self->s);
-    self->s = o;
+    self->s = newval;
 
     Py_INCREF(Py_None);
     return Py_None;

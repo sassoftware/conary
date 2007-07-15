@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -98,7 +98,7 @@ class Cursor(BaseCursor):
         if len(keys):
             return (sql, tuple(keys))
         # handle the ? syntax
-        sql = re.sub("(?i)(?P<pre>[(,<>=]|(LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
+        sql = re.sub("(?i)(?P<pre>[(,<>=]|(SELECT|LIKE|AND|BETWEEN|LIMIT|OFFSET)\s)(?P<s>\s*)[?]", "\g<pre>\g<s>%s", sql)
         return (sql, ())
 
     # we need to "fix" the sql code before calling out
@@ -327,32 +327,29 @@ class Database(BaseDatabase):
         return version
 
     # A trigger that syncs up a column to the timestamp
-    def createTrigger(self, table, column, onAction, pinned = False):
+    def createTrigger(self, table, column, onAction, pinned=None):
+        if pinned is not None:
+            import warnings
+            warnings.warn(
+                'The "pinned" kwparam to createTrigger is deprecated and '
+                'no longer has any affect on triggers',
+                DeprecationWarning)
         onAction = onAction.lower()
         assert(onAction in ["insert", "update"])
         # prepare the sql and the trigger name and pass it to the
         # BaseTrigger for creation
         when = "BEFORE"
         # force the current_timestamp into a numeric context
-        if pinned:
-            sql = """
-            SET NEW.%s = OLD.%s ;
-            """ % (column, column)
-        else:
-            sql = """
-            SET NEW.%s = current_timestamp() + 0 ;
-            """ % (column,)
+        sql = """
+        SET NEW.%s = current_timestamp() + 0 ;
+        """ % (column,)
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
     # MySQL uses its own "special" syntax for dropping indexes....
-    def dropIndex(self, table, name):
-        if name not in self.tables[table]:
-            return False
+    def _dropIndexSql(self, table, name):
         sql = "ALTER TABLE %s DROP INDEX %s" % (table, name)
         cu = self.dbh.cursor()
         cu.execute(sql)
-        self.tables[table].remove(name)
-        return True
 
     # MySQL requires us to redefine a column even if all we need is to
     # rename it...
@@ -458,12 +455,19 @@ class Database(BaseDatabase):
                 raise
         self.dbName = dbName
         self._setCharSet(cu)
-        self.loadSchema()
+        # wipe out the preloaded schema we had (if any), but don't
+        # load up the new one - on mysql this is a very expensive operation
+        BaseDatabase.loadSchema(self)
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
         BaseDatabase.use(self, dbName)
 
-    def analyze(self):
-        self.loadSchema()
+    # analyze one or all tables in the database
+    def analyze(self, table=""):
         cu = self.cursor()
+        if table:
+            assert (isinstance(table, str))
+            cu.execute("ANALYZE TABLE %s" % table)
+            return
+        self.loadSchema()
         for table in self.tables:
             cu.execute("ANALYZE TABLE %s" % table)

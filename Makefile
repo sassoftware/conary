@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 1.0.42
+export VERSION = 1.1.33
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -58,13 +58,14 @@ dist:
 archive:
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d dist || exit 1; done
-	for f in $(dist_files); do \
-		mkdir -p $(DISTDIR)/`dirname $$f`; \
-		cp -a $$f $(DISTDIR)/$$f; \
-	done; \
-	tar cjf $(DISTDIR).tar.bz2 `basename $(DISTDIR)` ; \
-	rm -rf $(DISTDIR)
+	hg archive -t tbz2 -r conary-$(VERSION) conary-$(VERSION).tar.bz2
+
+version:
+	sed -i 's/@NEW@/$(VERSION)/g' NEWS
+	$(MAKE) -C extra VERSION=$(VERSION)
+
+show-version:
+	@echo $(VERSION)
 
 smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
@@ -82,14 +83,24 @@ tag:
 
 clean: clean-subdirs default-clean
 
+check: check-subdirs
+
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
 	sed -i 's,version = ".*",version = "$(VERSION)",' \
                                         conary-$(VERSION)/conary.recipe;
-	sed -i 's,r.addArchive.*,r.addArchive("conary-$(VERSION).tar.bz2"),' \
+	sed -i 's,version = '.*',version = "$(VERSION)",' \
                                         conary-$(VERSION)/conary.recipe;
+	sed -i 's,r.addArchive(.*),r.addArchive("conary-$(VERSION).tar.bz2"),' \
+                                        conary-$(VERSION)/conary.recipe;
+	# Assume conary tip always has the patches required to build from the
+	# recipe: filter out non-sqlite patches (the sqlite patch spans across
+	# two lines)
+	sed -i 's,r.addPatch(.*),,' conary-$(VERSION)/conary.recipe;
 	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
-	bin/cvc cook conary-$(VERSION)/conary.recipe
+	# This is just to prime the cache for the cook from a recipe
+	bin/cvc cook --build-label conary.rpath.com@rpl:devel --prep conary=conary.rpath.com@rpl:devel
+	bin/cvc cook --build-label conary.rpath.com@rpl:devel conary-$(VERSION)/conary.recipe
 	rm -rf conary-$(VERSION)
 
 include Make.rules

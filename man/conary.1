@@ -133,6 +133,11 @@ See \-\-replace-files description from \fBconary update\fP
 .TP
 .B \-\-tag-script \fIpath\fR
 See \-\-tag-script description from \fBconary update\fP
+.TP
+.B \-\-just-db
+See \-\-just-db description from \fBconary update\fP.
+Note that this operation \fBwill\fP roll back the rollback
+stack, as the rollback stack is part of the database.
 .RE
 
 .TP
@@ -200,6 +205,12 @@ Unless \-\-resolve has been made the default by setting the
 autoResolve flag in conaryrc, \-\-no-resolve
 is the default behavior.
 .TP
+.B \-\-no-restart
+Do not restart Conary after applying a critical update.
+This option is only useful in the context of installing troves in
+a chroot, therefore it requires the \fB\-\-root \fI<root>\fR option
+to be used.
+.TP
 .B \-\-replace-files
 When a normal file (not a configuration file or a transient file) has
 changed on the system between updates to that file, or if a file
@@ -226,6 +237,11 @@ Perform all actions up to the point of writing to the filesystem.
 .B \-\-apply-critical
 If the given update involves critical updates, apply only those critical 
 updates and then stop.
+.TP
+.B \-\-exact-flavors
+Match only the exact flavors specified at the command line. This turns off
+conary's automatic merging of your system flavor with any flavor specified at
+the command line and only uses the flavors you explicitly specify.
 .TP
 .B updateall
 Iterates through all the top-level troves installed on the system
@@ -268,7 +284,6 @@ installs it. This could help if the locally installed client is too
 old (or otherwise misbehaves) and cannot perform a regular upgrade
 through a \fBconary update conary\fP invocation.
 .RE
-.TP
 .TP
 .B verify [--all] \fI<trove>[=version]*\fP
 Compares the files in the given \fItrove\fP (or all troves if the --all 
@@ -355,6 +370,9 @@ All file display options imply --recurse.  All extended file display options imp
 .B \-\-file-deps
 Displays the individual provides and requires for each file.  If a file has no dependencies, no information will be displayed.
 .TP
+.B \-\-file-flavors
+Displays the flavor for each file listed.
+.TP
 .B \-\-file-versions
 Displays the version of each file listed.
 .TP
@@ -417,10 +435,22 @@ Return all troves that match the system flavor + any specified flavors
 .B \-\-best-flavors [default]
 Return the best trove flavor based on your system flavor,
 .TP
+.B \-\-exact-flavors
+Return only troves that have exactly the flavor you specify.
+.TP
 .B \-\-affinity
 Turn on flavor and branch affinity.  For example, when  using --best-flavors 
 (the default), the best flavor that matches your install flavor is used.
 Note that affinity is not used when no trove specifiers are given.
+.RE
+.TP
+.B Type Selection
+You can also filter by type.  By default, rq shows all troves that actually 
+exist in the repository.  You can specify:
+.RS
+.TP
+.B \-\-show-removed
+Shows troves that have been removed from the repository.
 .RE
 .TP 4
 .B Flavor and Branch affinity
@@ -434,6 +464,59 @@ The affect of flavor affinity on an update or query command can be described as 
 .TP
 In summary, when you install a trove on a particular branch, conary assumes, unless you explicitly specify otherwise, that you would like to continue getting updates from that branch.  Similarly, if you install a trove with a different flavor than your install flavor, conary assumes that you wish to keep that flavor.  
 Repository querying matches this behavior to help you see what trove will be installed if you perform an update.
+.RE
+.RE
+.TP
+.B Displaying Trove Differences From The Repository
+.RS 4
+.TP
+.B rdiff \fItrovename\fP=\fIoldver\fP[\fI<flavor>\fP]--\fInewver\fP[\fI<flavor>\fP] [\fI--buildreqs\fP] [\fI--deps\fP] [\fI--show-empty\fP] [\fI--ls\fP] [\fI--lsl\fP] [\fI--file-deps\fP] [\fI--file-versions\fP] [\fI--tags\fP] [\fI--file-contents\fP]  [\fI--labels\fP]  [\fI--flavors\fP]  [\fI--full-versions\fP] [\fI--tags\fP]
+.TP
+Report differences between the two specified troves.
+.TP
+The command line options explicitly turn on extra output for different sections.
+.RS 4
+.TP
+.B \-\-buildreqs
+Display changes in build requirements.
+.TP
+.B \-\-deps
+Display changes in trove dependencies. For file dependencies, see \fI--file-deps\fP below.
+.TP
+.B \-\-show-empty
+By default, troves that have not changed do not get displayed. This option includes these in the output as well.
+.TP
+.B \-\-tags
+Display changes in file tags.
+.TP
+.B \-\-ls
+Show added, removed and changed files.
+.TP
+.B \-\-lsl
+Detailed output of how the file has changed. The output for the new file omits the elements that have not changed.
+.TP
+.B \-\-file-deps
+Display changes in file dependencies.
+.TP
+.B \-\-file-versions
+Turn on the display for file versions.
+.TP
+.B \-\-labels
+Displays <label>/<revision> instead of abbreviated version numbers.
+.TP
+.B \-\-full-version
+Full version strings are displayed instead of abbreviated version numbers
+
+.RE
+For example, to see the difference between python 2.4.1-20.7-1 (x86 flavor) and
+2.4.1-20.7-2 (x86_64 flavor), one can run:
+.TP
+.B conary rdiff 'python=2.4.1-20.7-1[is:x86]--2.4.1-20.8-1[is:x86_64]'
+
+.RE
+\fBNOTE:\fR the format for the output is subject to change.
+.RE
+
 .RE
 .RE
 .TP
@@ -467,7 +550,7 @@ The \fBshowcs\fP command can also be invoked as \fBscs\fP.
 .B \-\-show-changes
 For files that have been modified, lists the old version of the file above the
 new version of the file for easy comparison.  Implies --ls
-is specified.  
+if specified.  
 .TP 4
 .B \-\-recurse-repository
 When recursing, use the repository to download information about troves not in 
@@ -501,12 +584,11 @@ installed version of the group being migrated (often group-os or group-dist).
 .B sync [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Update the children of \fItrovename\fP so that the versions of the child
 troves match the version specified by the parent trove.
-By default, the the specified trove itself is updated first, and
+By default, the specified trove itself is updated first, and
 then children are synced to the new trove.
 
 Arguments include
 .RS 4
-.TP 4
 .TP 4
 .B \-\-current
 Cause only the children of the specified troves to be updated to match the 
@@ -515,7 +597,7 @@ themselves are not touched.
 .TP
 .B \-\-full
 Erase packages and components that are children of the specified troves and 
-would not be installed if the the specified troves were being installed for the first time.  For example, :debuginfo components are not installed by default.
+would not be installed if the specified troves were being installed for the first time.  For example, :debuginfo components are not installed by default.
 If you used this option when syncing a package and you had its :debuginfo 
 component installed, that component would get erased.
 .TP 4
@@ -682,6 +764,11 @@ when building.
 .B buildPath
 The path packages are built under; default \fI/usr/src/conary/builds
 .TP
+.B conaryProxy
+The Conary proxy to use. The value can be \fIprotocol
+URL\fR (supported protocols are \fIhttp\fR and \fIhttps\fR), or just a URL, in
+which case it will be used for both protocols.
+.TP
 .B contact
 The contact name (normally an email address or URL) to put in changelog
 entries when committing changes to source components.
@@ -711,6 +798,7 @@ The ordered path of labels to use when an incomplete version is
 specified to install package, query the repository, and abbreviate
 versions when displaying them.
 Can be overridden by the \fB\-\-install-label \fI<label>\fR command-line option.
+Can also be overridden by the \fBsearchPath\fR configuration option.
 .TP
 .B interactive
 If set to True, conary will ask for confirmation before performing actions that modifying system or repository state.
@@ -724,6 +812,15 @@ The transient lookaside cache used only during building, normally
 The name used in changelog entries when committing changes to source
 components.
 .TP
+.B pinTroves
+The regular expression of a trove name to pin when installing.
+Multiple regular expressions can be specified with mutiple pinTroves
+lines.
+.TP
+.B proxy
+The HTTP proxy to use to connect to the Internet. The value can be \fIprotocol
+URL\fR (supported protocols are \fIhttp\fR and \fIhttps\fR), or just a URL, in
+which case it will be used for both protocols.
 .B pubRing
 The filename of the OpenPGP Keyring to refer to for signature keys.
 .TP
@@ -750,6 +847,28 @@ If the level is 2:
 
 (The default level is 2)
 .TP
+.B searchPath
+Replacement for installLabelPath that allows you to specify groups or
+packages (as well as labels) to search for packages to install.  The groups
+used are found using the same algorithm used by "conary update <group>",
+meaning that if you have a group installed, that group's branch will be
+used for finding the group to search and resolve against.
+
+Example: Your conaryrc contains:
+    searchPath group-os contrib.rpath.org@rpl:1
+
+When running "conary update frob", Conary will first search group-os for a
+version of frob first, and then fall back to find a version on
+contrib.rpath.org@rpl:1 if one could not be found in group-os.  If frob has
+any dependencies that need to be resolved, they will be resolved first
+against group-os; then contrib.rpath.org@rpl:1 will be searched.
+.TP
+.B shortenGroupFlavors
+Decreases the number of items in group flavors to the bare minimum needed
+to differentiate between cooks.  This is done by starting with any platform
+flavors (determined by the presence of a "platform True" line in the definition
+of the flavor in one the useDirs), and if necessary, adding in additional distinguishing
+flavors to make all of flavors of the group being cooked unique.
 .B signatureKey
 Specifies the OpenPGP Key from a local keyring to be used when generating trove
 signatures. \fBNOTE:\fR When this option is processed, it clears all entries in
@@ -840,11 +959,14 @@ Original file contents of configuration files Conary tracks.
 .I /var/lib/conarydb/rollbacks
 Changeset files representing rollbacks (listed via \fBconary
 rblist\fP).
+.TP
 .I /etc/conary/arch
 Directory containing architecture definition files.
 .\" FIXME: need a man page describing architecture definition files
+.TP
 .I /etc/conary/recipeTemplates
 Directory containing recipe templates.
+.TP
 .I /etc/conary/use
 Directory containing use flag definition files.
 .\" FIXME: need a man page describing use flag definition files

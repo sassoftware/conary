@@ -4,7 +4,7 @@
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
  * source file in a file called LICENSE. If it is not present, the license
- * is always available at http://www.opensource.org/licenses/cpl.php.
+ * is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
  *
  * This program is distributed in the hope that it will be useful, but
  * without any warranty; without even the implied warranty of merchantability
@@ -29,7 +29,9 @@
 /* Module initialization                 */
 
 static PyMethodDef CStreamsMethods[] = {
-    {NULL}  /* Sentinel */
+    { "splitFrozenStreamSet", StreamSet_split, METH_VARARGS },
+    { "whiteOutFrozenStreamSet", StreamSet_remove, METH_VARARGS },
+    { NULL, NULL, NULL }  /* Sentinel */
 };
 
 struct singleStream allStreams[];
@@ -41,6 +43,9 @@ initcstreams(void)
     int i;
 
     m = Py_InitModule3("cstreams", CStreamsMethods, "");
+    if (NULL == m) {
+        return;
+    }
 
     streamsetinit(m);
     numericstreaminit(m);
@@ -59,4 +64,8 @@ initcstreams(void)
     PyModule_AddObject(m, "SMALL", (PyObject *) PyInt_FromLong(SMALL));
     PyModule_AddObject(m, "LARGE", (PyObject *) PyInt_FromLong(LARGE));
     PyModule_AddObject(m, "DYNAMIC", (PyObject *) PyInt_FromLong(DYNAMIC));
+    PyModule_AddObject(m, "SKIP_UNKNOWN",
+                       (PyObject *) PyInt_FromLong(SKIP_UNKNOWN));
+    PyModule_AddObject(m, "PRESERVE_UNKNOWN",
+                       (PyObject *) PyInt_FromLong(PRESERVE_UNKNOWN));
 }

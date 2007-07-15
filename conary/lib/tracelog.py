@@ -3,7 +3,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -102,7 +102,7 @@ class FileLog(NullLog):
         if self.level > 3:
             return ret
         # otherwise, of this takes too much space, just print it's length
-        if type(val) in set([list,tuple,dict]) and len(ret) > MaxArgLen:
+        if type(val) in set([list,tuple,dict,set]) and len(ret) > MaxArgLen:
             if len(val) > 1:
                 ret = "len(%s)=%d" % (type(val), len(val))
         return ret
@@ -238,9 +238,9 @@ class CfgTraceLog(cfg.CfgType):
             raise cfgtypes.ParseError("log level and path expected")
         try:
             s = (int(s[0]), cfgtypes.Path(s[1]))
-        except:
+        except Exception, e:
             raise cfgtypes.ParseError(
-                "log level (integer) and path (string) expected")
+                "log level (integer) and path (string) expected\n%s" % (e,))
         return s
     def format(self, val, displayOptions = None):
         return "%s %s" % val

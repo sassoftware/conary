@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -58,19 +58,56 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
                           {sourceVersion.getBinaryVersion().branch() : None })
     
     if repos and not sourceVersion.isOnLocalHost():
-        d = repos.getTroveVersionsByBranch(query)
+        d = repos.getTroveVersionsByBranch(query,
+                                           troveTypes = repos.TROVE_QUERY_ALL)
     else:
         d = {}
+    return _nextVersionFromQuery(d, db, pkgNames, sourceVersion,
+                                 troveFlavorSet, targetLabel=targetLabel,
+                                 alwaysBumpCount=alwaysBumpCount)
 
+
+def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
+    # search for all the packages that are being created by this cook -
+    # we take the max of all of these versions as our latest.
+    query = {}
+    d = {}
+    if repos:
+        for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
+            if sourceVersion.isOnLocalHost():
+                continue
+            pkgNames = set([x.split(':')[-1] for x in troveNames])
+            for pkgName in pkgNames:
+                if pkgName not in query:
+                    query[pkgName] = {}
+                query[pkgName][sourceVersion.getBinaryVersion().branch()] = None
+
+        d = repos.getTroveVersionsByBranch(query,
+                                           troveTypes = repos.TROVE_QUERY_ALL)
+    nextVersions = []
+    for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
+        if not isinstance(troveFlavors, (list, tuple, set)):
+            troveFlavors = set([troveFlavors])
+        else:
+            troveFlavors = set(troveFlavors)
+        newVersion = _nextVersionFromQuery(d, db, troveNames, sourceVersion,
+                                           troveFlavors,
+                                           alwaysBumpCount=alwaysBumpCount)
+        nextVersions.append(newVersion)
+    return nextVersions
+
+def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
+                          troveFlavorSet, targetLabel=None,
+                          alwaysBumpCount=False):
+    pkgNames = set([x.split(':')[-1] for x in troveNames])
     latest = None
-
     relVersions = []
     for pkgName in pkgNames:
-        if pkgName in d:
-            for version in d[pkgName]:
+        if pkgName in query:
+            for version in query[pkgName]:
                 if (not version.isBranchedBinary()
                     and version.getSourceVersion() == sourceVersion):
-                    relVersions.append((version, d[pkgName][version]))
+                    relVersions.append((version, query[pkgName][version]))
     del pkgName
 
     if relVersions:
@@ -110,14 +147,15 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         return nextLocalVersion(db, troveNames, latest, troveFlavorSet)
     else:
         return latest
-        
+
 def nextLocalVersion(db, troveNames, latest, troveFlavorSet):
     # if we've branched on to a local label, we check
     # the database for installed versions to see if we need to
     # bump the build count on this label
 
     # search for both pkgs and their components
-    pkgNames = set([x.split(':')[0] for x in troveNames] + troveNames)
+    pkgNames = set([x.split(':')[0] for x in troveNames])
+    pkgNames.update(troveNames)
 
     query = dict.fromkeys(troveNames, {latest.branch() : None })
     results = db.getTroveLeavesByBranch(query)

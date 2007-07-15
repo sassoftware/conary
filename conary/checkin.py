@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -17,7 +17,6 @@ checking in changes; checking out the latest version; displaying logs
 and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
-import difflib
 import errno
 import fnmatch
 import itertools
@@ -36,15 +35,16 @@ from conary import errors
 from conary import files
 from conary import trove
 from conary import versions
-from conary.build import recipe
+from conary.build import derivedrecipe, recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
 from conary.build.macros import Macros
 from conary.build.packagerecipe import loadMacros
 from conary.build.cook import signAbsoluteChangeset
-from conary.build import cook
+from conary.build import cook, use
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
+from conary.lib import fixeddifflib
 from conary.lib import log
 from conary.lib import magic
 from conary.lib import util
@@ -248,18 +248,20 @@ use cvc co %s=<branch> for the following branches:
 	    fileObj.restore(None, '/', fullPath, nameLookup=False)
 	else:
 	    # tracking the pathId separately from the fileObj lets
-	    # us sort the list of files by fileid
+	    # us sort the list of files by pathId,fileId (which is how
+            # changesets are ordered)
 	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((pathId, fileObj, '/', fullPath))
+		earlyRestore.append((pathId, fileId, fileObj, '/', fullPath))
 	    else:
-		lateRestore.append((pathId, fileObj, '/', fullPath))
+		lateRestore.append((pathId, fileId, fileObj, '/', fullPath))
 
     earlyRestore.sort()
     lateRestore.sort()
 
-    for pathId, fileObj, root, target in earlyRestore + lateRestore:
-	contents = cs.getFileContents(pathId)[1]
+    for pathId, fileId, fileObj, root, target in \
+                            itertools.chain(earlyRestore, lateRestore):
+	contents = cs.getFileContents(pathId, fileId)[1]
 	fileObj.restore(contents, root, target, nameLookup=False)
 
     conaryState.write(workDir + "/CONARY")
@@ -284,8 +286,11 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
+        # Don't add TROVE_QUERY_ALL here, removed packages could exist
+        # and we'd still want newpkg to work
         matches = repos.getTroveLeavesByLabel(
-        { troveName : { state.getBranch().label() : None } }).get(troveName, {})
+        { troveName : { state.getBranch().label() : None } }).get(
+                                                                troveName, {})
         if matches:
             for version in matches:
                 if version.branch() == state.getBranch():
@@ -303,6 +308,7 @@ def commit(repos, cfg, message, callback=None, test=False):
                       "from the head of the branch; use update")
             return
 
+    use.allowUnknownFlags(True)
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
                                      branch=state.getBranch())
@@ -319,13 +325,27 @@ def commit(repos, cfg, message, callback=None, test=False):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+    if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
+            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
-            recipeObj = recipeClass(cfg, lcache, srcdirs, lightInstance=True)
+            if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+                recipeObj = recipeClass(cfg, lcache, srcdirs,
+                                        lightInstance=True)
+            elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
+                v = state.getVersion()
+                if isinstance(v, versions.NewVersion):
+                    label = cfg.buildLabel
+                elif isinstance(v, versions.Version):
+                    label = v.trailingLabel()
+                else:
+                    raise RuntimeError('unable to determine which label to use when instantiating group recipe')
+                recipeObj = recipeClass(repos, cfg, label,
+                                        None, lcache, srcdirs,
+                                        lightInstance = True)
         except builderrors.RecipeFileError, msg:
             log.error(str(msg))
             sys.exit(1)
@@ -344,7 +364,6 @@ def commit(repos, cfg, message, callback=None, test=False):
         # os.path.basenames stripts the protocol off a url as well
         sourceFiles = [ os.path.basename(x.getPath()) for x in 
                                 recipeObj.getSourcePathList() ]
-
         # sourceFiles is a list of everything which ought to be autosourced.
         # those are either the same as in the previous trove, new (in which
         # case they are missing from the previous trove), or nonexistant. So
@@ -452,14 +471,7 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     branch = state.getBranch()
 
-    # repos.nextVersion seems like a good idea, but it doesn't know how to
-    # handle shadow merges. this is easier than teaching it
-    if isinstance(state.getVersion(), versions.NewVersion):
-        # increment it like this to get it right on shadows
-        newVersion = state.getBranch().createVersion(
-                           versions.Revision("%s-0" % recipeVersionStr))
-        newVersion.incrementSourceCount()
-    elif (state.getLastMerged() 
+    if (state.getLastMerged() 
           and recipeVersionStr == state.getLastMerged().trailingRevision().getVersion()):
         # If we've merged, and our changes did not affect the original
         # version, then we try to maintain appropriate shadow dots
@@ -468,18 +480,23 @@ def commit(repos, cfg, message, callback=None, test=False):
                                     state.getVersion().branch().label())
         newVersion.incrementSourceCount()
     else:
-        d = repos.getTroveVersionsByBranch({ troveName : 
-                                             { state.getBranch() : None } } )
+        # repos.nextVersion seems like a good idea, but it doesn't know how to
+        # handle shadow merges. this is easier than teaching it
+        d = repos.getTroveVersionsByBranch({ troveName :
+                                            { state.getBranch() : None } },
+                                            troveTypes=repos.TROVE_QUERY_ALL)
         versionList = d.get(troveName, {}).keys()
         versionList.sort()
 
-        if state.getVersion().trailingRevision().getVersion() != \
-                                    recipeVersionStr:
+        ver = None
+        if (state.getVersion() == versions.NewVersion()
+            or state.getVersion().trailingRevision().getVersion() != \
+                                    recipeVersionStr):
             for ver in reversed(versionList):
                 if ver.trailingRevision().getVersion() == recipeVersionStr:
                     break
 
-            if ver.trailingRevision().getVersion() == recipeVersionStr:
+            if ver and ver.trailingRevision().getVersion() == recipeVersionStr:
                 newVersion = ver.copy()
             else:
                 newVersion = state.getBranch().createVersion(
@@ -496,7 +513,8 @@ def commit(repos, cfg, message, callback=None, test=False):
 
     try:
         result = update.buildLocalChanges(repos, 
-                        [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
+                        [(state, srcPkg, newVersion, 
+                          update.UpdateFlags(ignoreUGids = True))],
                         forceSha1=True,
                         crossRepositoryDeltas = False,
                         allowMissingFiles = bool(callback))
@@ -552,8 +570,8 @@ def commit(repos, cfg, message, callback=None, test=False):
             return
 
     newState.changeChangeLog(cl)
-    newState.invalidateSignatures()
-    newState.computeSignatures()
+    newState.invalidateDigests()
+    newState.computeDigests()
     signatureKey = selectSignatureKey(cfg,
                                       newState.getBranch().label().asString())
     if signatureKey is not None:
@@ -685,7 +703,7 @@ def annotate(repos, filename):
     # newest version.
     lineMap = {} 
                  
-    s = difflib.SequenceMatcher(None)
+    s = fixeddifflib.SequenceMatcher(None)
     newV = newTrove = newLines = newFileV = newContact = None
     
     verList = [ v for v in branchVerList[branch] if not v.isAfter(curVersion) ]
@@ -721,7 +739,7 @@ def annotate(repos, filename):
                 for i in xrange(0, len(newLines)):
                     if lineMap.get(i, None) is not None:
                         assert(newLines[i] == finalLines[lineMap[i]][0])
-                # use difflib SequenceMatcher to 
+                # use fixeddifflib SequenceMatcher to 
                 # find lines that are shared between old and new files
                 s.set_seqs(oldLines, newLines)
                 blocks = s.get_matching_blocks()
@@ -899,6 +917,78 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 
     _showChangeSet(repos, cs, old, new)
 
+def revert(repos, fileList):
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
+
+    origTrove = repos.getTrove(state.getName(),
+                               state.getVersion().canonicalVersion(),
+                               deps.deps.DependencySet())
+
+    checkList = []
+
+    pathsToCheck = set(fileList)
+    # look file files we've been asked to revert
+    for fileInfo in origTrove.iterFileList():
+        if not fileList:
+            if not state.fileIsAutoSource(fileInfo[0]):
+                checkList.append(fileInfo)
+        elif fileInfo[1] in fileList:
+            checkList.append(fileInfo)
+            pathsToCheck.remove(fileInfo[1])
+
+    if pathsToCheck:
+        includedFiles = set( x[1] for x in state.iterFileList() )
+        #includedFiles.update(set( x[1] for x in origTrove.iterFileList() ))
+        for path in pathsToCheck:
+            if path in includedFiles:
+                log.error('file %s was newly added; use cvc remove to '
+                          'remove it' % path)
+            else:
+                log.error('file %s not found in source component' % path)
+
+        return 1
+
+    del pathsToCheck
+
+    fileObjects = repos.getFileVersions(
+                            [ (x[0], x[2], x[3]) for x in checkList ] )
+    contentsNeeded = [ (x[0][2], x[0][3]) for x in
+                            itertools.izip(checkList, fileObjects)
+                            if x[1].hasContents ]
+    contents = repos.getFileContents(contentsNeeded)
+
+    currentDir = os.getcwd()
+
+    for fileInfo, fileObj in itertools.izip(checkList, fileObjects):
+        if fileObj.flags.isAutoSource():
+            raise errors.CvcError('autosource files cannot be '
+                                  'reverted')
+
+        path = fileInfo[1]
+
+        if fileObj.hasContents:
+            content = contents.pop(0)
+        else:
+            content = None
+
+        if os.path.exists(path):
+            currentFileObj = files.FileFromFilesystem(path, fileInfo[0])
+            currentFileObj.flags.thaw(fileObj.flags.freeze())
+            if fileObj.__eq__(currentFileObj, ignoreOwnerGroup = True):
+                continue
+
+        log.info('reverting %s', path)
+        fileObj.restore(content, '/', currentDir + '/' + path,
+                        nameLookup = False)
+
+        # the user originally to removed the file (which means marking it
+        # as autosource!) but now wants it back
+        if state.fileIsAutoSource(fileInfo[0]):
+            state.fileIsAutoSource(fileInfo[0], set = False)
+
+    conaryState.write("CONARY")
+
 def diff(repos, versionStr = None):
     # return 0 if no differences, 1 if differences, 2 on error
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
@@ -926,9 +1016,12 @@ def diff(repos, versionStr = None):
 	oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
     result = update.buildLocalChanges(repos, 
-	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
+	    [(state, oldTrove, versions.NewVersion(),
+              update.UpdateFlags(ignoreUGids = True))],
             forceSha1=True, ignoreAutoSource = True)
     if not result: return 2
+
+    result = localAutoSourceChanges(oldTrove, result)
 
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return 0
@@ -958,7 +1051,7 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
 
             if (displayAutoSourceFiles or not f.flags.isAutoSource()) \
                     and f.hasContents and f.flags.isConfig():
-		(contType, contents) = changeSet.getFileContents(pathId)
+		(contType, contents) = changeSet.getFileContents(pathId, fileId)
                 lines = contents.get().readlines()
 
                 print '--- /dev/null'
@@ -997,7 +1090,7 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
             print 'version'
 
 	if csInfo and files.contentsChanged(csInfo):
-	    (contType, contents) = changeSet.getFileContents(pathId)
+	    (contType, contents) = changeSet.getFileContents(pathId, fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
                                  %(path, oldTrove.getVersion().asString(),
@@ -1062,8 +1155,8 @@ def updateSrc(repos, versionStr = None, callback = None):
     localVer = state.getVersion().createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
-                                 conarycfg.CfgLabelList(),
-				 flags = update.IGNOREUGIDS | update.MERGE)
+                                 flags = update.UpdateFlags(ignoreUGids = True,
+                                                            merge = True) )
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)
@@ -1101,7 +1194,7 @@ def _determineRootVersion(repos, state):
         # We must have done a shadow at some point.
         assert(0)
 
-def merge(repos, versionSpec=None, callback=None):
+def merge(cfg, repos, versionSpec=None, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
     try:
@@ -1116,6 +1209,10 @@ def merge(repos, versionSpec=None, callback=None):
     troveName = state.getName()
     troveBranch = state.getBranch()
 
+    if state.getLastMerged():
+        log.error("outstanding merge must be committed before merging again")
+        return
+
     if not state.getVersion().isShadow():
         log.error("%s=%s is not a shadow" % (troveName, troveBranch.asString()))
         return
@@ -1123,7 +1220,7 @@ def merge(repos, versionSpec=None, callback=None):
     # make sure the current version is at head
     shadowHeadVersion = repos.getTroveLatestVersion(troveName, troveBranch)
     if state.getVersion() != shadowHeadVersion:
-        log.info("working directory is already based on head of branch")
+        log.info("working directory is not at the tip of the shadow")
         return
 
     # safe to call parentBranch() b/c a shadow will always have a parent branch
@@ -1175,6 +1272,45 @@ def merge(repos, versionSpec=None, callback=None):
                   "to merge.")
         return
 
+    if os.path.exists(state.getRecipeFileName()):
+        use.allowUnknownFlags(True)
+        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                         cfg=cfg, repos=repos,
+                                         branch=state.getBranch())
+        recipeClass = loader.getRecipe()
+    else:
+        recipeClass = None.__class__
+
+    if issubclass(recipeClass, derivedrecipe.DerivedPackageRecipe):
+        # Merges between non-derived recipes and derived recipes don't
+        # do a patch merge.
+        loader = loadrecipe.recipeLoaderFromSourceComponent(troveName, cfg,
+                               repos, versionStr = str(parentHeadVersion))[0]
+        parentRecipeClass = loader.getRecipe()
+        if not issubclass(parentRecipeClass,
+                          derivedrecipe.DerivedPackageRecipe):
+            newVersion = parentHeadVersion.trailingRevision().getVersion()
+            if True or newVersion != state.getVersion().trailingRevision.getVersion():
+                recipePath = state.getRecipeFileName()
+                recipe = open(recipePath).read()
+                regexp = re.compile('''^[ \t]*version *=[ ]*['"](.*)['"] *$''',
+                                    re.MULTILINE)
+                l = list(regexp.finditer(recipe))
+                if len(l) != 1:
+                    log.warning("Couldn't find version assignment in %s. The "
+                                "version for this recipe needs to be set to "
+                                "%s." % (recipePath, newVersion) )
+                else:
+                    match = l[0]
+                    newRecipe = recipe[0:match.start(1)] + newVersion + \
+                                recipe[match.end(1):]
+                    open(recipePath, "w").write(newRecipe)
+
+            state.setLastMerged(parentHeadVersion)
+            state.changeVersion(shadowHeadVersion)
+            conaryState.write("CONARY")
+            return
+
     changeSet = repos.createChangeSet([(troveName,
                             (parentRootVersion, deps.deps.Flavor()), 
                             (parentHeadVersion, deps.deps.Flavor()), 
@@ -1188,8 +1324,8 @@ def merge(repos, versionSpec=None, callback=None):
     localVer = parentRootVersion.createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
-                                 conarycfg.CfgLabelList(),
-				 flags = update.IGNOREUGIDS | update.MERGE)
+                                 flags = update.UpdateFlags(ignoreUGids = True,
+                                                            merge = True) )
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)
@@ -1207,6 +1343,51 @@ def merge(repos, versionSpec=None, callback=None):
 
     conaryState.setSourceState(newState)
     conaryState.write("CONARY")
+
+def markRemoved(cfg, repos, troveSpec):
+    troveSpec = cmdline.parseTroveSpec(troveSpec)
+    trvList = repos.findTrove(cfg.buildLabel, troveSpec,
+                              defaultFlavor = cfg.flavor)
+    if len(trvList) > 1:
+        log.error("multiple troves found " + 
+            " ".join([ "%s=%s[%s]" % x for x in trvList ] ))
+        return 1
+
+    # XXX should this do a full recursive descent? seems scary.
+    existingTrove = repos.getTrove(withFiles = False, *trvList[0])
+    if not existingTrove.getName().startswith('group'):
+        trvList += [ x for x in
+                     existingTrove.iterTroveList(strongRefs = True) ]
+
+    cs = changeset.ChangeSet()
+
+    for (name, version, flavor) in trvList:
+        trv = trove.Trove(name, version, flavor,
+                          type = trove.TROVE_TYPE_REMOVED)
+        trv.computeDigests()
+        signatureKey = selectSignatureKey(cfg,
+                                          version.trailingLabel().asString())
+        if signatureKey is not None:
+            # skip integrity checks since we just want to compute the
+            # new sha1 with all our changes accounted for
+            trv.addDigitalSignature(signatureKey, skipIntegrityChecks=True)
+
+        cs.newTrove(trv.diff(None, absolute = True)[0])
+
+    # XXX This forces interactive mode for removing troves. Seems like a good
+    # idea.
+    if True or cfg.interactive:
+        print 'The contents of the following troves will be removed:'
+        print
+        for (name, version, flavor) in trvList:
+            print '\t%s=%s[%s]' % (name, version.asString(), str(flavor))
+        print
+        okay = cmdline.askYn('continue with commit? [Y/n]', default=True)
+
+        if not okay:
+            return
+
+    repos.commitChangeSet(cs)
 
 def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
              repos=None, defaultToText=True):
@@ -1397,8 +1578,9 @@ def removeFile(filename, repos=None):
 
     conaryState.write("CONARY")
 
-def newTrove(repos, cfg, name, dir = None, template = None):
-    parts = name.split('=', 1) 
+def newTrove(repos, cfg, name, dir = None, template = None,
+             buildBranch=None):
+    parts = name.split('=', 1)
     if len(parts) == 1:
         label = cfg.buildLabel
     else:
@@ -1415,13 +1597,17 @@ def newTrove(repos, cfg, name, dir = None, template = None):
 
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
-    branch = versions.Branch([label])
+    if not buildBranch:
+        branch = versions.Branch([label])
+    else:
+        branch = buildBranch
     sourceState = SourceState(component, versions.NewVersion(), branch)
     conaryState = ConaryState(cfg.context, sourceState)
 
     # see if this package exists on our build branch
     if repos and repos.getTroveLeavesByLabel(
-                        { component : { label : None } }).get(component, []):
+                        { component : { label : None } },
+                        ).get(component, []):
         log.error("package %s already exists" % component)
         return
 
@@ -1734,6 +1920,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     if not isinstance(state.getVersion(), versions.NewVersion):
         srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
 
+    use.allowUnknownFlags(True)
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
                                      branch=state.getBranch())
@@ -1748,7 +1935,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
 
     # don't download sources for groups or filesets
     if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-        raise errors.CvcError('Only package recipes can be refreshed')
+        raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter)
     srcdirs = [ os.path.dirname(recipeClass.filename),
@@ -1790,8 +1977,9 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
             continue
         if refreshFilter(path):
             if not state.fileIsAutoSource(pathId):
-                raise errors.CvcError('%s is not autosourced and cannot be '
-                                      'refreshed' % path)
+                log.warning('%s is not autosourced and cannot be refreshed' %
+                            path)
+                continue
             state.fileNeedsRefresh(pathId, True)
 
     conaryState.setSourceState(state)
@@ -1820,8 +2008,10 @@ def stat_(repos):
     oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
     result = update.buildLocalChanges(repos, 
-	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
+	    [(state, oldTrove, versions.NewVersion(),
+              update.UpdateFlags(ignoreUGids = True) )],
             forceSha1=True, ignoreAutoSource = True)
+    result = localAutoSourceChanges(oldTrove, result)
 
     (changeSet, ((isDifferent, newState),)) = result
 
@@ -1838,15 +2028,17 @@ troveCs.getNewFileList() ]
     results = []
 
     for (pathId, path, isNew, fileId, newVersion) in fileList:
+        if path in dirfilesHash:
+            # autosource files aren't in this dict
+            del dirfilesHash[path]
+
 	if isNew:
             results.append(('A', path))
-            del dirfilesHash[path]
             continue
 
 	# changed file
         if not path:
             path = oldTrove.getFile(pathId)[0]
-        del dirfilesHash[path]
         results.append(('M', path))
         continue
 
@@ -1881,3 +2073,24 @@ def _showStat(results):
         print "%s  %s" % (fstat, path)
 
     return results
+
+def localAutoSourceChanges(oldTrove, (changeSet, ((isDifferent, newState),))):
+    # look for autosource files which have changed from upstream; we don't
+    # use buildLocalChanges to do this because we don't want to download
+    # autosource'd files which haven't changed; a side affect is that
+    # changing, adding, or removing a url in a recipe won't show up here as a
+    # change to an autosource files; only changes due to refresh will be
+    # noticed
+    for (pathId, path, fileId, version) in newState.iterFileList():
+        if not newState.fileNeedsRefresh(pathId): continue
+        assert(newState.fileIsAutoSource(pathId))
+        assert(not newState.fileIsConfig(pathId))
+
+        # we don't need the real change; we just make one up
+        newState.updateFile(pathId, None, newState.getVersion(), '0' * 20)
+        isDifferent = True
+
+    d = newState.diff(oldTrove)[0]
+    changeSet.newTrove(d)
+
+    return (changeSet, ((isDifferent, newState),))

@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -166,6 +166,11 @@ class UserNotFound(RepositoryError):
         self.user = user
         RepositoryError.__init__(self, "UserNotFound: %s" % self.user)
 
+class InvalidName(RepositoryError):
+    def __init__(self, name):
+        self.name = name
+        RepositoryError.__init__(self, "InvalidName: %s" % self.name)
+
 class InvalidServerVersion(RepositoryError):
     pass
 
@@ -224,6 +229,9 @@ class DigitalSignatureError(RepositoryError):
         RepositoryError.__init__(self, error)
         self.error = error
 
+class ProxyError(RepositoryError):
+    pass
+
 class InternalServerError(RepositoryError, InternalConaryError):
     def __init__(self,  err):
         self.err = err
@@ -234,6 +242,9 @@ configured incorrectly or the request you sent to the server was invalid.
 ''' % (err,))
 
 class ReadOnlyRepositoryError(RepositoryError):
+    pass
+
+class CannotCalculateDownloadSize(RepositoryError):
     pass
 
 # This is a list of simple exception classes and the text string
@@ -258,5 +269,7 @@ simpleExceptions = (
     (InvalidEntitlement,         'InvalidEntitlement'),
     (CannotChangePassword,       'CannotChangePassword'),
     (InvalidRegex,               'InvalidRegex'),
+    (InvalidName,                'InvalidName'),
     (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
+    (ProxyError,                 'ProxyError'),
     )

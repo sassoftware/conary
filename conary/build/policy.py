@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -85,6 +85,27 @@ class Policy(action.RecipeAction):
     work only on contents of listed directories (C{invariantsubtrees}
     and C{subtrees}).
     @type recursive: boolean
+
+    @cvar filetree: where to look for files to which to apply the
+    policy: C{policy.DESTDIR}, the default, walks the files in the
+    C{destdir}, C{policy.BUILDDIR} walks the files in the build
+    directory, and C{policy.PACKAGE} iterates over the packaged
+    files rather than walking the destdir, which besides being
+    possibly faster also applies to files that are not on the
+    filesystem (like device nodes).
+
+    @cvar rootdir: The root of the tree to walk for files, normally
+    implied by the setting of filetree.
+
+    @cvar processUnmodified: allows special handling for derived
+    packages in order to make only appropriate changes in the
+    derived package.  C{None} (default) disables the policy for
+    derived packages.  C{True} causes C{doFile} to be called for
+    all files found, regardless of whether they are in the
+    parent version, and C{False} causes C{doFile} to be called
+    only for files that are new or have changed timestamps.
+    Note that if C{filetree} is C{policy.PACKAGE}, unchanged
+    file contents will lead to unchanged timestamps.
     """
     bucket = None
     invariantsubtrees = []
@@ -93,6 +114,7 @@ class Policy(action.RecipeAction):
     recursive = True
     filetree = DESTDIR
     rootdir = None
+    processUnmodified = None
 
     keywords = {
         'use': None,
@@ -255,6 +277,12 @@ class Policy(action.RecipeAction):
         if self.rootdir:
             self.rootdir = self.rootdir % self.macros
 
+        if (hasattr(recipe, '_isDerived')
+            and recipe._isDerived == True
+            and self.processUnmodified is None):
+            # This policy does not handle derived packages
+            return
+
 	if hasattr(self.__class__, 'preProcess'):
 	    self.preProcess()
 
@@ -338,7 +366,25 @@ class Policy(action.RecipeAction):
             return True
         return False
 
+    def mtimeChanged(self, path):
+        newPath = util.joinPaths(self.rootdir, path)
+        if not util.exists(newPath):
+            return True
+        try:
+            oldMtime = self.recipe._derivedFiles[path]
+            newMtime = os.lstat(newPath).st_mtime
+            return oldMtime != newMtime
+        except:
+            return True
+
     def policyInclusion(self, filespec):
+        if (hasattr(self.recipe, '_isDerived')
+            and self.recipe._isDerived == True
+            and self.processUnmodified is False
+            and filespec in self.recipe._derivedFiles
+            and not self.mtimeChanged(filespec)):
+            # policy has elected not to handle unchanged files
+            return False
 	if not self.inclusionFilters:
 	    # empty list is '.*'
 	    return True
@@ -394,7 +440,8 @@ class _K:
 classType = type(_K)
 
 # loading, sorting, and initializing policy modules
-def loadPolicy(recipeObj):
+def loadPolicy(recipeObj, policySet = None,
+               internalPolicyModules = () ):
     # path -> module
     policyPathMap = {}
     # bucket -> ordered list of policy objects
@@ -432,13 +479,16 @@ def loadPolicy(recipeObj):
                 policyCls = m.__dict__[symbolName]
                 if type(policyCls) is not classType:
                     continue
+                if policySet is not None and symbolName not in policySet:
+                    continue
                 if symbolName[0].isupper() and issubclass(policyCls, Policy):
                     policyNameMap[symbolName] = policyCls
 
     # Load conary internal policy
     import conary.build.destdirpolicy
+    import conary.build.derivedpolicy
     import conary.build.packagepolicy
-    for pt in 'destdirpolicy', 'packagepolicy':
+    for pt in internalPolicyModules:
         m = sys.modules['conary.build.'+pt]
         for symbolName in m.__dict__.keys():
             policyCls = m.__dict__[symbolName]

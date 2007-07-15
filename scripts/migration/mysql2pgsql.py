@@ -5,7 +5,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -21,6 +21,7 @@ if 'CONARY_PATH' in os.environ:
 
 import time
 import types
+import itertools
 
 from conary import dbstore
 from conary.dbstore import sqlerrors, sqllib
@@ -74,23 +75,24 @@ tList = [
     'EntitlementAccessMap',
     'Caps',
     'Permissions',
+    'FileStreams',
+    'Nodes',
+    'ChangeLogs',
     'Instances',
+    'TroveInfo',
     'Dependencies',
     'Latest',
     'Metadata',
     'MetadataItems',
-    'Nodes',
-    'ChangeLogs',
     'PGPKeys',
     'PGPFingerprints',
     'Provides',
     'Requires',
     'TroveRedirects',
     'TroveTroves',
-    'TroveInfo',
-    'FileStreams',
     'TroveFiles',
     ]
+
 skip = ['databaseversion', 'instructionsets']
 knowns = [x.lower() for x in tList]
 missing = []
@@ -141,87 +143,155 @@ for t in tList:
         src: %s
         dst: %s""" % (t, f1, f2))
 
-# update the primary key sequence
-def fix_pk(table):
+# update the primary key sequences for all tables
+def fix_primary_keys(cu):
     # get the name of the primary key
-    dst.execute("""
+    cu.execute("""
     select
         t.relname as table_name,
-        ind.relname as pk_name,
         col.attname as column_name
     from pg_class t
     join pg_index i on t.oid = i.indrelid and i.indisprimary = true
     join pg_class ind on i.indexrelid = ind.oid
     join pg_attribute col on col.attrelid = t.oid and col.attnum = i.indkey[0]
-    where
-        t.relname = ?
-    and i.indnatts = 1
-    and pg_catalog.pg_table_is_visible(t.oid)
-    """, table.lower())
-    ret = dst.fetchall()
-    if not len(ret):
-        return
-    pkname = ret[0][2]
-    # get the max seq value
-    dst.execute("select max(%s) from %s" % (pkname, table))
-    pkval = dst.fetchall()[0][0]
-    if not pkval:
-        pkval = 1
-    # now reset the sequence for the primary key
-    dst.execute("select pg_catalog.setval(pg_catalog.pg_get_serial_sequence(?, ?), ?, false)",
-                table.lower(), pkname.lower(), pkval)
-    ret = dst.fetchall()[0][0]
-    assert (ret == pkval)
-    print "    SETVAL %s(%s) = %d" % (table, pkname, ret)
+    where i.indnatts = 1
+      and pg_catalog.pg_table_is_visible(t.oid)
+    """)
+    for (t, col) in cu.fetchall():
+        table = t.lower()
+        cu.execute("select pg_catalog.pg_get_serial_sequence(?, ?)", (table, col))
+        seqname = cu.fetchone()[0]
+        if seqname is None:
+            # this primary key does not have a sequence associated with it
+            continue
+        # get the max seq value
+        cu.execute("select max(%s) from %s" % (col, table))
+        seqval = cu.fetchone()[0]
+        if not seqval:
+            seqval = 1
+        else:
+            seqval += 1 # we need the next one in line
+        # now reset the sequence for the primary key
+        cu.execute("select pg_catalog.setval(?, ?, false)", (seqname, seqval))
+        ret = cu.fetchone()[0]
+        assert (ret == seqval)
+        print "SETVAL %s = %d (%s.%s)" % (seqname, ret, table, col)
 
-for t in tList:
+def migrate_table(t):
+    global pgsql, src, dst
+
     count = src.execute("SELECT COUNT(*) FROM %s" % t).fetchone()[0]
     # prepare the execution cursor
     src.execute("SELECT * FROM %s LIMIT 1" % (t,))
     fields = src.fields()
-    sql = "INSERT INTO %s (%s) VALUES (%s)" % (
-        t, ", ".join(fields), ",".join(["?"]*len(fields)))
-    stmt = dst.compile(sql)
     funcs = [ getfunc(x) for x in fields ]
-    i = 0
-    src.execute("SELECT * FROM %s" % t)
-    t1 = time.time()
-    while True:
-        row = src.fetchone()
-        if row is None:
-            break
-        i += 1
-        rowval = map(lambda (f, x): f(x), zip(funcs, row))
-        try:
-            dst.execstmt(stmt, *tuple(rowval))
-        except sqlerrors.ColumnNotUnique:
-            print "\r%s: SKIPPING DUPLICATE" % t, row
-            pgsql.commit()
-        except sqlerrors.ConstraintViolation, e:
-            print
-            print "%s: SKIPPED CONSTRAINT VIOLATION: %s" % (t, sql)
-            print row, e.msg
-            print
-            pgsql.commit()
-        except Exception, e:
-            print "ERROR - SQL", sql
-            epdb.st()
-            raise
-        else:
+
+    # fix up the values in a row to match the transforms
+    def rowvals(funcs, row):
+        return tuple(map(lambda (f, x): f(x), zip(funcs, row)))
+
+    def copy1by1(t, src):
+        sql = "INSERT INTO %s (%s) VALUES (%s)" % (
+            t, ", ".join(fields), ",".join(["?"]*len(fields)))
+        stmt = dst.compile(sql)
+        i = 0
+        while True:
+            lastrow = row = src.fetchone()
+            if row is None:
+                break
+            i += 1
+            dst.execstmt(stmt, *rowvals(funcs, row))
             if i % 1000 == 0:
                 t2 = time.time()
                 sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
                 sys.stdout.flush()
             if i % 10000 == 0:
                 pgsql.commit()
-    print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
-    fix_pk(t)
+        pgsql.commit()
+        return i
+
+    def copyBulk(t, src, batch=10000):
+        i = 0
+        while i <= count:
+            pgsql.dbh.bulkload(t, itertools.islice(src, batch), fields)
+            i = i + batch
+            pgsql.commit()
+            sys.stdout.write("\r%s: %s" % (t, timings(i, count, t1)))
+            sys.stdout.flush()
+        dst.execute("select count(*) from %s" %(t,))
+        ret = dst.fetchall()[0][0]
+        sys.stdout.write("\r%s: %s" % (t, timings(ret, count, t1)))
+        sys.stdout.flush()
+        return ret
+
+    src.execute("SELECT * FROM %s" % t)
+    t1 = time.time()
+    try:
+        if hasattr(pgsql.dbh, "bulkload"):
+            sys.stdout.write("Bulk load table: %s (%d records...)\r" % (t, count))
+            sys.stdout.flush()
+            ret = copyBulk(t, src)
+        else:
+            print "WARNING: not using bulk load, update your python-pgsql bindings!"
+            ret = copy1by1(t, src)
+        assert (ret == count), "Inserted %d rows != source count %d rows" % (ret, count)
+    except Exception, e:
+        print "ERROR:", e, e.args
+        epdb.st()
+        raise
+    else:
+        print "\r%s: %s %s" % (t, timings(count, count, t1), " "*10)
     pgsql.commit()
+
+def verify_table(t, quick=False):
+    nrsrc = src.execute("select count(*) from %s" % (t,)).fetchall()[0][0]
+    nrdst = src.execute("select count(*) from %s" % (t,)).fetchall()[0][0]
+    assert(nrsrc == nrdst), "not all records were copied: src=%d, dst=%d" % (nrsrc, nrdst)
+    src.execute("select * from %s limit 1" % (t,))
+    dst.execute("select * from %s limit 1" % (t,))
+    setsrc = set([x.lower() for x in src.fields()])
+    setdst = set([x.lower() for x in dst.fields()])
+    assert ( setsrc == setdst ), "columns are different: src=%d, dst=%d" % (setsrc, setdst)
+    if quick:
+        return True
+    fields = ",".join(setsrc)
+    src.execute("select %s from %s" %(fields, t))
+    dst.execute("select %s from %s" %(fields, t))
+    t1 = time.time()
+    i = 0
+    for row1, row2 in itertools.izip(src, dst):
+        i = i+1
+        for a,b in zip(row1, row2):
+            assert (a==b), "\nrow differences in table %s:\nsrc: %s\ndst: %s\n" %(
+                t, row1, row2)
+        if i%100 and i<nrsrc: continue
+        sys.stdout.write("\rVerify %s: %s" % (t, timings(i, nrsrc, t1)))
+        sys.stdout.flush()
+    print
+    return True
+
+# PROGRAM MAIN LOOP
+for t in tList:
+    migrate_table(t)
+    #verify_table(t)
 
 # and now create the indexes
 dst = pgsql.cursor()
 for stmt in getIndexes("postgresql"):
     print stmt
     dst.execute(stmt)
+# fix the primary keys
+fix_primary_keys(dst)
+print "VACUUM ANALYZE"
+pgsql.dbh.execute("VACUUM ANALYZE")
 pgsql.setVersion(VERSION)
 pgsql.commit()
+
+del src
+srcdb.close()
+
+del dst
+pgsql.close()
+
+print "Done"
+

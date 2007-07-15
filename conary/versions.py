@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -22,7 +22,7 @@ import time
 import weakref
 
 #conary
-from conary.errors import ParseError
+from conary.errors import ParseError, VersionStringError
 from conary.lib import log
 
 staticLabelTable = {}
@@ -611,12 +611,7 @@ class VersionSequence(AbstractVersion):
             for ver in self.versions:
                 self.hash ^= hash(ver)
 
-	return self.hash
-
-    def iterLabels(self):
-        for item in self.versions:
-            if isinstance(item, AbstractLabel):
-                yield item
+        return self.hash
 
     def iterRevisions(self):
         for item in self.versions:
@@ -750,7 +745,7 @@ class VersionSequence(AbstractVersion):
                         'cached.  Someone may already have a reference to '
                         'the cached object.')
         # assert not self.cached
-        if clearCache and self.timeStamps:
+        if clearCache and self.timeStamps():
             self._clearVersionCache()
 
         i = 0
@@ -783,6 +778,10 @@ class VersionSequence(AbstractVersion):
         for item in self.versions:
             if isinstance(item, Label):
                 yield item
+
+    def depth(self):
+        count = 0
+        return len([x for x in self.versions if isinstance(x, Label)])
 
     def getHost(self):
         """
@@ -1055,6 +1054,12 @@ class Version(VersionSequence):
         """ Returns True if this version is a shadow of another trove """
         return self.branch().isShadow()
 
+    def isUnmodifiedShadow(self):
+        """
+            Returns True if this version is a shadow that has not been modified
+        """
+        return self.isShadow() and not self.isModifiedShadow()
+
     def isModifiedShadow(self):
         """ Returns True if this version is a shadow that has been modified
         """
@@ -1175,7 +1180,10 @@ class Version(VersionSequence):
 	@rtype: Version
 	"""
 	assert(isinstance(label, AbstractLabel))
-        assert(self.versions[-2] != label)
+        if label in self.versions:
+            raise VersionStringError(
+                "Shadowing %s to %s would create a circular reference" % 
+                    (self.asString(), label.asString()))
 
         newRelease = self.versions[-1].copy()
 	newRelease.timeStamp = time.time()
@@ -1307,6 +1315,23 @@ class Branch(VersionSequence):
 
 	newlist = [ label ]
         return Branch(self.versions + newlist)
+
+    def createSibling(self, label):
+        """
+        Creates a branch that has all the same revision.
+
+        @param label: Trailing label of the new branch
+        @type label: AbstractLabel
+        @rtype: Branch
+        """
+        return Branch(self.versions[:-1] + [label])
+
+    def isSibling(self, other):
+        return self.versions[:-1] == other.versions[:-1]
+
+    def isAncestor(self, other):
+        return self.versions == other.versions[:len(self.versions)]
+
 
 def _parseVersionString(ver, frozen):
     """

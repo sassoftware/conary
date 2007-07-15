@@ -6,7 +6,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -28,24 +28,33 @@ else:
 
 sys.path.insert(0, os.path.dirname(fullPath))
 
+from conary.repository.changeset import parseKey
 from conary.repository.filecontainer import FileContainer
 from conary.lib.sha1helper import *
+from conary.lib import util
 
-f = open(sys.argv[1], "r")
+f = util.ExtendedFile(sys.argv[1], "r", buffering = False)
 c = FileContainer(f)
 if len(sys.argv) == 2:
     rc = c.getNextFile()
     while rc:
 	(name, tag, f) = rc
+        pathId = None
 	if len(name) == 16:
 	    name = md5ToString(name)
+            fileId = ''
+        elif len(name) == 36:
+            pathId, fileId = parseKey(name)
+            name = md5ToString(pathId) + "," + sha1ToString(fileId)
 
-	print "%s (%s)" % (name, tag)
+	print "%s (%s) %d" % (name, tag, f.size)
 	rc = c.getNextFile()
 elif len(sys.argv) == 3:
     name = sys.argv[2]
     if len(name) == 32:
 	name = md5FromString(name)
+    elif len(name) == 73:
+	name = md5FromString(name[0:32]) + sha1FromString(name[33:])
 
     nf = c.getNextFile()
     while nf:

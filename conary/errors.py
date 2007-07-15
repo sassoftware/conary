@@ -5,7 +5,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -40,13 +40,17 @@ class ConaryError(Exception):
     pass
 
 
-class CvcError(Exception):
+class CvcError(ConaryError):
     """Base class for errors that are cvc-specific."""
     pass
 
 
 class ParseError(ConaryError):
     """Base class for errors parsing input"""
+    pass
+
+class VersionStringError(ConaryError):
+    """Base class for other version string specific error"""
     pass
 
 class DatabaseError(ConaryError):
@@ -103,7 +107,7 @@ class DatabaseLockedError(DatabaseError):
                 "but you don't have write permission to the database.")
 
 class ShadowRedirect(ConaryError):
-    """User attempted to create a shadow (or branch, but branch's aren't
+    """User attempted to create a shadow (or branch, but branches aren't
        really supported anymore) or a redirect"""
 
     def __str__(self):
@@ -112,6 +116,26 @@ class ShadowRedirect(ConaryError):
 
     def __init__(self, n, v, f):
         self.info = (n, v, f)
+
+class MissingTrovesError(ConaryError):
+
+    def __str__(self):
+        l = []
+        if self.missing:
+            l.append(
+                "The following troves are missing from the repository and " \
+                 "cannot be installed: %s" % \
+                 ", ".join([ "%s=%s[%s]" % x for x in self.missing ]))
+        if self.removed:
+            l.append(
+                "The following troves no longer exist in the repository and " \
+                 "cannot be installed: %s" % \
+                 ", ".join([ "%s=%s[%s]" % x for x in self.removed ]))
+        return '\n'.join(l)
+
+    def __init__(self, missing=[], removed=[]):
+        self.missing = missing
+        self.removed = removed
 
 class InvalidRegex(ParseError):
     """User attempted to input an invalid regular expression"""

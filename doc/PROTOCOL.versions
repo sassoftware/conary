@@ -1,0 +1,54 @@
+# this file documents the wire protocol changes for conary.
+Version 51:
+  - getChangeSet supports infoOnly parameter
+  - parameters are passed as (args, kwArgs) instead of individually
+
+Version 50:
+  - getChangeSet keeps (troveNeeded, filesNeeded, troveRemoved) information
+    separate for each element of the job list
+
+Version 49:
+  - added mirrorMode to getChangeSet and getFingerprints which forces files
+    to be included in changesets whenever the changeset is across hosts
+
+Version 48: Conary 1.1.25
+  - Added extra argument to getChangeSet to force the creation of a specific
+    changeset version.
+
+Version 47:
+  - Added getNewTroveInfo and setTroveInfo
+  - added addMetadataItems call
+
+Version 46:
+  - Added hidden flag to commitChangeSet and hasTroves call (only allowed for
+    users with mirror or write permissions, respectively) and the
+    presentHiddenTroves() call which requires write permissions
+
+Version 45:
+  - addDigitalSignature takes a VersionedSignatureSet object. This call
+    is incompatible between versions 43 and 44 of the protocol (though this
+    could be addressed, to a limited extent).
+  - indicates that the repository can store V1 signatures and unknown troveinfo
+
+Version 44:
+  - added support for decoding "chunked" Transfer-encoding requests
+    from clients
+  - added support for obtaining sizes of changesets > 2 GiB via the
+    getChangeSet() and getFileContents() calls. The sizes are now
+    returned as strings instead of ints.
+
+Version 43:
+  - added getTroveReferences call.
+  - added getTroveDescendants call
+  - switched to fileId,pathId indexed changesets (changeset 2007022001)
+  - added getChangesetFingerprints call (not exposed in netclient)
+  - getTroveInfo now advertises troves as missing instead of raising
+    PermissionDenied
+
+Version 42: Conary 1.1.17
+ - Client uses negotiated protocol version
+ - getFileContents has authOnly parameter
+
+
+Version 41: Conary 1.1.16
+ - Added getTroveInfo call [proxy requires at least this version]

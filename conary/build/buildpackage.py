@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -22,7 +22,7 @@ import os
 import time
 
 from conary import files
-from conary.lib import sha1helper, elf
+from conary.lib import sha1helper
 from conary.build import use
 from conary.deps import deps
 
@@ -39,7 +39,7 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     f.inode.owner.set(owner)
     f.inode.group.set(group)
     f.inode.perms.set(perms)
-    f.inode.mtime.set(time.time())
+    f.inode.mtime.set(int(time.time()))
     f.flags.set(0)
 
     return f
@@ -49,9 +49,17 @@ def _getUseFlavor(recipe):
     Returns a deps.Flavor instance that represents the Use flags
     that have been used.
     """
-    return use.createFlavor(recipe.name, use.Use._iterUsed(), 
-                                         recipe.Flags._iterUsed(), 
-                                         use.Arch._iterUsed())
+    f = use.createFlavor(recipe.name, use.Use._iterUsed(),
+                         recipe.Flags._iterUsed(),
+                         use.Arch._iterUsed(), 
+                         targetDep=recipe.isCrossCompileTool())
+    if recipe.isCrossCompileTool():
+        # there's no guarantee that a cross compiler tool will mention
+        # anything in its flavor to automatically add the target flavor.
+        # We have to do it manually.
+        f.union(recipe.targetFlavor)
+    return f
+
 class BuildComponent(dict):
 
     def addFile(self, path, realPath):

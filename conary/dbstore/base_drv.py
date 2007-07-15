@@ -1,10 +1,10 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -291,7 +291,7 @@ class BaseDatabase:
         return self.sequenceClass(self, name)
 
     # perform the equivalent of a analyze on $self
-    def analyze(self):
+    def analyze(self, table=""):
         assert(self.database)
         pass
 
@@ -333,7 +333,7 @@ class BaseDatabase:
     def dropTrigger(self, table, onAction):
         onAction = onAction.lower()
         name = "%s_%s" % (table, onAction)
-        if name in self.triggers:
+        if name not in self.triggers:
             return False
         cu = self.dbh.cursor()
         cu.execute("DROP TRIGGER %s" % name)
@@ -356,18 +356,20 @@ class BaseDatabase:
         cu = self.dbh.cursor()
         cu.execute(sql)
         return True
+    def _dropIndexSql(self, table, name):
+        sql = "DROP INDEX %s" % (name,)
+        cu = self.dbh.cursor()
+        cu.execute(sql)
     def dropIndex(self, table, name, check = True):
-        remove = False
         if check:
             assert(table in self.tables)
             if name not in self.tables[table]:
                 return False
-            remove = True
-        sql = "DROP INDEX %s" % (name,)
-        cu = self.dbh.cursor()
-        cu.execute(sql)
-        if remove:
+        self._dropIndexSql(table, name)
+        try:
             self.tables[table].remove(name)
+        except ValueError, e:
+            pass
         return True
 
     # since not all databases handle renaming and dropping columns the
@@ -404,28 +406,52 @@ class BaseDatabase:
         c = self.cursor()
         # schema might not be loaded, so we have to try: except: here
         # instead of looking at the self.tables
+
+        # DatabaseVersion canbe an old style table that has only a version column
+        # or it could be a new style version that has (version, minor) columns
+        # or it can be a mint table that has (version, timestamps) columns
         try:
-            c.execute("select max(version) as version from DatabaseVersion")
+            c.execute("select * from DatabaseVersion limit 1")
         except sqlerrors.InvalidTable, e:
-            self.version = 0
-            return 0
-        else:
-            self.version = c.fetchone()[0]
+            self.version = sqllib.DBversion(0,0)
+            return self.version
+        # keep compatibility with old style table versioning
+        ret = c.fetchone_dict()
+        if ret is None: # no version record found...
+            self.version = sqllib.DBversion(0,0)
+        elif ret.has_key("minor"): # assume new style
+            self.version = sqllib.DBversion(ret["version"], ret["minor"])
+        else: # assume mint/old style
+            c.execute("select max(version) from DatabaseVersion")
+            self.version = sqllib.DBversion(c.fetchone()[0])
         return self.version
 
     def setVersion(self, version):
         assert(self.dbh)
+        if isinstance(version, int):
+            version = sqllib.DBversion(version)
+        elif isinstance(version, tuple):
+            version = sqllib.DBversion(*version)
+        assert (isinstance(version, sqllib.DBversion))
         c = self.cursor()
         crtVersion = self.getVersion()
+        # test if we have the old style database version and update
+        if crtVersion > 0 and crtVersion.minor == 0:
+            c.execute("select * from DatabaseVersion")
+            ret = c.fetchone()
+            if len(ret) == 1: # old style, one number
+                c.execute("drop table DatabaseVersion")
+                crtVersion = 0 # mark for re-creation
         # do not allow "going back"
         assert (version >= crtVersion)
         if crtVersion == 0: # indicates table is not there
-            c.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
-            c.execute("INSERT INTO DatabaseVersion (version) VALUES (?)",
-                      version)
+            c.execute("CREATE TABLE DatabaseVersion (version INTEGER, minor INTEGER)")
+            c.execute("INSERT INTO DatabaseVersion (version, minor) VALUES (?,?)",
+                      (version.major, version.minor))
             self.commit()
             return version
-        c.execute("UPDATE DatabaseVersion SET version = ?", version)
+        c.execute("UPDATE DatabaseVersion SET version = ?, minor = ?",
+                  (version.major, version.minor))
         self.commit()
         return version
 

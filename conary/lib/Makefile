@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -21,6 +21,7 @@ python_files=	    __init__.py		\
 		    debugger.py		\
 		    erlcompleter.py	\
 		    epdb.py     	\
+		    fixeddifflib.py	\
 		    fixedglob.py	\
 		    fixedthreading.py	\
 		    graph.py		\
@@ -48,12 +49,25 @@ cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs)
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
              stringstream.c cstreams.h filename_wrapper.c Makefile
+libelf = $(shell \
+if [ -x /usr/bin/pkg-config ] && /usr/bin/pkg-config --exists libelf; then \
+    pkg-config --cflags --libs libelf; \
+elif [ -d /usr/include/libelf-lgpl ]; then \
+    echo "-I/usr/include/libelf-lgpl -lelf-lgpl"; \
+elif [ -d ${SYSROOT}/usr/include/libelf-lgpl ]; then \
+    echo "-I${SYSROOT}/usr/include/libelf-lgpl -lelf-lgpl"; \
+else \
+    echo -lelf; \
+fi)
 
 
 all: $(python_modules) $(wrapper_libs)
 
+elf.o: elf.c
+	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
+
 elfmodule.so: $(elfmodule_objs)
-	$(CC) -shared -o $@ $< -lelf
+	$(CC) -shared -o $@ $< $(libelf)
 
 miscmodule.so: $(miscmodule_objs)
 	$(CC) -shared -o $@ $<
@@ -79,6 +93,6 @@ dist: default-dist
 
 include ../../Make.rules
 # needs to come after including Make.rules so that PYINCLUDE is defined
-CFLAGS:=-Wall -I$(PYINCLUDE) -fPIC $(CFLAGS) -g
+CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
 
 $(cstreamsmodule_objs): cstreams.h

@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -18,15 +18,15 @@ Module implementing the "macro" dictionary class
 
 import re
 
-from conary.lib import util
 from conary.build.errors import MacroKeyError
 
 class Macros(dict):
-    def __init__(self, macros={}, shadow=False):
+    def __init__(self, macros={}, shadow=False, ignoreUnknown=False):
 	self.__tracked = {}
 	self.__track = False
 	self.__overrides = {}
         self.__callbacks = {}
+        self.__ignoreUnknown = ignoreUnknown
 	if shadow:
 	    self.__macros = macros
 	else:
@@ -37,8 +37,12 @@ class Macros(dict):
         return dict.__getitem__(self, key)
             
     def update(self, other):
-        for key, item in other.iteritems():
-            self[key] = item
+        if isinstance(other, dict):
+            for key, item in other.iteritems():
+                self[key] = item
+        else:
+            for key, item in other:
+                self[key] = item
 
     def setCallback(self, name, callback):
         """ Add a callback to a particular macros.  When that macro is 
@@ -97,6 +101,8 @@ class Macros(dict):
             except KeyError:
                 # let's make this error message more helpful
                 # so our users will have a chance of debugging.
+                if self.__ignoreUnknown:
+                    return ''
                 raise MacroKeyError(name)
 
 	    value = self.__macros[name]
@@ -124,8 +130,9 @@ class Macros(dict):
     
     def copy(self, shadow=True):
 	# shadow saves initial copying cost for a higher search cost
+        if not shadow:
+            return Macros([(x, self._get(x)) for x in dict.__iter__(self)])
 	return Macros(self, shadow)
-
     
     # occasionally it may be desirable to switch from shadowing
     # to a flattened representation
@@ -153,6 +160,10 @@ class Macros(dict):
     def iteritems(self):
         for key in self.__iter__():
             yield (key, self[key])
+
+    def itermacros(self):
+        for key in self.__iter__():
+            yield (key, self._get(key))
 
     def keys(self):
         return [ x for x in self.__iter__() ]

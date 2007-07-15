@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -15,7 +15,10 @@
 import gzip
 import sha
 import zlib
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary.repository import errors, repository, datastore
 from conary.local import schema
@@ -31,7 +34,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     to the old version of things.
     """
 
-    def addTrove(self, oldTroveSpec, trove):
+    def addTrove(self, oldTroveSpec, trove, hidden = False):
+        assert(not hidden)
         info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
 	return (info, self.repos.addTrove(trove, pin = pin))
@@ -111,7 +115,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs, callback, autoPinList, 
-                 filePriorityPath,
                  allowIncomplete = False, pathRemovedCheck = None,
                  replaceFiles = False):
 	assert(not cs.isAbsolute())
@@ -134,8 +137,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	    self.repos.eraseFileVersion(pathId, fileVersion)
 
         # this raises an exception if this install would create conflicts
-        self.repos.db.db.checkPathConflicts(self.trovesAdded, 
-                                            filePriorityPath, replaceFiles)
+        self.repos.db.db.checkPathConflicts(self.trovesAdded, replaceFiles)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:

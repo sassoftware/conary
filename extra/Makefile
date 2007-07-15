@@ -3,7 +3,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,10 +14,10 @@
 TOPDIR = ..
 
 extra_files = Makefile conary.spec.in
+gen_files = conary.spec
+dist_files = $(gen_files) $(extra_files)
 
-dist_files = conary.spec $(extra_files)
-
-all : conary.spec
+all : $(gen_files)
 
 conary.spec : conary.spec.in $(TOPDIR)/Makefile
 	sed s,@version@,$(VERSION),g $< > $@
@@ -27,7 +27,6 @@ install :
 dist : $(dist_files) default-dist
 
 clean : default-clean
-	rm -f conary.spec
 
 include $(TOPDIR)/Make.rules
 

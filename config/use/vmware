@@ -1,0 +1,4 @@
+sense disallowed
+shortDoc VMware(TM) guest
+longDoc As a package flavor, determines whether the package is appropriate for installation in a VMware(TM) guest instance.  As a system flavor, reflects the status of whether the system is a VMware(TM) guest instance.
+platform True

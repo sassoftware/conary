@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -47,7 +47,7 @@ from conary.errors import CvcError
 class Flag(dict):
 
     def __init__(self, name, parent=None, value=False, 
-                 required=True, track=False, path=None):
+                 required=True, track=False, path=None, platform=False):
         self._name = name
         self._value = value
         self._parent = parent
@@ -56,6 +56,7 @@ class Flag(dict):
         self._used = False
         self._alias = None
         self._path = path
+        self._platform = platform
 
     def __repr__(self):
         if self._alias: 
@@ -75,7 +76,13 @@ class Flag(dict):
         self._shortDoc = doc
 
     def setRequired(self, value=True):
-        self._required = value 
+        self._required = value
+
+    def setPlatform(self, value=True):
+        self._platform = value
+
+    def isPlatformFlag(self):
+        return self._platform
 
     def _set(self, value=True):
         self._value = value
@@ -193,6 +200,11 @@ class Collection(dict):
         return "%s: {%s}" % (self._name,
                              ', '.join((repr(x) for x in self.values())))
 
+    def __nonzero__(self):
+        raise RuntimeError(
+                    'Cannot compare collection as True/False')
+
+
     def _clear(self):
         for flag in self.keys():
             del self[flag]
@@ -244,7 +256,7 @@ class Collection(dict):
 
     def _reverseParents(self):
         """ Traverse through the parents from the topmost parent down. """
-        if self._parent:
+        if self._parent is not None:
             for parent in self._parent._reverseParents():
                 yield parent
             yield self._parent
@@ -472,7 +484,8 @@ class ArchCollection(Collection):
 
 class MajorArch(CollectionWithFlag):
     
-    def __init__(self, name, parent, track=False, archProps=None, macros=None):
+    def __init__(self, name, parent, track=False, archProps=None, macros=None,
+                 platform=False):
         self._collectionType = SubArch
         if archProps:
             self._archProps = archProps.copy()
@@ -482,6 +495,7 @@ class MajorArch(CollectionWithFlag):
             self._macros = {}
         else:
             self._macros = macros
+        self._platform = platform
         CollectionWithFlag.__init__(self, name, parent, track=track)
 
     def _setUsed(self, used=True):
@@ -534,11 +548,11 @@ class MajorArch(CollectionWithFlag):
                 continue
             self[subArch]._set()
 
-    def _toDependency(self):
+    def _toDependency(self, depType=deps.InstructionSetDependency):
         set = deps.Flavor()
         sense = self._getDepSense()
         dep = deps.Dependency(self._name, [])
-        set.addDep(deps.InstructionSetDependency, dep)
+        set.addDep(depType, dep)
         return set
 
     def _trackUsed(self, value=True):
@@ -571,7 +585,7 @@ class SubArch(Flag):
             currentArch = self._parent._parent.getCurrentArch()
             currentArch._setUsed()
 
-    def _toDependency(self):
+    def _toDependency(self, depType=deps.InstructionSetDependency):
         """ Creates a Flavor dep set with the subarch in it.
             Also includes any subsumed subarches if the 
             value of this subarch is true
@@ -585,7 +599,7 @@ class SubArch(Flag):
             depFlags.extend((parent[x]._name, sense) \
                                       for x in self._subsumes)
         dep = deps.Dependency(parent._name, depFlags)
-        set.addDep(deps.InstructionSetDependency, dep)
+        set.addDep(depType, dep)
         return set
         
 ####################### USE STUFF HERE ###########################
@@ -658,6 +672,41 @@ class LocalFlagCollection(Collection):
                 self._addFlag(key) 
             self[key]._set(value)
 
+####################### Package Local Flags Here ###################
+
+class PackageFlagCollection(Collection):
+
+    def __init__(self, track=False):
+        self._collectionType = PackageFlagPackageCollection
+        Collection.__init__(self, 'PackageFlags')
+
+    def __getitem__(self, key):
+        if key not in self:
+            return self._getNonExistantKey(key)
+        return Collection.__getitem__(self, key)
+
+    def _getNonExistantKey(self, key):
+        self._addFlag(key)
+        self[key]._setStrictMode(False)
+        return self[key]
+
+class PackageFlagPackageCollection(Collection):
+    
+    def __init__(self, name, parent, track=False):
+        self._collectionType = PackageFlag
+        Collection.__init__(self, name, parent)
+
+    def __getitem__(self, key):
+        if key not in self:
+            return self._getNonExistantKey(key)
+        return Collection.__getitem__(self, key)
+
+    def _getNonExistantKey(self, key):
+        self._addFlag(key)
+        return self[key]
+
+class PackageFlag(LocalFlag):
+    pass
 
 def allowUnknownFlags(value=True):
     Use._setStrictMode(not value)
@@ -681,7 +730,10 @@ def clearFlags():
     Use._clear()
     Arch._clear()
     LocalFlags._clear()
+    PackageFlags._clear()
 
+def clearLocalFlags():
+    LocalFlags._clear()
 
 def track(value=True):
     Arch._trackUsed(value)
@@ -691,13 +743,14 @@ def track(value=True):
 def iterAll():
     return itertools.chain(Arch._iterAll(), 
                            Use._iterAll(), 
-                           LocalFlags._iterAll())
+                           LocalFlags._iterAll(),
+                           PackageFlags._iterAll())
 def getUsed():
     return [ x for x in iterUsed() ]
 
 def iterUsed():
-    return itertools.chain(Arch._iterUsed(), 
-                           Use._iterUsed(), 
+    return itertools.chain(Arch._iterUsed(),
+                           Use._iterUsed(),
                            LocalFlags._iterUsed())
 
 def usedFlagsToFlavor(recipeName):
@@ -706,13 +759,28 @@ def usedFlagsToFlavor(recipeName):
 def allFlagsToFlavor(recipeName):
     return createFlavor(recipeName, iterAll())
 
-def createFlavor(recipeName, *flagIterables):
+def localFlagsToFlavor(recipeName):
+    return createFlavor(recipeName, LocalFlags._iterAll())
+
+def platformFlagsToFlavor(recipeName=None):
+    flags = []
+    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), LocalFlags._iterAll()):
+        if flag.isPlatformFlag():
+            flags.append(flag)
+    return createFlavor(recipeName, flags, error=False)
+
+def createFlavor(recipeName, *flagIterables, **kw):
     """ create a dependency set consisting of all of the flags in the 
         given flagIterables.  Note that is a broad category that includes
         lists, iterators, etc. RecipeName is the recipe which local flags
         should be relative to, can be set to None if there are definitely
         no local flags in the flagIterables.
     """
+    targetDep = kw.pop('targetDep', False)
+    if targetDep:
+        depType = deps.TargetInstructionSetDependency
+    else:
+        depType = deps.InstructionSetDependency
     majArch = None
     archFlags = {}
     subsumed = {}
@@ -723,14 +791,16 @@ def createFlavor(recipeName, *flagIterables):
         if flagType == MajorArch:
             if not flag._get():
                 continue
-            set.union(flag._toDependency())
+            set.union(flag._toDependency(depType=depType))
         elif flagType ==  SubArch:
-            set.union(flag._toDependency())
+            set.union(flag._toDependency(depType=depType))
         elif flagType == UseFlag:
             set.union(flag._toDependency())
         elif flagType == LocalFlag:
             assert(recipeName)
             set.union(flag._toDependency(recipeName))
+        elif flagType == PackageFlag:
+            set.union(flag._toDependency(flag._parent._name))
     return set
 
 def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
@@ -764,18 +834,19 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                 log.warning(
                                         'ignoring unknown Use flag %s' % flag)
                                 continue
-                    elif recipeName:
+                    else:
                         packageName, flag = parts
-                        if packageName == recipeName:
-                            # local flag values set from a build flavor
-                            # are overrides -- the recipe should not 
-                            # change these values
-                            LocalFlags._override(flag, value)
-                    elif error:
-                        raise RuntimeError, ('Trying to set a flavor with '
-                                             'localflag %s when no trove '
-                                             ' name was given' % flag)
-
+                        PackageFlags[packageName][flag]._set(value)
+                        if recipeName:
+                            if packageName == recipeName:
+                                # local flag values set from a build flavor
+                                # are overrides -- the recipe should not 
+                                # change these values
+                                LocalFlags._override(flag, value)
+                        elif error:
+                            raise RuntimeError('Trying to set a flavor with '
+                                               'localflag %s when no trove '
+                                               'name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             if len([ x for x in depGroup.getDeps()]) > 1:
                 setOnlyIfMajArchSet = True
@@ -801,8 +872,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                     raise RuntimeError, ('Cannot set arctitecture build flags'
                                          ' to multiple architectures:'
                                          ' %s: %s' % (recipeName, flavor))
-                
-
 Arch = ArchCollection()
 Use = UseCollection()
 LocalFlags = LocalFlagCollection()
+PackageFlags = PackageFlagCollection()

@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -32,8 +32,12 @@ import urllib2
 import urlparse
 import cookielib
 
-# location is normally the package name
-networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://')
+# location is normally the package name.
+# lookaside:// is used internally only for things that are inserted
+# into the cache but managed by calling code.  It should not be
+# referenced from recipes
+networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://',
+                   'lookaside://')
 
 def _truncateName(name):
     for prefix in networkPrefixes:
@@ -345,7 +349,7 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             name, mirror = name
 
         prefix = name.split('://', 1)[0] + '://'
-        if not prefix in networkPrefixes:
+        if not prefix in networkPrefixes or prefix == 'lookaside://':
             continue
 
         f = fetchURL(cfg, name, location, httpHeaders, guessName, mirror)

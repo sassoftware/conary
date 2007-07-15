@@ -1,9 +1,9 @@
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -13,22 +13,111 @@
 
 from conary import trove, versions
 from conary.deps import deps
-from conary.lib import util
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use
 from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
 
-import itertools
+class _Redirect(object):
+
+    __slots__ = [ 'components', 'isRemove' ]
+
+    def __init__(self):
+        self.components = []
+
+    def addComponents(self, nameList):
+        self.components += nameList
+
+class _RemoveRedirect(_Redirect):
+
+    isRemove = True
+
+class _RedirectInfo(_Redirect):
+
+    __slots__ = [ 'targetName', 'targetBranch', 'targetFlavor', 'components' ]
+    isRemove = False
+
+    def __init__(self, targetName, targetBranch, targetFlavor):
+        assert(targetName is not None)
+        _Redirect.__init__(self)
+        self.targetName = targetName
+        self.targetBranch = targetBranch
+        self.targetFlavor = targetFlavor
+
+class _Redirections(dict):
+
+    def add(self, sourceName, sourceFlavor, redir):
+        l = self.setdefault((sourceName, sourceFlavor), [])
+        l.append(redir)
+
+class _RedirectRule(object):
+    __slots__ = [ 'destName', 'branchStr', 'sourceFlavor', 'targetFlavor',
+                  'skipTargetMatching', 'sourceName', 'allowMultipleTargets' ]
+
+    def findAvailableTargetFlavors(self, repos):
+        if self.branchStr is None:
+            # redirect to nothing
+            return set()
+
+        if self.branchStr[0] == '/':
+            branch = versions.VersionFromString(self.branchStr)
+            if not isinstance(branch, versions.Branch):
+                raise builderrors.RecipeFileError, \
+                    "Redirects must specify branches or labels, " \
+                    "not versions"
+
+            matches = repos.getTroveLeavesByBranch(
+                            { self.destName : { branch : None } })
+        else:
+            label = versions.Label(self.branchStr)
+            matches = repos.getTroveLeavesByLabel(
+                            { self.destName : { label : None } })
+            # check for label multiplicity
+            if matches:
+                branches = set(x.branch() for x in matches[self.destName])
+                if len(branches) > 1:
+                    raise builderrors.RecipeFileError, \
+                        "Label %s matched multiple branches." % str(label)
+
+        targetFlavors = set()
+        # Get the flavors and branch available on the target
+        for version, flavorList in matches.get(self.destName, {}).iteritems():
+            targetFlavors.update((version, x) for x in flavorList)
+
+        return targetFlavors
+
+    def __str__(self):
+        return "%s[%s] -> %s=%s[%s]" % (self.sourceName, self.sourceFlavor,
+                self.destName, self.branchStr, self.targetFlavor)
+
+    def __init__(self, sourceName = None, destName = None, branchStr = None,
+                 sourceFlavor = None, targetFlavor = None,
+                 skipTargetMatching = None, allowMultipleTargets = False):
+        self.sourceName = sourceName
+        self.destName = destName
+        self.branchStr = branchStr
+        self.sourceFlavor = sourceFlavor
+        self.targetFlavor = targetFlavor
+        self.skipTargetMatching = skipTargetMatching
+        self.allowMultipleTargets = allowMultipleTargets
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
     _recipeType = RECIPE_TYPE_REDIRECT
     internalAbstractBaseClass = 1
 
-    def addRedirect(self, name, branchStr = None, sourceFlavor = None,
-                    targetFlavor = None, fromTrove = None, 
-                    skipTargetMatching = False):
+    def _addRule(self, rule):
+        l = self.rules.setdefault(rule.sourceName, list())
+        if rule.sourceFlavor is None:
+            l.append(rule)
+        else:
+            # the default (with no sourceFlavor) has to be at the end to
+            # make sure it matches last
+            l.insert(0, rule)
+
+    def addRedirect(self, toTrove, branchStr = None, sourceFlavor = None,
+                    targetFlavor = None, fromTrove = None,
+                    skipTargetMatching = False, allowMultipleTargets = False):
         if ((sourceFlavor is not None) and (targetFlavor is None)) or \
            ((targetFlavor is not None) and (sourceFlavor is None)):
             raise builderrors.RecipeFileError, \
@@ -51,46 +140,32 @@ class RedirectRecipe(Recipe):
         elif fromTrove.find(":") != -1:
             raise ValueError, 'components cannot be individually redirected'
 
-        if fromTrove.startswith("group-"):
-            # how sad
-            raise ValueError, "groups cannot be redirected"
-
-        self.addTroveList.append((name, branchStr, sourceFlavor, 
-                                  targetFlavor, fromTrove, skipTargetMatching))
+        rule = _RedirectRule(sourceName = fromTrove, destName = toTrove,
+                             branchStr = branchStr, sourceFlavor = sourceFlavor,
+                             targetFlavor = targetFlavor,
+                             skipTargetMatching = skipTargetMatching,
+                             allowMultipleTargets = allowMultipleTargets)
+        self._addRule(rule)
 
     def addRemoveRedirect(self, fromTrove = None):
+        # We don't allow flavor-specificty for remove rules. You could write
+        # redirect rules for everything which ought to be redirected and have
+        # a catch-all remove redirect for everything else.
         if fromTrove is None:
             fromTrove = self.name
         elif fromTrove.find(":") != -1:
             raise ValueError, 'components cannot be individually redirected'
 
-        # the None for branchStr (the second item in this tuple) indicates
-        # this is a redirect to nothing
-        self.addTroveList.append((self.name, None, None, None, fromTrove, None))
+        rule = _RedirectRule(sourceName = fromTrove)
+        self._addRule(rule)
 
-    def findTroves(self):
-        self.size = 0
-
-        validSize = True
-        troveList = []
-
-        packageSet = {}
-
+    def _findSourceTroves(self):
         sourceSearch = {}
-        fromRule = {}
-        for (name, branchStr, sourceFlavor, targetFlavor,
-             fromTrove, skipTargetMatching) in self.addTroveList:
-            l = fromRule.setdefault(fromTrove, list())
-            # the catch-all (with no sourceFlavor) has to be at the end
-            if sourceFlavor is None:
-                l.append((name, branchStr, sourceFlavor, targetFlavor,
-                          skipTargetMatching))
-            else:
-                l.insert(0, (name, branchStr, sourceFlavor, targetFlavor,
-                             skipTargetMatching))
-
+        for fromTrove in self.rules.iterkeys():
             sourceSearch.setdefault(fromTrove, { self.branch : None })
 
+        # this treats previously-built redirects as flavors we need to
+        # redirect from, which seems a bit weird
         sourceTroveMatches = self.repos.getTroveLeavesByBranch(sourceSearch)
 
         if len(sourceTroveMatches) != len(sourceSearch):
@@ -98,8 +173,11 @@ class RedirectRecipe(Recipe):
             raise builderrors.RecipeFileError, \
                     "No troves found with name(s) %s" % " ".join(missing)
 
+        return sourceTroveMatches
+
+    def _getSourceTroves(self, searchResult):
         l = []
-        for name, d in sourceTroveMatches.iteritems():
+        for name, d in searchResult.iteritems():
             for version, flavorList in d.iteritems():
                 l += [ (name, (None, None), (version, x), True) 
                                 for x in flavorList ]
@@ -107,191 +185,219 @@ class RedirectRecipe(Recipe):
         trvCsDict = {}
         # We don't need to recurse here since we only support package
         # redirects
-        cs = self.repos.createChangeSet(l, recurse = False, withFiles = False)
+        cs = self.repos.createChangeSet(l, recurse = False,
+                                        withFiles = False)
         for trvCs in cs.iterNewTroveList():
             info = (trvCs.getName(), trvCs.getNewVersion(),
                     trvCs.getNewFlavor())
             trvCsDict[info] = trvCs
 
-        redirMap = {}
+        return trvCsDict
 
-        names = sourceTroveMatches.keys()
-        additionalNameQueue = util.IterableQueue()
-        for name in itertools.chain(names, additionalNameQueue):
-            versionDict = sourceTroveMatches.pop(name)
+    @staticmethod
+    def _getTargetRules(rules, name):
+        # return the rules for troves with this name; if it's a component of
+        # a package we alrady built reuse the rule which we used for that 
+        # package
+        targetRules = rules.get(name, None)
+        if targetRules is None:
+            raise builderrors.RecipeFileError, \
+                "Cannot find redirection for trove %s" % name
 
-            destSet = fromRule.get(name, None)
-            if destSet is None and ':' in name:
-                # package redirections imply component redirections
-                pkgName, compName = name.split(':')
-                destSet = fromRule.get(pkgName, None)
-                if destSet is not None:
-                    destSet = set(
-                        [ (x[0] + ':' + compName,) + x[1:] for x in destSet ])
+        return targetRules
 
-            if destSet is None:
-                raise builderrors.RecipeFileError, \
-                    "Cannot find redirection for trove %s" % name
+    def _buildRedirect(self, trvCsDict, sourceFlavor,
+                       sourceVersion, rule, target):
+        if target[0] is not None:
+            redirInfo = _RedirectInfo(target[0], target[1].branch(), rule.targetFlavor)
+        else:
+            redirInfo = _RemoveRedirect()
+
+        self.redirections.add(rule.sourceName, sourceFlavor, redirInfo)
+
+        # Groups don't include any additional redirections, and
+        # neither do items which aren't collections
+        if (rule.sourceName.startswith('group-') or
+            not trove.troveIsCollection(rule.sourceName)):
+            return
+
+        if target[0] is not None:
+            targetTrove = self.repos.getTrove(withFiles = False, *target)
+            targetComponents = set([ x[0].split(':')[1]
+                for x in
+                targetTrove.iterTroveList(strongRefs = True) ])
+        else:
+            targetComponents = set()
+
+        # we can't integrity check here because we got
+        # the trove w/o files
+        trvCs = trvCsDict[(rule.sourceName, sourceVersion, sourceFlavor)]
+        trv = trove.Trove(trvCs)
+
+        # assemble a set of all of the components included
+        # in this trove
+        currentComponents = set([ x[0].split(':')[1] for x in
+                        trv.iterTroveList(strongRefs = True) ])
+
+        # components shared between the current trove and
+        # the target should be redirected to the target
+        # components
+        for compName in currentComponents & targetComponents:
+            sourceCompName = rule.sourceName + ':' + compName
+            targetCompName = redirInfo.targetName + ':' + compName
+            self.redirections.add(sourceCompName, sourceFlavor,
+                    _RedirectInfo(targetCompName, redirInfo.targetBranch,
+                                  redirInfo.targetFlavor))
+
+        # now get all of the components which have been
+        # included in this trove anywhere on the branch; those
+        # components need to generate erase redirects
+        allVersions = self.repos.getTroveVersionsByBranch(
+            { trv.getName() :
+                { trv.getVersion().branch() : None } } )
+        l = []
+        for subVersion, subFlavorList in \
+                allVersions[trv.getName()].iteritems():
+            l += [ ( trv.getName(), subVersion, flavor)
+                     for flavor in subFlavorList ]
+
+        allTroves = self.repos.getTroves(l, withFiles = False)
+        allComponents = set()
+        for otherTrv in allTroves:
+            allComponents.update(
+               [ x[0].split(':')[1] for x in
+                 otherTrv.iterTroveList(strongRefs = True) ] )
+
+        # components which existed at any point for this
+        # trove but don't have a component in the redirect
+        # target need to be erased
+        for subName in allComponents - targetComponents:
+            newName = rule.sourceName + ':' + subName
+            self.redirections.add(newName, sourceFlavor, _RemoveRedirect())
+
+        # the package redirect includes references to the
+        # component redirects to let the update code know
+        # how to redirect the components; this tracks the
+        # components of this redirect
+        redirInfo.addComponents(
+            [ rule.sourceName + ':' + x for x in allComponents ])
+
+    def findTroves(self):
+        sourceTroveMatches = self._findSourceTroves()
+        trvCsDict = self._getSourceTroves(sourceTroveMatches)
+
+        redirRuleMap = {}
+
+        # sourceTroveVersions is all of the versions/flavors which 
+        # currently exist for this trove
+        for sourceName, sourceTroveVersions in sourceTroveMatches.iteritems():
+            # set of rules for where this trove should redirect to
+            targetRules = self._getTargetRules(self.rules, sourceName)
 
             # XXX the repository operations should be pulled out of all of
             # these loops
             additionalNames = set()
-            for (destName, branchStr, sourceFlavorRestriction,
-                targetFlavorRestriction, skipTargetMatching) in destSet:
+            for rule in targetRules:
+                # get all of the flavors this rule specifies redirecting to
+                targetFlavors = rule.findAvailableTargetFlavors(self.repos)
 
-                if branchStr is None:
-                    # redirect to nothing
-                    matches = None
-                elif branchStr[0] == '/':
-                    branch = versions.VersionFromString(branchStr)
-                    if not isinstance(branch, versions.Branch):
-                        raise builderrors.RecipeFileError, \
-                            "Redirects must specify branches or labels, " \
-                            "not versions"
-
-                    matches = self.repos.getTroveLeavesByBranch(
-                                    { destName : { branch : None } })
-                else:
-                    label = versions.Label(branchStr)
-                    matches = self.repos.getTroveLeavesByLabel(
-                                    { destName : { label : None } })
-                    # if there are multiple versions returned, the label
-                    # may have matched multiple branches
-                    if matches:
-                        branches = set(x.branch() for x in matches[destName])
-                        if len(branches) > 1:
-                            raise builderrors.RecipeFileError, \
-                                "Label %s matched multiple branches." % str(label)
-                targetFlavors = set()
-                if matches is None:
-                    # Intentional redirect to nothing
-                    pass
-                elif destName not in matches:
+                if rule.branchStr and not targetFlavors:
                     # We're redirecting to something which doesn't
-                    # exist. This is an error if it's the top of a
-                    # redirect (a package), but generates an erase
-                    # redirect if it's for a component.
-                    if name in names:
-                        raise builderrors.RecipeFileError, \
-                            "Trove %s does not exist" % (destName)
-                else:
-                    # Get the flavors and branch available on the target
-                    for version, flavorList in matches[destName].iteritems():
-                        targetFlavors.update((version, x) for x in flavorList)
-                del matches
+                    # exist.
+                    raise builderrors.RecipeFileError, \
+                        "Trove %s does not exist" % (rule.destName)
 
+                # This lets us catch where we haven't found any matches for
+                # this rule. If we have found any matches for this rule, no
+                # error results, even if some of the troves on that label
+                # cannot be redirected due to flavor conflicts
                 foundMatch = False
-                for version, flavorList in versionDict.items():
+
+                # Try to create redirects for each version/flavor combination
+                for sourceVersion, flavorList in sourceTroveVersions.items():
                     for sourceFlavor in flavorList:
-                        if sourceFlavorRestriction is not None and \
-                           sourceFlavor != sourceFlavorRestriction: continue
+                        if rule.sourceFlavor is not None and \
+                           sourceFlavor != rule.sourceFlavor:
+                            continue
 
                         match = None
                         for targetVersion, targetFlavor in targetFlavors:
-                            if (not skipTargetMatching and 
-                                targetFlavorRestriction is not None and
-                                targetFlavor != targetFlavorRestriction):
+                            if (not rule.skipTargetMatching and
+                                rule.targetFlavor is not None and
+                                targetFlavor != rule.targetFlavor):
                                 continue
 
-                            if ((sourceFlavorRestriction is not None)
-                                or skipTargetMatching
+                            if ((rule.sourceFlavor is not None)
+                                or rule.skipTargetMatching
                                 or sourceFlavor.score(targetFlavor) is not False):
-                                match = targetVersion
+                                match = (targetVersion, targetFlavor)
                                 break
 
                         if match is not None:
-                            if (name, sourceFlavor) in redirMap:
-                                raise builderrors.RecipeFileError, \
-                                    "Multiple redirect targets specified " \
-                                    "from trove %s[%s]" % (name, sourceFlavor)
+                            # found a compatible trove to redirect to
+                            if (sourceName, sourceFlavor) in self.redirections:
+                                # a default-flavor rule doesn't cause a
+                                # conflict with a flavor-specifying rule
+                                # because the later is more specific (and
+                                # we know we've already processed the
+                                # flavor-specifying rule because self.rules
+                                # is sorted with flavor-specifying rules
+                                # at the front)
+                                previousRule = redirRuleMap[(sourceName,
+                                                             sourceFlavor)]
+                                if (previousRule.sourceFlavor 
+                                                    is not None and
+                                    rule.sourceFlavor is None):
+                                    # the default rule should be skipped
+                                    # rather than causing a conflict
+                                    continue
 
-                            redirInfo = (destName, match.branch(),
-                                         targetFlavorRestriction)
+                                if not rule.allowMultipleTargets:
+                                    raise builderrors.RecipeFileError, \
+                                        "Multiple redirect targets specified " \
+                                        "from trove %s[%s]" \
+                                        % (sourceName, sourceFlavor)
+
+                            targetTroveInfo = (rule.destName, match[0],
+                                               match[1])
                         elif not targetFlavors:
                             # redirect to nothing
-                            redirInfo = (None, None, None)
-                        elif targetFlavorRestriction is not None:
+                            targetTroveInfo = (None, None, None)
+                        elif rule.targetFlavor is not None:
                             raise builderrors.RecipeFileError, \
-                                "Trove %s does not exist for flavor %s" \
-                                % (name, targetFlavor)
+                                "Trove %s does not exist for flavor [%s]" \
+                                % (sourceName, targetFlavor)
                         else:
                             continue
 
                         # we created a redirect!
                         foundMatch = True
+                        redirRuleMap[(sourceName, sourceFlavor)] = rule
 
-                        redirMap[(name, sourceFlavor)] = redirInfo + ([], )
+                        self._buildRedirect(trvCsDict, sourceFlavor,
+                                            sourceVersion, rule,
+                                            targetTroveInfo)
 
-                        if not trove.troveIsCollection(name):
-                            continue
-
-                        # add any troves the redirected trove referenced
-                        # to the todo list
-                        trvCs = trvCsDict[(name, version, sourceFlavor)]
-
-                        # we can't integrity check here because we got
-                        # the trove w/o files
-                        trv = trove.Trove(trvCs, skipIntegrityChecks = True)
-
-                        subNames = set()
-                        for info in trv.iterTroveList(strongRefs = True):
-                            assert(info[1] == version)
-                            assert(info[2] == sourceFlavor)
-                            subNames.add(info[0])
-                            d = sourceTroveMatches.setdefault(info[0], {})
-                            d.setdefault(info[1], []).append(info[2])
-
-                        allOldVersions = self.repos.getTroveVersionsByBranch(
-                            { trv.getName() :
-                                { trv.getVersion().branch() : None } } )
-                        l = []
-                        for subVersion, subFlavorList in \
-                                allOldVersions[trv.getName()].iteritems():
-                            l += [ ( trv.getName(), subVersion, flavor)
-                                     for flavor in subFlavorList ]
-
-                        allTroves = self.repos.getTroves(l, withFiles = False)
-                        neededNames = set()
-                        for otherTrv in allTroves:
-                            neededNames.update(
-                               [ x[0] for x in
-                                 otherTrv.iterTroveList(strongRefs = True) ] )
-
-                        # subNames is all of the included troves we've built
-                        # redirects for, and neededNames is everything we
-                        # should have built them for; the difference is troves
-                        # that disappeared
-                        for subName in neededNames - subNames:
-                            d = sourceTroveMatches.setdefault(subName, {})
-                            d.setdefault(None, []).append(sourceFlavor)
-
-                        redirMap[(name, sourceFlavor)][-1].extend(neededNames)
-
-                        additionalNames.update(neededNames)
 
                 if not foundMatch:
                     raise builderrors.CookError(
                     "Could not find target with satisfying flavor"
                     " for redirect %s - either create a redirect"
                     " with targetFlavor and sourceFlavor set, or"
-                    " create a redirect with skipTargetMatching = True" % name)
-
-            for name in additionalNames:
-                additionalNameQueue.add(name)
-
-        self.redirections = redirMap
+                    " create a redirect with skipTargetMatching = True" % sourceName)
 
     def getRedirections(self):
         return self.redirections
 
     def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
+        Recipe.__init__(self)
         self.repos = repos
         self.cfg = cfg
-        self.redirections = {}
+        self.redirections = _Redirections()
         self.branch = branch
         self.flavor = flavor
-        self.addTroveList = []
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
+        self.rules = {}
 
 

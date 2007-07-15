@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -12,7 +12,6 @@
 # full details.
 #
 
-import copy
 import glob
 import os
 import imp
@@ -28,11 +27,9 @@ from conary.build import build
 from conary.build import errors
 from conary.build import macros
 from conary.build import policy
-from conary.build import source
 from conary.build import use
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary import files
 from conary.lib import log, magic, util
 from conary.local import database
 
@@ -77,41 +74,51 @@ class _policyUpdater:
     def __call__(self, *args, **keywords):
 	self.theobject.updateArgs(*args, **keywords)
 
-class _sourceHelper:
-    def __init__(self, theclass, recipe):
-        self.theclass = theclass
-	self.recipe = recipe
-    def __call__(self, *args, **keywords):
-        self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
-
-
 def clearBuildReqs(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
+    _clearReqs('buildRequires', buildReqs)
+
+def clearCrossReqs(*crossReqs):
+    """ Clears inherited build requirement lists of a given set of packages,
+        or all packages if none listed.
+    """
+    _clearReqs('crossRequires', crossReqs)
+
+def _clearReqs(attrName, reqs):
     def _removePackages(class_, pkgs):
         if not pkgs:
-            class_.buildRequires = []
+            setattr(class_, attrName, [])
         else:
             for pkg in pkgs:
-                if pkg in class_.buildRequires:
-                    class_.buildRequires.remove(pkg)
+                if pkg in getattr(class_, attrName):
+                    getattr(class_, attrName).remove(pkg)
 
-    callerGlobals = inspect.stack()[1][0].f_globals
+    callerGlobals = inspect.stack()[2][0].f_globals
     classes = []
     for value in callerGlobals.itervalues():
         if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
             classes.append(value)
 
     for class_ in classes:
-        _removePackages(class_, buildReqs)
+        _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
             if issubclass(base, _AbstractPackageRecipe):
-                _removePackages(base, buildReqs)
+                _removePackages(base, reqs)
 
-def _ignoreCall(*args, **kw):
-    pass
+crossFlavor = deps.parseFlavor('cross')
+def getCrossCompileSettings(flavor):
+    flavorTargetSet = flavor.getDepClasses().get(deps.DEP_CLASS_TARGET_IS, None)
+    if flavorTargetSet is None:
+        return None
+
+    targetFlavor = deps.Flavor()
+    for insSet in flavorTargetSet.getDeps():
+        targetFlavor.addDep(deps.InstructionSetDependency, insSet)
+    isCrossTool = flavor.stronglySatisfies(crossFlavor)
+    return None, targetFlavor, isCrossTool
 
 class _AbstractPackageRecipe(Recipe):
     buildRequires = [
@@ -126,6 +133,7 @@ class _AbstractPackageRecipe(Recipe):
         'conary-build:python',
         'sqlite:lib',
     ]
+    crossRequires = []
 
     Flags = use.LocalFlags
     explicitMainDir = False
@@ -162,70 +170,6 @@ class _AbstractPackageRecipe(Recipe):
     def cleanup(self, builddir, destdir):
 	if self.cfg.cleanAfterCook:
 	    util.rmtree(builddir)
-
-    def sourceMap(self, path):
-        if os.path.exists(path):
-            basepath = path
-        else:
-            basepath = os.path.basename(path)
-        if basepath in self.sourcePathMap:
-            if basepath == path:
-                # we only care about truly different source locations with the
-                # same basename
-                return
-            if basepath in self.pathConflicts:
-                self.pathConflicts[basepath].append(path)
-            else:
-                self.pathConflicts[basepath] = [
-                    # previous (first) instance
-                    self.sourcePathMap[basepath],
-                    # this instance
-                    path
-                ]
-        else:
-            self.sourcePathMap[basepath] = path
-
-    def fetchAllSources(self, refreshFilter=None, skipFilter=None):
-	"""
-	returns a list of file locations for all the sources in
-	the package recipe
-	"""
-        # first make sure we had no path conflicts:
-        if self.pathConflicts:
-            errlist = []
-            for basepath in self.pathConflicts.keys():
-                errlist.extend([x for x in self.pathConflicts[basepath]])
-            raise RecipeFileError("The following file names conflict "
-                                  "(cvc does not currently support multiple"
-                                  " files with the same name from different"
-                                  " locations):\n   " + '\n   '.join(errlist))
-	self.prepSources()
-	files = []
-	for src in self.getSourcePathList():
-            if skipFilter and skipFilter(os.path.basename(src.getPath())):
-                continue
-
-	    f = src.fetch(refreshFilter)
-	    if f:
-		if type(f) in (tuple, list):
-		    files.extend(f)
-		else:
-		    files.append(f)
-	return files
-
-    def fetchLocalSources(self):
-	files = []
-	for src in self._sources:
-	    f = src.fetchLocal()
-	    if f:
-		if type(f) in (tuple, list):
-		    files.extend(f)
-		else:
-		    files.append(f)
-        return files
-
-    def getSourcePathList(self):
-        return [ x for x in self._sources if isinstance(x, source._Source) ]
 
     def checkBuildRequirements(self, cfg, sourceVersion, raiseError=True):
         """ Checks to see if the build requirements for the recipe
@@ -264,46 +208,96 @@ class _AbstractPackageRecipe(Recipe):
             return versionMatches
 
         def _filterBuildReqsByFlavor(flavor, troves):
-            troves.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
+            troves.sort(key = lambda x: x.getVersion(), reverse=True)
             if flavor is None:
                 return troves[-1]
-            for trove in reversed(versionMatches):
+            for trove in troves:
                 troveFlavor = trove.getFlavor()
                 if troveFlavor.stronglySatisfies(flavor):
                     return trove
 
+        def _matchReqs(reqList, db):
+            reqMap = {}
+            missingReqs = []
+            for buildReq in reqList:
+                (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
+                # XXX move this to use more of db.findTrove's features, instead
+                # of hand parsing
+                try:
+                    troves = db.trovesByName(name)
+                    troves = db.getTroves(troves)
+                except errors.TroveNotFound:
+                    missingReqs.append(buildReq)
+                    continue
+
+                versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
+
+                if not versionMatches:
+                    missingReqs.append(buildReq)
+                    continue
+                match = _filterBuildReqsByFlavor(flavor, versionMatches)
+                if match:
+                    reqMap[buildReq] = match
+                else:
+                    missingReqs.append(buildReq)
+            return reqMap, missingReqs
+
+
 	db = database.Database(cfg.root, cfg.dbPath)
-        time = sourceVersion.timeStamps()[-1]
-        reqMap = {}
-        missingReqs = []
-        for buildReq in self.buildRequires:
-            (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
-            # XXX move this to use more of db.findTrove's features, instead
-            # of hand parsing
-            try:
-                troves = db.trovesByName(name)
-                troves = db.getTroves(troves)
-            except errors.TroveNotFound:
-                missingReqs.append(buildReq)
-                continue
 
-            versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
 
-            if not versionMatches:
-                missingReqs.append(buildReq)
-                continue
-            match = _filterBuildReqsByFlavor(flavor, versionMatches)
-            if match:
-                reqMap[buildReq] = match
+        if self.crossRequires:
+            if not self.macros.sysroot:
+                err = ("cross requirements needed but %(sysroot)s undefined")
+                if raiseError:
+                    log.error(err)
+                    raise errors.RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
+
+            if self.cfg.root != '/':
+                sysroot = self.cfg.root + self.macros.sysroot
             else:
-                missingReqs.append(buildReq)
+                sysroot = self.macros.sysroot
+            if not os.path.exists(sysroot):
+                err = ("cross requirements needed but sysroot (%s) does not exist" % (sysroot))
+                if raiseError:
+                    raise errors.RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
 
+            else:
+                crossDb = database.Database(sysroot, cfg.dbPath)
+        time = sourceVersion.timeStamps()[-1]
 
+        reqMap, missingReqs = _matchReqs(self.buildRequires, db)
+        if self.crossRequires:
+            crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
+                                                       crossDb)
+        else:
+            missingCrossReqs = []
+            crossReqMap = {}
 
-        if missingReqs:
-            err = ("Could not find the following troves "
-                   "needed to cook this recipe:\n"
-                   "%s" % '\n'.join(sorted(missingReqs)))
+        if missingReqs or missingCrossReqs:
+            if missingReqs:
+                err = ("Could not find the following troves "
+                       "needed to cook this recipe:\n"
+                       "%s" % '\n'.join(sorted(missingReqs)))
+                if missingCrossReqs:
+                    err += '\n'
+            else:
+                err = ''
+            if missingCrossReqs:
+                err += ("Could not find the following cross requirements"
+                        " (that must be installed in %s) needed to cook this"
+                        " recipe:\n"
+                        "%s" % (sysroot, '\n'.join(sorted(missingCrossReqs))))
             if raiseError:
                 log.error(err)
                 raise errors.RecipeDependencyError(
@@ -311,6 +305,7 @@ class _AbstractPackageRecipe(Recipe):
             else:
                 log.warning(err)
         self.buildReqMap = reqMap
+        self.crossReqMap = crossReqMap
         self.ignoreDeps = not raiseError
 
     def _getTransitiveBuildRequiresNames(self):
@@ -328,23 +323,6 @@ class _AbstractPackageRecipe(Recipe):
                 set(troveTup[0] for troveTup in d[depSet]))
 
         return self.transitiveBuildRequiresNames
-
-
-    def extraSource(self, action):
-	"""
-	extraSource allows you to append a source list item that is
-	not a part of source.py.  Be aware when writing these source
-	list items that you are writing conary internals!  In particular,
-	anything that needs to add a source file to the repository will
-	need to implement fetch(), and all source files will have to be
-	sought using the lookaside cache.
-	"""
-        self._sources.append(action)
-
-
-    def prepSources(self):
-	for source in self._sources:
-	    source.doPrep()
 
     def processResumeList(self, resume):
 	resumelist = []
@@ -382,27 +360,6 @@ class _AbstractPackageRecipe(Recipe):
 		    if action.linenum == resumeBegin:
 			yield action
 
-    def unpackSources(self, builddir, destdir, resume=None, downloadOnly=False):
-	self.macros.builddir = builddir
-	self.macros.destdir = destdir
-	if resume == 'policy':
-	    return
-	elif resume:
-	    log.info("Resuming on line(s) %s" % resume)
-	    # note resume lines must be in order
-	    self.processResumeList(resume)
-	    for source in self.iterResumeList(self._sources):
-		source.doPrep()
-		source.doAction()
-        elif downloadOnly:
-            for source in self._sources:
-                source.doPrep()
-                source.doDownload()
-	else:
-	    for source in self._sources:
-		source.doPrep()
-		source.doAction()
-
     def extraBuild(self, action):
 	"""
 	extraBuild allows you to append a build list item that is
@@ -424,8 +381,15 @@ class _AbstractPackageRecipe(Recipe):
             for bld in self._build:
                 bld.doAction()
 
-    def loadPolicy(self):
-        (self._policyPathMap, self._policies) = policy.loadPolicy(self)
+    def loadSourceActions(self):
+        self._loadSourceActions(lambda item: item._packageAction is True)
+
+    def loadPolicy(self, policySet = None,
+                   internalPolicyModules =
+                            ( 'destdirpolicy', 'packagepolicy') ):
+        (self._policyPathMap, self._policies) = \
+                policy.loadPolicy(self, policySet = policySet,
+                                  internalPolicyModules = internalPolicyModules)
         # create bucketless name->policy map for getattr
         policyList = []
         for bucket in self._policies.keys():
@@ -444,6 +408,9 @@ class _AbstractPackageRecipe(Recipe):
 
         # returns list of policy files loaded
         return self._policyPathMap.keys()
+
+    def _addBuildAction(self, name, item):
+        self.externalMethods[name] = _recipeHelper(self._build, self, item)
 
     def doProcess(self, policyBucket):
 	for post in self._policies[policyBucket]:
@@ -477,80 +444,10 @@ class _AbstractPackageRecipe(Recipe):
     def disableParallelMake(self):
         self.macros._override('parallelmflags', '')
 
-    def populateLcache(self):
-        """
-        Populate a repository lookaside cache
-        """
-        recipeClass = self.__class__
-        repos = self.laReposCache.repos
-
-        # build a list containing this recipe class and any ancestor class
-        # from which it descends
-        classes = [ recipeClass ]
-        bases = list(recipeClass.__bases__)
-        while bases:
-            parent = bases.pop()
-            bases.extend(list(parent.__bases__))
-            if issubclass(parent, PackageRecipe):
-                classes.append(parent)
-
-        # reverse the class list, this way the files will be found in the
-        # youngest descendant first
-        classes.reverse()
-
-        # populate the repository source lookaside cache from the :source
-        # components
-        for rclass in classes:
-            if not rclass._trove:
-                continue
-            srcName = rclass._trove.getName()
-            srcVersion = rclass._trove.getVersion()
-            # CNY-31: walk over the files in the trove we found upstream
-            # (which we may have modified to remove the non-autosourced files
-            # Also, if an autosource file is marked as needing to be refreshed
-            # in the Conary state file, the lookaside cache has to win, so
-            # don't populate it with the repository file)
-            for pathId, path, fileId, version in rclass._trove.iterFileList():
-                assert(path[0] != "/")
-                # we might need to retrieve this source file
-                # to enable a build, so we need to find the
-                # sha1 hash of it since that's how it's indexed
-                # in the file store
-                fileObj = repos.getFileVersion(pathId, fileId, version)
-                if isinstance(fileObj, files.RegularFile):
-                    # it only makes sense to fetch regular files, skip
-                    # anything that isn't
-                    self.laReposCache.addFileHash(srcName, srcVersion, pathId,
-                        path, fileId, version, fileObj.contents.sha1())
-
     def isatty(self, value=None):
         if value is not None:
             self._tty = value
         return self._tty
-
-    def __getattr__(self, name):
-	"""
-	Allows us to dynamically suck in namespace of other modules
-	with modifications.
-	 - The public namespace of the build module is accessible,
-	   and build objects are created and put on the build list
-	   automatically when they are referenced.
-	 - The public namespaces of the policy modules are accessible;
-	   policy objects already on their respective lists are returned,
-	   policy objects not on their respective lists are added to
-	   the end of their respective lists like build objects are
-	   added to the build list.
-	"""
-        if not name.startswith('_'):
-            externalMethod = self.externalMethods.get(name, None)
-            if externalMethod is not None:
-                return externalMethod
-
-            if self._lightInstance:
-                return _ignoreCall
-
-        # we don't get here if name is in __dict__, so it must not be defined
-        raise AttributeError, name
 
     def __delattr__(self, name):
 	"""
@@ -583,6 +480,12 @@ class _AbstractPackageRecipe(Recipe):
 	del self.__dict__[name]
 
     def _includeSuperClassBuildReqs(self):
+        self._includeSuperClassItemsForAttr('buildRequires')
+
+    def _includeSuperClassCrossReqs(self):
+        self._includeSuperClassItemsForAttr('crossRequires')
+
+    def _includeSuperClassItemsForAttr(self, attr):
         """ Include build requirements from super classes by searching
             up the class hierarchy for buildRequires.  You can only
             override this currenly by calling
@@ -590,8 +493,8 @@ class _AbstractPackageRecipe(Recipe):
         """
         buildReqs = set()
         for base in inspect.getmro(self.__class__):
-            buildReqs.update(getattr(base, 'buildRequires', []))
-        self.buildRequires = list(buildReqs)
+            buildReqs.update(getattr(base, attr, []))
+        setattr(self, attr, list(buildReqs))
 
     def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
@@ -610,7 +513,7 @@ class _AbstractPackageRecipe(Recipe):
                  binaries from this build should be runnable on the build
                  architecture.
         """
-        def _parseArch(archSpec):
+        def _parseArch(archSpec, target=False):
             if isinstance(archSpec, deps.Flavor):
                 return archSpec, None, None
 
@@ -621,7 +524,10 @@ class _AbstractPackageRecipe(Recipe):
                 vendor = hostOs = None
 
             try:
-                flavor = deps.parseFlavor('is: ' + arch)
+                if target:
+                    flavor = deps.parseFlavor('target: ' + arch)
+                else:
+                    flavor = deps.parseFlavor('is: ' + arch)
             except deps.ParseError, msg:
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
@@ -637,11 +543,6 @@ class _AbstractPackageRecipe(Recipe):
                 flag._set(False)
             use.setBuildFlagsFromFlavor(self.name, flavor)
 
-        def _setBuildMacros(macros):
-            # get the necessary information about the build system
-            # the only information we can grab is the arch.
-            macros['buildarch'] = use.Arch._getMacro('targetarch')
-
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
             if vendor:
@@ -649,7 +550,16 @@ class _AbstractPackageRecipe(Recipe):
             if targetOs:
                 macros['targetos'] = targetOs
             _setArchFlags(targetFlavor)
+            self.targetFlavor = deps.Flavor()
+            targetDeps = targetFlavor.iterDepsByClass(
+                                            deps.InstructionSetDependency)
+            self.targetFlavor.addDeps(deps.TargetInstructionSetDependency,
+                                      targetDeps)
             macros['targetarch'] = use.Arch._getMacro('targetarch')
+            archMacros = use.Arch._getMacros()
+            # don't override values we've set for crosscompiling
+            archMacros.pop('targetarch', False)
+            macros.update(archMacros)
 
         def _setHostMacros(crossHost, macros):
             hostFlavor, vendor, hostOs = _parseArch(crossHost)
@@ -658,54 +568,85 @@ class _AbstractPackageRecipe(Recipe):
             if hostOs:
                 macros['hostos'] = hostOs
 
-            tmpArch = copy.deepcopy(use.Arch)
             _setArchFlags(hostFlavor)
             macros['hostarch'] = use.Arch._getMacro('targetarch')
             macros['hostmajorarch'] = use.Arch.getCurrentArch()._name
-                
-            use.Arch = tmpArch
+            self.hostmacros = _createMacros('%(host)s', hostOs)
 
-        def _setSiteConfig(macros):
+        def _setBuildMacros(macros):
+            # get the necessary information about the build system
+            # the only information we can grab is the arch.
+            macros['buildarch'] = use.Arch._getMacro('targetarch')
+            self.buildmacros = _createMacros('%(build)s')
+
+
+        def _createMacros(compileTarget, osName=None):
+            theMacros = self.macros.copy(False)
+
+            archMacros = use.Arch._getMacros()
+            theMacros.majorarch = use.Arch.getCurrentArch()._name
+            theMacros.update(archMacros)
+            # locate the correct config.site files
+            theMacros.env_path = os.environ['PATH']
+            _setSiteConfig(theMacros, theMacros.majorarch, osName)
+            theMacros['cc'] = '%s-gcc' % compileTarget
+            theMacros['cxx'] = '%s-g++' % compileTarget
+            theMacros['strip'] = '%s-strip' % compileTarget
+            theMacros['strip_archive'] = '%s-strip -g' % compileTarget
+            return theMacros
+
+        def _setSiteConfig(macros, arch, osName, setEnviron=False):
+            if osName is None:
+                osName = self.macros.os
             archConfig = None
             osConfig = None
             for siteDir in self.cfg.siteConfigPath:
-                ac = '/'.join((siteDir, macros.hostmajorarch))
+                ac = '/'.join((siteDir, arch))
                 if util.exists(ac):
                     archConfig = ac
-                oc = '/'.join((siteDir, macros.hostos))
-                if util.exists(oc):
-                    osConfig = oc
+                if osName:
+                    oc = '/'.join((siteDir, osName))
+                    if util.exists(oc):
+                        osConfig = oc
             if not archConfig and not osConfig:
+                macros.env_siteconfig = ''
                 return
 
             siteConfig = None
-            if 'CONFIG_SITE' in os.environ:
+            if setEnviron and 'CONFIG_SITE' in os.environ:
                 siteConfig = os.environ['CONFIG_SITE']
             siteConfig = ' '.join((x for x in [siteConfig, archConfig, osConfig]
                                    if x is not None))
-            os.environ['CONFIG_SITE'] = siteConfig
+            macros.env_siteconfig = siteConfig
+            if setEnviron:
+                os.environ['CONFIG_SITE'] = siteConfig
 
-        macros = self.macros
-        macros.update(dict(x for x in crossMacros.iteritems() if x[0] not in macros))
+        self.macros.update(dict(x for x in crossMacros.iteritems() 
+                                 if x[0] not in self.macros))
 
         tmpArch = use.Arch.copy()
 
-        _setBuildMacros(macros)
-        _setTargetMacros(crossTarget, macros)
+        _setBuildMacros(self.macros)
+
+        if isCrossTool:
+            targetFlavor, vendor, targetOs = _parseArch(crossTarget, True)
+            self._isCrossCompileTool = True
+        else:
+            self._isCrossCompiling = True
 
         if crossHost is None:
             if isCrossTool:
-                # we want the resulting binaries to run on
-                # this machine.
-                macros['hostarch'] = macros['buildarch']
-                macros['hostmajorarch'] = use.Arch.getCurrentArch()._name
+                _setHostMacros(self._buildFlavor, self.macros)
+                _setTargetMacros(crossTarget, self.macros)
+                # leave things set up for the target
             else:
                 # we want the resulting binaries to run
                 # on the target machine.
-                macros['hostarch'] = macros['targetarch']
-                _setHostMacros(crossTarget, macros)
+                _setTargetMacros(crossTarget, self.macros)
+                _setHostMacros(crossTarget, self.macros)
         else:
-            _setHostMacros(crossHost, macros)
+            _setTargetMacros(crossTarget, self.macros)
+            _setHostMacros(crossHost, self.macros)
 
         # make sure that host != build, so that we are always
         # doing a real cross compile.  To make this work, we add
@@ -714,12 +655,12 @@ class _AbstractPackageRecipe(Recipe):
         # gcc and g++ for local builds are located, so set those local
         # values first.
 
-        origBuild = macros['build'] % macros
-        macros['buildcc'] = '%s-gcc' % (origBuild)
-        macros['buildcxx'] = '%s-g++' % (origBuild)
+        origBuild = self.macros['build'] % self.macros
+        self.macros['buildcc'] = '%s-gcc' % (origBuild)
+        self.macros['buildcxx'] = '%s-g++' % (origBuild)
 
-        if (macros['host'] % macros) == (macros['build'] % macros):
-            macros['buildvendor'] += '_build'
+        if (self.macros['host'] % self.macros) == (self.macros['build'] % self.macros):
+            self.macros['buildvendor'] += '_build'
 
         if isCrossTool:
             # we want the resulting binaries to run on our machine
@@ -730,16 +671,12 @@ class _AbstractPackageRecipe(Recipe):
             # target
             compileTarget = '%(target)s'
 
-        macros['cc'] = '%s-gcc' % compileTarget
-        macros['cxx'] = '%s-g++' % compileTarget
-        macros['strip'] = '%s-strip' % compileTarget
-        macros['strip_archive'] = '%s-strip -g' % compileTarget
+        self.macros['cc'] = '%s-gcc' % compileTarget
+        self.macros['cxx'] = '%s-g++' % compileTarget
+        self.macros['strip'] = '%s-strip' % compileTarget
+        self.macros['strip_archive'] = '%s-strip -g' % compileTarget
 
 
-	archMacros = use.Arch._getMacros()
-        # don't override values we've set for crosscompiling
-        archMacros = dict(x for x in archMacros.iteritems() if x[0] != 'targetarch')
-        macros.update(archMacros)
         newPath = '%(crossprefix)s/bin:' % self.macros
         os.environ['PATH'] = newPath + os.environ['PATH']
 
@@ -751,35 +688,45 @@ class _AbstractPackageRecipe(Recipe):
             self.macros.buildcxx = '%(bindir)s/' + self.macros.buildcxx
         
         # locate the correct config.site files
-        _setSiteConfig(macros)
+        _setSiteConfig(self.macros, self.macros.hostmajorarch,
+                       self.macros.hostos, setEnviron=True)
 
-        # set the bootstrap flag
-        # FIXME: this should probably be a cross flag instead.
-        use.Use.bootstrap._set()
+    def needsCrossFlags(self):
+        return self._isCrossCompileTool or self._isCrossCompiling
+
+    def isCrossCompiling(self):
+        return self._isCrossCompiling
+
+    def isCrossCompileTool(self):
+        return self._isCrossCompileTool
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        Recipe.__init__(self)
-	self._sources = []
+        Recipe.__init__(self, lightInstance = lightInstance,
+                        laReposCache = laReposCache, srcdirs = srcdirs)
 	self._build = []
-        self.buildinfo = False
+
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
-
-        self.externalMethods = {}
+        if not hasattr(self,'_buildFlavor'):
+            self._buildFlavor = cfg.buildFlavor
 
         self._policyPathMap = {}
         self._policies = {}
         self._policyMap = {}
+        self._componentReqs = {}
+        self._componentProvs = {}
+        self._derivedFiles = {} # used only for derived packages
         self._includeSuperClassBuildReqs()
+        self._includeSuperClassCrossReqs()
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
-	self.laReposCache = laReposCache
-	self.srcdirs = srcdirs
-	self.macros = macros.Macros()
+	self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
+        self.hostmacros = self.macros.copy()
+        self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
 
         # allow for architecture not to be set -- this could happen
@@ -798,16 +745,38 @@ class _AbstractPackageRecipe(Recipe):
 	if extraMacros:
 	    self.macros.update(extraMacros)
 
+        self._isCrossCompileTool = False
+        self._isCrossCompiling = False
+        if crossCompile is None:
+            crossCompile = getCrossCompileSettings(self._buildFlavor)
+
         if crossCompile:
             self.setCrossCompile(crossCompile)
         else:
             self.macros.update(use.Arch._getMacros())
             self.macros.setdefault('hostarch', self.macros['targetarch'])
             self.macros.setdefault('buildarch', self.macros['targetarch'])
+        if not hasattr(self, 'keepBuildReqs'):
+            self.keepBuildReqs = []
 
-	self.mainDir(self.nameVer(), explicit=False)
-        self.sourcePathMap = {}
-        self.pathConflicts = {}
+        if self.needsCrossFlags() and self.keepBuildReqs is not True:
+            crossSuffixes = ['devel', 'devellib']
+            crossTools = ['gcc', 'libgcc', 'binutils']
+            if (not hasattr(self, 'keepBuildReqs') 
+                or not hasattr(self.keepBuildReqs, '__iter__')):
+                # if we're in the "lightReference" mode, this might 
+                # return some bogus object...
+                self.keepBuildReqs = set()
+            newCrossRequires = \
+                [ x for x in self.buildRequires 
+                   if (':' in x and x.split(':')[-1] in crossSuffixes
+                       and x.split(':')[0] not in crossTools
+                       and x not in self.keepBuildReqs) ]
+            self.buildRequires = [ x for x in self.buildRequires
+                                   if x not in newCrossRequires ]
+            self.crossRequires.extend(newCrossRequires)
+
+        self.mainDir(self.nameVer(), explicit=False)
         self._autoCreatedFileCount = 0
 
 
@@ -855,12 +824,7 @@ class PackageRecipe(_AbstractPackageRecipe):
         _AbstractPackageRecipe.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
-                self.externalMethods[name] = \
-                    _recipeHelper(self._build, self, item)
-
-        for name, item in source.__dict__.items():
-            if name[0:3] == 'add' and issubclass(item, action.Action):
-                self.externalMethods[name] = _sourceHelper(item, self)
+                self._addBuildAction(name, item)
 
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)
@@ -909,6 +873,7 @@ class BuildPackageRecipe(PackageRecipe):
         'make:runtime',
         'mktemp:runtime',
         # all the rest of these are for configure
+        'file:runtime',
         'findutils:runtime',
         'gawk:runtime',
         'grep:runtime',

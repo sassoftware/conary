@@ -4,7 +4,7 @@
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -156,6 +156,9 @@ class DirectedGraph:
                     for x in self.edges[self.data.getIndex(node)].iteritems())
         return (self.data.get(idx)
                     for idx in self.edges[self.data.getIndex(node)])
+
+    def getIndex(self, node):
+        return self.data.getIndex(node)
 
     def iterNodes(self):
         return self.data.iterNodes()
@@ -334,3 +337,32 @@ class DirectedGraph:
                 children.update(self.edges.get(child, []))
                 self.edges[node].update(self.edges.get(child, []))
                 seen.add(child)
+
+    def generateDotFile(self, out, labelFormatFn=str, edgeFormatFn=None):
+        """
+            Generates a dot file based on the contents of the graph.
+            @param out: file-like object we write to
+            @labelFormatFn: function that takes a node as a parameter
+              and returns the output string
+            @edgeFormatFn: function that takes fromNode, toNode, value as 
+                           parameters and returns a string for the edge.
+        """
+        if isinstance(out, str):
+            out = open(out, 'w')
+        out.write('digraph graphName {\n')
+        nodes = {}
+        for node in self.iterNodes():
+            idx = self.data.getIndex(node)
+            nodes[idx] = node
+            out.write('   n%s [label="%s"]\n' % (idx, labelFormatFn(node)))
+        for fromIdx, toIdxDict in self.edges.iteritems():
+            fromNode = nodes[fromIdx]
+            for toIdx, value in toIdxDict.iteritems():
+                out.write('   n%s -> n%s' % (fromIdx, toIdx))
+                if edgeFormatFn:
+                    labelStr = edgeFormatFn(fromNode,
+                                         nodes[toIdx],
+                                         value)
+                    out.write(' [label="%s"]' % (labelStr,))
+                out.write('\n')
+        out.write('}\n')
