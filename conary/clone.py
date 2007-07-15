@@ -182,20 +182,6 @@ def _finishClone(client, cfg, cs, callback, info=False, test=False,
         print 'The following clones will be created:'
         displayCloneJob(cs)
 
-    labelConflicts = client._checkChangeSetForLabelConflicts(cs)
-    if labelConflicts and not ignoreConflicts:
-        print
-        print 'WARNING: performing this clone will create label conflicts:'
-        for troveTups in labelConflicts:
-            print
-            print '%s=%s[%s]' % (troveTups[0])
-            print '  conflicts with %s=%s[%s]' % (troveTups[1])
-
-        if not cfg.interactive and not info:
-            print
-            print 'error: interactive mode is required for when creating label conflicts'
-            return
-
     if info:
         return
 

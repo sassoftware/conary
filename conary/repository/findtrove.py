@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -264,6 +264,8 @@ class QueryByLabelPath(Query):
 
     def addQueryWithAffinity(self, troveTup, labelPath, affinityTroves):
         name = troveTup[0]
+        if labelPath is None:
+            labelPath = [ x[1].trailingLabel() for x in affinityTroves ]
         self.map[name] = [troveTup, labelPath]
 
         for label in labelPath:
@@ -287,7 +289,7 @@ class QueryByLabelPath(Query):
 
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:
-            return troveSource.getTroveLeavesByLabel(query, 
+            return troveSource.getTroveLatestByLabel(query,
                                                      bestFlavor=self.bestFlavor,
                                                      troveTypes=self.troveTypes)
         else:
@@ -295,7 +297,6 @@ class QueryByLabelPath(Query):
                                                    bestFlavor=self.bestFlavor,
                                                    troveTypes=self.troveTypes)
 
-        
     def findAll(self, troveSource, missing, finalMap):
 
         index = 0
@@ -802,8 +803,9 @@ class TroveFinder:
             if self.query[QUERY_BY_BRANCH].hasName(name):
                 self.remaining.append(troveTup)
                 return
-            self.query[QUERY_BY_BRANCH].addQueryWithAffinity(troveTup, None, 
-                                                             affinityTroves)
+            self.query[QUERY_BY_LABEL_PATH].addQueryWithAffinity(troveTup,
+                                                                 None,
+                                                                 affinityTroves)
         elif self.query[QUERY_BY_LABEL_PATH].hasName(name):
             self.remaining.append(troveTup)
             return
@@ -920,15 +922,12 @@ class TroveFinder:
     def sortTroveVersion(self, troveTup, affinityTroves):
         name = troveTup[0]
         flavor = troveTup[2]
-        if flavor is None and affinityTroves:
-            if self.query[QUERY_REVISION_BY_BRANCH].hasName(name):
-                self.remaining.append(troveTup)
-                return
-            self.query[QUERY_REVISION_BY_BRANCH].addQueryWithAffinity(troveTup,
-                                                          None, affinityTroves)
-        elif self.query[QUERY_REVISION_BY_LABEL].hasName(name):
+        if self.query[QUERY_REVISION_BY_LABEL].hasName(name):
             self.remaining.append(troveTup)
             return
+        if flavor is None and affinityTroves:
+            self.query[QUERY_REVISION_BY_LABEL].addQueryWithAffinity(troveTup,
+                                                          None, affinityTroves)
         else:
             flavorList = self.mergeFlavors(flavor)
             labelPath = self._getLabelPath(troveTup)

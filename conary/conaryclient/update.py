@@ -1554,6 +1554,7 @@ conary erase '%s=%s[%s]'
         results = {}
         searchSource = uJob.getSearchSource()
 
+        import epdb; epdb.st('f')
         if not useAffinity:
             results.update(searchSource.findTroves(toFind, useAffinity=False,
                                                    exactFlavors=exactFlavors))

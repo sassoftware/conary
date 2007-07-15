@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o Client Changes:
+    * Added getTroveLatestByLabel as a client-side call
+    * Label lookups pick the latest version which matches instead of the
+      latest version on each branch
+    * Replaced label affinity with branch affinity
+
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
       you could not commit recipes that used it.  (CNY-1752)
@@ -63,6 +69,11 @@ Changes in 1.1.32:
       been fixed.
     * A bug that caused changes in the byDefault status of a trove to
       be omitted from local rollbacks has been fixed. (CNY-1796)
+
+Changes in 1.1.31.2:
+  o Proxy changes:
+    * Proxy can now inject entitlements and user authentication on behalf
+      of clients (CNY-1836)
 
 Changes in 1.1.31.1:
   o Bug Fix:

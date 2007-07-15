@@ -343,9 +343,9 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         if versionFilter == VERSION_FILTER_ALL:
             queryFn = repos.getTroveVersionsByLabel
         elif versionFilter == VERSION_FILTER_LATEST:
-            queryFn = repos.getTroveLeavesByLabel
+            queryFn = repos.getTroveLatestByLabel
         elif versionFilter == VERSION_FILTER_LEAVES:
-            queryFn = repos.getTroveLeavesByLabel
+            queryFn = repos.getTroveLatestByLabel
 
 
         if flavorFilter == FLAVOR_FILTER_ALL:
@@ -384,13 +384,13 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
             else:
                 localFlavors = []
 
-            versionsByBranch = {}
+            versionsByLabel = {}
             for version, flavorList in versionDict.iteritems():
-                versionsByBranch.setdefault(version.branch(),
+                versionsByLabel.setdefault(version.trailingLabel(),
                                             []).append((version, flavorList))
 
 
-            for versionDict in versionsByBranch.itervalues():
+            for versionDict in versionsByLabel.itervalues():
                 for version, flavorList in sorted(versionDict, reverse=True):
                     if flavorFilter == FLAVOR_FILTER_BEST:
                         best = None
@@ -434,7 +434,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
                         troveTups.append((name, version, flavor))
                         added = True
                     if added and versionFilter == VERSION_FILTER_LATEST:
-                        continue
+                        break
     return sorted(troveTups, display._sortTroves)
 
 
