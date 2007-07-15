@@ -347,6 +347,8 @@ class DirectedGraph:
             @edgeFormatFn: function that takes fromNode, toNode, value as 
                            parameters and returns a string for the edge.
         """
+        if isinstance(out, str):
+            out = open(out, 'w')
         out.write('digraph graphName {\n')
         nodes = {}
         for node in self.iterNodes():
