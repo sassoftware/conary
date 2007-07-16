@@ -82,9 +82,8 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
                 label = sourceVersion.getBinaryVersion().trailingLabel()
                 query[pkgName][label] = None
 
-    if repos and not sourceVersion.isOnLocalHost():
         d = repos.getTroveVersionsByLabel(query,
-                                           troveTypes = repos.TROVE_QUERY_ALL)
+                                          troveTypes = repos.TROVE_QUERY_ALL)
     nextVersions = []
     for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
         if not isinstance(troveFlavors, (list, tuple, set)):
