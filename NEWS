@@ -4,6 +4,9 @@ Changes in @NEW@:
     * Label lookups pick the latest version which matches instead of the
       latest version on each branch
     * Replaced branch affinity with label affinity
+    * getAllTroveLeavesByLabel() filters results by server names to eliminate
+      spurious results from repositories which host multiple server names
+      (CNY-1771)
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because

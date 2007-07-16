@@ -912,7 +912,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         *self._setTroveTypeArgs(serverName, req,
                                                 troveTypes = troveTypes))
 
-        return self._mergeTroveQuery({}, d)
+        result = self._mergeTroveQuery({}, d)
+
+        # filter the result by server name; repositories hosting multiple
+        # server names will return results for all server names the user
+        # is allowed to see
+        for versionDict in result.itervalues():
+            for version in versionDict.keys():
+                if version.trailingLabel().getHost() != serverName:
+                    del versionDict[version]
+
+        for name, versionDict in result.items():
+            if not versionDict:
+                del result[name]
+
+        return result
 
     def getTroveVersionList(self, serverName, troveNameList,
                             troveTypes = TROVE_QUERY_PRESENT):
