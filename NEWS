@@ -3,7 +3,7 @@ Changes in @NEW@:
     * Added getTroveLatestByLabel as a client-side call
     * Label lookups pick the latest version which matches instead of the
       latest version on each branch
-    * Replaced label affinity with branch affinity
+    * Replaced branch affinity with label affinity
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
