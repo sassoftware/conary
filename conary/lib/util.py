@@ -25,6 +25,7 @@ import shutil
 import signal
 import stat
 import string
+import StringIO
 import subprocess
 import sys
 import tempfile
@@ -658,6 +659,15 @@ class ExtendedFile(file):
 
     def pread(self, bytes, offset):
         return misc.pread(self.fileno(), bytes, offset)
+
+class ExtendedStringIO(StringIO.StringIO):
+    def pread(self, bytes, offset):
+        pos = self.tell()
+        if offset:
+            self.seek(offset, 0)
+        data = self.read(bytes)
+        self.seek(pos, 0)
+        return data
 
 class PreadWrapper(object):
     # DEPRECATED. Will be removed in 1.1.23.
