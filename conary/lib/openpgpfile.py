@@ -366,15 +366,9 @@ def getHashableKeyData(keyRing):
     return data
 
 def getKeyId(keyRing):
-    startPoint = keyRing.tell()
-    keyRing.seek(0, SEEK_END)
-    if keyRing.tell() == startPoint:
-        return ''
-    keyRing.seek(startPoint)
-    data = getHashableKeyData(keyRing)
-    m = sha.new()
-    m.update(data)
-    return m.hexdigest().upper()
+    pkt = PGP_Packet()
+    pkt.initFromStream(keyRing, start = 0)
+    return pkt.getBody().getKeyId()
 
 def getSignatureTuple(keyRing):
     startPoint = keyRing.tell()
@@ -1039,7 +1033,7 @@ def getPublicKey(keyId, keyFile=''):
         else:
             keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
     try:
-        keyRing=open(keyFile)
+        keyRing = util.ExtendedFile(keyFile, buffering = False)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
     verifySelfSignatures(keyId, keyRing)
@@ -1054,7 +1048,7 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
         else:
             keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
     try:
-        keyRing=open(keyFile)
+        keyRing = util.ExtendedFile(keyFile, buffering = False)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
     key =  makeKey(getGPGKeyTuple(keyId, keyRing, 1, passPhrase))
@@ -1068,7 +1062,7 @@ def getPublicKeyFromString(keyId, data):
     return key
 
 def getKeyEndOfLifeFromString(keyId, data):
-    keyRing = StringIO(data)
+    keyRing = util.ExtendedStringIO(data)
     revoked, timestamp = findEndOfLife(keyId, keyRing)
     keyRing.close()
     return revoked, timestamp
@@ -1102,7 +1096,7 @@ def getFingerprint(keyId, keyFile=''):
         else:
             keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
     try:
-        keyRing=open(keyFile)
+        keyRing = util.ExtendedFile(keyFile, buffering = False)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open keyring")
     keyRing.seek(0, SEEK_END)
@@ -1111,14 +1105,12 @@ def getFingerprint(keyId, keyFile=''):
         # no keys in a zero length file
         raise KeyNotFound(keyId, "Couldn't open keyring")
     keyRing.seek(0, SEEK_SET)
-    while (keyRing.tell() < limit) and (keyId not in getKeyId(keyRing)):
-        seekNextKey(keyRing)
-    if keyRing.tell() >= limit:
-        keyRing.close()
+    msg = PGP_Message(keyRing)
+    try:
+        pkt = msg.iterByKeyId(keyId).next()
+    except StopIteration:
         raise KeyNotFound(keyId)
-    fingerprint = getKeyId(keyRing)
-    keyRing.close()
-    return fingerprint
+    return pkt.getBody().getKeyId()
 
 def getKeyEndOfLife(keyId, keyFile=''):
     if keyFile == '':
@@ -1127,7 +1119,7 @@ def getKeyEndOfLife(keyId, keyFile=''):
         else:
             keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
     try:
-        keyRing=open(keyFile)
+        keyRing = util.ExtendedFile(keyFile, buffering = False)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open keyring")
     res = findEndOfLife(keyId, keyRing)
@@ -1431,7 +1423,7 @@ class PGP_Message(object):
         else:
             # Assume an ExtendedFile
             assert hasattr(message, "pread"), "Not an ExtendedFile"
-        self._f = message
+            self._f = message
 
     def _getPacket(self):
         pkt = PGP_Packet()
@@ -1447,14 +1439,40 @@ class PGP_Message(object):
             pkt = pkt.next()
 
     def iterKeys(self):
-        pkt = self._getPacket()
-        for p in pkt.iterKeys():
-            yield p
+        """Iterate over all keys"""
+        for pkt in self.iterPackets():
+            if pkt.tag in PKT_ALL_KEYS:
+                yield pkt
 
     def iterByKeyId(self, keyId):
-        pkt = self._getPacket()
-        for p in pkt.iterByKeyId(keyId):
-            yield p
+        """Iterate over the keys with this key ID"""
+        for pkt in self.iterKeys():
+            if keyId.upper() in pkt.getBody().getKeyId():
+                yield pkt
+
+    def seekParentKey(self, keyId):
+        """Get a parent key with this keyId or with a subkey with this
+        keyId"""
+        for pkt in self.iterKeys():
+            if pkt.tag in PKT_MAIN_KEYS:
+                if keyId.upper() in pkt.getBody().getKeyId():
+                    # This is a main key and it has the keyId we need
+                    return pkt
+                mainKey = pkt
+            elif pkt.tag in PKT_SUB_KEYS:
+                if keyId.upper() in pkt.getBody().getKeyId():
+                    # This is a subkey, return the main key
+                    assert mainKey is not None
+                    return mainKey
+            try:
+                pkt = pkt.next()
+            except StopIteration:
+                break
+
+        return None
+
+def seekKeyById(keyRing, keyId):
+    pass
 
 class PGP_Packet(object):
     __slots__ = ['_f', '_bodyStream', 'tag', 'headerLength', 'bodyLength',
@@ -1532,15 +1550,23 @@ class PGP_Packet(object):
 
     def writeBody(self, stream):
         self._bodyStream.seek(0)
+        print "RRRR start"
         while 1:
             buf = self._bodyStream.read(self.BUFFER_SIZE)
             if not buf:
                 break
             stream.write(buf)
+            print "RRRR", len(buf)
 
     def write(self, stream):
         self.writeHeader(stream)
         self.writeBody(stream)
+
+    def resetBody(self):
+        self._bodyStream.seek(0)
+
+    def readBody(self, bytes = -1):
+        return self._bodyStream.read(bytes = bytes)
 
     def initFromStream(self, fileobj, start = 0):
         """Create packet from stream"""
@@ -1560,7 +1586,6 @@ class PGP_Packet(object):
             self._newStyle = True
             self._newHeader(first)
         else:
-            print "old header"
             self._newStyle = False
             self._oldHeader(first)
 
@@ -1577,46 +1602,6 @@ class PGP_Packet(object):
         if pkt.isEmpty():
             raise StopIteration()
         return pkt
-
-    def iterKeys(self):
-        """Iterate over all keys"""
-        pkt = self
-        while 1:
-            if pkt.tag in PKT_ALL_KEYS:
-                yield pkt
-            try:
-                pkt = pkt.next()
-            except StopIteration:
-                break
-
-    def iterByKeyId(self, keyId):
-        """Iterate over the keys with this key ID"""
-        for pkt in self.iterKeys():
-            if keyId.upper() in pkt.getBody().getKeyId():
-                yield pkt
-
-    def seekParentKey(self, keyId):
-        """Get a parent key with this keyId or with a subkey with this
-        keyId"""
-        pkt = self
-        mainKey = None
-        while 1:
-            if pkt.tag in PKT_MAIN_KEYS:
-                if keyId in pkt.getBody().getKeyId():
-                    # This is a main key and it has the keyId we need
-                    return pkt
-                mainKey = pkt
-            elif pkt.tag in PKT_SUB_KEYS:
-                if keyId in pkt.getBody().getKeyId():
-                    # This is a subkey, return the main key
-                    assert mainKey is not None
-                    return mainKey
-            try:
-                pkt = pkt.next()
-            except StopIteration:
-                break
-
-        return None
 
     def getUserIds(self):
         # Start with a key of some sort
@@ -1728,6 +1713,15 @@ class PGP_Packet(object):
 
     def getBodyStream(self):
         return self._bodyStream
+
+    def _iterSubPackets(self, limitTags):
+        """Iterate over the packets following this packet, until we reach a
+        packet of the specified type as the limit"""
+        pkt = self.next()
+        while not pkt.isEmpty() and pkt.tag not in limitTags:
+            yield pkt
+            pkt = pkt.next()
+
 
 class PGP_MessageBody(object):
     __slots__ = ['file']
@@ -1859,7 +1853,6 @@ class PGP_Key(PGP_MessageBody):
     BUFFER_SIZE = 16384
 
     def validate(self):
-        print "-------> Key", self.tag
         return True
 
     def getKeyId(self):
@@ -1896,7 +1889,7 @@ class PGP_Key(PGP_MessageBody):
         self.file.seek(0)
 
         while 1:
-            buf = self.file.read(self.BUFFER_SIZE)
+            buf = pkt.readBody(self.BUFFER_SIZE)
             if not buf:
                 break
             m.update(buf)
@@ -1945,9 +1938,9 @@ class PGP_SecretKey(PGP_Key):
         for i in range(numMPI):
             buf = self.readCheck(2)
             mLen = ((ord(buf[0]) * 256 +
-                     ord(buf[1])) + 7) // 8 + 2
+                     ord(buf[1])) + 7) // 8
             # Skip the MPI len
-            self.readCheck(mLen - 2)
+            self.readCheck(mLen)
 
         # Create a nested file starting at the beginning of the body's and
         # with the length equal to the position in the body (after we read the
