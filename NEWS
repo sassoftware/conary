@@ -7,6 +7,7 @@ Changes in @NEW@:
     * getAllTroveLeavesByLabel() filters results by server names to eliminate
       spurious results from repositories which host multiple server names
       (CNY-1771)
+    * 'cvc update' can now update multiple directories simultanously
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because

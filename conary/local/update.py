@@ -917,8 +917,7 @@ class FilesystemJob:
             twmSkipList = {  "contents" : True }
 
         if troveCs.getName().endswith(':source'):
-            cwd = os.getcwd()
-            rootFixup = cwd + "/"
+            rootFixup = root
             assert(not pathsMoved)
             isSrcTrove = True
             self.isSourceTrove = True
@@ -926,6 +925,9 @@ class FilesystemJob:
             rootFixup = root
             isSrcTrove = False
             self.isSourceTrove = False
+
+        if rootFixup[-1] != '/':
+            rootFixup += '/'
 
         newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                         troveCs.getNewFlavor())

@@ -357,9 +357,11 @@ R = removed
 ? = not tracked
 .fi
 .TP
-.B update [\fI<version>\fP]
-Updates the current source directory to the latest version, or to
-\fI<version>\fP if specified.  Merges changes when possible.
+.B update [\fI<dir>=<version>\fP]*
+Updates directories to different versions, merging changes when possible.
+If no parameter is given, the current directory is updated to the latest
+version. If only a version string is given, the current directory is updated
+to that version.
 Synonyms: \fBup\fP
 .RE
 .\"
