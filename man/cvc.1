@@ -358,10 +358,12 @@ R = removed
 .fi
 .TP
 .B update [\fI<dir>=<version>\fP]*
-Updates directories to different versions, merging changes when possible.
-If no parameter is given, the current directory is updated to the latest
-version. If only a version string is given, the current directory is updated
-to that version.
+Updates one or more directories, merging changes when possible.  When no
+directory is specified, the current directory is updated to the latest
+version.  Specifying one or more directories updates each directory to its
+latest version.  To update to a version other than the latest, specify the
+version alone (to update the current directory) or with each directory
+listed.
 Synonyms: \fBup\fP
 .RE
 .\"
