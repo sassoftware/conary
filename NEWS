@@ -12,6 +12,9 @@ Changes in @NEW@:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
       you could not commit recipes that used it.  (CNY-1752)
 
+  o Other changes:
+    * showchangeset script displays information on redirec troves
+
 Changes in 1.1.33:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)

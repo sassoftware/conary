@@ -2920,6 +2920,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def formatToFile(self, changeSet, f):
 	f.write("%s " % self.getName())
 
+        if self.troveType() == TROVE_TYPE_REDIRECT:
+            if not [ x for x in self.redirects.iter() ]:
+                f.write("remove redirect ")
+            else:
+                f.write("redirect ")
+
 	if self.isAbsolute():
 	    f.write("absolute ")
 	elif self.getOldVersion():
@@ -2941,6 +2947,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
             depformat('Old Flavor', self.getOldFlavor(), f)
         if not self.getNewFlavor().isEmpty():
             depformat('New Flavor', self.getNewFlavor(), f)
+
+        for redirect in self.redirects.iter():
+            print '\t-> %s=%s' % (redirect.name(), redirect.branch())
 
 	for (pathId, path, fileId, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (pathId[:6], pathId[-6:]))
