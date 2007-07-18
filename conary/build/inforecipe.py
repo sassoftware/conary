@@ -13,23 +13,23 @@
 #
 
 from conary.build.loadrecipe import _addRecipeToCopy
-from conary.build.packagerecipe import _AbstractPackageRecipe, _recipeHelper
+from conary.build.packagerecipe import AbstractPackageRecipe, _recipeHelper
 from conary.build.recipe import RECIPE_TYPE_INFO
 
 from conary.build import buildpackage
 from conary.build import usergroup
 from conary.deps import deps
 
-class UserGroupInfoRecipe(_AbstractPackageRecipe):
+class UserGroupInfoRecipe(AbstractPackageRecipe):
     _recipeType = RECIPE_TYPE_INFO
     internalAbstractBaseClass = 1
-    # we need to add this line because _AbstractPackageRecipe
+    # we need to add this line because AbstractPackageRecipe
     # isn't copied in
-    buildRequires = _AbstractPackageRecipe.buildRequires[:]
+    buildRequires = AbstractPackageRecipe.buildRequires[:]
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}, 
                  crossCompile=None):
-        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros, crossCompile)
+        AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros, crossCompile)
         self.requires = []
         self.infofilename = None
         self.realfilename = None

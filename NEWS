@@ -2,6 +2,10 @@ Changes in @NEW@:
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
       you could not commit recipes that used it.  (CNY-1752)
+    * An internal class, _AbstractPackageRecipe, has been renamed, to allow
+      the inclusion of its methods in the subclasses' documentation pages.
+      The old name is still available for compatibility with older modules.
+      (CNY-1848)
 
 Changes in 1.1.33:
   o Build Changes:
