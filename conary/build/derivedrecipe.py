@@ -14,11 +14,11 @@ from conary import files, trove, versions
 from conary import errors as conaryerrors
 from conary.build import build, source
 from conary.build import errors as builderrors
-from conary.build.packagerecipe import _AbstractPackageRecipe
+from conary.build.packagerecipe import AbstractPackageRecipe
 from conary.lib import log, util
 from conary.repository import changeset, filecontents
 
-class DerivedPackageRecipe(_AbstractPackageRecipe):
+class DerivedPackageRecipe(AbstractPackageRecipe):
 
     internalAbstractBaseClass = 1
     _isDerived = True
@@ -230,16 +230,16 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
 
         self._expandChangeset()
 
-        _AbstractPackageRecipe.unpackSources(self, resume = resume,
+        AbstractPackageRecipe.unpackSources(self, resume = resume,
                                              downloadOnly = downloadOnly)
 
     def loadPolicy(self):
-        return _AbstractPackageRecipe.loadPolicy(self,
+        return AbstractPackageRecipe.loadPolicy(self,
                                 internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
+        AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
