@@ -8,6 +8,8 @@ Changes in @NEW@:
       spurious results from repositories which host multiple server names
       (CNY-1771)
     * 'cvc update' can now update multiple directories simultanously
+    * cvc and conary commands now ignore broken pipes on stdout instead
+      of producing a traceback
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because

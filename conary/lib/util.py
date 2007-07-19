@@ -1051,3 +1051,32 @@ def stripUserPassFromUrl(url):
     userPass, host = urllib.splituser(hostUserPass)
     arr[1] = host
     return urlparse.urlunparse(arr)
+
+class FileIgnoreEpipe:
+
+    def ignoreEpipe(fn):
+
+        def wrapper(*args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except IOError, e:
+                if e.errno != errno.EPIPE:
+                    raise
+
+            return
+
+        return wrapper
+
+    @ignoreEpipe
+    def write(self, *args):
+        return self.f.write(*args)
+
+    @ignoreEpipe
+    def close(self, *args):
+        return self.f.close(*args)
+
+    def __getattr__(self, name):
+        return getattr(self.f, name)
+
+    def __init__(self, f):
+        self.f = f
