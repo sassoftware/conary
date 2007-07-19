@@ -366,9 +366,9 @@ def getHashableKeyData(keyRing):
     return data
 
 def getKeyId(keyRing):
-    pkt = PGP_Packet()
-    pkt.initFromStream(keyRing, start = 0)
-    return pkt.getBody().getKeyId()
+    pkt = newPacketFromStream(keyRing, start = -1)
+    assert pkt is not None
+    return pkt.getKeyId()
 
 def getSignatureTuple(keyRing):
     startPoint = keyRing.tell()
@@ -1110,7 +1110,7 @@ def getFingerprint(keyId, keyFile=''):
         pkt = msg.iterByKeyId(keyId).next()
     except StopIteration:
         raise KeyNotFound(keyId)
-    return pkt.getBody().getKeyId()
+    return pkt.getKeyId()
 
 def getKeyEndOfLife(keyId, keyFile=''):
     if keyFile == '':
@@ -1236,7 +1236,7 @@ def countKeys(keyRing):
 def getFingerprints(keyRing):
     # returns the fingerprints for all keys in a key ring file
     msg = PGP_Message(keyRing)
-    return [ x.getBody().getKeyId() for x in msg.iterKeys() ]
+    return [ x.getKeyId() for x in msg.iterKeys() ]
 
 def parseAsciiArmorKey(asciiData):
     data = StringIO(asciiData)
@@ -1415,8 +1415,8 @@ def getKeyTrust(trustFile, fingerprint):
 ### New-style
 
 class PGP_Message(object):
-    __slots__ = ['_f']
-    def __init__(self, message):
+    __slots__ = ['_f', 'pos']
+    def __init__(self, message, start = -1):
         if isinstance(message, str):
             # Assume a path
             self._f = util.ExtendedFile(message, buffering = False)
@@ -1424,16 +1424,16 @@ class PGP_Message(object):
             # Assume an ExtendedFile
             assert hasattr(message, "pread"), "Not an ExtendedFile"
             self._f = message
+        self.pos = start
 
     def _getPacket(self):
-        pkt = PGP_Packet()
-        pkt.initFromStream(self._f)
+        pkt = newPacketFromStream(self._f, start = self.pos)
         return pkt
 
     def iterPackets(self):
         pkt = self._getPacket()
         while 1:
-            if pkt.isEmpty():
+            if pkt is None:
                 break
             yield pkt
             pkt = pkt.next()
@@ -1447,7 +1447,7 @@ class PGP_Message(object):
     def iterByKeyId(self, keyId):
         """Iterate over the keys with this key ID"""
         for pkt in self.iterKeys():
-            if keyId.upper() in pkt.getBody().getKeyId():
+            if keyId.upper() in pkt.getKeyId():
                 yield pkt
 
     def seekParentKey(self, keyId):
@@ -1455,12 +1455,12 @@ class PGP_Message(object):
         keyId"""
         for pkt in self.iterKeys():
             if pkt.tag in PKT_MAIN_KEYS:
-                if keyId.upper() in pkt.getBody().getKeyId():
+                if keyId.upper() in pkt.getKeyId():
                     # This is a main key and it has the keyId we need
                     return pkt
                 mainKey = pkt
             elif pkt.tag in PKT_SUB_KEYS:
-                if keyId.upper() in pkt.getBody().getKeyId():
+                if keyId.upper() in pkt.getKeyId():
                     # This is a subkey, return the main key
                     assert mainKey is not None
                     return mainKey
@@ -1471,105 +1471,30 @@ class PGP_Message(object):
 
         return None
 
+class PacketTypeDispatcher(object):
+    _registry = {}
+
+    @staticmethod
+    def addPacketType(klass):
+        PacketTypeDispatcher._registry[klass.tag] = klass
+
+    @staticmethod
+    def getClass(tag):
+        return PacketTypeDispatcher._registry.get(tag, PGP_Packet)
+
 def seekKeyById(keyRing, keyId):
     pass
 
-class PGP_Packet(object):
-    __slots__ = ['_f', '_bodyStream', 'tag', 'headerLength', 'bodyLength',
-                 '_newStyle' ]
-    _bodyDispatcher = {}
-
-    BUFFER_SIZE = 16384
-
+class PGP_PacketFromStream(object):
+    __slots__ = ['_f', 'tag', 'headerLength', 'bodyLength']
     def __init__(self):
         self.tag = None
         self.headerLength = self.bodyLength = 0
         self._f = None
-        self._bodyStream = None
-        self._newStyle = True
 
-    def initFromBody(self, tag, bodyStream, newStyle = False, minLenLen = 1):
-        """Create packet from stream"""
-        assert hasattr(bodyStream, 'pread')
-        self.tag = tag
-        self._newStyle = newStyle
-        self._bodyStream = bodyStream
-        self.bodyLength = self._getBodyLength()
-        self.headerLength = self._getHeaderLength(minLenLen = minLenLen)
-
-    def _getHeaderLength(self, minLenLen = 1):
-        # bsrepr is the body size representation
-        if minLenLen > 2 or self.bodyLength > 65535:
-            # 4-byte packet length field
-            bsrepr = 4
-        elif minLenLen > 1 or self.bodyLength > 255:
-            # 2-byte packet length field
-            bsrepr = 2
-        else:
-            # 1 byte packet-length field
-            bsrepr = 1
-
-        return bsrepr + 1
-
-    def _getBodyLength(self):
-        """Determine the body length"""
-        pos = self._bodyStream.tell()
-        self._bodyStream.seek(0, SEEK_END)
-        blen = self._bodyStream.tell()
-        self._bodyStream.seek(pos, SEEK_SET)
-        return blen
-
-    def writeHeader(self, stream):
-        # Generate packet header
-        if self._newStyle:
-            raise NotImplementedError
-        # bit 7 is set, bit 6 is not set (old packet format)
-        fbyte = 0x80
-
-        # Add the tag, bits 5432. For old-style headers, they are represented
-        # on 4 bits only.
-        fbyte |= (0x0f & self.tag) << 2
-
-        # bsrepr is the body size representation
-        if self.headerLength == 5:
-            # 4-byte packet length field
-            fbyte |= 2
-            bsrepr = 4
-        elif self.headerLength == 3:
-            # 2-byte packet length field
-            fbyte |= 1
-            bsrepr = 2
-        else:
-            # 1 byte packet-length field (no changes to first byte needed)
-            bsrepr = 1
-
-        stream.write(chr(fbyte))
-        # prepare the size octets
-        for i in range(1, bsrepr + 1):
-            stream.write(chr((self.bodyLength >> ((bsrepr - i) << 3)) & 0xff))
-
-    def writeBody(self, stream):
-        self._bodyStream.seek(0)
-        print "RRRR start"
-        while 1:
-            buf = self._bodyStream.read(self.BUFFER_SIZE)
-            if not buf:
-                break
-            stream.write(buf)
-            print "RRRR", len(buf)
-
-    def write(self, stream):
-        self.writeHeader(stream)
-        self.writeBody(stream)
-
-    def resetBody(self):
-        self._bodyStream.seek(0)
-
-    def readBody(self, bytes = -1):
-        return self._bodyStream.read(bytes = bytes)
-
-    def initFromStream(self, fileobj, start = 0):
-        """Create packet from stream"""
+    def read(self, fileobj, start = -1):
+        """Create packet from stream
+        Return a PGP_Packet instance"""
         self._f = util.SeekableNestedFile(fileobj, 1, start)
         first = self._f.read(1)
         if not first:
@@ -1583,40 +1508,20 @@ class PGP_Packet(object):
 
         if first & 0x40:
             print "new header"
-            self._newStyle = True
+            newStyle = True
             self._newHeader(first)
         else:
-            self._newStyle = False
+            newStyle = False
             self._oldHeader(first)
 
-        self._bodyStream = util.SeekableNestedFile(self._f.file,
+        _bodyStream = util.SeekableNestedFile(self._f.file,
                      self.bodyLength, self._f.start + self.headerLength)
+        nextStreamPos = self._f.start + self.headerLength + self.bodyLength
 
-    def isEmpty(self):
-        return self.headerLength == 0
-
-    def next(self):
-        newStart = self._f.start + self.headerLength + self.bodyLength
-        pkt = PGP_Packet()
-        pkt.initFromStream(self._f.file, newStart)
-        if pkt.isEmpty():
-            raise StopIteration()
+        pkt = newPacket(self.tag, _bodyStream, newStyle = newStyle,
+                        minHeaderLen = self.headerLength)
+        pkt.setNextStream(fileobj, nextStreamPos)
         return pkt
-
-    def getUserIds(self):
-        # Start with a key of some sort
-        assert self.tag in PKT_ALL_KEYS
-        pkt = self
-        while 1:
-            try:
-                pkt = pkt.next()
-            except StopIteration:
-                break
-            if pkt.tag in PKT_ALL_KEYS:
-                # We got to the next key, stop
-                break
-            if pkt.tag == PKT_USERID:
-                yield pkt.getBody().toString()
 
     def _oldHeader(self, first):
         self.tag = (first & 0x3C) >> 2
@@ -1699,17 +1604,135 @@ class PGP_Packet(object):
         partialBodyLength = 1 << (body1 & 0x1F)
         raise NotImplementedError("Patial body lengths not implemented")
 
-    @staticmethod
-    def addBodyType(klass):
-        PGP_Packet._bodyDispatcher[klass.tag] = klass
+class PGP_BasePacket(object):
+    __slots__ = ['_bodyStream', 'headerLength', 'bodyLength',
+                 '_newStyle', '_nextStream', '_nextStreamPos' ]
 
-    @staticmethod
-    def getBodyTypeClass(tag):
-        return PGP_Packet._bodyDispatcher.get(tag, PGP_MessageBody)
+    tag = None
+    BUFFER_SIZE = 16384
 
-    def getBody(self):
-        klass = self._bodyDispatcher.get(self.tag, PGP_MessageBody)
-        return klass(self._bodyStream)
+    def __init__(self, bodyStream, newStyle = False, minHeaderLen = 2):
+        assert hasattr(bodyStream, 'pread')
+        self._newStyle = newStyle
+        self._bodyStream = bodyStream
+        self.bodyLength = self._getBodyLength()
+        self.headerLength = self._getHeaderLength(minHeaderLen = minHeaderLen)
+        # Keep a reference to the next stream we link to
+        self._nextStream = None
+        self._nextStreamPos = 0
+
+    def setNextStream(self, stream, pos):
+        if stream:
+            assert hasattr(stream, 'pread')
+        self._nextStream = stream
+        self._nextStreamPos = pos
+
+    def _getHeaderLength(self, minHeaderLen = 2):
+        # bsrepr is the body size representation
+        if minHeaderLen > 3 or self.bodyLength > 65535:
+            # 4-byte packet length field
+            bsrepr = 4
+        elif minHeaderLen > 2 or self.bodyLength > 255:
+            # 2-byte packet length field
+            bsrepr = 2
+        else:
+            # 1 byte packet-length field
+            bsrepr = 1
+
+        return bsrepr + 1
+
+    def _getBodyLength(self):
+        """Determine the body length"""
+        pos = self._bodyStream.tell()
+        self._bodyStream.seek(0, SEEK_END)
+        blen = self._bodyStream.tell()
+        self._bodyStream.seek(pos, SEEK_SET)
+        return blen
+
+    def writeHeader(self, stream):
+        # Generate packet header
+        if self._newStyle:
+            raise NotImplementedError
+        # bit 7 is set, bit 6 is not set (old packet format)
+        fbyte = 0x80
+
+        # Add the tag, bits 5432. For old-style headers, they are represented
+        # on 4 bits only.
+        fbyte |= (0x0f & self.tag) << 2
+
+        # bsrepr is the body size representation
+        if self.headerLength == 5:
+            # 4-byte packet length field
+            fbyte |= 2
+            bsrepr = 4
+        elif self.headerLength == 3:
+            # 2-byte packet length field
+            fbyte |= 1
+            bsrepr = 2
+        else:
+            # 1 byte packet-length field (no changes to first byte needed)
+            bsrepr = 1
+
+        stream.write(chr(fbyte))
+        # prepare the size octets
+        for i in range(1, bsrepr + 1):
+            stream.write(chr((self.bodyLength >> ((bsrepr - i) << 3)) & 0xff))
+
+    def writeBody(self, stream):
+        self._bodyStream.seek(0)
+        print "RRRR start"
+        while 1:
+            buf = self._bodyStream.read(self.BUFFER_SIZE)
+            if not buf:
+                break
+            stream.write(buf)
+            print "RRRR", len(buf)
+
+    def write(self, stream):
+        self.writeHeader(stream)
+        self.writeBody(stream)
+
+    def resetBody(self):
+        self._bodyStream.seek(0)
+
+    def readBody(self, bytes = -1):
+        """Read bytes from stream"""
+        return self._bodyStream.read(bytes = bytes)
+
+    def readExact(self, bytes):
+        """Read bytes from stream, checking that enough bytes were read"""
+        data = self._bodyStream.read(bytes = bytes)
+        if bytes > 0 and len(data) != bytes:
+            raise ShortReadError(bytes, len(data))
+        return data
+
+    def isEmpty(self):
+        return self.headerLength == 0
+
+    def next(self):
+        if self._nextStream is None:
+            raise StopIteration()
+
+        newPkt = newPacketFromStream(self._nextStream, self._nextStreamPos)
+        if newPkt is None:
+            raise StopIteration()
+
+        return newPkt
+
+    def getUserIds(self):
+        # Start with a key of some sort
+        assert self.tag in PKT_ALL_KEYS
+        pkt = self
+        while 1:
+            try:
+                pkt = pkt.next()
+            except StopIteration:
+                break
+            if pkt.tag in PKT_ALL_KEYS:
+                # We got to the next key, stop
+                break
+            if pkt.tag == PKT_USERID:
+                yield pkt.readBody()
 
     def getBodyStream(self):
         return self._bodyStream
@@ -1722,6 +1745,11 @@ class PGP_Packet(object):
             yield pkt
             pkt = pkt.next()
 
+class PGP_Packet(PGP_BasePacket):
+    """Anonymous PGP packet"""
+    __slots__ = ['tag']
+    def setTag(self, tag):
+        self.tag = tag
 
 class PGP_MessageBody(object):
     __slots__ = ['file']
@@ -1734,13 +1762,6 @@ class PGP_MessageBody(object):
     def read(self, amt=None):
         return self.file.read(amt)
 
-    def readCheck(self, amt):
-        """Read amt bytes, and verify we did read exactly that amount"""
-        data = self.file.read(amt)
-        if len(data) != amt:
-            raise ShortReadError(amt, len(data))
-        return data
-
     def validate(self):
         return True
 
@@ -1751,11 +1772,11 @@ class PGP_MessageBody(object):
         """Reset the file stream to point at the beginning of the body"""
         self.file.seek(0)
 
-class PGP_Signature(PGP_MessageBody):
+class PGP_Signature(PGP_BasePacket):
     tag = PKT_SIG
-    __slots__ = ['file', 'version']
+    __slots__ = ['version']
 
-    def validate(self):
+    def validateBody(self):
         sigVersion = ord(self.file.pread(1, 0))
         if sigVersion not in [3, 4]:
             raise InvalidBodyError("Invalid signature type %s" % sigType)
@@ -1831,26 +1852,24 @@ class PGP_Signature(PGP_MessageBody):
         fobj.seek(pktlen, 1)
         return dataf
 
-PGP_Packet.addBodyType(PGP_Signature)
+PacketTypeDispatcher.addPacketType(PGP_Signature)
 
-class PGP_UserID(PGP_MessageBody):
+class PGP_UserID(PGP_BasePacket):
     __slots__ = ['id']
     tag = PKT_USERID
 
     def validate(self):
         self.id = self.file.read()
-        print "FGSFG", self.id
         return True
 
     def toString(self):
         return self.id
 
-PGP_Packet.addBodyType(PGP_UserID)
+PacketTypeDispatcher.addPacketType(PGP_UserID)
 
-class PGP_Key(PGP_MessageBody):
+class PGP_Key(PGP_BasePacket):
     # Base class for public/secret keys/subkeys
     tag = None
-    BUFFER_SIZE = 16384
 
     def validate(self):
         return True
@@ -1858,9 +1877,9 @@ class PGP_Key(PGP_MessageBody):
     def getKeyId(self):
         # Convert to public key
 
-        pkt = self.toPublicKey(minLenLen = 2)
+        pkt = self.toPublicKey(minHeaderLen = 3)
 
-        # Why minLenLen = 2?
+        # Why minHeaderLen = 3?
 
         # This is a holdover from the days of PGP 2.6.2
         # RFC 2440 section 11.2 does a really bad job of explaining this.
@@ -1886,8 +1905,7 @@ class PGP_Key(PGP_MessageBody):
         pkt.writeHeader(sio)
         m.update(sio.getvalue())
 
-        self.file.seek(0)
-
+        pkt.resetBody()
         while 1:
             buf = pkt.readBody(self.BUFFER_SIZE)
             if not buf:
@@ -1900,18 +1918,17 @@ class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
     pubTag = PKT_PUBLIC_KEY
 
-    def toPublicKey(self, minLenLen = 1):
-        pkt = PGP_Packet()
-        pkt.initFromBody(self.pubTag, self.file, minLenLen = minLenLen)
-        return pkt
+    def toPublicKey(self, minHeaderLen = 2):
+        return newPacket(self.pubTag, self._bodyStream,
+                         minHeaderLen = minHeaderLen)
 
 class PGP_SecretKey(PGP_Key):
     tag = PKT_SECRET_KEY
     pubTag = PKT_PUBLIC_KEY
 
-    def toPublicKey(self, minLenLen = 1):
-        self.file.seek(0)
-        pver = self.readCheck(1)
+    def toPublicKey(self, minHeaderLen = 2):
+        self.resetBody()
+        pver = self.readExact(1)
 
         # RFC 2440, sect. 5.5.2
         # check the packet version, we only handle version 4
@@ -1920,9 +1937,9 @@ class PGP_SecretKey(PGP_Key):
 
         # get the key data
         # Key creation
-        data = self.readCheck(4)
+        data = self.readExact(4)
         # Public key algorithm
-        algType = ord(self.read(1))
+        algType = ord(self.readExact(1))
 
         if algType in PK_ALGO_ALL_RSA:
             numMPI = 2
@@ -1936,18 +1953,18 @@ class PGP_SecretKey(PGP_Key):
 
         # parse the MPIs from the key block
         for i in range(numMPI):
-            buf = self.readCheck(2)
+            buf = self.readExact(2)
             mLen = ((ord(buf[0]) * 256 +
                      ord(buf[1])) + 7) // 8
             # Skip the MPI len
-            self.readCheck(mLen)
+            self.readExact(mLen)
 
         # Create a nested file starting at the beginning of the body's and
         # with the length equal to the position in the body (after we read the
         # MPIs)
-        io = util.SeekableNestedFile(self.file, self.file.tell(), start = 0)
-        pkt = PGP_Packet()
-        pkt.initFromBody(self.pubTag, io, minLenLen = minLenLen)
+        io = util.SeekableNestedFile(self._bodyStream, self._bodyStream.tell(),
+                                     start = 0)
+        pkt = newPacket(self.pubTag, io, minHeaderLen = minHeaderLen)
         return pkt
 
 
@@ -1963,13 +1980,18 @@ class PGP_SecretSubKey(PGP_SecretKey):
 
 # Register class processors
 for klass in [PGP_PublicKey, PGP_SecretKey, PGP_PublicSubKey, PGP_SecretSubKey]:
-    PGP_Packet.addBodyType(klass)
+    PacketTypeDispatcher.addPacketType(klass)
 
-def newPacket(tag, fileobj, newStyle = False, minLenLen = 1):
+def newPacket(tag, bodyStream, newStyle = False, minHeaderLen = 2):
     """Create a new Packet"""
-    pkt = PGP_Packet()
-    pkt.initFromBody(tag, fileobj, newStyle = newStyle, minLenLen = minLenLen)
+    klass = PacketTypeDispatcher.getClass(tag)
+    pkt = klass(bodyStream, newStyle = newStyle, minHeaderLen = minHeaderLen)
+    if not hasattr(pkt, 'tag'): # No special class for this packet
+        pkt.setTag(tag)
     return pkt
+
+def newPacketFromStream(stream, start = -1):
+    return PGP_PacketFromStream().read(stream, start = start)
 
 def len2bytes(v1, v2):
     """Return the packet body length when represented on 2 bytes"""

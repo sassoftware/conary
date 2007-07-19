@@ -663,8 +663,7 @@ class ExtendedFile(file):
 class ExtendedStringIO(StringIO.StringIO):
     def pread(self, bytes, offset):
         pos = self.tell()
-        if offset:
-            self.seek(offset, 0)
+        self.seek(offset, 0)
         data = self.read(bytes)
         self.seek(pos, 0)
         return data
