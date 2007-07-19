@@ -10,6 +10,10 @@ Changes in @NEW@:
     * 'cvc update' can now update multiple directories simultanously
     * cvc and conary commands now ignore broken pipes on stdout instead
       of producing a traceback
+    * Redirects follow the label of the branch they were built with instead
+      of the branch itself
+    * Building redirects to a branch is now deprecated; redirects should
+      point to labels instead
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because

@@ -194,7 +194,7 @@ class ClientUpdate:
                     raise UpdateError, \
                         "Redirect found with --no-recurse set: %s=%s[%s]" % item
 
-                allTargets = [ (x[0], str(x[1]), x[2]) 
+                allTargets = [ (x[0], str(x[1].label()), x[2]) 
                                         for x in trv.iterRedirects() ]
                 matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
                                                 affinityDatabase = self.db)
