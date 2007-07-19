@@ -42,6 +42,7 @@ from conary.lib import options
 from conary.lib import util
 
 sys.excepthook = util.genExcepthook()
+sys.stdout = util.FileIgnoreEpipe(sys.stdout)
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
