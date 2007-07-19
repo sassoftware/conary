@@ -60,13 +60,14 @@ def mkdirChain(*paths):
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
+        normpath = os.path.normpath(path)
 
         # don't die in case the dir already exists
         try:
-            os.makedirs(path)
+            os.makedirs(normpath)
         except OSError, exc:
             if exc.errno == errno.EEXIST:
-                if os.path.isdir(path):
+                if os.path.isdir(normpath):
                     continue
                 else:
                     raise
