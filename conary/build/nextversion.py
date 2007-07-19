@@ -143,7 +143,7 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
                 incCount = True
 
         if incCount:
-            revision = latest.trailingRevision()
+            revision = latest.trailingRevision().copy()
             latest = sourceVersion.branch().createVersion(revision)
             latest.incrementBuildCount()
 
