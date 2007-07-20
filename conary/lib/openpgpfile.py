@@ -167,6 +167,13 @@ class MalformedKeyRing(PGPError):
     def __init__(self, reason="Malformed Key Ring"):
         self.error = "Malformed Key Ring: %s" %reason
 
+class UnsupportedEncryptionAlgorithm(PGPError):
+    def __init__(self, alg):
+        self.alg = alg
+
+    def __str__(self):
+        return "Unsupported encryption algorithm code %s" % self.alg
+
 class IncompatibleKey(PGPError):
     def __str__(self):
         return self.error
@@ -1620,12 +1627,17 @@ class PGP_BasePacket(object):
         # Keep a reference to the next stream we link to
         self._nextStream = None
         self._nextStreamPos = 0
+        self.validate()
 
     def setNextStream(self, stream, pos):
         if stream:
             assert hasattr(stream, 'pread')
         self._nextStream = stream
         self._nextStreamPos = pos
+
+    def validate(self):
+        """To be overridden by various subclasses"""
+        pass
 
     def _getHeaderLength(self, minHeaderLen = 2):
         # bsrepr is the body size representation
@@ -1679,14 +1691,12 @@ class PGP_BasePacket(object):
             stream.write(chr((self.bodyLength >> ((bsrepr - i) << 3)) & 0xff))
 
     def writeBody(self, stream):
-        self._bodyStream.seek(0)
-        print "RRRR start"
+        self.reset()
         while 1:
             buf = self._bodyStream.read(self.BUFFER_SIZE)
             if not buf:
                 break
             stream.write(buf)
-            print "RRRR", len(buf)
 
     def write(self, stream):
         self.writeHeader(stream)
@@ -1699,12 +1709,31 @@ class PGP_BasePacket(object):
         """Read bytes from stream"""
         return self._bodyStream.read(bytes = bytes)
 
-    def readExact(self, bytes):
+    def seek(self, pos, whence = SEEK_SET):
+        return self._bodyStream.seek(pos, whence)
+
+    @staticmethod
+    def _readExact(stream, bytes):
         """Read bytes from stream, checking that enough bytes were read"""
-        data = self._bodyStream.read(bytes = bytes)
+        data = stream.read(bytes = bytes)
         if bytes > 0 and len(data) != bytes:
             raise ShortReadError(bytes, len(data))
         return data
+
+    @staticmethod
+    def _readBin(stream, bytes):
+        """Read bytes from stream, checking that enough bytes were read.
+        Return a list of bytes"""
+        return [ ord(x) for x in PGP_BasePacket._readExact(stream, bytes) ]
+
+    def readExact(self, bytes):
+        """Read bytes from stream, checking that enough bytes were read"""
+        return self._readExact(self._bodyStream, bytes)
+
+    def readBin(self, bytes):
+        """Read bytes from stream, checking that enough bytes were read.
+        Return a list of bytes"""
+        return self._readBin(self._bodyStream, bytes)
 
     def isEmpty(self):
         return self.headerLength == 0
@@ -1772,85 +1801,178 @@ class PGP_MessageBody(object):
         """Reset the file stream to point at the beginning of the body"""
         self.file.seek(0)
 
-class PGP_Signature(PGP_BasePacket):
-    tag = PKT_SIG
-    __slots__ = ['version']
+class PGP_BaseKeySig(PGP_BasePacket):
+    """Base class for keys and signatures"""
 
-    def validateBody(self):
-        sigVersion = ord(self.file.pread(1, 0))
+    def _getMPICount(self, algType):
+        """This returns the right number of MPIs for converting a private key
+        to a public key. Overwrite in subclasses for any other usage"""
+        if algType in PK_ALGO_ALL_RSA:
+            numMPI = 2
+        elif algType in PK_ALGO_ALL_ELGAMAL:
+            numMPI = 3
+        elif algType == PK_ALGO_DSA:
+            numMPI = 4
+        else:
+            # unhandled algorithm
+            raise UnsupportedEncryptionAlgorithm(algType)
+        return numMPI
+
+    def _readMPIs(self, stream, algType, discard = True):
+        """Read the MPIs from the current position in the message body.
+        @raise UnsupportedEncryptionAlgorithm
+        """
+        numMPI = self._getMPICount(algType)
+
+        r = 0L
+        ret = []
+        for i in range(numMPI):
+            buf = self._readBin(stream, 2)
+            mLen = ((buf[0] * 256 + buf[1]) + 7) // 8
+            if discard:
+                # Skip the MPI len
+                self._readExact(stream, mLen)
+                ret.append(None)
+            else:
+                data = self._readBin(stream, mLen)
+                for i in data:
+                    r = r * 256 + i
+                ret.append(r)
+        return ret
+
+    def skipMPIs(self, stream, algType):
+        self._readMPIs(stream, algType, discard = True)
+
+    def readMPIs(self, stream, algType):
+        return self._readMPIs(stream, algType, discard = False)
+
+class PGP_Signature(PGP_BaseKeySig):
+    __slots__ = ['version', 'sigType', 'pubKeyAlg', 'hashAlg', 'hashSig',
+                 'mpiFile', '_parsed']
+    tag = PKT_SIG
+
+    def validate(self):
+        self.version = self.sigType = self.pubKeyAlg = self.hashAlg = None
+        self.hashSig = self.mpiFile = None
+        self._parsed = False
+
+    def parse(self):
+        """Parse the signature body and initializes the internal data
+        structures for other operations"""
+        self.resetBody()
+        sigVersion, = self.readBin(1)
         if sigVersion not in [3, 4]:
             raise InvalidBodyError("Invalid signature type %s" % sigType)
         self.version = sigVersion
-        if sigVersion == 4:
-            self.file.seek(1)
-            sigType = ord(self.file.read(1))
-            pkAlg = ord(self.file.read(1))
-            hashAlg = ord(self.file.read(1))
-            arr = self.file.read(2)
-            hSubPktLen = (ord(arr[0]) << 8) + ord(arr[1])
-            subpktsFile = util.SeekableNestedFile(self.file, hSubPktLen)
-            print '  H', list(self.decodeSigSubpackets(subpktsFile))
-            # Skip over the packets, we've decoded them already
-            self.file.seek(hSubPktLen, 1)
+        if sigVersion == 3:
+            self._readSigV3()
+        else:
+            self._readSigV4()
+        self._parsed = True
 
+    def _getMPICount(self, algType):
+        if algType in PK_ALGO_ALL_RSA:
+            numMPI = 1
+        elif algType in PK_ALGO_ALL_ELGAMAL:
+            numMPI = 2
+        elif algType == PK_ALGO_DSA:
+            numMPI = 2
+        else:
+            # unhandled algorithm
+            raise UnsupportedEncryptionAlgorithm(algType)
+        return numMPI
 
-            arr = self.file.read(2)
-            uSubPktLen = (ord(arr[0]) << 8) + ord(arr[1])
+    def parseMPIs(self):
+        if not self._parsed:
+            self.parse()
+        assert hasattr(self, 'mpiFile') and self.mpiFile is not None
+        self.mpiFile.seek(0)
+        return self.readMPIs(self.mpiFile, self.pubKeyAlg)
 
-            subpktsFile = util.SeekableNestedFile(self.file, uSubPktLen)
-            print uSubPktLen
-            print '  UH', list(self.decodeSigSubpackets(subpktsFile))
+    def _readSigV3(self):
+        hLen, sigType = self.readBin(2)
+        if hLen != 5:
+            raise PGPError('Expected 5 octets of length of hashed material, '
+                           'got %d' % hLen)
 
-            print "  Sig type", sigType, pkAlg, hashAlg, hSubPktLen, uSubPktLen
-        return True
+        creation = self.readBin(4)
+        binKeyId = self.readBin(8)
+        pkAlg, hashAlg, sig0, sig1 = self.readBin(4)
+
+        self.sigType = sigType
+        self.pubKeyAlg = pkAlg
+        self.hashAlg = hashAlg
+        self.hashSig = (sig0, sig1)
+        raise IncompatibleKey("Must be a V4 signature")
+
+    def _readSigV4(self):
+        sigType, pkAlg, hashAlg = self.readBin(3)
+        # Hashed subpacket data length
+        arr = self.readBin(2)
+        hSubPktLen = (arr[0] << 8) + arr[1]
+        hSubpktsFile = util.SeekableNestedFile(self._bodyStream, hSubPktLen)
+
+        # Skip over the packets, we've decoded them already
+        self.seek(hSubPktLen, SEEK_CUR)
+
+        # Unhashed subpacket data length
+        arr = self.readBin(2)
+        uSubPktLen = (arr[0] << 8) + arr[1]
+
+        uSubpktsFile = util.SeekableNestedFile(self._bodyStream, uSubPktLen)
+        # Skip over the packets, we've decoded them already
+        self.seek(uSubPktLen, SEEK_CUR)
+
+        # Two-octet field holding left 16 bits of signed hash value.
+        hashSig = self.readBin(2)
+
+        # MPI data
+        mpiFile = util.SeekableNestedFile(self._bodyStream,
+            self.bodyLength - self._bodyStream.tell())
+
+        self.sigType = sigType
+        self.pubKeyAlg = pkAlg
+        self.hashAlg = hashAlg
+        self.mpiFile = mpiFile
+        self.hashSig = hashSig
+        return sigType, pkAlg, hashAlg, hSubpktsFile, uSubpktsFile, mpiFile
 
     def decodeSigSubpackets(self, fobj):
-        while 1:
-            dataf = self._getNextSubpacket(fobj)
-            if dataf is None:
-                break
-            yield dataf
+        while fobj.size != fobj.tell():
+            yield self._getNextSubpacket(fobj)
 
     def _getNextSubpacket(self, fobj):
-        # We need at least one byte
-        b0 = fobj.read(1)
-        if not b0:
-            return None
+        len0, = self._readBin(fobj, 1)
 
         # Sect 5.2.3.1 of RFC2440 implies there should be a 2-octet scalar
         # count of the length of the set of subpackets, but I can't seem to
         # find it here.
 
-        len0 = ord(b0)
         if len0 & 0xC0 == 0:
             pktlenlen = 1
             pktlen = len0
         elif len0 == 0xFF:
             pktlenlen = 5
-            data = fobj.read(4)
-            if len(data) != 4:
-                raise ShortReadError(pktlenlen, len(data))
-            pktlen = len4bytes(*[ord(x) for x in data])
+            data = self._readBin(fobj, 4)
+            pktlen = len4bytes(*data)
         else:
             pktlenlen = 2
-            data = fobj.read(1)
-            if len(data) != 1:
-                raise ShortReadError(1, len(data))
-            pktlen = len2bytes(len0, ord(data))
+            len1, = self._readBin(fobj, 1)
+            pktlen = len2bytes(len0, len1)
 
-        dataf = util.SeekableNestedFile(fobj, pktlen)
+        spktType, = self._readBin(fobj, 1)
+
+        # The packet length includes the subpacket type
+        dataf = util.SeekableNestedFile(fobj, pktlen - 1)
         # Do we have enough data?
-        dataf.seek(0, 2)
-        if dataf.tell() != pktlen:
+        dataf.seek(0, SEEK_END)
+        if dataf.tell() != pktlen - 1:
             raise ShortReadError(pktlen + pktlenlen, dataf.tell())
+        dataf.seek(0, SEEK_SET)
 
-        spktType = ord(dataf.pread(1, 0))
-        print "RRRRRRRR", spktType
-
-        dataf.seek(0, 0)
         # Skip the data
-        fobj.seek(pktlen, 1)
-        return dataf
+        fobj.seek(pktlen - 1, SEEK_CUR)
+        return spktType, dataf
 
 PacketTypeDispatcher.addPacketType(PGP_Signature)
 
@@ -1859,20 +1981,17 @@ class PGP_UserID(PGP_BasePacket):
     tag = PKT_USERID
 
     def validate(self):
-        self.id = self.file.read()
-        return True
+        self.resetBody()
+        self.id = self.readBody()
 
     def toString(self):
         return self.id
 
 PacketTypeDispatcher.addPacketType(PGP_UserID)
 
-class PGP_Key(PGP_BasePacket):
+class PGP_Key(PGP_BaseKeySig):
     # Base class for public/secret keys/subkeys
     tag = None
-
-    def validate(self):
-        return True
 
     def getKeyId(self):
         # Convert to public key
@@ -1914,6 +2033,14 @@ class PGP_Key(PGP_BasePacket):
 
         return m.hexdigest().upper()
 
+    def iterSubPackets(self):
+        # Stop at another main key (pub or sec)
+        return self._iterSubPackets(PKT_MAIN_KEYS)
+
+    def iterSignatures(self):
+        return (x for x in self._iterSubPackets(PKT_ALL_KEYS)
+                if x.tag == PKT_SIG)
+
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
     pubTag = PKT_PUBLIC_KEY
@@ -1928,36 +2055,21 @@ class PGP_SecretKey(PGP_Key):
 
     def toPublicKey(self, minHeaderLen = 2):
         self.resetBody()
-        pver = self.readExact(1)
+        pver, = self.readBin(1)
 
         # RFC 2440, sect. 5.5.2
         # check the packet version, we only handle version 4
-        if ord(pver) != 4:
+        if pver != 4:
             raise PGPError('2')
 
         # get the key data
         # Key creation
         data = self.readExact(4)
         # Public key algorithm
-        algType = ord(self.readExact(1))
+        algType, = self.readBin(1)
 
-        if algType in PK_ALGO_ALL_RSA:
-            numMPI = 2
-        elif algType in PK_ALGO_ALL_ELGAMAL:
-            numMPI = 3
-        elif algType == PK_ALGO_DSA:
-            numMPI = 4
-        else:
-            # unhandled algorithm
-            raise PGPError('4')
-
-        # parse the MPIs from the key block
-        for i in range(numMPI):
-            buf = self.readExact(2)
-            mLen = ((ord(buf[0]) * 256 +
-                     ord(buf[1])) + 7) // 8
-            # Skip the MPI len
-            self.readExact(mLen)
+        # Skip over the MPIs
+        self.skipMPIs(self._bodyStream, algType)
 
         # Create a nested file starting at the beginning of the body's and
         # with the length equal to the position in the body (after we read the
@@ -1973,10 +2085,18 @@ class PGP_PublicSubKey(PGP_PublicKey):
     # Subkeys are promoted to main keys
     pubTag = PKT_PUBLIC_KEY
 
+    def iterSubPackets(self):
+        # Stop at another key
+        return self._iterSubPackets(PKT_ALL_KEYS)
+
 class PGP_SecretSubKey(PGP_SecretKey):
     tag = PKT_SECRET_SUBKEY
     # Subkeys are promoted to main keys
     pubTag = PKT_PUBLIC_KEY
+
+    def iterSubPackets(self):
+        # Stop at another key
+        return self._iterSubPackets(PKT_ALL_KEYS)
 
 # Register class processors
 for klass in [PGP_PublicKey, PGP_SecretKey, PGP_PublicSubKey, PGP_SecretSubKey]:
