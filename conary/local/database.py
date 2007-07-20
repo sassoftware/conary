@@ -1028,7 +1028,7 @@ class Database(SqlDbRepository):
                     dbCache, cs, callback, autoPinList, 
                     allowIncomplete = (rollbackPhase is not None),
                     pathRemovedCheck = fsJob.pathRemoved,
-                    replaceFiles = replaceFiles)
+                    replaceFiles = flags.replaceManagedFiles)
             except DatabasePathConflicts, e:
                 for (path, (pathId, (troveName, version, flavor)),
                            newTroveInfo) in e.getConflicts():

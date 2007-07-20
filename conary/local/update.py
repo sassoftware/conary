@@ -52,10 +52,14 @@ class UpdateFlags(util.Flags):
     """
 
     __slots__ = [ 'merge', 'replaceFiles', 'ignoreUGids', 'missingFilesOkay',
-                  'ignoreInitialContents' ]
+                  'ignoreInitialContents', 'replaceManagedFiles',
+                  'replaceUnmanagedFiles', 'replaceModifiedFiles' ]
 
     def setReplaceFiles(self):
         self.replaceFiles = True
+        self.replaceManagedFiles = True
+        self.replaceUnmanagedFiles = True
+        self.replaceModifiedFiles = True
 
 class LastRestored(object):
 
@@ -80,7 +84,12 @@ class FilesystemJob:
         self.linkGroups[linkGroup] = target
 
     def _restore(self, fileObj, target, troveInfo, msg,
-                 contentsOverride = "", replaceFiles = False, fileId = None):
+                 contentsOverride = "", overrideInternalConflicts = False,
+                 fileId = None):
+        """
+        @param overrideInternalConflicts: Should this restore override another
+        restore rule for the same path in this job?
+        """
         assert(contentsOverride != "" or fileId is not None)
         restoreFile = True
 
@@ -88,7 +97,7 @@ class FilesystemJob:
             pathId = self.restores[target][0]
             formerTroveInfo = self.restores[target][4]
 
-            if not replaceFiles:
+            if not overrideInternalConflicts:
                 # we're not going to be able to install this; record the
                 # error, but fix things up so we don't generate a duplicate
                 # error later on
@@ -997,7 +1006,8 @@ class FilesystemJob:
                     if (isinstance(dup[0][3], versions.NewVersion) and
                             fsFile.__eq__(headFile, ignoreOwnerGroup = True)):
                         self._restore(headFile, headRealPath, newTroveInfo,
-                                      "creating %s", replaceFiles = True,
+                                      "creating %s",
+                                      overrideInternalConflicts = True,
                                       fileId = headFileId)
                         fsTrove.removeFile(dup[0][0])
                         fsTrove.addFile(pathId, headPath, headFileVersion,
@@ -1016,11 +1026,16 @@ class FilesystemJob:
                 # We found a conflict with an already-existing file. If
                 # we're installing binaryies, let's see who owns it
                 if isSrcTrove:
-                    existingOwners = True
+                    existingOwners = []
                 else:
                     existingOwners = list(
                         self.db.iterFindPathReferences(
                                             headPath, justPresent = True))
+
+                if existingOwners:
+                    replaceThisFile = flags.replaceManagedFiles
+                else:
+                    replaceThisFile = flags.replaceUnmanagedFiles
 
                 # If the file being created is a directory and the file on the
                 # file system is a directory, we're OK
@@ -1034,10 +1049,11 @@ class FilesystemJob:
 			restoreFile = False
                 elif (not isinstance(headFile, files.Directory)
                       and stat.S_ISDIR(s.st_mode)
-                      and (os.listdir(headRealPath) or not flags.replaceFiles)):
-                    # this is a non-empty directory that's in the way of
-                    # a new file (which flags.replaceFiles can't overwrite),
-                    # or flags.replaceFiles wasn't specified
+                      and (os.listdir(headRealPath) or not replaceThisFile)):
+                    # this is a non-empty directory that's in the way of a new
+                    # file (which we can't overwrite no matter what flags are
+                    # specified) or we don't have a flag which lets us replace
+                    # the empty directory with a file
                     self.errors.append(
                                DirectoryInWayError(
                                    util.normpath(headRealPath),
@@ -1071,7 +1087,7 @@ class FilesystemJob:
                         fileConflict = \
                                 not silentlyReplace(headFile, existingFile)
 
-                    if fileConflict and flags.replaceFiles:
+                    if fileConflict and replaceThisFile:
                         # --replace-files was specified
                         fileConflict = False
 
@@ -1092,7 +1108,9 @@ class FilesystemJob:
 
             if restoreFile:
                 self._restore(headFile, headRealPath, newTroveInfo, 
-                              "creating %s", replaceFiles = flags.replaceFiles,
+                              "creating %s",
+                              overrideInternalConflicts =
+                                                    flags.replaceManagedFiles,
                               fileId = headFileId)
                 if isSrcTrove:
                     fsTrove.addFile(pathId, headPath, headFileVersion,
@@ -1208,7 +1226,8 @@ class FilesystemJob:
                 self._restore(headFile, realPath, newTroveInfo,
                               "creating %s with contents "
                               "from repository",
-                              replaceFiles = flags.replaceFiles,
+                              overrideInternalConflicts = 
+                                    flags.replaceManagedFiles,
                               fileId = headFileId)
                 continue
             elif isSrcTrove:
@@ -1264,7 +1283,8 @@ class FilesystemJob:
                         # something else instead of a directory
                         forceUpdate = True
                         attributesChanged = True
-                elif flags.replaceFiles or baseFile.lsTag == fsFile.lsTag:
+                elif (flags.replaceManagedFiles or
+                                        baseFile.lsTag == fsFile.lsTag):
                     # the file type changed between versions. Force an
                     # update because changes cannot be be merged
                     attributesChanged = True
@@ -1277,7 +1297,7 @@ class FilesystemJob:
                 # the user changed the file type. we could try and
                 # merge things a bit more intelligently then we do
                 # here, but it probably isn't worth the effort
-                if flags.replaceFiles:
+                if flags.replaceModifiedFiles:
                     attributesChanged = True
                     fsFile = headFile
                     forceUpdate = True
@@ -1328,7 +1348,7 @@ class FilesystemJob:
                    headFile.flags.isInitialContents():
 		    log.debug("skipping new contents of InitialContents file"
                               " %s" % finalPath)
-		elif forceUpdate or flags.replaceFiles or \
+		elif forceUpdate or flags.replaceModifiedFiles or \
                         (not flags.merge) or \
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:
@@ -1362,7 +1382,8 @@ class FilesystemJob:
                                       "replacing %s with merged "
                                       "config file",
 				      contentsOverride = headFileContents,
-                                      replaceFiles = flags.replaceFiles,
+                                      overrideInternalConflicts =
+                                            flags.replaceManagedFiles,
                                       fileId = headFileId)
 		    else:
                         # switch the fsFile to the sha1 for the new file
@@ -1372,7 +1393,8 @@ class FilesystemJob:
                         self._restore(fsFile, realPath, newTroveInfo,
 				      "replacing %s with contents "
 				      "from repository",
-                                      replaceFiles = flags.replaceFiles,
+                                      overrideInternalConflicts =
+                                            flags.replaceManagedFiles,
                                       fileId = headFileId)
 
 		    beenRestored = True
@@ -1419,7 +1441,7 @@ class FilesystemJob:
                     self._restore(fsFile, realPath, newTroveInfo,
                           "merging changes from repository into %s",
                           contentsOverride = cont,
-                          replaceFiles = flags.replaceFiles,
+                          overrideInternalConflicts = flags.replaceManagedFiles,
                           fileId = headFileId)
                     beenRestored = True
 
@@ -1446,7 +1468,7 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
 		      "merging changes from repository into %s",
                       contentsOverride = None,
-                      replaceFiles = flags.replaceFiles,
+                      overrideInternalConflicts = flags.replaceManagedFiles,
                       fileId = headFileId)
             elif not attributesChanged and not beenRestored and headChanges:
                 # Nothing actually changed, but the diff isn't empty
@@ -1458,7 +1480,7 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
                       "file has not changed",
                       contentsOverride = None,
-                      replaceFiles = flags.replaceFiles,
+                      overrideInternalConflicts = flags.replaceManagedFiles,
                       fileId = headFileId)
 
 	    if pathOkay and contentsOkay:
