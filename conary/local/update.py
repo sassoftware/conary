@@ -54,6 +54,9 @@ class UpdateFlags(util.Flags):
     __slots__ = [ 'merge', 'replaceFiles', 'ignoreUGids', 'missingFilesOkay',
                   'ignoreInitialContents' ]
 
+    def setReplaceFiles(self):
+        self.replaceFiles = True
+
 class LastRestored(object):
 
     __slots__ = [ 'pathId', 'fileId', 'target', 'type' ]
@@ -1009,19 +1012,25 @@ class FilesystemJob:
             restoreFile = True
 
             s = util.lstat(headRealPath)
-            if s is None:
-                # the path doesn't exist, carry on with the restore
-                pass
-            else:
-                # if this file is a directory and the file on the file
-                # system is a directory, we're OK
+            if s is not None:
+                # We found a conflict with an already-existing file. If
+                # we're installing binaryies, let's see who owns it
+                if isSrcTrove:
+                    existingOwners = True
+                else:
+                    existingOwners = list(
+                        self.db.iterFindPathReferences(
+                                            headPath, justPresent = True))
+
+                # If the file being created is a directory and the file on the
+                # file system is a directory, we're OK
                 if (isinstance(headFile, files.Directory)
                     and stat.S_ISDIR(s.st_mode)):
 		    # if nobody else owns this directory, set the ownership
 		    # and permissions from this trove. FIXME: if it is
 		    # already owned, we just assume those permissions are
 		    # right
-		    if repos.pathIsOwned(headPath):
+                    if existingOwners:
 			restoreFile = False
                 elif (not isinstance(headFile, files.Directory)
                       and stat.S_ISDIR(s.st_mode)
@@ -1045,29 +1054,22 @@ class FilesystemJob:
                 elif not self.removes.has_key(headRealPath):
                     fileConflict = True
 
-                    if hasattr(self.db, 'iterFindPathReferences'):
-                        # The hasattr check restricts these override checks
-                        # to system updates (they get skipped for source
-                        # updates). Yuck. This also avoids calling
-                        # iterFindPathReferences() against a network server
+                    # removalHints contains None to match all
+                    # files, or a list of pathIds. If that doesn't
+                    # allow the update, see if a label-based priorities
+                    # resolve the conflict.
+                    for info in existingOwners:
+                        # info here is (name, version, flavor, pathID)
+                        match = removalHints.get(info[0:3], [])
+                        if match is None or info[3] in match:
+                            fileConflict = False
+                            break
 
-                        # removalHints contains None to match all
-                        # files, or a list of pathIds. If that doesn't
-                        # allow the update, see if a label-based priorities
-                        # resolve the conflict.
-                        for info in self.db.iterFindPathReferences(
-                                            headPath, justPresent = True):
-                            # info here is (name, version, flavor, pathID)
-                            match = removalHints.get(info[0:3], [])
-                            if match is None or info[3] in match:
-                                fileConflict = False
-                                break
-
-                        if restoreFile and fileConflict:
-                            existingFile = files.FileFromFilesystem(
-                                headRealPath, pathId)
-                            fileConflict = \
-                                    not silentlyReplace(headFile, existingFile)
+                    if restoreFile and fileConflict:
+                        existingFile = files.FileFromFilesystem(
+                            headRealPath, pathId)
+                        fileConflict = \
+                                not silentlyReplace(headFile, existingFile)
 
                     if fileConflict and flags.replaceFiles:
                         # --replace-files was specified

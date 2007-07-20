@@ -848,7 +848,7 @@ class Database(SqlDbRepository):
 
         flags = update.UpdateFlags()
         if replaceFiles:
-            flags.replaceFiles = True
+            flags.setReplaceFiles()
         if rollbackPhase:
             flags.missingFilesOkay = True
             flags.ignoreInitialContents = True
