@@ -962,7 +962,7 @@ class FilesystemJob:
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
                 continue
 
-            headRealPath = rootFixup + headPath
+            headRealPath = os.path.normpath(rootFixup + headPath)
             headFile = files.ThawFile(
                             changeSet.getFileChange(None, headFileId), pathId)
 
@@ -1153,7 +1153,7 @@ class FilesystemJob:
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
-	    realPath = rootFixup + finalPath
+	    realPath = os.path.normpath(rootFixup + finalPath)
 
 	    # headFileVersion is None for renames, but in that case there
             # is nothing left to do for this file
