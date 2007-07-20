@@ -2507,15 +2507,18 @@ conary erase '%s=%s[%s]'
 
         return suggMap
 
-    def applyUpdateJob(self, updJob, replaceFiles = False, tagScript = None,
+    def applyUpdateJob(self, updJob, replaceFiles = None, tagScript = None,
                     test = False, justDatabase = False, journal = None,
                     localRollbacks = None, autoPinList = None,
-                    keepJournal = False, noRestart=False):
+                    keepJournal = False, noRestart=False,
+                    replaceManagedFiles = False,
+                    replaceUnmanagedFiles = False,
+                    replaceModifiedFiles = False):
         """
         Apply the update job.
         @param updJob: An UpdateJob object.
         @type updJob: conary.local.database.UpdateJob object
-        @param replaceFiles: Replace locally changed files.
+        @param replaceFiles: Replace locally changed files (deprecated).
         @type replaceFiles: bool
         @param tagScript:
         @type tagScript:
@@ -2551,10 +2554,15 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        if replaceFiles is not None:
+            replaceManagedFiles = replaceFiles
+            replaceUnmanagedFiles = replaceFiles
+            replaceModifiedFiles = replaceFiles
+
         commitFlags = database.CommitChangeSetFlags(
-            replaceManagedFiles = replaceFiles,
-            replaceUnmanagedFiles = replaceFiles,
-            replaceModifiedFiles = replaceFiles,
+            replaceManagedFiles = replaceManagedFiles,
+            replaceUnmanagedFiles = replaceUnmanagedFiles,
+            replaceModifiedFiles = replaceModifiedFiles,
             justDatabase = justDatabase,
             localRollbacks = localRollbacks,
             test = test, keepJournal = keepJournal)
