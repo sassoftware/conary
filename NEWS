@@ -13,7 +13,7 @@ Changes in @NEW@:
     * Redirects follow the label of the branch they were built with instead
       of the branch itself
     * Building redirects to a branch is now deprecated; redirects should
-      point to labels instead
+      point to labels instead (CNY-1857)
     * The --replace-files option has been split into --replace-managed-files,
       --replace-unmanaged-files, and --replace-modified-files. The original
       option is still accepted, and is equivalent to specifying all three
