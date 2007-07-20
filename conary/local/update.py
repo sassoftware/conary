@@ -51,15 +51,9 @@ class UpdateFlags(util.Flags):
     flag for files is ignored.
     """
 
-    __slots__ = [ 'merge', 'replaceFiles', 'ignoreUGids', 'missingFilesOkay',
+    __slots__ = [ 'merge', 'ignoreUGids', 'missingFilesOkay',
                   'ignoreInitialContents', 'replaceManagedFiles',
                   'replaceUnmanagedFiles', 'replaceModifiedFiles' ]
-
-    def setReplaceFiles(self):
-        self.replaceFiles = True
-        self.replaceManagedFiles = True
-        self.replaceUnmanagedFiles = True
-        self.replaceModifiedFiles = True
 
 class LastRestored(object):
 

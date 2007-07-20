@@ -2551,6 +2551,14 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        commitFlags = database.CommitChangeSetFlags(
+            replaceManagedFiles = replaceFiles,
+            replaceUnmanagedFiles = replaceFiles,
+            replaceModifiedFiles = replaceFiles,
+            justDatabase = justDatabase,
+            localRollbacks = localRollbacks,
+            test = test, keepJournal = keepJournal)
+
         if autoPinList is None:
             autoPinList = self.cfg.pinTroves
 
@@ -2565,12 +2573,8 @@ conary erase '%s=%s[%s]'
 
         # XXX May have to use a callback for this
         log.syslog.command()
-        self.applyUpdate(updJob, replaceFiles = replaceFiles,
-                        tagScript = tagScript, test = test,
-                        justDatabase = justDatabase, journal = journal,
-                        localRollbacks = localRollbacks,
-                        autoPinList = autoPinList,
-                        keepJournal = keepJournal)
+        self._applyUpdate(updJob, tagScript = tagScript, journal = journal,
+                          autoPinList = autoPinList, commitFlags = commitFlags)
         log.syslog.commandComplete()
 
         if remainingJobs:
@@ -3043,7 +3047,21 @@ conary erase '%s=%s[%s]'
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
         """Apply an update job. DEPRECATED, use applyUpdateJob instead"""
+        commitFlags = database.CommitChangeSetFlags(
+            replaceManagedFiles = replaceFiles,
+            replaceUnmanagedFiles = replaceFiles,
+            replaceModifiedFiles = replaceFiles,
+            justDatabase = justDatabase,
+            localRollbacks = localRollbacks,
+            test = test, keepJournal = keepJournal)
 
+        return self._applyUpdate(uJob, tagScript = tagScript,
+                          journal = journal, autoPinList = autoPinList,
+                          commitFlags = commitFlags)
+
+    def _applyUpdate(self, uJob, tagScript = None, journal = None,
+                     callback = None, autoPinList = None,
+                     commitFlags = None):
         self.db.commitLock(True)
 
         uJobTransactionCounter = uJob.getTransactionCounter()
@@ -3075,16 +3093,14 @@ conary erase '%s=%s[%s]'
         # run preinstall scripts
         if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
                                      tagScript = tagScript,
-                                     justDatabase = justDatabase,
+                                     justDatabase = commitFlags.justDatabase,
                                      tmpDir = self.cfg.tmpDir):
             raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
         kwargs = dict(
-            replaceFiles=replaceFiles, tagScript=tagScript,
-            justDatabase=justDatabase, test=test, journal=journal,
-            localRollbacks=localRollbacks, autoPinList=autoPinList,
-            keepJournal=keepJournal)
+            commitFlags=commitFlags, tagScript=tagScript,
+            journal=journal, autoPinList=autoPinList)
 
         if len(allJobs) == 1 and not uJob.getChangesetsDownloaded():
             # this handles change sets which include change set files
