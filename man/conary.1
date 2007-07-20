@@ -213,8 +213,14 @@ to be used.
 .TP
 .B \-\-replace-files
 Equivalent to specifying \fB\-\-replace\-managed\-files\fR,
-\fB\-\-replace\-unmanaged\-files\fR, and \fB\-\-replace\-modified\-files\fR
-simultaneously.
+\fB\-\-replace\-unmanaged\-files\fR, \fB\-\-replace\-modified\-files\fR,
+and \fB\-\-replace\-config\-files\fR simultaneously.
+.TP
+.B \-\-replace-config-files
+Config files owned by the old verson of the trove being updated which
+have been modified and have changed in the new version of the trove are
+replaced with the new versions and the local changes are lost (though
+they are preserved in the rollback).
 .TP
 .B \-\-replace-managed-files
 Files which are owned by other troves are replaced by files from the trove

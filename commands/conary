@@ -786,6 +786,9 @@ class _UpdateCommand(ConaryCommand):
         'replace-files' : 'Replace existing files if file conflict found '
                           '(equivalent to --replace-managed-files '
                           '--replace-modified-files --replace-unmanaged-files',
+        'replace-config-files':
+                          'Replace config files on the system which have '
+                          'been changed by something other than conary',
         'replace-managed-files':
                           'Replaces files owned by other troves (including'
                           'other troves which are part of this update)',
@@ -821,6 +824,7 @@ class _UpdateCommand(ConaryCommand):
         d["no-conflict-check"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["replace-files"] = NO_PARAM
+        d["replace-config-files"] = NO_PARAM
         d["replace-managed-files"] = NO_PARAM
         d["replace-modified-files"] = NO_PARAM
         d["replace-unmanaged-files"] = NO_PARAM
@@ -865,10 +869,13 @@ class _UpdateCommand(ConaryCommand):
                                                      False)
         kwargs['replaceModifiedFiles'] = argSet.pop('replace-modified-files',
                                                     False)
+        kwargs['replaceModifiedConfigFiles'] = \
+                        argSet.pop('replace-config-files', False)
         if argSet.pop('replace-files', False):
             kwargs['replaceManagedFiles'] = True
             kwargs['replaceUnmanagedFiles'] = True
             kwargs['replaceModifiedFiles'] = True
+            kwargs['replaceModifiedConfigFiles'] = True
 
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])

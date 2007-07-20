@@ -2513,7 +2513,8 @@ conary erase '%s=%s[%s]'
                     keepJournal = False, noRestart=False,
                     replaceManagedFiles = False,
                     replaceUnmanagedFiles = False,
-                    replaceModifiedFiles = False):
+                    replaceModifiedFiles = False,
+                    replaceModifiedConfigFiles = False):
         """
         Apply the update job.
         @param updJob: An UpdateJob object.
@@ -2558,11 +2559,13 @@ conary erase '%s=%s[%s]'
             replaceManagedFiles = replaceFiles
             replaceUnmanagedFiles = replaceFiles
             replaceModifiedFiles = replaceFiles
+            replaceModifiedConfigFiles = replaceFiles
 
         commitFlags = database.CommitChangeSetFlags(
             replaceManagedFiles = replaceManagedFiles,
             replaceUnmanagedFiles = replaceUnmanagedFiles,
             replaceModifiedFiles = replaceModifiedFiles,
+            replaceModifiedConfigFiles = replaceModifiedConfigFiles,
             justDatabase = justDatabase,
             localRollbacks = localRollbacks,
             test = test, keepJournal = keepJournal)
@@ -3059,6 +3062,7 @@ conary erase '%s=%s[%s]'
             replaceManagedFiles = replaceFiles,
             replaceUnmanagedFiles = replaceFiles,
             replaceModifiedFiles = replaceFiles,
+            replaceModifiedConfigFiles = replaceFiles,
             justDatabase = justDatabase,
             localRollbacks = localRollbacks,
             test = test, keepJournal = keepJournal)

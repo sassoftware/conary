@@ -15,9 +15,10 @@ Changes in @NEW@:
     * Building redirects to a branch is now deprecated; redirects should
       point to labels instead (CNY-1857)
     * The --replace-files option has been split into --replace-managed-files,
-      --replace-unmanaged-files, and --replace-modified-files. The original
-      option is still accepted, and is equivalent to specifying all three
-      of the new options simultaneously (CNY-1270)
+      --replace-unmanaged-files, --replace-modified-files, and
+      --replace-config-files. The original option is still accepted, and is
+      equivalent to specifying all four of the new options simultaneously
+      (CNY-1270)
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because

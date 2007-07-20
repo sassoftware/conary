@@ -53,7 +53,8 @@ class UpdateFlags(util.Flags):
 
     __slots__ = [ 'merge', 'ignoreUGids', 'missingFilesOkay',
                   'ignoreInitialContents', 'replaceManagedFiles',
-                  'replaceUnmanagedFiles', 'replaceModifiedFiles' ]
+                  'replaceUnmanagedFiles', 'replaceModifiedFiles',
+                  'replaceModifiedConfigFiles' ]
 
 class LastRestored(object):
 
@@ -1246,6 +1247,11 @@ class FilesystemJob:
             fsFile.flags.isSource(headFile.flags.isSource())
             fsFile.tags.thaw(headFile.tags.freeze())
 
+            if baseFile.flags.isConfig() or headFile.flags.isConfig():
+                replaceThisModifiedFile = flags.replaceModifiedConfigFiles
+            else:
+                replaceThisModifiedFile = flags.replaceModifiedFiles
+
             # this is changed to true when the file attributes have changed;
             # this helps us know if we need a restore event
 	    attributesChanged = False
@@ -1291,7 +1297,7 @@ class FilesystemJob:
                 # the user changed the file type. we could try and
                 # merge things a bit more intelligently then we do
                 # here, but it probably isn't worth the effort
-                if flags.replaceModifiedFiles:
+                if replaceThisModifiedFile:
                     attributesChanged = True
                     fsFile = headFile
                     forceUpdate = True
@@ -1342,7 +1348,7 @@ class FilesystemJob:
                    headFile.flags.isInitialContents():
 		    log.debug("skipping new contents of InitialContents file"
                               " %s" % finalPath)
-		elif forceUpdate or flags.replaceModifiedFiles or \
+		elif forceUpdate or replaceThisModifiedFile or \
                         (not flags.merge) or \
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:

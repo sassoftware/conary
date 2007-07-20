@@ -365,6 +365,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                         replaceManagedFiles = False,
                         replaceUnmanagedFiles = False,
                         replaceModifiedFiles = False,
+                        replaceModifiedConfigFiles = False,
                         tagScript = None,
                         justDatabase = False,
                         info = False,
