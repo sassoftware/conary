@@ -756,12 +756,14 @@ def seekNextSignature(keyRing):
 def fingerprintToInternalKeyId(fingerprint):
     if len(fingerprint) == 0:
         return ''
-    data = int(fingerprint[-16:],16)
-    r = ''
-    for i in range(8):
-        r = chr(data%256) + r
-        data //= 256
-    return r
+    fp = fingerprint[-16:]
+    return ''.join([ chr(int(x + y, 16))
+                   for x, y in zip(fp[0::2], fp[1::2])] )
+
+def binSeqToString(sequence):
+    """sequence is a sequence if unsigned chars.
+    Return the string with a corresponding char for each item"""
+    return "".join([ chr(x) for x in sequence ])
 
 def getSigId(keyRing):
     startPoint = keyRing.tell()
@@ -1070,9 +1072,7 @@ def getPublicKeyFromString(keyId, data):
 
 def getKeyEndOfLifeFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
-    revoked, timestamp = findEndOfLife(keyId, keyRing)
-    keyRing.close()
-    return revoked, timestamp
+    return _getKeyEndOfLife(keyId, keyRing)
 
 def getUserIdsFromString(keyId, data):
     keyRing = StringIO(data)
@@ -1129,9 +1129,16 @@ def getKeyEndOfLife(keyId, keyFile=''):
         keyRing = util.ExtendedFile(keyFile, buffering = False)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open keyring")
-    res = findEndOfLife(keyId, keyRing)
-    keyRing.close()
-    return res
+
+    return _getKeyEndOfLife(keyId, keyRing)
+
+def _getKeyEndOfLife(keyId, stream):
+    msg = PGP_Message(stream, start = 0)
+    try:
+        pkt = msg.iterByKeyId(keyId).next()
+    except StopIteration:
+        raise KeyNotFound(keyId, "Key not found")
+    return pkt.getEndOfLife()
 
 def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum
@@ -1735,6 +1742,24 @@ class PGP_BasePacket(object):
         Return a list of bytes"""
         return self._readBin(self._bodyStream, bytes)
 
+    @staticmethod
+    def checkStreamLength(stream, length):
+        """Checks that the stream has exactly the length specified"""
+        stream.seek(0, SEEK_END)
+        if length != stream.tell():
+            raise ShortReadError(length, stream.tell())
+        # Rewind
+        stream.seek(0)
+
+    @staticmethod
+    def readTimestamp(stream):
+        """Reads a timestamp from the stream"""
+        PGP_BasePacket.checkStreamLength(stream, 4)
+        ret = 0
+        for oct in PGP_BasePacket._readBin(stream, 4):
+            ret = ret * 256 + oct
+        return ret
+
     def isEmpty(self):
         return self.headerLength == 0
 
@@ -1848,12 +1873,14 @@ class PGP_BaseKeySig(PGP_BasePacket):
 
 class PGP_Signature(PGP_BaseKeySig):
     __slots__ = ['version', 'sigType', 'pubKeyAlg', 'hashAlg', 'hashSig',
-                 'mpiFile', '_parsed']
+                 'mpiFile', 'signerKeyId', 'hashedFile', 'unhashedFile',
+                 '_parsed']
     tag = PKT_SIG
 
     def validate(self):
         self.version = self.sigType = self.pubKeyAlg = self.hashAlg = None
-        self.hashSig = self.mpiFile = None
+        self.hashSig = self.mpiFile = self.signerKeyId = None
+        self.hashedFile = self.unhashedFile = None
         self._parsed = False
 
     def parse(self):
@@ -1896,7 +1923,7 @@ class PGP_Signature(PGP_BaseKeySig):
                            'got %d' % hLen)
 
         creation = self.readBin(4)
-        binKeyId = self.readBin(8)
+        self.signerKeyId = self.readBin(8)
         pkAlg, hashAlg, sig0, sig1 = self.readBin(4)
 
         self.sigType = sigType
@@ -1935,7 +1962,26 @@ class PGP_Signature(PGP_BaseKeySig):
         self.hashAlg = hashAlg
         self.mpiFile = mpiFile
         self.hashSig = hashSig
+        self.hashedFile = hSubpktsFile
+        self.unhashedFile = uSubpktsFile
         return sigType, pkAlg, hashAlg, hSubpktsFile, uSubpktsFile, mpiFile
+
+    def getSigId(self):
+        """Get the key ID of the issuer for this signature.
+        Return None if the packet did not contain an issuer key ID"""
+        if not self._parsed:
+            self.parse()
+        if self.signerKeyId is not None:
+            return binSeqToString(self.signerKeyId)
+        # Version 3 packets should have already set signerKeyId
+        assert self.version == 4
+        for spktType, dataf in self.decodeSigSubpackets(self.unhashedFile):
+            if spktType != SIG_SUBPKT_ISSUER_KEYID:
+                continue
+            # Verify it only contains 8 bytes
+            self.checkStreamLength(dataf, 8)
+            self.signerKeyId = self._readBin(dataf, 8)
+            return binSeqToString(self.signerKeyId)
 
     def decodeSigSubpackets(self, fobj):
         while fobj.size != fobj.tell():
@@ -2032,6 +2078,82 @@ class PGP_Key(PGP_BaseKeySig):
             m.update(buf)
 
         return m.hexdigest().upper()
+
+    def getEndOfLife(self):
+        """Parse self signatures to find timestamp(s) of key expiration.
+        Also seek out any revocation timestamps.
+        We don't need to actually verify these signatures.
+        See verifySelfSignatures()
+        Returns bool, timestamp (is revoked, expiration)
+        """
+        parentExpire = 0
+        parentRevoked = False
+
+        if self.tag in PKT_SUB_KEYS:
+            # Look for parent key's expiration
+            # Cheat a little, poke into the NestedFile to get to the parent
+            # file
+            newMsg = PGP_Message(self._bodyStream.file, start = 0)
+            pkt = newMsg.seekParentKey(self.getKeyId())
+            parentRevoked, parentExpire = pkt.getEndOfLife()
+
+        expireTimestamp = revocTimestamp = 0
+
+        # Get our key ID
+        keyId = self.getKeyId()
+        intKeyId = fingerprintToInternalKeyId(keyId)
+
+        # Iterate over signatures, look for one whose ID matches our own ID
+        for pkt in self.iterSignatures():
+            if intKeyId != pkt.getSigId():
+                continue
+            if pkt.version != 4:
+                raise IncompatibleKey("Not a V4 signature")
+            if pkt.sigType in SIG_CERTS:
+                eTimestamp = cTimestamp = 0
+                for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                    if spktType == SIG_SUBPKT_KEY_EXPIRE:
+                        eTimestamp = self.readTimestamp(dataf)
+                    elif spktType == SIG_SUBPKT_CREATION:
+                        cTimestamp = self.readTimestamp(dataf)
+                # if there's no expiration, DON'T COMPUTE this, otherwise
+                # it will appear as if the key expired the very moment
+                # it was created.
+                if eTimestamp:
+                    ts = eTimestamp + cTimestamp
+                    expireTimestamp = max(expireTimestamp, ts)
+            elif pkt.sigType in SIG_KEY_REVOCS:
+                # parse this revocation to look for the creation timestamp
+                # we're ultimately looking for the most stringent revocation
+                for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                    if spktType == SIG_SUBPKT_CREATION:
+                        ts = self.readTimestamp(dataf)
+                        if revocTimestamp:
+                            revocTimestamp = min(expireTimestamp, ts)
+                        else:
+                            revocTimestamp = ts
+
+        # return minimum non-zero value of the three expirations
+        # unless they're ALL zero. 8-)
+        if not (revocTimestamp or expireTimestamp or parentExpire):
+            return False, 0
+
+        # make no assumptions about how big a timestamp is.
+        ts = max(revocTimestamp, expireTimestamp, parentExpire)
+        if revocTimestamp:
+            ts = min(ts, revocTimestamp)
+        if expireTimestamp:
+            ts = min(ts, expireTimestamp)
+        if parentExpire:
+            ts = min(ts, parentExpire)
+        return (revocTimestamp != 0) and (not parentRevoked), ts
+
+
+
+
+
+
+
 
     def iterSubPackets(self):
         # Stop at another main key (pub or sec)
