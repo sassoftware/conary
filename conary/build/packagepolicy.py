@@ -1996,10 +1996,10 @@ class Provides(_dependency):
     EXAMPLES
     ========
 
-    C{r.Provides('file', '/usr/sbin/sendmail')}
+    C{r.Provides('file', '/usr/share/dict/words')}
 
     Demonstrates using C{r.Provides} to specify the file provision
-    C{/usr/sbin/sendmail}.
+    C{/usr/share/dict/words}, so that other files can now require that file.
 
     C{r.Provides('soname: libperl.so', '%(libdir)s/perl5/.*/CORE/libperl.so')}
 
