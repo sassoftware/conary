@@ -213,10 +213,10 @@ class BadPassPhrase(PGPError):
 
 class BadSelfSignature(PGPError):
     def __str__(self):
-        return self.error
+        return "Key %s failed self signature check" % self.keyId
 
-    def __init__(self, reason="Bad Self Signature"):
-        self.error = reason
+    def __init__(self, keyId):
+        self.keyId = keyId
 
 class InvalidBodyError(PGPError):
     pass
@@ -408,6 +408,7 @@ def getSignatureTuple(keyRing):
 
 
 def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
+    # XXX FIXME misa next to convert
     # find the self signature
     intKeyId = fingerprintToInternalKeyId(fingerprint)
     while (intKeyId != getSigId(keyRing)):
@@ -1144,7 +1145,7 @@ def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum
     if len(data) < 2:
         return 0
-    checksum = ord(data[-2:-1]) * 256 + ord (data[-1:])
+    checksum = int2bytes(*data[-2:])
     runningCount=0
     for i in range(len(data) - 2):
         runningCount += ord(data[i])
@@ -1612,7 +1613,7 @@ class PGP_PacketFromStream(object):
             body3 = ord(rest[1])
             body4 = ord(rest[2])
             body5 = ord(rest[3])
-            self.bodyLength = len4bytes(body2, body3, body4, body5)
+            self.bodyLength = int4bytes(body2, body3, body4, body5)
             return
         # 4.2.2.4. Partial Body Lengths
         partialBodyLength = 1 << (body1 & 0x1F)
@@ -1722,7 +1723,7 @@ class PGP_BasePacket(object):
     @staticmethod
     def _readExact(stream, bytes):
         """Read bytes from stream, checking that enough bytes were read"""
-        data = stream.read(bytes = bytes)
+        data = stream.read(bytes)
         if bytes > 0 and len(data) != bytes:
             raise ShortReadError(bytes, len(data))
         return data
@@ -1743,22 +1744,44 @@ class PGP_BasePacket(object):
         return self._readBin(self._bodyStream, bytes)
 
     @staticmethod
+    def _writeBin(stream, bytes):
+        """Write the bytes in binary format"""
+        for b in bytes:
+            stream.write(chr(b))
+
+    @staticmethod
+    def _copyStream(src, dst):
+        """Copy stream src into dst"""
+        while 1:
+            buf = src.read(self.BUFFER_SIZE)
+            if not buf:
+                break
+            dst.write(buf)
+
+    @staticmethod
+    def _updateHash(hashObj, stream):
+        """Update the hash object with data from the stream"""
+        while 1:
+            buf = stream.read(self.BUFFER_SIZE)
+            if not buf:
+                break
+            hashObj.update(buf)
+
+    @staticmethod
     def checkStreamLength(stream, length):
         """Checks that the stream has exactly the length specified"""
+        pos = stream.tell()
         stream.seek(0, SEEK_END)
-        if length != stream.tell():
-            raise ShortReadError(length, stream.tell())
+        if length != stream.tell() - pos:
+            raise ShortReadError(length, stream.tell() - pos)
         # Rewind
-        stream.seek(0)
+        stream.seek(pos)
 
     @staticmethod
     def readTimestamp(stream):
         """Reads a timestamp from the stream"""
         PGP_BasePacket.checkStreamLength(stream, 4)
-        ret = 0
-        for oct in PGP_BasePacket._readBin(stream, 4):
-            ret = ret * 256 + oct
-        return ret
+        return len4bytes(*PGP_BasePacket._readBin(stream, 4))
 
     def isEmpty(self):
         return self.headerLength == 0
@@ -1805,27 +1828,6 @@ class PGP_Packet(PGP_BasePacket):
     def setTag(self, tag):
         self.tag = tag
 
-class PGP_MessageBody(object):
-    __slots__ = ['file']
-    tag = None
-    def __init__(self, fileObj):
-        self.file = fileObj
-        if not self.validate():
-            raise InvalidBodyError
-
-    def read(self, amt=None):
-        return self.file.read(amt)
-
-    def validate(self):
-        return True
-
-    def toString(self):
-        return "<OpenPGP Message: tag %s at %s>" % (self.tag, id(self))
-
-    def reset(self):
-        """Reset the file stream to point at the beginning of the body"""
-        self.file.seek(0)
-
 class PGP_BaseKeySig(PGP_BasePacket):
     """Base class for keys and signatures"""
 
@@ -1843,17 +1845,25 @@ class PGP_BaseKeySig(PGP_BasePacket):
             raise UnsupportedEncryptionAlgorithm(algType)
         return numMPI
 
+
     def _readMPIs(self, stream, algType, discard = True):
-        """Read the MPIs from the current position in the message body.
+        """Read the corresponding number of MPIs for the specified algorithm
+        type from the stream
         @raise UnsupportedEncryptionAlgorithm
         """
         numMPI = self._getMPICount(algType)
+        return self._readCountMPIs(stream, numMPI, discard = discard)
+
+    def _readCountMPIs(self, stream, count, discard = True):
+        """Read count MPs from the current position in stream.
+        @raise UnsupportedEncryptionAlgorithm
+        """
 
         r = 0L
         ret = []
-        for i in range(numMPI):
+        for i in range(count):
             buf = self._readBin(stream, 2)
-            mLen = ((buf[0] * 256 + buf[1]) + 7) // 8
+            mLen = (int2bytes(*buf) + 7) // 8
             if discard:
                 # Skip the MPI len
                 self._readExact(stream, mLen)
@@ -1964,7 +1974,6 @@ class PGP_Signature(PGP_BaseKeySig):
         self.hashSig = hashSig
         self.hashedFile = hSubpktsFile
         self.unhashedFile = uSubpktsFile
-        return sigType, pkAlg, hashAlg, hSubpktsFile, uSubpktsFile, mpiFile
 
     def getSigId(self):
         """Get the key ID of the issuer for this signature.
@@ -2020,6 +2029,53 @@ class PGP_Signature(PGP_BaseKeySig):
         fobj.seek(pktlen - 1, SEEK_CUR)
         return spktType, dataf
 
+    def _finalizeSelfSig(self, dataFile, mainKey):
+        """Append more data to dataFile and compute the self signature"""
+        if self.version != 4:
+            raise InvalidKey("Self signature is not a V4 signature")
+        dataFile.seek(0, SEEK_END)
+        digSig = self.parseMPIs()
+
+        # (re)compute the hashed packet subpacket data length
+        self.hashedFile.seek(0, SEEK_END)
+        hSubPktLen = self.hashedFile.tell()
+        self.hashedFile.seek(0, SEEK_SET)
+
+        # Write signature version, sig type, pub alg, hash alg
+        self._writeBin(dataFile, [ self.version, self.sigType, self.pubKeyAlg,
+                                   self.hashAlg ])
+        # Write hashed data length
+        self._writeBin(dataFile, [ hSubPktLen // 256, hSubPktLen % 256 ])
+        # Write the hashed data
+        self._copyStream(self.hashedFile, dataFile)
+
+        # We've added 6 bytes for the header
+        dataLen = hSubPktLen + 6
+
+        # Append trailer - 5-byte header
+        self._writeBin(dataFile, [ 0x04, 0xFF,
+            (dataLen // 0x1000000) & 0xFF, (dataLen // 0x10000) & 0xFF,
+            (dataLen // 0x100) & 0xFF, dataLen & 0xFF ])
+        hashAlgList = [ None, md5, sha]
+        hashFunc = hashAlgList[self.hashAlg]
+        hashObj = hashFunc.new()
+
+        # Rewind dataFile, we need to hash it
+        dataFile.seek(0, SEEK_SET)
+        self._updateHash(hashObj, dataFile)
+        sigString = hashObj.digest()
+        # if this is an RSA signature, it needs to properly padded
+        # RFC 2440 5.2.2 and RFC 2313 10.1.2
+
+        if self.pubKeyAlg in PK_ALGO_ALL_RSA:
+            # hashPads from RFC2440 section 5.2.2
+            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
+            padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) // 2 -1
+            sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
+
+        if not mainKey.verify(sigString, digSig):
+            raise BadSelfSignature(None)
+
 PacketTypeDispatcher.addPacketType(PGP_Signature)
 
 class PGP_UserID(PGP_BasePacket):
@@ -2036,8 +2092,66 @@ class PGP_UserID(PGP_BasePacket):
 PacketTypeDispatcher.addPacketType(PGP_UserID)
 
 class PGP_Key(PGP_BaseKeySig):
+    __slots__ = ['_parsed', 'version', 'createdTimestamp', 'pubKeyAlg',
+                 'mpiFile', 'mpiLen', 'daysValid']
     # Base class for public/secret keys/subkeys
     tag = None
+
+    def validate(self):
+        self.version = self.createdTimestamp = self.pubKeyAlg = None
+        self.mpiFile = self.mpiLen = None
+        self.daysValid = None
+        self._parsed = False
+
+    def parse(self):
+        """Parse the signature body and initializes the internal data
+        structures for other operations"""
+        self.resetBody()
+        keyVersion, = self.readBin(1)
+        if keyVersion not in [3, 4]:
+            raise InvalidBodyError("Invalid key version %s" % keyVersion)
+        self.version = keyVersion
+
+        if keyVersion == 3:
+            self._readKeyV3()
+        else:
+            self._readKeyV4()
+        self._parsed = True
+
+    def _readKeyV3(self):
+        # RFC 2440, sect. 5.5.2
+        self.createdTimestamp = len4bytes(*self._readBin(self._bodyStream, 4))
+
+        # daysValid
+        data = self.readBin(2)
+        self.daysValid = int2bytes(*data)
+
+        # Public key algorithm
+        self.pubKeyAlg, = self.readBin(1)
+
+        # Record current position in body
+        mpiStart = self._bodyStream.tell()
+        # Read and discard 2 MPIs
+        self._readCountMPIs(self._bodyStream, count, discard = True)
+        self.mpiLen = self._bodyStream.tell() - mpiStart
+        self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
+            start = mpiStart)
+
+    def _readKeyV4(self):
+        # RFC 2440, sect. 5.5.2
+        # Key creation
+        self.createdTimestamp = len4bytes(*self._readBin(self._bodyStream, 4))
+
+        # Public key algorithm
+        self.pubKeyAlg, = self.readBin(1)
+
+        # Record current position in body
+        mpiStart = self._bodyStream.tell()
+        # Skip over the MPIs
+        self.skipMPIs(self._bodyStream, self.pubKeyAlg)
+        self.mpiLen = self._bodyStream.tell() - mpiStart
+        self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
+            start = mpiStart)
 
     def getKeyId(self):
         # Convert to public key
@@ -2148,13 +2262,6 @@ class PGP_Key(PGP_BaseKeySig):
             ts = min(ts, parentExpire)
         return (revocTimestamp != 0) and (not parentRevoked), ts
 
-
-
-
-
-
-
-
     def iterSubPackets(self):
         # Stop at another main key (pub or sec)
         return self._iterSubPackets(PKT_MAIN_KEYS)
@@ -2162,6 +2269,45 @@ class PGP_Key(PGP_BaseKeySig):
     def iterSignatures(self):
         return (x for x in self._iterSubPackets(PKT_ALL_KEYS)
                 if x.tag == PKT_SIG)
+
+    def assertSigningKey(self):
+        # Find self signature of this key
+        # first search for the public key algortihm octet. if the key is really
+        # old, this might be the only hint that it's legal to use this key to
+        # make digital signatures.
+        if self._parsed is False:
+            self.parse()
+
+        if sig.pubKeyAlg in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
+            # the public key algorithm octet satisfies this test. no more
+            # checks required.
+            return True
+
+        keyId = self.getKeyId()
+
+        # If it's a subkey, look for the master key
+        if self.tag in PKT_SUB_KEYS:
+            # Cheat a little, poke into the NestedFile to get to the parent
+            # file
+            newMsg = PGP_Message(self._bodyStream.file, start = 0)
+            pkt = newMsg.seekParentKey(keyId)
+            return pkt.assertSigningKey()
+
+        intKeyId = fingerprintToInternalKeyId(fingerprint)
+        # Look for a self signature
+        for pkt in self.iterSignatures():
+            if intKeyId != pkt.getSigId():
+                continue
+            # We know it's a ver4 packet, otherwise getSigId would have failed
+            for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                if spktType == SIG_SUBPKT_KEY_FLAGS:
+                    break
+                # RFC 2440, sect. 5.2.3.20
+                foct, = self._readBin(dataf, 1)
+                if foct & 0x02:
+                    return True
+        # No subpacket or no key flags
+        raise IncompatibleKey('Key %s is not a signing key.'% intKeyId)
 
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
@@ -2172,35 +2318,128 @@ class PGP_PublicKey(PGP_Key):
                          minHeaderLen = minHeaderLen)
 
 class PGP_SecretKey(PGP_Key):
+    __slots__ = ['s2k', 'symmEncAlg', 's2kType', 'hashAlg', 'salt',
+                 'count', 'initialVector', 'encMpiFile']
     tag = PKT_SECRET_KEY
     pubTag = PKT_PUBLIC_KEY
 
+    _hashes = [ 'Unknown', md5, sha, RIPEMD, 'Double Width SHA',
+                'MD2', 'Tiger/192', 'HAVAL-5-160' ]
+    # Ciphers and their associated key sizes
+    _ciphers = [ ('Unknown', 0), ('IDEA', 0), (DES3, 192), (CAST, 128),
+                 (Blowfish, 128), ('SAFER-SK128', 0), ('DES/SK', 0),
+                 (AES, 128), (AES, 192), (AES, 256), ]
+    _legalCiphers = set([ 2, 3, 4, 7, 8, 9 ])
+
+    def validate(self):
+        PGP_Key.validate(self)
+        self.s2k = self.symmEncAlg = self.s2kType = None
+        self.hashAlg = self.salt = self.count = None
+        self.initialVector = self.encMpiFile = None
+
+    def parse(self):
+        PGP_Key.parse(self)
+
+        # Seek to the end of the MPI file, just to be safe (we should be there
+        # already)
+        self._bodyStream.seek(self.mpiFile.start + self.mpiLen, SEEK_SET)
+
+        self.s2k, = self.readBin(1)
+
+        if self.s2k in [ENCRYPTION_TYPE_SHA1_CHECK,
+                        ENCRYPTION_TYPE_S2K_SPECIFIED]:
+            self.symmEncAlg, self.s2kType, self.hashAlg = self.readBin(3)
+            if self.s2kType:
+                if self.s2kType not in (0x01, 0x03):
+                    raise IncompatibleKey('Unknown string-to-key type %s' %
+                                          self.s2kType)
+                self.salt = self.readExact(8)
+                if self.s2kType == 0x03:
+                    self.count, = self.readBin(1)
+        # The MPIs are most likely encrypted, we'll just have to trust that
+        # there are enough of them for now.
+        dataLen = self._bodyStream.size - self._bodyStream.tell()
+        self.encMpiFile = util.SeekableNestedFile(self._bodyStream, dataLen)
+
+    def _getSecretMPICount(self):
+        if self.pubKeyAlg in PK_ALGO_ALL_RSA:
+            return 4
+        if self.pubKeyAlg == PK_ALGO_DSA:
+            return 1
+        if self.pubKeyAlg in PK_ALGO_ALL_ELGAMAL:
+            return 1
+        raise PGPError("Unsupported public key algorithm %s" % self.pubKeyAlg)
+
     def toPublicKey(self, minHeaderLen = 2):
-        self.resetBody()
-        pver, = self.readBin(1)
-
-        # RFC 2440, sect. 5.5.2
-        # check the packet version, we only handle version 4
-        if pver != 4:
-            raise PGPError('2')
-
-        # get the key data
-        # Key creation
-        data = self.readExact(4)
-        # Public key algorithm
-        algType, = self.readBin(1)
-
-        # Skip over the MPIs
-        self.skipMPIs(self._bodyStream, algType)
+        if not self._parsed:
+            self.parse()
 
         # Create a nested file starting at the beginning of the body's and
-        # with the length equal to the position in the body (after we read the
-        # MPIs)
-        io = util.SeekableNestedFile(self._bodyStream, self._bodyStream.tell(),
-                                     start = 0)
+        # with the length equal to the position in the body up to the MPIs
+        io = util.SeekableNestedFile(self._bodyStream,
+            self.mpiFile.start + self.mpiLen, start = 0)
         pkt = newPacket(self.pubTag, io, minHeaderLen = minHeaderLen)
         return pkt
 
+    def decrypt(self, passPhrase):
+        if not self._parsed:
+            self.parse()
+
+        if self.s2k == ENCRYPTION_TYPE_UNENCRYPTED:
+            return self._readCountMPIs(self.encMpiFile,
+                self._getSecretMPICount(), discard = False)
+
+        if self.symmEncAlg not in self._legalCiphers:
+            if self.symmetricEngAlg >= len(self._ciphers):
+                raise IncompatibleKey("Unknown cipher %s" %
+                                      self.symmetricEngAlg)
+            
+            cipher, cipherKeySize = self._ciphers[self.symmEncAlg]
+            raise IncompatibleKey("Cipher %s is unusable" % cipher)
+
+        if self.hashAlg >= len(self._hashes):
+            raise IncompatibleKey("Unknown hash algorithm %s" % self.hashAlg)
+        hashAlg = self._hashes[self.hashAlg]
+        if isinstance(hashAlg, str):
+            raise IncompatibleKey('Hash algorithm %s is not implemented. '
+                                  'Key not readable' % hashAlg)
+
+        cipherAlg, cipherKeySize = self._ciphers[self.symmEncAlg]
+        if self.s2kType == 0x00:
+            key = simpleS2K(passPhrase, hashAlg, cipherKeySize)
+        elif self.s2kType == 0x01:
+            key = saltedS2K(passPhrase, hashAlg, cipherKeySize, self.salt)
+        elif self.s2kType == 0x03:
+            key = iteratedS2K(passPhrase, hashAlg, cipherKeySize, self.salt,
+                              self.count)
+        # Dark magic here --misa
+        if self.symmEncAlg > 6:
+            cipherBlockSize = 16
+        else:
+            cipherBlockSize = 8
+
+        io = util.ExtendedStringIO()
+        cipher = cipherAlg.new(key,1)
+        block = self._readExact(self.encMpiFile, cipherBlockSize)
+        FRE = cipher.encrypt(block)
+        while 1:
+            block = self.encMpiFile.read(cipherBlockSize)
+            io.write(xorStr(FRE, block))
+            if len(block) != cipherBlockSize:
+                break
+            FRE = cipher.encrypt(block)
+        unenc = io.getvalue()
+        if self.s2k == ENCRYPTION_TYPE_S2K_SPECIFIED:
+            check = verifyRFC2440Checksum(unenc)
+        else:
+            check = verifySHAChecksum(unenc)
+
+        if not check:
+            raise BadPassPhrase('Pass phrase incorrect')
+
+        io.seek(0)
+        return self._readCountMPIs(io, self._getSecretMPICount(),
+                                   discard = False)
 
 class PGP_PublicSubKey(PGP_PublicKey):
     tag = PKT_PUBLIC_SUBKEY
@@ -2242,6 +2481,12 @@ def len2bytes(v1, v2):
 def len4bytes(v1, v2, v3, v4):
     """Return the packet body length when represented on 4 bytes"""
     return (v1 << 24) | (v2 << 16) | (v3 << 8) | v4
+
+def int2bytes(v1, v2):
+    return (v1 << 8) + v2
+
+def int4bytes(v1, v2, v3, v4):
+    return len4bytes(v1, v2, v3, v4)
 
 class KeyId(object):
     """Class to store a Key Identifier"""
