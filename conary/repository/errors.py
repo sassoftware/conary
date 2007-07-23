@@ -232,6 +232,17 @@ class DigitalSignatureError(RepositoryError):
 class ProxyError(RepositoryError):
     pass
 
+class EntitlementTimeout(RepositoryError):
+
+    def __str__(self):
+        return "EntitlementTimeout for %s" % ",".join(self.entitlements)
+
+    def getEntitlements(self):
+        return self.entitlements
+
+    def __init__(self, entitlements):
+        self.entitlements = entitlements
+
 class InternalServerError(RepositoryError, InternalConaryError):
     def __init__(self,  err):
         self.err = err

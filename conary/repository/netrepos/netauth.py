@@ -76,7 +76,7 @@ class UserAuthorization:
         if self.cacheTimeout:
             cacheEntry = sha1helper.sha1String("%s%s" % (user, challenge))
             timeout = self.pwCache.get(cacheEntry, None)
-            if timeout is not None and timeout < time.time():
+            if timeout is not None and time.time() < timeout:
                 return True
 
         if self.pwCheckUrl:
@@ -180,8 +180,11 @@ class EntitlementAuthorization:
             cacheEntry = sha1helper.sha1String("%s%s%s" % (
                 serverName, entitlementGroup, entitlement))
             userGroupIds, timeout = self.cache.get(cacheEntry, (None, None))
-            if timeout is not None and (timeout < time.time()):
+            if (timeout is not None) and time.time() < timeout:
                 return userGroupIds
+            elif (timeout is not None):
+                del self.cache[cacheEntry]
+                raise errors.EntitlementTimeout([entitlement])
 
         if self.entCheckUrl:
             if entitlementGroup is not None:
@@ -277,14 +280,22 @@ class NetworkAuthorization:
         else:
             entList = authToken[2]
 
+        timedOut = []
         for entClass, entKey in entList:
             # XXX serverName is passed only for compatibility with the server
             # and entitlement class based entitlement design; it's only used
             # here during external authentication (used by some rPath
             # customers)
-            groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
-                cu, self.serverNameList[0], entClass, entKey)
-            groupSet.update(groupsFromEntitlement)
+            try:
+                groupsFromEntitlement = \
+                    self.entitlementAuth.getAuthorizedGroups(
+                        cu, self.serverNameList[0], entClass, entKey)
+                groupSet.update(groupsFromEntitlement)
+            except errors.EntitlementTimeout, e:
+                timedOut += e.getEntitlements()
+
+        if timedOut:
+            raise errors.EntitlementTimeout(timedOut)
 
         return groupSet
 
