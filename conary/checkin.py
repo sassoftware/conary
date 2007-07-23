@@ -1410,8 +1410,9 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     assert(util.assertIteratorAtEnd(troveChanges))
 
     localVer = parentRootVersion.createShadow(versions.LocalLabel())
-    fsJob = update.FilesystemJob(repos, changeSet, 
-				 { (state.getName(), localVer) : state }, "",
+    fsJob = update.FilesystemJob(repos, changeSet,
+                                 { (state.getName(), localVer) : state },
+                                 os.getcwd(),
                                  flags = update.UpdateFlags(ignoreUGids = True,
                                                             merge = True) )
     errList = fsJob.getErrorList()
