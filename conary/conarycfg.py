@@ -31,16 +31,18 @@ from conary import flavorcfg
 
 class ServerGlobList(list):
 
-    def find(self, server, allMatches = False):
+    multipleMatches = False
+
+    def find(self, server):
         l = []
         for (serverGlob, item) in ServerGlobList.__iter__(self):
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
-                if not allMatches:
+                if not self.multipleMatches:
                     return item
                 l.append(item)
 
-        if not allMatches:
+        if not self.multipleMatches:
             return None
 
         return l
@@ -57,7 +59,7 @@ class ServerGlobList(list):
         removeOld = False
         for i, (serverGlob, info) in enumerate(ServerGlobList.__iter__(self)):
             if fnmatch.fnmatch(newItem[0], serverGlob):
-                if serverGlob == newItem[0]:
+                if not self.multipleMatches and serverGlob == newItem[0]:
                     removeOld = True
                 location = i
                 break
@@ -134,6 +136,8 @@ class CfgUserInfo(CfgList):
         return curVal
 
 class EntitlementList(ServerGlobList):
+
+    multipleMatches = True
 
     def addEntitlement(self, serverGlob, entitlement, entClass = None):
         self.append((serverGlob, (entClass, entitlement)))

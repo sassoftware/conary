@@ -391,7 +391,7 @@ class ServerCache:
 
         # look for any entitlements for this server
         if self.entitlements:
-            entList = self.entitlements.find(serverName, allMatches = True)
+            entList = self.entitlements.find(serverName)
         else:
             entList = []
 

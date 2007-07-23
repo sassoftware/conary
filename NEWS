@@ -19,6 +19,9 @@ Changes in @NEW@:
       --replace-config-files. The original option is still accepted, and is
       equivalent to specifying all four of the new options simultaneously
       (CNY-1270)
+    * Multiple entitlements can be stored for a single hostname or glob
+      (previously only the last hostname for a particular hostname/glob
+      would be used) (CNY-1825)
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
