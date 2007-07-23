@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -66,10 +66,18 @@ class Query:
         self.exactFlavors = exactFlavors
         self.troveTypes = troveTypes
 
+        # localTroves are troves that, through affinity, are assigned to
+        # a local branch.  Since there's no repository associated with 
+        # local branches, there's no chance of an update available.  
+        # We merely return an empty set of troves, showing that there were
+        # no updates found for that trove.
+        self.localTroves = set()
+
     def reset(self):
         for dct in self.query:
             dct.clear()
         self.map.clear()
+        self.localTroves.clear()
 
     def hasName(self, name):
         return name in self.map
@@ -112,13 +120,22 @@ class Query:
     def addQuery(self, troveTup, *params):
         raise NotImplementedError
 
+    def _addLocalTrove(self, troveTup):
+        name = troveTup[0]
+        self.map[name] = [ troveTup ]
+        self.localTroves.add(name)
+
+    def _findLocalTroves(self, finalMap):
+        for name in self.localTroves:
+            finalMap.setdefault(self.map[name], [])
+
     def addMissing(self, missing, name):
         troveTup = self.map[name][0]
         missing[troveTup] = self.missingMsg(name)
-            
+
     def missingMsg(self, name):
         raise NotImplementedError
-    
+
 class QueryByVersion(Query):
 
     def __init__(self, *args, **kw):
@@ -207,41 +224,97 @@ class QueryByLabelPath(Query):
     def __init__(self, *args, **kw):
         Query.__init__(self, *args, **kw)
         self.query = {}
-    
+        self.acrossLabelsPerTrove = {}
+        self.affQueries = {}
+
     def reset(self):
         self.query = {}
         self.map = {}
+        self.localTroves.clear()
+        self.affQueries.clear()
+        self.acrossLabelsPerTrove = {}
 
-    def addQuery(self, troveTup, labelPath, flavorList):
+    def addQuery(self, troveTup, labelPath, flavorItems, acrossLabels=None):
         name = troveTup[0]
         self.map[name] = [troveTup, labelPath]
-        self.exactFlavorMap[name] = flavorList
+        self.exactFlavorMap[name] = flavorItems
 
         if self.acrossLabels or isinstance(labelPath, set):
-            if not flavorList or self.exactFlavors:
+            self.acrossLabelsPerTrove[name] = True
+            if not flavorItems or self.exactFlavors:
                 self.query[name] = [ dict.fromkeys(labelPath, None)]
             elif self.acrossFlavors:
-                # create one big query: {name : [{label  : [flavor1, flavor2],
-                #                                 label2 : [flavor1, flavor2]}
                 d = {}
-                for label in labelPath:
-                    d[label] = flavorList[:]
+                if isinstance(flavorItems, dict):
+                    # Affinity queries are a particularly hairy beast.
+                    # Here's the deal.  You may have two versions
+                    # of foo installed from the same label L, with different
+                    # flavors.  We want to search for both flavors
+                    # in the repository, but if we only return one
+                    # new package that's not a problem...we don't want to
+                    # return a "trove missing" error.  But we _do_ want to
+                    # do a full search for both flavors, across the user's
+                    # flavorPath.
+                    # To make this work, we do one full search for one
+                    # flavor, then another full search for the other flavor
+                    # The second full search is stored in the affQueries
+                    # queue, and pulled off when the first search is done.
+                    # TODO: Move all of these lists of dicts of lists
+                    # to classes to make this code parseable by mortals.
+                    affQueries = []
+                    for label in labelPath:
+                        for idx, flavorList in enumerate(flavorItems[label]):
+                            if len(affQueries) <= idx:
+                                affDict = {}
+                                affQueries.append(affDict)
+                            else:
+                                affDict = affQueries[idx]
+                            affDict[label] = flavorList[:]
+                    d = affQueries.pop(0)
+                    if affQueries:
+                        self.affQueries[name] = affQueries
+                else:
+                    # create one big query: {name : [{label  : [flavor1, flavor2],
+                    #                            label2 : [flavor1, flavor2]}
+                    for label in labelPath:
+                        d[label] = flavorItems[:]
                 self.query[name] = [d]
             else:
-                # create a set of queries like {name : [{label  : [flavor1],
-                #                                        label2 : [flavor1]},
-                #                                       {label : [flavor2],
-                #                                        label2 : [flavor2]}
-                # -- if flavor1 is found on label1 or label2, stop searching
-                # on that label for this name.  Otherwise, continue searching 
-                # using flavor1
                 self.query[name] = []
-                for flavor in flavorList:
-                    d = {}
-                    self.query[name].append(d)
+                if isinstance(flavorItems, dict):
+                    affQueries = []
                     for label in labelPath:
-                        d[label] = [flavor]
+                        for affIdx, flavorList in enumerate(flavorItems[label]):
+                            if len(affQueries) <= affIdx:
+                                queryList = []
+                                affQueries.append(queryList)
+                            else:
+                                queryList = affQueries[affIdx]
+                            for idx, flavor in enumerate(flavorList):
+                                if len(queryList) <= idx:
+                                    d = {}
+                                    queryList.append(d)
+                                else:
+                                    d = queryList[idx]
+                                d[label] = [flavor]
+                    self.query[name] = affQueries.pop(0)
+                    if affQueries:
+                        self.affQueries[name] = affQueries
+                else:
+                    # create a set of queries like {name : [{label  : [flavor1],
+                    #                                     label2 : [flavor1]},
+                    #                                     {label : [flavor2],
+                    #                                    label2 : [flavor2]}
+                    # -- if flavor1 is found on label1 or label2,
+                    # stop searching  on that label for this name.
+                    # Otherwise, continue searching using flavor2
+                    for flavor in flavorItems:
+                        d = {}
+                        self.query[name].append(d)
+                        for label in labelPath:
+                            d[label] = [flavor]
         else:
+            flavorList = flavorItems
             self.query[name] = []
             if not flavorList or self.exactFlavors:
                 for label in labelPath:
@@ -264,6 +337,25 @@ class QueryByLabelPath(Query):
 
     def addQueryWithAffinity(self, troveTup, labelPath, affinityTroves):
         name = troveTup[0]
+        if labelPath is None:
+            flavorDict = {}
+            for afTrove in affinityTroves:
+                afVersion, afFlavor = afTrove[1], afTrove[2]
+                if afVersion.isOnLocalHost():
+                    self._addLocalTrove(troveTup)
+                    self.map[name] = troveTup
+                else:
+                    flavor = troveTup[2]
+                    if flavor is None:
+                        flavorList = self.overrideFlavors(afFlavor)
+                    else:
+                        flavorList = self.overrideFlavors(flavor)
+                    flavorDict.setdefault(afVersion.trailingLabel(), []).append(flavorList)
+            labelPath = set(flavorDict)
+            if labelPath:
+                self.addQuery(troveTup, labelPath, flavorDict)
+            return
+
         self.map[name] = [troveTup, labelPath]
 
         for label in labelPath:
@@ -283,11 +375,12 @@ class QueryByLabelPath(Query):
                 flavorList = self.defaultFlavorPath
             else:
                 flavorList = self.overrideFlavors(f)  
-            self.addQuery(troveTup, labelPath, flavorList) 
+            self.addQuery(troveTup, labelPath, flavorList,
+                          acrossLabels=True)
 
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:
-            return troveSource.getTroveLeavesByLabel(query, 
+            return troveSource.getTroveLatestByLabel(query,
                                                      bestFlavor=self.bestFlavor,
                                                      troveTypes=self.troveTypes)
         else:
@@ -295,12 +388,11 @@ class QueryByLabelPath(Query):
                                                    bestFlavor=self.bestFlavor,
                                                    troveTypes=self.troveTypes)
 
-        
     def findAll(self, troveSource, missing, finalMap):
 
         index = 0
         foundNames = set()
-        if self.acrossLabels:
+        if self.acrossLabels or self.acrossLabelsPerTrove:
             foundNameLabels = set()
         # self.query[name] is an ordered list of queries to use 
         # for that name.  If name is found using one query, then
@@ -316,10 +408,18 @@ class QueryByLabelPath(Query):
                 except IndexError:
                     if name not in foundNames:
                         self.addMissing(missing, name)
-                    del(self.query[name])
-                    continue
+                    if name in self.affQueries:
+                        self.query[name].extend(self.affQueries[name].pop())
+                        if not self.affQueries[name]:
+                            del self.affQueries[name]
+                        req = self.query[name][index]
+                        for label in req.keys():
+                            foundNameLabels.discard((name, label))
+                    else:
+                        del(self.query[name])
+                        continue
 
-                if self.acrossLabels:
+                if self.acrossLabels or name in self.acrossLabelsPerTrove:
                     # if we're searching across repositories, 
                     # we are trying to find one match per label
                     # if we've already found a match for a label, 
@@ -353,11 +453,12 @@ class QueryByLabelPath(Query):
                 for version, flavorList in matches.iteritems():
                     pkgList.extend((name, version, f) for f in flavorList)
 
-                    if self.acrossLabels:
+                    if self.acrossLabels or name in self.acrossLabelsPerTrove:
                         foundNameLabels.add((name, 
                                              version.branch().label()))
                 finalMap.setdefault(self.map[name][0], []).extend(pkgList)
             index +=1
+        self._findLocalTroves(finalMap)
 
     def missingMsg(self, name):
         # collapse all the labels searched in the queries to a unique list
@@ -374,12 +475,6 @@ class QueryByBranch(Query):
         Query.__init__(self, *args, **kw)
         self.queryNoFlavor = {}
         self.affinityFlavors = {}
-        # localTroves are troves that, through affinity, are assigned to
-        # a local branch.  Since there's no repository associated with 
-        # local branches, there's no chance of an update available.  
-        # We merely return an empty set of troves, showing that there were
-        # no updates found for that trove.
-        self.localTroves = set()
 
     def reset(self):
         Query.reset(self)
@@ -432,11 +527,6 @@ class QueryByBranch(Query):
                     flavorList = self.overrideFlavors(flavor)
 
                 self.addQuery(troveTup, afVersion.branch(), flavorList)
-
-    def _addLocalTrove(self, troveTup):
-        name = troveTup[0]
-        self.map[name] = [ troveTup ]
-        self.localTroves.add(name)
 
     def findAll(self, troveSource, missing, finalMap):
         self._findAllNoFlavor(troveSource, missing, finalMap)
@@ -517,10 +607,6 @@ class QueryByBranch(Query):
             for version, flavorList in res[name].iteritems():
                 pkgList.extend((name, version, f) for f in flavorList)
             finalMap[self.map[name][0]] = pkgList
-
-    def _findLocalTroves(self, finalMap):
-        for name in self.localTroves:
-            finalMap.setdefault(self.map[name][0], [])
 
     def missingMsg(self, name):
         flavor = self.map[name][0][2]
@@ -799,11 +885,12 @@ class TroveFinder:
     def sortNoVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup
         if affinityTroves:
-            if self.query[QUERY_BY_BRANCH].hasName(name):
+            if self.query[QUERY_BY_LABEL_PATH].hasName(name):
                 self.remaining.append(troveTup)
                 return
-            self.query[QUERY_BY_BRANCH].addQueryWithAffinity(troveTup, None, 
-                                                             affinityTroves)
+            self.query[QUERY_BY_LABEL_PATH].addQueryWithAffinity(troveTup,
+                                                                 None,
+                                                                 affinityTroves)
         elif self.query[QUERY_BY_LABEL_PATH].hasName(name):
             self.remaining.append(troveTup)
             return
@@ -920,15 +1007,12 @@ class TroveFinder:
     def sortTroveVersion(self, troveTup, affinityTroves):
         name = troveTup[0]
         flavor = troveTup[2]
-        if flavor is None and affinityTroves:
-            if self.query[QUERY_REVISION_BY_BRANCH].hasName(name):
-                self.remaining.append(troveTup)
-                return
-            self.query[QUERY_REVISION_BY_BRANCH].addQueryWithAffinity(troveTup,
-                                                          None, affinityTroves)
-        elif self.query[QUERY_REVISION_BY_LABEL].hasName(name):
+        if self.query[QUERY_REVISION_BY_LABEL].hasName(name):
             self.remaining.append(troveTup)
             return
+        if flavor is None and affinityTroves:
+            self.query[QUERY_REVISION_BY_LABEL].addQueryWithAffinity(troveTup,
+                                                          None, affinityTroves)
         else:
             flavorList = self.mergeFlavors(flavor)
             labelPath = self._getLabelPath(troveTup)

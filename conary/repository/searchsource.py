@@ -104,8 +104,8 @@ class SearchSource(AbstractSearchSource):
     def findTroves(self, troveSpecs, useAffinity=False, **kw):
         """
             Finds the trove matching the given list of 
-            (name, versionSpec, flavor) troveSpecs.  If useAffinity is True, 
-            uses the associated database for branch/flavor affinity.
+            (name, versionSpec, flavor) troveSpecs.  If useAffinity is True,
+            uses the associated database for label/flavor affinity.
         """
         if useAffinity:
             kw['affinityDatabase'] = self.db

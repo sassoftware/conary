@@ -42,6 +42,7 @@ from conary.lib import options
 from conary.lib import util
 
 sys.excepthook = util.genExcepthook()
+sys.stdout = util.FileIgnoreEpipe(sys.stdout)
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
@@ -797,18 +798,17 @@ _register(StatCommand)
 
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
-    paramHelp = "[<version>]"
-    help = 'Update files in current directory to a different version'
+    paramHelp = "[<dir>=<version>]*"
+    help = 'Update files in one or more directories to a different version'
     commandGroup = 'File Operations'
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
-        args = args[1:]
-        if argSet or not args or len(args) > 2: return self.usage()
+        args = args[2:]
+        if argSet: return self.usage()
 
-        args[0] = repos
         kwargs = {'callback': callback}
-        checkin.updateSrc(*args, **kwargs)
+        checkin.updateSrc(repos, versionList = args, **kwargs)
 _register(UpdateCommand)
 
 

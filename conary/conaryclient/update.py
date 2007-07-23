@@ -194,7 +194,7 @@ class ClientUpdate:
                     raise UpdateError, \
                         "Redirect found with --no-recurse set: %s=%s[%s]" % item
 
-                allTargets = [ (x[0], str(x[1]), x[2]) 
+                allTargets = [ (x[0], str(x[1].label()), x[2]) 
                                         for x in trv.iterRedirects() ]
                 matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
                                                 affinityDatabase = self.db)
@@ -2507,15 +2507,19 @@ conary erase '%s=%s[%s]'
 
         return suggMap
 
-    def applyUpdateJob(self, updJob, replaceFiles = False, tagScript = None,
+    def applyUpdateJob(self, updJob, replaceFiles = None, tagScript = None,
                     test = False, justDatabase = False, journal = None,
                     localRollbacks = None, autoPinList = None,
-                    keepJournal = False, noRestart=False):
+                    keepJournal = False, noRestart=False,
+                    replaceManagedFiles = False,
+                    replaceUnmanagedFiles = False,
+                    replaceModifiedFiles = False,
+                    replaceModifiedConfigFiles = False):
         """
         Apply the update job.
         @param updJob: An UpdateJob object.
         @type updJob: conary.local.database.UpdateJob object
-        @param replaceFiles: Replace locally changed files.
+        @param replaceFiles: Replace locally changed files (deprecated).
         @type replaceFiles: bool
         @param tagScript:
         @type tagScript:
@@ -2551,6 +2555,21 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        if replaceFiles is not None:
+            replaceManagedFiles = replaceFiles
+            replaceUnmanagedFiles = replaceFiles
+            replaceModifiedFiles = replaceFiles
+            replaceModifiedConfigFiles = replaceFiles
+
+        commitFlags = database.CommitChangeSetFlags(
+            replaceManagedFiles = replaceManagedFiles,
+            replaceUnmanagedFiles = replaceUnmanagedFiles,
+            replaceModifiedFiles = replaceModifiedFiles,
+            replaceModifiedConfigFiles = replaceModifiedConfigFiles,
+            justDatabase = justDatabase,
+            localRollbacks = localRollbacks,
+            test = test, keepJournal = keepJournal)
+
         if autoPinList is None:
             autoPinList = self.cfg.pinTroves
 
@@ -2565,12 +2584,8 @@ conary erase '%s=%s[%s]'
 
         # XXX May have to use a callback for this
         log.syslog.command()
-        self.applyUpdate(updJob, replaceFiles = replaceFiles,
-                        tagScript = tagScript, test = test,
-                        justDatabase = justDatabase, journal = journal,
-                        localRollbacks = localRollbacks,
-                        autoPinList = autoPinList,
-                        keepJournal = keepJournal)
+        self._applyUpdate(updJob, tagScript = tagScript, journal = journal,
+                          autoPinList = autoPinList, commitFlags = commitFlags)
         log.syslog.commandComplete()
 
         if remainingJobs:
@@ -3043,7 +3058,22 @@ conary erase '%s=%s[%s]'
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
         """Apply an update job. DEPRECATED, use applyUpdateJob instead"""
+        commitFlags = database.CommitChangeSetFlags(
+            replaceManagedFiles = replaceFiles,
+            replaceUnmanagedFiles = replaceFiles,
+            replaceModifiedFiles = replaceFiles,
+            replaceModifiedConfigFiles = replaceFiles,
+            justDatabase = justDatabase,
+            localRollbacks = localRollbacks,
+            test = test, keepJournal = keepJournal)
 
+        return self._applyUpdate(uJob, tagScript = tagScript,
+                          journal = journal, autoPinList = autoPinList,
+                          commitFlags = commitFlags)
+
+    def _applyUpdate(self, uJob, tagScript = None, journal = None,
+                     callback = None, autoPinList = None,
+                     commitFlags = None):
         self.db.commitLock(True)
 
         uJobTransactionCounter = uJob.getTransactionCounter()
@@ -3075,16 +3105,14 @@ conary erase '%s=%s[%s]'
         # run preinstall scripts
         if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
                                      tagScript = tagScript,
-                                     justDatabase = justDatabase,
+                                     justDatabase = commitFlags.justDatabase,
                                      tmpDir = self.cfg.tmpDir):
             raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
         kwargs = dict(
-            replaceFiles=replaceFiles, tagScript=tagScript,
-            justDatabase=justDatabase, test=test, journal=journal,
-            localRollbacks=localRollbacks, autoPinList=autoPinList,
-            keepJournal=keepJournal)
+            commitFlags=commitFlags, tagScript=tagScript,
+            journal=journal, autoPinList=autoPinList)
 
         if len(allJobs) == 1 and not uJob.getChangesetsDownloaded():
             # this handles change sets which include change set files

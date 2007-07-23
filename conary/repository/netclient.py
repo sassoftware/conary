@@ -391,7 +391,7 @@ class ServerCache:
 
         # look for any entitlements for this server
         if self.entitlements:
-            entList = self.entitlements.find(serverName, allMatches = True)
+            entList = self.entitlements.find(serverName)
         else:
             entList = []
 
@@ -912,7 +912,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         *self._setTroveTypeArgs(serverName, req,
                                                 troveTypes = troveTypes))
 
-        return self._mergeTroveQuery({}, d)
+        result = self._mergeTroveQuery({}, d)
+
+        # filter the result by server name; repositories hosting multiple
+        # server names will return results for all server names the user
+        # is allowed to see
+        for versionDict in result.itervalues():
+            for version in versionDict.keys():
+                if version.trailingLabel().getHost() != serverName:
+                    del versionDict[version]
+
+        for name, versionDict in result.items():
+            if not versionDict:
+                del result[name]
+
+        return result
 
     def getTroveVersionList(self, serverName, troveNameList,
                             troveTypes = TROVE_QUERY_PRESENT):
@@ -936,7 +950,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
                                            'getTroveLeavesByLabel', 
                                            labels = True,
-                                           troveTypes = troveTypes)
+                                           troveTypes = troveTypes,
+                                           getLeaves = True,
+                                           splitByBranch = True)
+
+    def getTroveLatestByLabel(self, troveSpecs, bestFlavor = False,
+                              troveTypes = TROVE_QUERY_PRESENT):
+        return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor,
+                                           'getTroveLeavesByLabel',
+                                           labels = True,
+                                           troveTypes = troveTypes,
+                                           getLeaves = True)
+
+
 
     def getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False,
                                 troveTypes = TROVE_QUERY_PRESENT):
@@ -962,7 +988,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method, 
                                branches = False, labels = False, 
                                versions = False, 
-                               troveTypes = TROVE_QUERY_PRESENT):
+                               troveTypes = TROVE_QUERY_PRESENT,
+                               getLeaves = False, splitByBranch = False):
         assert(branches + labels + versions == 1)
 
         d = {}
@@ -982,10 +1009,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 versionDict = d.setdefault(host, {})
                 flavorDict = versionDict.setdefault(name, {})
 
-                if flavors is None:
-                    flavorDict[verStr] = ''
-                else:
-                    flavorDict[verStr] = [ self.fromFlavor(x) for x in flavors ]
+                flavorDict[verStr] = ''
 
         result = {}
 	if not d:
@@ -997,8 +1021,52 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                     bestFlavor,
                                                     troveTypes = troveTypes))
             self._mergeTroveQuery(result, respD)
+        if not result:
+            return result
+        scoreCache = {}
+        filteredResult = {}
+        for name, versionFlavorDict in result.iteritems():
+            if branches:
+                keyFn = lambda version: version.branch()
+            elif labels:
+                keyFn = lambda version: version.trailingLabel()
+            elif versions:
+                keyFn = lambda version: version
+            resultsByKey = {}
+            for version, flavorList in versionFlavorDict.iteritems():
+                key = keyFn(version)
+                if key not in resultsByKey:
+                    resultsByKey[key] = {}
+                resultsByKey[key][version] = flavorList
+            if getLeaves:
+                latestFilter = trovesource._GET_TROVE_VERY_LATEST
+            else:
+                latestFilter = trovesource._GET_TROVE_ALL_VERSIONS
 
-        return result
+            if bestFlavor:
+                flavorFilter = trovesource._GET_TROVE_BEST_FLAVOR
+            else:
+                flavorFilter = trovesource._GET_TROVE_ALL_FLAVORS
+            flavorCheck = trovesource._CHECK_TROVE_REG_FLAVOR
+
+            if name in troveSpecs:
+                queryDict = troveSpecs[name]
+            elif '' in troveSpecs:
+                queryDict =  troveSpecs['']
+            elif None in troveSpecs:
+                queryDict = troveSpecs[None]
+
+            for versionQuery, flavorQueryList in queryDict.iteritems():
+                versionFlavorDict = resultsByKey.get(versionQuery, None)
+                if not versionFlavorDict:
+                    continue
+                self._filterResultsByFlavor(name, filteredResult,
+                                            versionFlavorDict,
+                                            flavorQueryList, flavorFilter,
+                                            flavorCheck, latestFilter,
+                                            scoreCache, 
+                                            splitByBranch=splitByBranch)
+        return filteredResult
 
     def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False,
                                troveTypes = TROVE_QUERY_PRESENT):
