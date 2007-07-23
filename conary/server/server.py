@@ -212,6 +212,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             return None
 
         httpAuthToken.append(entitlementList)
+        httpAuthToken.append(self.connection.getpeername()[0])
         return httpAuthToken
 
     def checkAuth(self):

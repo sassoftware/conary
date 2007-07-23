@@ -2,6 +2,8 @@ Changes in 1.1.31.2:
   o Server changes:
     * Added EntitlementTimeout exception to notify clients that an
       entitlement has timed out from the authentication cache (CNY-1862)
+    * Added remote_ip to user and entitlement based external authentication
+      checks (CNY-1864)
 
   o Proxy changes:
     * Proxy can now inject entitlements and user authentication on behalf
