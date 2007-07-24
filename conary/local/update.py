@@ -1019,7 +1019,7 @@ class FilesystemJob:
             s = util.lstat(headRealPath)
             if s is not None:
                 # We found a conflict with an already-existing file. If
-                # we're installing binaryies, let's see who owns it
+                # we're installing binaries, let's see who owns it
                 if isSrcTrove:
                     existingOwners = []
                 else:
