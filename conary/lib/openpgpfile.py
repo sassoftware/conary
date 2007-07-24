@@ -2309,6 +2309,24 @@ class PGP_Key(PGP_BaseKeySig):
         # No subpacket or no key flags
         raise IncompatibleKey('Key %s is not a signing key.'% intKeyId)
 
+    def getPublicKeyTuple(self):
+        """Return the key material"""
+        if not self._parsed:
+            self.parse()
+        self.mpiFile.seek(0, SEEK_SET)
+        return self.readMPIs(self.mpiFile, self.pubKeyAlg)
+
+    def makePgpKey(self, passPhrase = None):
+        assert passPhrase is None
+        pkTuple = self.getPublicKeyTuple()
+        if self.pubKeyAlg in PK_ALGO_ALL_RSA:
+            n, e = pkTuple
+            return RSA.construct((n, e))
+        if self.pubKeyAlg == PK_ALGO_DSA:
+            p, q, g, y = pkTuple
+            return DSA.construct((y, g, p, q))
+        raise MalformedKeyRing("Can't use El-Gamal keys in current version")
+
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
     pubTag = PKT_PUBLIC_KEY
@@ -2384,6 +2402,7 @@ class PGP_SecretKey(PGP_Key):
     def decrypt(self, passPhrase):
         if not self._parsed:
             self.parse()
+        self.encMpiFile.seek(0, SEEK_SET)
 
         if self.s2k == ENCRYPTION_TYPE_UNENCRYPTED:
             return self._readCountMPIs(self.encMpiFile,
@@ -2440,6 +2459,21 @@ class PGP_SecretKey(PGP_Key):
         io.seek(0)
         return self._readCountMPIs(io, self._getSecretMPICount(),
                                    discard = False)
+
+    def makePgpKey(self, passPhrase = None):
+        assert passPhrase is not None
+        pkTuple = self.getPublicKeyTuple()
+        secMPIs = self.decrypt(passPhrase)
+        if self.pubKeyAlg in PK_ALGO_ALL_RSA:
+            n, e = pkTuple
+            d, p, q, u = secMPIs
+            return RSA.construct((n, e, d, p, q, u))
+        if self.pubKeyAlg == PK_ALGO_DSA:
+            p, q, g, y = pkTuple
+            x, = secMPIs
+            return DSA.construct((y, g, p, q, x))
+        raise MalformedKeyRing("Can't use El-Gamal keys in current version")
+
 
 class PGP_PublicSubKey(PGP_PublicKey):
     tag = PKT_PUBLIC_SUBKEY
