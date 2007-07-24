@@ -1,38 +1,38 @@
 Changes in @NEW@:
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
-    * Label lookups pick the latest version which matches instead of the
-      latest version on each branch
+    * Label lookups pick the latest version which matches instead of
+      the latest version on each branch
     * Replaced branch affinity with label affinity
-    * getAllTroveLeavesByLabel() filters results by server names to eliminate
-      spurious results from repositories which host multiple server names
-      (CNY-1771)
+    * getAllTroveLeavesByLabel() filters results by server names to
+      eliminate spurious results from repositories which host multiple
+      server names (CNY-1771)
     * 'cvc update' can now update multiple directories simultanously
     * cvc and conary commands now ignore broken pipes on stdout instead
       of producing a traceback (CNY-1853)
-    * Redirects follow the label of the branch they were built with instead
-      of the branch itself
+    * Redirects follow the label of the branch they were built with
+      instead of the branch itself
     * Building redirects to a branch is now deprecated; redirects should
       point to labels instead (CNY-1857)
-    * The --replace-files option has been split into --replace-managed-files,
-      --replace-unmanaged-files, --replace-modified-files, and
-      --replace-config-files. The original option is still accepted, and is
-      equivalent to specifying all four of the new options simultaneously
-      (CNY-1270)
+    * The --replace-files option has been split into
+      --replace-managed-files, --replace-unmanaged-files,
+      --replace-modified-files, and --replace-config-files. The original
+      option is still accepted, and is equivalent to specifying all four
+      of the new options simultaneously (CNY-1270)
     * Multiple entitlements can be stored for a single hostname or glob
       (previously only the last hostname for a particular hostname/glob
       would be used) (CNY-1825)
 
   o Bug Fixes:
-    * Fix a bug in commit code that made r.macros.buildlabel unusable because
-      you could not commit recipes that used it.  (CNY-1752)
-    * An internal class, _AbstractPackageRecipe, has been renamed, to allow
-      the inclusion of its methods in the subclasses' documentation pages.
-      The old name is still available for compatibility with older modules.
-      (CNY-1848)
+    * Fix a bug in commit code that made r.macros.buildlabel unusable
+      because you could not commit recipes that used it.  (CNY-1752)
+    * An internal class, _AbstractPackageRecipe, has been renamed, to
+      allow the inclusion of its methods in the subclasses'
+      documentation pages. The old name is still available for
+      compatibility with older modules. (CNY-1848)
 
   o Other changes:
-    * showchangeset script displays information on redirec troves
+    * showchangeset script displays information on redirect troves
 
 Changes in 1.1.33:
   o Build Changes:
