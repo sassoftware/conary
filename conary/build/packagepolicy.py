@@ -1664,6 +1664,9 @@ class _dependency(policy.Policy):
         # interpolate macros, using canonical path form with no trailing /
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
                                   for x in self.sonameSubtrees)
+        self.pythonFlagCache = {}
+        self.pythonTroveFlagCache = {}
+        self.pythonVersionCache = {}
 
     def _hasContents(self, m, contents):
         """
@@ -1685,6 +1688,106 @@ class _dependency(policy.Policy):
 
     def _isPythonModuleCandidate(self, path):
         return path.endswith('.so') or self._isPython(path)
+
+    def _getPythonVersion(self, pythonPath):
+        if pythonPath not in self.pythonVersionCache:
+            self.pythonVersionCache[pythonPath] = util.popen(
+                r"""%s -Ec 'import sys;"""
+                 """ print "%%d.%%d" %%sys.version_info[0:2]'"""
+                %pythonPath).read().strip()
+        return self.pythonVersionCache[pythonPath]
+
+    def _getPythonSysPath(self, pythonPath):
+        return [x.strip() for x in util.popen(
+                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
+                %pythonPath).read().split('\0')
+                if x]
+
+    def _warnPythonPathNotInDB(self, pathName):
+        self.warn('%s found on system but not provided by'
+                  ' system database; python requirements'
+                  ' may be generated incorrectly as a result', pathName)
+        return []
+
+    def _getPythonTroveFlags(self, pathName):
+        if pathName in self.pythonTroveFlagCache:
+            return self.pythonTroveFlagCache[pathName]
+        db = self._getDb()
+        foundPath = False
+        pythonFlags = set()
+        pythonTroveList = db.iterTrovesByPath(pathName)
+        if pythonTroveList:
+            depContainer = pythonTroveList[0]
+            assert(depContainer.getName())
+            foundPath = True
+            for dep in depContainer.getRequires().iterDepsByClass(
+                    deps.PythonDependencies):
+                flagNames = [x[0] for x in dep.getFlags()[0]]
+                pythonFlags.update(flagNames)
+            self.pythonTroveFlagCache[pathName] = pythonFlags
+
+        if not foundPath:
+            self.pythonTroveFlagCache[pathName] = self._warnPythonPathNotInDB(
+                pathName)
+
+        return self.pythonTroveFlagCache[pathName]
+
+    def _getPythonFlags(self, pathName, bootstrapPythonFlags=None):
+        if pathName in self.pythonFlagCache:
+            return self.pythonFlagCache[pathName]
+
+        if bootstrapPythonFlags:
+            self.pythonFlagCache[pathName] = bootstrapPythonFlags
+            return self.pythonFlagCache[pathName]
+
+        db = self._getDb()
+        foundPath = False
+
+        # FIXME: This should be iterFilesByPath when implemented (CNY-1833)
+        # For now, cache all the python deps in all the files in the
+        # trove(s) so that we iterate over each trove only once
+        containingTroveList = db.iterTrovesByPath(pathName)
+        for containerTrove in containingTroveList:
+            for pathid, p, fileid, v in containerTrove.iterFileList():
+                if pathName == p:
+                    foundPath = True
+                pythonFlags = set()
+                f = files.ThawFile(db.getFileStream(fileid), pathid)
+                for dep in f.requires().iterDepsByClass(
+                        deps.PythonDependencies):
+                    flagNames = [x[0] for x in dep.getFlags()[0]]
+                    pythonFlags.update(flagNames)
+                self.pythonFlagCache[p] = pythonFlags
+
+        if not foundPath:
+            self.pythonFlagCache[pathName] = self._warnPythonPathNotInDB(
+                pathName)
+
+        return self.pythonFlagCache[pathName]
+
+    def _getPythonFlagsFromPath(self, pathName):
+        pathList = pathName.split('/')
+        foundLib = False
+        foundVer = False
+        flags = set()
+        for dirName in pathList:
+            if not foundVer and not foundLib and dirName.startswith('lib'):
+                # lib will always come before ver
+                foundLib = True
+                flags.add(dirName)
+            elif not foundVer and dirName.startswith('python'):
+                foundVer = True
+                flags.add(dirName[6:])
+            if foundLib and foundVer:
+                break
+        return flags
+
+    def _getPythonVersionFromPath(self, pathName):
+        pathList = pathName.split('/')
+        for dirName in pathList:
+            if dirName.startswith('python'):
+                return dirName
+        return ''
 
     def _isCIL(self, m):
         return m and m.name == 'CIL'
@@ -1925,22 +2028,37 @@ class _dependency(policy.Policy):
         return ['', '']
 
 
-    def _getpython(self, macros):
+    def _getPython(self, macros, path):
         """
-        Returns the preferred instance of python to use.
+        Takes a path
+        Returns, for that path, a tuple of
+            the preferred instance of python to use
+            whether that instance is in the destdir
         """
-        pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
-        # not %(bindir)s so that package modifications do not affect
-        # the search for system python
-        pythonPath = '/usr/bin/python'
+        m = self.recipe.magic[path]
+        if m and m.name == 'script' and 'python' in m.contents['interpreter']:
+            pythonPath = [m.contents['interpreter']]
+        elif 'python' in path:
+            pythonVersion = self._getPythonVersionFromPath(path)
+            # after %(bindir)s, fall back to /usr/bin so that package
+            # modifications do not break the search for system python
+            pythonPath = [ '%(bindir)s/' + pythonVersion,
+                           '/usr/bin/' + pythonVersion ]
+        else:
+            pythonPath = [ '/usr/bin/python' ]
 
-        if os.access(pythonDestPath, os.X_OK):
-            return pythonDestPath
-        elif os.access(pythonPath, os.X_OK):
-            self._enforceProvidedPath(pythonPath)
-            return pythonPath
+        for pathElement in pythonPath:
+            pythonDestPath = ('%(destdir)s'+pathElement) %macros
+            if os.access(pythonDestPath, os.X_OK):
+                return (pythonDestPath, True)
+        for pathElement in pythonPath:
+            pythonDestPath = pathElement %macros
+            if os.access(pythonDestPath, os.X_OK):
+                self._enforceProvidedPath(pythonDestPath)
+                return (pythonDestPath, False)
+
         # No python?  How is cvc running at all?
-        return None
+        return (None, None)
 
 
     def _stripDestDir(self, pathList, destdir):
@@ -2027,6 +2145,7 @@ class Provides(_dependency):
         self.sysPath = None
         self.monodisPath = None
         self.perlIncPath = None
+        self.pythonSysPathMap = {}
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2167,30 +2286,40 @@ class Provides(_dependency):
                                   path=path))
 
 
-    def _generatePythonProvidesSysPath(self):
+    def _getPythonProvidesSysPath(self, path):
         """ Generate a correct sys.path based on both the installed
             system (in case a buildreq affects the sys.path) and the
             destdir (for newly added sys.path directories).  Use site.py
             to generate a list of such dirs.  Note that this list of dirs
             should NOT have destdir in front.
+            Returns tuple: (sysPath, pythonVersion)
         """
+
+        pythonPath, bootstrapPython = self._getPython(self.macros, path)
+        # conary is a python program...
+        assert(pythonPath)
+
+        if pythonPath in self.pythonSysPathMap:
+            return self.pythonSysPathMap[pythonPath]
+
         oldSysPath = sys.path
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = self._getpython(self.macros)
-        # conary is a python program...
-        assert(pythonPath)
+        systemPythonFlags = set()
 
         try:
             # get preferred sys.path (not modified by Conary wrapper)
             # from python just built in destdir, or if that is not
             # available, from system conary
-            systemPaths = set(x.strip() for x in util.popen(
-                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
-                %pythonPath).read().split('\0')
-                if x)
-            systemPaths = set(self._stripDestDir(systemPaths, destdir))
+            systemPaths = set(self._stripDestDir(
+                self._getPythonSysPath(pythonPath), destdir))
+
+            pythonVersion = self._getPythonVersion(pythonPath)
+
+            # Unlike Requires, we always provide version and
+            # libname (lib/lib64/...) in order to facilitate
+            # migration.
 
             # determine created destdir site-packages, and add them to
             # the list of acceptable provide paths
@@ -2201,11 +2330,14 @@ class Provides(_dependency):
             systemPaths.update(self._stripDestDir(sys.path, destdir))
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath = sorted(systemPaths, key=len, reverse=True)
+            sysPath = sorted(systemPaths, key=len, reverse=True)
         finally:
             sys.path = oldSysPath
             sys.prefix = oldSysPrefix
             sys.exec_prefix = oldSysExecPrefix
+
+        self.pythonSysPathMap[pythonPath] = (sysPath, pythonVersion)
+        return self.pythonSysPathMap[pythonPath]
 
     def _fetchPerlIncPath(self):
         """
@@ -2223,11 +2355,10 @@ class Provides(_dependency):
         if not self._isPythonModuleCandidate(path):
             return
 
-        if self.sysPath is None:
-            self._generatePythonProvidesSysPath()
+        sysPath, pythonVersion = self._getPythonProvidesSysPath(path)
 
         depPath = None
-        for sysPathEntry in self.sysPath:
+        for sysPathEntry in sysPath:
             if path.startswith(sysPathEntry):
                 newDepPath = path[len(sysPathEntry)+1:]
                 if newDepPath not in ('__init__.py', '__init__'):
@@ -2243,13 +2374,15 @@ class Provides(_dependency):
         # remove extension
         depPath = depPath.rsplit('.', 1)[0]
 
+        if depPath == '__future__':
+            return
         if depPath.endswith('/__init__'):
             depPath = depPath.replace('/__init__', '')
         depPath = depPath.replace('/', '.')
-        if depPath == '__future__':
-            return
 
-        dep = deps.Dependency(depPath)
+        flags = self._getPythonFlagsFromPath(path)
+        flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
+        dep = deps.Dependency(depPath, flags)
         self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
 
 
@@ -2477,6 +2610,7 @@ class Requires(_addInfo, _dependency):
 
     def __init__(self, *args, **keywords):
         self.sonameSubtrees = set()
+        self.bootstrapPythonFlags = set()
         self._privateDepMap = {}
         self.rpathFixup = []
         self.exceptDeps = []
@@ -2486,6 +2620,8 @@ class Requires(_addInfo, _dependency):
         self.perlPath = None
         self.perlIncPath = None
         self._CILPolicyProvides = {}
+        self.pythonSysPathMap = {}
+        self.pythonModuleFinderMap = {}
         policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2499,6 +2635,12 @@ class Requires(_addInfo, _dependency):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
                 self.sonameSubtrees.add(sonameSubtrees)
+        bootstrapPythonFlags = keywords.pop('bootstrapPythonFlags', None)
+        if bootstrapPythonFlags:
+            if type(bootstrapPythonFlags) in (list, tuple):
+                self.bootstrapPythonFlags.update(set(bootstrapPythonFlags))
+            else:
+                self.bootstrapPythonFlags.add(bootstrapPythonFlags)
         _CILPolicyProvides = keywords.pop('_CILPolicyProvides', None)
         if _CILPolicyProvides:
             self._CILPolicyProvides.update(_CILPolicyProvides)
@@ -2523,6 +2665,8 @@ class Requires(_addInfo, _dependency):
         macros = self.macros
         self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
+        self.bootstrapPythonFlags= set(x%macros
+                                       for x in self.bootstrapPythonFlags)
         # anything that any buildreqs have caused to go into ld.so.conf
         # is a system library by definition
         self.systemLibPaths |= set(os.path.normpath(x[:-1])
@@ -2539,6 +2683,9 @@ class Requires(_addInfo, _dependency):
                 self.error('Bad regular expression %s for file spec %s: %s', rE, fE, e)
         self.exceptDeps= exceptDeps
         _dependency.preProcess(self)
+
+    def postProcess(self):
+        self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -2706,30 +2853,49 @@ class Requires(_addInfo, _dependency):
                 path=path))
 
 
-    def _generatePythonRequiresSysPath(self):
+    def _getPythonRequiresSysPath(self, pathName):
         # Generate the correct sys.path for finding the required modules.
         # we use the built in site.py to generate a sys.path for the
         # current system and another one where destdir is the root.
         # note the below code is similar to code in Provides,
         # but it creates an ordered path list with and without destdir prefix,
         # while provides only needs a complete list without destdir prefix.
+        # Returns tuple:
+        #  (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
+
+        pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
+        # conary is a python program...
+        assert(pythonPath)
+
+        if pythonPath in self.pythonSysPathMap:
+            return self.pythonSysPathMap[pythonPath]
 
         oldSysPath = sys.path
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = self._getpython(self.macros)
-        # conary is a python program...
-        assert(pythonPath)
+        pythonVersion = None
+        systemPythonFlags = set()
 
         try:
             # get preferred sys.path (not modified by Conary wrapper)
             # from python just built in destdir, or if that is not
             # available, from system conary
-            systemPaths = [x.strip() for x in util.popen(
-                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
-                %pythonPath).read().split('\0')
-                if x]
+            systemPaths = self._getPythonSysPath(pythonPath)
+
+            pythonVersion = self._getPythonVersion(pythonPath)
+            if not bootstrapPython:
+                # determine dynamically whether to require version
+                # and libname (lib/lib64/...) based on whether the
+                # python in the destdir provides them.  Note that
+                # this means that when building python itself,
+                # we'll have to provide this information from the
+                # recipe.
+                systemPythonFlags.update(
+                    self._getPythonTroveFlags(pythonPath))
+
+            if bootstrapPython and self.bootstrapPythonFlags:
+                systemPythonFlags = set(self.bootstrapPythonFlags)
 
             # generate site-packages list for destdir
             # (look in python base directory first)
@@ -2744,7 +2910,7 @@ class Requires(_addInfo, _dependency):
             sysPathForModuleFinder = list(systemPaths)
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
+            sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
                                   key=len, reverse=True)
 
         finally:
@@ -2754,39 +2920,65 @@ class Requires(_addInfo, _dependency):
 
         # load module finder after sys.path is restored
         # in case delayed importer is installed.
-        self.pythonModuleFinder = pydeps.DirBasedModuleFinder(
-                                            destdir, sysPathForModuleFinder)
+        pythonModuleFinder = self._getPythonRequiresModuleFinder(
+            pythonPath, destdir, sysPathForModuleFinder, bootstrapPython)
+
+        self.pythonSysPathMap[pythonPath] = (
+            sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
+        return self.pythonSysPathMap[pythonPath]
+
+    def _getPythonRequiresModuleFinder(self, pythonPath, destdir, sysPath, bootstrapPython):
+
+        if pythonPath not in self.pythonModuleFinderMap:
+            if not bootstrapPython and pythonPath == sys.executable:
+                self.pythonModuleFinderMap[pythonPath] = pydeps.DirBasedModuleFinder(destdir, sysPath)
+            else:
+                self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, sysPath, self.error)
+        return self.pythonModuleFinderMap[pythonPath]
+
+    def _delPythonRequiresModuleFinder(self):
+        for finder in self.pythonModuleFinderMap.values():
+            finder.close()
 
 
     def _addPythonRequirements(self, path, fullpath, pkg, script=False):
-        # FIXME: we really should check for python in destdir and shell
-        # out to use that python to discover the dependencies if it exists.
         destdir = self.recipe.macros.destdir
         destDirLen = len(destdir)
-
-        if not self.sysPath:
-            self._generatePythonRequiresSysPath()
+        
+        (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion
+        )= self._getPythonRequiresSysPath(path)
 
         try:
             if script:
-                self.pythonModuleFinder.run_script(fullpath)
+                pythonModuleFinder.run_script(fullpath)
             else:
-                self.pythonModuleFinder.load_file(fullpath)
+                pythonModuleFinder.load_file(fullpath)
         except:
             # not a valid python file
             self.info('File %s is not a valid python file', path)
             return
 
-        for depPath in self.pythonModuleFinder.getDepsForPath(fullpath):
+        for depPath in pythonModuleFinder.getDepsForPath(fullpath):
+            flags = None
+            if depPath.startswith('///invalid'):
+                # same as exception handling above
+                self.info('File %s is not a valid python file', path)
+                return
             if depPath.startswith(destdir):
                 depPath = depPath[destDirLen:]
-            for sysPathEntry in self.sysPath:
+                flags = self._getPythonFlagsFromPath(depPath)
+            for sysPathEntry in sysPath:
                 if depPath.startswith(sysPathEntry):
                     newDepPath = depPath[len(sysPathEntry)+1:]
                     if newDepPath not in ('__init__', '__init__.py'):
                         # we don't allow bare __init__'s as dependencies.
                         # hopefully we'll find this at deeper level in
                         # in the sysPath
+                        if flags is None:
+                            # this is provided by the system, so we have
+                            # to see with which flags it is provided with
+                            flags = self._getPythonFlags(depPath,
+                                self.bootstrapPythonFlags)
                         depPath = newDepPath
                         break
 
@@ -2810,7 +3002,10 @@ class Requires(_addInfo, _dependency):
             if depPath == '__future__':
                 continue
 
-            self._addRequirement(path, depPath, [], pkg,
+            # in order to limit requiring flags, we remove from flags
+            # anything that is not provided by systemPythonFlags
+            flags.intersection_update(systemPythonFlags)
+            self._addRequirement(path, depPath, flags, pkg,
                                  deps.PythonDependencies)
 
     def _fetchPerl(self):

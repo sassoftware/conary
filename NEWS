@@ -7,11 +7,10 @@ Changes in @NEW@:
     * getAllTroveLeavesByLabel() filters results by server names to
       eliminate spurious results from repositories which host multiple
       server names (CNY-1771)
-    * 'cvc update' can now update multiple directories simultanously
     * cvc and conary commands now ignore broken pipes on stdout instead
       of producing a traceback (CNY-1853)
     * Redirects follow the label of the branch they were built with
-      instead of the branch itself
+      instead of the branch itself.
     * Building redirects to a branch is now deprecated; redirects should
       point to labels instead (CNY-1857)
     * The --replace-files option has been split into
@@ -21,18 +20,31 @@ Changes in @NEW@:
       of the new options simultaneously (CNY-1270)
     * Multiple entitlements can be stored for a single hostname or glob
       (previously only the last hostname for a particular hostname/glob
-      would be used) (CNY-1825)
+      would be used). (CNY-1825)
 
   o Bug Fixes:
-    * Fix a bug in commit code that made r.macros.buildlabel unusable
+    * Fixed a bug in commit code that made r.macros.buildlabel unusable
       because you could not commit recipes that used it.  (CNY-1752)
-    * An internal class, _AbstractPackageRecipe, has been renamed, to
-      allow the inclusion of its methods in the subclasses'
-      documentation pages. The old name is still available for
-      compatibility with older modules. (CNY-1848)
+    * An internal class, _AbstractPackageRecipe, has been renamed to
+      AbstractPackageRecipe, in order to allow the inclusion of its
+      methods in its subclasses' documentation pages.  The old name is
+      still available for compatibility with older modules.  (CNY-1848)
+
+  o Build Changes:
+    * The cvc update command can now update multiple directories
+      simultaneously.
+    * Java files are now put in a :java component by default. (CNY-527)
+    * Python dependencies now include flags designating the major version
+      of python involved, as well as a flag distinguishing the target
+      architecture library directory (normally "lib" or "lib64") to
+      enhance update reliability.  When building a bootstrap python
+      or using a different python executable than Conary is running
+      with, Conary will use an external python process to determine
+      python dependencies. (CNY-1517)
 
   o Other changes:
-    * showchangeset script displays information on redirect troves
+    * The showchangeset script now displays information on redirect
+      troves.
 
 Changes in 1.1.33:
   o Build Changes:
