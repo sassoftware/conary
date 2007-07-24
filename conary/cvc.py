@@ -42,7 +42,6 @@ from conary.lib import options
 from conary.lib import util
 
 sys.excepthook = util.genExcepthook()
-sys.stdout = util.FileIgnoreEpipe(sys.stdout)
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
@@ -892,6 +891,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
                                   repos=repos)
 
 def main(argv=sys.argv):
+    sys.stdout = util.FileIgnoreEpipe(sys.stdout)
     try:
         argv = list(argv)
         debugAll = '--debug-all' in argv
