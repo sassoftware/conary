@@ -113,8 +113,7 @@ class ProxyCallFactory:
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName):
         entitlementList = authToken[2][:]
-        entitlementList += cfg.entitlement.find(targetServerName,
-                                                allMatches = True)
+        entitlementList += cfg.entitlement.find(targetServerName)
 
         userOverride = cfg.user.find(targetServerName)
         if userOverride:
