@@ -41,6 +41,10 @@ Changes in @NEW@:
       or using a different python executable than Conary is running
       with, Conary will use an external python process to determine
       python dependencies. (CNY-1517)
+    * Ruby dependencies are now generated, and Ruby modules are placed
+      in a :ruby component by default.  Flags are included in the
+      dependencies similar to the Python flags, except that they are
+      not conditional. (CNY-612)
 
   o Other changes:
     * The showchangeset script now displays information on redirect

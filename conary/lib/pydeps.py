@@ -21,6 +21,7 @@ import subprocess
 import sys
 
 from conary import errors
+from conary.lib import coveragehook
 
 class DirBasedModuleFinder(modulefinder.ModuleFinder):
     def __init__(self, baseDir, *args, **kw):

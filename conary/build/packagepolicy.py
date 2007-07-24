@@ -1950,6 +1950,56 @@ class _dependency(policy.Policy):
 
         return troveName
 
+    def _getRuby(self, macros, path):
+        # For bootstrapping purposes, prefer the just-built version if
+        # it exists
+        # Returns tuple: (pathToRubyInterpreter, bootstrap)
+        ruby = '%(ruby)s' %macros
+        if os.access('%(destdir)s/%(ruby)s' %macros, os.X_OK):
+            return '%(destdir)s/%(ruby)s' %macros, True
+        elif os.access(ruby, os.X_OK):
+            # Enforce the build requirement, since it is not in the package
+            self._enforceProvidedPath(ruby)
+            return ruby, False
+        else:
+            self.warn('%s not available for Ruby dependency discovery'
+                      ' for path %s' %(ruby, path))
+        return False, None
+
+    def _getRubyLoadPath(self, macros, rubyInvocation, bootstrap):
+        # Returns tuple of (invocationString, loadPathList)
+        destdir = macros.destdir
+        rubyLoadPath = util.popen("%s -e 'puts $:'" %rubyInvocation).readlines()
+        rubyLoadPath = [ x.strip() for x in rubyLoadPath if x.startswith('/') ]
+        loadPathList = rubyLoadPath[:]
+        if bootstrap:
+            rubyLoadPath = [ destdir+x for x in rubyLoadPath ]
+            rubyInvocation = ('LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
+                    ' RUBYLIB="'+':'.join(rubyLoadPath)+'"'
+                    ' %(destdir)s/%(ruby)s' %macros)
+        return (rubyInvocation, loadPathList)
+
+    def _getRubyVersion(self, macros, ruby):
+        rubyVersion = util.popen("%s -e 'puts RUBY_VERSION'" %ruby).read()
+        rubyVersion = '.'.join(rubyVersion.split('.')[0:2])
+        return rubyVersion
+
+    def _getRubyFlagsFromPath(self, pathName, rubyVersion):
+        pathList = pathName.split('/')
+        foundLib = False
+        foundVer = False
+        flags = set()
+        for dirName in pathList:
+            if not foundLib and dirName.startswith('lib'):
+                foundLib = True
+                flags.add(dirName)
+            elif not foundVer and dirName == rubyVersion:
+                foundVer = True
+                flags.add(dirName)
+            if foundLib and foundVer:
+                break
+        return flags
+
 
     def _getmonodis(self, macros, path):
         # For bootstrapping purposes, prefer the just-built version if
@@ -1964,7 +2014,7 @@ class _dependency(policy.Policy):
             self._enforceProvidedPath(monodis)
             return monodis
         else:
-            self.warn('%s not available for dependency discovery'
+            self.warn('%s not available for CIL dependency discovery'
                       ' for path %s' %(monodis, path))
         return None
 
@@ -2144,6 +2194,10 @@ class Provides(_dependency):
         self.sonameSubtrees = set()
         self.sysPath = None
         self.monodisPath = None
+        self.rubyInterpreter = None
+        self.rubyVersion = None
+        self.rubyInvocation = None
+        self.rubyLoadPath = None
         self.perlIncPath = None
         self.pythonSysPathMap = {}
 	policy.Policy.__init__(self, *args, **keywords)
@@ -2216,6 +2270,10 @@ class Provides(_dependency):
 
             if self._isPythonModuleCandidate(path):
                 self._addPythonProvides(path, m, pkg, macros)
+
+            rubyProv = self._isRubyModule(path, macros, fullpath)
+            if rubyProv:
+                self._addRubyProvides(path, m, pkg, macros, rubyProv)
 
             elif self._isCIL(m):
                 self._addCILProvides(path, m, pkg, macros)
@@ -2428,6 +2486,36 @@ class Provides(_dependency):
             return
         self._addOneCILProvide(pkg, path, name, ver)
 
+    def _isRubyModule(self, path, macros, fullpath):
+        if not util.isregular(fullpath) or os.path.islink(fullpath):
+            return False
+        if '/ruby/' in path:
+            # load up ruby opportunistically; this is our first chance
+            if self.rubyInterpreter is None:
+                self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
+                if not self.rubyInterpreter:
+                    return False
+                self.rubyVersion = self._getRubyVersion(macros,
+                    self.rubyInterpreter)
+                self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
+                    macros, self.rubyInterpreter, bootstrap)
+                # we need to look deep first
+                self.rubyLoadPath = sorted(list(self.rubyLoadPath),
+                                           key=len, reverse=True)
+            elif self.rubyInterpreter is False:
+                return False
+
+            for pathElement in self.rubyLoadPath:
+                if path.startswith(pathElement) and '.' in os.path.basename(path):
+                    return path[len(pathElement)+1:].rsplit('.', 1)[0]
+        return False
+
+    def _addRubyProvides(self, path, m, pkg, macros, prov):
+        flags = self._getRubyFlagsFromPath(path, self.rubyVersion)
+        flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
+        self._addDepToMap(path, pkg.providesMap, 
+            deps.RubyDependencies, deps.Dependency(prov, flags))
+
     def _addJavaProvides(self, path, m, pkg):
         if 'provides' not in m.contents or not m.contents['provides']:
             return
@@ -2616,6 +2704,10 @@ class Requires(_addInfo, _dependency):
         self.exceptDeps = []
         self.sysPath = None
         self.monodisPath = None
+        self.rubyInterpreter = None
+        self.rubyVersion = None
+        self.rubyInvocation = None
+        self.rubyLoadPath = None
         self.perlReqs = None
         self.perlPath = None
         self.perlIncPath = None
@@ -2729,6 +2821,12 @@ class Requires(_addInfo, _dependency):
             self._addPythonRequirements(path, fullpath, pkg, script=True)
         elif self._isPython(path):
             self._addPythonRequirements(path, fullpath, pkg, script=False)
+
+        if (f.inode.perms() & 0111 and m and m.name == 'script' and
+            os.path.basename(m.contents['interpreter']).startswith('ruby')):
+            self._addRubyRequirements(path, fullpath, pkg, script=True)
+        elif '/ruby/' in path:
+            self._addRubyRequirements(path, fullpath, pkg, script=False)
 
         if self._isCIL(m):
             if not self.monodisPath:
@@ -3007,6 +3105,73 @@ class Requires(_addInfo, _dependency):
             flags.intersection_update(systemPythonFlags)
             self._addRequirement(path, depPath, flags, pkg,
                                  deps.PythonDependencies)
+
+    def _addRubyRequirements(self, path, fullpath, pkg, script=False):
+        macros = self.recipe.macros
+        destdir = macros.destdir
+        destDirLen = len(destdir)
+
+        if self.rubyInterpreter is None:
+            self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
+            if not self.rubyInterpreter:
+                return
+            self.rubyVersion = self._getRubyVersion(macros,
+                self.rubyInterpreter)
+            self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
+                macros, self.rubyInterpreter, bootstrap)
+        elif self.rubyInterpreter is False:
+            return
+
+        if not script:
+            if not util.isregular(fullpath) or os.path.islink(fullpath):
+                return
+            foundInLoadPath = False
+            for pathElement in self.rubyLoadPath:
+                if path.startswith(pathElement):
+                    foundInLoadPath = True
+                    break
+            if not foundInLoadPath:
+                return
+
+        # This is a very limited hack, but will work for the 90% case
+        # better parsing may be written later
+        depEntries = [x.strip() for x in file(fullpath)
+                      if x.startswith('require')]
+        depEntries = (x.split() for x in depEntries)
+        depEntries = (x[1].strip("\"'") for x in depEntries
+                      if len(x) == 2 and x[1].startswith("'") and
+                                         x[1].endswith("'"))
+        depEntries = set(depEntries)
+
+        # I know of no way to ask ruby to report deps from scripts
+        if not script:
+            depClosure = util.popen(r'''%s -e "require '%s'; puts $\""'''
+                %(self.rubyInvocation%macros, fullpath)).readlines()
+            depClosure = set([x.split('.')[0] for x in depClosure])
+            # remove any entries from the guessed immediate requirements
+            # that are not in the closure
+            depEntries = set(x for x in depEntries if x in depClosure)
+
+        def _getDepEntryPath(depEntry):
+            for prefix in (destdir, ''):
+                for pathElement in self.rubyLoadPath:
+                    for suffix in ('.rb', '.so'):
+                        candidate = util.joinPaths(pathElement, depEntry+suffix)
+                        if util.exists(prefix+candidate):
+                            return candidate
+            return None
+        
+        for depEntry in depEntries:
+            depEntryPath = _getDepEntryPath(depEntry)
+            if depEntryPath is None:
+                continue
+            if depEntryPath.startswith(destdir):
+                depPath = depEntryPath[destDirLen:]
+            else:
+                depPath = depEntryPath
+            flags = self._getRubyFlagsFromPath(depPath, self.rubyVersion)
+            self._addRequirement(path, depEntry, flags, pkg,
+                                 deps.RubyDependencies)
 
     def _fetchPerl(self):
         """
