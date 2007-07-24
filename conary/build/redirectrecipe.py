@@ -68,7 +68,7 @@ class _RedirectRule(object):
                     "not versions"
 
             log.info('redirecting to branches is deprecated; redirects must '
-                     'be too labels')
+                     'be to labels')
 
             matches = repos.getTroveLeavesByBranch(
                             { self.destName : { branch : None } })
