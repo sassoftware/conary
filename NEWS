@@ -45,6 +45,8 @@ Changes in @NEW@:
       in a :ruby component by default.  Flags are included in the
       dependencies similar to the Python flags, except that they are
       not conditional. (CNY-612)
+    * Ensure that two binaries with the same source count but different
+      build counts end up with the same build count after cloning. (CNY-1871)
 
   o Other changes:
     * The showchangeset script now displays information on redirect

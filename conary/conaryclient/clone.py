@@ -400,10 +400,11 @@ class ClientClone:
 
             byVersion = {}
             for binaryTup in binaryList:
-                byFlavor = byVersion.setdefault(binaryTup[1], {})
+                byFlavor = byVersion.setdefault(binaryTup[1].getSourceVersion(),
+                                                {})
                 byFlavor.setdefault(binaryTup[2], []).append(binaryTup)
 
-            for version, byFlavor in byVersion.iteritems():
+            for byFlavor in byVersion.itervalues():
                 finalNewVersion = None
                 for flavor, binaryList in byFlavor.iteritems():
                     # Binary list is a list of binaries all created from the
