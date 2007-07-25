@@ -827,69 +827,6 @@ def readBlockSize(keyRing, packetType):
             dataSize = (dataSize * 256) + ord(keyRing.read(1))
     return dataSize
 
-def getGPGKeyTuple(keyId, keyRing, secret=0, passPhrase=''):
-    startPoint = keyRing.tell()
-    keyRing.seek(0, SEEK_END)
-    limit = keyRing.tell()
-    if limit == 0:
-        # empty file, there can be no keys in it
-        raise KeyNotFound(keyId)
-    if secret:
-        assertSigningKey(keyId, keyRing)
-    keyRing.seek(0)
-    while (keyId not in getKeyId(keyRing)):
-        seekNextKey(keyRing)
-        if keyRing.tell() == limit:
-            raise KeyNotFound(keyId)
-    startLoc=keyRing.tell()
-    seekNextPacket(keyRing)
-    limit = keyRing.tell()
-    keyRing.seek(startLoc)
-    packetType=ord(keyRing.read(1))
-    if secret and (not ((packetType>>2) & 1)):
-        raise IncompatibleKey("Can't get private key from public keyring")
-    # reading the block size skips the length octets
-    readBlockSize(keyRing, packetType)
-    if ord(keyRing.read(1)) != 4:
-        raise MalformedKeyRing("Can only read V4 packets")
-    keyRing.seek(4, SEEK_CUR)
-    keyType = ord(keyRing.read(1))
-    if keyType in PK_ALGO_ALL_RSA:
-        # do RSA stuff
-        # n e
-        n = readMPI(keyRing)
-        e = readMPI(keyRing)
-        if secret:
-            privateMPIs = decryptPrivateKey(keyRing, limit, 4, passPhrase)
-            r = (n, e, privateMPIs[0], privateMPIs[1],
-                 privateMPIs[2], privateMPIs[3])
-        else:
-            r = (n, e)
-    elif keyType in (PK_ALGO_DSA,):
-        p = readMPI(keyRing)
-        q = readMPI(keyRing)
-        g = readMPI(keyRing)
-        y = readMPI(keyRing)
-        if secret:
-            privateMPIs=decryptPrivateKey(keyRing, limit, 1, passPhrase)
-            r = (y, g, p, q, privateMPIs[0])
-        else:
-            r = (y, g, p, q)
-    elif keyType in PK_ALGO_ALL_ELGAMAL:
-        raise MalformedKeyRing("Can't use El-Gamal keys in current version")
-        p = readMPI(keyRing)
-        g = readMPI(keyRing)
-        y = readMPI(keyRing)
-        if secret:
-            privateMPIs = decryptPrivateKey(keyRing, limit, 1, passPhrase)
-            r = (y, g, p, privateMPIs[0])
-        else:
-            r = (p, g, y)
-    else:
-        raise MalformedKeyRing("Wrong key type")
-    keyRing.seek(startPoint)
-    return r
-
 def makeKey(keyTuple):
     # public lengths: rsa=2, dsa=4, elgamal=3
     # private lengths: rsa=6 dsa=5 elgamal=4
@@ -929,9 +866,16 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
         keyRing = util.ExtendedFile(keyFile, buffering = False)
     except IOError:
         raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    key =  makeKey(getGPGKeyTuple(keyId, keyRing, 1, passPhrase))
-    keyRing.close()
-    return key
+    return _getPrivateKey(keyId, keyRing, passPhrase)
+
+def _getPrivateKey(keyId, stream, passPhrase):
+    msg = PGP_Message(stream, start = 0)
+    try:
+        pkt = msg.iterByKeyId(keyId).next()
+    except StopIteration:
+        raise KeyNotFound(keyId)
+    pkt.verifySelfSignatures()
+    return pkt.makePgpKey(passPhrase)
 
 def getPublicKeyFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
@@ -2142,6 +2086,20 @@ class PGP_Key(PGP_BaseKeySig):
                 continue
             yield pkt
 
+    def iterAllSelfSignatures(self):
+        """Iterate over direct signatures and UserId signatures"""
+        return self._iterAllSelfSignatures(self.getKeyId())
+
+    def _iterAllSelfSignatures(self, keyId):
+        for pkt in self.iterSelfSignatures():
+            yield pkt
+        intKeyId = fingerprintToInternalKeyId(keyId)
+        for uid in self.iterUserIds():
+            for pkt in uid.iterSignatures():
+                if intKeyId != pkt.getSigId():
+                    continue
+                yield pkt
+
     def iterUserIds(self):
         for pkt in self.iterSubPackets():
             if pkt.tag == PKT_USERID:
@@ -2160,7 +2118,7 @@ class PGP_Key(PGP_BaseKeySig):
         if self._parsed is False:
             self.parse()
 
-        if sig.pubKeyAlg in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
+        if self.pubKeyAlg in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
             # the public key algorithm octet satisfies this test. no more
             # checks required.
             return True
@@ -2169,24 +2127,20 @@ class PGP_Key(PGP_BaseKeySig):
 
         # If it's a subkey, look for the master key
         if self.tag in PKT_SUB_KEYS:
-            # Cheat a little, poke into the NestedFile to get to the parent
-            # file
-            newMsg = PGP_Message(self._bodyStream.file, start = 0)
-            pkt = newMsg.seekParentKey(keyId)
+            pkt = self.getMainKey()
             return pkt.assertSigningKey()
 
         # Look for a self signature
-        for pkt in self.iterSelfSignatures():
+        for pkt in self.iterAllSelfSignatures():
             # We know it's a ver4 packet, otherwise getSigId would have failed
             for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
                 if spktType == SIG_SUBPKT_KEY_FLAGS:
-                    break
-                # RFC 2440, sect. 5.2.3.20
-                foct, = self._readBin(dataf, 1)
-                if foct & 0x02:
-                    return True
+                    # RFC 2440, sect. 5.2.3.20
+                    foct, = self._readBin(dataf, 1)
+                    if foct & 0x02:
+                        return True
         # No subpacket or no key flags
-        raise IncompatibleKey('Key %s is not a signing key.'% intKeyId)
+        raise IncompatibleKey('Key %s is not a signing key.'% keyId)
 
     def getPublicKeyTuple(self):
         """Return the key material"""
@@ -2410,6 +2364,10 @@ class PGP_SubKey(PGP_Key):
 
     def iterSelfSignatures(self):
         return self._iterSelfSignatures(self.getMainKey().getKeyId())
+
+    def iterAllSelfSignatures(self):
+        """Iterate over direct signatures and UserId signatures"""
+        return self._iterAllSelfSignatures(self.getMainKey().getKeyId())
 
     def getMainKey(self):
         """Return the main key for this subkey"""
