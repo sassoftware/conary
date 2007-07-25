@@ -17,6 +17,19 @@ from conary.deps import deps
 from conary import versions, errors
 
 ######################################
+# Flavor rules
+# normal means: merge in default flavor then match
+# primary means: match flavor for each trove explicitly (trove flavor
+# must be a superset of the flavors specified for that trove and also match
+# like normal
+# exact means: ignore default flavor, troves must match exactly the flavor
+# specified for them.
+
+FT_MATCH_NORMAL_FLAVORS = 0
+FT_MATCH_PRIMARY_FLAVORS = 1
+FT_MATCH_EXACT_FLAVORS = 2
+
+######################################
 # Query Types
 # findTroves divides queries up into a set of sub queries, depending on 
 # how the trove is to be found
@@ -47,10 +60,10 @@ VERSION_STR_REVISION             = 6 # troveversion-sourcecount[-buildcount]
 VERSION_STR_TROVE_VER            = 7 # troveversion (no source or build count)
 VERSION_STR_HOST                 = 8 # host@
 
-class Query:
+class QueryMethod:
     def __init__(self, defaultFlavorPath, labelPath, 
                  acrossLabels, acrossFlavors, getLeaves, bestFlavor,
-                 troveTypes, exactFlavors):
+                 troveTypes, flavorMatch):
         self.map = {}
         self.defaultFlavorPath = defaultFlavorPath
         if not self.defaultFlavorPath:
@@ -63,7 +76,8 @@ class Query:
         self.acrossFlavors = acrossFlavors
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
-        self.exactFlavors = exactFlavors
+        self.exactFlavors = flavorMatch == FT_MATCH_EXACT_FLAVORS
+        self.primaryFlavors = flavorMatch == FT_MATCH_PRIMARY_FLAVORS
         self.troveTypes = troveTypes
 
         # localTroves are troves that, through affinity, are assigned to
@@ -136,10 +150,10 @@ class Query:
     def missingMsg(self, name):
         raise NotImplementedError
 
-class QueryByVersion(Query):
+class QueryByVersion(QueryMethod):
 
     def __init__(self, *args, **kw):
-        Query.__init__(self, *args, **kw)
+        QueryMethod.__init__(self, *args, **kw)
         self.queryNoFlavor = {}
 
     def reset(self):
@@ -219,10 +233,10 @@ class QueryByVersion(Query):
         versionStr = self.map[name][0][1]
         return "version %s of %s was not found" % (versionStr, name)
 
-class QueryByLabelPath(Query):
+class QueryByLabelPath(QueryMethod):
 
     def __init__(self, *args, **kw):
-        Query.__init__(self, *args, **kw)
+        QueryMethod.__init__(self, *args, **kw)
         self.query = {}
         self.acrossLabelsPerTrove = {}
         self.affQueries = {}
@@ -469,10 +483,10 @@ class QueryByLabelPath(Query):
         else:
             return "%s was not found" % name
 
-class QueryByBranch(Query):
+class QueryByBranch(QueryMethod):
 
     def __init__(self, *args, **kw):
-        Query.__init__(self, *args, **kw)
+        QueryMethod.__init__(self, *args, **kw)
         self.queryNoFlavor = {}
         self.affinityFlavors = {}
 
@@ -1038,7 +1052,7 @@ class TroveFinder:
                  acrossLabels, acrossFlavors, affinityDatabase, 
                  getLeaves=True, bestFlavor=True,
                  allowNoLabel=False, troveTypes=None, 
-                 exactFlavors=False):
+                 flavorMatch=FT_FLAVOR_MATCH_NORMAL):
 
         self.troveSource = troveSource
         self.affinityDatabase = affinityDatabase
@@ -1057,6 +1071,7 @@ class TroveFinder:
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
         self.allowNoLabel = allowNoLabel
+        self.flavorMatch = flavorMatch
         if troveTypes is None:
             from conary.repository import netclient
             troveTypes = netclient.TROVE_QUERY_PRESENT
