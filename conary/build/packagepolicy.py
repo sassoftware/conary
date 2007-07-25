@@ -3135,6 +3135,13 @@ class Requires(_addInfo, _dependency):
 
         # This is a very limited hack, but will work for the 90% case
         # better parsing may be written later
+        # Note that we only honor "require" at the beginning of
+        # the line and only requirements enclosed in single quotes
+        # to avoid conditional requirements and requirements that
+        # do any sort of substitution.  Because most ruby packages
+        # contain multiple ruby modules, getting 90% of the ruby
+        # dependencies will find most of the required packages in
+        # practice
         depEntries = [x.strip() for x in file(fullpath)
                       if x.startswith('require')]
         depEntries = (x.split() for x in depEntries)
@@ -3144,13 +3151,19 @@ class Requires(_addInfo, _dependency):
         depEntries = set(depEntries)
 
         # I know of no way to ask ruby to report deps from scripts
-        if not script:
-            depClosure = util.popen(r'''%s -e "require '%s'; puts $\""'''
-                %(self.rubyInvocation%macros, fullpath)).readlines()
-            depClosure = set([x.split('.')[0] for x in depClosure])
-            # remove any entries from the guessed immediate requirements
-            # that are not in the closure
-            depEntries = set(x for x in depEntries if x in depClosure)
+        # Unfortunately, so far it seems that there are too many
+        # Ruby modules which have code that runs in the body; this
+        # code runs slowly, has not been useful in practice for
+        # filtering out bogus dependencies, and has been hanging
+        # and causing other unintended side effects from modules
+        # that have code in the main body.
+        #if not script:
+        #    depClosure = util.popen(r'''%s -e "require '%s'; puts $\""'''
+        #        %(self.rubyInvocation%macros, fullpath)).readlines()
+        #    depClosure = set([x.split('.')[0] for x in depClosure])
+        #    # remove any entries from the guessed immediate requirements
+        #    # that are not in the closure
+        #    depEntries = set(x for x in depEntries if x in depClosure)
 
         def _getDepEntryPath(depEntry):
             for prefix in (destdir, ''):
