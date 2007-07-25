@@ -41,6 +41,8 @@ Changes in @NEW@:
       or using a different python executable than Conary is running
       with, Conary will use an external python process to determine
       python dependencies. (CNY-1517)
+    * Ensure that two binaries with the same source count but different
+      build counts end up with the same build count after cloning. (CNY-1871)
 
   o Other changes:
     * The showchangeset script now displays information on redirect
