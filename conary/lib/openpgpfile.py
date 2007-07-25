@@ -2293,11 +2293,14 @@ class PGP_Key(PGP_BaseKeySig):
             yield x
 
     def iterSelfSignatures(self):
+        return self._iterSelfSignatures(self.getKeyId())
+
+    def _iterSelfSignatures(self, keyId):
         """Iterate over all the self-signatures"""
         if self._parsed is False:
             self.parse()
 
-        intKeyId = fingerprintToInternalKeyId(self.getKeyId())
+        intKeyId = fingerprintToInternalKeyId(keyId)
         # Look for a self signature
         for pkt in self.iterSignatures():
             if intKeyId != pkt.getSigId():
@@ -2307,6 +2310,11 @@ class PGP_Key(PGP_BaseKeySig):
     def iterUserIds(self):
         for pkt in self.iterSubPackets():
             if pkt.tag == PKT_USERID:
+                yield pkt
+
+    def iterSubKeys(self):
+        for pkt in self.iterSubPackets():
+            if pkt.tag in PKT_SUB_KEYS:
                 yield pkt
 
     def assertSigningKey(self):
@@ -2364,11 +2372,13 @@ class PGP_Key(PGP_BaseKeySig):
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
     def verifySelfSignatures(self):
-        if self.tag in PKT_MAIN_KEYS:
-            return self._verifyMainKeySelfSig()
-        return self._verifySubKeySelfSig()
-
-    def _verifyMainKeySelfSig(self):
+        """
+        Verify the self signatures on this key.
+        If successful, returns the public key packet associated with this key,
+        and crypto key.
+        @return (pubKeyPacket, cryptoKey)
+        @raises BadSelfSignature
+        """
         # Convert to a public key (even if it's already a public key)
         pkpkt = self.toPublicKey(minHeaderLen = 3)
         keyId = pkpkt.getKeyId()
@@ -2395,6 +2405,8 @@ class PGP_Key(PGP_BaseKeySig):
             else: # for
                 # No signature. Not good, according to our standards
                 raise BadSelfSignature(keyId)
+
+        return pkpkt, pgpKey
 
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
@@ -2531,6 +2543,8 @@ class PGP_SecretKey(PGP_Key):
 
     def makePgpKey(self, passPhrase = None):
         assert passPhrase is not None
+        # Secret keys have to be signing keys
+        self.assertSigningKey()
         pkTuple = self.getPublicKeyTuple()
         secMPIs = self.decrypt(passPhrase)
         if self.pubKeyAlg in PK_ALGO_ALL_RSA:
@@ -2543,24 +2557,68 @@ class PGP_SecretKey(PGP_Key):
             return DSA.construct((y, g, p, q, x))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+class PGP_SubKey(PGP_Key):
+    # Subkeys are promoted to main keys when converted to public keys
+    pubTag = PKT_PUBLIC_KEY
 
-class PGP_PublicSubKey(PGP_PublicKey):
+    def validate(self):
+        PGP_Key.validate(self)
+        self.mainKey = None
+
+    def iterSubPackets(self):
+        # Stop at another key
+        return self._iterSubPackets(PKT_ALL_KEYS)
+
+    def iterSelfSignatures(self):
+        return self._iterSelfSignatures(self.getMainKey().getKeyId())
+
+    def getMainKey(self):
+        """Return the main key for this subkey"""
+        if self.mainKey is not None:
+            return self.mainKey
+        # Cheat a little, poke into the NestedFile to get to the parent
+        # file
+        newMsg = PGP_Message(self._bodyStream.file, start = 0)
+        self.mainKey = newMsg.seekParentKey(self.getKeyId())
+        return self.mainKey
+
+    def verifySelfSignatures(self):
+        # seek the main key associated with this subkey
+        mainKey = self.getMainKey()
+        # since this is a subkey, let's go ahead and make sure the
+        # main key is valid before we continue
+        mainpkpkt, mainPgpKey = mainKey.verifySelfSignatures()
+
+        # Convert this subkey to a public key
+        pkpkt = self.toPublicKey(minHeaderLen = 3)
+
+        # Only verify direct signatures
+        keyId = pkpkt.getKeyId()
+        for sig in self.iterSelfSignatures():
+            # There should be exactly one signature, according to
+            # RFC 2440 11.1
+            sio = util.ExtendedStringIO()
+            mainpkpkt.write(sio)
+            pkpkt.write(sio)
+            try:
+                sig._finalizeSelfSig(sio, mainPgpKey)
+            except BadSelfSignature:
+                raise BadSelfSignature(keyId)
+            # Stop after the first sig
+            break
+        else: # for
+            # No signatures on the subkey
+            raise BadSelfSignature(keyId)
+
+    def iterSubKeys(self):
+        # Nothing to iterate over, subkeys don't have subkeys
+        yield []
+
+class PGP_PublicSubKey(PGP_SubKey, PGP_PublicKey):
     tag = PKT_PUBLIC_SUBKEY
-    # Subkeys are promoted to main keys
-    pubTag = PKT_PUBLIC_KEY
 
-    def iterSubPackets(self):
-        # Stop at another key
-        return self._iterSubPackets(PKT_ALL_KEYS)
-
-class PGP_SecretSubKey(PGP_SecretKey):
+class PGP_SecretSubKey(PGP_SubKey, PGP_SecretKey):
     tag = PKT_SECRET_SUBKEY
-    # Subkeys are promoted to main keys
-    pubTag = PKT_PUBLIC_KEY
-
-    def iterSubPackets(self):
-        # Stop at another key
-        return self._iterSubPackets(PKT_ALL_KEYS)
 
 # Register class processors
 for klass in [PGP_PublicKey, PGP_SecretKey, PGP_PublicSubKey, PGP_SecretSubKey]:
