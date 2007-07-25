@@ -1066,36 +1066,20 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
     return key
 
 def getPublicKeyFromString(keyId, data):
-    keyRing = StringIO(data)
-    key = makeKey(getGPGKeyTuple(keyId, keyRing, 0, ''))
-    keyRing.close()
-    return key
+    keyRing = util.ExtendedStringIO(data)
+    msg = newPacketFromStream(keyRing)
+    key = msg.iterByKeyId(keyId)
+    return key.toPublicKey().makePgpKey()
 
 def getKeyEndOfLifeFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
     return _getKeyEndOfLife(keyId, keyRing)
 
 def getUserIdsFromString(keyId, data):
-    keyRing = StringIO(data)
-    seekKeyById(keyId, keyRing)
-    startPoint = keyRing.tell()
-    seekNextKey(keyRing)
-    limit = keyRing.tell()
-    keyRing.seek(startPoint)
-    r = []
-    while keyRing.tell() < limit:
-        blockType = readBlockType(keyRing)
-        if blockType != -1:
-            keyRing.seek(-1, SEEK_CUR)
-        if (blockType >> 2) & 15 == PKT_USERID:
-            uidStart = keyRing.tell()
-            keyRing.seek(1, SEEK_CUR)
-            uidLen = readBlockSize(keyRing, blockType & 3)
-            r.append(keyRing.read(uidLen))
-            keyRing.seek(uidStart)
-        seekNextPacket(keyRing)
-    keyRing.close()
-    return r
+    keyRing = ExtendedStringIO(data)
+    msg = newPacketFromStream(keyRing)
+    key = msg.iterByKeyId(keyId)
+    return list(key.getUserIds())
 
 def getFingerprint(keyId, keyFile=''):
     if keyFile == '':
@@ -1793,21 +1777,6 @@ class PGP_BasePacket(object):
 
         return newPkt
 
-    def getUserIds(self):
-        # Start with a key of some sort
-        assert self.tag in PKT_ALL_KEYS
-        pkt = self
-        while 1:
-            try:
-                pkt = pkt.next()
-            except StopIteration:
-                break
-            if pkt.tag in PKT_ALL_KEYS:
-                # We got to the next key, stop
-                break
-            if pkt.tag == PKT_USERID:
-                yield pkt.readBody()
-
     def getBodyStream(self):
         return self._bodyStream
 
@@ -2408,6 +2377,10 @@ class PGP_Key(PGP_BaseKeySig):
 
         return pkpkt, pgpKey
 
+    def getUserIds(self):
+        for pkt in self.iterUserIds():
+            yield pkt.id
+
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
     pubTag = PKT_PUBLIC_KEY
@@ -2612,7 +2585,7 @@ class PGP_SubKey(PGP_Key):
 
     def iterSubKeys(self):
         # Nothing to iterate over, subkeys don't have subkeys
-        yield []
+        return []
 
 class PGP_PublicSubKey(PGP_SubKey, PGP_PublicKey):
     tag = PKT_PUBLIC_SUBKEY
