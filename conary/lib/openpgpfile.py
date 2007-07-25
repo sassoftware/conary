@@ -16,6 +16,7 @@ import base64
 import os
 import sha
 import md5
+import struct
 
 try:
     from Crypto.Hash import RIPEMD
@@ -408,7 +409,6 @@ def getSignatureTuple(keyRing):
 
 
 def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
-    # XXX FIXME misa next to convert
     # find the self signature
     intKeyId = fingerprintToInternalKeyId(fingerprint)
     while (intKeyId != getSigId(keyRing)):
@@ -1699,12 +1699,9 @@ class PGP_BasePacket(object):
             stream.write(chr((self.bodyLength >> ((bsrepr - i) << 3)) & 0xff))
 
     def writeBody(self, stream):
-        self.reset()
-        while 1:
-            buf = self._bodyStream.read(self.BUFFER_SIZE)
-            if not buf:
-                break
-            stream.write(buf)
+        self.resetBody()
+        self._bodyStream.seek(0)
+        self._copyStream(self._bodyStream, stream)
 
     def write(self, stream):
         self.writeHeader(stream)
@@ -1753,7 +1750,7 @@ class PGP_BasePacket(object):
     def _copyStream(src, dst):
         """Copy stream src into dst"""
         while 1:
-            buf = src.read(self.BUFFER_SIZE)
+            buf = src.read(PGP_BasePacket.BUFFER_SIZE)
             if not buf:
                 break
             dst.write(buf)
@@ -1762,7 +1759,7 @@ class PGP_BasePacket(object):
     def _updateHash(hashObj, stream):
         """Update the hash object with data from the stream"""
         while 1:
-            buf = stream.read(self.BUFFER_SIZE)
+            buf = stream.read(PGP_BasePacket.BUFFER_SIZE)
             if not buf:
                 break
             hashObj.update(buf)
@@ -1822,6 +1819,7 @@ class PGP_BasePacket(object):
             yield pkt
             pkt = pkt.next()
 
+
 class PGP_Packet(PGP_BasePacket):
     """Anonymous PGP packet"""
     __slots__ = ['tag']
@@ -1859,7 +1857,6 @@ class PGP_BaseKeySig(PGP_BasePacket):
         @raise UnsupportedEncryptionAlgorithm
         """
 
-        r = 0L
         ret = []
         for i in range(count):
             buf = self._readBin(stream, 2)
@@ -1870,6 +1867,7 @@ class PGP_BaseKeySig(PGP_BasePacket):
                 ret.append(None)
             else:
                 data = self._readBin(stream, mLen)
+                r = 0L
                 for i in data:
                     r = r * 256 + i
                 ret.append(r)
@@ -2031,6 +2029,8 @@ class PGP_Signature(PGP_BaseKeySig):
 
     def _finalizeSelfSig(self, dataFile, mainKey):
         """Append more data to dataFile and compute the self signature"""
+        if not self._parsed:
+            self.parse()
         if self.version != 4:
             raise InvalidKey("Self signature is not a V4 signature")
         dataFile.seek(0, SEEK_END)
@@ -2076,6 +2076,7 @@ class PGP_Signature(PGP_BaseKeySig):
         if not mainKey.verify(sigString, digSig):
             raise BadSelfSignature(None)
 
+
 PacketTypeDispatcher.addPacketType(PGP_Signature)
 
 class PGP_UserID(PGP_BasePacket):
@@ -2089,11 +2090,29 @@ class PGP_UserID(PGP_BasePacket):
     def toString(self):
         return self.id
 
+    def iterSignatures(self):
+        # Packet signatures extend up to another User Id (section RFC 2440 11.1)
+        # Signatures should be consecutive
+        limit = set(PKT_ALL_KEYS)
+        limit.add(PKT_USERID)
+        for x in self._iterSubPackets(limit):
+            if x.tag != PKT_SIG:
+                break
+            yield x
+
+    def writeHash(self, stream):
+        """Write a UserID packet in a stream, in order to be hashed.
+        Described in RFC 2440 5.2.4 computing signatures."""
+        assert len(self.id) == self.bodyLength
+        stream.write(chr(0xB4))
+        stream.write(struct.pack("!I", self.bodyLength))
+        stream.write(self.id)
+
 PacketTypeDispatcher.addPacketType(PGP_UserID)
 
 class PGP_Key(PGP_BaseKeySig):
     __slots__ = ['_parsed', 'version', 'createdTimestamp', 'pubKeyAlg',
-                 'mpiFile', 'mpiLen', 'daysValid']
+                 'mpiFile', 'mpiLen', 'daysValid', '_keyId']
     # Base class for public/secret keys/subkeys
     tag = None
 
@@ -2101,6 +2120,8 @@ class PGP_Key(PGP_BaseKeySig):
         self.version = self.createdTimestamp = self.pubKeyAlg = None
         self.mpiFile = self.mpiLen = None
         self.daysValid = None
+        # Cache
+        self._keyId = None
         self._parsed = False
 
     def parse(self):
@@ -2154,6 +2175,9 @@ class PGP_Key(PGP_BaseKeySig):
             start = mpiStart)
 
     def getKeyId(self):
+        if self._keyId is not None:
+            return self._keyId
+
         # Convert to public key
 
         pkt = self.toPublicKey(minHeaderLen = 3)
@@ -2191,7 +2215,8 @@ class PGP_Key(PGP_BaseKeySig):
                 break
             m.update(buf)
 
-        return m.hexdigest().upper()
+        self._keyId = m.hexdigest().upper()
+        return self._keyId
 
     def getEndOfLife(self):
         """Parse self signatures to find timestamp(s) of key expiration.
@@ -2213,16 +2238,8 @@ class PGP_Key(PGP_BaseKeySig):
 
         expireTimestamp = revocTimestamp = 0
 
-        # Get our key ID
-        keyId = self.getKeyId()
-        intKeyId = fingerprintToInternalKeyId(keyId)
-
-        # Iterate over signatures, look for one whose ID matches our own ID
-        for pkt in self.iterSignatures():
-            if intKeyId != pkt.getSigId():
-                continue
-            if pkt.version != 4:
-                raise IncompatibleKey("Not a V4 signature")
+        # Iterate over self signatures
+        for pkt in self.iterSelfSignatures():
             if pkt.sigType in SIG_CERTS:
                 eTimestamp = cTimestamp = 0
                 for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
@@ -2267,8 +2284,30 @@ class PGP_Key(PGP_BaseKeySig):
         return self._iterSubPackets(PKT_MAIN_KEYS)
 
     def iterSignatures(self):
-        return (x for x in self._iterSubPackets(PKT_ALL_KEYS)
-                if x.tag == PKT_SIG)
+        # Packet signatures extend up to a User Id (section RFC 2440 11.1)
+        # Normally there should be at least one UserID. Either way, signatures
+        # for a (sub)key should be consecutive
+        for x in self._iterSubPackets(PKT_ALL_KEYS):
+            if x.tag != PKT_SIG:
+                break
+            yield x
+
+    def iterSelfSignatures(self):
+        """Iterate over all the self-signatures"""
+        if self._parsed is False:
+            self.parse()
+
+        intKeyId = fingerprintToInternalKeyId(self.getKeyId())
+        # Look for a self signature
+        for pkt in self.iterSignatures():
+            if intKeyId != pkt.getSigId():
+                continue
+            yield pkt
+
+    def iterUserIds(self):
+        for pkt in self.iterSubPackets():
+            if pkt.tag == PKT_USERID:
+                yield pkt
 
     def assertSigningKey(self):
         # Find self signature of this key
@@ -2293,11 +2332,8 @@ class PGP_Key(PGP_BaseKeySig):
             pkt = newMsg.seekParentKey(keyId)
             return pkt.assertSigningKey()
 
-        intKeyId = fingerprintToInternalKeyId(fingerprint)
         # Look for a self signature
-        for pkt in self.iterSignatures():
-            if intKeyId != pkt.getSigId():
-                continue
+        for pkt in self.iterSelfSignatures():
             # We know it's a ver4 packet, otherwise getSigId would have failed
             for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
                 if spktType == SIG_SUBPKT_KEY_FLAGS:
@@ -2326,6 +2362,39 @@ class PGP_Key(PGP_BaseKeySig):
             p, q, g, y = pkTuple
             return DSA.construct((y, g, p, q))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
+
+    def verifySelfSignatures(self):
+        if self.tag in PKT_MAIN_KEYS:
+            return self._verifyMainKeySelfSig()
+        return self._verifySubKeySelfSig()
+
+    def _verifyMainKeySelfSig(self):
+        # Convert to a public key (even if it's already a public key)
+        pkpkt = self.toPublicKey(minHeaderLen = 3)
+        keyId = pkpkt.getKeyId()
+        pgpKey = pkpkt.makePgpKey()
+        for sig in self.iterSelfSignatures():
+            sio = util.ExtendedStringIO()
+            pkpkt.write(sio)
+            try:
+                sig._finalizeSelfSig(sio, pgpKey)
+            except BadSelfSignature:
+                raise BadSelfSignature(keyId)
+        for uid in self.iterUserIds():
+            for sig in uid.iterSignatures():
+                sio = util.ExtendedStringIO()
+                pkpkt.write(sio)
+                uid.writeHash(sio)
+                try:
+                    sig._finalizeSelfSig(sio, pgpKey)
+                except BadSelfSignature:
+                    raise BadSelfSignature(keyId)
+                # Only verify the first sig on the user ID.
+                # XXX Why? No idea yet
+                break
+            else: # for
+                # No signature. Not good, according to our standards
+                raise BadSelfSignature(keyId)
 
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
