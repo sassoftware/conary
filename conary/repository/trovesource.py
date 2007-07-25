@@ -759,6 +759,7 @@ class ReferencedTrovesSource(SearchableTroveSource):
         referenced by other, installed troves.
     """
     def __init__(self, source):
+        SearchableTroveSource.__init__(self)
         self.searchAsDatabase()
         self.source = source
 
@@ -1581,6 +1582,7 @@ class AbstractJobSource(AbstractTroveSource):
 class JobSource(AbstractJobSource):
 
     def __init__(self, newTroveSource, oldTroveSource):
+        AbstractJobSource.__init__(self)
         self.newTroveSource = newTroveSource
         self.oldTroveSource = oldTroveSource
         self.jobMap = {}
