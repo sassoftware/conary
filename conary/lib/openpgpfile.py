@@ -161,6 +161,9 @@ SEEK_END = 2
 class PGPError(Exception):
     pass
 
+class InvalidPacketError(PGPError):
+    pass
+
 class MalformedKeyRing(PGPError):
     def __str__(self):
         return self.error
@@ -227,7 +230,6 @@ class ShortReadError(InvalidBodyError):
         self.expected = expected
         self.actual = actual
 
-
 def readBlockType(keyRing):
     r=keyRing.read(1)
     if r != '':
@@ -235,353 +237,29 @@ def readBlockType(keyRing):
     else:
         return -1
 
-def convertPrivateKey(privateBlock):
-    # converts a private key into a public one, used for generating
-    # keyids
-    if not privateBlock:
-        # give us nothing, you get nothing from us
-        return ''
-
-    packetType = ord(privateBlock[0])
-    if not (packetType & 128):
-        raise MalformedKeyRing("Not an OpenPGP packet.")
-    if packetType & 64:
-        return ''
-    if ((packetType >> 2) & 15) in PKT_ALL_PUBLIC:
-        # if it's already a public key, there's nothing to do
-        return privateBlock
-    if ((packetType >> 2) & 15) not in PKT_ALL_SECRET:
-        # other types of packets aren't secret, so return empty string
-        return ''
-    blockSize=0
-
-    # form up a cipher type byte (CTB). See RFC 1991 - 4.1
-    # the high 2 bits are 10b (binary) to indicate a normal CTB. So OR
-    # 0x80 with the correct packet type shifted left 2 (which happens
-    # to correspond to the correct packet type bits) to get the CTB
-    # (with no size set yet, that will come later)
-    if ((packetType >> 2) & 15) == PKT_SECRET_KEY:
-        ctb = 0x80 | (PKT_PUBLIC_KEY & 0xf) << 2
-    elif ((packetType >> 2) & 15) == PKT_SECRET_SUBKEY:
-        ctb = 0x80 | (PKT_PUBLIC_SUBKEY & 0xf) << 2
-    else:
-        assert(0)
-
-    # figure out how much of the size we need to skip
-    if (packetType & 3) == OLD_PKT_LEN_ONE_OCTET:
-        index = 2
-    elif (packetType & 3) == OLD_PKT_LEN_TWO_OCTET:
-        index = 3
-    elif (packetType & 3) == OLD_PKT_LEN_FOUR_OCTET:
-        index = 5
-    else:
-        raise MalformedKeyRing("Packet of indeterminate size.")
-
-    # RFC 2440, sect. 5.5.2
-    # check the packet version, we only handle version 4
-    if ord(privateBlock[index]) != 4:
-        return ''
-
-    # get the key data
-    buf = privateBlock[index:index + 6]
-    index += 5
-
-    # get the algorithm type
-    algType = ord(privateBlock[index])
-    index += 1
-    if algType in PK_ALGO_ALL_RSA:
-        numMPI = 2
-    elif algType in PK_ALGO_ALL_ELGAMAL:
-        numMPI = 3
-    elif algType == PK_ALGO_DSA:
-        numMPI = 4
-    else:
-        # unhandled algorithm
-        return ''
-
-    # parse the MPIs from the key block
-    for i in range(0, numMPI):
-        mLen = ((ord(privateBlock[index]) * 256 +
-                 ord(privateBlock[index + 1])) + 7) // 8 + 2
-        buf = buf + privateBlock[index:index + mLen]
-        index += mLen
-
-    # calculate the new key length, record the size in the ctb
-    # see RFC 1991 for the low end bit definitions
-    bufLen = len(buf)
-    if bufLen > 65535:
-        # 4-byte packet-length field
-        ctb |= 2
-        sizeBytes = 4
-    elif bufLen > 255:
-        # 2-byte packet length field
-        ctb |= 1
-        sizeBytes = 2
-    else:
-        # 1 byte packet-length field (no changes to ctb needed)
-        sizeBytes = 1
-
-    # prepare the size octets
-    sizeBuf=''
-    for i in range(1, sizeBytes + 1):
-        sizeBuf += chr((bufLen >> ((sizeBytes - i) << 3)) & 0xff)
-
-    # complete the new key packet
-    return (chr(ctb) + sizeBuf + buf)
-
-#turn the current key into a form usable for keyId's and self signatures
-def getHashableKeyData(keyRing):
-    # see RFC 2440 11.2 - Key IDs and Fingerprints
-    keyPoint = keyRing.tell()
-    keyBlock=readBlockType(keyRing)
-    if not (keyBlock & 128):
-        raise MalformedKeyRing("Not an OpenPGP packet.")
-    keyRing.seek(keyPoint)
-    if ((keyBlock == -1) or (keyBlock & 64)
-        or (((keyBlock >> 2) & 15) not in PKT_ALL_KEYS)):
-        return ''
-    seekNextPacket(keyRing)
-    dataSize = keyRing.tell() - keyPoint
-    keyRing.seek(keyPoint)
-    data = keyRing.read(dataSize)
-    keyRing.seek(keyPoint)
-    # convert private keys to a public key
-    if ((keyBlock >> 2) & 15) in PKT_ALL_SECRET:
-        data = convertPrivateKey(data)
-    # This is a holdover from the days of PGP 2.6.2
-    # RFC 2440 section 11.2 does a really bad job of explaining this.
-    # RFC 2440 section 5.2.4 refers to this for self signature computation.
-    # One of the least documented gotchas of Key fingerprints:
-    # they're ALWAYS calculated as if they were a public key main key block.
-    # this means private keys will be treated as public keys, and subkeys
-    # will be treated as main keys for the purposes of this test.
-    # Furthermore if the length was one byte long it must be translated
-    # into a 2 byte long length (upper octet is 0)
-    # not doing this will result in key fingerprints which do not match the
-    # output produced by OpenPGP compliant programs.
-    # this will result in the first octet ALWYAS being 0x99
-    # in binary 10 0110 01
-    # 10 indicates old style PGP packet
-    # 0110 indicates public key
-    # 01 indicates 2 bytes length
-    keyBlock = ord(data[0])
-    # Translate 1 byte length blocks to two byte length blocks
-    if not (keyBlock & 1):
-        data = chr(keyBlock|1) + chr(0) + data[1:]
-    # promote subkeys to main keys
-    # 0x99 is the ctb for a public key packet with two byte length
-    data = chr(0x99) + data[1:]
-    return data
-
 def getKeyId(keyRing):
     pkt = newPacketFromStream(keyRing, start = -1)
     assert pkt is not None
     return pkt.getKeyId()
 
-def getSignatureTuple(keyRing):
-    startPoint = keyRing.tell()
-    blockType = readBlockType(keyRing)
-    #reading the block size skips the length octets
-    readBlockSize(keyRing, blockType)
-    if ord(keyRing.read(1)) != 4:
-        raise IncompatibleKey("Must be a V4 signature")
-    keyRing.seek(1, SEEK_CUR)
-    algType = ord(keyRing.read(1))
-    keyRing.seek(1, SEEK_CUR)
-    for repeat in range(2):
-        hashLen = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1))
-        keyRing.seek(hashLen, SEEK_CUR)
-    keyRing.seek(2, SEEK_CUR)
-    #now we're pointing at the MPIs
-    if algType in PK_ALGO_ALL_RSA:
-        numMPI = 1
-    elif algType in PK_ALGO_ALL_ELGAMAL:
-        numMPI = 2
-    elif algType == PK_ALGO_DSA:
-        numMPI = 2
-    else:
-        raise IncompatibleKey("Signature is signed by an algorithm we don't know")
-    mpiList = []
-    for i in range(numMPI):
-        mpiList.append(readMPI(keyRing))
-    keyRing.seek(startPoint)
-    return tuple(mpiList)
-
-
-def finalizeSelfSig(data, keyRing, fingerprint, mainKey):
-    # find the self signature
-    intKeyId = fingerprintToInternalKeyId(fingerprint)
-    while (intKeyId != getSigId(keyRing)):
-        seekNextSignature(keyRing)
-    # we now point to the self signature.
-    # get the actual signature Tuple
-    dig_sig = getSignatureTuple(keyRing)
-    # append the hashable portion of the self signature
-    # and record what kind of hash alorithm to use while we're at it.
-    hashBlock = readBlockType(keyRing)
-    # reading the block size skips the length octets
-    readBlockSize(keyRing, hashBlock)
-    hashData = keyRing.read(6)
-    if ord(hashData[0]) != 4:
-        raise InvalidKey('Self signature is not a V4 signature')
-    pubAlg = ord(hashData[2])
-    hashAlg = ord(hashData[3])
-    hashLen = ord(hashData[4]) * 256 + ord(hashData[5])
-    hashData += keyRing.read(hashLen)
-    data += hashData
-    # then append the trailer
-    dataLen = len(hashData)
-    data += chr(4) + chr(0xFF) + chr((dataLen // 0x1000000) & 0xFF) + \
-            chr((dataLen // 0x10000) & 0xFF) + \
-            chr((dataLen // 0x100) & 0xFF) + chr(dataLen & 0xFF)
-    hashAlgList = [ None, md5, sha]
-    hashFunc = hashAlgList[hashAlg]
-    hashFunc = hashFunc.new()
-    hashFunc.update(data)
-    sigString = hashFunc.digest()
-    # if this is an RSA signature, it needs to properly padded
-    # RFC 2440 5.2.2 and RFC 2313 10.1.2
-    if pubAlg in PK_ALGO_ALL_RSA:
-        #hashPads from RFC2440 section 5.2.2
-        hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
-        padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) // 2 -1
-        sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
-    if not mainKey.verify(sigString, dig_sig):
-        raise BadSelfSignature("Key: %s failed self signature check"% fingerprint)
-
 def seekKeyById(keyId, keyRing):
-    pass
+    if isinstance(keyRing, str):
+        keyRing = util.ExtendedFile(keyRing, buffering = False)
+    msg = PGP_Message(keyRing)
+    try:
+        return msg.iterByKeyId(keyId).next()
+    except StopIteration:
+        return False
 
-def seekParentKey(keyId, keyRing):
-    seekKeyById(keyId, keyRing)
-    blockType = readBlockType(keyRing)
-    if blockType != -1:
-        keyRing.seek(-1, SEEK_CUR)
-    if (blockType >> 2) & 15 in PKT_MAIN_KEYS:
-        # key in question is a main key, no need to seek
-        return
-    limit = keyRing.tell()
-    keyRing.seek(0)
-    mainKeyPoint = 0
-    while keyRing.tell() < limit:
-        blockType = readBlockType(keyRing)
-        if blockType != -1:
-            keyRing.seek(-1, SEEK_CUR)
-        if (blockType >> 2) & 15 in PKT_MAIN_KEYS:
-            mainKeyPoint = keyRing.tell()
-        seekNextKey(keyRing)
-    keyRing.seek(mainKeyPoint)
-
-# parse self signatures to find timestamp(s) of key expiration.
-# also seek out any revocation timestamps.
-# we don't need to actually verify these signatures. see verifySelfSignatures()
-def findEndOfLife(keyId, keyRing):
-    parentRevoked = False
-    parentExpire = 0
-    expireTimestamp = 0
-    revocTimestamp = 0
-    startPoint = keyRing.tell()
-    seekKeyById(keyId, keyRing)
-    keyPoint = keyRing.tell()
-    fingerprint = getKeyId(keyRing)
-    intKeyId = fingerprintToInternalKeyId(fingerprint)
-    blockType = readBlockType(keyRing)
-    if blockType != -1:
-        keyRing.seek(-1, SEEK_CUR)
-    if (blockType >> 2) & 15 in PKT_SUB_KEYS:
-        seekParentKey(keyId, keyRing)
-        fingerprint = getKeyId(keyRing)
-        parentRevoked, parentExpire = findEndOfLife(fingerprint, keyRing)
-        intKeyId = fingerprintToInternalKeyId(fingerprint)
-    seekNextKey(keyRing)
-    limit = keyRing.tell()
-    keyRing.seek(keyPoint)
-    seekNextSignature(keyRing)
-    while (keyRing.tell() < limit):
-        while (keyRing.tell() < limit) and (intKeyId != getSigId(keyRing)):
-            seekNextSignature(keyRing)
-        if keyRing.tell() >= limit:
-            break
-        sigPoint = keyRing.tell()
-        #we found a self signature, parse it for the info we want
-        blockType = readBlockType(keyRing)
-        # reading the block size skips the length octets
-        readBlockSize(keyRing, blockType & 3)
-        if (ord(keyRing.read(1)) != 4):
-            raise IncompatibleKey("Not a V4 signature")
-        sigType = ord(keyRing.read(1))
-        #skip ahead to the hashed subpackets
-        keyRing.seek(2, SEEK_CUR)
-        subLim = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + keyRing.tell()
-        # if the self signature is a cert or revocation we care.
-        # other self signatures are of no use.
-        if sigType in SIG_CERTS:
-            # parse this self cert to see if key expires.
-            # do not assume packet will even be present!
-            # we're ultimately looking for the least stringent expiration
-            eTimestamp = 0
-            cTimestamp = 0
-            while keyRing.tell() < subLim:
-                subLen = ord(keyRing.read(1))
-                subType = ord(keyRing.read(1))
-                if subType == SIG_SUBPKT_KEY_EXPIRE:
-                    eTimestamp = 0
-                    for i in range(subLen-1):
-                        eTimestamp = eTimestamp * 256 + ord(keyRing.read(1))
-                    keyRing.seek(-1 * (subLen - 1), SEEK_CUR)
-                elif subType == SIG_SUBPKT_CREATION:
-                    cTimestamp = 0
-                    for i in range(subLen-1):
-                        cTimestamp = cTimestamp * 256 + ord(keyRing.read(1))
-                    keyRing.seek(-1 * (subLen - 1), SEEK_CUR)
-                keyRing.seek(subLen - 1, SEEK_CUR)
-            # if there's no expiration, DON'T COMPUTE this, otherwise
-            # it will appear as if the key expired the very moment
-            # it was created.
-            if eTimestamp:
-                timestamp = eTimestamp + cTimestamp
-                expireTimestamp = max(expireTimestamp, timestamp)
-        elif sigType in SIG_KEY_REVOCS:
-            # parse this revocation to look for the creation timestamp
-            # we're ultimately looking for the most stringent revocation
-            while keyRing.tell() < subLim:
-                subLen = ord(keyRing.read(1))
-                subType = ord(keyRing.read(1))
-                if subType == SIG_SUBPKT_CREATION:
-                    timestamp = 0
-                    for i in range(subLen-1):
-                        timestamp = timestamp * 256 + ord(keyRing.read(1))
-                    if revocTimestamp:
-                        revocTimestamp = min(expireTimestamp, timestamp)
-                    else:
-                        revocTimestamp = timestamp
-                keyRing.seek(subLen - 1, SEEK_CUR)
-        keyRing.seek(sigPoint)
-        seekNextSignature(keyRing)
-    keyRing.seek(startPoint)
-    # return minimum non-zero value of the three expirations
-    # unless they're ALL zero. 8-)
-    if not (revocTimestamp or expireTimestamp or parentExpire):
-        return False, 0
-    # make no assumptions about how big a timestamp is.
-    timestamp = max(revocTimestamp, expireTimestamp, parentExpire)
-    if revocTimestamp:
-        timestamp = min(timestamp, revocTimestamp)
-    if expireTimestamp:
-        timestamp = min(timestamp, expireTimestamp)
-    if parentExpire:
-        timestamp = min(timestamp, parentExpire)
-    return (revocTimestamp != 0) and (not parentRevoked), timestamp
-    
 # it might seem counterproductive to re-create the key within this function,
 # but alas, we don't always need the key associated with the keyId we're
 # trying to verify (think subkeys)
 # if you play with this chunk of code be careful to not use high-level
 # functions lest you cause inadverdent recursion.
-def verifySelfSignatures(keyId, keyRing):
+def verifySelfSignatures(keyId, stream):
     msg = PGP_Message(stream, start = 0)
     try:
-        pkt = msg.iterByKeyId(keyId)
+        pkt = msg.iterByKeyId(keyId).next()
     except StopIteration:
         raise KeyNotFound(keyId)
 
@@ -651,91 +329,6 @@ def getSigId(keyRing):
     data = keyRing.read(subLen - 1)
     keyRing.seek(startPoint)
     return data
-
-def assertSigningKey(keyId,keyRing):
-    startPoint = keyRing.tell()
-    keyRing.seek(0, SEEK_END)
-    limit = keyRing.tell()
-    if limit == 0:
-        # no keys in a zero length file
-        keyRing.seek(startPoint)
-        raise KeyNotFound(keyId, "Couldn't open keyring")
-    keyRing.seek(0, SEEK_SET)
-    while (keyRing.tell() < limit) and (keyId not in getKeyId(keyRing)):
-        seekNextKey(keyRing)
-    if keyRing.tell() >= limit:
-        keyRing.seek(startPoint)
-        raise KeyNotFound(keyId)
-    # keyring now points to the beginning of the key we wanted
-    # find self signature of this key
-    keyStart = keyRing.tell()
-    seekNextKey(keyRing)
-    keyLim = keyRing.tell()
-    keyRing.seek(keyStart)
-    fingerprint = getKeyId(keyRing)
-    intKeyId = fingerprintToInternalKeyId(fingerprint)
-    # first search for the public key algortihm octet. if the key is really
-    # old, this might be the only hint that it's legal to use this key to
-    # make digital signatures.
-    blockType = readBlockType(keyRing)
-    readBlockSize(keyRing, blockType)
-    if (ord(keyRing.read(1)) != 4):
-        raise IncompatibleKey("Can only use V4 keys")
-    keyRing.seek(4, SEEK_CUR)
-    if ord(keyRing.read(1)) in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
-        # the public key algorithm octet satisfies this test. no more checks required
-        keyRing.seek(startPoint)
-        return
-    # now, if the key we are looking at is a subkey, then we need to go
-    # back and find the keyId of the parent key, since we'll need that
-    # to find the subkey binding signature
-    if (blockType >> 2) & 15 in PKT_SUB_KEYS:
-        keyRing.seek(0)
-        mainKeyStart = 0
-        while keyRing.tell() != keyStart:
-            mainBlock = readBlockType(keyRing)
-            if mainBlock != -1:
-                keyRing.seek(-1, SEEK_CUR)
-            if ((mainBlock >> 2) & 15) in PKT_MAIN_KEYS:
-                mainKeyStart = keyRing.tell()
-            seekNextKey(keyRing)
-        keyRing.seek(mainKeyStart)
-        fingerprint = getKeyId(keyRing)
-        intKeyId = fingerprintToInternalKeyId(fingerprint)
-    # return to beginning of key so we can skip chunks.
-    keyRing.seek(keyStart)
-    keyFlagsFound = 0
-    while (not keyFlagsFound) and (keyRing.tell() < keyLim):
-        seekNextSignature(keyRing)
-        while (intKeyId != getSigId(keyRing)):
-            seekNextSignature(keyRing)
-        # we now point to the self signature. now find the Key Flags subpacket
-        # remember where we are in case we didn't find what we need.
-        sigStart = keyRing.tell()
-        blockType = readBlockType(keyRing)
-        readBlockSize(keyRing, blockType)
-        if (ord(keyRing.read(1)) != 4):
-            raise IncompatibleKey("Can only use V4 keys")
-        keyRing.seek(3, SEEK_CUR)
-        subLim = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + keyRing.tell()
-        done = 0
-        while (not done) and (keyRing.tell() < subLim):
-            subLen = ord(keyRing.read(1))
-            subType = ord(keyRing.read(1))
-            if (subType != 27):
-                keyRing.seek(subLen - 1, SEEK_CUR)
-            else:
-                keyFlagsFound = 1
-                done = 1
-        if not keyFlagsFound:
-            keyRing.seek(sigStart)
-    if not keyFlagsFound:
-        keyRing.seek(startPoint)
-        raise IncompatibleKey("Key %s has no key flags block. Can't determine suitabilty for use as a signature key"% fingerprint)
-    Flags = ord(keyRing.read(1))
-    keyRing.seek(startPoint)
-    if not (Flags & 2):
-        raise IncompatibleKey('Key %s is not a signing key.'% fingerprint)
 
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
@@ -939,7 +532,8 @@ def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum
     if len(data) < 2:
         return 0
-    checksum = int2bytes(*data[-2:])
+    checksum = [ ord(x) for x in data[-2:] ]
+    checksum = int2bytes(*checksum)
     runningCount=0
     for i in range(len(data) - 2):
         runningCount += ord(data[i])
@@ -1230,8 +824,14 @@ class PGP_Message(object):
             # Assume a path
             self._f = util.ExtendedFile(message, buffering = False)
         else:
-            # Assume an ExtendedFile
-            assert hasattr(message, "pread"), "Not an ExtendedFile"
+            # Be tolerant, accept non-Extended objects
+            if isinstance(message, file) and not hasattr(message, "pread"):
+                # Try to reopen as an ExtendedFile
+                f = util.ExtendedFile(message.name, buffering = False)
+                f.seek(message.tell())
+                message = f
+            if not hasattr(message, "pread"):
+                raise MalformedKeyRing("Not an ExtendedFile object")
             self._f = message
         self.pos = start
 
@@ -1291,9 +891,6 @@ class PacketTypeDispatcher(object):
     def getClass(tag):
         return PacketTypeDispatcher._registry.get(tag, PGP_Packet)
 
-def seekKeyById(keyRing, keyId):
-    pass
-
 class PGP_PacketFromStream(object):
     __slots__ = ['_f', 'tag', 'headerLength', 'bodyLength']
     def __init__(self):
@@ -1313,7 +910,7 @@ class PGP_PacketFromStream(object):
         first = ord(first)
 
         if not (first & 0x80):
-            raise Exception("First bit not 1")
+            raise InvalidPacketError("First bit not 1")
 
         if first & 0x40:
             print "new header"
@@ -2018,7 +1615,7 @@ class PGP_Key(PGP_BaseKeySig):
         expireTimestamp = revocTimestamp = 0
 
         # Iterate over self signatures
-        for pkt in self.iterSelfSignatures():
+        for pkt in self.iterAllSelfSignatures():
             if pkt.sigType in SIG_CERTS:
                 eTimestamp = cTimestamp = 0
                 for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
@@ -2430,6 +2027,11 @@ def newPacket(tag, bodyStream, newStyle = False, minHeaderLen = 2):
     return pkt
 
 def newPacketFromStream(stream, start = -1):
+    if isinstance(stream, file) and not hasattr(stream, "pread"):
+        # Try to reopen as an ExtendedFile
+        f = util.ExtendedFile(stream.name, buffering = False)
+        f.seek(stream.tell())
+        stream = f
     return PGP_PacketFromStream().read(stream, start = start)
 
 def len2bytes(v1, v2):
