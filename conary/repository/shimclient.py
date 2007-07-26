@@ -109,10 +109,13 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     """
     def __init__(self, server, protocol, port, authToken, repMap, userMap,
             conaryProxies=None):
-        if len(authToken) == 4:
+        if type(authToken[3]) is str:
             # old-style [single entitlement] authToken
             authToken = (authToken[0], authToken[1],
-                         [ ( authToken[2], authToken[3]) ] )
+                         [ ( authToken[2], authToken[3]) ], None )
+        elif len(authToken[3]) == 3:
+            authToken = authToken + (None,)
+
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap,
                 proxy=conaryProxies)
         proxy = ShimServerProxy(server, protocol, port, authToken)
@@ -148,6 +151,8 @@ class ShimServerProxy(netclient.ServerProxy):
         self._server = server
         self._protocol = protocol
         self._port = port
+        if len(self._authToken) == 3:
+            import epdb;epdb.st()
 
     def setAbortCheck(self, *args):
         pass
