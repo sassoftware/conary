@@ -19,6 +19,9 @@ Changes in @NEW@:
       --replace-config-files. The original option is still accepted, and is
       equivalent to specifying all four of the new options simultaneously
       (CNY-1270)
+    * Now when updating, conary will never automatically drop an architecture
+      from an installed trove (unless you specify the flavor to update to 
+      explicitly).  (CNY-1714)
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
