@@ -1073,7 +1073,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
                                            'getTroveLeavesByBranch', 
                                            branches = True,
-                                           troveTypes = troveTypes)
+                                           troveTypes = troveTypes,
+                                           getLeaves=True)
 
     def getTroveVersionsByBranch(self, troveSpecs, bestFlavor = False,
                                  troveTypes = TROVE_QUERY_PRESENT):
