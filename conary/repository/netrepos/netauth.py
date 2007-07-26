@@ -72,7 +72,7 @@ class UserAuthorization:
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    cu.binary(password), cu.binary(salt), user)
 
-    def _checkPassword(self, user, salt, password, challenge, remoteIp):
+    def _checkPassword(self, user, salt, password, challenge, remoteIp = None):
         if self.cacheTimeout:
             cacheEntry = sha1helper.sha1String("%s%s" % (user, challenge))
             timeout = self.pwCache.get(cacheEntry, None)
