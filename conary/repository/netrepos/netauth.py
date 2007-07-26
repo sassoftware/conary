@@ -282,6 +282,8 @@ class NetworkAuthorization:
             if entClass is not None and entKey is not None:
                 entList.append((entClass, entKey))
             remoteIp = None
+        elif len(authToken) == 3:
+            entList = authToken[2]
         else:
             entList = authToken[2]
             remoteIp = authToken[3]
