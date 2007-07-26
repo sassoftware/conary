@@ -13,6 +13,23 @@ Changes in @NEW@:
       instead of the branch itself.
     * Building redirects to a branch is now deprecated; redirects should
       point to labels instead (CNY-1857)
+    * The --replace-files option has been split into --replace-managed-files,
+      --replace-unmanaged-files, --replace-modified-files, and
+      --replace-config-files. The original option is still accepted, and is
+      equivalent to specifying all four of the new options simultaneously
+      (CNY-1270)
+    * Now when updating, conary will never automatically drop an architecture
+      from an installed trove (unless you specify the flavor to update to 
+      explicitly).  (CNY-1714)
+
+  o Bug Fixes:
+    * Fix a bug in commit code that made r.macros.buildlabel unusable because
+      you could not commit recipes that used it.  (CNY-1752)
+    * An internal class, _AbstractPackageRecipe, has been renamed, to allow
+      the inclusion of its methods in the subclasses' documentation pages.
+      The old name is still available for compatibility with older modules.
+      (CNY-1848)
+=======
     * The --replace-files option has been split into
       --replace-managed-files, --replace-unmanaged-files,
       --replace-modified-files, and --replace-config-files. The original
@@ -47,6 +64,7 @@ Changes in @NEW@:
       not conditional. (CNY-612)
     * Ensure that two binaries with the same source count but different
       build counts end up with the same build count after cloning. (CNY-1871)
+>>>>>>> /tmp/NEWS~other.7syXJR
 
   o Other changes:
     * The showchangeset script now displays information on redirect

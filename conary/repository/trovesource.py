@@ -123,14 +123,14 @@ class AbstractTroveSource:
             bestFlavor = self._bestFlavor
         if getLeaves is None:
             getLeaves = self._getLeavesOnly
-
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=self._allowNoLabel,
                                             bestFlavor=bestFlavor,
                                             getLeaves=getLeaves,
-                                            exactFlavors=exactFlavors, **kw)
+                                            exactFlavors=exactFlavors,
+                                            **kw)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
@@ -524,7 +524,19 @@ class SearchableTroveSource(AbstractTroveSource):
             # flavor that matches a flavor preference earlier in the list.
             currentPreferenceScore = len(flavorPreferences) + 1
 
+            if isinstance(flavorQuery, (tuple, list)):
+                flavorQuery, primaryFlavorQuery = flavorQuery
+            else:
+                primaryFlavorQuery = None
             for version, flavorList in versionFlavorList:
+                if primaryFlavorQuery is not None:
+                    self._calculateFlavorScores(_CHECK_TROVE_STRONG_FLAVOR,
+                                                primaryFlavorQuery,
+                                                flavorList, scoreCache)
+                    flavorList = [ x for x in flavorList
+                           if scoreCache[primaryFlavorQuery, x] is not False ]
+                if not flavorList:
+                    continue
                 self._calculateFlavorScores(flavorCheck, flavorQuery,
                                             flavorList, scoreCache)
                 flavorList = [ x for x in flavorList
@@ -1401,7 +1413,8 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                    acrossLabels=False, acrossFlavors=True,
                    affinityDatabase=None, allowMissing=False,
                    bestFlavor=None, getLeaves=None,
-                   troveTypes=TROVE_QUERY_PRESENT, **kw):
+                   troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
+                   **kw):
 
         sourceBestFlavor = bestFlavor
         sourceGetLeaves = getLeaves
@@ -1432,7 +1445,6 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                 sourceBestFlavor = source._bestFlavor
             if getLeaves is None:
                 sourceGetLeaves = source._getLeavesOnly
-
             troveFinder = findtrove.TroveFinder(source, sourceLabelPath, 
                                             sourceDefaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
@@ -1440,6 +1452,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                                             bestFlavor=sourceBestFlavor,
                                             getLeaves=sourceGetLeaves,
                                             troveTypes=sourceTroveTypes, 
+                                            exactFlavors=exactFlavors,
                                             **kw)
 
             foundTroves = troveFinder.findTroves(troveSpecs, allowMissing=True)

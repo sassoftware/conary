@@ -2347,8 +2347,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
-                  getLeaves = True, bestFlavor = True, 
-                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors = False):
+                  getLeaves = True, bestFlavor = True,
+                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
