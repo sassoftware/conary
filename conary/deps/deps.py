@@ -1220,6 +1220,22 @@ def _filterDeps(depClass, dep, filterDeps):
         return None
     return Dependency(dep.name, finalFlags)
 
+def getInstructionSetFlavor(flavor):
+    if flavor is None:
+        return None
+    newFlavor = Flavor()
+    targetISD = TargetInstructionSetDependency
+    ISD = InstructionSetDependency
+
+    # get just the arches, not any arch flags like mmx
+    newFlavor.addDeps(ISD,
+                      [Dependency(x[1].name) for x in flavor.iterDeps() 
+                       if x[0] is ISD])
+    newFlavor.addDeps(targetISD, 
+                      [ Dependency(x[1].name) for x in flavor.iterDeps() 
+                        if x[0] is targetISD ])
+    return newFlavor
+
 def formatFlavor(flavor):
     """
     Formats a flavor and returns a string which parseFlavor can 

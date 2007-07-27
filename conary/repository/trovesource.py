@@ -39,7 +39,7 @@ class AbstractTroveSource:
         self._bestFlavor = False
         self._getLeavesOnly = False
         self._searchableByType = searchableByType
-        self._flavorPreferences = None
+        self._flavorPreferences = []
         self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
         self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
         self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
@@ -512,17 +512,13 @@ class SearchableTroveSource(AbstractTroveSource):
                     fSet.update(flavorList)
             return results
 
-        flavorPreferences = self._flavorPreferences
-        if flavorPreferences is None:
-            flavorPreferences = []
-
         results = {}
         for flavorQuery in flavorQueryList:
             usedFlavors = set()
             queryResults = {}
             # lower preference score is better, means you've got a 
             # flavor that matches a flavor preference earlier in the list.
-            currentPreferenceScore = len(flavorPreferences) + 1
+            currentPreferenceScore = len(self._flavorPreferences) + 1
 
             if isinstance(flavorQuery, (tuple, list)):
                 flavorQuery, primaryFlavorQuery = flavorQuery
@@ -564,7 +560,6 @@ class SearchableTroveSource(AbstractTroveSource):
 
                 preferenceScore, flavorList = self._filterByPreferences(
                                                 flavorList,
-                                                flavorPreferences,
                                                 scoreToMatch)
                 if preferenceScore is None:
                     # didn't find any results better/equal to the current
@@ -605,8 +600,8 @@ class SearchableTroveSource(AbstractTroveSource):
                 results.setdefault(version, set()).update(flavorList)
         return results
 
-    def _filterByPreferences(self, flavorList, preferenceList,
-                             scoreToMatch):
+    def _filterByPreferences(self, flavorList, scoreToMatch):
+        preferenceList = self._flavorPreferences
         if not preferenceList:
             return 0, flavorList
         flavorList = [ (x.toStrongFlavor(), x) for x in flavorList ]

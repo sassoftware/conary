@@ -142,20 +142,6 @@ class QueryMethod:
         for name in self.localTroves:
             finalMap.setdefault(self.map[name], [])
 
-    def getInstructionFlavor(self, flavor):
-        if flavor is None:
-            return None
-        newFlavor = deps.Flavor()
-        targetISD = deps.TargetInstructionSetDependency
-        ISD = deps.InstructionSetDependency
-
-        # get just the arches, not any arch flags like mmx
-        newFlavor.addDeps(ISD, [deps.Dependency(x[1].name) 
-                                for x in flavor.iterDeps() if x[0] is ISD])
-        newFlavor.addDeps(targetISD, [deps.Dependency(x[1].name) 
-                                        for x in flavor.iterDeps() if x[0] is targetISD])
-        return newFlavor
-
     def addMissing(self, missing, name):
         troveTup = self.map[name][0]
         missing[troveTup] = self.missingMsg(name)
@@ -380,7 +366,7 @@ class QueryByLabelPath(QueryMethod):
                 flavor = troveTup[2]
                 # if the user specified the flavor then we only use the labelPath.
                 if flavor is None:
-                    requiredFlavor = self.getInstructionFlavor(afFlavor)
+                    requiredFlavor = deps.getInstructionSetFlavor(afFlavor)
                     flavorList = self.overrideFlavors(afFlavor)
                 else:
                     requiredFlavor = None
@@ -408,7 +394,7 @@ class QueryByLabelPath(QueryMethod):
             affTrovesByLabel.setdefault(affTrove[1].trailingLabel(), []).append(affTrove)
         for label, affTroves in affTrovesByLabel.iteritems():
             for (afName, afVersion, afFlavor) in affTroves:
-                requiredFlavor = self.getInstructionFlavor(afFlavor)
+                requiredFlavor = deps.getInstructionSetFlavor(afFlavor)
                 flavorList = self.overrideFlavors(afFlavor)
                 flavorDict.setdefault(label, []).append((flavorList, requiredFlavor))
         self.addQuery(troveTup, set(labelPath), flavorDict)
@@ -545,7 +531,7 @@ class QueryByBranch(QueryMethod):
             flavorList = self.defaultFlavorPath
             requiredFlavor = None
         else:
-            requiredFlavor = self.getInstructionFlavor(f)
+            requiredFlavor = deps.getInstructionSetFlavor(f)
             flavorList = self.overrideFlavors(f)
 
         self.addQuery(troveTup, branch, flavorList,

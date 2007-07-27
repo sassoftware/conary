@@ -21,6 +21,10 @@ Changes in @NEW@:
     * Now when updating, conary will never automatically drop an architecture
       from an installed trove (unless you specify the flavor to update to 
       explicitly).  (CNY-1714)
+    * Dependency resolution now allows updates to go across branches if the
+      branches are on the same label.
+    * Dependency resolution now follows the same "never drop an architecture"
+      rule as other update code (CNY-1713).
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
@@ -29,7 +33,6 @@ Changes in @NEW@:
       the inclusion of its methods in the subclasses' documentation pages.
       The old name is still available for compatibility with older modules.
       (CNY-1848)
-=======
     * The --replace-files option has been split into
       --replace-managed-files, --replace-unmanaged-files,
       --replace-modified-files, and --replace-config-files. The original
@@ -38,14 +41,6 @@ Changes in @NEW@:
     * Multiple entitlements can be stored for a single hostname or glob
       (previously only the last hostname for a particular hostname/glob
       would be used). (CNY-1825)
-
-  o Bug Fixes:
-    * Fixed a bug in commit code that made r.macros.buildlabel unusable
-      because you could not commit recipes that used it.  (CNY-1752)
-    * An internal class, _AbstractPackageRecipe, has been renamed to
-      AbstractPackageRecipe, in order to allow the inclusion of its
-      methods in its subclasses' documentation pages.  The old name is
-      still available for compatibility with older modules.  (CNY-1848)
 
   o Build Changes:
     * The cvc update command can now update multiple directories
@@ -64,7 +59,6 @@ Changes in @NEW@:
       not conditional. (CNY-612)
     * Ensure that two binaries with the same source count but different
       build counts end up with the same build count after cloning. (CNY-1871)
->>>>>>> /tmp/NEWS~other.7syXJR
 
   o Other changes:
     * The showchangeset script now displays information on redirect
