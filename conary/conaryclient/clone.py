@@ -234,7 +234,8 @@ class ClientClone:
             needed = []
 
             for info in toClone:
-                if info[0].startswith("fileset"):
+                if (info[0].startswith("fileset")
+                    and not info[0].endswith(':source')):
                     raise CloneError("File sets cannot be cloned")
 
                 if info not in seen:
