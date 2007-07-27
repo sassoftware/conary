@@ -52,7 +52,13 @@ Arguments include
 .TP 4
 .B \-\-show-passwords
 Normally, conary config will mask paswords in repository maps, to avoid their
-accidental display.  You can override this masking with --show-passwords.  
+accidental display.  You can override this masking with --show-passwords.
+.RE
+.B \-\-show-lines
+Displays as comments the line number that each configuration item came
+from.  If no line is given, then that item is the default.  If an
+item is read in from multiple places, all places are mentioned, in the order
+in which they are read in.
 .RE
 .TP
 .B emerge \fI<file>\fP.recipe\fI|<component>[=<version>]...

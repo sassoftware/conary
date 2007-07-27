@@ -25,6 +25,8 @@ Changes in @NEW@:
       branches are on the same label.
     * Dependency resolution now follows the same "never drop an architecture"
       rule as other update code (CNY-1713).
+    * Added --show-files parameter to "conary config" to display where
+      configuration items came from.
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
