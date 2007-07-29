@@ -284,6 +284,7 @@ class NetworkAuthorization:
             remoteIp = None
         elif len(authToken) == 3:
             entList = authToken[2]
+            remoteIp = None
         else:
             entList = authToken[2]
             remoteIp = authToken[3]
