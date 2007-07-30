@@ -109,11 +109,11 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     """
     def __init__(self, server, protocol, port, authToken, repMap, userMap,
             conaryProxies=None):
-        if type(authToken[3]) is not list:
+        if type(authToken[2]) is not list:
             # old-style [single entitlement] authToken
             authToken = (authToken[0], authToken[1],
                          [ ( authToken[2], authToken[3]) ], None )
-        elif len(authToken[3]) == 3:
+        elif len(authToken) == 3:
             authToken = authToken + (None,)
 
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap,
