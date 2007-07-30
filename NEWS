@@ -27,6 +27,8 @@ Changes in @NEW@:
       rule as other update code (CNY-1713).
     * Added --show-files parameter to "conary config" to display where
       configuration items came from.
+    * Newly installed transient files now silently replace files which are
+      otherwise unowned (CNY-1841)
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
