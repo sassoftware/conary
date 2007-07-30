@@ -1085,12 +1085,14 @@ class FilesystemJob:
                     if fileConflict and replaceThisFile:
                         # --replace-files was specified
                         fileConflict = False
+                    elif headFile.flags.isTransient() and not existingOwners:
+                        # transient files silently replace unowned files
+                        fileConflict = False
 
                     if restoreFile and not fileConflict:
                         # mark the file as replaced in anything which used
                         # to own it
-                        for info in self.db.iterFindPathReferences(
-                                    headPath, justPresent = True):
+                        for info in existingOwners:
                             self.userRemoval(replaced = True, *info)
                     elif restoreFile:
                         self.errors.append(FileInWayError(
