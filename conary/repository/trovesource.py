@@ -45,6 +45,8 @@ class AbstractTroveSource:
         self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
 
     def setFlavorPreferenceList(self, preferenceList):
+        if not preferenceList:
+            preferenceList = []
         self._flavorPreferences = preferenceList
 
     def requiresLabelPath(self):
@@ -1486,6 +1488,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                                         bestFlavor=sourceBestFlavor,
                                         getLeaves=sourceGetLeaves,
                                         troveTypes=sourceTroveTypes,
+                                        exactFlavors=exactFlavors,
                                         **kw)
 
         results.update(troveFinder.findTroves(troveSpecs,
