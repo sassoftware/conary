@@ -2111,12 +2111,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                           self.fromVersion(x[1][1])) for x in itemList ]
             if callback:
                 callback.requestingFileContents()
-            try:
-                (url, sizes) = self.c[server].getFileContents(fileList)
-            except Exception, e:
-                import epdb
-                import sys
-                epdb.post_mortem(sys.exc_info()[2])
+            (url, sizes) = self.c[server].getFileContents(fileList)
             # protocol version 44 and later return sizes as strings rather
             # than ints to avoid 2 GiB limits
             sizes = [ int(x) for x in sizes ]
