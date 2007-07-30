@@ -164,7 +164,8 @@ def _handler(req):
             repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]
-    secure =  (port == 443)
+    # Rely on the client to tell us if we're using a secure protocol
+    secure = req.unparsed_uri.lower().startswith('https')
 
     repos = repositories[repName]
     method = req.method.upper()
