@@ -547,86 +547,6 @@ def verifySHAChecksum(data):
     m.update(data[:-20])
     return m.digest() == data[-20:]
 
-def decryptPrivateKey(keyRing, limit, numMPIs, passPhrase):
-    hashes = ('Unknown', md5, sha, RIPEMD, 'Double Width SHA',
-              'MD2', 'Tiger/192', 'HAVAL-5-160')
-    ciphers = ('Unknown', 'IDEA', DES3, CAST, Blowfish, 'SAFER-SK128',
-               'DES/SK', AES, AES, AES)
-    keySizes = (0, 0, 192, 128, 128, 0, 0, 128, 192, 256)
-    legalCiphers = (2, 3, 4, 7, 8, 9)
-
-    encryptType = readBlockType(keyRing)
-
-    if encryptType == ENCRYPTION_TYPE_UNENCRYPTED:
-        mpiList = []
-        for i in range(0,numMPIs):
-            mpiList.append(readMPI(keyRing))
-        return mpiList
-
-    if encryptType in (ENCRYPTION_TYPE_SHA1_CHECK,
-                       ENCRYPTION_TYPE_S2K_SPECIFIED):
-        algType=readBlockType(keyRing)
-        if algType not in legalCiphers:
-            if algType > len(ciphers) - 1:
-                algType = 0
-            raise IncompatibleKey('Cipher: %s unusable' %ciphers[algType])
-        cipherAlg = ciphers[algType]
-        s2kType = readBlockType(keyRing)
-        hashType = readBlockType(keyRing)
-        if hashType > len(hashes) - 1:
-            hashType = 0
-        hashAlg = hashes[hashType]
-        if isinstance(hashAlg, str):
-            raise IncompatibleKey('Hash algortihm %s is not implemented. '
-                                  'Key not readable' %hashes[hashType])
-        # RFC 2440 3.6.1.1
-        keySize = keySizes[algType]
-        if not s2kType:
-            key = simpleS2K(passPhrase, hashAlg, keySize)
-        elif s2kType == 1:
-            salt = keyRing.read(8)
-            key = saltedS2K(passPhrase, hashAlg, keySize, salt)
-        elif s2kType == 3:
-            salt = keyRing.read(8)
-            count = ord(keyRing.read(1))
-            key = iteratedS2K(passPhrase,hashAlg, keySize, salt, count)
-        data = keyRing.read(limit - keyRing.tell())
-        if algType > 6:
-            cipherBlockSize = 16
-        else:
-            cipherBlockSize = 8
-        cipher = cipherAlg.new(key,1)
-        FR = data[:cipherBlockSize]
-        data = data[cipherBlockSize:]
-        FRE = cipher.encrypt(FR)
-        unenc = xorStr(FRE, data[:cipherBlockSize])
-        i = 0
-        while i + cipherBlockSize < len(data):
-            FR=data[i:i + cipherBlockSize]
-            i += cipherBlockSize
-            FRE = cipher.encrypt(FR)
-            unenc += xorStr(FRE, data[i:i + cipherBlockSize])
-        if encryptType == ENCRYPTION_TYPE_S2K_SPECIFIED:
-            check = verifyRFC2440Checksum(unenc)
-        else:
-            check = verifySHAChecksum(unenc)
-        if not check:
-            raise BadPassPhrase('Pass phrase incorrect')
-        data = unenc
-        index = 0
-        r = []
-        for count in range(numMPIs):
-            MPIlen = (ord(data[index]) * 256 + ord(data[index+1]) + 7 ) // 8
-            index += 2
-            MPI = 0L
-            for i in range(MPIlen):
-                MPI = MPI * 256 + ord(data[index])
-                index += 1
-            r.append(MPI)
-        return r
-    raise MalformedKeyRing("Can't decrypt key. unkown string-to-key "
-                           "specifier: %i" %encryptType)
-
 def xorStr(str1, str2):
     return ''.join(chr(ord(x) ^ ord(y)) for x, y in zip(str1, str2))
 
@@ -1097,6 +1017,12 @@ class PGP_BasePacket(object):
     def write(self, stream):
         self.writeHeader(stream)
         self.writeBody(stream)
+
+    def writeAll(self, stream):
+        # Write this packet and all subpackets
+        self.write(stream)
+        for pkt in self.iterSubPackets():
+            pkt.write(stream)
 
     def resetBody(self):
         self._bodyStream.seek(0)
@@ -1797,6 +1723,36 @@ class PGP_Key(PGP_BaseKeySig):
     def getUserIds(self):
         for pkt in self.iterUserIds():
             yield pkt.id
+
+    def isSupersetOf(self, key):
+        """Check if this key is a superset of key"""
+        if self.tag != key.tag:
+            raise IncompatibleKey("Attempting to compare different key types")
+        if self.getKeyId() != key.getKeyId():
+            raise IncompatibleKey("Attempting to compare different keys")
+
+        thisSubkeyIds = set(x.getKeyId() for x in self.iterSubKeys())
+        otherSubkeyIds = set(x.getKeyId() for x in key.iterSubKeys())
+        if not thisSubkeyIds.issuperset(otherSubkeyIds):
+            # Missing subkey
+            return False
+
+        # XXX
+
+
+    def _hashSet(self, items):
+        """Hashes the items in items through sha, and return a set of the
+        computed digests.
+        Each item is expected to be a stream"""
+
+        ret = ()
+        for stream in items:
+            stream.seek(0)
+            hobj = sha.new()
+            self._updateHash(hobj, stream)
+            ret.add(hobj.digest())
+        return ret
+
 
 class PGP_PublicKey(PGP_Key):
     tag = PKT_PUBLIC_KEY
