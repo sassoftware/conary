@@ -68,7 +68,8 @@ def _cleanseUrl(protocol, url):
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
-                 altHostCallback, protocolVersion, transport):
+                 altHostCallback, protocolVersion, transport, serverName,
+                 entitlementDir):
         xmlrpclib._Method.__init__(self, send, name)
         self.__name = name
         self.__host = host
@@ -76,6 +77,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         self.__anonymousCallback = anonymousCallback
         self.__altHostCallback = altHostCallback
         self.__protocolVersion = protocolVersion
+        self.__serverName = serverName
+        self.__entitlementDir = entitlementDir
         self._transport = transport
 
     def __repr__(self):
@@ -102,7 +105,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
         return self.doCall(protocolVersion, args, kwargs)
 
-    def __doCall(self, clientVersion, argList):
+    def __doCall(self, clientVersion, argList,
+                 retryOnEntitlementTimeout = True):
         newArgs = ( clientVersion, ) + argList
 
         try:
@@ -115,10 +119,26 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         if usedAnonymous:
             self.__anonymousCallback()
 
-	if not isException:
-	    return result
-        else:
+        if isException:
+            if retryOnEntitlementTimeout and result[0] == 'EntitlementTimeout':
+                entList = self._transport.getEntitlements()
+                exception = errors.EntitlementTimeout(result[1])
+
+                singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
+                                                      self.__serverName)
+                # remove entitlement(s) which timed out
+                newEntList = [ x for x in entList if x[1] not in
+                                    exception.getEntitlements() ]
+                newEntList.insert(0, singleEnt[1:])
+
+                # try again with the new entitlement
+                self._transport.setEntitlements(newEntList)
+                return self.__doCall(clientVersion, argList,
+                                     retryOnEntitlementTimeout = False)
+
             self.handleError(result)
+        else:
+            return result
 
     def doCall(self, clientVersion, *args):
         try:
@@ -192,6 +212,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise errors.TroveChecksumMissing(*self.toTroveTup(exceptionArgs[1]))
         elif exceptionName == errors.RepositoryMismatch.__name__:
             raise errors.RepositoryMismatch(*exceptionArgs)
+        elif exceptionName == errors.EntitlementTimeout.__name__:
+            raise errors.EntitlementTimeout(*exceptionArgs)
         elif exceptionName == 'FileContentsNotFound':
             raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
                                                self.toVersion(exceptionArgs[1])))
@@ -270,7 +292,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
         return _Method(self.__request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.getProtocolVersion(),
-                       self.__transport)
+                       self.__transport, self.__serverName,
+                       self.__entitlementDir)
 
     def usedProxy(self):
         return self.__transport.usedProxy
@@ -284,7 +307,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
     def getProtocolVersion(self):
         return self.__protocolVersion
 
-    def __init__(self, url, serverName, transporter, pwCallback, usedMap):
+    def __init__(self, url, serverName, transporter, pwCallback, usedMap,
+                 entitlementDir):
         try:
             xmlrpclib.ServerProxy.__init__(self, url, transporter)
         except IOError, e:
@@ -296,6 +320,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         self.__serverName = serverName
         self.__usedMap = usedMap
         self.__protocolVersion = CLIENT_VERSIONS[-1]
+        self.__entitlementDir = entitlementDir
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
@@ -382,7 +407,7 @@ class ServerCache:
         if userInfo and userInfo[1] is None:
             userInfo = (userInfo[0], "")
 
-        # look for an exact match for the server before letting globs match
+        # load any entitlement for this server which is on-disk
         if self.entitlementDir is not None:
             singleEnt = conarycfg.loadEntitlement(self.entitlementDir,
                                                   serverName)
@@ -433,12 +458,14 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
-                                          entitlementList = entList,
                                           proxies = self.proxies,
                                           serverName = serverName)
         transporter.setCompress(True)
+        transporter.setEntitlements(entList)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
-                             usedMap = usedMap)
+                             usedMap = usedMap,
+                             entitlementDir = self.entitlementDir)
+
         # Avoid poking at __transport
         server._transport = transporter
 

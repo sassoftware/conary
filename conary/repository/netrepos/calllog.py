@@ -17,18 +17,18 @@ import cPickle, mmap, os, struct, time
 class CallLogEntry:
 
     def __init__(self, info):
-        revision = info[0]
+        self.revision = info[0]
 
-        if (revision == 1):
+        if (self.revision == 1):
             self.entKey = 'unknown'
             (self.serverName, self.timeStamp, self.remoteIp,
              (self.user, self.entClass),
              self.methodName, self.args, self.exceptionStr) = info[1:]
-        elif (revision == 2):
+        elif (self.revision == 2):
             (self.serverName, self.timeStamp, self.remoteIp,
              (self.user, self.entClass, self.entKey),
              self.methodName, self.args, self.exceptionStr) = info[1:]
-        elif (revision == 3):
+        elif (self.revision == 3):
             (self.serverName, self.timeStamp, self.remoteIp,
              (self.user, self.entitlements),
              self.methodName, self.args, self.exceptionStr) = info[1:]

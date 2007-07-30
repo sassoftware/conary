@@ -111,7 +111,8 @@ class ProxyCallFactory:
 
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
-                     protocolString, headers, cfg, targetServerName):
+                     protocolString, headers, cfg, targetServerName,
+                     remoteIp):
         entitlementList = authToken[2][:]
         entitlementList += cfg.entitlement.find(targetServerName)
 
@@ -134,9 +135,9 @@ class ProxyCallFactory:
             lheaders['Via'] = ', '.join(via)
 
         transporter = transport.Transport(https = url.startswith('https:'),
-                                          entitlementList = entitlementList,
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
+        transporter.setEntitlements(entitlementList)
 
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
@@ -147,7 +148,8 @@ class RepositoryCaller:
 
     def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
-                                    self.authToken, args, kwargs)
+                                    self.authToken, args, kwargs,
+                                    remoteIp = self.remoteIp)
 
         if rc[1]:
             # exception occured
@@ -162,12 +164,13 @@ class RepositoryCaller:
     def __getattr__(self, method):
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
-    def __init__(self, protocol, port, authToken, repos):
+    def __init__(self, protocol, port, authToken, repos, remoteIp):
         self.repos = repos
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
         self.url = None
+        self.remoteIp = remoteIp
 
 class RepositoryCallFactory:
 
@@ -177,10 +180,11 @@ class RepositoryCallFactory:
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
                      localAddr, protocolString, headers, cfg,
-                     targetServerName):
+                     targetServerName, remoteIp):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
-        return RepositoryCaller(protocol, port, authToken, self.repos)
+        return RepositoryCaller(protocol, port, authToken, self.repos,
+                                remoteIp)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -239,7 +243,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                self.proxies, authToken,
                                                localAddr, protocolString,
                                                headers, self.cfg,
-                                               targetServerName)
+                                               targetServerName,
+                                               remoteIp)
 
         # args[0] is the protocol version
         if args[0] < 51:

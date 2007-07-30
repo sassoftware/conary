@@ -44,6 +44,7 @@ def getAuth(req):
         return None
 
     authToken.append(entitlementList)
+    authToken.append(req.connection.remote_ip)
     return authToken
 
 class Authorization:

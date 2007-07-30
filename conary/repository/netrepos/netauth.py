@@ -72,11 +72,11 @@ class UserAuthorization:
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
                    cu.binary(password), cu.binary(salt), user)
 
-    def _checkPassword(self, user, salt, password, challenge):
+    def _checkPassword(self, user, salt, password, challenge, remoteIp = None):
         if self.cacheTimeout:
             cacheEntry = sha1helper.sha1String("%s%s" % (user, challenge))
             timeout = self.pwCache.get(cacheEntry, None)
-            if timeout is not None and timeout < time.time():
+            if timeout is not None and time.time() < timeout:
                 return True
 
         if self.pwCheckUrl:
@@ -84,6 +84,10 @@ class UserAuthorization:
                 url = "%s?user=%s;password=%s" \
                         % (self.pwCheckUrl, urllib.quote(user),
                            urllib.quote(challenge))
+
+                if remoteIp is not None:
+                    url += ';remote_ip=%s' % urllib.quote(remoteIp)
+
                 f = urllib2.urlopen(url)
                 xmlResponse = f.read()
             except:
@@ -116,7 +120,8 @@ class UserAuthorization:
         sql = "DELETE from Users WHERE userId=?"
         cu.execute(sql, userId)
 
-    def getAuthorizedGroups(self, cu, user, password, allowAnonymous = True):
+    def getAuthorizedGroups(self, cu, user, password, allowAnonymous = True,
+                            remoteIp = None):
         cu.execute("""
         SELECT salt, password, userGroupId, userName FROM Users
         JOIN UserGroupMembers USING(userId)
@@ -140,7 +145,7 @@ class UserAuthorization:
                                         user,
                                         cu.frombinary(userPasswords[0][0]),
                                         userPasswords[0][1],
-                                        password):
+                                        password, remoteIp):
             result = [ x for x in result if x[3] == 'anonymous' ]
 
         return set(x[2] for x in result)
@@ -175,13 +180,17 @@ class EntitlementAuthorization:
         self.cacheTimeout = cacheTimeout
         self.cache = {}
 
-    def getAuthorizedGroups(self, cu, serverName, entitlementGroup, entitlement):
+    def getAuthorizedGroups(self, cu, serverName, remoteIp,
+                            entitlementGroup, entitlement):
         if self.cacheTimeout:
             cacheEntry = sha1helper.sha1String("%s%s%s" % (
                 serverName, entitlementGroup, entitlement))
             userGroupIds, timeout = self.cache.get(cacheEntry, (None, None))
-            if timeout is not None and (timeout < time.time()):
+            if (timeout is not None) and time.time() < timeout:
                 return userGroupIds
+            elif (timeout is not None):
+                del self.cache[cacheEntry]
+                raise errors.EntitlementTimeout([entitlement])
 
         if self.entCheckUrl:
             if entitlementGroup is not None:
@@ -193,6 +202,9 @@ class EntitlementAuthorization:
                 url = "%s?server=%s;key=%s" \
                         % (self.entCheckUrl, urllib.quote(serverName),
                            urllib.quote(entitlement))
+
+            if remoteIp is not None:
+                url += ';remote_ip=%s' % urllib.quote(remoteIp)
 
             try:
                 f = urllib2.urlopen(url)
@@ -260,12 +272,7 @@ class NetworkAuthorization:
         # we need a hashable tuple, a list won't work
         authToken = tuple(authToken)
 
-        groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
-                                                     authToken[1],
-                                                     allowAnonymous =
-                                                            allowAnonymous)
-
-        if len(authToken) == 4:
+        if type(authToken[2]) is not list:
             # this code is for compatibility with old callers who
             # form up an old (user, pass, entclass, entkey) authToken.
             # rBuilder is one such caller.
@@ -274,17 +281,38 @@ class NetworkAuthorization:
             entKey = authToken[3]
             if entClass is not None and entKey is not None:
                 entList.append((entClass, entKey))
+            remoteIp = None
+        elif len(authToken) == 3:
+            entList = authToken[2]
+            remoteIp = None
         else:
             entList = authToken[2]
+            remoteIp = authToken[3]
 
+        groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
+                                                     authToken[1],
+                                                     allowAnonymous =
+                                                            allowAnonymous,
+                                                     remoteIp = remoteIp)
+
+
+        timedOut = []
         for entClass, entKey in entList:
             # XXX serverName is passed only for compatibility with the server
             # and entitlement class based entitlement design; it's only used
             # here during external authentication (used by some rPath
             # customers)
-            groupsFromEntitlement = self.entitlementAuth.getAuthorizedGroups(
-                cu, self.serverNameList[0], entClass, entKey)
-            groupSet.update(groupsFromEntitlement)
+            try:
+                groupsFromEntitlement = \
+                    self.entitlementAuth.getAuthorizedGroups(
+                        cu, self.serverNameList[0], remoteIp,
+                        entClass, entKey)
+                groupSet.update(groupsFromEntitlement)
+            except errors.EntitlementTimeout, e:
+                timedOut += e.getEntitlements()
+
+        if timedOut:
+            raise errors.EntitlementTimeout(timedOut)
 
         return groupSet
 
