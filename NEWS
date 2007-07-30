@@ -1,4 +1,4 @@
-Changes in 1.1.31.2:
+Changes in 1.1.31.3:
   o Server changes:
     * Added EntitlementTimeout exception to notify clients that an
       entitlement has timed out from the authentication cache (CNY-1862)
@@ -7,16 +7,17 @@ Changes in 1.1.31.2:
     * Fixed bug in proxy which prevented remote_ip from being passed to
       internal repository
 
-  o Proxy changes:
-    * Proxy can now inject entitlements and user authentication on behalf
-      of clients (CNY-1836)
-
   o Client changes:
     * Reread entitlements from disk when EntitlementTimeout is received
       (CNY-1862)
 
   o Other changes:
     * Logcat now works for calls which passed lists of entitlements
+
+Changes in 1.1.31.2:
+  o Proxy changes:
+    * Proxy can now inject entitlements and user authentication on behalf
+      of clients (CNY-1836)
 
 Changes in 1.1.31.1:
   o Bug Fix:
