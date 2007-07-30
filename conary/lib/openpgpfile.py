@@ -1130,6 +1130,7 @@ class PGP_Packet(PGP_BasePacket):
 
 class PGP_BaseKeySig(PGP_BasePacket):
     """Base class for keys and signatures"""
+    __slots__ = []
 
     def _getMPICount(self, algType):
         """This returns the right number of MPIs for converting a private key
@@ -1382,12 +1383,14 @@ class PGP_Signature(PGP_BaseKeySig):
 PacketTypeDispatcher.addPacketType(PGP_Signature)
 
 class PGP_UserID(PGP_BasePacket):
-    __slots__ = ['id']
+    __slots__ = ['id', 'signatures']
     tag = PKT_USERID
 
     def validate(self):
         self.resetBody()
         self.id = self.readBody()
+        # Signatures for this user ID
+        self.signatures = []
 
     def toString(self):
         return self.id
@@ -1755,6 +1758,7 @@ class PGP_Key(PGP_BaseKeySig):
 
 
 class PGP_PublicKey(PGP_Key):
+    __slots__ = []
     tag = PKT_PUBLIC_KEY
     pubTag = PKT_PUBLIC_KEY
 
@@ -1965,9 +1969,11 @@ class PGP_SubKey(PGP_Key):
         return []
 
 class PGP_PublicSubKey(PGP_SubKey, PGP_PublicKey):
+    __slots__ = []
     tag = PKT_PUBLIC_SUBKEY
 
 class PGP_SecretSubKey(PGP_SubKey, PGP_SecretKey):
+    __slots__ = []
     tag = PKT_SECRET_SUBKEY
 
 # Register class processors
@@ -2003,22 +2009,3 @@ def int2bytes(v1, v2):
 
 def int4bytes(v1, v2, v3, v4):
     return len4bytes(v1, v2, v3, v4)
-
-class KeyId(object):
-    """Class to store a Key Identifier"""
-    __slots__ = ['id']
-    def __init__(self, keyId = None, hexKeyId = None):
-        if hexKeyId:
-            self.id = self.fromHex(hexKeyId)
-        else:
-            self.id = keyId
-
-    def fromHex(self, hexKeyId):
-        assert len(hexKeyId) == 16, "Hex key ID should be 16 bytes"
-        return "".join(chr(int(hexKeyId[i:i+2], 16))
-                        for i in range(0, len(hexKeyId), 2))
-
-    def __str__(self):
-        if self.id is None:
-            return ''
-        return ''.join('%02x' % ord(c) for c in self.id).lower()
