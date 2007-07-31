@@ -17,7 +17,6 @@ import os
 import sha
 import md5
 import struct
-import weakref
 
 try:
     from Crypto.Hash import RIPEMD
@@ -355,13 +354,6 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
         iteration += 1
     return r[:keyLength]
 
-def readMPI(keyRing):
-    MPIlen=(ord(keyRing.read(1)) * 256 + ord(keyRing.read(1)) + 7 ) // 8
-    r=0L
-    for i in range(MPIlen):
-        r = r * 256 + ord(keyRing.read(1))
-    return r
-
 def readBlockSize(keyRing, packetType):
     if packetType == -1:
         return 0
@@ -396,14 +388,6 @@ def readBlockSize(keyRing, packetType):
         for i in range(0, sizeLen):
             dataSize = (dataSize * 256) + ord(keyRing.read(1))
     return dataSize
-
-def makeKey(keyTuple):
-    # public lengths: rsa=2, dsa=4, elgamal=3
-    # private lengths: rsa=6 dsa=5 elgamal=4
-    if len(keyTuple) in (2, 6):
-        return RSA.construct(keyTuple)
-    if len(keyTuple) in (4, 5):
-        return DSA.construct(keyTuple)
 
 def getPublicKey(keyId, keyFile=''):
     if keyFile == '':
@@ -747,14 +731,12 @@ class PGP_Message(object):
     def iterKeys(self):
         """Iterate over all keys"""
         # Store the main key while we're here
-        mainKey = None
         for pkt in self.iterPackets():
             if isinstance(pkt, PGP_MainKey):
-                mainKey = pkt
-            if pkt.tag in PKT_ALL_KEYS:
-                if isinstance(pkt, PGP_SubKey) and mainKey:
-                    pkt.mainKey = lambda x=mainKey: x
+                pkt.initSubPackets()
                 yield pkt
+                for subkey in pkt.iterSubKeys():
+                    yield subkey
 
     def iterByKeyId(self, keyId):
         """Iterate over the keys with this key ID"""
@@ -766,22 +748,14 @@ class PGP_Message(object):
         """Get a parent key with this keyId or with a subkey with this
         keyId"""
         for pkt in self.iterKeys():
-            if pkt.tag in PKT_MAIN_KEYS:
+            if isinstance(pkt, PGP_MainKey):
                 if keyId.upper() in pkt.getKeyId():
                     # This is a main key and it has the keyId we need
                     return pkt
-                mainKey = pkt
-            elif pkt.tag in PKT_SUB_KEYS:
+            elif isinstance(pkt, PGP_SubKey):
                 if keyId.upper() in pkt.getKeyId():
                     # This is a subkey, return the main key
-                    assert mainKey is not None
-                    return mainKey
-            try:
-                pkt = pkt.next()
-            except StopIteration:
-                break
-
-        return None
+                    return pkt.getMainKey()
 
 class PacketTypeDispatcher(object):
     _registry = {}
@@ -1281,6 +1255,7 @@ class PGP_Signature(PGP_BaseKeySig):
             return binSeqToString(self.signerKeyId)
 
     def decodeSigSubpackets(self, fobj):
+        fobj.seek(0)
         while fobj.size != fobj.tell():
             yield self._getNextSubpacket(fobj)
 
@@ -1448,22 +1423,24 @@ class PGP_Key(PGP_BaseKeySig):
 
     def _readKeyV3(self):
         # RFC 2440, sect. 5.5.2
-        self.createdTimestamp = len4bytes(*self._readBin(self._bodyStream, 4))
+        # We only support V4 keys
+        raise InvalidKey("Version 3 keys not supported")
+        #self.createdTimestamp = len4bytes(*self._readBin(self._bodyStream, 4))
 
-        # daysValid
-        data = self.readBin(2)
-        self.daysValid = int2bytes(*data)
+        ## daysValid
+        #data = self.readBin(2)
+        #self.daysValid = int2bytes(*data)
 
-        # Public key algorithm
-        self.pubKeyAlg, = self.readBin(1)
+        ## Public key algorithm
+        #self.pubKeyAlg, = self.readBin(1)
 
         # Record current position in body
-        mpiStart = self._bodyStream.tell()
-        # Read and discard 2 MPIs
-        self._readCountMPIs(self._bodyStream, count, discard = True)
-        self.mpiLen = self._bodyStream.tell() - mpiStart
-        self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
-            start = mpiStart)
+        #mpiStart = self._bodyStream.tell()
+        ## Read and discard 2 MPIs
+        #self._readCountMPIs(self._bodyStream, count, discard = True)
+        #self.mpiLen = self._bodyStream.tell() - mpiStart
+        #self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
+        #    start = mpiStart)
 
     def _readKeyV4(self):
         # RFC 2440, sect. 5.5.2
@@ -1582,19 +1559,6 @@ class PGP_Key(PGP_BaseKeySig):
             ts = min(ts, parentExpire)
         return (revocTimestamp != 0) and (not parentRevoked), ts
 
-    def iterSubPackets(self):
-        # Stop at another main key (pub or sec)
-        return self._iterSubPackets(PKT_MAIN_KEYS)
-
-    def iterSignatures(self):
-        # Packet signatures extend up to a User Id (section RFC 2440 11.1)
-        # Normally there should be at least one UserID. Either way, signatures
-        # for a (sub)key should be consecutive
-        for x in self._iterSubPackets(PKT_ALL_KEYS):
-            if x.tag != PKT_SIG:
-                break
-            yield x
-
     def iterSelfSignatures(self):
         return self._iterSelfSignatures(self.getKeyId())
 
@@ -1674,87 +1638,22 @@ class PGP_Key(PGP_BaseKeySig):
             return DSA.construct((y, g, p, q))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
-    def verifySelfSignatures(self):
-        """
-        Verify the self signatures on this key.
-        If successful, returns the public key packet associated with this key,
-        and crypto key.
-        @return (pubKeyPacket, cryptoKey)
-        @raises BadSelfSignature
-        """
-        # Convert to a public key (even if it's already a public key)
-        pkpkt = self.toPublicKey(minHeaderLen = 3)
-        keyId = pkpkt.getKeyId()
-        pgpKey = pkpkt.makePgpKey()
-        for sig in self.iterSelfSignatures():
-            sio = util.ExtendedStringIO()
-            pkpkt.write(sio)
-            try:
-                sig._finalizeSelfSig(sio, pgpKey)
-            except BadSelfSignature:
-                raise BadSelfSignature(keyId)
-        for uid in self.iterUserIds():
-            for sig in uid.iterSignatures():
-                sio = util.ExtendedStringIO()
-                pkpkt.write(sio)
-                uid.writeHash(sio)
-                try:
-                    sig._finalizeSelfSig(sio, pgpKey)
-                except BadSelfSignature:
-                    raise BadSelfSignature(keyId)
-                # Only verify the first sig on the user ID.
-                # XXX Why? No idea yet
-                break
-            else: # for
-                # No signature. Not good, according to our standards
-                raise BadSelfSignature(keyId)
-
-        return pkpkt, pgpKey
-
-    def getUserIds(self):
-        for pkt in self.iterUserIds():
-            yield pkt.id
-
-    def isSupersetOf(self, key):
-        """Check if this key is a superset of key"""
-        if self.tag != key.tag:
-            raise IncompatibleKey("Attempting to compare different key types")
-        if self.getKeyId() != key.getKeyId():
-            raise IncompatibleKey("Attempting to compare different keys")
-
-        thisSubkeyIds = set(x.getKeyId() for x in self.iterSubKeys())
-        otherSubkeyIds = set(x.getKeyId() for x in key.iterSubKeys())
-        if not thisSubkeyIds.issuperset(otherSubkeyIds):
-            # Missing subkey
-            return False
-
-        # XXX
-
-
-    def _hashSet(self, items):
-        """Hashes the items in items through sha, and return a set of the
-        computed digests.
-        Each item is expected to be a stream"""
-
-        ret = ()
-        for stream in items:
-            stream.seek(0)
-            hobj = sha.new()
-            self._updateHash(hobj, stream)
-            ret.add(hobj.digest())
-        return ret
-
 class PGP_MainKey(PGP_Key):
     def initSubPackets(self):
+        if hasattr(self, "subkeys"):
+            # Already processed
+            return
+
         self.revsigs = []
         self.uids = []
         self.subkeys = []
 
-        subpkts = [ x for x in self.iterSubPackets() ]
+        subpkts = [ x for x in self._iterSubPackets(PKT_MAIN_KEYS) ]
 
         # Start reading signatures until we hit a UserID or another key
         limit = set(PKT_SUB_KEYS)
         limit.add(PKT_USERID)
+        i = 0
         for i, pkt in enumerate(subpkts):
             if pkt.tag in limit:
                 # UserID or subkey
@@ -1792,10 +1691,17 @@ class PGP_MainKey(PGP_Key):
         uidLimit = sigLimit + i
 
         # Read until the end
+        # We don't want to point back to ourselves, or we'll create a
+        # circular loop.
+        newMainKey = newPacket(self.tag, self._bodyStream,
+                    newStyle = self._newStyle, minHeaderLen = self.headerLength)
+        newMainKey.setNextStream(self._nextStream, self._nextStreamPos)
+        # Don't call initSubPackets on newMainKey here, or you end up with an
+        # infinite loop.
         for i, pkt in enumerate(subpkts[uidLimit:]):
             if isinstance(pkt, PGP_SubKey):
+                pkt.mainKey = newMainKey
                 self.subkeys.append(pkt)
-                pkt.mainKey = weakref.ref(self)
                 continue
             if isinstance(pkt, PGP_Signature):
                 # This can't be the first packet, or we wouldn't have stopped
@@ -1813,20 +1719,96 @@ class PGP_MainKey(PGP_Key):
             # Ignore other packets
 
     def iterUserIds(self):
-        for pkt in self.iterSubPackets():
-            if pkt.tag == PKT_USERID:
+        self.initSubPackets()
+        return iter(self.uids)
+
+    def iterSubPackets(self):
+        for sig in self.iterSignatures():
+            yield sig
+        for uid in self.iterUserIds():
+            yield uid
+            for sig in uid.iterSignatures():
+                yield sig
+        for subkey in self.iterSubKeys():
+            yield subkey
+            for pkt in subkey.iterSubPackets():
                 yield pkt
 
-    def iterSubKeys(self):
-        if not hasattr(self, "subkeys"):
-            self.initSubPackets()
-        return iter(self.subkeys)
-        #for pkt in self.iterSubPackets():
-        #    if pkt.tag in PKT_SUB_KEYS:
-        #        # Point back to ourselves
-        #        pkt.mainKey = weakref.ref(self)
-        #        yield pkt
+    def iterSignatures(self):
+        self.initSubPackets()
+        return iter(self.revsigs)
 
+    def iterSubKeys(self):
+        self.initSubPackets()
+        return iter(self.subkeys)
+
+    def verifySelfSignatures(self):
+        """
+        Verify the self signatures on this key.
+        If successful, returns the public key packet associated with this key,
+        and crypto key.
+        @return (pubKeyPacket, cryptoKey)
+        @raises BadSelfSignature
+        """
+        # Convert to a public key (even if it's already a public key)
+        pkpkt = self.toPublicKey(minHeaderLen = 3)
+        keyId = pkpkt.getKeyId()
+        pgpKey = pkpkt.makePgpKey()
+        for sig in self.iterSelfSignatures():
+            sio = util.ExtendedStringIO()
+            pkpkt.write(sio)
+            try:
+                sig._finalizeSelfSig(sio, pgpKey)
+            except BadSelfSignature:
+                raise BadSelfSignature(keyId)
+        for uid in self.iterUserIds():
+            for sig in uid.iterSignatures():
+                sio = util.ExtendedStringIO()
+                pkpkt.write(sio)
+                uid.writeHash(sio)
+                try:
+                    sig._finalizeSelfSig(sio, pgpKey)
+                except BadSelfSignature:
+                    raise BadSelfSignature(keyId)
+                # Only verify the first sig on the user ID.
+                # XXX Why? No idea yet
+                break
+            else: # for
+                # No signature. Not good, according to our standards
+                raise BadSelfSignature(keyId)
+
+        return pkpkt, pgpKey
+
+    def isSupersetOf(self, key):
+        """Check if this key is a superset of key"""
+        if self.tag != key.tag:
+            raise IncompatibleKey("Attempting to compare different key types")
+        if self.getKeyId() != key.getKeyId():
+            raise IncompatibleKey("Attempting to compare different keys")
+
+        thisSubkeyIds = set(x.getKeyId() for x in self.iterSubKeys())
+        otherSubkeyIds = set(x.getKeyId() for x in key.iterSubKeys())
+        if not thisSubkeyIds.issuperset(otherSubkeyIds):
+            # Missing subkey
+            return False
+
+        # XXX
+
+    def _hashSet(self, items):
+        """Hashes the items in items through sha, and return a set of the
+        computed digests.
+        Each item is expected to be a stream"""
+
+        ret = ()
+        for stream in items:
+            stream.seek(0)
+            hobj = sha.new()
+            self._updateHash(hobj, stream)
+            ret.add(hobj.digest())
+        return ret
+
+    def getUserIds(self):
+        return [ pkt.id for pkt in self.iterUserIds() ]
 
 class PGP_PublicAnyKey(PGP_Key):
     pubTag = None
@@ -1982,7 +1964,6 @@ class PGP_SecretKey(PGP_SecretAnyKey, PGP_MainKey):
     tag = PKT_SECRET_KEY
     pubTag = PKT_PUBLIC_KEY
 
-
 class PGP_SubKey(PGP_Key):
     # Subkeys are promoted to main keys when converted to public keys
     pubTag = PKT_PUBLIC_KEY
@@ -1995,7 +1976,10 @@ class PGP_SubKey(PGP_Key):
 
     def iterSubPackets(self):
         # Stop at another key
-        return self._iterSubPackets(PKT_ALL_KEYS)
+        if self.bindingSig:
+            yield self.bindingSig
+        if self.bindingSigRevoc:
+            yield self.bindingSigRevoc
 
     def iterUserIds(self):
         # Subkeys don't have user ids
@@ -2011,7 +1995,7 @@ class PGP_SubKey(PGP_Key):
     def getMainKey(self):
         """Return the main key for this subkey"""
         if self.mainKey is not None:
-            return self.mainKey()
+            return self.mainKey
         return None
 
     def verifySelfSignatures(self):
@@ -2045,6 +2029,11 @@ class PGP_SubKey(PGP_Key):
     def iterSubKeys(self):
         # Nothing to iterate over, subkeys don't have subkeys
         return []
+
+    def iterSignatures(self):
+        for pkt in self.iterSubPackets():
+            yield pkt
+
 
 class PGP_PublicSubKey(PGP_SubKey, PGP_PublicAnyKey):
     __slots__ = []
