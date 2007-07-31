@@ -65,6 +65,11 @@ Changes in @NEW@:
     * Ensure that two binaries with the same source count but different
       build counts end up with the same build count after cloning. (CNY-1871)
 
+  o Scripts Changes:
+    * Repository database migration scripts have been integrated into a 
+      common unit
+
+
 Changes in 1.1.31.3:
   o Server changes:
     * Added EntitlementTimeout exception to notify clients that an
