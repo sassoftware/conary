@@ -307,30 +307,6 @@ def binSeqToString(sequence):
     Return the string with a corresponding char for each item"""
     return "".join([ chr(x) for x in sequence ])
 
-def getSigId(keyRing):
-    startPoint = keyRing.tell()
-    blockType = readBlockType(keyRing)
-    if (blockType >> 2) & 15 != PKT_SIG:
-        #block is not a signature. it has no sigId
-        keyRing.seek(startPoint, SEEK_SET)
-        return ''
-    readBlockSize(keyRing, blockType)
-    assert (ord(keyRing.read(1)) == 4)
-    keyRing.seek(3, SEEK_CUR)
-    hashedLen = ord(keyRing.read(1)) * 256 + ord(keyRing.read(1))
-    # hashedLen plus two to skip len of unhashed data.
-    keyRing.seek(hashedLen + 2, SEEK_CUR)
-    done = 0
-    while not done:
-        subLen = ord(keyRing.read(1))
-        if ord(keyRing.read(1)) == 16:
-            done = 1
-        else:
-            keyRing.seek(subLen - 1, SEEK_CUR)
-    data = keyRing.read(subLen - 1)
-    keyRing.seek(startPoint)
-    return data
-
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
     r = ''
@@ -1207,7 +1183,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self.resetBody()
         sigVersion, = self.readBin(1)
         if sigVersion not in [3, 4]:
-            raise InvalidBodyError("Invalid signature type %s" % sigType)
+            raise InvalidBodyError("Invalid signature version %s" % sigVersion)
         self.version = sigVersion
         if sigVersion == 3:
             self._readSigV3()
@@ -1296,7 +1272,11 @@ class PGP_Signature(PGP_BaseKeySig):
             if spktType != SIG_SUBPKT_ISSUER_KEYID:
                 continue
             # Verify it only contains 8 bytes
-            self.checkStreamLength(dataf, 8)
+            try:
+                self.checkStreamLength(dataf, 8)
+            except ShortReadError, e:
+                raise InvalidPacketError("Expected %s bytes, got %s instead" %
+                    (e.expected, e.actual))
             self.signerKeyId = self._readBin(dataf, 8)
             return binSeqToString(self.signerKeyId)
 
@@ -1557,11 +1537,7 @@ class PGP_Key(PGP_BaseKeySig):
 
         if self.tag in PKT_SUB_KEYS:
             # Look for parent key's expiration
-            # Cheat a little, poke into the NestedFile to get to the parent
-            # file
-            newMsg = PGP_Message(self._bodyStream.file, start = 0)
-            pkt = newMsg.seekParentKey(self.getKeyId())
-            parentRevoked, parentExpire = pkt.getEndOfLife()
+            parentRevoked, parentExpire = self.getMainKey().getEndOfLife()
 
         expireTimestamp = revocTimestamp = 0
 
@@ -1646,18 +1622,6 @@ class PGP_Key(PGP_BaseKeySig):
             for pkt in uid.iterSignatures():
                 if intKeyId != pkt.getSigId():
                     continue
-                yield pkt
-
-    def iterUserIds(self):
-        for pkt in self.iterSubPackets():
-            if pkt.tag == PKT_USERID:
-                yield pkt
-
-    def iterSubKeys(self):
-        for pkt in self.iterSubPackets():
-            if pkt.tag in PKT_SUB_KEYS:
-                # Point back to ourselves
-                pkt.mainKey = weakref.ref(self)
                 yield pkt
 
     def assertSigningKey(self):
@@ -1848,6 +1812,21 @@ class PGP_MainKey(PGP_Key):
                 assert False, "Unexpected signature type %s" % pkt.sigType
             # Ignore other packets
 
+    def iterUserIds(self):
+        for pkt in self.iterSubPackets():
+            if pkt.tag == PKT_USERID:
+                yield pkt
+
+    def iterSubKeys(self):
+        if not hasattr(self, "subkeys"):
+            self.initSubPackets()
+        return iter(self.subkeys)
+        #for pkt in self.iterSubPackets():
+        #    if pkt.tag in PKT_SUB_KEYS:
+        #        # Point back to ourselves
+        #        pkt.mainKey = weakref.ref(self)
+        #        yield pkt
+
 
 class PGP_PublicAnyKey(PGP_Key):
     pubTag = None
@@ -2003,6 +1982,7 @@ class PGP_SecretKey(PGP_SecretAnyKey, PGP_MainKey):
     tag = PKT_SECRET_KEY
     pubTag = PKT_PUBLIC_KEY
 
+
 class PGP_SubKey(PGP_Key):
     # Subkeys are promoted to main keys when converted to public keys
     pubTag = PKT_PUBLIC_KEY
@@ -2016,6 +1996,10 @@ class PGP_SubKey(PGP_Key):
     def iterSubPackets(self):
         # Stop at another key
         return self._iterSubPackets(PKT_ALL_KEYS)
+
+    def iterUserIds(self):
+        # Subkeys don't have user ids
+        return []
 
     def iterSelfSignatures(self):
         return self._iterSelfSignatures(self.getMainKey().getKeyId())
