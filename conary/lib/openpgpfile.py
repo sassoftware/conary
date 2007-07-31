@@ -790,7 +790,6 @@ class PGP_PacketFromStream(object):
             raise InvalidPacketError("First bit not 1")
 
         if first & 0x40:
-            print "new header"
             newStyle = True
             self._newHeader(first)
         else:
@@ -799,6 +798,12 @@ class PGP_PacketFromStream(object):
 
         _bodyStream = util.SeekableNestedFile(self._f.file,
                      self.bodyLength, self._f.start + self.headerLength)
+        if self.bodyLength:
+            # Read one octet from the end
+            data = _bodyStream.pread(1, self.bodyLength - 1)
+            if not data:
+                raise ShortReadError(self.bodyLength, -1)
+            _bodyStream.seek(0)
         nextStreamPos = self._f.start + self.headerLength + self.bodyLength
 
         pkt = newPacket(self.tag, _bodyStream, newStyle = newStyle,
@@ -823,11 +828,8 @@ class PGP_PacketFromStream(object):
             raise NotImplementedError("Indeterminate length not supported")
 
         self.headerLength = headerLength
-        rest = self._f.read()
-        if len(rest) != blLen:
-            raise Exception("Unable to read %s bytes" % blLen)
+        bbytes = PGP_BasePacket._readBin(self._f, blLen)
 
-        bbytes = [ ord(x) for x in rest ]
         bodyLength = 0
         for i in bbytes:
             bodyLength <<= 8
@@ -841,10 +843,7 @@ class PGP_PacketFromStream(object):
         self._f.__init__(self._f.file, 2, self._f.start)
         self._f.seek(1)
 
-        body1 = self._f.read(1)
-        if len(body1) < 1:
-            raise Exception("Need to read at least one more byte")
-        body1 = ord(body1)
+        body1, = PGP_BasePacket._readBin(self._f, 1)
 
         if body1 & 0xC0 == 0:
             # 4.2.2.1. One-Octet Lengths (less than 192)
@@ -852,36 +851,25 @@ class PGP_PacketFromStream(object):
             self.bodyLength = body1
             return
 
-        if body1 & 0xE0 == 0:
+        if 192 <= body1 < 223:
             # 4.2.2.2. Two-Octet Lengths (between 192 and 223):
             self.headerLength = 3
             self._f.__init__(self._f.file, self.headerLength, self._f.start)
             self._f.seek(2)
 
-            body2 = self._f.read(1)
-
-            if len(body2) != 1:
-                raise Exception("Unable to read 1 more byte")
-
-            body2 = ord(body2)
+            body2, = PGP_BasePacket._readBin(self._f, 1)
             self.bodyLength = len2bytes(body1, body2)
             return
 
-        if body1 & 0xFF:
+        if body1 == 0xFF:
             # 4.2.2.3. Five-Octet Lengths (exactly 255)
-            self.headerLength = 5
+            self.headerLength = 6
 
             self._f.__init__(self._f.file, self.headerLength, self._f.start)
             self._f.seek(2)
 
-            rest = self._f.read(4)
-            if len(rest) != 4:
-                raise Exception("Unable to read 4 bytes")
-            body2 = ord(rest[0])
-            body3 = ord(rest[1])
-            body4 = ord(rest[2])
-            body5 = ord(rest[3])
-            self.bodyLength = int4bytes(body2, body3, body4, body5)
+            rest = PGP_BasePacket._readBin(self._f, 4)
+            self.bodyLength = int4bytes(*rest)
             return
         # 4.2.2.4. Partial Body Lengths
         partialBodyLength = 1 << (body1 & 0x1F)
@@ -917,6 +905,13 @@ class PGP_BasePacket(object):
 
     def _getHeaderLength(self, minHeaderLen = 2):
         # bsrepr is the body size representation
+        if self._newStyle:
+            # For new style, we can't really force the minimum header length
+            if self.bodyLength < 192:
+                return 2
+            if 192 <= self.bodyLength < 8384:
+                return 3
+            return 6
         if minHeaderLen > 3 or self.bodyLength > 65535:
             # 4-byte packet length field
             bsrepr = 4
@@ -1373,14 +1368,15 @@ class PGP_UserID(PGP_BasePacket):
         """Iterate over this user's UserID"""
         if self.signatures is not None:
             return iter(self.signatures)
-        # Packet signatures extend up to another User Id (section RFC 2440 11.1)
-        # Signatures should be consecutive, but it is also possible for trust
-        # packets to interleave, so Ignore non-signature packets
-        limit = set(PKT_ALL_KEYS)
-        limit.add(PKT_USERID)
-        self.signatures = [ x for x in self._iterSubPackets(limit) 
-                if isinstance(x, PGP_Signature) ]
-        return iter(self.signatures)
+        raise PGPError("Key packet not parsed")
+
+    def iterKeySignatures(self, keyId):
+        intKeyId = fingerprintToInternalKeyId(keyId)
+        # Look for a signature by this key
+        for pkt in self.iterSignatures():
+            if intKeyId != pkt.getSigId():
+                continue
+            yield pkt
 
     def writeHash(self, stream):
         """Write a UserID packet in a stream, in order to be hashed.
@@ -1762,7 +1758,7 @@ class PGP_MainKey(PGP_Key):
             except BadSelfSignature:
                 raise BadSelfSignature(keyId)
         for uid in self.iterUserIds():
-            for sig in uid.iterSignatures():
+            for sig in uid.iterKeySignatures(keyId):
                 sio = util.ExtendedStringIO()
                 pkpkt.write(sio)
                 uid.writeHash(sio)
@@ -2065,7 +2061,7 @@ def newPacketFromStream(stream, start = -1):
 
 def len2bytes(v1, v2):
     """Return the packet body length when represented on 2 bytes"""
-    return (v1 - 192) << 8 + v2 + 192
+    return ((v1 - 192) << 8) + v2 + 192
 
 def len4bytes(v1, v2, v3, v4):
     """Return the packet body length when represented on 4 bytes"""
