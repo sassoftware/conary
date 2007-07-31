@@ -17,6 +17,7 @@ import os
 import sha
 import md5
 import struct
+import weakref
 
 try:
     from Crypto.Hash import RIPEMD
@@ -769,8 +770,14 @@ class PGP_Message(object):
 
     def iterKeys(self):
         """Iterate over all keys"""
+        # Store the main key while we're here
+        mainKey = None
         for pkt in self.iterPackets():
+            if isinstance(pkt, PGP_MainKey):
+                mainKey = pkt
             if pkt.tag in PKT_ALL_KEYS:
+                if isinstance(pkt, PGP_SubKey) and mainKey:
+                    pkt.mainKey = lambda x=mainKey: x
                 yield pkt
 
     def iterByKeyId(self, keyId):
@@ -1390,20 +1397,35 @@ class PGP_UserID(PGP_BasePacket):
         self.resetBody()
         self.id = self.readBody()
         # Signatures for this user ID
-        self.signatures = []
+        self.signatures = None
 
     def toString(self):
         return self.id
 
+    def addSignatures(self, signatures):
+        """Add signatures to this UserID"""
+        if self.signatures is None:
+            self.signatures = []
+        for sig in signatures:
+            assert isinstance(sig, PGP_Signature)
+            self.signatures.append(sig)
+
+    def resetSignatures(self):
+        """Reset the signature cache for this UserID"""
+        self.signatures = None
+
     def iterSignatures(self):
+        """Iterate over this user's UserID"""
+        if self.signatures is not None:
+            return iter(self.signatures)
         # Packet signatures extend up to another User Id (section RFC 2440 11.1)
-        # Signatures should be consecutive
+        # Signatures should be consecutive, but it is also possible for trust
+        # packets to interleave, so Ignore non-signature packets
         limit = set(PKT_ALL_KEYS)
         limit.add(PKT_USERID)
-        for x in self._iterSubPackets(limit):
-            if x.tag != PKT_SIG:
-                break
-            yield x
+        self.signatures = [ x for x in self._iterSubPackets(limit) 
+                if isinstance(x, PGP_Signature) ]
+        return iter(self.signatures)
 
     def writeHash(self, stream):
         """Write a UserID packet in a stream, in order to be hashed.
@@ -1634,6 +1656,8 @@ class PGP_Key(PGP_BaseKeySig):
     def iterSubKeys(self):
         for pkt in self.iterSubPackets():
             if pkt.tag in PKT_SUB_KEYS:
+                # Point back to ourselves
+                pkt.mainKey = weakref.ref(self)
                 yield pkt
 
     def assertSigningKey(self):
@@ -1756,21 +1780,89 @@ class PGP_Key(PGP_BaseKeySig):
             ret.add(hobj.digest())
         return ret
 
+class PGP_MainKey(PGP_Key):
+    def initSubPackets(self):
+        self.revsigs = []
+        self.uids = []
+        self.subkeys = []
 
-class PGP_PublicKey(PGP_Key):
-    __slots__ = []
-    tag = PKT_PUBLIC_KEY
-    pubTag = PKT_PUBLIC_KEY
+        subpkts = [ x for x in self.iterSubPackets() ]
 
+        # Start reading signatures until we hit a UserID or another key
+        limit = set(PKT_SUB_KEYS)
+        limit.add(PKT_USERID)
+        for i, pkt in enumerate(subpkts):
+            if pkt.tag in limit:
+                # UserID or subkey
+                break
+            if not isinstance(pkt, PGP_Signature):
+                continue
+            pkt.parse()
+            if pkt.sigType == SIG_TYPE_KEY_REVOC:
+                # Key revocation
+                self.revsigs.append(pkt)
+                continue
+            # According to sect. 10.1, there should not be other signatures
+            # here.
+            assert False, "Unexpected signature type %s" % pkt.sigType
+        sigLimit = i
+
+        # Read until we hit a subkey
+        limit = set(PKT_SUB_KEYS)
+        for i, pkt in enumerate(subpkts[sigLimit:]):
+            if pkt.tag in limit:
+                break
+            # Certification revocations live together with regular signatures
+            # or so is the RFC saying
+            if isinstance(pkt, PGP_UserID):
+                self.uids.append(pkt)
+                continue
+            if isinstance(pkt, PGP_Signature):
+                # This can't be the first packet, or we wouldn't have stopped
+                # in the previous loop
+                # Add this signature to the last user id we found
+                self.uids[-1].addSignatures([pkt])
+                continue
+            # We ignore other packets (like trust)
+
+        uidLimit = sigLimit + i
+
+        # Read until the end
+        for i, pkt in enumerate(subpkts[uidLimit:]):
+            if isinstance(pkt, PGP_SubKey):
+                self.subkeys.append(pkt)
+                pkt.mainKey = weakref.ref(self)
+                continue
+            if isinstance(pkt, PGP_Signature):
+                # This can't be the first packet, or we wouldn't have stopped
+                # in the previous loop
+                subkey = self.subkeys[-1]
+                pkt.parse()
+                if pkt.sigType == SIG_TYPE_SUBKEY_REVOC:
+                    subkey.bindingSigRevoc = pkt
+                    continue
+                if pkt.sigType == SIG_TYPE_SUBKEY_BIND:
+                    subkey.bindingSig = pkt
+                    continue
+                # There should not be any other type of signature here
+                assert False, "Unexpected signature type %s" % pkt.sigType
+            # Ignore other packets
+
+
+class PGP_PublicAnyKey(PGP_Key):
+    pubTag = None
     def toPublicKey(self, minHeaderLen = 2):
         return newPacket(self.pubTag, self._bodyStream,
                          minHeaderLen = minHeaderLen)
 
-class PGP_SecretKey(PGP_Key):
+class PGP_PublicKey(PGP_PublicAnyKey, PGP_MainKey):
+    tag = PKT_PUBLIC_KEY
+    pubTag = PKT_PUBLIC_KEY
+
+class PGP_SecretAnyKey(PGP_Key):
     __slots__ = ['s2k', 'symmEncAlg', 's2kType', 'hashAlg', 'salt',
                  'count', 'initialVector', 'encMpiFile']
-    tag = PKT_SECRET_KEY
-    pubTag = PKT_PUBLIC_KEY
+    pubTag = None
 
     _hashes = [ 'Unknown', md5, sha, RIPEMD, 'Double Width SHA',
                 'MD2', 'Tiger/192', 'HAVAL-5-160' ]
@@ -1907,6 +1999,10 @@ class PGP_SecretKey(PGP_Key):
             return DSA.construct((y, g, p, q, x))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+class PGP_SecretKey(PGP_SecretAnyKey, PGP_MainKey):
+    tag = PKT_SECRET_KEY
+    pubTag = PKT_PUBLIC_KEY
+
 class PGP_SubKey(PGP_Key):
     # Subkeys are promoted to main keys when converted to public keys
     pubTag = PKT_PUBLIC_KEY
@@ -1914,6 +2010,8 @@ class PGP_SubKey(PGP_Key):
     def validate(self):
         PGP_Key.validate(self)
         self.mainKey = None
+        self.bindingSig = None
+        self.bindingSigRevoc = None
 
     def iterSubPackets(self):
         # Stop at another key
@@ -1929,12 +2027,8 @@ class PGP_SubKey(PGP_Key):
     def getMainKey(self):
         """Return the main key for this subkey"""
         if self.mainKey is not None:
-            return self.mainKey
-        # Cheat a little, poke into the NestedFile to get to the parent
-        # file
-        newMsg = PGP_Message(self._bodyStream.file, start = 0)
-        self.mainKey = newMsg.seekParentKey(self.getKeyId())
-        return self.mainKey
+            return self.mainKey()
+        return None
 
     def verifySelfSignatures(self):
         # seek the main key associated with this subkey
@@ -1968,11 +2062,11 @@ class PGP_SubKey(PGP_Key):
         # Nothing to iterate over, subkeys don't have subkeys
         return []
 
-class PGP_PublicSubKey(PGP_SubKey, PGP_PublicKey):
+class PGP_PublicSubKey(PGP_SubKey, PGP_PublicAnyKey):
     __slots__ = []
     tag = PKT_PUBLIC_SUBKEY
 
-class PGP_SecretSubKey(PGP_SubKey, PGP_SecretKey):
+class PGP_SecretSubKey(PGP_SubKey, PGP_SecretAnyKey):
     __slots__ = []
     tag = PKT_SECRET_SUBKEY
 
