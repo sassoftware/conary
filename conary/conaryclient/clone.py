@@ -255,6 +255,10 @@ class ClientClone:
                     cloneMap.addTrove(troveTup, targetBranch, sourceName)
                     chooser.addSource(troveTup, sourceName)
                     cloneJob.add(troveTup)
+                elif trove.troveIsPackage(troveTup[0]):
+                    # don't bother downloading components for something
+                    # we're not cloning
+                    continue
                 newToClone.extend(trv.iterTroveList(strongRefs=True))
 
             toClone = newToClone

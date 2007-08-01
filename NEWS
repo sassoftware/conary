@@ -58,6 +58,7 @@ Changes in @NEW@:
     * includeConfigFile now sorts files that are matched in globs
     * The default settings from r.add() will now override the default
       settings from an r.addAll() (CNY-1882)
+    * Cloning no longer downloads components that won't be cloned (CNY-1891)
 
   o Build Changes:
     * The cvc update command can now update multiple directories
