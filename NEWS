@@ -1,3 +1,8 @@
+Changes in 1.1.31.4:
+  o Server changes:
+    * Fixed forceSSL for apache servers (which has been broken for a large
+      number of releases) (CNY-1880)
+
 Changes in 1.1.31.3:
   o Server changes:
     * Added EntitlementTimeout exception to notify clients that an
