@@ -1397,10 +1397,6 @@ class PGP_UserID(PGP_BasePacket):
             assert isinstance(sig, PGP_Signature)
             self.signatures.append(sig)
 
-    def resetSignatures(self):
-        """Reset the signature cache for this UserID"""
-        self.signatures = None
-
     def iterSignatures(self):
         """Iterate over this user's UserID"""
         if self.signatures is not None:
