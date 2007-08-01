@@ -415,7 +415,7 @@ class ConfigFile(_Config):
         if self.isUrl(val):
             self.readUrl(val)
         else:
-            for cfgfile in util.braceGlob(val):
+            for cfgfile in sorted(util.braceGlob(val)):
                 self.read(cfgfile)
 
 class ConfigSection(ConfigFile):
