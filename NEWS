@@ -55,6 +55,7 @@ Changes in @NEW@:
       (previously only the last hostname for a particular hostname/glob
       would be used). (CNY-1825)
     * Cloning the source component for filesets is now allowed.
+    * includeConfigFile now sorts files that are matched in globs
 
   o Build Changes:
     * The cvc update command can now update multiple directories
