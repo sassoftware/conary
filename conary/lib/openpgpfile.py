@@ -935,7 +935,44 @@ class PGP_BasePacket(object):
     def writeHeader(self, stream):
         # Generate packet header
         if self._newStyle:
-            raise NotImplementedError
+            return self._writeHeaderNewStyle(stream)
+
+        return self._writeHeaderOldStyle(stream)
+
+    def _writeHeaderNewStyle(self, stream):
+        # bit 7 is set, bit 6 is set (new packet format)
+        fbyte = 0xC0
+
+        # Add the tag.
+        fbyte |= self.tag
+
+        stream.write(chr(fbyte))
+
+        if self.headerLength == 6:
+            # 5-byte body length length, first byte is 255
+            stream.write(chr(255))
+            blen = self.bodyLength & 0xffffffff
+            for i in range(1, 5):
+                stream.write(chr((blen >> ((4 - i) << 3)) & 0xff))
+            return
+        if self.headerLength == 3:
+            # 2-byte body length length
+            if not (192 <= self.bodyLength < 8384):
+                raise InvalidPacketError("Invalid body length %s for "
+                    "header length %s" % (self.bodyLength, self.headerLength))
+            stream.write(chr(((self.bodyLength - 192) >> 8) + 192))
+            stream.write(chr((self.bodyLength - 192) & 0xff))
+            return 
+        if self.headerLength == 2:
+            # 1-byte body length length
+            if not (self.bodyLength < 192):
+                raise InvalidPacketError("Invalid body length %s for "
+                    "header length %s" % (self.bodyLength, self.headerLength))
+            stream.write(chr(self.bodyLength))
+            return
+        raise InvalidPacketError("Invalid header length %s" % self.headerLength)
+
+    def _writeHeaderOldStyle(self, stream):
         # bit 7 is set, bit 6 is not set (old packet format)
         fbyte = 0x80
 
@@ -1990,9 +2027,7 @@ class PGP_SubKey(PGP_Key):
 
     def getMainKey(self):
         """Return the main key for this subkey"""
-        if self.mainKey is not None:
-            return self.mainKey
-        return None
+        return self.mainKey
 
     def verifySelfSignatures(self):
         # seek the main key associated with this subkey
