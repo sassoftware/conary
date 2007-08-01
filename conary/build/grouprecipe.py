@@ -2441,11 +2441,17 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
         for (childTup, childByDefault, _) in cache.iterTroveListInfo(troveTup):
             childName = childTup[0]
 
-            addAllDefault = group.checkAddAllForByDefault(troveTup, childTup)
+            childByDefault = childByDefault and byDefault
+            addAllDefault = group.checkAddAllForByDefault(troveTup,
+                                                          childTup)
             if addAllDefault is not None:
-                childByDefault = addAllDefault
-            else:
-                childByDefault = childByDefault and byDefault
+                # only use addAll default settings if that's the reason
+                # why this trove was added, otherwise those settings
+                # are overridden by some other reason to add this package.
+                if group.getReason(*troveTup)[0] == ADD_REASON_ADDALL:
+                    childByDefault = addAllDefault
+                else:
+                    childByDefault = childByDefault or addAllDefault
 
             if componentsToRemove and _componentMatches(childName,
                                                         componentsToRemove):

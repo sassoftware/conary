@@ -56,6 +56,8 @@ Changes in @NEW@:
       would be used). (CNY-1825)
     * Cloning the source component for filesets is now allowed.
     * includeConfigFile now sorts files that are matched in globs
+    * The default settings from r.add() will now override the default
+      settings from an r.addAll() (CNY-1882)
 
   o Build Changes:
     * The cvc update command can now update multiple directories
