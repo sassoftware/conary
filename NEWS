@@ -1,47 +1,56 @@
 Changes in @NEW@:
+  o Major Changes:
+    * Label multiplicity, in which a trove on the same label
+      appearing on multiple branches was understood as meaning that
+      all the trove can be installed at once, is being generally
+      deprecated.  Instead, a newer trove on a different branch that
+      ends with the same label as an older trove will be considered
+      together with and generally preferred to the older trove.
+      Branch affinity, in which Conary keeps packages from the same
+      branch during an update, is therefore replaced with label
+      affinity, in which Conary keeps packages from the same label
+      during an update.  Many of the individual changes in this
+      version are parts of implementing this general change in
+      behavior.
+
   o Client Changes:
-    * Added getTroveLatestByLabel as a client-side call
+    * Added getTroveLatestByLabel as a client-side call.
     * Label lookups pick the latest version which matches instead of
-      the latest version on each branch
-    * Replaced branch affinity with label affinity
+      the latest version on each branch.
+    * Replaced branch affinity with label affinity.
     * getAllTroveLeavesByLabel() filters results by server names to
       eliminate spurious results from repositories which host multiple
-      server names (CNY-1771)
-    * cvc and conary commands now ignore broken pipes on stdout instead
-      of producing a traceback (CNY-1853)
+      server names. (CNY-1771)
+    * The cvc and conary commands now ignore broken pipes on standard
+      output instead of producing a traceback. (CNY-1853)
     * Redirects follow the label of the branch they were built with
       instead of the branch itself.
     * Building redirects to a branch is now deprecated; redirects should
-      point to labels instead (CNY-1857)
-    * The --replace-files option has been split into --replace-managed-files,
-      --replace-unmanaged-files, --replace-modified-files, and
-      --replace-config-files. The original option is still accepted, and is
-      equivalent to specifying all four of the new options simultaneously
-      (CNY-1270)
+      point to labels instead. (CNY-1857)
+    * The --replace-files option has been split into
+      --replace-managed-files, --replace-unmanaged-files,
+      --replace-modified-files, and --replace-config-files. The original
+      option is still accepted, and is equivalent to specifying all four
+      of the new options simultaneously (CNY-1270)
     * Now when updating, conary will never automatically drop an architecture
       from an installed trove (unless you specify the flavor to update to 
       explicitly).  (CNY-1714)
     * Dependency resolution now allows updates to go across branches if the
       branches are on the same label.
     * Dependency resolution now follows the same "never drop an architecture"
-      rule as other update code (CNY-1713).
+      rule as other update code. (CNY-1713).
     * Added --show-files parameter to "conary config" to display where
       configuration items came from.
     * Newly installed transient files now silently replace files which are
-      otherwise unowned (CNY-1841)
+      otherwise unowned. (CNY-1841)
 
   o Bug Fixes:
     * Fix a bug in commit code that made r.macros.buildlabel unusable because
       you could not commit recipes that used it.  (CNY-1752)
-    * An internal class, _AbstractPackageRecipe, has been renamed, to allow
-      the inclusion of its methods in the subclasses' documentation pages.
-      The old name is still available for compatibility with older modules.
-      (CNY-1848)
-    * The --replace-files option has been split into
-      --replace-managed-files, --replace-unmanaged-files,
-      --replace-modified-files, and --replace-config-files. The original
-      option is still accepted, and is equivalent to specifying all four
-      of the new options simultaneously (CNY-1270)
+    * An internal class, _AbstractPackageRecipe, has been renamed to
+      AbstractPackageRecipe, in order to allow the inclusion of its
+      methods in its subclasses' documentation pages.  The old name is
+      still available for compatibility with older modules.  (CNY-1848)
     * Multiple entitlements can be stored for a single hostname or glob
       (previously only the last hostname for a particular hostname/glob
       would be used). (CNY-1825)
@@ -67,7 +76,7 @@ Changes in @NEW@:
 
   o Scripts Changes:
     * Repository database migration scripts have been integrated into a 
-      common unit
+      common unit.
 
 
 Changes in 1.1.31.3:
