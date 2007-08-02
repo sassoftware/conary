@@ -247,6 +247,17 @@ def seekKeyById(keyId, keyRing):
     except StopIteration:
         return False
 
+def readKeyData(stream, keyId):
+    """Read the key from the keyring and export it"""
+    msg = PGP_Message(stream, start = 0)
+    try:
+        pkt = msg.iterByKeyId(keyId).next()
+    except StopIteration:
+        raise KeyNotFound(keyId)
+    sio = StringIO()
+    pkt.writeAll(sio)
+    return sio.getvalue()
+
 def verifySelfSignatures(keyId, stream):
     msg = PGP_Message(stream, start = 0)
     try:
@@ -367,7 +378,7 @@ def getKeyEndOfLifeFromString(keyId, data):
     return _getKeyEndOfLife(keyId, keyRing)
 
 def getUserIdsFromString(keyId, data):
-    keyRing = ExtendedStringIO(data)
+    keyRing = util.ExtendedStringIO(data)
     msg = newPacketFromStream(keyRing)
     key = msg.iterByKeyId(keyId)
     return list(key.getUserIds())
@@ -1570,10 +1581,11 @@ class PGP_MainKey(PGP_Key):
         limit = set(PKT_SUB_KEYS)
         limit.add(PKT_USERID)
         i = 0
-        for i, pkt in enumerate(subpkts):
+        for pkt in subpkts:
             if pkt.tag in limit:
                 # UserID or subkey
                 break
+            i += 1
             if not isinstance(pkt, PGP_Signature):
                 continue
             pkt.parse()
@@ -1584,13 +1596,16 @@ class PGP_MainKey(PGP_Key):
             # According to sect. 10.1, there should not be other signatures
             # here.
             assert False, "Unexpected signature type %s" % pkt.sigType
+
         sigLimit = i
 
         # Read until we hit a subkey
         limit = set(PKT_SUB_KEYS)
-        for i, pkt in enumerate(subpkts[sigLimit:]):
+        i = 0
+        for pkt in subpkts[sigLimit:]:
             if pkt.tag in limit:
                 break
+            i += 1
             # Certification revocations live together with regular signatures
             # or so is the RFC saying
             if isinstance(pkt, PGP_UserID):
@@ -1612,7 +1627,7 @@ class PGP_MainKey(PGP_Key):
         newMainKey = self.clone()
         # Don't call initSubPackets on newMainKey here, or you end up with an
         # infinite loop.
-        for i, pkt in enumerate(subpkts[uidLimit:]):
+        for pkt in subpkts[uidLimit:]:
             if isinstance(pkt, PGP_SubKey):
                 pkt.mainKey = newMainKey
                 self.subkeys.append(pkt)
