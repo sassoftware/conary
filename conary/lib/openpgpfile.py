@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2005-2006 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -65,6 +64,10 @@ PKT_LITERAL_DATA       = 11 # Literal Data Packet
 PKT_TRUST              = 12 # Trust Packet
 PKT_USERID             = 13 # User ID Packet
 PKT_PUBLIC_SUBKEY      = 14 # Public Subkey Packet
+# Additions from http://tools.ietf.org/html/draft-ietf-openpgp-rfc2440bis-17
+PKT_USER_ATTRIBUTE     = 17 # User Attribute Packet
+PKT_DATA_PACKET        = 18 # Sym. Encrypted and Integrity Protected Data Packet
+PKT_MOD_DETECTION      = 19 # Modification Detection Code Packet
 PKT_PRIVATE1           = 60 # 60 to 63 -- Private or Experimental Values
 PKT_PRIVATE2           = 61
 PKT_PRIVATE3           = 62
@@ -230,13 +233,6 @@ class ShortReadError(InvalidBodyError):
         self.expected = expected
         self.actual = actual
 
-def readBlockType(keyRing):
-    r=keyRing.read(1)
-    if r != '':
-        return ord(r)
-    else:
-        return -1
-
 def getKeyId(keyRing):
     pkt = newPacketFromStream(keyRing, start = -1)
     assert pkt is not None
@@ -251,11 +247,6 @@ def seekKeyById(keyId, keyRing):
     except StopIteration:
         return False
 
-# it might seem counterproductive to re-create the key within this function,
-# but alas, we don't always need the key associated with the keyId we're
-# trying to verify (think subkeys)
-# if you play with this chunk of code be careful to not use high-level
-# functions lest you cause inadverdent recursion.
 def verifySelfSignatures(keyId, stream):
     msg = PGP_Message(stream, start = 0)
     try:
@@ -264,35 +255,6 @@ def verifySelfSignatures(keyId, stream):
         raise KeyNotFound(keyId)
 
     return pkt.verifySelfSignatures()
-
-def seekNextPacket(keyRing):
-    packetType=readBlockType(keyRing)
-    dataSize = readBlockSize(keyRing, packetType)
-    keyRing.seek(dataSize, SEEK_CUR)
-
-def seekNextKey(keyRing):
-    done = 0
-    while not done:
-        seekNextPacket(keyRing)
-        packetType = readBlockType(keyRing)
-        if packetType != -1:
-            keyRing.seek(-1, SEEK_CUR)
-        if ((packetType == -1)
-            or ((not (packetType & 64))
-                and (((packetType >> 2) & 15) in PKT_ALL_KEYS))):
-            done = 1
-
-def seekNextSignature(keyRing):
-    done = 0
-    while not done:
-        seekNextPacket(keyRing)
-        packetType = readBlockType(keyRing)
-        if packetType != -1:
-            keyRing.seek(-1,SEEK_CUR)
-        if ((packetType == -1)
-            or ((not (packetType&64))
-                and (((packetType >> 2) & 15) == PKT_SIG))):
-            done = 1
 
 def fingerprintToInternalKeyId(fingerprint):
     if len(fingerprint) == 0:
@@ -353,41 +315,6 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
         r += d.digest()
         iteration += 1
     return r[:keyLength]
-
-def readBlockSize(keyRing, packetType):
-    if packetType == -1:
-        return 0
-    # check if packet is old or new style
-    dataSize = -1
-    if not packetType & 64:
-        # RFC 2440 4.2.1 - Old-Format Packet Lengths
-        if (packetType & 3) == OLD_PKT_LEN_ONE_OCTET:
-            sizeLen = 1
-        elif (packetType & 3) == OLD_PKT_LEN_TWO_OCTET:
-            sizeLen = 2
-        elif (packetType & 3) == OLD_PKT_LEN_FOUR_OCTET:
-            sizeLen = 4
-        else:
-            raise MalformedKeyRing("Can't get size of packet of indeterminate length.")
-    else:
-        # RFC 2440 4.2.2 - New-Format Packet Lengths
-        octet=ord(keyRing.read(1))
-        if octet < 192:
-            sizeLen=1
-            keyRing.seek(-1, SEEK_CUR)
-        elif octet < 224:
-            dataSize = (octet - 192 ) * 256 + \
-                       ord(keyRing.read(1)) + 192
-        elif octet < 255:
-            dataSize = 1 << (octet & 0x1f)
-        else:
-            sizeLen=4
-    # if we have not already calculated datasize, calculate it now
-    if dataSize == -1:
-        dataSize = 0
-        for i in range(0, sizeLen):
-            dataSize = (dataSize * 256) + ord(keyRing.read(1))
-    return dataSize
 
 def getPublicKey(keyId, keyFile=''):
     if keyFile == '':
@@ -551,76 +478,8 @@ def parseAsciiArmorKey(asciiData):
 # rules one and two are to prevent repo breakage
 # rule three is to enforce a modicum of sanity to the security posture
 def assertReplaceKeyAllowed(origKey, newKey):
-    origRing = StringIO(origKey)
-    newRing = StringIO(newKey)
-    fingerprint = getKeyId(origRing)
-    if fingerprint != getKeyId(newRing):
-        origRing.close()
-        newRing.close()
-        raise IncompatibleKey("Attempting to replace key %s with a different key is not allowed" %fingerprint)
-    origKeyIds = []
-    newKeyIds = []
-    # make a list of keyIds from the original key
-    origRing.seek(0, SEEK_END)
-    limit = origRing.tell()
-    origRing.seek(0)
-    while origRing.tell() < limit:
-        origKeyIds.append(getKeyId(origRing))
-        seekNextKey(origRing)
-    # make a list of keyIds from the new key
-    newRing.seek(0, SEEK_END)
-    limit = newRing.tell()
-    newRing.seek(0)
-    while newRing.tell() < limit:
-        newKeyIds.append(getKeyId(newRing))
-        seekNextKey(newRing)
-    # ensure no keys were lost
-    origRing.seek(0)
-    newRing.seek(0)
-    for keyId in origKeyIds:
-        if keyId not in newKeyIds:
-            origRing.close()
-            newRing.close()
-            raise IncompatibleKey("Attempting to remove a subkey from key %s is not allowed" %fingerprint)
-    # for the main key and all subkeys in the original key:
-    # loop thru all the revocations and ensure the new key contains at least
-    # those revocations
-    origRing.seek(0, SEEK_END)
-    limit = origRing.tell()
-    origRing.seek(0)
-    seekNextSignature(origRing)
-    while origRing.tell() < limit:
-        # ensure sig is in fact a revocation.
-        sigStartPoint = origRing.tell()
-        blockType = readBlockType(origRing)
-        try:
-            readBlockSize(origRing, blockType)
-        except:
-            origRing.close()
-            newRing.close()
-            raise
-        if ord(origRing.read(1)) != 4:
-            origRing.close()
-            newRing.close()
-            raise IncompatibleKey("Only V4 signatures allowed")
-        sigType = ord(origRing.read(1))
-        origRing.seek(sigStartPoint)
-        # if it is a revocation, read in the entire revocation packet
-        if sigType in (SIG_TYPE_KEY_REVOC, SIG_TYPE_SUBKEY_REVOC, SIG_TYPE_CERT_REVOC):
-            seekNextPacket(origRing)
-            packetLength = origRing.tell() - sigStartPoint
-            origRing.seek(sigStartPoint)
-            revocPacket = origRing.read(packetLength)
-            origRing.seek(sigStartPoint)
-            # use substring matching to ensure revocation is still in new key
-            if revocPacket not in newKey:
-                origRing.close()
-                newRing.close()
-                raise IncompatibleKey("Removing a revocation from key %s is not allowed" %fingerprint)
-        # seek to next signature
-        seekNextSignature(origRing)
-    origRing.close()
-    newRing.close()
+    if not newKey.isSupersetOf(origKey):
+        raise IncompatibleKey("Attempting to replace a key with a non-superset")
 
 # this code is GnuPG specific. RFC 2440 indicates the existence of trust
 # packets inside a keyring. GnuPG ignores this convention and keeps trust
@@ -730,13 +589,17 @@ class PGP_Message(object):
 
     def iterKeys(self):
         """Iterate over all keys"""
-        # Store the main key while we're here
+        for pkt in self.iterMainKeys():
+            yield pkt
+            for subkey in pkt.iterSubKeys():
+                yield subkey
+
+    def iterMainKeys(self):
+        """Iterate over main keys"""
         for pkt in self.iterPackets():
             if isinstance(pkt, PGP_MainKey):
                 pkt.initSubPackets()
                 yield pkt
-                for subkey in pkt.iterSubKeys():
-                    yield subkey
 
     def iterByKeyId(self, keyId):
         """Iterate over the keys with this key ID"""
@@ -898,6 +761,17 @@ class PGP_BasePacket(object):
             assert hasattr(stream, 'pread')
         self._nextStream = stream
         self._nextStreamPos = pos
+
+    def clone(self):
+        """Produce another packet identical with this one"""
+        # Create new body stream sharing the same file
+        newBodyStream = util.SeekableNestedFile(self._bodyStream.file,
+            self._bodyStream.size, self._bodyStream.start)
+
+        newPkt = newPacket(self.tag, newBodyStream,
+                    newStyle = self._newStyle, minHeaderLen = self.headerLength)
+        newPkt.setNextStream(self._nextStream, self._nextStreamPos)
+        return newPkt
 
     def validate(self):
         """To be overridden by various subclasses"""
@@ -1110,6 +984,19 @@ class PGP_BasePacket(object):
             yield pkt
             pkt = pkt.next()
 
+    @staticmethod
+    def _hashSet(items):
+        """Hashes the items in items through sha, and return a set of the
+        computed digests.
+        Each item is expected to be a stream"""
+
+        ret = set([])
+        for stream in items:
+            stream.seek(0)
+            hobj = sha.new()
+            PGP_BasePacket._updateHash(hobj, stream)
+            ret.add(hobj.digest())
+        return ret
 
 class PGP_Packet(PGP_BasePacket):
     """Anonymous PGP packet"""
@@ -1722,9 +1609,7 @@ class PGP_MainKey(PGP_Key):
         # Read until the end
         # We don't want to point back to ourselves, or we'll create a
         # circular loop.
-        newMainKey = newPacket(self.tag, self._bodyStream,
-                    newStyle = self._newStyle, minHeaderLen = self.headerLength)
-        newMainKey.setNextStream(self._nextStream, self._nextStreamPos)
+        newMainKey = self.clone()
         # Don't call initSubPackets on newMainKey here, or you end up with an
         # infinite loop.
         for i, pkt in enumerate(subpkts[uidLimit:]):
@@ -1809,32 +1694,41 @@ class PGP_MainKey(PGP_Key):
         return pkpkt, pgpKey
 
     def isSupersetOf(self, key):
-        """Check if this key is a superset of key"""
+        """Check if this key is a superset of key
+        We try to make sure that:
+        - the keys have the same ID
+        - this key's set of revocation signatures is a superset of the other
+          key's revocations
+        - this key's set of subkeys is a superset of the other key's subkeys
+        - this key's set of userids is a superset of the other key's userids
+        """
         if self.tag != key.tag:
             raise IncompatibleKey("Attempting to compare different key types")
         if self.getKeyId() != key.getKeyId():
             raise IncompatibleKey("Attempting to compare different keys")
 
-        thisSubkeyIds = set(x.getKeyId() for x in self.iterSubKeys())
-        otherSubkeyIds = set(x.getKeyId() for x in key.iterSubKeys())
-        if not thisSubkeyIds.issuperset(otherSubkeyIds):
+        thisSubkeyIds = dict((x.getKeyId(), x) for x in self.iterSubKeys())
+        otherSubkeyIds = dict((x.getKeyId(), x) for x in key.iterSubKeys())
+        if not set(thisSubkeyIds).issuperset(otherSubkeyIds):
             # Missing subkey
             return False
 
-        # XXX
+        thisUids = dict((x.id, x) for x in self.iterUserIds())
+        otherUids = dict((x.id, x) for x in key.iterUserIds())
+        if not set(thisUids).issuperset(otherUids):
+            # Missing uid
+            return False
 
-    def _hashSet(self, items):
-        """Hashes the items in items through sha, and return a set of the
-        computed digests.
-        Each item is expected to be a stream"""
+        thisRevSigs = self._hashSet(x.getBodyStream() for x in self.revsigs)
+        otherRevSigs = self._hashSet(x.getBodyStream() for x in key.revsigs)
+        if not thisRevSigs.issuperset(otherRevSigs):
+            # Missing revocation signature
+            return False
 
-        ret = ()
-        for stream in items:
-            stream.seek(0)
-            hobj = sha.new()
-            self._updateHash(hobj, stream)
-            ret.add(hobj.digest())
-        return ret
+        # XXX More work to be done here, we would have to verify that
+        # signatures don't change. This is what the old code was doing (and it
+        # wasn't actually verifying user ids either ) -- misa
+        return True
 
     def getUserIds(self):
         return [ pkt.id for pkt in self.iterUserIds() ]
@@ -2089,6 +1983,23 @@ def newPacketFromStream(stream, start = -1):
         f.seek(stream.tell())
         stream = f
     return PGP_PacketFromStream().read(stream, start = start)
+
+def newKeyFromString(data):
+    """Create a new (main) key from the data
+    Returns None if a key was not found"""
+    return newKeyFromStream(util.ExtendedStringIO(data))
+
+def newKeyFromStream(stream):
+    """Create a new (main) key from the stream
+    Returns None if a key was not found"""
+    pkt = newPacketFromStream(stream)
+    if pkt is None:
+        return None
+    if not isinstance(pkt, PGP_MainKey):
+        return None
+    pkt.initSubPackets()
+    return pkt
+
 
 def len2bytes(v1, v2):
     """Return the packet body length when represented on 2 bytes"""
