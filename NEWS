@@ -77,6 +77,8 @@ Changes in @NEW@:
       not conditional. (CNY-612)
     * Ensure that two binaries with the same source count but different
       build counts end up with the same build count after cloning. (CNY-1871)
+    * Redirects will now be followed in group recipes.  Previously including
+      redirects would result in an error. (CNY-1693)
 
   o Scripts Changes:
     * Repository database migration scripts have been integrated into a 
