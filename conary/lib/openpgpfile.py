@@ -379,8 +379,9 @@ def getKeyEndOfLifeFromString(keyId, data):
 
 def getUserIdsFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
-    msg = newPacketFromStream(keyRing)
-    key = msg.iterByKeyId(keyId)
+    key = seekKeyById(keyId, keyRing)
+    if key is None:
+        return []
     return list(key.getUserIds())
 
 def getFingerprint(keyId, keyFile=''):
