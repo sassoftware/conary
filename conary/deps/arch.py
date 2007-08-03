@@ -82,3 +82,32 @@ def initializeArch():
 baseArch = os.uname()[4]
 currentArch = [[ deps.Dependency(baseArch) ]]
 initializeArch()
+
+class FlavorPreferences:
+    @staticmethod
+    def _getCurrentArchIS(arch):
+        # Returns just the name of the current arch
+        return ' '.join(sorted(dep.name for dep in arch[0]))
+
+    # The flavor preferences table is keyed on the current arch
+    flavorPreferences = {
+        'x86'           : ['is: x86'],
+        # We can get rid of the next line once x86_64 systems are primarily 
+        # biarch 
+        'x86_64'        : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
+        'x86 x86_64'    : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
+    }
+
+    @staticmethod
+    def getStringFlavorPreferences(arch):
+        key = FlavorPreferences._getCurrentArchIS(arch)
+        return FlavorPreferences.flavorPreferences.get(key, [])
+
+    @staticmethod
+    def getFlavorPreferences(arch):
+        return [ deps.parseFlavor(x)
+            for x in FlavorPreferences.getStringFlavorPreferences(arch)
+        ]
+
+def getFlavorPreferences(arch = currentArch):
+    return FlavorPreferences.getFlavorPreferences(arch)
