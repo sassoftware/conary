@@ -1435,11 +1435,25 @@ class DictAsCsf:
         (name, contType, contObj) = self.items[self.next]
         self.next += 1
 
-        compressedFile = StringIO()
-        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-        util.copyfileobj(contObj.get(), gzf)
-        gzf.close()
-        compressedFile.seek(0)
+        f = contObj.get()
+        contents = f.read(16384)
+        if len(contents) == 16384:
+            # too big; compress using a temporary file
+            (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
+            os.unlink(path)
+            gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
+            gzf.write(contents)
+            util.copyfileobj(f, gzf)
+            # don't close the result of contObj.get(); we may need it again
+            os.lseek(fd, 0, 0)
+            f = os.fdopen(fd, "r")
+            return (name, contType, f)
+        else:
+            compressedFile = StringIO()
+            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+            gzf.write(contents)
+            gzf.close()
+            compressedFile.seek(0)
 
         return (name, contType, compressedFile)
 
