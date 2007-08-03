@@ -189,8 +189,19 @@ class Nodes:
 	nodeId = cu.fetchone()
 	if nodeId is None:
 	    return default
-
 	return nodeId[0]
+
+    def updateSourceItemId(self, nodeId, sourceItemId):
+        cu = self.db.cursor()
+        cu.execute("select sourceItemId from Nodes where nodeId = ?", nodeId)
+        oldItemId = cu.fetchall()[0][0]
+        if oldItemId is None:
+            cu.execute("update Nodes set sourceItemId = ? where nodeId = ?",
+                       (sourceItemId, nodeId))
+            return True
+        if oldItemId != sourceItemId:
+            raise InvalidSourceNameError(nodeId, oldItemId, sourceItemId)
+        return False # noop
 
 class SqlVersioning:
 
@@ -322,3 +333,13 @@ class DuplicateVersionError(SqlVersionsError):
 	self.version = version
 	self.itemId = itemId
 
+class InvalidSourceNameError(SqlVersionsError):
+    def __str__(self):
+        return "nodeid %d cannot change sourceItemId from %d to %d" % (
+            self.nodeId, self.oldItemId, self.newItemId)
+    def __init__(self, nodeId, oldItemId, newItemId):
+        SqlVersionsError.__init__(self)
+        self.nodeId = nodeId
+        self.oldItemId = oldItemId
+        self.newItemId = newItemId
+        

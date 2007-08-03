@@ -108,7 +108,7 @@ class TroveStore:
 					 troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
         if isPresent != instances.INSTANCE_PRESENT_MISSING:
-	    self.instances.setPresent(theId, isPresent)
+	    self.instances.update(theId, isPresent=isPresent, clonedFromId=clonedFromId)
             self.items.setTroveFlag(itemId, 1)
  	return theId
 
@@ -260,8 +260,7 @@ class TroveStore:
 	newVersion = False
 	troveVersionId = self.versionTable.get(troveVersion, None)
 	if troveVersionId is not None:
-	    nodeId = self.versionOps.nodes.getRow(troveItemId,
-						  troveVersionId, None)
+	    nodeId = self.versionOps.nodes.getRow(troveItemId, troveVersionId, None)
 
 	troveFlavor = trv.getFlavor()
 
@@ -328,7 +327,10 @@ class TroveStore:
 
 	    if trv.getChangeLog() and trv.getChangeLog().getName():
 		self.changeLogs.add(nodeId, trv.getChangeLog())
-
+        elif sourceName: # make sure the sourceItemId matches for the trove we are comitting
+            sourceItemId = self.items.getOrAddId(sourceName)
+            self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId)
+                                         
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
         if hidden:
@@ -343,8 +345,7 @@ class TroveStore:
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
         troveBranchId = self.branchTable[troveVersion.branch()]
-        self.versionOps.updateLatest(troveItemId, troveBranchId,
-                                     troveFlavorId)
+        self.versionOps.updateLatest(troveItemId, troveBranchId, troveFlavorId)
 
         self.depTables.add(cu, trv, troveInstanceId)
 
@@ -464,24 +465,25 @@ class TroveStore:
             version = versions.ThawVersion(version)
 	    versionId = self.getVersionId(version)
 
+            # sourcename = None for now.
+            # will be fixed up when the real trove is comitted
 	    if versionId is not None:
-		nodeId = self.versionOps.nodes.getRow(itemId,
-						      versionId, None)
+		nodeId = self.versionOps.nodes.getRow(itemId, versionId, None)
 		if nodeId is None:
 		    (nodeId, versionId) = self.versionOps.createVersion(
-						    itemId, version,
-						    flavorId, sourceName,
-						    updateLatest = False)
+                        itemId, version, flavorId, sourceName = None,
+                        updateLatest = False)
 		del nodeId
             else:
                 (nodeId, versionId) = self.versionOps.createVersion(
-                                                itemId, version,
-                                                flavorId, sourceName,
-                                                updateLatest = False)
-
-            instanceId = self.getInstanceId(itemId, versionId, flavorId,
-                                clonedFromId, trv.getType(),
-                                isPresent = instances.INSTANCE_PRESENT_MISSING)
+                    itemId, version, flavorId, sourceName = None,
+                    updateLatest = False)
+            # cloneFromId = None for now.
+            # will get fixed when the trove is comitted.
+            instanceId = self.getInstanceId(
+                itemId, versionId, flavorId,
+                clonedFromId = None, troveType =  trv.getType(),
+                isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""
         INSERT INTO TroveTroves (instanceId, includedId, flags)
