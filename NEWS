@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Client Changes:
+    * A new configuration option, "flavorPreferences", has been added.
+      The client uses this list of flavors in trove selection. (CNY-1710)
+
   o Build Changes:
     * Redirects will now be followed in group recipes.  Previously including
       redirects would result in an error. (CNY-1693)
