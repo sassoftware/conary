@@ -259,16 +259,27 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         return findSourcesForGroup(repos, self, callback)
 
-    def _getSearchSource(self):
-        if isinstance(self.defaultSource, (list, tuple)):
-            return searchsource.createSearchSourceStack(self.searchSource,
+    def _getSearchSource(self, ref=None):
+        if ref is None:
+            if isinstance(self.defaultSource, (list, tuple)):
+                return searchsource.createSearchSourceStack(self.searchSource,
                                                         self.defaultSource,
                                                         self.getSearchFlavor())
-        else:
-            return searchsource.createSearchSourceStack(None,
+            else:
+                return searchsource.createSearchSourceStack(None,
                                                 [self.getLabelPath()],
                                                 self.getSearchFlavor(),
                                                 troveSource=self.troveSource)
+        elif isinstance(ref, (tuple, list)):
+            source = searchsource.createSearchSourceStack(searchSource,
+                                                      item, searchFlavor)
+        else:
+            source = ref
+            assert(isinstance(source, GroupReference))
+            source.findSources(defaultSource, searchFlavor)
+        return source
+
+
 
     def _parseFlavor(self, flavor):
         assert(flavor is None or isinstance(flavor, str))
@@ -1834,6 +1845,9 @@ class GroupReference:
     def getTroves(self, *args, **kw):
         return self.source.getTroves(*args, **kw)
 
+    def getTrove(self, *args, **kw):
+        return self.source.getTrove(*args, **kw)
+
     def getSourceTroves(self):
         """ Returns the list of troves that form this reference
             (without their children).
@@ -1922,6 +1936,10 @@ class TroveCache(dict):
     def getTroves(self, troveList, *args, **kw):
         self.cacheTroves(troveList)
         return [self[x] for x in troveList]
+
+    def getTrove(self, troveTup, *args, **kw):
+        self.cacheTroves([troveTup])
+        return self[troveTup]
 
     def cacheTroves(self, troveTupList):
         troveTupList = [x for x in troveTupList if x not in self]
@@ -2108,8 +2126,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
         # add troves to this group.
         unmatchedGlobalReplaceSpecs &= addTrovesToGroup(group, troveMap, cache,
-                                                    childGroups, repos, 
-                                                    groupMap)
+                                                    childGroups, repos,
+                                                    groupMap, recipeObj)
 
         log.debug('Troves in %s:' % group.name)
         for troveTup, isStrong, byDefault, _ in sorted(group.iterTroveListInfo()):
@@ -2201,6 +2219,22 @@ def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs,
 
     return results
 
+def followRedirect(recipeObj, trove, ref, reason):
+    log.info('Following redirects for trove %s=%s[%s]' % (
+                                    trove.getNameVersionFlavor()))
+    searchSource = recipeObj._getSearchSource(ref)
+    troveSpecs = [(x[0], str(x[1].label()), x[2]) for x in trove.iterRedirects()]
+    try:
+        results = searchSource.findTroves(troveSpecs)
+    except errors.TroveNotFound, err:
+        raise CookError('Could not find redirect target for %s=%s[%s].  Check your search path or remove redirect from recipe: %s' % (trove.getNameVersionFlavor() + (err,)))
+    troveTups = list(chain(*results.itervalues()))
+    for troveTup in troveTups:
+        log.info('Found %s=%s[%s] following redirect' % troveTup)
+    if not troveTups:
+        log.info('Redirect is to nothing')
+    return troveTups
+
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
         groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
@@ -2213,6 +2247,14 @@ def processAddAllDirectives(recipeObj, troveMap, cache, repos):
 def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
+    if topTrove.isRedirect():
+        troveTups = followRedirect(recipeObj, topTrove, flags.ref, 'addAll')
+        cache.cacheTroves(troveTups)
+        for troveTup in troveTups:
+            processOneAddAllDirective(parentGroup, troveTup, flags,
+                                      recipeObj, cache, repos)
+        return
+
     topGroup = parentGroup
 
     if flags.recurse:
@@ -2328,7 +2370,8 @@ def removeDifferences(group, differenceGroupList, differenceSpecs, troveMap,
                 group.delTrove(*troveTup)
 
 
-def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
+def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap,
+                      recipeObj):
     def _componentMatches(troveName, compList):
         if ':' not in troveName:
             return False
@@ -2345,9 +2388,17 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
         if byDefault is None:
             byDefault = group.getByDefault()
 
+        cache.getTroves(troveTupList, withFiles=False)
         for troveTup in troveTupList:
-            group.addTrove(troveTup, True, byDefault, components,
-                           reason=(ADD_REASON_ADDED,))
+            if cache.isRedirect(troveTup):
+                troveTups = followRedirect(recipeObj, cache.getTrove(troveTup),
+                                           refSource, 'add')
+                cache.cacheTroves(troveTups)
+            else:
+                troveTups = [troveTup]
+            for troveTup in troveTups:
+                group.addTrove(troveTup, True, byDefault, components,
+                               reason=(ADD_REASON_ADDED,))
 
     # remove/replace explicit troves
     removeSpecs = dict(group.iterRemoveSpecs())
@@ -2435,6 +2486,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
         assert(explicit)
 
         if cache.isRedirect(troveTup):
+
             # children of redirect troves are special, and not included.
             continue
 
