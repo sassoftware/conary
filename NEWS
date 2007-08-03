@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Build Changes:
+    * Redirects will now be followed in group recipes.  Previously including
+      redirects would result in an error. (CNY-1693)
+
+Changes in 1.1.90:
   o Major Changes:
     * Label multiplicity, in which a trove on the same label
       appearing on multiple branches was understood as meaning that
@@ -32,7 +37,7 @@ Changes in @NEW@:
       --replace-modified-files, and --replace-config-files. The original
       option is still accepted, and is equivalent to specifying all four
       of the new options simultaneously (CNY-1270)
-    * Now when updating, conary will never automatically drop an architecture
+    * When updating, conary will never automatically drop an architecture
       from an installed trove (unless you specify the flavor to update to 
       explicitly).  (CNY-1714)
     * Dependency resolution now allows updates to go across branches if the
@@ -43,22 +48,6 @@ Changes in @NEW@:
       configuration items came from.
     * Newly installed transient files now silently replace files which are
       otherwise unowned. (CNY-1841)
-
-  o Bug Fixes:
-    * Fix a bug in commit code that made r.macros.buildlabel unusable because
-      you could not commit recipes that used it.  (CNY-1752)
-    * An internal class, _AbstractPackageRecipe, has been renamed to
-      AbstractPackageRecipe, in order to allow the inclusion of its
-      methods in its subclasses' documentation pages.  The old name is
-      still available for compatibility with older modules.  (CNY-1848)
-    * Multiple entitlements can be stored for a single hostname or glob
-      (previously only the last hostname for a particular hostname/glob
-      would be used). (CNY-1825)
-    * Cloning the source component for filesets is now allowed.
-    * includeConfigFile now sorts files that are matched in globs
-    * The default settings from r.add() will now override the default
-      settings from an r.addAll() (CNY-1882)
-    * Cloning no longer downloads components that won't be cloned (CNY-1891)
 
   o Build Changes:
     * The cvc update command can now update multiple directories
@@ -82,6 +71,22 @@ Changes in @NEW@:
     * Repository database migration scripts have been integrated into a 
       common unit.
 
+  o Bug Fixes:
+    * Fix a bug in commit code that made r.macros.buildlabel unusable because
+      you could not commit recipes that used it.  (CNY-1752)
+    * An internal class, _AbstractPackageRecipe, has been renamed to
+      AbstractPackageRecipe, in order to allow the inclusion of its
+      methods in its subclasses' documentation pages.  The old name is
+      still available for compatibility with older modules.  (CNY-1848)
+    * Multiple entitlements can be stored for a single hostname or glob
+      (previously only the last hostname for a particular hostname/glob
+      would be used). (CNY-1825)
+    * Cloning the source component for filesets is now allowed.
+    * includeConfigFile now sorts files that are matched in globs
+    * The default settings from r.add() will now override the default
+      settings from an r.addAll() (CNY-1882)
+    * Cloning no longer downloads components that won't be cloned (CNY-1891)
+
   o Other changes:
     * The showchangeset script now displays information on redirect
       troves.
@@ -90,6 +95,10 @@ Changes in 1.1.31.4:
   o Server changes:
     * Fixed forceSSL for apache servers (which has been broken for a large
       number of releases) (CNY-1880)
+
+  o Client changes:
+    * Compress large files on disk instead of in memory when creating
+      rollbacks (CNY-1896)
 
 Changes in 1.1.31.3:
   o Server changes:
