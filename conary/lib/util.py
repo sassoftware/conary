@@ -1090,3 +1090,94 @@ class FileIgnoreEpipe:
 
     def __init__(self, f):
         self.f = f
+
+class BoundedStringIO(object):
+    """
+    An IO object that behaves like a StringIO.
+    Data is stored in memory (just like in a StringIO) if shorter than
+    maxMemorySize, or in a temporary file.
+    """
+    defaultMaxMemorySize = 65536
+    __slots__ = ['_backend', '_backendType', 'maxMemorySize']
+    def __init__(self, buf='', maxMemorySize=None):
+        if maxMemorySize is None:
+            maxMemorySize = object.__getattribute__(self, 'defaultMaxMemorySize')
+        self.maxMemorySize = maxMemorySize
+        # Store in memory by default
+        self._backend = StringIO.StringIO(buf)
+        self._backendType = "memory"
+
+    def _writeImpl(self, s):
+        backend = object.__getattribute__(self, '_backend')
+        if isinstance(backend, file):
+            # File backend
+            return backend.write(s)
+        # StringIO backend
+
+        maxMemorySize = object.__getattribute__(self, 'maxMemorySize')
+
+        # Save current position
+        curPos = backend.tell()
+        if curPos + len(s) < maxMemorySize:
+            # No danger to overflow the limit
+            return backend.write(s)
+
+        fd, name = tempfile.mkstemp(suffix=".tmp", prefix="tmpBSIO")
+        # Get rid of the file from the filesystem, we'll keep an open fd to it
+        os.unlink(name)
+        backendFile = os.fdopen(fd, "w+")
+        # Copy the data from the current StringIO (up to the current position)
+        backend.seek(0)
+        backendFile.write(backend.read(curPos))
+        ret = backendFile.write(s)
+        self._backend = backendFile
+        self._backendType = "file"
+        return ret
+
+    def _truncateImpl(self, size=None):
+        if size is None:
+            # Truncate to current position by default
+            size = self.tell()
+        backend = object.__getattribute__(self, '_backend')
+        maxMemorySize = object.__getattribute__(self, 'maxMemorySize')
+
+        if not isinstance(backend, file):
+            # Memory backend
+            # Truncating always reduces size, so we will not switch to a file
+            # for this case
+            return backend.truncate(size)
+
+        # File backend
+        if size > maxMemorySize:
+            # truncating a file to a size larger than the memory limit - just
+            # pass it through
+            return backend.truncate(size)
+
+        # Need to go from file to memory
+        # Read data from file first
+        backend.seek(0)
+        backendMem = StringIO.StringIO(backend.read(size))
+        self._backendType = "memory"
+        self._backend = backendMem
+        backend.close()
+
+    def getBackendType(self):
+        return object.__getattribute__(self, '_backendType')
+
+    def __getattribute__(self, attr):
+        # Passing calls to known local objects through
+        locs = ['_backend', '_backendType', 'getBackendType', 'maxMemorySize']
+        if attr in locs:
+            return object.__getattribute__(self, attr)
+
+        if attr == 'write':
+            # Return the real implementation of the write method
+            return object.__getattribute__(self, '_writeImpl')
+
+        if attr == 'truncate':
+            # Return the real implementation of the truncate method
+            return object.__getattribute__(self, '_truncateImpl')
+
+        backend = object.__getattribute__(self, '_backend')
+        return getattr(backend, attr)
+
