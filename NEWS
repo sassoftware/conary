@@ -6,6 +6,8 @@ Changes in @NEW@:
   o Build Changes:
     * Redirects will now be followed in group recipes.  Previously including
       redirects would result in an error. (CNY-1693)
+    * Derviced recipes couldn't be based on troves whose files were both
+      duplicated and members of different link groups (CNY-1733)
 
 Changes in 1.1.90:
   o Major Changes:

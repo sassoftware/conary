@@ -27,7 +27,6 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
     def _expandChangeset(self):
         destdir = self.macros.destdir
 
-        delayedRestores = {}
         ptrMap = {}
         byDefault = {}
 
@@ -55,6 +54,8 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                     [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
 
         fileList.sort()
+
+        restoreList = []
 
         for pathId, fileId, path, troveName in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
@@ -85,54 +86,53 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                                  fileObj.devt.major(), fileObj.devt.minor(),
                                  fileObj.inode.owner(), fileObj.inode.group(),
                                  fileObj.inode.perms())
+            elif fileObj.hasContents:
+                restoreList.append((pathId, fileId, fileObj, destdir, path))
             else:
-                if fileObj.hasContents:
-                    linkGroup = fileObj.linkGroup()
-                    if linkGroup:
-                        l = linkGroups.setdefault(linkGroup, [])
-                        l.append(path)
-
-                    (contentType, contents) = \
-                                    self.cs.getFileContents(pathId, fileId)
-                    if contentType == changeset.ChangedFileTypes.ptr:
-                        targetPtrId = contents.get().read()
-                        l = delayedRestores.setdefault(targetPtrId, [])
-                        l.append((fileObj, path))
-                        continue
-                    elif linkGroup and not linkGroup in linkGroupFirstPath:
-                        # only non-delayed restores can be initial target
-                        linkGroupFirstPath[linkGroup] = path
-
-                    assert(contentType == changeset.ChangedFileTypes.file)
-                else:
-                    contents = None
-
-                ptrId = pathId + fileId
-                if pathId in delayedRestores:
-                    ptrMap[pathId] = path
-                elif ptrId in delayedRestores:
-                    ptrMap[ptrId] = path
-
-                fileObj.restore(contents, destdir, destdir + path)
+                fileObj.restore(None, destdir, destdir + path)
 
             if isinstance(fileObj, files.Directory):
                 # remember to include this directory in the derived package
                 self.ExcludeDirectories(exceptions = path)
 
-        for targetPtrId in delayedRestores:
-            for fileObj, targetPath in delayedRestores[targetPtrId]:
-                sourcePath = ptrMap[targetPtrId]
-                fileObj.restore(
-                    filecontents.FromFilesystem(destdir + sourcePath),
-                    destdir, destdir + targetPath)
+        delayedRestores = {}
+        for pathId, fileId, fileObj, root, destPath in restoreList:
+            (contentType, contents) = \
+                            self.cs.getFileContents(pathId, fileId)
+            if contentType == changeset.ChangedFileTypes.ptr:
+                targetPtrId = contents.get().read()
+                l = delayedRestores.setdefault(targetPtrId, [])
+                l.append((root, fileObj, destPath))
+                continue
 
-        # we do not have to worry about cross-device hardlinks in destdir
-        for linkGroup in linkGroups:
-            for path in linkGroups[linkGroup]:
-                initialPath = linkGroupFirstPath[linkGroup]
-                if path == initialPath:
-                    continue
-                util.createLink(destdir + initialPath, destdir + path)
+            assert(contentType == changeset.ChangedFileTypes.file)
+
+            ptrId = pathId + fileId
+            if pathId in delayedRestores:
+                ptrMap[pathId] = path
+            elif ptrId in delayedRestores:
+                ptrMap[ptrId] = path
+
+            fileObj.restore(contents, root, root + destPath)
+
+            linkGroup = fileObj.linkGroup()
+            if linkGroup:
+                linkGroups[linkGroup] = destPath
+
+        for targetPtrId in delayedRestores:
+            for root, fileObj, targetPath in delayedRestores[targetPtrId]:
+                linkGroup = fileObj.linkGroup()
+                if linkGroup in linkGroups:
+                    util.createLink(destdir + linkGroups[linkGroup],
+                                    destdir + targetPath)
+                else:
+                    sourcePath = ptrMap[targetPtrId]
+                    fileObj.restore(
+                        filecontents.FromFilesystem(root + sourcePath),
+                        root, root + targetPath)
+
+                    if linkGroup:
+                        linkGroups[linkGroup] = targetPath
 
         self.useFlags = flavor
 
