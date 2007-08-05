@@ -606,14 +606,14 @@ class SearchableTroveSource(AbstractTroveSource):
         preferenceList = self._flavorPreferences
         if not preferenceList:
             return 0, flavorList
-        flavorList = [ (x.toStrongFlavor(), x) for x in flavorList ]
-        preferenceList = enumerate(preferenceList[:scoreToMatch + 1])
-        for prefScore, preferenceFlavor in preferenceList:
-            matchingFlavors = [ x[1] for x in flavorList 
+        strongList = [ (x.toStrongFlavor(), x) for x in flavorList ]
+        indexedList = enumerate(preferenceList[:scoreToMatch + 1])
+        for prefScore, preferenceFlavor in indexedList:
+            matchingFlavors = [ x[1] for x in strongList
                                 if x[0].satisfies(preferenceFlavor) ]
             if matchingFlavors:
                 return prefScore, matchingFlavors
-        return None, []
+        return len(preferenceList), flavorList
 
     def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList, 
                                scoreCache):
