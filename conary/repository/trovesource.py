@@ -613,7 +613,10 @@ class SearchableTroveSource(AbstractTroveSource):
                                 if x[0].satisfies(preferenceFlavor) ]
             if matchingFlavors:
                 return prefScore, matchingFlavors
-        return len(preferenceList), flavorList
+        curScore = len(preferenceList)
+        if curScore <= scoreToMatch:
+            return len(preferenceList), flavorList
+        return None, []
 
     def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList, 
                                scoreCache):
