@@ -744,7 +744,7 @@ class addPatch(_Source):
         if self.level != None:
             leveltuple = (self.level,)
         else:
-            leveltuple = (1, 0, 2, 3,)
+            leveltuple = (1, 0, 2, 3, 4,)
         util.mkdirChain(destDir)
 
         pin = util.popen("%s '%s'" %(provides, f))
