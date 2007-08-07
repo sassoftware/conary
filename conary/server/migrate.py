@@ -13,10 +13,10 @@
 import sys
 
 from conary import files, trove, versions
-from conary.dbstore import migration, sqlerrors, sqllib
+from conary.dbstore import migration, sqlerrors, sqllib, idtable
 from conary.lib.tracelog import logMe
 from conary.deps import deps
-from conary.repository.netrepos import versionops, trovestore
+from conary.repository.netrepos import versionops, trovestore, instances
 from conary.server import schema
 
 # SCHEMA Migration
@@ -124,95 +124,103 @@ class MigrateTo_14(SchemaMigration):
         self.db.loadSchema()
         return self.Version
 
+def rebuildLatest(db):
+    cu = db.cursor()
+    logMe(2, "Updating the Latest table...")
+    cu.execute("DROP TABLE Latest")
+    db.loadSchema()
+    schema.createLatest(db)
+
+    # As a matter of choice, the Latest table only includes stuff that
+    # has the isPresent flag to NORMAL. This means we exclude from
+    # computation the missing and hidden troves
+    cu.execute("""
+    insert into Latest (itemId, branchId, flavorId, versionId, latestType)
+    select
+        instances.itemid as itemid,
+        nodes.branchid as branchid,
+        instances.flavorid as flavorid,
+        nodes.versionid as versionid,
+        %(type)d
+    from
+    ( select
+        i.itemid as itemid,
+        n.branchid as branchid,
+        i.flavorid as flavorid,
+        max(n.finalTimestamp) as finaltimestamp
+      from instances as i join nodes as n using(itemId, versionId)
+      where i.isPresent = %(present)d
+      group by i.itemid, n.branchid, i.flavorid
+    ) as tmp
+    join nodes using(itemId, branchId, finalTimestamp)
+    join instances using(itemId, versionId)
+    where instances.flavorid = tmp.flavorid
+      and instances.isPresent = %(present)d
+    """ % {"type" : versionops.LATEST_TYPE_ANY,
+           "present" : instances.INSTANCE_PRESENT_NORMAL, })
+    # latest type present excludes the removed troves from computation
+    cu.execute("""
+    insert into Latest (itemId, branchId, flavorId, versionId, latestType)
+    select
+        instances.itemid as itemid,
+        nodes.branchid as branchid,
+        instances.flavorid as flavorid,
+        nodes.versionid as versionid,
+        %(type)d
+    from
+    ( select
+        i.itemid as itemid,
+        n.branchid as branchid,
+        i.flavorid as flavorid,
+        max(n.finalTimestamp) as finaltimestamp
+      from instances as i join nodes as n using(itemId, versionId)
+      where i.isPresent = %(present)d
+        and i.troveType != %(trove)d
+      group by i.itemid, n.branchid, i.flavorid
+    ) as tmp
+    join nodes using(itemId, branchId, finalTimestamp)
+    join instances using(itemId, versionId)
+    where instances.flavorid = tmp.flavorid
+      and instances.isPresent = %(present)d
+      and instances.troveType != %(trove)d
+    """ % {"type" : versionops.LATEST_TYPE_PRESENT,
+           "present" : instances.INSTANCE_PRESENT_NORMAL,
+           "trove" : trove.TROVE_TYPE_REMOVED, })
+    # latest type normal excludes the removed and redirect troves from computation
+    cu.execute("""
+    insert into Latest (itemId, branchId, flavorId, versionId, latestType)
+    select
+        instances.itemid as itemid,
+        nodes.branchid as branchid,
+        instances.flavorid as flavorid,
+        nodes.versionid as versionid,
+        %(type)d
+    from
+    ( select
+        i.itemid as itemid,
+        n.branchid as branchid,
+        i.flavorid as flavorid,
+        max(n.finalTimestamp) as finaltimestamp
+      from instances as i join nodes as n using(itemId, versionId)
+      where i.isPresent = %(present)d
+        and i.troveType = %(trove)d
+      group by i.itemid, n.branchid, i.flavorid
+    ) as tmp
+    join nodes using(itemId, branchId, finalTimestamp)
+    join instances using(itemId, versionId)
+    where instances.flavorid = tmp.flavorid
+      and instances.isPresent = %(present)d
+      and instances.troveType = %(trove)d
+    """ % {"type" : versionops.LATEST_TYPE_NORMAL,
+           "present" :  instances.INSTANCE_PRESENT_NORMAL,
+           "latest" : versionops.LATEST_TYPE_PRESENT,
+           "trove" : trove.TROVE_TYPE_NORMAL, })
+    return True
+    
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 5)
-    def updateLatest(self, cu):
-        logMe(2, "Updating the Latest table...")
-        cu.execute("DROP TABLE Latest")
-        self.db.loadSchema()
-        schema.createLatest(self.db)
-
-        cu.execute("""
-            insert into Latest (itemId, branchId, flavorId, versionId,
-                                latestType)
-                select
-                    instances.itemid as itemid,
-                    nodes.branchid as branchid,
-                    instances.flavorid as flavorid,
-                    nodes.versionid as versionid,
-                    %d
-                from
-                    ( select
-                        i.itemid as itemid,
-                        n.branchid as branchid,
-                        i.flavorid as flavorid,
-                        max(n.finalTimestamp) as finaltimestamp
-                      from
-                        instances as i, nodes as n
-                      where
-                            i.itemid = n.itemid
-                        and i.versionid = n.versionid
-                      group by i.itemid, n.branchid, i.flavorid
-                    ) as tmp
-                    join nodes on
-                      tmp.itemid = nodes.itemid and
-                      tmp.branchid = nodes.branchid and
-                      tmp.finaltimestamp = nodes.finaltimestamp
-                    join instances on
-                      nodes.itemid = instances.itemid and
-                      nodes.versionid = instances.versionid and
-                      instances.flavorid = tmp.flavorid
-        """ % versionops.LATEST_TYPE_ANY)
-
-        self.cu.execute("""
-            insert into Latest (itemId, branchId, flavorId, versionId,
-                                latestType)
-                select
-                    instances.itemid as itemid,
-                    nodes.branchid as branchid,
-                    instances.flavorid as flavorid,
-                    nodes.versionid as versionid,
-                    %d
-                from
-                    ( select
-                        i.itemid as itemid,
-                        n.branchid as branchid,
-                        i.flavorid as flavorid,
-                        max(n.finalTimestamp) as finaltimestamp
-                      from
-                        instances as i, nodes as n
-                      where
-                            i.itemid = n.itemid
-                        and i.versionid = n.versionid
-                        and i.troveType != %d
-                      group by i.itemid, n.branchid, i.flavorid
-                    ) as tmp
-                    join nodes on
-                      tmp.itemid = nodes.itemid and
-                      tmp.branchid = nodes.branchid and
-                      tmp.finaltimestamp = nodes.finaltimestamp
-                    join instances on
-                      nodes.itemid = instances.itemid and
-                      nodes.versionid = instances.versionid and
-                      instances.flavorid = tmp.flavorid
-        """ % (versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_REMOVED))
-
-        self.cu.execute("""
-            insert into Latest (itemId, branchId, flavorId, versionId,
-                                latestType)
-                select
-                    instances.itemid as itemid,
-                    latest.branchid as branchid,
-                    instances.flavorid as flavorid,
-                    instances.versionid as versionid,
-                    %d
-                from Latest join Instances
-                    using (itemId, versionId, flavorId)
-                where
-                    latest.latestType = %d AND
-                    instances.troveType = %d
-        """ % (versionops.LATEST_TYPE_NORMAL,
-               versionops.LATEST_TYPE_PRESENT, trove.TROVE_TYPE_NORMAL))
+    Version = (15, 7)
+    def updateLatest(self):
+        return rebuildLatest(self.db)
 
     # update a trove signatures, if required
     def fixTroveSig(self, repos, instanceId):
@@ -371,7 +379,7 @@ class MigrateTo_15(SchemaMigration):
         self.fixRedirects(repos)
         self.fixDuplicatePaths(repos)
         self.fixPermissions()
-        self.updateLatest(cu)
+        self.updateLatest()
         return True
     # migrate to 15.1
     def migrate1(self):
@@ -408,6 +416,61 @@ class MigrateTo_15(SchemaMigration):
         self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
                             'itemId, branchId')
         return True
+
+    # 15.6 - fix for the wrong values of clonedFromId and sourceItemId
+    def migrate6(self):
+        # because Troveinfo.data is treated as a blob, we have to do
+        # the processing in python
+        nodesIdList = []
+        instancesIdList = []
+        cu = self.db.cursor()
+        logMe(2, "checking for bad clonedFromId entries...")
+        cu.execute("""
+        select Instances.instanceId, TroveInfo.data, Versions.version
+        from Instances
+        join TroveInfo using(instanceId)
+        left join Versions on Instances.clonedfromId = Versions.versionId
+        where TroveInfo.infotype = ?""", trove._TROVEINFO_TAG_CLONEDFROM)
+        for instanceId, tiVersion, currentVersion in cu:
+            correctVersion = cu.frombinary(tiVersion)
+            if correctVersion == currentVersion:
+                continue
+            instancesIdList.append((instanceId, correctVersion))
+        logMe(2, "checking for bad sourceItemId entries...")
+        # we need to force a "last one wins" policy
+        cu.execute("""
+        select maxNodes.nodeId, TroveInfo.data, Items.item
+        from ( select N.nodeId as nodeId, max(I.instanceId) as instanceId
+               from Nodes As N join Instances as I using(itemId, versionId)
+               group by N.nodeId ) as maxNodes
+        join Nodes on maxNodes.nodeId = Nodes.nodeId
+        join TroveInfo on maxNodes.instanceId = TroveInfo.instanceId
+        left join Items on Nodes.sourceItemId = Items.itemId
+        where TroveInfo.infoType = ?
+        """, trove._TROVEINFO_TAG_SOURCENAME)
+        for nodeId, tiSourceName, currentSourceName in cu:
+            correctSourceName = cu.frombinary(tiSourceName)
+            if correctSourceName == currentSourceName:
+                continue
+            nodesIdList.append((nodeId, correctSourceName))
+        # these are needed for looping ops
+        iT = idtable.IdTable(self.db, 'Items', 'itemId', 'item')
+        vT = idtable.IdTable(self.db, 'Versions', 'versionId', 'version')
+        logMe(2, "Fixing %d bad clonedFromId entries..." % (len(instancesIdList),))
+        # these shouldn't be that many, really - we can afford to loop over each one
+        for (instanceId, versionStr) in instancesIdList:
+            versionId = vT.getOrAddId(versionStr)
+            cu.execute("update Instances set clonedFromId = ? where instanceId = ?",
+                       (versionId, instanceId))
+        logMe(2, "Fixing %d bad sourceItemId entries..." % (len(nodesIdList),))
+        for (nodeId, sourceName) in nodesIdList:
+            itemId = iT.getOrAddId(sourceName)
+            cu.execute("update Nodes set sourceItemId = ? where nodeId = ?",
+                       (itemId, nodeId))
+        return True
+    # 15.7 - rebuild the Latest table to consider only the isPresent = NORMAL instances
+    def migrate7(self):
+        return rebuildLatest(self.db)
     
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
