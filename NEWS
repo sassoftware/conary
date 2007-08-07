@@ -4,6 +4,7 @@ Changes in 1.1.31.4:
       number of releases) (CNY-1880)
     * commit correct values for sourceItemId and clonedFromId when
       groups and components are comitted as part of the same changeset (CNY-1903)
+    * Latest table no longer includes references to missing troves (CNY-1909)
 
   o Client changes:
     * Compress large files on disk instead of in memory when creating
