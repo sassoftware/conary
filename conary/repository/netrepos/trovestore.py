@@ -235,7 +235,7 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewFiles')
 	return (cu, trv, hidden)
 
-    def addTroveDone(self, troveInfo):
+    def addTroveDone(self, troveInfo, mirror=False):
 	(cu, trv, hidden) = troveInfo
 
         self.log(3, trv)
@@ -329,7 +329,7 @@ class TroveStore:
 		self.changeLogs.add(nodeId, trv.getChangeLog())
         elif sourceName: # make sure the sourceItemId matches for the trove we are comitting
             sourceItemId = self.items.getOrAddId(sourceName)
-            self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId)
+            self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId, mirrorMode=mirror)
                                          
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)

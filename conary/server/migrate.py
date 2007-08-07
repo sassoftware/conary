@@ -13,7 +13,7 @@
 import sys
 
 from conary import files, trove, versions
-from conary.dbstore import migration, sqlerrors, sqllib
+from conary.dbstore import migration, sqlerrors, sqllib, idtable
 from conary.lib.tracelog import logMe
 from conary.deps import deps
 from conary.repository.netrepos import versionops, trovestore
@@ -125,7 +125,7 @@ class MigrateTo_14(SchemaMigration):
         return self.Version
 
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 5)
+    Version = (15, 6)
     def updateLatest(self, cu):
         logMe(2, "Updating the Latest table...")
         cu.execute("DROP TABLE Latest")
@@ -406,7 +406,58 @@ class MigrateTo_15(SchemaMigration):
         self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
         return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
                                    'itemId, branchId')
-
+    # 15.6 - fix for the wrong values of clonedFromId and sourceItemId
+    def migrate6(self):
+        # because Troveinfo.data is treated as a blob, we have to do
+        # the processing in python
+        nodesIdList = []
+        instancesIdList = []
+        cu = self.db.cursor()
+        logMe(2, "checking for bad clonedFromId entries...")
+        cu.execute("""
+        select Instances.instanceId, TroveInfo.data, Versions.version
+        from Instances
+        join TroveInfo using(instanceId)
+        left join Versions on Instances.clonedfromId = Versions.versionId
+        where TroveInfo.infotype = ?""", trove._TROVEINFO_TAG_CLONEDFROM)
+        for instanceId, tiVersion, currentVersion in cu:
+            correctVersion = cu.frombinary(tiVersion)
+            if correctVersion == currentVersion:
+                continue
+            instancesIdList.append((instanceId, correctVersion))
+        logMe(2, "checking for bad sourceItemId entries...")
+        # we need to force a "last one wins" policy
+        cu.execute("""
+        select maxNodes.nodeId, TroveInfo.data, Items.item
+        from ( select N.nodeId as nodeId, max(I.instanceId) as instanceId
+               from Nodes As N join Instances as I using(itemId, versionId)
+               group by N.nodeId ) as maxNodes
+        join Nodes on maxNodes.nodeId = Nodes.nodeId
+        join TroveInfo on maxNodes.instanceId = TroveInfo.instanceId
+        left join Items on Nodes.sourceItemId = Items.itemId
+        where TroveInfo.infoType = ?
+        """, trove._TROVEINFO_TAG_SOURCENAME)
+        for nodeId, tiSourceName, currentSourceName in cu:
+            correctSourceName = cu.frombinary(tiSourceName)
+            if correctSourceName == currentSourceName:
+                continue
+            nodesIdList.append((nodeId, correctSourceName))
+        # these are needed for looping ops
+        iT = idtable.IdTable(self.db, 'Items', 'itemId', 'item')
+        vT = idtable.IdTable(self.db, 'Versions', 'versionId', 'version')
+        logMe(2, "Fixing %d bad clonedFromId entries..." % (len(instancesIdList),))
+        # these shouldn't be that many, really - we can afford to loop over each one
+        for (instanceId, versionStr) in instancesIdList:
+            versionId = vT.getOrAddId(versionStr)
+            cu.execute("update Instances set clonedFromId = ? where instanceId = ?",
+                       (versionId, instanceId))
+        logMe(2, "Fixing %d bad sourceItemId entries..." % (len(nodesIdList),))
+        for (nodeId, sourceName) in nodesIdList:
+            itemId = iT.getOrAddId(sourceName)
+            cu.execute("update Nodes set sourceItemId = ? where nodeId = ?",
+                       (itemId, nodeId))
+        return True
+    
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
 def createLabelMap(db):
