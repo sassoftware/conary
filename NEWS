@@ -2,6 +2,8 @@ Changes in 1.1.31.4:
   o Server changes:
     * Fixed forceSSL for apache servers (which has been broken for a large
       number of releases) (CNY-1880)
+    * commit correct values for sourceItemId and clonedFromId when
+      groups and components are comitted as part of the same changeset (CNY-1903)
 
   o Client changes:
     * Compress large files on disk instead of in memory when creating
