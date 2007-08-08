@@ -191,7 +191,11 @@ class IterCursor(Cursor):
 class Llist(list):
     def __contains__(self, item):
         return item.lower() in [x.lower() for x in list.__iter__(self)]
-
+    def remove(self, item):
+        return list.pop(self, self.index(item))
+    def index(self, item):
+        return [x.lower() for x in list.__iter__(self)].index(item.lower())
+                           
 class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select count(*) from pg_tables"
