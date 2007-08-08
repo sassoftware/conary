@@ -541,7 +541,7 @@ class AbstractPackageRecipe(Recipe):
             # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
                 flag._set(False)
-            use.setBuildFlagsFromFlavor(self.name, flavor)
+            use.setBuildFlagsFromFlavor(self.name, flavor, error=False)
 
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
