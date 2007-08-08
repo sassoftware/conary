@@ -1445,6 +1445,9 @@ class DictAsCsf:
             gzf.write(contents)
             util.copyfileobj(f, gzf)
             # don't close the result of contObj.get(); we may need it again
+            # but do close gzf, so we're sure that any buffers are flushed
+            # to disk
+            gzf.close()
             os.lseek(fd, 0, 0)
             f = os.fdopen(fd, "r")
             return (name, contType, f)

@@ -1,14 +1,23 @@
+Changes in @NEW@:
+  o Server Changes
+    * a bug which triggered an exception while migrating postgresql
+      repositories has been fixed (CNY-1912)
+
 Changes in 1.1.31.4:
   o Server changes:
-    * Fixed forceSSL for apache servers (which has been broken for a large
-      number of releases) (CNY-1880)
-    * commit correct values for sourceItemId and clonedFromId when
-      groups and components are comitted as part of the same changeset (CNY-1903)
-    * Latest table no longer includes references to missing troves (CNY-1909)
+    * Setting "forceSSL" once again requires a HTTPS connection be
+      used when authentication data is passed to an Apache based
+      Conary Repository. (CNY-1880)
+    * A bug that caused incorrect values for sourceItemId and
+      clonedFromId to be used when groups and components were
+      committed as part of one changeset has been fixed. (CNY-1903)
+    * A bug that caused the Latest table to be rebuilt incorrectly
+      when migrating to schema version 15.0 has been fixed.
+      (CNY-1909)
 
   o Client changes:
-    * Compress large files on disk instead of in memory when creating
-      rollbacks (CNY-1896)
+    * Large files are now compressed on disk instead of in memory when
+      creating rollbacks. (CNY-1896)
 
 Changes in 1.1.31.3:
   o Server changes:
