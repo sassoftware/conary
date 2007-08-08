@@ -35,7 +35,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     """
 
     def addTrove(self, oldTroveSpec, trove, hidden = False):
-        assert(not hidden)
+        assert(not hidden), "This code pathway does not accept hidden trove commits"
         info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
 	return (info, self.repos.addTrove(trove, pin = pin))
@@ -48,7 +48,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
                                   fileStream = fileStream,
                                   isPresent = isPresent)
 
-    def addTroveDone(self, troveId):
+    def addTroveDone(self, troveId, mirror=False):
+        assert(not mirror), "This code pathway can not be used for mirroring"
         self.trovesAdded.append(self.repos.addTroveDone(troveId[1]))
 
     def oldTrove(self, oldTrove, trvCs, name, version, flavor):

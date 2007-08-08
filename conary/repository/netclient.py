@@ -229,6 +229,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise errors.RepositoryLocked
         elif exceptionName == 'RepositoryError':
             raise errors.RepositoryError(exceptionArgs[0])
+        elif exceptionName == "InvalidSourceNameError":
+            raise errors.InvalidSourceNameError(*exceptionArgs)
 	else:
             for klass, marshall in errors.simpleExceptions:
                 if exceptionName == marshall:
