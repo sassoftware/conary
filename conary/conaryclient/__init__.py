@@ -379,3 +379,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
     def applyRollback(self, rollbackSpec, **kwargs):
         return rollbacks.applyRollback(self, rollbackSpec, **kwargs)
+
+    def close(self):
+        """Close this client and release all associated resources"""
+        self.lzCache.release()
+        # self.db accepts to be closed multiple times
+        self.db.close()
+
+        # Close the log files too
+        log.syslog.close()

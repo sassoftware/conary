@@ -97,6 +97,15 @@ class Rollback:
             self.count = 0
 
 class UpdateJob:
+    def __del__(self):
+        # When the update job goes out of scope, we close the file descriptors
+        # in the lazy cache. In the future we probably need a way to
+        # track exactly which files were opened by this update job, and only
+        # close those, but since most of the time we're the only users of the
+        # update job, it's not a huge issue -- misa 20070807
+        self.lzCache.release()
+        # Close db too
+        self.troveSource.db.close()
 
     def addPinMapping(self, name, pinnedVersion, neededVersion):
         self.pinMapping.add((name, pinnedVersion, neededVersion))
@@ -232,8 +241,8 @@ class UpdateJob:
         self.transactionCounter = drep['transactionCounter']
         self._invalidateRollbackStack = bool(
                                         drep.get('invalidateRollbackStack'))
-        self._jobPreScripts = self._thawJobPreScripts(
-            list(drep.get('jobPreScripts', [])))
+        self._jobPreScripts = list(self._thawJobPreScripts(
+            list(drep.get('jobPreScripts', []))))
         self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
 
     def _freezeJobs(self, jobs):
@@ -666,6 +675,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def close(self):
 	self.db.close()
+        self._db = None
+        # Close the lock file as well
+        self.commitLock(False)
 
     def eraseTrove(self, troveName, version, flavor):
         self._updateTransactionCounter = True
@@ -1377,10 +1389,17 @@ class Database(SqlDbRepository):
         dir = self.rollbackCache + "/" + "%d" % num
         return Rollback(dir, load = True)
 
-    def applyRollbackList(self, repos, names, replaceFiles = False,
+    def applyRollbackList(self, *args, **kwargs):
+        try:
+            self.commitLock(True)
+            return self._applyRollbackList(*args, **kwargs)
+        finally:
+            self.commitLock(False)
+            self.db.close()
+
+    def _applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
                           justDatabase = False, transactionCounter = None):
-        self.commitLock(True)
         assert transactionCounter is not None, ("The transactionCounter "
             "argument is mandatory")
         if transactionCounter != self.getTransactionCounter():
@@ -1496,8 +1515,6 @@ class Database(SqlDbRepository):
                 (reposCs, localCs) = rb.getLast()
 
             self.removeRollback(name)
-
-        self.commitLock(False)
 
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
