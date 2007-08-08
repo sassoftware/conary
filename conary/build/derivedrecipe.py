@@ -10,6 +10,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+import os
+
 from conary import files, trove, versions
 from conary import errors as conaryerrors
 from conary.build import build, source
@@ -57,6 +59,10 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
 
         restoreList = []
 
+        # Build a list of symlinks in order to determine if we have to exclude
+        # them from the DanglingSymlink policy
+        symlinkList = []
+
         for pathId, fileId, path, troveName in fileList:
             fileCs = self.cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
@@ -94,6 +100,8 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
             if isinstance(fileObj, files.Directory):
                 # remember to include this directory in the derived package
                 self.ExcludeDirectories(exceptions = path)
+            if isinstance(fileObj, files.SymbolicLink):
+                symlinkList.append(path)
 
         delayedRestores = {}
         for pathId, fileId, fileObj, root, destPath in restoreList:
@@ -133,6 +141,22 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
 
                     if linkGroup:
                         linkGroups[linkGroup] = targetPath
+
+        # Now walk the symlink list
+        for path in symlinkList:
+            f = util.joinPaths(destdir, path)
+            contents = os.readlink(f)
+            if contents.startswith(os.sep):
+                # Absolute symlink, we'll have to deal with it
+                abscontents = util.joinPaths(destdir, contents)
+            else:
+                # Relative symlink
+                abscontents = util.joinPaths(destdir,
+                                             os.path.dirname(path), contents)
+                abscontents = os.path.realpath(abscontents)
+            if not os.path.exists(abscontents):
+                # It's a dangling symlink
+                self.DanglingSymlinks(exceptions = path)
 
         self.useFlags = flavor
 
