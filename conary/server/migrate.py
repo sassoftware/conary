@@ -124,13 +124,15 @@ class MigrateTo_14(SchemaMigration):
         self.db.loadSchema()
         return self.Version
 
-def rebuildLatest(db):
+def rebuildLatest(db, recreate=False):
     cu = db.cursor()
     logMe(2, "Updating the Latest table...")
-    cu.execute("DROP TABLE Latest")
-    db.loadSchema()
-    schema.createLatest(db)
-
+    if recreate:
+        cu.execute("DROP TABLE Latest")
+        db.loadSchema()
+        schema.createLatest(db)
+    else:
+        cu.execute("DELETE FROM Latest")
     # As a matter of choice, the Latest table only includes stuff that
     # has the isPresent flag to NORMAL. This means we exclude from
     # computation the missing and hidden troves
@@ -220,7 +222,7 @@ def rebuildLatest(db):
 class MigrateTo_15(SchemaMigration):
     Version = (15, 7)
     def updateLatest(self):
-        return rebuildLatest(self.db)
+        return rebuildLatest(self.db, recreate=True)
 
     # update a trove signatures, if required
     def fixTroveSig(self, repos, instanceId):
