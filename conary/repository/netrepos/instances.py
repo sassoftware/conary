@@ -55,6 +55,22 @@ class InstanceTable:
 	cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=?",
                    (val, theId))
 
+    def update(self, theId, isPresent = None, clonedFromId = None):
+        sets = []
+        args = []
+        if isPresent is not None:
+            sets.append("isPresent=?")
+            args.append(isPresent)
+        if clonedFromId is not None:
+            sets.append("clonedFromId=?")
+            args.append(clonedFromId)
+        if len(args):
+            cu = self.db.cursor()
+            args.append(theId)
+            cu.execute("UPDATE Instances SET %s WHERE instanceId=?" % (", ".join(sets),),
+                       args)
+        return theId
+    
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "

@@ -284,6 +284,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         elif isinstance(e, errors.RepositoryMismatch):
             return (False, True, (e.__class__.__name__,
                                   e.right, e.wrong))
+        elif isinstance(e, errors.InvalidSourceNameError):
+            return (False, True, (e.__class__.__name__,
+                                  e.name, e.version,
+                                  e.oldSourceItem, e.newSourceItem))
         elif isinstance(e, errors.EntitlementTimeout):
             return (False, True, (e.__class__.__name__,
                                   e.getEntitlements()))
