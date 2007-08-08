@@ -414,8 +414,8 @@ class MigrateTo_15(SchemaMigration):
     def migrate5(self):
         # drop the index in case a user created it by hand (CNY-1704)
         self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
-        return self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
-                                   'itemId, branchId')
+        self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx', 'itemId, branchId')
+        return True
     # 15.6 - fix for the wrong values of clonedFromId and sourceItemId
     def migrate6(self):
         # because Troveinfo.data is treated as a blob, we have to do
