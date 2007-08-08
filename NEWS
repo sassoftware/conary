@@ -4,6 +4,8 @@ Changes in @NEW@:
       The client uses this list of flavors in trove selection. (CNY-1710)
     * Large files are now compressed on disk instead of in memory when
       creating rollbacks. (CNY-1896)
+    * The Conary client API is now more careful with releasing open
+      file descriptors. (CNY-1834)
 
   o Server Changes:
     * Setting "forceSSL" once again requires a HTTPS connection be
