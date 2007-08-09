@@ -90,6 +90,10 @@ class UpdateSpec(object):
     __slots__ = [ "targetDir", "versionSpec", "state", "shadowHeadVersion",
                   "parentRootVersion", "parentHeadVersion", "targetBranch" ]
 
+class CheckoutSpec(object):
+
+    __slots__ = [ "targetDir", "conaryState" ]
+
 def _verifyAtHead(repos, headPkg, state):
     # get the latest version on our branch
     headVersion = repos.getTroveLatestVersion(state.getName(),
@@ -134,7 +138,7 @@ def _makeFilter(patterns):
 
     return patternsFilter
 
-def verifyAbsoluteChangeset(cs, callback):
+def verifyAbsoluteChangesetSignatures(cs, callback):
     # go through all the trove change sets we have in this changeset.
     # verify the digital signatures on each piece
     # return code should be the minimum trust on the entire set
@@ -153,112 +157,114 @@ def verifyAbsoluteChangeset(cs, callback):
     return r
 
 def checkout(repos, cfg, workDir, nameList, callback=None):
-    for name in nameList:
-        _checkout(repos, cfg, workDir, name, callback)
-
-def _checkout(repos, cfg, workDir, name, callback):
     if not callback:
         callback = CheckinCallback(trustThreshold=cfg.trustThreshold)
 
-    # We have to be careful with labels
-    name, versionStr, flavor = cmdline.parseTroveSpec(name)
-    if flavor is not None:
-        log.error('source troves do not have flavors')
-        return
+    fullList = []
+    for name in nameList:
+        name, versionStr, flavor = cmdline.parseTroveSpec(name)
+        if flavor is not None:
+            log.error('source troves do not have flavors')
+            return
 
-    if not name.endswith(':source'):
-        sourceName = name + ":source"
-    else:
-        sourceName = name
-
-    if not versionStr and not cfg.buildLabel:
-        raise errors.CvcError('buildLabel is not set.  Use --build-label or set buildLabel in your conaryrc to check out sources.')
-
-    try:
-        trvList = repos.findTrove(cfg.buildLabel, 
-                                  (sourceName, versionStr, None))
-    except errors.TroveNotFound, e:
-        if not cfg.buildLabel:
-            raise errors.CvcError('buildLabel is not set.  Use --build-label or set buildLabel in your conaryrc to check out sources.')
+        if not name.endswith(':source'):
+            sourceName = name + ":source"
         else:
-            raise
+            sourceName = name
 
-    if len(trvList) > 1:
-        trvList.sort()
+        if not versionStr and not cfg.buildLabel:
+            raise errors.CvcError('buildLabel is not set.  Use --build-label '
+                                  'or set buildLabel in your conaryrc to '
+                                  'check out sources.')
+        try:
+            trvList = repos.findTrove(cfg.buildLabel,
+                                      (sourceName, versionStr, None))
+        except errors.TroveNotFound, e:
+            if not cfg.buildLabel:
+                raise errors.CvcError('buildLabel is not set.  Use '
+                                      '--build-label or set buildLabel in '
+                                      'your conaryrc to check out sources.')
+            else:
+                raise
 
-        notSelected = [ '%s=%s' % (name, x[1].branch()) for x in trvList[:-1]]
-        trvInfo = trvList[-1]
-        
-        log.warning(
-""" Checking out %s (%s)
+        # we should never get multiple matches back
+        assert(len(trvList) == 1)
+        fullList += trvList
 
-Multiple branches were matched by your checkout command.  
-Conary defaults to checking out the most recently modified
-version.  To check out other versions of this source trove, 
-use cvc co %s=<branch> for the following branches:
+    _checkout(repos, cfg, workDir, fullList, callback)
 
-%s
+def _checkout(repos, cfg, workDirArg, trvList, callback):
+    assert(len(trvList) == 1 or workDirArg is None)
+    jobList = []
+    checkoutSpecs = []
 
-""" % (name, trvInfo[1].branch(), name, '\n'.join(notSelected)))
-    else:
-        trvInfo = trvList[0]
-	
-    if not workDir:
-	workDir = trvInfo[0].split(":")[0]
+    for trvInfo in trvList:
+        if not workDirArg:
+            workDir = trvInfo[0].split(":")[0]
+        else:
+            workDir = workDirArg
 
-    if not os.path.isdir(workDir):
-	try:
-	    os.mkdir(workDir)
-	except OSError, err:
-	    log.error("cannot create directory %s/%s: %s", os.getcwd(),
-                      workDir, str(err))
-	    return
+        if not os.path.isdir(workDir):
+            try:
+                os.mkdir(workDir)
+            except OSError, err:
+                log.error("cannot create directory %s/%s: %s", os.getcwd(),
+                          workDir, str(err))
+                return
 
-    branch = fullLabel(cfg.buildLabel, trvInfo[1], versionStr)
-    sourceState = SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
-    conaryState = ConaryState(cfg.context, sourceState)
+        jobList.append((trvInfo[0], (None, None), (trvInfo[1], trvInfo[2]), 
+                        True))
 
-    cs = repos.createChangeSet([(trvInfo[0],
-                                (None, None), 
-                                (trvInfo[1], trvInfo[2]),
-			        True)],
-                               excludeAutoSource = True,
+        sourceState = SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
+        conaryState = ConaryState(cfg.context, sourceState)
+
+        spec = CheckoutSpec()
+        spec.targetDir = workDir
+        spec.conaryState = conaryState
+        checkoutSpecs.append(spec)
+
+    del workDir
+    del conaryState
+
+    cs = repos.createChangeSet(jobList, excludeAutoSource = True,
                                callback=callback)
 
-    verifyAbsoluteChangeset(cs, callback)
-
-    troveCs = cs.iterNewTroveList().next()
+    verifyAbsoluteChangesetSignatures(cs, callback)
 
     earlyRestore = []
     lateRestore = []
 
-    for (pathId, path, fileId, version) in troveCs.getNewFileList():
-	fullPath = workDir + "/" + path
+    for trvInfo, spec in itertools.izip(trvList, checkoutSpecs):
+        sourceState = spec.conaryState.getSourceState()
+        troveCs = cs.getNewTroveVersion(*trvInfo)
 
-        fileStream = cs.getFileChange(None, fileId)
-        if fileStream is None:
-            # File is missing
-            continue
+        for (pathId, path, fileId, version) in troveCs.getNewFileList():
+            fullPath = spec.targetDir + "/" + path
 
-        fileObj = files.ThawFile(fileStream, pathId)
-        sourceState.addFile(pathId, path, version, fileId,
-                            isConfig = fileObj.flags.isConfig(),
-                            isAutoSource = fileObj.flags.isAutoSource())
+            fileStream = cs.getFileChange(None, fileId)
+            if fileStream is None:
+                # File is missing
+                continue
 
-        if fileObj.flags.isAutoSource():
-            continue
+            fileObj = files.ThawFile(fileStream, pathId)
+            sourceState.addFile(pathId, path, version, fileId,
+                                isConfig = fileObj.flags.isConfig(),
+                                isAutoSource = fileObj.flags.isAutoSource())
 
-	if not fileObj.hasContents:
-	    fileObj.restore(None, '/', fullPath, nameLookup=False)
-	else:
-	    # tracking the pathId separately from the fileObj lets
-	    # us sort the list of files by pathId,fileId (which is how
-            # changesets are ordered)
-	    assert(fileObj.pathId() == pathId)
-	    if fileObj.flags.isConfig():
-		earlyRestore.append((pathId, fileId, fileObj, '/', fullPath))
-	    else:
-		lateRestore.append((pathId, fileId, fileObj, '/', fullPath))
+            if fileObj.flags.isAutoSource():
+                continue
+
+            if not fileObj.hasContents:
+                fileObj.restore(None, '/', fullPath, nameLookup=False)
+            else:
+                # tracking the pathId separately from the fileObj lets
+                # us sort the list of files by pathId,fileId (which is how
+                # changesets are ordered)
+                assert(fileObj.pathId() == pathId)
+                if fileObj.flags.isConfig():
+                    earlyRestore.append((pathId, fileId, fileObj, '/', fullPath))
+                else:
+                    lateRestore.append((pathId, fileId, fileObj, '/', fullPath))
 
     earlyRestore.sort()
     lateRestore.sort()
@@ -268,7 +274,8 @@ use cvc co %s=<branch> for the following branches:
 	contents = cs.getFileContents(pathId, fileId)[1]
 	fileObj.restore(contents, root, target, nameLookup=False)
 
-    conaryState.write(workDir + "/CONARY")
+    for spec in checkoutSpecs:
+        spec.conaryState.write(spec.targetDir + "/CONARY")
 
 def commit(repos, cfg, message, callback=None, test=False):
     if not callback:
@@ -1164,7 +1171,6 @@ def updateSrc(repos, versionList = None, callback = None):
             if headVersion.branch() != state.getBranch():
                 log.info("switching directory %s to branch %s", targetDir,
                          headVersion.branch())
-                newBranch = fullLabel(None, headVersion, str(headVersion))
                 newBranch = headVersion.branch()
 
             updateSpecs[i] = (updateSpecs[i][0], state, headVersion, newBranch)
@@ -1191,7 +1197,7 @@ def updateSrc(repos, versionList = None, callback = None):
                 return
 
             headVersion = l[0][1]
-            newBranch = fullLabel(None, headVersion, versionStr)
+            newBranch = headVersion.branch()
             updateSpecs[i] = (updateSpecs[i][0], state, headVersion, newBranch)
 
     job = [ (state.getName(), (state.getVersion(), deps.deps.Flavor()),
@@ -1833,52 +1839,6 @@ def showOneLog(version, changeLog=''):
     else:
 	print "%s %s (no log message)\n" \
 	      %(versionStr, when)
-
-def fullLabel(defaultLabel, version, versionStr):
-    """
-    Converts a version string, and the version the string refers to
-    (often returned by findPackage()) into the full branch name the
-    node is on. This is different from version.branch() when versionStr
-    refers to the head of an empty branch, in which case version() will
-    be the version the branch was created from rather then a version on
-    that branch.
-
-    @param defaultLabel: default label we're on if versionStr is None
-    (may be none if versionStr is not None)
-    @type defaultLabel: versions.Label
-    @param version: version of the node versionStr resolved to
-    @type version: versions.Version
-    @param versionStr: string from the user; likely a very abbreviated version
-    @type versionStr: str
-    """
-    if not versionStr or (versionStr[0] != "/" and  \
-	# label was given
-	    (versionStr.find("/") == -1) and versionStr.count("@")):
-	if not versionStr:
-	    label = defaultLabel
-	elif versionStr[0] == "@":
-            label = versions.Label(defaultLabel.getHost() + versionStr)
-        elif versionStr[0] == ":":
-            label = versions.Label('%s@%s:%s' % (defaultLabel.getHost(),
-                                                defaultLabel.getNamespace(),
-                                                versionStr))
-	elif versionStr[-1] == "@":
-            label = versions.Label('%s%s:%s' % (versionStr, 
-                                                defaultLabel.getNamespace(),
-                                                defaultLabel.getLabel()))
-	else:
-	    label = versions.Label(versionStr)
-
-	if version.branch().label() == label:
-	    return version.branch()
-	else:
-	    # this must be the node the branch was created at, otherwise
-	    # we'd be on it
-	    return version.createBranch(label, withVerRel = 0)
-    elif isinstance(version, versions.Branch):
-	return version
-    else:
-	return version.branch()
 
 def setContext(cfg, contextName=None, ask=False, repos=None):
     def _ask(txt, *args):

@@ -4,6 +4,8 @@ Changes in @NEW@:
       The client uses this list of flavors in trove selection. (CNY-1710)
     * When signals are received during updates the journal is now rolled
       back before conary terminates (CNY-1393)
+    * 'cvc checkout' of multiple projects uses a far less repository
+      calls now and uses a single changeset
 
   o Build Changes:
     * Redirects will now be followed in group recipes.  Previously including
