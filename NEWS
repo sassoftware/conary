@@ -6,6 +6,10 @@ Changes in @NEW@:
       creating rollbacks. (CNY-1896)
     * The Conary client API is now more careful with releasing open
       file descriptors. (CNY-1834)
+    * The "migrate" mode has changed to overwrite changes made to
+      files that are not yet owned by Conary, but already exist on the
+      system, as well managed, non-configuration files that have changed.
+      (CNY-1866)
 
   o Server Changes:
     * Setting "forceSSL" once again requires a HTTPS connection be

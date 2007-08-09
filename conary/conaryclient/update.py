@@ -2555,6 +2555,12 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        # In migrate mode we replace modified and unmanaged files (CNY-1868)
+        # This can be overridden with arguments
+        if updJob.getKeywordArguments().get('migrate', False):
+            replaceModifiedFiles = True
+            replaceUnmanagedFiles = True
+
         if replaceFiles is not None:
             replaceManagedFiles = replaceFiles
             replaceUnmanagedFiles = replaceFiles
