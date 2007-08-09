@@ -26,7 +26,10 @@ Changes in @NEW@:
       members of different link groups (are not intended to be
       installed as hard links to each other). (CNY-1733)
     * Derived packages now work properly if the troves they are based
-      on contain dangling symlinks. (CNY-1914) 
+      on contain dangling symlinks. (CNY-1914)
+    * Symbolic links that have not changed in a derived package are
+      now correctly ignored by policies that are not interested in
+      unmodified files. (CNY-1879)
 
 Changes in 1.1.90:
   o Major Changes:
