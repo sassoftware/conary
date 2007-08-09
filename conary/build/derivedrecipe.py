@@ -11,6 +11,7 @@
 # full details.
 
 import os
+import re
 
 from conary import files, trove, versions
 from conary import errors as conaryerrors
@@ -101,7 +102,9 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                 # remember to include this directory in the derived package
                 self.ExcludeDirectories(exceptions = path)
             if isinstance(fileObj, files.SymbolicLink):
-                symlinkList.append(path)
+                # mtime for symlinks is meaningless, we have to record the
+                # target of the symlink instead
+                self._derivedFiles[path] = fileObj.target()
 
         delayedRestores = {}
         for pathId, fileId, fileObj, root, destPath in restoreList:
