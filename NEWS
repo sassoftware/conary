@@ -2,16 +2,42 @@ Changes in @NEW@:
   o Client Changes:
     * A new configuration option, "flavorPreferences", has been added.
       The client uses this list of flavors in trove selection. (CNY-1710)
+    * Large files are now compressed on disk instead of in memory when
+      creating rollbacks. (CNY-1896)
+    * The Conary client API is now more careful with releasing open
+      file descriptors. (CNY-1834)
+    * The "migrate" mode has changed to overwrite changes made to
+      files that are not yet owned by Conary, but already exist on the
+      system, as well managed, non-configuration files that have changed.
+      (CNY-1866)
     * When signals are received during updates the journal is now rolled
       back before conary terminates (CNY-1393)
     * 'cvc checkout' of multiple projects uses a far less repository
       calls now and uses a single changeset
 
+  o Server Changes:
+    * Setting "forceSSL" once again requires a HTTPS connection be
+      used when authentication data is passed to an Apache based
+      Conary Repository. (CNY-1880)
+    * A bug that caused incorrect values for sourceItemId and
+      clonedFromId to be used when groups and components were
+      committed as part of one changeset has been fixed. (CNY-1903)
+    * A bug that caused the Latest table to be rebuilt incorrectly
+      when migrating to schema version 15.0 has been fixed.
+      (CNY-1909)
+
   o Build Changes:
-    * Redirects will now be followed in group recipes.  Previously including
-      redirects would result in an error. (CNY-1693)
-    * Derviced recipes couldn't be based on troves whose files were both
-      duplicated and members of different link groups (CNY-1733)
+    * Redirects will now be followed in group recipes.  Previously
+      including redirects would result in an error. (CNY-1693)
+    * Derived recipes can now be based on troves which have files
+      that have the same content (SHA1) as each other but are
+      members of different link groups (are not intended to be
+      installed as hard links to each other). (CNY-1733)
+    * Derived packages now work properly if the troves they are based
+      on contain dangling symlinks. (CNY-1914)
+    * Symbolic links that have not changed in a derived package are
+      now correctly ignored by policies that are not interested in
+      unmodified files. (CNY-1879)
 
 Changes in 1.1.90:
   o Major Changes:
@@ -100,15 +126,6 @@ Changes in 1.1.90:
   o Other changes:
     * The showchangeset script now displays information on redirect
       troves.
-
-Changes in 1.1.31.4:
-  o Server changes:
-    * Fixed forceSSL for apache servers (which has been broken for a large
-      number of releases) (CNY-1880)
-
-  o Client changes:
-    * Compress large files on disk instead of in memory when creating
-      rollbacks (CNY-1896)
 
 Changes in 1.1.31.3:
   o Server changes:

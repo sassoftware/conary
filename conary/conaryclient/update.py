@@ -2555,6 +2555,12 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        # In migrate mode we replace modified and unmanaged files (CNY-1868)
+        # This can be overridden with arguments
+        if updJob.getKeywordArguments().get('migrate', False):
+            replaceModifiedFiles = True
+            replaceUnmanagedFiles = True
+
         if replaceFiles is not None:
             replaceManagedFiles = replaceFiles
             replaceUnmanagedFiles = replaceFiles
@@ -3068,14 +3074,21 @@ conary erase '%s=%s[%s]'
             test = test, keepJournal = keepJournal)
 
         return self._applyUpdate(uJob, tagScript = tagScript,
-                          journal = journal, autoPinList = autoPinList,
-                          commitFlags = commitFlags)
+                              journal = journal, autoPinList = autoPinList,
+                              commitFlags = commitFlags)
 
-    def _applyUpdate(self, uJob, tagScript = None, journal = None,
+    def _applyUpdate(self, *args, **kwargs):
+        # Calls _applyUpdateL, but deals with locks too
+        try:
+            self.db.commitLock(True)
+            return self._applyUpdateL(*args, **kwargs)
+        finally:
+            self.db.commitLock(False)
+            self.db.close()
+
+    def _applyUpdateL(self, uJob, tagScript = None, journal = None,
                      callback = None, autoPinList = None,
                      commitFlags = None):
-        self.db.commitLock(True)
-
         uJobTransactionCounter = uJob.getTransactionCounter()
         if uJobTransactionCounter is None:
             # Legacy applications
@@ -3210,7 +3223,7 @@ conary erase '%s=%s[%s]'
                 # DEBUGGING NOTE: if you need to debug update code not
                 # related to threading, the easiest thing is to add 
                 # 'threaded False' to your conary config.
-                self.db.commitLock(False)
+                pass
 
 
 class UpdateError(ClientError):

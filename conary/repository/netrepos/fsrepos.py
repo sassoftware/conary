@@ -125,8 +125,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def addTrove(self, pkg, hidden = False):
 	return self.troveStore.addTrove(pkg, hidden = hidden)
 
-    def addTroveDone(self, pkg):
-	self.troveStore.addTroveDone(pkg)
+    def addTroveDone(self, pkg, mirror=False):
+	self.troveStore.addTroveDone(pkg, mirror=mirror)
 
     ### File functions
 

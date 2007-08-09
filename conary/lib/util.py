@@ -1030,6 +1030,11 @@ class LazyFileCache:
             fd._cache = None
         self._fdMap.clear()
 
+    def release(self):
+        """Release the file descriptors kept open by the LazyFile objects"""
+        for fd in self._fdMap.values():
+            fd._close()
+
     __del__ = close
 
 class Flags(object):
