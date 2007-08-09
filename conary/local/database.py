@@ -105,7 +105,9 @@ class UpdateJob:
         # update job, it's not a huge issue -- misa 20070807
         self.lzCache.release()
         # Close db too
-        self.troveSource.db.close()
+        if self.troveSource.db:
+            self.troveSource.db.close()
+            self.troveSource.db = None
 
     def addPinMapping(self, name, pinnedVersion, neededVersion):
         self.pinMapping.add((name, pinnedVersion, neededVersion))
@@ -1395,7 +1397,7 @@ class Database(SqlDbRepository):
             return self._applyRollbackList(*args, **kwargs)
         finally:
             self.commitLock(False)
-            self.db.close()
+            self.close()
 
     def _applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
