@@ -29,7 +29,7 @@ from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
-from conary.lib import log, patch, sha1helper, util
+from conary.lib import log, patch, sha1helper, sigprotect, util
 from conary.local.errors import *
 from conary.repository import changeset, filecontents
 from conary.local.journal import JobJournal, NoopJobJournal
@@ -593,6 +593,7 @@ class FilesystemJob:
 	    f.close()
 	    self.callback.warning(msg)
 
+    @sigprotect.sigprotect()
     def apply(self, tagSet = {}, tagScript = None, journal = None,
               opJournalPath = None, keepJournal = False):
 
