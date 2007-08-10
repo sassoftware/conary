@@ -771,6 +771,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             compatClass = group.compatibilityClass
             if compatClass is not None:
                 grpTrv.setCompatibilityClass(compatClass)
+            # Add build flavor
+            grpTrv.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (group.postInstallScripts, False,
@@ -901,6 +903,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
     fileset.setIsCollection(False)
+    fileset.setBuildFlavor(use.allFlagsToFlavor(fullName))
     fileset.computePathHashes()
     
     filesetDiff = fileset.diff(None, absolute = 1)[0]
@@ -1266,6 +1269,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                 grpMap[main].setPolicyProviders(policyTroves)
             grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
             grpMap[main].setBuildRequirements(buildReqs)
+            grpMap[main].setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
@@ -1339,6 +1343,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
         p.setIsDerived(recipeObj._isDerived)
+
+        # Add build flavor
+        p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 
         _signTrove(p, signatureKey)
 
