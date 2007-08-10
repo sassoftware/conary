@@ -12,10 +12,10 @@ Changes in @NEW@:
       (CNY-1866)
     * When signals are received during updates the journal is now rolled
       back before conary terminates (CNY-1393)
-    * 'cvc checkout' of multiple projects uses a far less repository
-      calls now and uses a single changeset
-    * 'cvc update' and 'cvc diff' didn't accept a source version arguemnt
-      without a source count (CNY-1921)
+    * A 'cvc checkout' of multiple projects uses far fewer repository
+      calls now, and uses a single changeset.
+    * The 'cvc update' and 'cvc diff' commands now accept a source
+      version arguemnt without a source count. (CNY-1921)
 
   o Server Changes:
     * Setting "forceSSL" once again requires a HTTPS connection be
@@ -29,7 +29,7 @@ Changes in @NEW@:
       (CNY-1909)
 
   o Build Changes:
-    * Redirects will now be followed in group recipes.  Previously
+    * Redirects will now be followed in group recipes.  Previously,
       including redirects would result in an error. (CNY-1693)
     * Derived recipes can now be based on troves which have files
       that have the same content (SHA1) as each other but are
@@ -42,7 +42,7 @@ Changes in @NEW@:
       unmodified files. (CNY-1879)
     * The build flavor string used for building a trove is now stored
       as part of that trove's troveInfo field. (CNY-1678)
-    * Looking up path IDs is now stop when all files have been found,
+    * Looking up path IDs now stops when all files have been found,
       instead of always walking the shadow hierarchy. (CNY-1911)
 
 Changes in 1.1.90:
