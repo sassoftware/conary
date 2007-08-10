@@ -34,6 +34,8 @@ Changes in @NEW@:
     * Symbolic links that have not changed in a derived package are
       now correctly ignored by policies that are not interested in
       unmodified files. (CNY-1879)
+    * The build flavor string used for building a trove is now stored
+      as part of that trove's troveInfo field. (CNY-1678)
 
 Changes in 1.1.90:
   o Major Changes:
