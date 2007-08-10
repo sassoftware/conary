@@ -14,6 +14,8 @@ Changes in @NEW@:
       back before conary terminates (CNY-1393)
     * 'cvc checkout' of multiple projects uses a far less repository
       calls now and uses a single changeset
+    * 'cvc update' and 'cvc diff' didn't accept a source version arguemnt
+      without a source count (CNY-1921)
 
   o Server Changes:
     * Setting "forceSSL" once again requires a HTTPS connection be

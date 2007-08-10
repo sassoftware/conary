@@ -204,8 +204,8 @@ class SourceState(trove.Trove):
 	    return repName + versionStr
 	elif versionStr[0] != "/" and versionStr.find("@") == -1:
 	    # non fully-qualified version; make it relative to the current
-	    # branch
-	    return self.getVersion().branch().asString() + "/" + versionStr
+            # label
+            return str(self.getVersion().trailingLabel()) + "/" + versionStr
 
 	return versionStr
 
