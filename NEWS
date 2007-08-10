@@ -42,6 +42,8 @@ Changes in @NEW@:
       unmodified files. (CNY-1879)
     * The build flavor string used for building a trove is now stored
       as part of that trove's troveInfo field. (CNY-1678)
+    * Looking up path IDs is now stop when all files have been found,
+      instead of always walking the shadow hierarchy. (CNY-1911)
 
 Changes in 1.1.90:
   o Major Changes:

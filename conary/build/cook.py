@@ -1250,15 +1250,13 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     # create all of the package troves we need, and let each package provide
     # itself
     grpMap = {}
-    filePrefixes = set()
-    fileIds = set()
+    fileIdsPathMap = {}
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
         # Extract file prefixes and file ids
         for (path, (realPath, f)) in buildPkg.iteritems():
-            filePrefixes.add(os.path.dirname(path))
-            fileIds.add(f.fileId())
+            fileIdsPathMap[path] = f.fileId()
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
@@ -1275,22 +1273,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
-
-
-    filePrefixes = list(filePrefixes)
-    filePrefixes.sort()
-    # Now eliminate prefixes of prefixes
-    ret = []
-    oldp = None
-    for p in filePrefixes:
-        if oldp and p.startswith(oldp):
-            continue
-        ret.append(p)
-        oldp = p
-    filePrefixes = ret
-
-    # Sort the file ids to make sure we get consistent behavior
-    fileIds = sorted(fileIds)
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -1313,8 +1295,19 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         # look up the pathids for every file that has been built by
         # this source component, following our branch ancestry
         while True:
+            # Generate the file prefixes
+            filePrefixes = _computeCommonPrefixes(fileIdsPathMap.keys())
+            fileIds = sorted(fileIdsPathMap.values())
+            if not fileIds:
+                break
+            print "DEDEDEDE", searchBranch, filePrefixes, fileIds
             d = repos.getPackageBranchPathIds(sourceName, searchBranch,
                                               filePrefixes, fileIds)
+            # Remove the paths we've found already from fileIdsPathMap, so we
+            # don't ask the next server the same questions
+            for k in d.iterkeys():
+                fileIdsPathMap.pop(k, None)
+
             ident.merge(d)
 
             if not searchBranch.hasParentBranch():
@@ -1394,6 +1387,18 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         changeSet.newTrove(grpDiff)
 
     return changeSet, built
+
+def _computeCommonPrefixes(filePrefixes):
+    # Eliminate prefixes of prefixes
+    ret = []
+    oldp = None
+    filePrefixes = sorted(filePrefixes)
+    for p in filePrefixes:
+        if oldp and p.startswith(oldp):
+            continue
+        ret.append(p)
+        oldp = p
+    return ret
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write
