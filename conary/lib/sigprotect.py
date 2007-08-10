@@ -19,7 +19,7 @@ import os, signal
 # clear that letting python keep running after such signals is a good idea!
 # Signal names can differ by architecture, so this is a named list as strings,
 # and we turn that into signal numbers based on which ones are actually defined
-catchableSignalNames = [ 'SIGABRT', 'SIGALRM', 'SIGCHLD', 'SIGFPE', 'SIGHUP',
+catchableSignalNames = [ 'SIGABRT', 'SIGALRM', 'SIGFPE', 'SIGHUP',
                          'SIGILL', 'SIGINT', 'SIGIO', 'SIGIOT', 'SIGPIPE',
                          'SIGPOLL', 'SIGPROF', 'SIGPWR', 'SIGQUIT', 'SIGRTMAX',
                          'SIGRTMIN', 'SIGSYS', 'SIGTERM', 'SIGTRAP', 'SIGTSTP',
