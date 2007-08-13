@@ -1129,7 +1129,6 @@ class PGP_Signature(PGP_BaseKeySig):
         self.pubKeyAlg = pkAlg
         self.hashAlg = hashAlg
         self.hashSig = (sig0, sig1)
-        raise IncompatibleKey("Must be a V4 signature")
 
     def _readSigV4(self):
         sigType, pkAlg, hashAlg = self.readBin(3)
@@ -1169,7 +1168,8 @@ class PGP_Signature(PGP_BaseKeySig):
         Return None if the packet did not contain an issuer key ID"""
         if not self._parsed:
             self.parse()
-        if self.signerKeyId is not None:
+        if self.version == 3:
+            assert self.signerKeyId is not None
             return binSeqToString(self.signerKeyId)
         # Version 3 packets should have already set signerKeyId
         assert self.version == 4
@@ -1352,23 +1352,22 @@ class PGP_Key(PGP_BaseKeySig):
     def _readKeyV3(self):
         # RFC 2440, sect. 5.5.2
         # We only support V4 keys
-        raise InvalidKey("Version 3 keys not supported")
-        #self.createdTimestamp = len4bytes(*self._readBin(self._bodyStream, 4))
+        self.createdTimestamp = len4bytes(*self._readBin(self._bodyStream, 4))
 
         ## daysValid
-        #data = self.readBin(2)
-        #self.daysValid = int2bytes(*data)
+        data = self.readBin(2)
+        self.daysValid = int2bytes(*data)
 
         ## Public key algorithm
-        #self.pubKeyAlg, = self.readBin(1)
+        self.pubKeyAlg, = self.readBin(1)
 
         # Record current position in body
-        #mpiStart = self._bodyStream.tell()
+        mpiStart = self._bodyStream.tell()
         ## Read and discard 2 MPIs
-        #self._readCountMPIs(self._bodyStream, count, discard = True)
-        #self.mpiLen = self._bodyStream.tell() - mpiStart
-        #self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
-        #    start = mpiStart)
+        self.skipMPIs(self._bodyStream, self.pubKeyAlg)
+        self.mpiLen = self._bodyStream.tell() - mpiStart
+        self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
+            start = mpiStart)
 
     def _readKeyV4(self):
         # RFC 2440, sect. 5.5.2
@@ -1388,6 +1387,15 @@ class PGP_Key(PGP_BaseKeySig):
 
     def getKeyId(self):
         if self._keyId is not None:
+            return self._keyId
+
+        if self.version == 3:
+            # Key ID is low 64 bits of the modulus
+            self.mpiFile.seek(0)
+            self._readCountMPIs(self.mpiFile, 1, discard = True)
+            pos = self.mpiFile.tell()
+            octets = self.mpiFile.pread(8, pos - 8)
+            self._keyId = "".join("%02x" % ord(x) for x in octets).upper()
             return self._keyId
 
         # Convert to public key
@@ -1421,11 +1429,7 @@ class PGP_Key(PGP_BaseKeySig):
         m.update(sio.getvalue())
 
         pkt.resetBody()
-        while 1:
-            buf = pkt.readBody(self.BUFFER_SIZE)
-            if not buf:
-                break
-            m.update(buf)
+        self._updateHash(m, pkt.getBodyStream())
 
         self._keyId = m.hexdigest().upper()
         return self._keyId
@@ -1572,6 +1576,9 @@ class PGP_MainKey(PGP_Key):
             # Already processed
             return
 
+        if not self._parsed:
+            self.parse()
+
         self.revsigs = []
         self.uids = []
         self.subkeys = []
@@ -1680,6 +1687,8 @@ class PGP_MainKey(PGP_Key):
         @return (pubKeyPacket, cryptoKey)
         @raises BadSelfSignature
         """
+        if self.version == 3:
+            raise InvalidKey("Version 3 keys not supported")
         # Convert to a public key (even if it's already a public key)
         pkpkt = self.toPublicKey(minHeaderLen = 3)
         keyId = pkpkt.getKeyId()

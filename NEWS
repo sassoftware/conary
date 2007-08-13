@@ -45,6 +45,10 @@ Changes in @NEW@:
     * Looking up path IDs now stops when all files have been found,
       instead of always walking the shadow hierarchy. (CNY-1911)
 
+  o Bug Fixes:
+    * The new OpenPGP parsing code now accepts Version 3 keys and
+      signatures, without verifying them. (CNY-1931)
+
   o Other Changes:
     * Conary tracebacks now report values for each variable in the
       local namespace in each frame. (CNY-1922)
