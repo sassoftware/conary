@@ -114,7 +114,8 @@ class CfgUserInfoItem(CfgType):
         elif len(val) == 2:
             return (val[0], val[1], None)
         else:
-            return tuple(val)
+            pw = (val[2] is not None and util.ProtectedString(val[2])) or None
+            return (val[0], val[1], pw)
 
     def format(self, val, displayOptions=None):
         serverGlob, user, password = val
@@ -153,7 +154,7 @@ class CfgEntitlementItem(CfgType):
                 "Please change the 'entitlement %s' config line to\n"
                 "'entitlement %s %s'" % (str, val[0], val[2]),
                 DeprecationWarning)
-            return (val[0], (val[1], val[2]))
+            return (val[0], (val[1], util.ProtectedString(val[2])))
         elif len(val) != 2:
             raise ParseError("expected <hostglob> <entitlement>")
 

@@ -272,7 +272,9 @@ class ServerProxy(xmlrpclib.ServerProxy):
             if not user or not password:
                 return False
 
-        self.__host = '%s:%s@%s' % (user, password, fullHost)
+        password = util.ProtectedString(password)
+        self.__host = util.ProtectedTemplate('${user}:${passwd}@${host}')
+        self.__host.setArgs(user = user, passwd = password, host = fullHost)
 
         return True
 
@@ -437,10 +439,11 @@ class ServerCache:
             if userInfo is None:
                 url = "%s://%s/conary/" % (protocol, serverName)
             else:
-                url = "%s://%s:%s@%s/conary/" % (protocol,
+                url = "%s://%s:%s@%s/conary/"
+                url = util.ProtectedString(url   % (protocol,
                                                  quote(userInfo[0]),
                                                  quote(userInfo[1]),
-                                                 serverName)
+                                                 serverName))
         elif userInfo:
             s = url.split('/')
             if s[1]:

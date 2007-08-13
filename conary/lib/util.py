@@ -173,25 +173,30 @@ def genExcepthook(debug=True,
         _debugAll = True
         print >>sys.stderr, '<Turning on KeyboardInterrupt catching>'
 
-    def excepthook(type, value, tb):
-        if type is bdb.BdbQuit:
+    def excepthook(typ, value, tb):
+        if typ is bdb.BdbQuit:
             sys.exit(1)
         sys.excepthook = sys.__excepthook__
-        if not _debugAll and (type == KeyboardInterrupt and not debugCtrlC):
+        if not _debugAll and (typ == KeyboardInterrupt and not debugCtrlC):
             sys.exit(1)
 
-        lines = traceback.format_exception(type, value, tb)
+        out = BoundedStringIO()
+        formatTrace(typ, value, tb, stream = out)
+        out.seek(0)
+        tbString = out.read()
+        del out
         if log.syslog is not None:
-            log.syslog.traceback(lines)
+            log.syslog("command failed\n%s", tbString)
 
         if debug or _debugAll:
-            sys.stderr.write(string.joinfields(lines, ""))
+            formatTrace(typ, value, tb, stream = sys.stderr,
+                        withLocals = False)
             if sys.stdout.isatty() and sys.stdin.isatty():
-                debugger.post_mortem(tb, type, value)
+                debugger.post_mortem(tb, typ, value)
             else:
                 sys.exit(1)
         elif log.getVerbosity() is log.DEBUG:
-            log.debug(''.join(lines))
+            log.debug(tbString)
         else:
             cmd = sys.argv[0]
             if cmd.endswith('/commands/conary'):
@@ -199,14 +204,16 @@ def genExcepthook(debug=True,
             elif cmd.endswith('/commands/cvc'):
                 cmd = cmd[:len('/commands/cvc')] + '/bin/cvc'
                 
+            origTb = tb
             cmd = normpath(cmd)
             sys.argv[0] = cmd
             while tb.tb_next: tb = tb.tb_next
             lineno = tb.tb_frame.f_lineno
             filename = tb.tb_frame.f_code.co_filename
             tmpfd, stackfile = tempfile.mkstemp('.txt', prefix)
-            os.write(tmpfd, ''.join(lines))
+            os.write(tmpfd, tbString)
             os.close(tmpfd)
+
             sys.stderr.write(error % dict(command=' '.join(sys.argv),
                                                  filename=filename,
                                                  lineno=lineno,
@@ -1186,3 +1193,59 @@ class BoundedStringIO(object):
         backend = object.__getattribute__(self, '_backend')
         return getattr(backend, attr)
 
+class ProtectedString(str):
+    """A string that is not printed in tracebacks"""
+    def __safe_str__(self):
+        return "<Protected Value>"
+
+class ProtectedTemplate(str):
+    """A string template that hides parts of its components"""
+    def __init__(self, templ):
+        str.__init__(self, templ)
+        self.templ = string.Template(templ)
+        self.substArgs = {}
+
+    def setArgs(self, **kwargs):
+        self.substArgs = kwargs
+        return self
+
+    def __str__(self):
+        return self.templ.safe_substitute(self.substArgs)
+
+    def __safe_str__(self):
+        nargs = {}
+        for k, v in self.substArgs.iteritems():
+            if hasattr(v, '__safe_str__'):
+                v = "<%s>" % k.upper()
+            nargs[k] = v
+        return self.templ.safe_substitute(nargs)
+
+def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
+    import repr as reprmod
+    import inspect
+    stream.write("Traceback (most recent call last):\n")
+    while tb:
+        fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
+        frame = tb.tb_frame
+        tb = tb.tb_next
+        stream.write('  File "%s", line %d, in %s\n' % 
+            (fileName, lineNo, funcName))
+        stream.write('    %s\n' % text[idx].strip())
+        if not withLocals:
+            continue
+        r = reprmod.Repr()
+        r.maxtuple = 10
+        r.maxset = 10
+        r.maxlist = 10
+        r.maxdict = 10
+        r.maxstring = 80
+        r.maxother = 70
+        for k, v in sorted(frame.f_locals.items()):
+            if k.startswith('__') and k.endswith('__'):
+                # Presumably internal data
+                continue
+            if hasattr(v, '__safe_str__'):
+                vstr = v.__safe_str__()
+            else:
+                vstr = r.repr(v)
+            stream.write("        %15s : %s\n" % (k, vstr))
