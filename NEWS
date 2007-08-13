@@ -45,6 +45,10 @@ Changes in @NEW@:
     * Looking up path IDs now stops when all files have been found,
       instead of always walking the shadow hierarchy. (CNY-1911)
 
+  o Other Changes:
+    * Conary tracebacks now report values for each variable in the
+      local namespace in each frame. (CNY-1922)
+
 Changes in 1.1.90:
   o Major Changes:
     * Label multiplicity, in which a trove on the same label
