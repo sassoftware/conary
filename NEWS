@@ -48,6 +48,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * The new OpenPGP parsing code now accepts Version 3 keys and
       signatures, without verifying them. (CNY-1931)
+    * Fixed an fd leak in getFileContents
+    * if ignoreErrors is set for a configuration file, that setting is 
+      honored for contexts as well.
 
   o Other Changes:
     * Conary tracebacks now report values for each variable in the
