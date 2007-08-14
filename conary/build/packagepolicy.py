@@ -3444,7 +3444,7 @@ class Flavor(policy.Policy):
             '|/%(lib)s'
             '|%(x11prefix)s/%(lib)s'
             '|%(krbprefix)s/%(lib)s)(/|$)' %self.recipe.macros)
-	self.libReException = re.compile('^/usr/(lib|%(lib)s)/python.*$')
+	self.libReException = re.compile('^/usr/(lib|%(lib)s)/(python|ruby).*$')
         self.baseIsnset = use.Arch.getCurrentArch()._name
         self.baseArchFlavor = use.Arch.getCurrentArch()._toDependency()
         self.archFlavor = use.createFlavor(None, use.Arch._iterUsed())
