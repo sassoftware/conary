@@ -2147,6 +2147,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 (fd, path) = util.mkstemp()
                 outF = util.ExtendedFile(path, "r+", buffering = False)
+                os.close(fd)
                 os.unlink(path)
                 start = 0
 
