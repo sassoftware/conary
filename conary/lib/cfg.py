@@ -495,6 +495,7 @@ class SectionedConfigFile(ConfigFile):
 
     def _addSection(self, sectionName, sectionObject):
         self._sections[sectionName] = sectionObject
+        sectionObject._ignoreErrors = self._ignoreErrors
 
     def configLine(self, line, file = "override", lineno = '<No line>'):
 	line = line.strip()
