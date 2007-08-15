@@ -141,7 +141,7 @@ class EntitlementList(ServerGlobList):
     multipleMatches = True
 
     def addEntitlement(self, serverGlob, entitlement, entClass = None):
-        self.append((serverGlob, (entClass, entitlement)))
+        self.append((serverGlob, (entClass, util.ProtectedString(entitlement))))
 
 class CfgEntitlementItem(CfgType):
     def parseString(self, str):
@@ -158,7 +158,7 @@ class CfgEntitlementItem(CfgType):
         elif len(val) != 2:
             raise ParseError("expected <hostglob> <entitlement>")
 
-        return (val[0], (None, val[1]))
+        return (val[0], (None, util.ProtectedString(val[1])))
 
     def format(self, val, displayOptions=None):
         if val[1][0] is None:
