@@ -51,6 +51,8 @@ Changes in @NEW@:
     * Fixed an fd leak in getFileContents
     * if ignoreErrors is set for a configuration file, that setting is 
       honored for contexts as well.
+    * Files with large numbers of identical files now erase faster, thanks
+      to a sql fix in sqldb.iterFiles (CNY-1937)
 
   o Other Changes:
     * Conary tracebacks now report values for each variable in the
