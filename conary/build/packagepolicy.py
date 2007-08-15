@@ -1707,7 +1707,7 @@ class _dependency(policy.Policy):
         self.warn('%s found on system but not provided by'
                   ' system database; python requirements'
                   ' may be generated incorrectly as a result', pathName)
-        return []
+        return set([])
 
     def _getPythonTroveFlags(self, pathName):
         if pathName in self.pythonTroveFlagCache:
