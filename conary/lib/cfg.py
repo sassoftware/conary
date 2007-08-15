@@ -253,10 +253,10 @@ class ConfigFile(_Config):
     """ _Config class + ability to read in files """
 
     def __init__(self):
+        self._ignoreErrors = False
+        self._configFileStack = set()
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
-        self._configFileStack = set()
-        self._ignoreErrors = False
 
     def setIgnoreErrors(self, val=True):
         self._ignoreErrors = val
