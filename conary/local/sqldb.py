@@ -1025,9 +1025,10 @@ order by
         # millions of rows, we perform some more complicated sql.
         cu.execute("""
                 SELECT row, (SELECT stream
-                                FROM DBTroveFiles AS dbt 
-                                WHERE dbt.fileId = gft.fileId LIMIT 1)
+                              FROM DBTroveFiles AS dbt 
+                              WHERE dbt.fileId = gft.fileId LIMIT 1) AS stream
                     FROM getfilesTbl AS gft
+                    WHERE stream IS NOT NULL
         """)
 
         l2 = [ None ] * len(l)
