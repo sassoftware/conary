@@ -48,11 +48,13 @@ Changes in @NEW@:
   o Bug Fixes:
     * The new OpenPGP parsing code now accepts Version 3 keys and
       signatures, without verifying them. (CNY-1931)
-    * Fixed an fd leak in getFileContents
-    * if ignoreErrors is set for a configuration file, that setting is 
-      honored for contexts as well.
-    * Files with large numbers of identical files now erase faster, thanks
-      to a sql fix in sqldb.iterFiles (CNY-1937)
+    * Fixed a file descriptor leak in the getFileContents method.
+    * If ignoreErrors is set for a configuration file, that setting is 
+      now honored for contexts as well.
+    * Troves with large numbers of identical files now erase faster,
+      thanks to a SQL fix in sqldb.iterFiles. (CNY-1937)
+    * Python dependency determination now properly ignores filenames like
+      "python.so" when looking for version flags. (CNY-1940)
 
   o Other Changes:
     * Conary tracebacks now report values for each variable in the

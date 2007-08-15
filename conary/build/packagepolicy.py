@@ -1785,7 +1785,8 @@ class _dependency(policy.Policy):
     def _getPythonVersionFromPath(self, pathName):
         pathList = pathName.split('/')
         for dirName in pathList:
-            if dirName.startswith('python'):
+            if dirName.startswith('python') and not set(dirName[6:]).difference(set('.0123456789')):
+                # python2.4 or python2.5 or python3.9 but not python.so
                 return dirName
         return ''
 
@@ -2088,14 +2089,19 @@ class _dependency(policy.Policy):
         m = self.recipe.magic[path]
         if m and m.name == 'script' and 'python' in m.contents['interpreter']:
             pythonPath = [m.contents['interpreter']]
-        elif 'python' in path:
-            pythonVersion = self._getPythonVersionFromPath(path)
-            # after %(bindir)s, fall back to /usr/bin so that package
-            # modifications do not break the search for system python
-            pythonPath = [ '%(bindir)s/' + pythonVersion,
-                           '/usr/bin/' + pythonVersion ]
         else:
-            pythonPath = [ '/usr/bin/python' ]
+            pythonVersion = self._getPythonVersionFromPath(path)
+            if pythonVersion:
+                # After %(bindir)s, fall back to /usr/bin so that package
+                # modifications do not break the search for system python
+                # Include unversioned as a last resort for confusing
+                # cases.
+                pythonPath = [ '%(bindir)s/' + pythonVersion,
+                               '/usr/bin/' + pythonVersion,
+                               '%(bindir)s/python',
+                               '/usr/bin/python', ]
+            else:
+                pythonPath = [ '/usr/bin/python' ]
 
         for pathElement in pythonPath:
             pythonDestPath = ('%(destdir)s'+pathElement) %macros
