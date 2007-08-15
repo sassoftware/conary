@@ -273,8 +273,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
                 return False
 
         password = util.ProtectedString(password)
-        self.__host = util.ProtectedTemplate('${user}:${passwd}@${host}')
-        self.__host.setArgs(user = user, passwd = password, host = fullHost)
+        self.__host = util.ProtectedTemplate('${user}:${passwd}@${host}',
+                            user = user, passwd = password, host = fullHost)
 
         return True
 

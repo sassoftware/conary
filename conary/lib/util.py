@@ -1199,26 +1199,26 @@ class ProtectedString(str):
         return "<Protected Value>"
 
 class ProtectedTemplate(str):
-    """A string template that hides parts of its components"""
-    def __init__(self, templ):
-        str.__init__(self, templ)
-        self.templ = string.Template(templ)
-        self.substArgs = {}
-
-    def setArgs(self, **kwargs):
-        self.substArgs = kwargs
-        return self
-
-    def __str__(self):
-        return self.templ.safe_substitute(self.substArgs)
+    """A string template that hides parts of its components.
+    The first argument is a template (see string.Template for a complete
+    documentation). The values that can be filled in are using the format
+    ${VAR} or $VAR. The keyword arguments are expanding the template.
+    If one of the keyword arguments has a __safe_str__ method, its value is
+    going to be hidden when this object's __safe_str__ is called."""
+    def __new__(cls, templ, **kwargs):
+        tmpl = string.Template(templ)
+        s = str.__new__(cls, tmpl.safe_substitute(kwargs))
+        s._templ = tmpl
+        s._substArgs = kwargs
+        return s
 
     def __safe_str__(self):
         nargs = {}
-        for k, v in self.substArgs.iteritems():
+        for k, v in self._substArgs.iteritems():
             if hasattr(v, '__safe_str__'):
                 v = "<%s>" % k.upper()
             nargs[k] = v
-        return self.templ.safe_substitute(nargs)
+        return self._templ.safe_substitute(nargs)
 
 def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     import repr as reprmod
