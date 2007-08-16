@@ -123,7 +123,7 @@ class BaseDependency(object):
 
 class Dependency(BaseDependency):
 
-    __slots__ = ( 'name', 'flags', 'isMajor' )
+    __slots__ = ( 'name', 'flags', )
 
     def __hash__(self):
 	val = hash(self.name)
@@ -336,7 +336,6 @@ class Dependency(BaseDependency):
 
     def __init__(self, name, flags = []):
 	self.name = name
-        self.isMajor = True
 	if type(flags) == dict:
 	    self.flags = flags
 	else:

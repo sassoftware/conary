@@ -40,7 +40,7 @@ export their namespaces.
 import itertools
 
 #conary
-from conary.deps import deps
+from conary.deps import arch, deps
 from conary.lib import log
 from conary.errors import CvcError
 
@@ -849,22 +849,32 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                                'name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             found = False
+            # Compare instruction sets by looking at the flavor preferences -
+            # the major architecture should be a superset of all other arches
+            majorArch = None
+            archTableSet = set([])
             for dep in depGroup.getDeps():
-                if not dep.isMajor:
+                prefs = arch.getFlavorPreferences([[dep]])
+                prefsSet = set(prefs)
+                if archTableSet.issubset(prefsSet):
+                    archTableSet = set(prefs)
+                    majorArch = dep
                     continue
-                if found and error:
-                    raise RuntimeError, ('Cannot set arctitecture build flags'
-                                         ' to multiple architectures:'
-                                         ' %s: %s' % (recipeName, flavor))
-                found = True
-                majarch = dep.name
+                if prefsSet.issubset(archTableSet):
+                    continue
+                raise RuntimeError, ('Incompatible architectures:'
+                                     ' %s: %s' % (majorArch.name, dep))
 
-                subarches = []
-                for (flag, sense) in dep.flags.iteritems():
-                    if sense in (deps.FLAG_SENSE_REQUIRED,
-                                 deps.FLAG_SENSE_PREFERRED):
-                        subarches.append(flag)
-                Arch._setArch(majarch, subarches)
+            if majorArch is None:
+                # No IS deps?
+                return
+
+            subarches = []
+            for (flag, sense) in majorArch.flags.iteritems():
+                if sense in (deps.FLAG_SENSE_REQUIRED,
+                             deps.FLAG_SENSE_PREFERRED):
+                    subarches.append(flag)
+            Arch._setArch(majorArch.name, subarches)
 
 Arch = ArchCollection()
 Use = UseCollection()

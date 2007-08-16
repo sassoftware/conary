@@ -59,9 +59,6 @@ def flags_x86_64():
 
     x86_64 = x86flags('x86_64', baseArch, baseFlagMap, ofInterest)
     multiarch = flags_i686()
-    for depGroup in multiarch:
-        for dep in depGroup:
-            dep.isMajor = False
     multiarch[0].append(x86_64)
     return multiarch
 
@@ -95,8 +92,6 @@ class FlavorPreferences:
     # The flavor preferences table is keyed on the current arch
     flavorPreferences = {
         'x86'           : ['is: x86'],
-        # We can get rid of the next line once x86_64 systems are primarily 
-        # biarch 
         'x86_64'        : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
         'x86 x86_64'    : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
     }
