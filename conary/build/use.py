@@ -848,17 +848,16 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                                'localflag %s when no trove '
                                                'name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
-            if len([ x for x in depGroup.getDeps()]) > 1:
-                setOnlyIfMajArchSet = True
-                found = False
-            else:
-                setOnlyIfMajArchSet = False
-
+            found = False
             for dep in depGroup.getDeps():
-                majarch = dep.name
-                if setOnlyIfMajArchSet and not Arch[majarch]:
+                if not dep.isMajor:
                     continue
+                if found and error:
+                    raise RuntimeError, ('Cannot set arctitecture build flags'
+                                         ' to multiple architectures:'
+                                         ' %s: %s' % (recipeName, flavor))
                 found = True
+                majarch = dep.name
 
                 subarches = []
                 for (flag, sense) in dep.flags.iteritems():
@@ -867,11 +866,6 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                         subarches.append(flag)
                 Arch._setArch(majarch, subarches)
 
-            if setOnlyIfMajArchSet and not found:
-                if error:
-                    raise RuntimeError, ('Cannot set arctitecture build flags'
-                                         ' to multiple architectures:'
-                                         ' %s: %s' % (recipeName, flavor))
 Arch = ArchCollection()
 Use = UseCollection()
 LocalFlags = LocalFlagCollection()
