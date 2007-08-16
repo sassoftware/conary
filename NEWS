@@ -44,6 +44,7 @@ Changes in @NEW@:
       as part of that trove's troveInfo field. (CNY-1678)
     * Looking up path IDs now stops when all files have been found,
       instead of always walking the shadow hierarchy. (CNY-1911)
+    * multilib cooks set only Arch.x86_64. (CNY-1711)
 
   o Bug Fixes:
     * The new OpenPGP parsing code now accepts Version 3 keys and
