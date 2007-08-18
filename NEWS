@@ -53,6 +53,8 @@ Changes in @NEW@:
       honored for contexts as well.
     * Files with large numbers of identical files now erase faster, thanks
       to a sql fix in sqldb.iterFiles (CNY-1937)
+    * The q --buildreqs option now functions when multiple build requirements 
+      have the same name
 
   o Other Changes:
     * Conary tracebacks now report values for each variable in the
