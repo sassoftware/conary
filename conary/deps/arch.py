@@ -91,9 +91,15 @@ class FlavorPreferences:
 
     # The flavor preferences table is keyed on the current arch
     flavorPreferences = {
+        'alpha'         : ['is: alpha'],
+        'ppc'           : ['is: ppc'],
+        'ppc64'         : ['is: ppc ppc64', 'is: ppc64', 'is: ppc'],
+        'ppc ppc64'     : ['is: ppc ppc64', 'is: ppc64', 'is: ppc'],
+        's390'          : ['is: s390'],
+        'sparc'         : ['is: sparc'],
+        'sparc64'       : ['is: sparc sparc64', 'is: sparc64', 'is: sparc'],
+        'sparc sparc64' : ['is: sparc sparc64', 'is: sparc64', 'is: sparc'],
         'x86'           : ['is: x86'],
-        # We can get rid of the next line once x86_64 systems are primarily 
-        # biarch 
         'x86_64'        : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
         'x86 x86_64'    : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
     }

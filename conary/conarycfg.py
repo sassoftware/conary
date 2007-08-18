@@ -141,7 +141,7 @@ class EntitlementList(ServerGlobList):
     multipleMatches = True
 
     def addEntitlement(self, serverGlob, entitlement, entClass = None):
-        self.append((serverGlob, (entClass, entitlement)))
+        self.append((serverGlob, (entClass, util.ProtectedString(entitlement))))
 
 class CfgEntitlementItem(CfgType):
     def parseString(self, str):
@@ -158,7 +158,7 @@ class CfgEntitlementItem(CfgType):
         elif len(val) != 2:
             raise ParseError("expected <hostglob> <entitlement>")
 
-        return (val[0], (None, val[1]))
+        return (val[0], (None, util.ProtectedString(val[1])))
 
     def format(self, val, displayOptions=None):
         if val[1][0] is None:
@@ -762,13 +762,14 @@ def loadEntitlementFromProgram(fullPath, serverName):
         try:
             try:
                 os.close(readFd)
-                os.close(sys.stdin.fileno())
+                # close stdin
+                os.close(0)
 
                 # both error and stderr are redirected  - the entitlement
                 # should be on stdout, and error info should be 
                 # on stderr.
-                os.dup2(writeFd, sys.stdout.fileno())
-                os.dup2(stdErrWrite, sys.stderr.fileno())
+                os.dup2(writeFd, 1)
+                os.dup2(stdErrWrite, 2)
                 os.close(writeFd)
                 os.close(stdErrWrite)
                 os.execl(fullPath, fullPath, serverName)

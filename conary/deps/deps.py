@@ -123,7 +123,7 @@ class BaseDependency(object):
 
 class Dependency(BaseDependency):
 
-    __slots__ = ( 'name', 'flags' )
+    __slots__ = ( 'name', 'flags', )
 
     def __hash__(self):
 	val = hash(self.name)

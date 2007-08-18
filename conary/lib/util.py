@@ -181,7 +181,9 @@ def genExcepthook(debug=True,
             sys.exit(1)
 
         out = BoundedStringIO()
-        formatTrace(typ, value, tb, stream = out)
+        formatTrace(typ, value, tb, stream = out, withLocals = False)
+        out.write("\nFull stack:\n")
+        formatTrace(typ, value, tb, stream = out, withLocals = True)
         out.seek(0)
         tbString = out.read()
         del out
@@ -1198,6 +1200,8 @@ class ProtectedString(str):
     def __safe_str__(self):
         return "<Protected Value>"
 
+    __repr__ = __safe_str__
+
 class ProtectedTemplate(str):
     """A string template that hides parts of its components.
     The first argument is a template (see string.Template for a complete
@@ -1221,31 +1225,66 @@ class ProtectedTemplate(str):
         return self._templ.safe_substitute(nargs)
 
 def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
-    import repr as reprmod
+    import types
     import inspect
-    stream.write("Traceback (most recent call last):\n")
-    while tb:
+    import repr as reprmod
+    class Repr(reprmod.Repr):
+        def __init__(self):
+            reprmod.Repr.__init__(self)
+            self.maxtuple = 20
+            self.maxset = 160
+            self.maxlist = 20
+            self.maxdict = 20
+            self.maxstring = 160
+            self.maxother = 160
+
+        def repr_str(self, x, level):
+            if hasattr(x, '__safe_str__'):
+                return x.__safe_str__()
+            return reprmod.Repr.repr_str(self, x, level)
+
+    def formatOneFrame(tb, stream):
         fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
         frame = tb.tb_frame
-        tb = tb.tb_next
         stream.write('  File "%s", line %d, in %s\n' % 
             (fileName, lineNo, funcName))
         stream.write('    %s\n' % text[idx].strip())
+
+    tbStack = []
+    while tb:
+        tbStack.append(tb)
+        tb = tb.tb_next
+
+    if withLocals:
+        tbStack.reverse()
+        msg = "Traceback (most recent call first):\n"
+    else:
+        msg = "Traceback (most recent call last):\n"
+
+    r = Repr()
+    ignoredTypes = (types.ClassType, types.ModuleType, types.FunctionType,
+                    types.TypeType)
+
+    stream.write(msg)
+    for tb in tbStack:
+        formatOneFrame(tb, stream)
+
         if not withLocals:
             continue
-        r = reprmod.Repr()
-        r.maxtuple = 10
-        r.maxset = 10
-        r.maxlist = 10
-        r.maxdict = 10
-        r.maxstring = 80
-        r.maxother = 70
+
+        frame = tb.tb_frame
         for k, v in sorted(frame.f_locals.items()):
             if k.startswith('__') and k.endswith('__'):
                 # Presumably internal data
                 continue
+            if isinstance(v, ignoredTypes):
+                continue
+            if hasattr(v, '__class__'):
+                if v.__class__.__name__ == 'ModuleProxy':
+                    continue
             if hasattr(v, '__safe_str__'):
                 vstr = v.__safe_str__()
             else:
                 vstr = r.repr(v)
             stream.write("        %15s : %s\n" % (k, vstr))
+        stream.write("  %s\n\n" % ("*" * 70))
