@@ -323,7 +323,7 @@ class ClientClone:
             for host, troveTups in hasTrovesByHost.items():
                 try:
                     results = troveCache.hasTroves(troveTups)
-                except neterrors.OpenError, msg:
+                except errors.ConaryError, msg:
                     log.debug('warning: Could not access host %s: %s' % (host, msg))
                     results = dict((x, False) for x in troveTups)
                 hasTroves.update(results)
