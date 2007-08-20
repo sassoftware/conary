@@ -742,6 +742,7 @@ class GroupRecipeSource(SearchableTroveSource):
     """
 
     def __init__(self, source, groupRecipe):
+        SearchableTroveSource.__init__(self)
         self.searchAsDatabase()
         self.deps = {}
         self._trovesByName = {}
