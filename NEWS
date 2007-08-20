@@ -66,6 +66,7 @@ Changes in @NEW@:
   o Other Changes:
     * Conary tracebacks now report values for each variable in the
       local namespace in each frame. (CNY-1922)
+    * Replace select with poll for higher efficiency (CNY-1933)
 
 Changes in 1.1.90:
   o Major Changes:

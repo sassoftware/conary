@@ -388,9 +388,10 @@ def copyfileobj(source, dest, callback = None, digest = None,
     copied = 0
 
     if abortCheck:
-        sourceFd = source.fileno()
+        pollObj = select.poll()
+        pollObj.register(source.fileno(), select.POLLIN)
     else:
-        sourceFd = None
+        pollObj = None
 
     while True:
         if sizeLimit and (sizeLimit - copied < bufSize):
@@ -399,11 +400,12 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time
             # read returns, and every five seconds
-            l1 = []
-            while not l1:
+            l = []
+            while not l:
                 if abortCheck():
                     return None
-                l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
+                l = pollObj.poll(5)
+
         buf = source.read(bufSize)
         if not buf:
             break
