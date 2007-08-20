@@ -362,13 +362,17 @@ class URLOpener(urllib.FancyURLopener):
             check = self.abortCheck
         else:
             check = lambda: False
-        sourceFd = h.sock.fileno()
+
+        pollObj = select.poll()
+        pollObj.register(h.sock.fileno(), select.POLLIN)
+
         while True:
             if check():
                 raise AbortError
             # wait 5 seconds for a response
-            l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
-            if not l1:
+            l = pollObj.poll(5)
+
+            if not l:
                 # still no response from the server.  send a space to
                 # keep the connection alive - in case the server is
                 # behind a load balancer/firewall with short

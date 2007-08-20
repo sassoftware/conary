@@ -1245,6 +1245,14 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
     buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
                     for x in recipeObj.buildReqMap.itervalues())
+    packageReqs = [ x for x in recipeObj.buildReqMap.itervalues() 
+                    if trove.troveIsCollection(x.getName()) ]
+    for package in packageReqs:
+        childPackages = [ x for x in package.iterTroveList(strongRefs=True,
+                                                           weakRefs=True) ]
+        hasTroves = db.hasTroves(childPackages)
+        buildReqs.update(x[0] for x in itertools.izip(childPackages,
+                                                      hasTroves) if x[1])
     buildReqs = getRecursiveRequirements(db, buildReqs, cfg.flavor)
 
     # create all of the package troves we need, and let each package provide
