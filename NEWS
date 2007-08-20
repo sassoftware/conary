@@ -62,6 +62,8 @@ Changes in @NEW@:
       standard input, output, or error could trace back. (CNY-1946)
     * The q --buildreqs option now functions when multiple build requirements 
       have the same name
+    * An issue related to the flavor preferences list not being properly
+      populated when a group was cooked has been fixed. (CNY-1951)
 
   o Other Changes:
     * Conary tracebacks now report values for each variable in the
