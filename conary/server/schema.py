@@ -683,12 +683,11 @@ def createLabelMap(db):
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["LabelMap"] = []
+        createTrigger(db, "LabelMap")
         commit = True
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
     db.createIndex("LabelMap", "LabelMapItemIdBranchIdIdx", "itemId, branchId")
     db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
-    if createTrigger(db, "LabelMap"):
-        commit = True
     if commit:
         db.commit()
         db.loadSchema()

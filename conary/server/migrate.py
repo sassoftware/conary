@@ -348,15 +348,22 @@ class MigrateTo_15(SchemaMigration):
         # tables, it is easier if we save the tables and recreate them
         logMe(2, "Updating the Permissions table...")
         cu = self.db.cursor()
+        # handle the case where the admin field has been relocated from Permissions
         cu.execute("""create table tmpPerm as
-        select permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove
+        select userGroupId, labelId, itemId, admin, canWrite, canRemove
         from Permissions""")
         cu.execute("drop table Permissions")
         self.db.loadSchema()
         schema.createUsers(self.db)
+        # check if we need to preserve the admin field for a while longer
+        cu.execute("select * from Permissions limit 0")
+        columns = [x.lower() for x in cu.fields()]
+        if "admin" not in columns:
+            cu.execute("alter table Permissions add column "
+                       "admin integer not null default 0")
         cu.execute("""insert into Permissions
-        (permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove)
-        select permissionId, userGroupId, labelId, itemId, admin, canWrite, canRemove
+        (userGroupId, labelId, itemId, admin, canWrite, canRemove)
+        select userGroupId, labelId, itemId, admin, canWrite, canRemove
         from tmpPerm
         """)
         cu.execute("drop table tmpPerm")
@@ -402,9 +409,7 @@ class MigrateTo_15(SchemaMigration):
         return updateLabelMap(self.db)
     # 15.5
     def migrate5(self):
-        # drop the index in case a user created it by hand (CNY-1704)
         self.db.loadSchema()
-        self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
         self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
                             'itemId, branchId')
         return True
@@ -496,6 +501,7 @@ class MigrateTo_16(SchemaMigration):
         return True
     def migrate2(self):
         # need to rebuild flavormap
+        logMe(2, "Recreating the FlavorMap table...")
         cu = self.db.cursor()
         cu.execute("drop table FlavorMap")
         self.db.loadSchema()
@@ -508,6 +514,7 @@ class MigrateTo_16(SchemaMigration):
         return True
     # move the admin field from Permissions into UserGroups
     def migrate3(self):
+        logMe(2, "Relocating the admin field from Permissions to UserGroups...")
         cu = self.db.cursor()
         self.db.loadSchema()
         if "OldPermissions" in self.db.tables:
