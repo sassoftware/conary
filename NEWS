@@ -178,6 +178,18 @@ Changes in 1.1.31.3:
   o Other changes:
     * Logcat now works for calls which passed lists of entitlements
 
+Changes in 1.1.34:
+  o Build Changes:
+    * The default settings from r.add() will now override the default
+      settings from an r.addAll() (CNY-1882)
+    * Looking up path IDs is now stop when all files have been found,
+      instead of always walking the shadow hierarchy. (CNY-1911)
+
+  o Bug Fixes:
+    * A bug that caused an error message in the rPath Appliance
+      Platform Agent (rAPA) when using an entitlement generator has
+      been fixed. (CNY-1946)
+
 Changes in 1.1.33:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)
