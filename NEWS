@@ -1,3 +1,8 @@
+Changes in 1.1.34:
+  o Build Changes:
+   * The default settings from r.add() will now override the default
+     settings from an r.addAll() (CNY-1882)
+
 Changes in 1.1.33:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)
