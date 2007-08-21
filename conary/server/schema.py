@@ -667,9 +667,11 @@ def createLabelMap(db):
     if "LabelMap" not in db.tables:
         cu.execute("""
         CREATE TABLE LabelMap(
+            labelmapId      %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT LabelMap_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -682,10 +684,11 @@ def createLabelMap(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["LabelMap"] = []
         commit = True
-    db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
     db.createIndex("LabelMap", "LabelMapItemIdBranchIdIdx", "itemId, branchId")
     db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
+    if createTrigger(db, "LabelMap"):
+        commit = True
     if commit:
         db.commit()
         db.loadSchema()
