@@ -1380,12 +1380,14 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
     return changeSet, built
 
-def _computeCommonPrefixes(filePrefixes):
+def _computeCommonPrefixes(filePaths):
     # Eliminate prefixes of prefixes
     ret = []
     oldp = None
-    filePrefixes = sorted(filePrefixes)
-    for p in filePrefixes:
+    filePaths = sorted(filePaths)
+    for p in filePaths:
+        # Get the dirname
+        p = os.path.dirname(p)
         if oldp and p.startswith(oldp):
             continue
         ret.append(p)
