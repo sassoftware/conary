@@ -479,7 +479,7 @@ class NetworkAuthorization:
             cu.execute("""
             INSERT INTO Permissions
             (userGroupId, labelId, itemId, canWrite, capId, canRemove)
-            VALUES (?, ?, ?, ?, ?, ?, ?)""", (
+            VALUES (?, ?, ?, ?, ?, ?)""", (
                 userGroupId, labelId, itemId, write, capId, remove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()

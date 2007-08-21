@@ -51,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36,51 + 1)
+CLIENT_VERSIONS = range(36, 52 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -702,6 +702,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
+    def setUserGroupIsAdmin(self, reposLabel, userGroup, admin):
+        self.c[reposLabel].setUserGroupIsAdmin(userGroup, admin)
 
     def listAcls(self, reposLabel, userGroup):
         return self.c[reposLabel].listAcls(userGroup)

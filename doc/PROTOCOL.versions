@@ -1,4 +1,8 @@
 # this file documents the wire protocol changes for conary.
+Version 52:
+  - server side support for setUserGroupIsAdmin
+  - addAcl and editAcl shouldn't be used for settign the admin flag anymore
+
 Version 51:
   - getChangeSet supports infoOnly parameter
   - parameters are passed as (args, kwArgs) instead of individually

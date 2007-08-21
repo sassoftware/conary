@@ -44,7 +44,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36,51 + 1)
+SERVER_VERSIONS = range(36, 52 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -406,7 +406,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, remove = False):
+               label, write, capped, admin = False, remove = False):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
@@ -422,7 +422,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if label == "":
             label = None
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         emove = remove)
+                         remove = remove)
+        # legacy support
+        if admin:
+            self.auth.setAdmin(userGroup, True)
         return True
 
     @accessReadWrite
@@ -443,7 +446,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write, capped, canRemove = False):
+                oldLabel, trovePattern, label, write, capped, admin=False,
+                canRemove = False):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
@@ -470,6 +474,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
             write, capped, canRemove = canRemove)
+        # limited legacy support - editAcl can not reset the admin bit!!!
+        if admin:
+            self.auth.setAdmin(userGroup, True)
         return True
 
     @accessReadWrite
