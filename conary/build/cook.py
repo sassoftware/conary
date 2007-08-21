@@ -1296,7 +1296,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             fileIds = sorted(fileIdsPathMap.values())
             if not fileIds:
                 break
-            print "DEDEDEDE", searchBranch, filePrefixes, fileIds
             d = repos.getPackageBranchPathIds(sourceName, searchBranch,
                                               filePrefixes, fileIds)
             # Remove the paths we've found already from fileIdsPathMap, so we
