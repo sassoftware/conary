@@ -406,7 +406,15 @@ if SSL:
                 return
 
         def close_request(self, request):
-            HTTPServer.close_request(self, request)
+            pollObj = select.poll()
+            pollObj.register(request, select.POLLIN)
+
+            while pollObj.poll(0):
+                # drain any remaining data on this request
+                # This avoids the problem seen with the keepalive code sending
+                # extra bytes after all the request has been sent.
+                if not request.recv(8096):
+                    break
             request.set_shutdown(SSL.SSL_RECEIVED_SHUTDOWN |
                                  SSL.SSL_SENT_SHUTDOWN)
             HTTPServer.close_request(self, request)
