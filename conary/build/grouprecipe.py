@@ -1426,7 +1426,7 @@ class GroupRecipe(_BaseGroupRecipe):
         The C{r.createGroup()} command accepts the following parameters, with
         default values shown in parentheses:
 
-        B{autoResolve} : (current group setting) Whether to resolve
+        B{autoResolve} : (False) Whether to resolve
         dependencies for this group.
 
         B{byDefault} : (Current group setting) Whether to add troves to this
@@ -1438,7 +1438,7 @@ class GroupRecipe(_BaseGroupRecipe):
         B{checkPathConflicts} :  (Current group setting) Whether to check path
         conflicts for this group.
 
-        B{depCheck} : (Current group setting) Whether to check for dependency
+        B{depCheck} : (False) Whether to check for dependency
         closure for this group.
 
         B{groupName} : (None) The name of the group to be created. Must start
