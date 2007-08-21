@@ -26,8 +26,7 @@ from conary.conarycfg import CfgProxy, CfgRepoMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
-from conary.repository import changeset, errors, xmlshims, filecontainer
-from conary.repository import filecontents
+from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, instances, trovestore
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
@@ -321,7 +320,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addUser(self, authToken, clientVersion, user, newPassword):
         # adds a new user, with no acls. for now it requires full admin
         # rights
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         self.auth.addUser(user, newPassword)
@@ -331,7 +330,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addUserByMD5(self, authToken, clientVersion, user, salt, newPassword):
         # adds a new user, with no acls. for now it requires full admin
         # rights
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         #Base64 decode salt
@@ -340,14 +339,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addAccessGroup(self, authToken, clientVersion, groupName):
-        if not self.auth.check(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin=True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], groupName)
         return self.auth.addGroup(groupName)
 
     @accessReadWrite
     def deleteAccessGroup(self, authToken, clientVersion, groupName):
-        if not self.auth.check(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin=True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], groupName)
         self.auth.deleteGroup(groupName)
@@ -355,14 +354,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def listAccessGroups(self, authToken, clientVersion):
-        if not self.auth.check(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin=True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], 'listAccessGroups')
         return self.auth.getGroupList()
 
     @accessReadWrite
     def updateAccessGroupMembers(self, authToken, clientVersion, groupName, members):
-        if not self.auth.check(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin=True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], 'updateAccessGroupMembers')
         self.auth.updateGroupMembers(groupName, members)
@@ -370,7 +369,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def deleteUserByName(self, authToken, clientVersion, user):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         self.auth.deleteUserByName(user)
@@ -379,15 +378,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def setUserGroupCanMirror(self, authToken, clientVersion, userGroup,
                               canMirror):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, canMirror)
         self.auth.setMirror(userGroup, canMirror)
         return True
+    @accessReadWrite
+    def setUserGroupIsAdmin(self, authToken, clientVersion, userGroup,
+                            admin):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], userGroup, admin)
+        self.auth.setAdmin(userGroup, admin)
+        return True
 
     @accessReadOnly
     def listAcls(self, authToken, clientVersion, userGroup):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup)
 
@@ -403,7 +410,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin, remove = False):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
                  "write=%s admin=%s remove=%s" % (write, admin, remove))
@@ -426,7 +433,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadWrite
     def deleteAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label)
         if trovePattern == "":
@@ -443,7 +450,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
                 oldLabel, trovePattern, label, write, capped, admin,
                 canRemove = False):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
                  "old=%s new=%s" % ((oldTrovePattern, oldLabel),
@@ -474,8 +481,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def changePassword(self, authToken, clientVersion, user, newPassword):
-        if (not self.auth.check(authToken, admin = True)
-            and not self.auth.check(authToken, allowAnonymous = False)):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], user)
         self.auth.changePassword(user, newPassword)
@@ -483,8 +489,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getUserGroups(self, authToken, clientVersion):
-        if (not self.auth.check(authToken, admin = True)
-            and not self.auth.check(authToken, allowAnonymous = False)):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2)
         r = self.auth.getUserGroups(authToken[0])
@@ -1655,7 +1660,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _checkCommitPermissions(self, authToken, verList, mirror, hidden):
         if (mirror or hidden) and \
-                    not self.auth.check(authToken, mirror=(mirror or hidden)):
+               not self.auth.authCheck(authToken, mirror=(mirror or hidden)):
             raise errors.InsufficientPermission
         # verList items are (name, oldVer, newVer). e check both
         # combinations in one step
@@ -1696,7 +1701,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
-        if not self.auth.check(authToken, mirror = True):
+        if not self.auth.authCheck(authToken, mirror = True):
             raise errors.InsufficientPermission
 
         self.repos.troveStore.presentHiddenTroves()
@@ -1772,8 +1777,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             removedList.append(troveCs.getNewNameVersionFlavor())
             (name, version, flavor) = troveCs.getNewNameVersionFlavor()
 
-            if not self.auth.check(authToken, mirror = (mirror or hidden),
-                                   remove = True,
+            if not self.auth.authCheck(authToken, mirror = (mirror or hidden)):
+                raise errors.InsufficientPermission
+            if not self.auth.check(authToken, remove = True,
                                    label = version.branch().label(),
                                    trove = name):
                 raise errors.InsufficientPermission
@@ -2314,7 +2320,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addNewAsciiPGPKey(self, authToken, label, user, keyData):
-        if (not self.auth.check(authToken, admin = True)
+        if (not self.auth.authCheck(authToken, admin = True)
             and (not self.auth.check(authToken, allowAnonymous = False) or
                      authToken[0] != user)):
             raise errors.InsufficientPermission
@@ -2325,7 +2331,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addNewPGPKey(self, authToken, label, user, encKeyData):
-        if (not self.auth.check(authToken, admin = True)
+        if (not self.auth.authCheck(authToken, admin = True)
             and (not self.auth.check(authToken, allowAnonymous = False) or
                      authToken[0] != user)):
             raise errors.InsufficientPermission
@@ -2337,7 +2343,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def changePGPKeyOwner(self, authToken, label, user, key):
-        if not self.auth.check(authToken, admin = True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         if user:
             uid = self.auth.userAuth.getUserIdByName(user)
@@ -2357,7 +2363,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # the only reason to lock this fuction down is because it correlates
         # a valid user to valid fingerprints. neither of these pieces of
         # information is sensitive separately.
-        if (not self.auth.check(authToken, admin = True)
+        if (not self.auth.authCheck(authToken, admin = True)
             and (user != authToken[0]) or not self.auth.check(authToken)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], label, user)
@@ -2410,7 +2416,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getMirrorMark(self, authToken, clientVersion, host):
-	if not self.auth.check(authToken, write = False, mirror = True):
+	if not self.auth.authCheck(authToken, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, host)
         cu = self.db.cursor()
@@ -2427,7 +2433,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-	if not self.auth.check(authToken, write = False, mirror = True):
+	if not self.auth.authCheck(authToken, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], host, mark)
         cu = self.db.cursor()
@@ -2587,7 +2593,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # return the number of signatures which have changed
         self.log(2, infoList)
         # this requires mirror access and write access for that trove
-        if requireMirror and not self.auth.check(authToken, mirror=True):
+        if requireMirror and not self.auth.authCheck(authToken, mirror=True):
             raise errors.InsufficientPermission
         # batch permission check for writing
         if False in self.auth.batchCheck(authToken, [
@@ -2723,7 +2729,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-	if not self.auth.check(authToken, write = False, mirror = True):
+	if not self.auth.authCheck(authToken, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
         cu = self.db.cursor()
@@ -2733,7 +2739,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addPGPKeyList(self, authToken, clientVersion, keyList):
-	if not self.auth.check(authToken, write = False, mirror = True):
+	if not self.auth.authCheck(authToken, mirror = True):
 	    raise errors.InsufficientPermission
 
         for encKey in keyList:
@@ -2749,7 +2755,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-	if not self.auth.check(authToken, write = False, mirror = True):
+	if not self.auth.authCheck(authToken, mirror = True):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
         # only show troves the user is allowed to see
@@ -2900,9 +2906,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         troveInfoList is a list of (name, version, flavor) tuples. For
         each (name, version, flavor) specied, return a list of the troves
         (groups and packages) which reference it (either strong or weak)
-        (the user must have permission to see the referencing trove, but
-        not the trove being referenced).
         """
+        # design decision: the user must have permission to see the
+        # referencing trove, but not the trove being referenced.
         if not self.auth.check(authToken):
             raise errors.InsufficientPermission
         self.log(2, troveInfoList)
@@ -2960,7 +2966,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """
         troveList is a list of (name, branch, flavor) tuples. For each
         item, return the full version and flavor of each trove named
-        Name which exists on a downstream branch from the branch
+        name which exists on a downstream branch from the branch
         passed in and is of the specified flavor. If the flavor is not
         specified, all matches should be returned. Only troves the
         user has permission to view should be returned.
@@ -3009,7 +3015,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     'checkVersion call only supports protocol versions 50 '
                     'and lower')
 
-	if not self.auth.check(authToken, write = False):
+	if not self.auth.check(authToken):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
         # cut off older clients entirely, no negotiation

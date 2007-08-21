@@ -243,6 +243,7 @@ def createUsers(db):
             userGroupId     %(PRIMARYKEY)s,
             userGroup       VARCHAR(254) NOT NULL,
             canMirror       INTEGER NOT NULL DEFAULT 0,
+            admin           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroups"] = []
@@ -288,7 +289,6 @@ def createUsers(db):
             itemId          INTEGER NOT NULL,
             canWrite        INTEGER NOT NULL DEFAULT 0,
             capId           INTEGER NOT NULL DEFAULT 0,
-            admin           INTEGER NOT NULL DEFAULT 0,
             canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk

@@ -415,6 +415,7 @@ def createCheckTroveCache(db):
     logMe(2, "creating the CheckTroveCache table...")
     assert("CheckTroveCache" in db.tables)
     cu = db.cursor()
+    cu.execute("delete from CheckTroveCache")
     cu.execute("""
     select distinct
         P.itemId as patternId, Items.itemId as itemId,
@@ -441,6 +442,7 @@ def createUserGroupInstances(db):
     assert("UserGroupInstancesCache" in db.tables)
     assert("CheckTroveCache" in db.tables)
     cu = db.cursor()
+    cu.execute("delete from UserGroupInstancesCache")
     # select all instances that each usergroupid has access to
     # this query needs the CheckTroveCache table to be fully populated
     cu.execute("""
@@ -479,7 +481,7 @@ def updateLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16,2)
+    Version = (16,3)
     # migrate to 16.0
     # create a primary key for labelmap
     def migrate(self):
@@ -504,7 +506,31 @@ class MigrateTo_16(SchemaMigration):
             flavor = deps.ThawFlavor(flavorStr)
             flavTable.createFlavorMap(flavorId, flavor, cu)
         return True
-
+    # move the admin field from Permissions into UserGroups
+    def migrate3(self):
+        cu = self.db.cursor()
+        self.db.loadSchema()
+        if "OldPermissions" in self.db.tables:
+            cu.execute("drop table OldPermissions")
+        cu.execute("create table OldPermissions as select * from Permissions")
+        cu.execute("drop table Permissions")
+        self.db.loadSchema()
+        schema.createUsers(self.db)
+        cu.execute("alter table UserGroups add column "
+                   "admin INTEGER NOT NULL DEFAULT 0 ")
+        cu.execute("select userGroupId, max(admin) from OldPermissions "
+                   "group by userGroupId")
+        for ugid, admin in cu.fetchall():
+            cu.execute("update UserGroups set admin = ? where userGroupId = ?",
+                       (admin, ugid))
+        fields = ",".join(["userGroupId", "labelId", "itemId", "canWrite",
+                           "canRemove", "capId"])
+        cu.execute("insert into Permissions(%s) "
+                   "select distinct %s from OldPermissions " %(fields, fields))
+        cu.execute("drop table OldPermissions")
+        self.db.loadSchema()
+        return True
+    
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]
