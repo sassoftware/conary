@@ -339,14 +339,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addAccessGroup(self, authToken, clientVersion, groupName):
-        if not self.auth.authCheck(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], groupName)
         return self.auth.addGroup(groupName)
 
     @accessReadWrite
     def deleteAccessGroup(self, authToken, clientVersion, groupName):
-        if not self.auth.authCheck(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], groupName)
         self.auth.deleteGroup(groupName)
@@ -354,14 +354,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def listAccessGroups(self, authToken, clientVersion):
-        if not self.auth.authCheck(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], 'listAccessGroups')
         return self.auth.getGroupList()
 
     @accessReadWrite
     def updateAccessGroupMembers(self, authToken, clientVersion, groupName, members):
-        if not self.auth.authCheck(authToken, admin=True):
+        if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], 'updateAccessGroupMembers')
         self.auth.updateGroupMembers(groupName, members)
@@ -376,16 +376,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     @accessReadWrite
-    def setUserGroupCanMirror(self, authToken, clientVersion, userGroup,
-                              canMirror):
+    def setUserGroupCanMirror(self, authToken, clientVersion, userGroup, canMirror):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, canMirror)
         self.auth.setMirror(userGroup, canMirror)
         return True
     @accessReadWrite
-    def setUserGroupIsAdmin(self, authToken, clientVersion, userGroup,
-                            admin):
+    def setUserGroupIsAdmin(self, authToken, clientVersion, userGroup, admin):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, admin)
@@ -397,7 +395,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup)
-
         returner = list()
         for acl in self.auth.getPermsByGroup(userGroup):
             if acl['label'] is None:
@@ -409,11 +406,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, admin, remove = False):
+               label, write, capped, remove = False):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup, trovePattern, label,
-                 "write=%s admin=%s remove=%s" % (write, admin, remove))
+                 "write=%s remove=%s" % (write, remove))
         if trovePattern == "":
             trovePattern = None
         if trovePattern:
@@ -424,10 +421,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if label == "":
             label = None
-
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         admin, remove = remove)
-
+                         emove = remove)
         return True
 
     @accessReadWrite
@@ -448,14 +443,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write, capped, admin,
-                canRemove = False):
+                oldLabel, trovePattern, label, write, capped, canRemove = False):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
                  "old=%s new=%s" % ((oldTrovePattern, oldLabel),
                                     (trovePattern, label)),
-                 "write=%s admin=%s" % (write, admin))
+                 "write=%s" % (write,))
         if trovePattern == "":
             trovePattern = "ALL"
         if trovePattern:
@@ -475,8 +469,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin, canRemove = canRemove)
-
+            write, capped, canRemove = canRemove)
         return True
 
     @accessReadWrite

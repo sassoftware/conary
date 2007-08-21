@@ -444,13 +444,12 @@ class NetworkAuthorization:
         return items.checkTrove(pattern, trove)
 
     def addAcl(self, userGroup, trovePattern, label, write = False,
-               capped = False, admin = False, remove = False):
-        self.log(3, userGroup, trovePattern, label, write, admin, remove)
+               capped = False, remove = False):
+        self.log(3, userGroup, trovePattern, label, write, remove)
         cu = self.db.cursor()
 
         # these need to show up as 0/1 regardless of what we pass in
         write = int(bool(write))
-        admin = int(bool(admin))
         remove = int(bool(remove))
         capped = int(bool(capped))
         assert(not capped)
@@ -479,9 +478,9 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             INSERT INTO Permissions
-            (userGroupId, labelId, itemId, canWrite, capId, admin, canRemove)
+            (userGroupId, labelId, itemId, canWrite, capId, canRemove)
             VALUES (?, ?, ?, ?, ?, ?, ?)""", (
-                userGroupId, labelId, itemId, write, capId, admin, remove))
+                userGroupId, labelId, itemId, write, capId, remove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -489,17 +488,16 @@ class NetworkAuthorization:
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin, canRemove = False):
+            write, capped, canRemove = False):
 
         self.log(3, userGroup,  (oldTroveId, oldLabelId), (troveId, labelId),
-                 write, admin, canRemove)
+                 write, canRemove)
         cu = self.db.cursor()
 
         userGroupId = self._getGroupIdByName(userGroup)
 
         # these need to show up as 0/1 regardless of what we pass in
         write = int(bool(write))
-        admin = int(bool(admin))
         canRemove = int(bool(canRemove))
 
         capped = int(bool(capped))
@@ -509,10 +507,10 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             UPDATE Permissions
-            SET labelId = ?, itemId = ?, canWrite = ?, capId = ?, admin = ?,
+            SET labelId = ?, itemId = ?, canWrite = ?, capId = ?,
                 canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, capId, admin, canRemove,
+                       labelId, troveId, write, capId, canRemove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
@@ -639,7 +637,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("""SELECT Labels.label,
                              PerItems.item,
-                             canWrite, capId, admin, canRemove
+                             canWrite, capId, canRemove
                       FROM UserGroups
                       JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
@@ -663,7 +661,7 @@ class NetworkAuthorization:
         l = []
         for result in results:
             d = {}
-            for key in ('label', 'item', 'canWrite', 'capId', 'admin',
+            for key in ('label', 'item', 'canWrite', 'capId',
                         'canRemove'):
                 d[key] = result[key]
             l.append(d)
@@ -800,10 +798,9 @@ class NetworkAuthorization:
             return entGroupIdList[0]
 
         # admins can do everything
-        cu.execute("SELECT permissionId FROM Permissions "
-                   "WHERE Permissions.userGroupId IN (%s) "
-                   "AND Permissions.admin = 1" %
-                   ",".join(str(x) for x in authGroupIds))
+        cu.execute("select userGroupId from UserGroups "
+                   "where userGroupId in (%s) "
+                   "and admin = 1" % ",".join(str(x) for x in authGroupIds))
         if not len(cu.fetchall()):
             raise errors.InsufficientPermission
 
