@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * ccs2tar handles changesets with duplicate contents and hard links
+      (CNY-1953)
+
 Changes in 1.1.91:
   o Client Changes:
     * A new configuration option, "flavorPreferences", has been added.
@@ -73,8 +78,6 @@ Changes in 1.1.91:
       local namespace in each frame. (CNY-1922)
     * select() calls have been replaced with poll() for higher
       efficiency. (CNY-1933)
-    * ccs2tar handles changesets with duplicate contents and hard links
-      (CNY-1953)
 
 Changes in 1.1.90:
   o Major Changes:
