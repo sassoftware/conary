@@ -67,7 +67,8 @@ Changes in @NEW@:
     * Conary tracebacks now report values for each variable in the
       local namespace in each frame. (CNY-1922)
     * Replace select with poll for higher efficiency (CNY-1933)
-    * ccs2tar handles changesets with duplicate contents (CNY-1953)
+    * ccs2tar handles changesets with duplicate contents and hard links
+      (CNY-1953)
 
 Changes in 1.1.90:
   o Major Changes:
