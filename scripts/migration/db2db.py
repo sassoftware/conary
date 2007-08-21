@@ -118,21 +118,26 @@ if __name__ == '__main__':
             parser.values.db = []
         parser.values.db.append((opt_str[2:], value))
         if len(parser.values.db) > 2:
-            raise OptionValueError("Can only specify one source and one target database")
+            raise optparse.OptionValueError("Can only specify one source and one target database")
     parser = optparse.OptionParser(usage = "usage: %prog [options] srcopt=DB dstopt=DB")
     for db in ["sqlite", "mysql", "postgresql"]:
         parser.add_option("--" + db, action = "callback", callback = store_db, type="string",
-                      dest = "db", help = "specify a %s database" %db, metavar = db.upper())
-    parser.add_option("--verify", "-V", action = "store_true", dest = "verify",
+                      dest = "db", help = "specify a %s database" % db, metavar = db.upper())
+    parser.add_option("--verify", "-V", action = "store_true", dest = "verify", default = False,
                       help = "Verify each table after copy")
+    parser.add_option("--batch", "-b", action = "store", dest = "batch", metavar="N", type = int,
+                      default = 5000, help = "batch size in (row count) for each copy operation")
     (options, args) = parser.parse_args()
-    if len(options.db) != 2:
+    if options.db is None or len(options.db) != 2:
         parser.print_help()
         sys.exit(-1)
     src = getdb(*options.db[0])
     dst = getdb(*options.db[1])
 
+    # Sanity checks
+    src.checkTablesList()
     dst.createSchema()
+    dst.checkTablesList(isSrc=False)
     # check that the source and target match schemas
     diff = set(src.getTables()).difference(set(dst.getTables()))
     if diff:
@@ -140,8 +145,6 @@ if __name__ == '__main__':
     diff = set(dst.getTables()).difference(set(src.getTables()))
     if diff:
         print "WARNING: Only in Target (%s): %s" % (dst.driver, diff)
-    src.checkTablesList()
-    dst.checkTablesList(isSrc=False)
     # compare each table's schema between the source and target
     for table in TableList:
         srcFields = src.getFields(table)
@@ -155,7 +158,7 @@ if __name__ == '__main__':
 
     # now migrate all tables
     for table in TableList:
-        migrate_table(src, dst, table)
+        migrate_table(src, dst, table, options.batch)
         if options.verify:
             verify_table(src, dst, table)
         sys.stdout.write("\n")
