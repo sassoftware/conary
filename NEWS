@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * ccs2tar handles changesets with duplicate contents and hard links
       (CNY-1953)
+    * An error in the way attributes of ServerProxy classes get
+      marshaled has been fixed. (CNY-1956)
 
 Changes in 1.1.91:
   o Client Changes:
