@@ -1291,6 +1291,9 @@ class Database(SqlDbRepository):
             try:
                 fcntl.lockf(lockFd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except IOError, e:
+                # Close the lock object file descriptor, we don't want leaks,
+                # even on the error code path
+                os.close(lockFd)
                 if e.errno in (errno.EACCES, errno.EAGAIN):
                     raise DatabaseLockedError
                 raise
