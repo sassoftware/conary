@@ -754,13 +754,14 @@ def loadEntitlementFromProgram(fullPath, serverName):
         try:
             try:
                 os.close(readFd)
-                os.close(sys.stdin.fileno())
+                # close stdin
+                os.close(0)
 
                 # both error and stderr are redirected  - the entitlement
                 # should be on stdout, and error info should be 
                 # on stderr.
-                os.dup2(writeFd, sys.stdout.fileno())
-                os.dup2(stdErrWrite, sys.stderr.fileno())
+                os.dup2(writeFd, 1)
+                os.dup2(stdErrWrite, 2)
                 os.close(writeFd)
                 os.close(stdErrWrite)
                 os.execl(fullPath, fullPath, serverName)

@@ -1,9 +1,14 @@
 Changes in 1.1.34:
   o Build Changes:
-   * The default settings from r.add() will now override the default
-     settings from an r.addAll() (CNY-1882)
-   * Looking up path IDs is now stop when all files have been found,
-     instead of always walking the shadow hierarchy. (CNY-1911)
+    * The default settings from r.add() will now override the default
+      settings from an r.addAll() (CNY-1882)
+    * Looking up path IDs is now stop when all files have been found,
+      instead of always walking the shadow hierarchy. (CNY-1911)
+
+  o Bug Fixes:
+    * A bug that caused an error message in the rPath Appliance
+      Platform Agent (rAPA) when using an entitlement generator has
+      been fixed. (CNY-1946)
 
 Changes in 1.1.33:
   o Build Changes:
