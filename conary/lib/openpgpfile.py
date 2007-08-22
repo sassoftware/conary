@@ -275,7 +275,7 @@ def fingerprintToInternalKeyId(fingerprint):
                    for x, y in zip(fp[0::2], fp[1::2])] )
 
 def binSeqToString(sequence):
-    """sequence is a sequence if unsigned chars.
+    """sequence is a sequence of unsigned chars.
     Return the string with a corresponding char for each item"""
     return "".join([ chr(x) for x in sequence ])
 
