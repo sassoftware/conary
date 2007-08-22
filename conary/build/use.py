@@ -849,21 +849,10 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                                'name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             found = False
-            # Compare instruction sets by looking at the flavor preferences -
-            # the major architecture should be a superset of all other arches
-            majorArch = None
-            archTableSet = set([])
-            for dep in depGroup.getDeps():
-                prefs = arch.getFlavorPreferences([[dep]])
-                prefsSet = set(prefs)
-                if archTableSet.issubset(prefsSet):
-                    archTableSet = set(prefs)
-                    majorArch = dep
-                    continue
-                if prefsSet.issubset(archTableSet):
-                    continue
-                raise RuntimeError, ('Incompatible architectures:'
-                                     ' %s: %s' % (majorArch.name, dep))
+            try:
+                majorArch = arch.getMajorArch(depGroup.getDeps())
+            except arch.IncompatibleInstructionSets, e:
+                raise RuntimeError(str(e))
 
             if majorArch is None:
                 # No IS deps?
