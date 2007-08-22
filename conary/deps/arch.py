@@ -117,3 +117,39 @@ class FlavorPreferences:
 
 def getFlavorPreferences(arch = currentArch):
     return FlavorPreferences.getFlavorPreferences(arch)
+
+class IncompatibleInstructionSets(Exception):
+    def __init__(self, is1, is2):
+        Exception.__init__(self)
+        self.is1 = is1
+        self.is2 = is2
+
+    def __str__(self):
+        return "Incompatible architectures: %s: %s" % (self.is1, self.is2)
+
+def getMajorArch(depList):
+    """Return the major architecture from an instruction set dependency
+    @type depList: list (iterable) of Dependency objects
+    @param depGroupL a list (iterable) of Dependency objects.
+    @raise IncompatibleInstructionSets: when incompatible architectures are
+           present in the list.
+    @rtype: instance of Dependency, or None
+    @return: major architecture from the list, or None if the list is empty
+    """
+
+    # Compare instruction sets by looking at the flavor preferences -
+    # the major architecture should be a superset of all other arches
+    majorArch = None
+    archTableSet = set([])
+    for dep in depList:
+        prefs = getFlavorPreferences([[dep]])
+        prefsSet = set(prefs)
+        if archTableSet.issubset(prefsSet):
+            archTableSet = set(prefs)
+            majorArch = dep
+            continue
+        if prefsSet.issubset(archTableSet):
+            continue
+        raise IncompatibleInstructionSets(majorArch.name, dep)
+
+    return majorArch
