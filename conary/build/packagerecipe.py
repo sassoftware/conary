@@ -98,14 +98,14 @@ def _clearReqs(attrName, reqs):
     callerGlobals = inspect.stack()[2][0].f_globals
     classes = []
     for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
+        if inspect.isclass(value) and issubclass(value, AbstractPackageRecipe):
             classes.append(value)
 
     for class_ in classes:
         _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
-            if issubclass(base, _AbstractPackageRecipe):
+            if issubclass(base, AbstractPackageRecipe):
                 _removePackages(base, reqs)
 
 crossFlavor = deps.parseFlavor('cross')
@@ -120,7 +120,7 @@ def getCrossCompileSettings(flavor):
     isCrossTool = flavor.stronglySatisfies(crossFlavor)
     return None, targetFlavor, isCrossTool
 
-class _AbstractPackageRecipe(Recipe):
+class AbstractPackageRecipe(Recipe):
     buildRequires = [
         'filesystem:runtime',
         'setup:runtime',
@@ -541,7 +541,7 @@ class _AbstractPackageRecipe(Recipe):
             # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
                 flag._set(False)
-            use.setBuildFlagsFromFlavor(self.name, flavor)
+            use.setBuildFlagsFromFlavor(self.name, flavor, error=False)
 
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
@@ -722,7 +722,7 @@ class _AbstractPackageRecipe(Recipe):
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
-	self.macros = macros.Macros()
+	self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()
@@ -779,8 +779,11 @@ class _AbstractPackageRecipe(Recipe):
         self.mainDir(self.nameVer(), explicit=False)
         self._autoCreatedFileCount = 0
 
+# For compatibility with older modules. epydoc doesn't document classes
+# starting with _, see CNY-1848
+_AbstractPackageRecipe = AbstractPackageRecipe
 
-class PackageRecipe(_AbstractPackageRecipe):
+class PackageRecipe(AbstractPackageRecipe):
     """
     NAME
     ====
@@ -812,7 +815,7 @@ class PackageRecipe(_AbstractPackageRecipe):
     # of :lib in here is only for runtime, not to link against.
     # Any package that needs to link should still specify the :devel
     # component
-    buildRequires = _AbstractPackageRecipe.buildRequires + [
+    buildRequires = AbstractPackageRecipe.buildRequires + [
         'bzip2:runtime',
         'gzip:runtime',
         'tar:runtime',
@@ -821,7 +824,7 @@ class PackageRecipe(_AbstractPackageRecipe):
     ]
 
     def __init__(self, *args, **kwargs):
-        _AbstractPackageRecipe.__init__(self, *args, **kwargs)
+        AbstractPackageRecipe.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)

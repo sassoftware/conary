@@ -103,7 +103,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         proxy = conarycfg.getProxyFromConfig(cfg)
 
-        return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
+        repos = NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                                        pwPrompt = passwordPrompter,
                                        localRepository = db,
                                        entitlementDir =
@@ -114,6 +114,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                           cfg.uploadRateLimit,
                                        entitlements = cfg.entitlement,
                                        proxy = proxy)
+        repos.setFlavorPreferenceList(cfg.flavorPreferences)
+        return repos
 
     def getRepos(self):
         return self.repos
@@ -351,45 +353,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         """
         return self.db.iterRollbacksList()
 
-    def _checkChangeSetForLabelConflicts(self, cs):
-        source = trovesource.ChangesetFilesTroveSource(None)
-        source.addChangeSet(cs)
-        # there should be a better way to iterate over all NVF in a source.
-        toCreate = [source.trovesByName(x) for x in source.iterAllTroveNames()]
-
-        conflicts = []
-        branchesByLabel = {}
-        for (n,v,f) in itertools.chain(*toCreate):
-            troveSpec =  (n, str(v.trailingLabel()), None)
-            if troveSpec in branchesByLabel:
-                # We've seen this trove before; was it on a different branch?
-                oEnt = branchesByLabel[troveSpec]
-                if oEnt[0] != v.branch():
-                    conflicts.append(((n,v,f), oEnt[1]))
-            else:
-                branchesByLabel[troveSpec] = (v.branch(), (n,v,f))
-
-        results = self.repos.findTroves(None, branchesByLabel, None,
-                                       bestFlavor = False, getLeaves = True,
-                                       allowMissing = True)
-
-        for troveSpec, troveTups in results.iteritems():
-            if not troveTups:
-                continue
-            # finding one conflict per trove to create is enough
-            troveConflict = None
-            foundPrevious = False
-            branchToCreate, tupToCreate = branchesByLabel[troveSpec]
-            for troveTup in troveTups:
-                if branchToCreate != troveTup[1].branch():
-                    troveConflict = (troveTup, tupToCreate)
-                else:
-                    foundPrevious = True
-                    break 
-            if not foundPrevious and troveConflict:
-                conflicts.append(troveConflict)
-        return conflicts
-
     def getSearchSource(self, flavor=0, troveSource=None):
         # a flavor of None is common in some cases so we use 0
         # as our "unset" case.
@@ -416,3 +379,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
     def applyRollback(self, rollbackSpec, **kwargs):
         return rollbacks.applyRollback(self, rollbackSpec, **kwargs)
+
+    def close(self):
+        """Close this client and release all associated resources"""
+        self.lzCache.release()
+        # self.db accepts to be closed multiple times
+        self.db.close()
+
+        # Close the log files too
+        log.syslog.close()

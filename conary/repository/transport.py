@@ -362,13 +362,17 @@ class URLOpener(urllib.FancyURLopener):
             check = self.abortCheck
         else:
             check = lambda: False
-        sourceFd = h.sock.fileno()
+
+        pollObj = select.poll()
+        pollObj.register(h.sock.fileno(), select.POLLIN)
+
         while True:
             if check():
                 raise AbortError
             # wait 5 seconds for a response
-            l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
-            if not l1:
+            l = pollObj.poll(5)
+
+            if not l:
                 # still no response from the server.  send a space to
                 # keep the connection alive - in case the server is
                 # behind a load balancer/firewall with short
@@ -415,6 +419,9 @@ class Transport(xmlrpclib.Transport):
 
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
+    # make this a class variable so that across all attempts to transport we'll only
+    # spew messages once per host.
+    failedHosts = set()
 
     def __init__(self, https = False, proxies = None, serverName = None,
                  extraHeaders = None):
@@ -508,7 +515,8 @@ class Transport(xmlrpclib.Transport):
                 break
             except IOError, e:
                 tries += 1
-                if tries >= 5:
+                if tries >= 5 or host in self.failedHosts:
+                    self.failedHosts.add(host)
                     raise
                 if e.args[0] == 'socket error':
                     e = e.args[1]

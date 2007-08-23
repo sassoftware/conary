@@ -370,9 +370,14 @@ class Policy(action.RecipeAction):
         newPath = util.joinPaths(self.rootdir, path)
         if not util.exists(newPath):
             return True
+        oldMtime = self.recipe._derivedFiles.get(path, None)
         try:
-            oldMtime = self.recipe._derivedFiles[path]
-            newMtime = os.lstat(newPath).st_mtime
+            if os.path.islink(newPath):
+                # symlinks are special, we compare the target of the link
+                # instead of the mtime
+                newMtime = os.readlink(newPath)
+            else:
+                newMtime = os.lstat(newPath).st_mtime
             return oldMtime != newMtime
         except:
             return True

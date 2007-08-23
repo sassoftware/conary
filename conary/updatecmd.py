@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -362,7 +362,10 @@ def doUpdate(cfg, changeSpecs, **kwargs):
 def _updateTroves(cfg, applyList, **kwargs):
     # Take out the apply-related keyword arguments
     applyDefaults = dict(
-                        replaceFiles = False,
+                        replaceManagedFiles = False,
+                        replaceUnmanagedFiles = False,
+                        replaceModifiedFiles = False,
+                        replaceModifiedConfigFiles = False,
                         tagScript = None,
                         justDatabase = False,
                         info = False,
@@ -373,6 +376,7 @@ def _updateTroves(cfg, applyList, **kwargs):
     for k in applyDefaults:
         if k in kwargs:
             applyKwargs[k] = kwargs.pop(k)
+
     callback = kwargs.pop('callback')
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
