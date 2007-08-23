@@ -22,7 +22,7 @@ TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
 # This is the major number of the schema we need
-VERSION = sqllib.DBversion(15)
+VERSION = sqllib.DBversion(16)
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -91,8 +91,9 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE FlavorMap(
             flavorId        INTEGER NOT NULL,
-            base            VARCHAR(254),
+            base            VARCHAR(254) NOT NULL,
             sense           INTEGER,
+            depClass        INTEGER NOT NULL,
             flag            VARCHAR(254),
             CONSTRAINT FlavorMap_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
@@ -100,7 +101,7 @@ def createFlavors(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FlavorMap"] = []
         commit = True
-    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId")
+    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId, depClass, base")
 
     if "FlavorScores" not in db.tables:
         from conary.deps import deps
@@ -242,6 +243,7 @@ def createUsers(db):
             userGroupId     %(PRIMARYKEY)s,
             userGroup       VARCHAR(254) NOT NULL,
             canMirror       INTEGER NOT NULL DEFAULT 0,
+            admin           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroups"] = []
@@ -287,7 +289,6 @@ def createUsers(db):
             itemId          INTEGER NOT NULL,
             canWrite        INTEGER NOT NULL DEFAULT 0,
             capId           INTEGER NOT NULL DEFAULT 0,
-            admin           INTEGER NOT NULL DEFAULT 0,
             canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
@@ -666,9 +667,11 @@ def createLabelMap(db):
     if "LabelMap" not in db.tables:
         cu.execute("""
         CREATE TABLE LabelMap(
+            labelmapId      %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT LabelMap_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -680,8 +683,8 @@ def createLabelMap(db):
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["LabelMap"] = []
+        createTrigger(db, "LabelMap")
         commit = True
-    db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
     db.createIndex("LabelMap", "LabelMapItemIdBranchIdIdx", "itemId, branchId")
     db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
@@ -716,6 +719,129 @@ def createIdTables(db):
         db.commit()
         db.loadSchema()
 
+# cached access map for (userGroupId, instanceId)
+def createAccessMaps(db):
+    commit = False
+    cu = db.cursor()
+    # permissions by group. This only expresses/implies read
+    # permissions; for write and remove the acls in Permissions are
+    # controlling
+    if "UserGroupTroves" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupTroves(
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            recursive       INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT UserGroupTroves_ugid_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UserGroupTroves_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupTroves"] = []
+        commit = True
+    db.createIndex("UserGroupTroves", "UserGroupTroves_userGroupIdIdx", "userGroupId,instanceId",
+                   unique=True)
+    db.createIndex("UserGroupTroves", "UserGroupTroves_instanceId_fk", "instanceId")
+    if createTrigger(db, "UserGroupTroves"):
+        commit = True
+
+    # cache of what troves a usergroup can see. Based on acls in
+    # Permissions and the recursive group grants from UserGroupTroves
+    if "UserGroupInstancesCache" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupInstancesCache(
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
+            canRemove       INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT UGIC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGIC_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupInstancesCache"] = []
+        commit = True
+    db.createIndex("UserGroupInstancesCache", "UGIC_userGroupIdIdx", "userGroupId,instanceId",
+                   unique=True)
+    db.createIndex("UserGroupInstancesCache", "UGIC_instanceId_fk", "instanceId")
+
+    # Latest, as seen by each usergroup
+    if "UserGroupLatestCache" not in db.tables:
+        assert("Items" in db.tables)
+        assert("Branches" in db.tables)
+        assert("Flavors" in db.tables)
+        assert("Versions" in db.tables)
+        assert("UserGroups" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupLatestCache(
+            userGroupId     INTEGER NOT NULL,
+            itemId          INTEGER NOT NULL,
+            branchId        INTEGER NOT NULL,
+            flavorId        INTEGER NOT NULL,
+            versionId       INTEGER NOT NULL,
+            latestType      INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT UGLC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGLC_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGLC_branchId_fk
+                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT UGLC_flavorId_fk
+                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT UGLC_versionId_fk
+                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupLatestCache"] = []
+        commit = True
+    # sanity index that isn't very useful as an index due to its size...
+    db.createIndex("UserGroupLatestCache", "UGLC_userGroupId_uniq",
+                   "userGroupId,itemId,branchId,flavorId,latestType",
+                   unique=True)
+    # create needed FKs
+    db.createIndex("UserGroupLatestCache", "UGLC_itemId_fk", "itemId,branchId,userGroupId")
+    db.createIndex("UserGroupLatestCache", "UGLC_branchId_fk", "branchId,userGroupId")
+    db.createIndex("UserGroupLatestCache", "UGLC_flavorId_fk", "flavorId")
+    db.createIndex("UserGroupLatestCache", "UGLC_versionId_fk", "versionId")
+    if createTrigger(db, "UserGroupLatestCache"):
+        commit = True
+    
+    # a cache table for netauth.checktrove calls for use in SQL
+    if 'CheckTroveCache' not in db.tables:
+        cu.execute("""
+        CREATE TABLE CheckTroveCache(
+            itemId      INTEGER NOT NULL,
+            patternId   INTEGER NOT NULL,
+            CONSTRAINT CheckTroveCache_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT CheckTroveCache_patternId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["CheckTroveCache"] = []
+        commit = True
+    db.createIndex("CheckTroveCache", "CheckTroveCache_itemId_fk",
+                   "itemId,patternId", unique = True)
+    db.createIndex("CheckTroveCache", "CheckTroveCache_patternId_fk", "patternId")
+    if commit:
+        db.commit()
+        db.loadSchema()
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     logMe(3)
@@ -725,13 +851,14 @@ def setupTempTables(db):
     if "tmpFlavorMap" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpFlavorMap(
-            flavorId    INTEGER,
-            base        VARCHAR(254),
+            flavorId    INTEGER NOT NULL,
+            base        VARCHAR(254) NOT NULL,
             sense       INTEGER,
+            depClass    INTEGER NOT NULL,
             flag        VARCHAR(254)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpFlavorMap"] = True
-        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,base",
+        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,depClass,base",
                        check = False)
         db.createIndex("tmpFlavorMap", "tmpFlavorMapSenseIdx", "flavorId,sense",
                        check = False)
@@ -845,7 +972,16 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpId"] = True
         db.createIndex("tmpId", "tmpIdIdx", "id", check=False)
-
+    # for processing UserGroupInstancesCache entries
+    if "tmpUGI" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpUGI(
+            userGroupid   INTEGER,
+            instanceId    INTEGER
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpUGI"] = True
+        db.createIndex("tmpUGI", "tmpUGIIdx", "instanceId,userGroupId",
+                       unique=True, check=False)
     if "tmpTroves" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpTroves(
@@ -886,8 +1022,7 @@ def setupTempTables(db):
     db.commit()
 
 def resetTable(cu, name):
-    cu.execute("DELETE FROM %s" % name,
-               start_transaction = False)
+    cu.execute("DELETE FROM %s" % name, start_transaction = False)
 
 # create the (permanent) server repository schema
 def createSchema(db):
@@ -895,14 +1030,15 @@ def createSchema(db):
         db.loadSchema()
     createIdTables(db)
     createLabelMap(db)
+    createFlavors(db)
+    createInstances(db)
+    createNodes(db)
 
     createUsers(db)
     createEntitlements(db)
     createPGPKeys(db)
-
-    createFlavors(db)
-    createInstances(db)
-    createNodes(db)
+    createAccessMaps(db)
+    
     createChangeLog(db)
     createLatest(db)
 

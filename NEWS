@@ -1,3 +1,12 @@
+Changes in 2.0.0:
+  o Client Changes:
+    * Added getTroveLatestByLabel as a client-side call
+
+  o Server Changes:
+    * fixed scoring for target flavor sets (CNY-1539)
+    * setting/resetting the admin field permission is handled now by the
+      setUserGroupIsAdmin() call instead of addAcl/editAcl (CNY-1782)
+
 Changes in @NEW@:
   o Bug Fixes:
     * ccs2tar handles changesets with duplicate contents and hard links

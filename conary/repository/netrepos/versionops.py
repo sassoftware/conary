@@ -94,13 +94,12 @@ class LatestTable:
                     Nodes.itemId = ? AND
                     Nodes.branchId = ? AND
                     flavorId = ? AND
-                    isPresent = ?
+                    isPresent = %d
                     %s
                 ORDER BY finalTimestamp DESC
                 LIMIT 1
-        """ % troveTypeFilter, itemId, branchId, flavorId,
-              instances.INSTANCE_PRESENT_NORMAL)
-
+        """ % (instances.INSTANCE_PRESENT_NORMAL, troveTypeFilter),
+                   (itemId, branchId, flavorId))
         try:
             latestVersionId, troveType = cu.next()
         except StopIteration:
@@ -117,8 +116,10 @@ class LatestTable:
 
     def update(self, itemId, branchId, flavorId):
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Latest WHERE itemId=? AND branchId=? AND "
-                   "flavorId=?", itemId, branchId, flavorId)
+        cu.execute("""
+        DELETE FROM Latest
+        WHERE itemId=? AND branchId=? AND flavorId=?
+        """, (itemId, branchId, flavorId))
 
         versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId)
 
@@ -133,7 +134,6 @@ class LatestTable:
             self._add(cu, itemId, branchId, flavorId, versionId,
                       LATEST_TYPE_NORMAL)
             return
-
 
         presentVersionId, troveType = \
             self._findLatest(cu, itemId, branchId, flavorId,
@@ -217,6 +217,16 @@ class Nodes:
         return False # noop
 
 class SqlVersioning:
+    def __init__(self, db, versionTable, branchTable):
+        self.items = items.Items(db)
+	self.labels = LabelTable(db)
+	self.latest = LatestTable(db)
+	self.labelMap = LabelMap(db)
+	self.versionTable = versionTable
+        self.branchTable = branchTable
+	self.needsCleanup = False
+	self.nodes = Nodes(db)
+	self.db = db
 
     def versionsOnBranch(self, itemId, branchId):
 	cu = self.db.cursor()
@@ -243,8 +253,7 @@ class SqlVersioning:
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
-    def createVersion(self, itemId, version, flavorId, sourceName,
-                      updateLatest = True):
+    def createVersion(self, itemId, version, flavorId, sourceName):
 	"""
 	Creates a new versionId for itemId. The branch must already exist
 	for the given itemId.
@@ -313,17 +322,6 @@ class SqlVersioning:
 	self.labelMap.addItem((itemId, labelId), branchId)
 
 	return branchId
-
-    def __init__(self, db, versionTable, branchTable):
-        self.items = items.Items(db)
-	self.labels = LabelTable(db)
-	self.latest = LatestTable(db)
-	self.labelMap = LabelMap(db)
-	self.versionTable = versionTable
-        self.branchTable = branchTable
-	self.needsCleanup = False
-	self.nodes = Nodes(db)
-	self.db = db
 
 class SqlVersionsError(Exception):
     pass

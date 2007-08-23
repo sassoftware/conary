@@ -14,7 +14,6 @@
 import itertools
 import md5
 import os
-import re
 import time
 import urllib, urllib2
 import xml
@@ -23,6 +22,7 @@ from conary import conarycfg
 from conary.repository import errors
 from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
+from conary.repository.netrepos import items, versionops, accessmap
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists
@@ -62,7 +62,6 @@ class UserAuthorization:
 
         cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
                    "VALUES (?, ?)", (ugid, uid))
-
         return uid
 
     def changePassword(self, cu, user, salt, password):
@@ -156,7 +155,6 @@ class UserAuthorization:
                         JOIN UserGroupMembers USING (userId)
                         JOIN UserGroups USING (userGroupId)
                         WHERE Users.userName = ?""", user)
-
         return [ x[0] for x in cu ]
 
     def getUserIdByName(self, userName):
@@ -262,7 +260,9 @@ class NetworkAuthorization:
             self.db, passwordURL, cacheTimeout = cacheTimeout)
         self.entitlementAuth = EntitlementAuthorization(
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
-
+        self.items = items.Items(db)
+        self.ugo = accessmap.UserGroupOps(db)
+        
     def getAuthGroups(self, cu, authToken, allowAnonymous = True):
         self.log(4, authToken[0], authToken[2])
         # Find what group this user belongs to
@@ -289,12 +289,10 @@ class NetworkAuthorization:
             entList = authToken[2]
             remoteIp = authToken[3]
 
-        groupSet = self.userAuth.getAuthorizedGroups(cu, authToken[0],
-                                                     authToken[1],
-                                                     allowAnonymous =
-                                                            allowAnonymous,
-                                                     remoteIp = remoteIp)
-
+        groupSet = self.userAuth.getAuthorizedGroups(
+            cu, authToken[0], authToken[1],
+            allowAnonymous = allowAnonymous,
+            remoteIp = remoteIp)
 
         timedOut = []
         for entClass, entKey in entList:
@@ -378,13 +376,43 @@ class NetworkAuthorization:
                         break
         return retlist
 
-    def check(self, authToken, write = False, admin = False, label = None,
-              trove = None, mirror = False, remove = False,
+    # checks for group-wide permissions like admin and mirror
+    def authCheck(self, authToken, admin=False, mirror=False):
+        self.log(3, authToken[0],
+                 "entitlements=%s admin=%s mirror=%s" %(
+            authToken[2], int(bool(admin)), int(bool(mirror)) ))
+        if not authToken[0]:
+            return False
+        cu = self.db.cursor()
+        try:
+            groupIds = self.getAuthGroups(cu, authToken, allowAnonymous=False)
+        except errors.InsufficientPermission:
+            return False
+        if len(groupIds) < 1:
+            return False
+        cu.execute("select canMirror, admin from UserGroups "
+                   "where userGroupId in (%s)" %(
+            ",".join("%d" % x for x in groupIds)))
+        hasAdmin = False
+        hasMirror = False
+        for mirrorBit, adminBit in cu.fetchall():
+            if admin and adminBit:
+                hasAdmin = True
+            if mirror and (mirrorBit or adminBit):
+                hasMirror = True       
+        admin = (not admin) or (admin and hasAdmin)
+        mirror = (not mirror) or (mirror and hasMirror)
+        return admin and mirror
+        
+    # a simple call to auth.check(authToken) checks that the usergroup
+    # has an entry into the Permissions table - questionable
+    # usefullness since we can't check that permission against the
+    # label or the troves
+    def check(self, authToken, write = False, label = None, trove = None, remove = False,
               allowAnonymous = True):
         self.log(3, authToken[0],
-                 "entitlements=%s write=%s admin=%s label=%s trove=%s mirror=%s remove=%s" %(
-            authToken[2], int(bool(write)), int(bool(admin)), label, trove, int(bool(mirror)),
-            int(bool(remove))))
+                 "entitlements=%s write=%s label=%s trove=%s remove=%s" %(
+            authToken[2], int(bool(write)), label, trove, int(bool(remove))))
 
         if label and label.getHost() not in self.serverNameList:
             raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
@@ -402,18 +430,6 @@ class NetworkAuthorization:
 
         if len(groupIds) < 1:
             return False
-
-        if mirror:
-            # admin access includes mirror access
-            cu.execute("""
-                SELECT userGroupId FROM 
-                    UserGroups JOIN Permissions USING (userGroupId)
-                    WHERE
-                        userGroupId IN (%s) AND
-                        (canMirror = 1 OR admin = 1)
-                """ % ",".join("%d" % x for x in groupIds))
-            if not cu.fetchall():
-                return False
 
         stmt = """
         select Items.item
@@ -437,9 +453,6 @@ class NetworkAuthorization:
         if write:
             where.append("Permissions.canWrite=1")
 
-        if admin:
-            where.append("Permissions.admin=1")
-
         if remove:
             where.append("Permissions.canRemove=1")
 
@@ -455,43 +468,26 @@ class NetworkAuthorization:
 
         return False
 
-    _cacheRe = {}
     def checkTrove(self, pattern, trove):
-        if pattern == 'ALL' or trove is None:
-            return True
-        regExp = self._cacheRe.get(pattern, None)
-        if regExp is None:
-            regExp = self._cacheRe[pattern] = re.compile(pattern + '$')
-        if regExp.match(trove):
-            return True
-        return False
+        return items.checkTrove(pattern, trove)
 
     def addAcl(self, userGroup, trovePattern, label, write = False,
-               capped = False, admin = False, remove = False):
-        self.log(3, userGroup, trovePattern, label, write, admin, remove)
+               capped = False, remove = False):
+        self.log(3, userGroup, trovePattern, label, write, remove)
         cu = self.db.cursor()
 
         # these need to show up as 0/1 regardless of what we pass in
         write = int(bool(write))
-        admin = int(bool(admin))
         remove = int(bool(remove))
         capped = int(bool(capped))
         assert(not capped)
-        capId = 0
 
-        # XXX This functionality is available in the TroveStore class
-        #     refactor so that the code is not in two places
         if trovePattern:
-            cu.execute("SELECT * FROM Items WHERE item=?", trovePattern)
-            itemId = cu.fetchone()
-            if itemId:
-                itemId = itemId[0]
-            else:
-                cu.execute("INSERT INTO Items (item) VALUES(?)", trovePattern)
-                itemId = cu.lastrowid
+            itemId = self.items.addPattern(trovePattern)
         else:
             itemId = 0
-
+        # XXX This functionality is available in the TroveStore class
+        #     refactor so that the code is not in two places
         if label:
             cu.execute("SELECT * FROM Labels WHERE label=?", label)
             labelId = cu.fetchone()
@@ -508,45 +504,43 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             INSERT INTO Permissions
-            (userGroupId, labelId, itemId, canWrite, capId, admin, canRemove)
-            VALUES (?, ?, ?, ?, ?, ?, ?)""", (
-                userGroupId, labelId, itemId, write, capId, admin, remove))
+            (userGroupId, labelId, itemId, canWrite, canRemove)
+            VALUES (?, ?, ?, ?, ?)""", (
+                userGroupId, labelId, itemId, write, remove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
-
+        self.ugo.updateUserGroupId(userGroupId)
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, admin, canRemove = False):
+                write, capped, canRemove = False):
 
         self.log(3, userGroup,  (oldTroveId, oldLabelId), (troveId, labelId),
-                 write, admin, canRemove)
+                 write, canRemove)
         cu = self.db.cursor()
 
         userGroupId = self._getGroupIdByName(userGroup)
 
         # these need to show up as 0/1 regardless of what we pass in
         write = int(bool(write))
-        admin = int(bool(admin))
         canRemove = int(bool(canRemove))
 
         capped = int(bool(capped))
         assert(not capped)
-        capId = 0
 
         try:
             cu.execute("""
             UPDATE Permissions
-            SET labelId = ?, itemId = ?, canWrite = ?, capId = ?, admin = ?,
+            SET labelId = ?, itemId = ?, canWrite = ?,
                 canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, capId, admin, canRemove,
+                       labelId, troveId, write, canRemove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, troveId)
-
+        self.ugo.updateUserGroupId(userGroupId)
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
@@ -565,6 +559,7 @@ class NetworkAuthorization:
           AND labelId = (SELECT labelId FROM Labels WHERE label=?)
           AND itemId = (SELECT itemId FROM Items WHERE item=?)
         """, (userGroupId, label, item))
+        self.ugo.updateUserGroupId(userGroupId)
         self.db.commit()
 
     def addUser(self, user, password):
@@ -577,16 +572,30 @@ class NetworkAuthorization:
 
         self.addUserByMD5(user, salt, m.hexdigest())
 
-    def groupCanMirror(self, userGroup):
+    def groupIsAdmin(self, userGroup):
         cu = self.db.cursor()
-        cu.execute("SELECT canMirror FROM UserGroups "
-                   "WHERE userGroup=?",
+        cu.execute("SELECT admin FROM UserGroups WHERE userGroup=?",
                    userGroup)
         ret = cu.fetchall()
         if len(ret):
-            canMirror = ret[0][0]
-            return canMirror
+            return ret[0][0]
         raise errors.GroupNotFound
+
+    def groupCanMirror(self, userGroup):
+        cu = self.db.cursor()
+        cu.execute("SELECT canMirror FROM UserGroups WHERE userGroup=?",
+                   userGroup)
+        ret = cu.fetchall()
+        if len(ret):
+            return ret[0][0]
+        raise errors.GroupNotFound
+
+    def setAdmin(self, userGroup, admin):
+        self.log(3, userGroup, admin)
+        cu = self.db.transaction()
+        cu.execute("UPDATE userGroups SET admin=? WHERE userGroup=?",
+                   (int(bool(admin)), userGroup))
+        self.db.commit()
 
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
@@ -656,7 +665,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("""SELECT Labels.label,
                              PerItems.item,
-                             canWrite, capId, admin, canRemove
+                             canWrite, canRemove
                       FROM UserGroups
                       JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
@@ -680,8 +689,7 @@ class NetworkAuthorization:
         l = []
         for result in results:
             d = {}
-            for key in ('label', 'item', 'canWrite', 'capId', 'admin',
-                        'canRemove'):
+            for key in ('label', 'item', 'canWrite', 'canRemove'):
                 d[key] = result[key]
             l.append(d)
         return l
@@ -773,11 +781,14 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM EntitlementAccessMap WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
-        cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
+        cu.execute("DELETE FROM UserGroupInstancesCache WHERE userGroupId = ?", userGroupId)
+        cu.execute("DELETE FROM UserGroupTroves WHERE userGroupId = ?", userGroupId)
+        cu.execute("DELETE FROM UserGroupLatestCache WHERE userGroupId = ?", userGroupId)
         #Note, there could be a user left behind with no associated group
         #if the group being deleted was created with a user.  This user is not
         #deleted because it is possible for this user to be a member of
         #another group.
+        cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
         if commit:
             self.db.commit()
 
@@ -815,10 +826,9 @@ class NetworkAuthorization:
             return entGroupIdList[0]
 
         # admins can do everything
-        cu.execute("SELECT permissionId FROM Permissions "
-                   "WHERE Permissions.userGroupId IN (%s) "
-                   "AND Permissions.admin = 1" %
-                   ",".join(str(x) for x in authGroupIds))
+        cu.execute("select userGroupId from UserGroups "
+                   "where userGroupId in (%s) "
+                   "and admin = 1" % ",".join(str(x) for x in authGroupIds))
         if not len(cu.fetchall()):
             raise errors.InsufficientPermission
 
@@ -836,7 +846,7 @@ class NetworkAuthorization:
 
     def deleteEntitlementGroup(self, authToken, entGroup):
         cu = self.db.cursor()
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu.execute("SELECT entGroupId FROM entitlementGroups "
@@ -904,7 +914,7 @@ class NetworkAuthorization:
 
     def addEntitlementGroup(self, authToken, entGroup, userGroup):
         cu = self.db.cursor()
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, "entGroup=%s userGroup=%s" % (entGroup, userGroup))
 
@@ -932,7 +942,7 @@ class NetworkAuthorization:
         """
         Returns the user group which controls the permissions for a group.
         """
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -949,7 +959,7 @@ class NetworkAuthorization:
         """
         Returns the user group which owns the entitlement group
         """
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -982,7 +992,7 @@ class NetworkAuthorization:
         Gives the userGroup ownership permission for the entGroup entitlement
         set.
         """
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, "userGroup=%s entGroup=%s" % (userGroup, entGroup))
         cu = self.db.cursor()
@@ -993,7 +1003,7 @@ class NetworkAuthorization:
         self.db.commit()
 
     def deleteEntitlementOwnerAcl(self, authToken, userGroup, entGroup):
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, "userGroup=%s entGroup=%s" % (userGroup, entGroup))
         cu = self.db.cursor()
@@ -1017,7 +1027,7 @@ class NetworkAuthorization:
     def listEntitlementGroups(self, authToken):
         cu = self.db.cursor()
 
-        if self.check(authToken, admin = True):
+        if self.authCheck(authToken, admin = True):
             # admins can see everything
             cu.execute("SELECT entGroup FROM EntitlementGroups")
         else:
@@ -1034,7 +1044,7 @@ class NetworkAuthorization:
         return [ x[0] for x in cu ]
 
     def getEntitlementClassAccessGroup(self, authToken, classList):
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -1063,7 +1073,7 @@ class NetworkAuthorization:
         should have map to.
         @type classInfo: dict
         """
-        if not self.check(authToken, admin = True):
+        if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
 
         cu = self.db.cursor()
@@ -1101,7 +1111,7 @@ class NetworkAuthorization:
                            entGroupMap[entGroup], userGroupMap[userGroup])
 
         self.db.commit()
-
+        
 class PasswordCheckParser(dict):
 
     def StartElementHandler(self, name, attrs):
