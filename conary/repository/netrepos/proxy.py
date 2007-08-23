@@ -248,7 +248,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                 anon, r = method(caller, authToken, *args, **kwargs)
                 return (anon, False, r, caller.getExtraInfo())
 
-            r = caller.callByName(methodname, *args)
+            r = caller.callByName(methodname, *args, **kwargs)
         except ProxyRepositoryError, e:
             return (False, True, e.args, None)
 
@@ -738,7 +738,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 ]
+    SERVER_VERSIONS = range(42, 60 + 1)
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):
