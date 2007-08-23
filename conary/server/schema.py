@@ -733,6 +733,7 @@ def createAccessMaps(db):
         CREATE TABLE UserGroupTroves(
             userGroupId     INTEGER NOT NULL,
             instanceId      INTEGER NOT NULL,
+            recursive       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT UserGroupTroves_ugid_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
@@ -971,7 +972,16 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpId"] = True
         db.createIndex("tmpId", "tmpIdIdx", "id", check=False)
-
+    # for processing UserGroupInstancesCache entries
+    if "tmpUGI" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpUGI(
+            userGroupid   INTEGER,
+            instanceId    INTEGER
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpUGI"] = True
+        db.createIndex("tmpUGI", "tmpUGIIdx", "instanceId,userGroupId",
+                       unique=True, check=False)
     if "tmpTroves" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpTroves(
@@ -1012,8 +1022,7 @@ def setupTempTables(db):
     db.commit()
 
 def resetTable(cu, name):
-    cu.execute("DELETE FROM %s" % name,
-               start_transaction = False)
+    cu.execute("DELETE FROM %s" % name, start_transaction = False)
 
 # create the (permanent) server repository schema
 def createSchema(db):

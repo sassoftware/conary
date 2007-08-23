@@ -72,7 +72,6 @@ class Items(idtable.IdTable):
 
     # XXX: __setitem__ and __delitem__ aren't currently used, but if
     # we do, they'll have to handle the CheckTrovesCache as well
-                
     def addPattern(self, pattern):
         cu = self.db.cursor()
         itemId = self.get(pattern, None)

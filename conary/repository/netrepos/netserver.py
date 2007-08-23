@@ -27,7 +27,7 @@ from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims
-from conary.repository.netrepos import fsrepos, instances, trovestore
+from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
@@ -165,6 +165,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             cacheTimeout = self.authCacheTimeout,
             passwordURL = self.externalPasswordURL,
             entCheckURL = self.entitlementCheckURL)
+        self.ugo = accessmap.UserGroupOps(self.db)
         self.log.reset()
 
     def reopen(self):
@@ -582,6 +583,27 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.auth.setEntitlementClassAccessGroup(authToken, classInfo)
         return ""
 
+    @accessReadWrite
+    def addTroveAccess(self, authToken, clientVersion, userGroup, troveList):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.ugo.addTroveAccess(userGroup, troveList, recursive=True)
+        return ""
+    
+    @accessReadWrite
+    def deleteTroveAccess(self, authToken, clientVersion, userGroup, troveList):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.ugo.deleteTroveAccess(userGroup, troveList)
+        return ""
+    
+    @accessReadOnly
+    def listTroveAccess(self, authToken, clientVersion, userGroup):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        ret = self.ugo.listTroveAccess(userGroup)
+        return [ (n,v,f) for (n,v,f),r in ret ]
+    
     @accessReadWrite
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,

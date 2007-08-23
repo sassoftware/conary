@@ -16,7 +16,8 @@ from conary import files, trove, versions
 from conary.dbstore import migration, sqlerrors, sqllib
 from conary.lib.tracelog import logMe
 from conary.deps import deps
-from conary.repository.netrepos import versionops, trovestore, netauth, flavors
+from conary.repository.netrepos import versionops, trovestore, \
+     netauth, flavors, accessmap
 from conary.server import schema
 
 # SCHEMA Migration
@@ -446,28 +447,8 @@ def createUserGroupInstances(db):
     logMe(2, "creating UserGroupInstances table")
     assert("UserGroupInstancesCache" in db.tables)
     assert("CheckTroveCache" in db.tables)
-    cu = db.cursor()
-    cu.execute("delete from UserGroupInstancesCache")
-    # select all instances that each usergroupid has access to
-    # this query needs the CheckTroveCache table to be fully populated
-    cu.execute("""
-    insert into UserGroupInstancesCache (instanceId, userGroupId, canWrite, canRemove)
-    select
-        Instances.instanceId as instanceId,
-        Permissions.userGroupId as userGroupId,
-        case when sum(Permissions.canWrite) = 0 then 0 else 1 end as canWrite,
-        case when sum(Permissions.canRemove) = 0 then 0 else 1 end as canRemove
-    from Instances
-    join Nodes using(itemId, versionId)
-    join LabelMap using(itemId, branchId)
-    join Permissions on
-        Permissions.labelId = 0 or
-        Permissions.labelId = LabelMap.labelId
-    join CheckTroveCache on Permissions.itemId = CheckTroveCache.patternId
-    where Instances.itemId = CheckTroveCache.itemId
-    group by Instances.instanceId, Permissions.userGroupId
-    """)
-    db.analyze("UserGroupInstancesCache")
+    ugi = accessmap.UserGroupInstances(db)
+    ugi.rebuild()
     return True
 
 # looks like this LabelMap has to be recreated multiple times by

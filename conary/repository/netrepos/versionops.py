@@ -192,51 +192,6 @@ class Nodes:
 
 	return nodeId[0]
 
-class UserGroupInstancesCache:
-    def __init__(self, db):
-        self.db = db
-
-    def _updateUGI(self, cu, instanceId = None, userGroupId = None):
-        where = []
-        args = []
-        if instanceId is not None:
-            where.append("Instances.instanceId = ?")
-            args.append(instanceId)
-        if userGroupId is not None:
-            where.append("Permissions.userGroupId = ?")
-            args.append(userGroupId)
-        cu.execute("""
-        insert into UserGroupInstancesCache (instanceId, userGroupId, canWrite, canRemove)
-        select
-            Instances.instanceId as instanceId,
-            Permissions.userGroupId as userGroupId,
-            case when sum(Permissions.canWrite) = 0 then 0 else 1 end as canWrite,
-            case when sum(Permissions.canRemove) = 0 then 0 else 1 end as canRemove
-        from Instances
-        join Nodes using(itemId, versionId)
-        join LabelMap using(itemId, branchId)
-        join Permissions on
-            Permissions.labelId = 0 or
-            Permissions.labelId = LabelMap.labelId
-        join CheckTroveCache on
-            Permissions.itemId = CheckTroveCache.patternId and
-            Instances.itemId = CheckTroveCache.itemId
-        where %s
-        group by Instances.instanceId, Permissions.userGroupId
-        """ % (' and '.join(where),), args)
-
-    def updateInstanceId(self, instanceId):
-        cu = self.db.cursor()
-        cu.execute("delete from UserGroupInstancesCache where instanceId = ?",
-                   instanceId)
-        self._updateUGI(cu, instanceId = instanceId)
-
-    def updateUserGroupId(self, userGroupId):
-        cu = self.db.cursor()
-        cu.execute("delete from UserGroupInstancesCache where userGroupId = ?",
-                   userGroupId)
-        self._updateUGI(cu, userGroupId = userGroupId)
-        
 class SqlVersioning:
     def __init__(self, db, versionTable, branchTable):
         self.items = items.Items(db)
