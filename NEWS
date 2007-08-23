@@ -17,7 +17,7 @@ Changes in 1.1.91:
     * The "migrate" mode has changed to overwrite changes made to
       files that are not yet owned by Conary, but already exist on the
       system, as well managed, non-configuration files that have
-      changed. (CNY-1866)
+      changed. (CNY-1868)
     * When signals are received during updates, the journal is now
       rolled back before conary terminates. (CNY-1393)
     * A 'cvc checkout' of multiple projects uses far fewer repository
