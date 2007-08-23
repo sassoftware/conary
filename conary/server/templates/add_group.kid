@@ -41,6 +41,13 @@
                         </td>
                     </tr>
                     <tr>
+                        <td id="header">Group is admin:</td>
+                        <td>
+                            <input type="radio" name="isAdmin" value="1" py:attrs="{'checked' : groupIsAdmin and 'checked' or None }"/>Yes
+                            <input type="radio" name="isAdmin" value="0" py:attrs="{'checked' : (not groupIsAdmin) and 'checked' or None }"/>No
+                        </td>
+                    </tr>
+                    <tr>
                         <td id="header">Group can mirror:</td>
                         <td>
                             <input type="radio" name="canMirror" value="1" py:attrs="{'checked' : canMirror and 'checked' or None }"/>Yes

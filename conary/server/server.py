@@ -472,8 +472,9 @@ def addUser(netRepos, userName, admin = False, mirror = False):
     write = userName != 'anonymous'
     netRepos.auth.addUser(userName, pw1)
     # user/group, trovePattern, label, write, capped, admin
-    netRepos.auth.addAcl(userName, None, None, write, False, admin)
+    netRepos.auth.addAcl(userName, None, None, write = write)
     netRepos.auth.setMirror(userName, mirror)
+    netRepos.auth.setAdmin(userName, admin)
 
 def getServer():
     argDef = {}

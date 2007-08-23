@@ -453,7 +453,6 @@ class NetworkAuthorization:
         remove = int(bool(remove))
         capped = int(bool(capped))
         assert(not capped)
-        capId = 0
 
         if trovePattern:
             itemId = self.items.addPattern(trovePattern)
@@ -477,9 +476,9 @@ class NetworkAuthorization:
         try:
             cu.execute("""
             INSERT INTO Permissions
-            (userGroupId, labelId, itemId, canWrite, capId, canRemove)
-            VALUES (?, ?, ?, ?, ?, ?)""", (
-                userGroupId, labelId, itemId, write, capId, remove))
+            (userGroupId, labelId, itemId, canWrite, canRemove)
+            VALUES (?, ?, ?, ?, ?)""", (
+                userGroupId, labelId, itemId, write, remove))
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
@@ -487,7 +486,7 @@ class NetworkAuthorization:
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, canRemove = False):
+                write, capped, canRemove = False):
 
         self.log(3, userGroup,  (oldTroveId, oldLabelId), (troveId, labelId),
                  write, canRemove)
@@ -501,15 +500,14 @@ class NetworkAuthorization:
 
         capped = int(bool(capped))
         assert(not capped)
-        capId = 0
 
         try:
             cu.execute("""
             UPDATE Permissions
-            SET labelId = ?, itemId = ?, canWrite = ?, capId = ?,
+            SET labelId = ?, itemId = ?, canWrite = ?,
                 canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, capId, canRemove,
+                       labelId, troveId, write, canRemove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
@@ -554,6 +552,7 @@ class NetworkAuthorization:
         if len(ret):
             return ret[0][0]
         raise errors.GroupNotFound
+
     def groupCanMirror(self, userGroup):
         cu = self.db.cursor()
         cu.execute("SELECT canMirror FROM UserGroups WHERE userGroup=?",
@@ -562,12 +561,14 @@ class NetworkAuthorization:
         if len(ret):
             return ret[0][0]
         raise errors.GroupNotFound
+
     def setAdmin(self, userGroup, admin):
         self.log(3, userGroup, admin)
         cu = self.db.transaction()
         cu.execute("UPDATE userGroups SET admin=? WHERE userGroup=?",
                    (int(bool(admin)), userGroup))
         self.db.commit()
+
     def setMirror(self, userGroup, canMirror):
         self.log(3, userGroup, canMirror)
         cu = self.db.transaction()
@@ -636,7 +637,7 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("""SELECT Labels.label,
                              PerItems.item,
-                             canWrite, capId, canRemove
+                             canWrite, canRemove
                       FROM UserGroups
                       JOIN Permissions USING (userGroupId)
                       LEFT OUTER JOIN Items AS PerItems ON
@@ -660,7 +661,7 @@ class NetworkAuthorization:
         l = []
         for result in results:
             d = {}
-            for key in ('label', 'item', 'canWrite', 'capId', 'canRemove'):
+            for key in ('label', 'item', 'canWrite', 'canRemove'):
                 d[key] = result[key]
             l.append(d)
         return l

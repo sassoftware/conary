@@ -44,7 +44,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 52 + 1)
+SERVER_VERSIONS = range(36, 60 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -407,9 +407,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write, capped, admin = False, remove = False):
-        if not self.auth.authCheck(authToken, admin = True):
-            raise errors.InsufficientPermission
+               label, write = False, capped = False, admin = False,
+               remove = False):
+        if clientVersion < 60:
+            # admin/capped flags were passed in old protocols (left in the
+            # signature to allow old calls to get the right error)
+            raise errors.InvalidClientVersion(
+                    'addAcl call only supports protocol versions 60 '
+                    'and later')
+
         self.log(2, authToken[0], userGroup, trovePattern, label,
                  "write=%s remove=%s" % (write, remove))
         if trovePattern == "":
@@ -424,9 +430,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             label = None
         self.auth.addAcl(userGroup, trovePattern, label, write, capped,
                          remove = remove)
-        # legacy support
-        if admin:
-            self.auth.setAdmin(userGroup, True)
+
         return True
 
     @accessReadWrite
@@ -447,8 +451,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write, capped, admin=False,
-                canRemove = False):
+                oldLabel, trovePattern, label, write = False, capped = False,
+                admin=False, canRemove = False):
+        if clientVersion < 60:
+            # admin/capped flags were passed in old protocols (left in the
+            # signature to allow old calls to get the right error)
+            raise errors.InvalidClientVersion(
+                    'editAcl call only supports protocol versions 60 '
+                    'and later')
+
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
@@ -474,10 +485,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
-            write, capped, canRemove = canRemove)
-        # limited legacy support - editAcl can not reset the admin bit!!!
-        if admin:
-            self.auth.setAdmin(userGroup, True)
+                          write, capped, canRemove = canRemove)
+
         return True
 
     @accessReadWrite
