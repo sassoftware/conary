@@ -7,6 +7,10 @@ Changes in @NEW@:
     * Derived packages properly handle files that were not flavored due
       to an exception in the upstream packages. (CNY-1954)
 
+  o Server Changes
+    * a bug which triggered an exception while migrating postgresql
+      repositories has been fixed (CNY-1912)
+
 Changes in 1.1.91:
   o Client Changes:
     * A new configuration option, "flavorPreferences", has been added.
@@ -28,6 +32,9 @@ Changes in 1.1.91:
       version arguemnt without a source count. (CNY-1921)
 
   o Server Changes:
+
+Changes in 1.1.31.4:
+  o Server changes:
     * Setting "forceSSL" once again requires a HTTPS connection be
       used when authentication data is passed to an Apache based
       Conary Repository. (CNY-1880)
