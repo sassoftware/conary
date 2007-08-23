@@ -80,7 +80,7 @@ class UserGroupTroves:
                            "where instanceId = ?", instanceId)
         self.db.analyze("tmpInstanceId")
         # check for which instanceIds we don't have access already
-        schema.reseTable(cu, "tmpInstances")
+        schema.resetTable(cu, "tmpInstances")
         cu.execute("""
         insert into tmpInstances(instanceId)
         select distinct tmpInstanceId.instanceId
@@ -219,9 +219,10 @@ class UserGroupInstances:
 class UserGroupLatest:
     def __init__(self, db):
         self.db = db
-    def rebuild(self, userGroupId):
+    def rebuild(self):
         raise NotImplementedError
-    
+    def updateUserGroupId(self, userGroupId):
+        pass
 
 # generic wrapper operations that handle updating and syncing all the
 # relevant usergroup access maps
@@ -247,7 +248,7 @@ class UserGroupOps:
         # add is simpler because we can only add the new stuff to UserGroupInstances
         self.ugt.update(userGroupId)
         # need to recompute the latest stuff for this userGroupId
-        self.ugl.rebuild(userGroupId)
+        self.ugl.updateUserGroupId(userGroupId)
 
     def deleteTroveAccess(self, userGroup, troveList):
         userGroupId = self._getGroupId(userGroup)
@@ -259,7 +260,7 @@ class UserGroupOps:
         # add extra troves allowed by UserGroupTroves
         self.ugt.update(userGroupId)
         # and recompute the Latest entries for this user
-        self.ugl.rebuild(userGroupId)
+        self.ugl.updateUserGroupId(userGroupId)
 
     def listTroveAccess(self, userGroup):
         userGroupId = self._getGroupId(userGroup)

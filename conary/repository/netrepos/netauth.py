@@ -755,7 +755,7 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroupInstancesCache WHERE userGroupId = ?", userGroupId)
         cu.execute("DELETE FROM UserGroupTroves WHERE userGroupId = ?", userGroupId)
-        cu.execuet("DELETE FROM UserGroupLatestCache WHERE userGroupId = ?", userGroupId)
+        cu.execute("DELETE FROM UserGroupLatestCache WHERE userGroupId = ?", userGroupId)
         #Note, there could be a user left behind with no associated group
         #if the group being deleted was created with a user.  This user is not
         #deleted because it is possible for this user to be a member of
