@@ -8,8 +8,12 @@ Changes in @NEW@:
       to an exception in the upstream packages. (CNY-1954)
 
   o Server Changes
-    * a bug which triggered an exception while migrating postgresql
-      repositories has been fixed (CNY-1912)
+    * A bug which triggered an exception while migrating postgresql
+      repositories has been fixed. (CNY-1912)
+
+  o Build Changes:
+    * Mono (CIL) files are now placed in :cil components by default.
+      (CNY-1821)
 
 Changes in 1.1.91:
   o Client Changes:
