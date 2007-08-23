@@ -470,13 +470,11 @@ class TroveStore:
 		nodeId = self.versionOps.nodes.getRow(itemId, versionId, None)
 		if nodeId is None:
 		    (nodeId, versionId) = self.versionOps.createVersion(
-                        itemId, version, flavorId, sourceName = None,
-                        updateLatest = False)
+                        itemId, version, flavorId, sourceName = None)
 		del nodeId
             else:
                 (nodeId, versionId) = self.versionOps.createVersion(
-                    itemId, version, flavorId, sourceName = None,
-                    updateLatest = False)
+                    itemId, version, flavorId, sourceName = None)
             # create the new instanceId entry.
             # cloneFromId = None for now.
             # will get fixed when the trove is comitted.
