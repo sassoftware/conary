@@ -719,7 +719,8 @@ class TroveFormatter(TroveTupFormatter):
             for line in self.formatDigSigs(trove, indent):
                 yield line
         if dcfg.printBuildReqs():
-            for buildReq in sorted(trove.getBuildRequirements()):
+            for buildReq in sorted(trove.getBuildRequirements(),
+                                   key=lambda x:x[0]):
                 yield '  ' * (indent) + self.formatNVF(*buildReq)
         elif dcfg.printDeps():
             for line in self.formatDeps(trove.getProvides(), 

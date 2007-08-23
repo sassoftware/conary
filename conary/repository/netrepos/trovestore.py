@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -109,7 +108,7 @@ class TroveStore:
 					 troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
         if isPresent != instances.INSTANCE_PRESENT_MISSING:
-	    self.instances.setPresent(theId, isPresent)
+	    self.instances.update(theId, isPresent=isPresent, clonedFromId=clonedFromId)
             self.items.setTroveFlag(itemId, 1)
  	return theId
 
@@ -237,7 +236,7 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewRedirects')
 	return (cu, trv, hidden)
 
-    def addTroveDone(self, troveInfo):
+    def addTroveDone(self, troveInfo, mirror=False):
 	(cu, trv, hidden) = troveInfo
 
         self.log(3, trv)
@@ -326,7 +325,10 @@ class TroveStore:
                 troveItemId, troveVersion, troveFlavorId, sourceName)
 	    if trv.getChangeLog() and trv.getChangeLog().getName():
 		self.changeLogs.add(nodeId, trv.getChangeLog())
-
+        elif sourceName: # make sure the sourceItemId matches for the trove we are comitting
+            sourceItemId = self.items.getOrAddId(sourceName)
+            self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId, mirrorMode=mirror)
+                                         
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
         if hidden:
@@ -421,10 +423,8 @@ class TroveStore:
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
-            assert(trv.isRedirect() or
-                            (not isPackage or version == trv.getVersion()))
-            assert(trv.isRedirect() or
-                            (not isPackage or flavor == trv.getFlavor()))
+            assert(not isPackage or version == trv.getVersion())
+            assert(not isPackage or flavor == trv.getFlavor())
             cu.execute("""
             INSERT INTO tmpTroves (item, version, frozenVersion, flavor, flags)
             VALUES (?, ?, ?, ?, ?)
@@ -464,21 +464,25 @@ class TroveStore:
             version = versions.ThawVersion(version)
 	    versionId = self.getVersionId(version)
 
+            # sourcename = None for now.
+            # will be fixed up when the real trove is comitted
 	    if versionId is not None:
-		nodeId = self.versionOps.nodes.getRow(itemId,
-						      versionId, None)
+		nodeId = self.versionOps.nodes.getRow(itemId, versionId, None)
 		if nodeId is None:
 		    (nodeId, versionId) = self.versionOps.createVersion(
-						    itemId, version,
-						    flavorId, sourceName)
+                        itemId, version, flavorId, sourceName = None,
+                        updateLatest = False)
 		del nodeId
             else:
                 (nodeId, versionId) = self.versionOps.createVersion(
-                                                itemId, version,
-                                                flavorId, sourceName)
-            # create the new instanceId entry. We actually don't quite
-            # care about the exact instanceId value we get back...
-            self.getInstanceId(itemId, versionId, flavorId, clonedFromId, trv.getType(),
+                    itemId, version, flavorId, sourceName = None,
+                    updateLatest = False)
+            # create the new instanceId entry.
+            # cloneFromId = None for now.
+            # will get fixed when the trove is comitted.
+            # We actually don't quite care about the exact instanceId value we get back...
+            self.getInstanceId(itemId, versionId, flavorId,
+                               clonedFromId = None, troveType =  trv.getType(),
                                isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""

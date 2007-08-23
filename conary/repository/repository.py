@@ -300,8 +300,8 @@ class ChangeSetJob:
     def addTrove(self, oldTroveSpec, trove, hidden = False):
 	return self.repos.addTrove(trove, hidden = hidden)
 
-    def addTroveDone(self, troveId):
-	self.repos.addTroveDone(troveId)
+    def addTroveDone(self, troveId, mirror=False):
+	self.repos.addTroveDone(troveId, mirror=mirror)
 
     def oldTrove(self, *args):
 	pass
@@ -548,7 +548,7 @@ class ChangeSetJob:
 		    normalRestoreList.append(tup)
 
 	    del newFileMap
-	    self.addTroveDone(troveInfo)
+	    self.addTroveDone(troveInfo, mirror=mirror)
 
         # use a key to select data up to, but not including, the first
         # version.  We can't sort on version because we don't have timestamps

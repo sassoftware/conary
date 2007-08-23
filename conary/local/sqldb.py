@@ -404,9 +404,6 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        if not readOnly:
-            self.db.analyze()
-
         self.needsCleanup = False
         self.addVersionCache = {}
         self.flavorsNeeded = {}
@@ -1022,11 +1019,17 @@ order by
         cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
                        ((x[0], x[1][1]) for x in enumerate(l)),
                        start_transaction = False)
-	cu.execute("""
-	    SELECT DISTINCT row, stream FROM getFilesTbl
-                JOIN DBTroveFiles ON
-		    getFilesTbl.fileId = DBTroveFiles.fileId
-	""")
+
+        # there may be duplicate fileId entries in getFilesTbl
+        # and DBTrovefiles.  To avoid searching through potentially
+        # millions of rows, we perform some more complicated sql.
+        cu.execute("""
+                SELECT row, (SELECT stream
+                              FROM DBTroveFiles AS dbt 
+                              WHERE dbt.fileId = gft.fileId LIMIT 1) AS stream
+                    FROM getfilesTbl AS gft
+                    WHERE stream IS NOT NULL
+        """)
 
         l2 = [ None ] * len(l)
 

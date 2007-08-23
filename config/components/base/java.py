@@ -1,12 +1,10 @@
-#!/usr/bin/env python2.4
-# -*- mode: python -*-
 #
-# Copyright (C) 2005-2006 rPath, Inc.
+# Copyright (c) 2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
 # source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+# is always available at http://www.opensource.org/licenses/cpl.php.
 #
 # This program is distributed in the hope that it will be useful, but
 # without any warranty; without even the implied warranty of merchantability
@@ -14,12 +12,6 @@
 # full details.
 #
 
-""" Returns the differences between a list of flavors """
-import sys
-from conary.deps import deps
-
-flavors = [ deps.parseFlavor(x) for x in sys.argv[1:] ]
-
-flavorDict = deps.flavorDifferences(flavors, strict=False)
-for int, flavor in enumerate(flavors):
-    print '%s: %s' % (int, flavorDict[flavor])
+filters = ('java', ('/%(datadir)s/java/',
+                    r'\.(j|e|w)ar'))
+precedes = ('devellib', 'lib', 'devel')

@@ -1431,6 +1431,7 @@ def CreateFromFilesystem(troveList):
     return cs
 
 class DictAsCsf:
+    maxMemSize = 16384
 
     def getNextFile(self):
         if self.next >= len(self.items):
@@ -1439,10 +1440,18 @@ class DictAsCsf:
         (name, contType, contObj) = self.items[self.next]
         self.next += 1
 
-        compressedFile = StringIO()
+        f = contObj.get()
+        compressedFile = util.BoundedStringIO(maxMemorySize = self.maxMemSize)
+        bufSize = 16384
+
         gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-        util.copyfileobj(contObj.get(), gzf)
+        while 1:
+            buf = f.read(bufSize)
+            if not buf:
+                break
+            gzf.write(buf)
         gzf.close()
+
         compressedFile.seek(0)
 
         return (name, contType, compressedFile)

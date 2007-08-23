@@ -271,8 +271,8 @@ Sources are always cloned with binaries.
 
 There are limits to the promotes one can make - one can clone between siblings - from /A//B to /A//C, for example, or uphill to parents - from /A//B to /A, or to siblings of parents - from /A//B/C to /A//D, or from /A//B//C to /D. One cannot clone from branch /A//B to /C//D, because there is no relationship between the parents of these two branches, /A != /C.  All promotes other than sibling promotes must be specified via branches.
 .TP 4
-.B \-\-all-flavors
-Clone all flavors for the latest versions of the specified troves.
+.B \-\-all-flavors (deprecated)
+Clone all flavors for the latest versions of the specified troves.  Now on by default.
 .TP 4
 .B \-\-without-sources
 Do not automatically clone the source for every package you are cloning.  This 
@@ -289,9 +289,11 @@ Normally, cvc tried to rewrite any build information stored with the trove, such
 .TP
 .B \-\-test
 Go through the entire process of creating the clone changeset, but do not commit it to the repository.
+.TP
+.B \-\-exact\-flavors
+Only promote exactly the packages with the flavors you specify, without merging in your system flavor.
 .RE
 .TP
-
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
 source directory.  It creates a diff between two versions of
@@ -355,9 +357,13 @@ R = removed
 ? = not tracked
 .fi
 .TP
-.B update [\fI<version>\fP]
-Updates the current source directory to the latest version, or to
-\fI<version>\fP if specified.  Merges changes when possible.
+.B update [\fI<dir>=<version>\fP]*
+Updates one or more directories, merging changes when possible.  When no
+directory is specified, the current directory is updated to the latest
+version.  Specifying one or more directories updates each directory to its
+latest version.  To update to a version other than the latest, specify the
+version alone (to update the current directory) or with each directory
+listed.
 Synonyms: \fBup\fP
 .RE
 .\"

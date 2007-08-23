@@ -22,7 +22,7 @@ import time
 import types
 
 from conary import files, trove, versions, streams
-from conary.conarycfg import CfgProxy, CfgRepoMap
+from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
@@ -284,6 +284,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         elif isinstance(e, errors.RepositoryMismatch):
             return (False, True, (e.__class__.__name__,
                                   e.right, e.wrong))
+        elif isinstance(e, errors.InvalidSourceNameError):
+            return (False, True, (e.__class__.__name__,
+                                  e.name, e.version,
+                                  e.oldSourceItem, e.newSourceItem))
+        elif isinstance(e, errors.EntitlementTimeout):
+            return (False, True, (e.__class__.__name__,
+                                  e.getEntitlements()))
         elif isinstance(e, errors.TroveSchemaError):
             return (False, True, (errors.TroveSchemaError.__name__, str(e),
                                   self.fromTroveTup(e.nvf),
@@ -3090,6 +3097,8 @@ class ServerConfig(ConfigFile):
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
+    deadlockRetry           = (CfgInt, 5)
+    entitlement             = CfgEntitlement
     entitlementCheckURL     = CfgString
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
@@ -3105,4 +3114,4 @@ class ServerConfig(ConfigFile):
     staticPath              = (CfgPath, '/conary-static')
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
-    deadlockRetry           = (CfgInt, 5)
+    user                    = CfgUserInfo

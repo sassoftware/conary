@@ -111,9 +111,17 @@ class ProxyCallFactory:
 
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
-                     protocolString, headers):
+                     protocolString, headers, cfg, targetServerName,
+                     remoteIp):
+        entitlementList = authToken[2][:]
+        entitlementList += cfg.entitlement.find(targetServerName)
+
+        userOverride = cfg.user.find(targetServerName)
+        if userOverride:
+            authToken = authToken[:]
+            authToken[0], authToken[1] = userOverride
+
         url = redirectUrl(authToken, rawUrl)
-        entitlementList = authToken[2]
 
         via = []
         # Via is a multi-valued header. Multiple occurences will be collapsed
@@ -127,9 +135,9 @@ class ProxyCallFactory:
             lheaders['Via'] = ', '.join(via)
 
         transporter = transport.Transport(https = url.startswith('https:'),
-                                          entitlementList = entitlementList,
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
+        transporter.setEntitlements(entitlementList)
 
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
@@ -140,7 +148,8 @@ class RepositoryCaller:
 
     def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
-                                    self.authToken, args, kwargs)
+                                    self.authToken, args, kwargs,
+                                    remoteIp = self.remoteIp)
 
         if rc[1]:
             # exception occured
@@ -155,12 +164,13 @@ class RepositoryCaller:
     def __getattr__(self, method):
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
-    def __init__(self, protocol, port, authToken, repos):
+    def __init__(self, protocol, port, authToken, repos, remoteIp):
         self.repos = repos
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
         self.url = None
+        self.remoteIp = remoteIp
 
 class RepositoryCallFactory:
 
@@ -169,10 +179,12 @@ class RepositoryCallFactory:
         self.log = logger
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
-                     localAddr, protocolString, headers):
+                     localAddr, protocolString, headers, cfg,
+                     targetServerName, remoteIp):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
-        return RepositoryCaller(protocol, port, authToken, self.repos)
+        return RepositoryCaller(protocol, port, authToken, self.repos,
+                                remoteIp)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -212,12 +224,16 @@ class BaseProxy(xmlshims.NetworkConvertors):
         the client used to talk to us.
         @param protocolString: if set, the protocol version the client used
         (i.e. HTTP/1.0)
+        @param targetServerName: if set, the conary server name the
+        request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""), None)
 
         self._port = port
         self._protocol = protocol
+
+        targetServerName = headers.get('X-Conary-Servername', None)
 
         # simple proxy. FIXME: caching these might help; building all
         # of this framework for every request seems dumb. it seems like
@@ -226,7 +242,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
                                                self.proxies, authToken,
                                                localAddr, protocolString,
-                                               headers)
+                                               headers, self.cfg,
+                                               targetServerName,
+                                               remoteIp)
 
         # args[0] is the protocol version
         if args[0] < 51:

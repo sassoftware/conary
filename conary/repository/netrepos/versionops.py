@@ -14,7 +14,7 @@
 
 from conary import trove, versions
 from conary.dbstore import idtable
-from conary.repository.errors import DuplicateBranch
+from conary.repository.errors import DuplicateBranch, InvalidSourceNameError
 from conary.repository.netrepos import instances, items
 
 LATEST_TYPE_ANY     = 0         # redirects, removed, and normal
@@ -189,8 +189,32 @@ class Nodes:
 	nodeId = cu.fetchone()
 	if nodeId is None:
 	    return default
-
 	return nodeId[0]
+
+    def updateSourceItemId(self, nodeId, sourceItemId, mirrorMode=False):
+        # mirrorMode is allowed to "steal" the sourceItemId of an
+        # existing package this is done in order to protect old
+        # mirrors that have already copied over busted content at
+        # least partially
+        cu = self.db.cursor()
+        cu.execute("select sourceItemId from Nodes where nodeId = ?", nodeId)
+        oldItemId = cu.fetchall()[0][0]
+        if oldItemId is None or (oldItemId != sourceItemId and mirrorMode):
+            cu.execute("update Nodes set sourceItemId = ? where nodeId = ?",
+                       (sourceItemId, nodeId))
+            return True
+        if oldItemId != sourceItemId:
+            # need to hit the database again to generate a nice(er) exception
+            cu.execute("select Items.item, Versions.version, OldItems.item "
+                       "from Nodes join Items on Nodes.itemId = Items.itemId "
+                       "join Versions on Nodes.versionId = Versions.versionId "
+                       "join Items as OldItems on Nodes.sourceItemId = OldItems.itemId "
+                       "where Nodes.nodeId = ?", nodeId)
+            ntup = tuple(cu.fetchall()[0])
+            cu.execute("select item from Items where itemId = ?", sourceItemId)
+            ntup = ntup + (cu.fetchall()[0][0],)
+            raise InvalidSourceNameError(*ntup)
+        return False # noop
 
 class SqlVersioning:
     def __init__(self, db, versionTable, branchTable):

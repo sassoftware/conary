@@ -74,6 +74,19 @@ class CommitError(RepositoryError):
 class DuplicateBranch(RepositoryError):
     """Error occurred commiting a trove"""
 
+class InvalidSourceNameError(RepositoryError):
+    def __init__(self, n, v, oldItem, newItem, *args):
+        self.name = n
+        self.version = v
+        self.oldSourceItem = oldItem
+        self.newSourceItem = newItem
+    def __str__(self):
+        return """
+SourceItem conflict detected for node %s=%s: %s cannot change to %s
+This can happen when there is a version collision in the repository.
+Try to update the version number of the troves being comitted and retry.
+""" % (self.name, self.version, self.oldSourceItem, self.newSourceItem)
+        
 class TroveMissing(RepositoryError, InternalConaryError):
     troveType = "trove"
     def __str__(self):
@@ -231,6 +244,17 @@ class DigitalSignatureError(RepositoryError):
 
 class ProxyError(RepositoryError):
     pass
+
+class EntitlementTimeout(RepositoryError):
+
+    def __str__(self):
+        return "EntitlementTimeout for %s" % ",".join(self.entitlements)
+
+    def getEntitlements(self):
+        return self.entitlements
+
+    def __init__(self, entitlements):
+        self.entitlements = entitlements
 
 class InternalServerError(RepositoryError, InternalConaryError):
     def __init__(self,  err):

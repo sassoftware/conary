@@ -77,6 +77,7 @@ def post(port, isSecure, repos, req):
             # local_addr.
             localAddr = "%s:%s" % (req.connection.local_ip,
                                    req.connection.local_addr[1])
+
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
