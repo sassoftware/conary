@@ -295,11 +295,27 @@ class ServerProxy(xmlrpclib.ServerProxy):
         #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
         if name.startswith('__'):
             raise AttributeError(name)
-        return _Method(self.__request, name, self.__host, 
+        return _Method(self._request, name, self.__host, 
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.getProtocolVersion(),
                        self.__transport, self.__serverName,
                        self.__entitlementDir)
+
+    def _request(self, methodname, params):
+        # Call a method on the remote server
+        request = util.xmlrpcDump(params, methodname,
+            encoding = self.__encoding, allow_none=self.__allow_none)
+
+        response = self.__transport.request(
+            self.__host,
+            self.__handler,
+            request,
+            verbose=self.__verbose)
+
+        if len(response) == 1:
+            response = response[0]
+
+        return response
 
     def usedProxy(self):
         return self.__transport.usedProxy

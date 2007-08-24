@@ -21,7 +21,6 @@ import posixpath
 import select
 import socket
 import sys
-import xmlrpclib
 import urllib
 import zlib
 import BaseHTTPServer
@@ -232,13 +231,20 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
-        data = self.rfile.read(contentLength)
+        sio = util.BoundedStringIO()
+
+        actual = util.copyStream(self.rfile, sio, contentLength)
+        if contentLength != actual:
+            raise Exception(contentLength, actual)
+
+        sio.seek(0)
 
         encoding = self.headers.get('Content-Encoding', None)
         if encoding == 'deflate':
-            data = zlib.decompress(data)
+            sio = util.decompressStream(sio)
+            sio.seek(0)
 
-        (params, method) = xmlrpclib.loads(data)
+        (params, method) = util.xmlrpcLoad(sio)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
         if self.netProxy:
@@ -265,16 +271,20 @@ class HttpRequests(SimpleHTTPRequestHandler):
         extraInfo = result[-1]
         result = result[1:-1]
 
-	resp = xmlrpclib.dumps((result,), methodresponse=1)
-        logMe(3, "encoded xml-rpc response to %d bytes" % (len(resp),))
+        sio = util.BoundedStringIO()
+	util.xmlrpcDump((result,), stream = sio, methodresponse=1)
+        respLen = sio.tell()
+        logMe(3, "encoded xml-rpc response to %d bytes" % respLen)
 
 	self.send_response(200)
         encoding = self.headers.get('Accept-encoding', '')
-        if len(resp) > 200 and 'deflate' in encoding:
-            resp = zlib.compress(resp, 5)
+        if respLen > 200 and 'deflate' in encoding:
+            sio.seek(0)
+            sio = util.compressStream(sio, level = 5)
+            respLen = sio.tell()
             self.send_header('Content-encoding', 'deflate')
 	self.send_header("Content-type", "text/xml")
-	self.send_header("Content-length", str(len(resp)))
+	self.send_header("Content-length", str(respLen))
         if usedAnonymous:
             self.send_header("X-Conary-UsedAnonymous", '1')
         if extraInfo:
@@ -291,9 +301,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header('Via', via)
 
 	self.end_headers()
-	self.wfile.write(resp)
-        logMe(3, "sent response to client", len(resp), "bytes")
-	return resp
+        sio.seek(0)
+        util.copyStream(sio, self.wfile)
+        logMe(3, "sent response to client", respLen, "bytes")
+        return respLen
 
     def do_PUT(self):
         chunked = False
