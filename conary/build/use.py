@@ -633,8 +633,10 @@ class UseCollection(Collection):
  
 class LocalFlag(Flag):
 
-    def __init__(self, name, parent, track=False, required=False):
-        Flag.__init__(self, name, parent, track=track, required=required)
+    def __init__(self, name, parent, track=False, required=False, path=None,
+                 platform=False):
+        Flag.__init__(self, name, parent, track=track, required=required,
+                      path=path, platform=platform)
         self._override = False
 
     def _set(self, value=True, override=False):
@@ -764,7 +766,8 @@ def localFlagsToFlavor(recipeName):
 
 def platformFlagsToFlavor(recipeName=None):
     flags = []
-    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), LocalFlags._iterAll()):
+    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), 
+                                LocalFlags._iterAll()):
         if flag.isPlatformFlag():
             flags.append(flag)
     return createFlavor(recipeName, flags, error=False)

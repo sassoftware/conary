@@ -4,6 +4,9 @@ Changes in @NEW@:
       (CNY-1953)
     * An error in the way attributes of ServerProxy classes get
       marshaled has been fixed. (CNY-1956)
+    * A bug the resulted in a traceback when cooking if local flags 
+      (e.g. kernel.smp) were defined in your /etc/conary/use directory has been
+      fixed (CNY-1963)
 
   o Server Changes
     * a bug which triggered an exception while migrating postgresql
