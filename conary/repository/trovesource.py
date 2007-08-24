@@ -1469,12 +1469,15 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
 
         source = self.sources[-1]
 
-        if source._allowNoLabel:
-            sourceLabelPath = None
+        if source._flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
             sourceDefaultFlavor = None
         else:
-            sourceLabelPath = labelPath
             sourceDefaultFlavor = defaultFlavor
+
+        if source._allowNoLabel:
+            sourceLabelPath = None
+        else:
+            sourceLabelPath = labelPath
         if source.searchableByType():
             sourceTroveTypes = troveTypes
         else:

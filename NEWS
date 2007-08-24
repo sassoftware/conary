@@ -7,6 +7,8 @@ Changes in @NEW@:
     * A bug the resulted in a traceback when cooking if local flags 
       (e.g. kernel.smp) were defined in your /etc/conary/use directory has been
       fixed (CNY-1963)
+    * Fixed a bug that affects trove sources stacks where the last source
+      should have flavor information passed to it and wasn't.
 
   o Server Changes
     * a bug which triggered an exception while migrating postgresql
