@@ -34,6 +34,8 @@ import traceback
 import urllib
 import urlparse
 import weakref
+import xmlrpclib
+import zlib
 
 from conary.lib import fixedglob, log
 
@@ -1290,3 +1292,183 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
                 vstr = r.repr(v)
             stream.write("        %15s : %s\n" % (k, vstr))
         stream.write("  %s\n\n" % ("*" * 70))
+
+class XMLRPCMarshaller(xmlrpclib.Marshaller):
+    """Marshaller for XMLRPC data"""
+    dispatch = xmlrpclib.Marshaller.dispatch.copy()
+    def dump_string(self, value, write, escape=xmlrpclib.escape):
+        try:
+            value = value.encode("ascii")
+        except UnicodeError:
+            sio = StringIO.StringIO()
+            xmlrpclib.Binary(value).encode(sio)
+            write(sio.getvalue())
+            return
+        return xmlrpclib.Marshaller.dump_string(self, value, write, escape)
+
+    def dump(self, values, stream):
+        write = stream.write
+        if isinstance(values, xmlrpclib.Fault):
+            # Fault instance
+            write("<fault>\n")
+            self._dump({'faultCode' : values.faultCode,
+                        'faultString' : values.faultString},
+                       write)
+            write("</fault>\n")
+        else:
+            write("<params>\n")
+            for v in values:
+                write("<param>\n")
+                self._dump(v, write)
+                write("</param>\n")
+            write("</params>\n")
+
+    def dumps(self, values):
+        sio = StringIO.StringIO()
+        self.dump(values, sio)
+        return sio.getvalue()
+
+    def _dump(self, value, write):
+        # Incorporates Patch #1070046: Marshal new-style objects like
+        # InstanceType
+        try:
+            f = self.dispatch[type(value)]
+        except KeyError:
+            # check if this object can be marshalled as a structure
+            try:
+                value.__dict__
+            except:
+                raise TypeError, "cannot marshal %s objects" % type(value)
+            # check if this class is a sub-class of a basic type,
+            # because we don't know how to marshal these types
+            # (e.g. a string sub-class)
+            for type_ in type(value).__mro__:
+                if type_ in self.dispatch.keys():
+                    raise TypeError, "cannot marshal %s objects" % type(value)
+            f = self.dispatch[InstanceType]
+        f(self, value, write)
+
+    dispatch[str] = dump_string
+    dispatch[ProtectedString] = dump_string
+    dispatch[ProtectedTemplate] = dump_string
+
+class XMLRPCUnmarshaller(xmlrpclib.Unmarshaller):
+    dispatch = xmlrpclib.Unmarshaller.dispatch.copy()
+    def end_base64(self, data):
+        value = xmlrpclib.Binary()
+        value.decode(data)
+        self.append(value.data)
+        self._value = 0
+
+    dispatch["base64"] = end_base64
+
+    def _stringify(self, data):
+        try:
+            return data.encode("ascii")
+        except UnicodeError:
+            return xmlrpclib.Binary(data)
+
+def xmlrpcGetParser():
+    parser, target = xmlrpclib.getparser()
+    # Use our own marshaller
+    target = XMLRPCUnmarshaller()
+    # Reuse the parser class as computed by xmlrpclib
+    parser = parser.__class__(target)
+    return parser, target
+
+def xmlrpcDump(params, methodname=None, methodresponse=None, stream=None,
+               encoding=None, allow_none=False):
+    assert isinstance(params, tuple) or isinstance(params, xmlrpclib.Fault),\
+           "argument must be tuple or Fault instance"
+    if isinstance(params, xmlrpclib.Fault):
+        methodresponse = 1
+    elif methodresponse and isinstance(params, tuple):
+        assert len(params) == 1, "response tuple must be a singleton"
+
+    if not encoding:
+        encoding = "utf-8"
+
+    m = XMLRPCMarshaller(encoding, allow_none)
+    if encoding != "utf-8":
+        xmlheader = "<?xml version='1.0' encoding='%s'?>\n" % str(encoding)
+    else:
+        xmlheader = "<?xml version='1.0'?>\n" # utf-8 is default
+
+    if stream is None:
+        io = StringIO.StringIO(stream)
+    else:
+        io = stream
+
+    # standard XML-RPC wrappings
+    if methodname:
+        if not isinstance(methodname, str):
+            methodname = methodname.encode(encoding)
+        io.write(xmlheader)
+        io.write("<methodCall>\n")
+        io.write("<methodName>%s</methodName>\n" % methodname)
+        m.dump(params, io)
+        io.write("</methodCall>\n")
+    elif methodresponse:
+        io.write(xmlheader)
+        io.write("<methodResponse>\n")
+        m.dump(params, io)
+        io.write("</methodResponse>\n")
+    else:
+        # Return as-is
+        m.dump(params, io)
+
+    if stream is None:
+        return io.getvalue()
+    return ""
+
+def xmlrpcLoad(stream):
+    p, u = xmlrpcGetParser()
+    if hasattr(stream, "read"):
+        # A real stream
+        while 1:
+            data = stream.read(16384)
+            if not data:
+                break
+            p.feed(data)
+    else:
+        # Assume it's a string
+        p.feed(stream)
+    p.close()
+    return u.close(), u.getmethodname()
+
+def copyStream(src, dest, length = None, bufferSize = 16384):
+    """Copy from one stream to another, up to a specified length"""
+    amtread = 0
+    while amtread != length:
+        if length is None:
+            bsize = bufferSize
+        else:
+            bsize = min(bufferSize, length - amtread)
+        buf = src.read(bsize)
+        if not buf:
+            break
+        dest.write(buf)
+        amtread += len(buf)
+    return amtread
+
+def decompressStream(src, bufferSize = 8092):
+    sio = BoundedStringIO()
+    z = zlib.decompressobj()
+    while 1:
+        buf = src.read(bufferSize)
+        if not buf:
+            break
+        sio.write(z.decompress(buf))
+    sio.write(z.flush())
+    return sio
+
+def compressStream(src, level = 5, bufferSize = 16384):
+    sio = BoundedStringIO()
+    z = zlib.compressobj(level)
+    while 1:
+        buf = src.read(bufferSize)
+        if not buf:
+            break
+        sio.write(z.compress(buf))
+    sio.write(z.flush())
+    return sio

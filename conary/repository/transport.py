@@ -30,6 +30,8 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from conary.lib import util
+
 class InfoURL(urllib.addinfourl):
     def __init__(self, fp, headers, url, protocolVersion):
         urllib.addinfourl.__init__(self, fp, headers, url)
@@ -537,6 +539,9 @@ class Transport(xmlrpclib.Transport):
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc
+
+    def getparser(self):
+        return util.xmlrpcGetParser()
 
 class AbortError(Exception): pass
 

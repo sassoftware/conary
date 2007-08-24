@@ -6,6 +6,8 @@ Changes in @NEW@:
       marshaled has been fixed. (CNY-1956)
     * Derived packages properly handle files that were not flavored due
       to an exception in the upstream packages. (CNY-1954)
+    * The transport layer is automatically encoding non-ASCII strings
+      into XMLRPC Binary objects. (CNY-1932)
 
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
@@ -14,6 +16,11 @@ Changes in @NEW@:
   o Build Changes:
     * Mono (CIL) files are now placed in :cil components by default.
       (CNY-1821)
+
+  o Other Changes
+    * The transport layer is using BoundedStringIO for compression,
+      decompression and XMLRPC encoding/decoding, to avoid excessive
+      memory consumption. (CNY-1968)
 
 Changes in 1.1.91:
   o Client Changes:
