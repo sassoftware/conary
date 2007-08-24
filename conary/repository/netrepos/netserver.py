@@ -62,6 +62,18 @@ def accessReadWrite(f, paramList = []):
     _methodAccess(f, 'readWrite')
     return f
 
+def requireClientProtocol(protocol):
+
+    # the check is written in callWrapper rather than in the decorator
+    # itself to make sure the access* and requireClientProtocol decorators
+    # play nicely together
+
+    def dec(f):
+        f._minimumClientProtocol = protocol
+        return f
+
+    return dec
+
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     # lets the following exceptions pass:
@@ -196,10 +208,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         method = self.__getattribute__(methodname)
 
         # Repository in read-only mode?
-        assert(hasattr(method, '_accessType'))
         if method._accessType == 'readWrite' and self.readOnlyRepository:
             return (False, True,
                 ('ReadOnlyRepositoryError', "Repository is read only"))
+
+        if (hasattr(method, '_minimumClientProtocol') and
+                        method._minimumClientProtocol > orderedArgs[0]):
+            return (False, True,
+                    ('InvalidClientVersion',
+                     '%s call only supports protocol versions %s '
+                     'and later' % (methodname, method._minimumClientProtocol)))
 
         attempt = 1
         # nested try:...except statements.... Yeeee-haaa!
@@ -413,16 +431,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return returner
 
     @accessReadWrite
+    @requireClientProtocol(60)
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label, write = False, capped = False, admin = False,
-               remove = False):
-        if clientVersion < 60:
-            # admin/capped flags were passed in old protocols (left in the
-            # signature to allow old calls to get the right error)
-            raise errors.InvalidClientVersion(
-                    'addAcl call only supports protocol versions 60 '
-                    'and later')
-
+               label, write = False, remove = False):
         self.log(2, authToken[0], userGroup, trovePattern, label,
                  "write=%s remove=%s" % (write, remove))
         if trovePattern == "":
@@ -435,8 +446,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if label == "":
             label = None
-        self.auth.addAcl(userGroup, trovePattern, label, write, capped,
-                         remove = remove)
+        self.auth.addAcl(userGroup, trovePattern, label, write, remove = remove)
 
         return True
 
@@ -457,16 +467,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     @accessReadWrite
+    @requireClientProtocol(60)
     def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
-                oldLabel, trovePattern, label, write = False, capped = False,
-                admin=False, canRemove = False):
-        if clientVersion < 60:
-            # admin/capped flags were passed in old protocols (left in the
-            # signature to allow old calls to get the right error)
-            raise errors.InvalidClientVersion(
-                    'editAcl call only supports protocol versions 60 '
-                    'and later')
-
+                oldLabel, trovePattern, label, write = False,
+                canRemove = False):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], userGroup,
@@ -492,7 +496,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
         self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
-                          write, capped, canRemove = canRemove)
+                          write, canRemove = canRemove)
 
         return True
 
@@ -2258,12 +2262,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._setTroveInfo(authToken, clientVersion, l)
 
     @accessReadWrite
+    @requireClientProtocol(45)
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
-        if clientVersion < 45:
-            raise InvalidClientVersion, "Conary client >= 1.1.20 required" \
-                    "for signing"
-
         version = self.toVersion(version)
 	if not self.auth.check(authToken, write = True, trove = name,
                                label = version.branch().label()):
@@ -3047,12 +3048,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ret
 
     @accessReadOnly
+    @requireClientProtocol(50)
     def checkVersion(self, authToken, clientVersion):
-        if clientVersion > 50:
-            raise errors.InvalidClientVersion(
-                    'checkVersion call only supports protocol versions 50 '
-                    'and lower')
-
 	if not self.auth.check(authToken):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)

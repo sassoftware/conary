@@ -748,7 +748,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
                remove = False):
         if self.c[reposLabel].getProtocolVersion() < 60:
-            raise InvalidServerVersion(
+            raise errors.InvalidServerVersion(
                     "addAcl only works on Conary 2.0 and later")
 
         if not label:
@@ -769,7 +769,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
                 trovePattern, label, write = False, canRemove = False):
         if self.c[reposLabel].getProtocolVersion() < 60:
-            raise InvalidServerVersion(
+            raise errors.InvalidServerVersion(
                     "editAcl only works on Conary 2.0 and later")
 
         if not label:

@@ -472,15 +472,13 @@ class NetworkAuthorization:
         return items.checkTrove(pattern, trove)
 
     def addAcl(self, userGroup, trovePattern, label, write = False,
-               capped = False, remove = False):
+               remove = False):
         self.log(3, userGroup, trovePattern, label, write, remove)
         cu = self.db.cursor()
 
         # these need to show up as 0/1 regardless of what we pass in
         write = int(bool(write))
         remove = int(bool(remove))
-        capped = int(bool(capped))
-        assert(not capped)
 
         if trovePattern:
             itemId = self.items.addPattern(trovePattern)
@@ -514,7 +512,7 @@ class NetworkAuthorization:
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
-                write, capped, canRemove = False):
+                write = False, canRemove = False):
 
         self.log(3, userGroup,  (oldTroveId, oldLabelId), (troveId, labelId),
                  write, canRemove)
@@ -525,9 +523,6 @@ class NetworkAuthorization:
         # these need to show up as 0/1 regardless of what we pass in
         write = int(bool(write))
         canRemove = int(bool(canRemove))
-
-        capped = int(bool(capped))
-        assert(not capped)
 
         try:
             cu.execute("""
