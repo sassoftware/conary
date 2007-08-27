@@ -405,7 +405,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
             while not l:
                 if abortCheck():
                     return None
-                l = pollObj.poll(5)
+                l = pollObj.poll(5000)
 
         buf = source.read(bufSize)
         if not buf:

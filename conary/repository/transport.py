@@ -340,7 +340,8 @@ class URLOpener(urllib.FancyURLopener):
             if encoding == 'deflate':
                 # disable until performace is better
                 #fp = DecompressFileObj(fp)
-                fp = StringIO(zlib.decompress(fp.read()))
+                fp = util.decompressStream(fp)
+                fp.seek(0)
 
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
             return InfoURL(fp, headers, selector, protocolVersion)
@@ -372,7 +373,7 @@ class URLOpener(urllib.FancyURLopener):
             if check():
                 raise AbortError
             # wait 5 seconds for a response
-            l = pollObj.poll(5)
+            l = pollObj.poll(5000)
 
             if not l:
                 # still no response from the server.  send a space to
