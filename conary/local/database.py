@@ -676,10 +676,16 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	self.db.commit()
 
     def close(self):
+        if self.dbpath == ':memory:':
+            # No resources associated with an in-memory database
+            # And no locks either
+            return
+
         if self._db:
             self.db.close()
             self._db = None
-            # Close the lock file as well
+
+        # Close the lock file as well
         self.commitLock(False)
 
     def eraseTrove(self, troveName, version, flavor):
