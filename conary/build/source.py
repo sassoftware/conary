@@ -994,7 +994,8 @@ class addAction(action.RecipeAction):
     ===========
 
     The C{r.addAction()} class executes a shell command during the source
-    preparation stage, in a manner similar to C{r.Run}.
+    preparation stage, in a manner similar to C{r.Run}, except that
+    C{r.Run} executes shell commands later, during the build stage.
 
     KEYWORDS
     ========
