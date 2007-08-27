@@ -30,7 +30,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import traceback
 import urllib
 import urlparse
 import weakref
@@ -1252,7 +1251,10 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
         frame = tb.tb_frame
         stream.write('  File "%s", line %d, in %s\n' % 
             (fileName, lineNo, funcName))
-        stream.write('    %s\n' % text[idx].strip())
+        if text is not None:
+            # If the source file is not available, we may not be able to get 
+            # the line
+            stream.write('    %s\n' % text[idx].strip())
 
     tbStack = []
     while tb:
