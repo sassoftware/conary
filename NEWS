@@ -7,7 +7,7 @@ Changes in 1.1.92:
     * If local flags (e.g. kernel.smp) are defined in /etc/conary/use,
       cooking no longer produces a traceback. (CNY-1963)
     * The last trove source in a trove source stack is now properly
-      passed flavor information.
+      passed flavor information. (CNY-1969)
     * Derived packages properly handle files that were not flavored due
       to an exception in the upstream packages. (CNY-1954)
     * The transport layer is automatically encoding non-ASCII strings
