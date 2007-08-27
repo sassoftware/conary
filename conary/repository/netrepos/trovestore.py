@@ -1089,12 +1089,9 @@ class TroveStore:
         """, instanceId, start_transaction=False)
         self.db.analyze("tmpRemovals")
 
-        # removing this instanceId removes access to all troves included by it
-        cu.execute("""
-        DELETE FROM UserGroupInstancesCache WHERE instanceId in (
-        SELECT includedId from TroveTroves WHERE instanceId = ? )
-        """, instanceId)
-        
+        # remove access to troves we're about to remove
+        cu.execute("DELETE FROM UserGroupInstancesCache WHERE instanceId "
+                   "in (SELECT instanceId FROM tmpRemovals)")
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM TroveRedirects WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM Instances WHERE instanceId IN "
@@ -1233,6 +1230,7 @@ class TroveStore:
         return filesToRemove
 
     def markTroveRemoved(self, name, version, flavor):
+        self.log(2, name, version, flavor)
         return self._removeTrove(name, version, flavor, markOnly = True)
 
     def getParentTroves(self, troveList):
