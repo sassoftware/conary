@@ -1436,6 +1436,34 @@ def xmlrpcLoad(stream):
     p.close()
     return u.close(), u.getmethodname()
 
+
+class ServerProxy(xmlrpclib.ServerProxy):
+
+    def _request(self, methodname, params):
+        # Call a method on the remote server
+        request = xmlrpcDump(params, methodname,
+            encoding = self.__encoding, allow_none=self.__allow_none)
+
+        response = self.__transport.request(
+            self.__host,
+            self.__handler,
+            request,
+            verbose=self.__verbose)
+
+        if len(response) == 1:
+            response = response[0]
+
+        return response
+
+    def __getattr__(self, name):
+        # magic method dispatcher
+        if name.startswith('__'):
+            raise AttributeError(name)
+        return self._createMethod(name)
+
+    def _createMethod(self, name):
+        return xmlrpclib._Method(self._request, name)
+
 def copyStream(src, dest, length = None, bufferSize = 16384):
     """Copy from one stream to another, up to a specified length"""
     amtread = 0

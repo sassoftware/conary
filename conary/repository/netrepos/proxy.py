@@ -12,7 +12,7 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib, xmlrpclib
+import base64, cPickle, itertools, os, tempfile, urllib
 
 from conary import constants, conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
@@ -51,7 +51,7 @@ class RepositoryVersionCache:
     def __init__(self):
         self.d = {}
 
-class ProxyClient(xmlrpclib.ServerProxy):
+class ProxyClient(util.ServerProxy):
 
     pass
 
@@ -82,7 +82,7 @@ class ProxyCaller:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
             rc = [ False, True, [ 'ProxyError', e.strerror[1] ] ]
-        except xmlrpclib.ProtocolError, e:
+        except util.xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission
 
