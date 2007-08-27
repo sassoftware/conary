@@ -1,14 +1,13 @@
-Changes in @NEW@:
+Changes in 1.1.92:
   o Bug Fixes:
-    * ccs2tar handles changesets with duplicate contents and hard links
-      (CNY-1953)
+    * ccs2tar correctly handles changesets with duplicate contents and
+      hard links. (CNY-1953)
     * An error in the way attributes of ServerProxy classes get
       marshaled has been fixed. (CNY-1956)
-    * A bug the resulted in a traceback when cooking if local flags 
-      (e.g. kernel.smp) were defined in your /etc/conary/use directory has been
-      fixed (CNY-1963)
-    * Fixed a bug that affects trove sources stacks where the last source
-      should have flavor information passed to it and wasn't.
+    * If local flags (e.g. kernel.smp) are defined in /etc/conary/use,
+      cooking no longer produces a traceback. (CNY-1963)
+    * The last trove source in a trove source stack is now properly
+      passed flavor information.
     * Derived packages properly handle files that were not flavored due
       to an exception in the upstream packages. (CNY-1954)
     * The transport layer is automatically encoding non-ASCII strings
@@ -23,9 +22,9 @@ Changes in @NEW@:
       (CNY-1821)
 
   o Other Changes
-    * The transport layer is using BoundedStringIO for compression,
-      decompression and XMLRPC encoding/decoding, to avoid excessive
-      memory consumption. (CNY-1968)
+    * The transport layer is using BoundedStringIO objects for
+      compression, decompression and XMLRPC encoding/decoding, to
+      avoid excessive memory consumption. (CNY-1968)
 
 Changes in 1.1.91:
   o Client Changes:
