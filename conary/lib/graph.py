@@ -367,7 +367,7 @@ class DirectedGraph:
         out.write('digraph graphName {\n')
         nodes = {}
         for node in self.iterNodes():
-            if filterFn and filterFn(node):
+            if not filterFn or filterFn(node):
                 idx = self.data.getIndex(node)
                 nodes[idx] = node
                 out.write('   n%s [label="%s"]\n' % (idx, labelFormatFn(node)))
