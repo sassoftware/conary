@@ -430,6 +430,9 @@ class NetworkAuthorization:
 
         if len(groupIds) < 1:
             return False
+        elif not label and not trove and not remove:
+            # no more checks to do -- the authentication information is valid
+            return True
 
         stmt = """
         select Items.item

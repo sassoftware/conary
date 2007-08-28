@@ -85,10 +85,10 @@ class UserGroupTroves:
         insert into tmpInstances(instanceId)
         select distinct tmpInstanceId.instanceId
         from tmpInstanceId
-        left join UserGroupInstancesCache as ugi using(instanceId)
-        where ugi.userGroupId = ?
-          and ugi.instanceId is NULL
-          and tmpInstanceId.instanceId is not NULL """, userGroupId)
+        left outer join UserGroupInstancesCache as ugi on
+            tmpInstanceId.instanceId = ugi.instanceId and
+            ugi.userGroupId = ?
+        where ugi.instanceId is NULL""", userGroupId)
         cu.execute("insert into UserGroupInstancesCache (userGroupId, instanceId) "
                    "select %d, instanceId from tmpInstances" %(userGroupId,))
         return True
@@ -103,11 +103,12 @@ class UserGroupTroves:
         cu = self.db.cursor()
         # grab the list of instanceIds we need to add to the UserGroupTroves table
         cu.execute("""
-        select distinct instanceId from tmpInstanceId
-        left join UserGroupTroves as ugt using(instanceId)
-        where ugt.userGroupId = ?
-          and tmpInstanceId is not NULL
-          and ugt.instanceId is NULL
+        select distinct tmpInstanceId.instanceId from tmpInstanceId
+        left outer join UserGroupTroves as ugt on
+            (tmpInstanceId.instanceId = ugt.instanceId and
+             ugt.userGroupId = ?)
+        where
+            ugt.instanceId is NULL
         """, userGroupId)
         # record the new permissions
         for instanceId, in cu.fetchall():
@@ -123,7 +124,7 @@ class UserGroupTroves:
         cu.execute("""
         delete from UserGroupTroves
         where userGroupId = ?
-          and instanceId in (select instanceId from tmpInstanceId
+          and instanceId in (select instanceId from tmpInstanceId)
         """, userGroupId)
         return True
 
@@ -253,12 +254,12 @@ class UserGroupOps:
     def deleteTroveAccess(self, userGroup, troveList):
         userGroupId = self._getGroupId(userGroup)
         self.ugt.delete(userGroupId, troveList)
+        # add extra troves allowed by UserGroupTroves
+        self.ugt.update(userGroupId)
         # in the remove access case, we need to recompute the entire
         # UserGroupInstances and UserGroupLatest for this userGroupId
         # rebuild the UserGroupInstances
         self.ugi.updateUserGroupId(userGroupId)
-        # add extra troves allowed by UserGroupTroves
-        self.ugt.update(userGroupId)
         # and recompute the Latest entries for this user
         self.ugl.updateUserGroupId(userGroupId)
 
