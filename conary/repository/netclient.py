@@ -742,6 +742,30 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def setUserGroupIsAdmin(self, reposLabel, userGroup, admin):
         self.c[reposLabel].setUserGroupIsAdmin(userGroup, admin)
 
+    def addTroveAccess(self, role, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].trailingLabel().getHost(), [])
+            l.append( (tup[0], self.fromVersion(tup[1]),
+                       self.fromFlavor(tup[2])) )
+
+        for serverName, troveList in byServer.iteritems():
+            self.c[serverName].addTroveAccess(role, troveList)
+
+    def deleteTroveAccess(self, role, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].trailingLabel().getHost(), [])
+            l.append( (tup[0], self.fromVersion(tup[1]),
+                       self.fromFlavor(tup[2])) )
+
+        for serverName, troveList in byServer.iteritems():
+            self.c[serverName].deleteTroveAccess(role, troveList)
+
+    def listTroveAccess(self, serverName, role):
+        return [ ( x[0], self.toVersion(x[1]), self.toFlavor(x[2]) ) for x in
+                            self.c[serverName].listTroveAccess(role) ]
+
     def listAcls(self, reposLabel, userGroup):
         return self.c[reposLabel].listAcls(userGroup)
 

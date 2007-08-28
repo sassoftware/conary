@@ -502,8 +502,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def changePassword(self, authToken, clientVersion, user, newPassword):
-        if not self.auth.authCheck(authToken, admin = True):
+        if (not self.auth.authCheck(authToken, admin = True)
+            and not self.auth.check(authToken, allowAnonymous = False)):
             raise errors.InsufficientPermission
+
         self.log(2, authToken[0], user)
         self.auth.changePassword(user, newPassword)
         return True
@@ -622,7 +624,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
         ret = self.ugo.listTroveAccess(userGroup)
-        return [ (n,v,f) for (n,v,f),r in ret ]
+        # strip off the recurse flag; return just the name,version,flavor tuple
+        return [ x[0] for x in ret ]
     
     @accessReadWrite
     def updateMetadata(self, authToken, clientVersion,
@@ -1050,6 +1053,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def troveNames(self, authToken, clientVersion, labelStr):
         cu = self.db.cursor()
+
+        groupIds = self.auth.getAuthGroups(cu, authToken)
+        if not groupIds:
+            return {}
+
+        if not labelStr:
+            cu.execute("""
+                select distinct item from usergroupinstancescache 
+                    join instances using (instanceId)
+                    join items using (itemId)
+                    where usergroupid in (%s)
+            """ % (",".join("%d" % x for x in groupIds)))
+        else:
+            cu.execute("""
+                select distinct item from labels
+                    join labelMap using (labelId)
+                    join nodes using (itemId, branchId)
+                    join instances using (itemId, versionId)
+                    join usergroupinstancescache using (instanceId)
+                    join items on
+                        instances.itemId = items.itemId
+                    where
+                        label = ? and
+                        userGroupId in (%s)
+            """ % (",".join("%d" % x for x in groupIds)), labelStr)
+
+        return [ x[0] for x in cu ]
+
         groupIds = self.auth.getAuthGroups(cu, authToken)
         if not groupIds:
             return {}
@@ -2994,7 +3025,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """ % (",".join("%d" % x for x in userGroupIds), ))
         # get the results
         ret = [ set() for x in range(len(troveInfoList)) ]
-        for i, n,v,f, pattern in cu:
+        for i, n,v,f in cu:
             s = ret[i-minIdx]
             s.add((n,v,f))
         ret = [ list(x) for x in ret ]
