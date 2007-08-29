@@ -663,7 +663,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             raise RuntimeError("Can not handle unknown target repository type", t)
     log.debug("-" * 20 + " start loop " + "-" * 20)
 
-    hidden = len(targets) > 1 and cfg.useHiddenCommits
+    hidden = len(targets) > 1 or cfg.useHiddenCommits
     if hidden:
         log.debug("will use hidden commits to syncronize target mirrors")
 
