@@ -254,12 +254,13 @@ class UserGroupOps:
     def deleteTroveAccess(self, userGroup, troveList):
         userGroupId = self._getGroupId(userGroup)
         self.ugt.delete(userGroupId, troveList)
-        # add extra troves allowed by UserGroupTroves
-        self.ugt.update(userGroupId)
         # in the remove access case, we need to recompute the entire
         # UserGroupInstances and UserGroupLatest for this userGroupId
         # rebuild the UserGroupInstances
         self.ugi.updateUserGroupId(userGroupId)
+        # add extra troves allowed by UserGroupTroves
+        self.ugt.update(userGroupId)
+        # in the remove access case, we need to recompute the entire
         # and recompute the Latest entries for this user
         self.ugl.updateUserGroupId(userGroupId)
 
