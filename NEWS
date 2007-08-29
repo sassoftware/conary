@@ -23,7 +23,7 @@ Changes in @NEW@:
       repositories has been fixed. (CNY-1912)
 
   o Client Changes:
-    * A bug which prevented the mirror client from using hidden comits
+    * A bug which prevented the mirror client from using hidden commits
       when mirroring to a single target has been fixed. (CNY-1981)
 
 Changes in 1.1.92:
