@@ -16,7 +16,7 @@
  full details.
 -->
     <!-- table of permissions -->
-    <table class="user-admin" id="permissions" py:def="permTable(group, rows)">
+    <table class="user-admin" id="permissions" py:def="permTable(role, rows)">
         <thead>
             <tr>
                 <td style="width: 55%;">Label</td>
@@ -34,8 +34,8 @@
                 <td py:content="row[1]"/>
                 <td py:content="row[2] and 'yes' or 'no'"/>
                 <td py:content="row[3] and 'yes' or 'no'"/>
-                <td><a href="deletePerm?group=${group};label=${row[0]}&amp;item=${row[1]}" title="Delete Permission">X</a></td>
-                <td><a href="editPermForm?group=${group};label=${row[0]};trove=${row[1]};writeperm=${row[2]};remove=${row[3]}" title="Edit Permission">E</a></td>
+                <td><a href="deletePerm?role=${role};label=${row[0]}&amp;item=${row[1]}" title="Delete Permission">X</a></td>
+                <td><a href="editPermForm?role=${role};label=${row[0]};trove=${row[1]};writeperm=${row[2]};remove=${row[3]}" title="Edit Permission">E</a></td>
             </tr>
             <tr py:if="not rows">
                 <td>Group has no permissions.</td>
@@ -84,7 +84,7 @@
                         <td py:if="not netAuth.groupCanMirror(group)" py:content="'no'"/>
                         <td py:if="rows" py:content="permTable(group, rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
-                        <td style="text-align: right;"><a href="addPermForm?userGroupName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?userGroupName=${group}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?userGroupName=${group}">Edit&nbsp;Role</a></td>
+                        <td style="text-align: right;"><a href="addPermForm?roleName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?roleName=${group}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?roleName=${group}">Edit&nbsp;Role</a></td>
                     </tr>
                 </tbody>
             </table>

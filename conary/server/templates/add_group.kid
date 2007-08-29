@@ -25,7 +25,7 @@
                 <table class="add-form">
                     <tr>
                         <td id="header">Role Name:</td>
-                        <td><input type="text" name="newUserGroupName" value="${userGroupName}"/></td>
+                        <td><input type="text" name="newRoleName" value="${userGroupName}"/></td>
                     </tr>
                     <tr>
                         <td id="header">Initial Users:</td>
