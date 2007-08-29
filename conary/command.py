@@ -131,17 +131,20 @@ class ConfigCommand(ConaryCommand):
         ConaryCommand.addParameters(self, argDef)
         argDef["show-contexts"] = NO_PARAM
         argDef["show-passwords"] = NO_PARAM
+        argDef["show-files"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, **kwargs):
         showPasswords = argSet.pop('show-passwords', False)
         showContexts = argSet.pop('show-contexts', False)
+        showLineOrigins = argSet.pop('show-files', False)
         try:
             prettyPrint = sys.stdout.isatty()
         except AttributeError:
             prettyPrint = False
         cfg.setDisplayOptions(hidePasswords=not showPasswords,
                               showContexts=showContexts,
-                              prettyPrint=prettyPrint)
+                              prettyPrint=prettyPrint,
+                              showLineOrigins=showLineOrigins)
         if argSet: return self.usage()
         if (len(args) > 2):
             return self.usage()

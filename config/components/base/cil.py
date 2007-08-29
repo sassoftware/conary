@@ -1,7 +1,5 @@
-#!/usr/bin/env python2.4
-# -*- mode: python -*-
 #
-# Copyright (C) 2005-2006 rPath, Inc.
+# Copyright (c) 2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,12 +12,8 @@
 # full details.
 #
 
-""" Returns the differences between a list of flavors """
-import sys
-from conary.deps import deps
+# Note that cil components have %(lib)s in them; we depend on the
+# NonMultilibComponent policy to ensure that cil is multilib-safe.
 
-flavors = [ deps.parseFlavor(x) for x in sys.argv[1:] ]
-
-flavorDict = deps.flavorDifferences(flavors, strict=False)
-for int, flavor in enumerate(flavors):
-    print '%s: %s' % (int, flavorDict[flavor])
+filters = ('cil', ('/usr/(%(lib)s|lib)/mono/',))
+precedes = ('devellib', 'lib', 'devel')

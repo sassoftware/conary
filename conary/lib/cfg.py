@@ -253,10 +253,10 @@ class ConfigFile(_Config):
     """ _Config class + ability to read in files """
 
     def __init__(self):
+        self._ignoreErrors = False
+        self._configFileStack = set()
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
-        self._configFileStack = set()
-        self._ignoreErrors = False
 
     def setIgnoreErrors(self, val=True):
         self._ignoreErrors = val
@@ -352,7 +352,8 @@ class ConfigFile(_Config):
     def configKey(self, key, val, fileName = "override", lineno = '<No line>'):
         try:
             key = self._lowerCaseMap[key.lower()]
-            self[key] = self._options[key].parseString(self[key], val)
+            self[key] = self._options[key].parseString(self[key], val,
+                                                       fileName, lineno)
             if hasattr(self._options[key].valueType, 'overrides'):
                 overrides = self._options[key].valueType.overrides
                 if overrides and hasattr(self, overrides):
@@ -414,7 +415,7 @@ class ConfigFile(_Config):
         if self.isUrl(val):
             self.readUrl(val)
         else:
-            for cfgfile in util.braceGlob(val):
+            for cfgfile in sorted(util.braceGlob(val)):
                 self.read(cfgfile)
 
 class ConfigSection(ConfigFile):
@@ -494,6 +495,7 @@ class SectionedConfigFile(ConfigFile):
 
     def _addSection(self, sectionName, sectionObject):
         self._sections[sectionName] = sectionObject
+        sectionObject._ignoreErrors = self._ignoreErrors
 
     def configLine(self, line, file = "override", lineno = '<No line>'):
 	line = line.strip()
@@ -566,10 +568,11 @@ class ConfigOption:
         self.default = valueType.getDefault(default)
         self.__doc__ = doc
         self._isDefault = True
-        
         self.listeners = []
+        self.origins = []
 
-    def parseString(self, curVal, str):
+    def parseString(self, curVal, str,
+                    path=None, lineNum=None):
         """ 
         Takes the current value for this option, and a string to update that
         value, and returns an updated value (which may either overwrite the 
@@ -578,8 +581,10 @@ class ConfigOption:
         self._callListeners()
 
         if curVal == self.default and self._isDefault:
+            self.origins = [(path, lineNum)]
             return self.valueType.setFromString(curVal, str)
         else:
+            self.origins.append((path, lineNum))
             return self.valueType.updateFromString(curVal, str)
 
     def set(self, curVal, newVal):
@@ -596,6 +601,7 @@ class ConfigOption:
         new = self.__class__(self.name, valueType, default)
         listeners = list(self.listeners)
         new._isDefault = self._isDefault
+        new.origins = list(self.origins)
         new.listeners = listeners
         return new
 
@@ -629,8 +635,17 @@ class ConfigOption:
         if self.isDefault() and value is None:
             return
 
-        # note that the value for a config item may only be reproducable
-        # by multiple lines in a config file.
+        if displayOptions.get('showLineOrigins', False):
+            lineStrs = []
+            curPath = None
+            for path, lineNum in self.origins:
+                if path == curPath:
+                    continue
+                else:
+                    lineStrs.append('%s' % (path,))
+                    curPath = path
+            if lineStrs:
+                out.write('# %s: %s\n' % (self.name, ' '.join(lineStrs)))
         for line in self.valueType.toStrings(value, displayOptions):
             out.write('%-25s %s\n' % (self.name, line))
 

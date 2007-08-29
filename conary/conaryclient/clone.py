@@ -50,6 +50,7 @@ from conary.build.nextversion import nextVersions
 from conary.deps import deps
 from conary.lib import log
 from conary.repository import changeset
+from conary.repository import trovesource
 from conary.repository import errors as neterrors
 
 V_LOADED = 0
@@ -120,11 +121,15 @@ class ClientClone:
                             message=message,
                             cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
                             updateBuildInfo=updateBuildInfo,
-                            infoOnly=infoOnly)
+                            infoOnly=infoOnly, 
+                            bumpGroupVersions=True)
         chooser = CloneChooser(targetMap, troveList, cloneOptions)
         return self._createCloneChangeSet(chooser, cloneOptions)
     # bw compatibility
     createSiblingCloneChangeSet = createTargetedCloneChangeSet
+
+    def createCloneChangeSetWithOptions(self, chooser, cloneOptions):
+        return self._createCloneChangeSet(chooser, cloneOptions)
 
     def _createCloneChangeSet(self, chooser, cloneOptions):
         callback = cloneOptions.callback
@@ -181,7 +186,7 @@ class ClientClone:
         cloneOptions.callback.determiningTargets()
 
         _logMe('get existing leaves')
-        leafMap = self._getExistingLeaves(cloneMap, troveCache)
+        leafMap = self._getExistingLeaves(cloneMap, troveCache, cloneOptions)
         _logMe('target sources')
         self._targetSources(chooser, cloneMap, cloneJob, leafMap, troveCache)
         _logMe('target binaries')
@@ -230,8 +235,12 @@ class ClientClone:
             needed = []
 
             for info in toClone:
-                if info[0].startswith("fileset"):
+                if (info[0].startswith("fileset")
+                    and not info[0].endswith(':source')):
                     raise CloneError("File sets cannot be cloned")
+                if (trove.troveIsPackage(info[0])
+                    and chooser.shouldPotentiallyClone(info) is False):
+                    continue
 
                 if info not in seen:
                     needed.append(info)
@@ -250,17 +259,21 @@ class ClientClone:
                     cloneMap.addTrove(troveTup, targetBranch, sourceName)
                     chooser.addSource(troveTup, sourceName)
                     cloneJob.add(troveTup)
+                elif trove.troveIsPackage(troveTup[0]):
+                    # don't bother downloading components for something
+                    # we're not cloning
+                    continue
                 newToClone.extend(trv.iterTroveList(strongRefs=True))
 
             toClone = newToClone
 
-    def _getExistingLeaves(self, cloneMap, troveCache):
+    def _getExistingLeaves(self, cloneMap, troveCache, cloneOptions):
         """
             Gets the needed information about the current repository state
             to find out what clones may have already been performed
             (and should have their clonedFrom fields checked to be sure)
         """
-        leafMap = LeafMap()
+        leafMap = LeafMap(cloneOptions)
         query = []
         for sourceTup, targetBranch in cloneMap.iterSourceTargetBranches():
             query.append((sourceTup[0], targetBranch, sourceTup[2]))
@@ -269,7 +282,8 @@ class ClientClone:
             query.append((binTup[0], targetBranch, binTup[2]))
         result = self.repos.findTroves(None, query,
                                        defaultFlavor = deps.parseFlavor(''),
-                                       getLeaves=False, allowMissing=True)
+                                       getLeaves=False, allowMissing=True,
+                                       troveTypes=trovesource.TROVE_QUERY_ALL)
         if not result:
             return leafMap
         leafMap.addLeafResults(result)
@@ -314,7 +328,7 @@ class ClientClone:
             for host, troveTups in hasTrovesByHost.items():
                 try:
                     results = troveCache.hasTroves(troveTups)
-                except neterrors.OpenError, msg:
+                except errors.ConaryError, msg:
                     log.debug('warning: Could not access host %s: %s' % (host, msg))
                     results = dict((x, False) for x in troveTups)
                 hasTroves.update(results)
@@ -396,10 +410,11 @@ class ClientClone:
 
             byVersion = {}
             for binaryTup in binaryList:
-                byFlavor = byVersion.setdefault(binaryTup[1], {})
+                byFlavor = byVersion.setdefault(binaryTup[1].getSourceVersion(),
+                                                {})
                 byFlavor.setdefault(binaryTup[2], []).append(binaryTup)
 
-            for version, byFlavor in byVersion.iteritems():
+            for byFlavor in byVersion.itervalues():
                 finalNewVersion = None
                 for flavor, binaryList in byFlavor.iteritems():
                     # Binary list is a list of binaries all created from the
@@ -744,9 +759,9 @@ def _getSourceName(trove):
 
 class CloneOptions(object):
     def __init__(self, fullRecurse=True, cloneSources=True,
-                       trackClone=True, callback=None,
-                       message=DEFAULT_MESSAGE, cloneOnlyByDefaultTroves=False,
-                       updateBuildInfo=True, infoOnly=False):
+                 trackClone=True, callback=None,
+                 message=DEFAULT_MESSAGE, cloneOnlyByDefaultTroves=False,
+                 updateBuildInfo=True, infoOnly=False, bumpGroupVersions=False):
         self.fullRecurse = fullRecurse
         self.cloneSources = cloneSources
         self.trackClone = trackClone
@@ -757,6 +772,7 @@ class CloneOptions(object):
         self.cloneOnlyByDefaultTroves = cloneOnlyByDefaultTroves
         self.updateBuildInfo = updateBuildInfo
         self.infoOnly = infoOnly
+        self.bumpGroupVersions = bumpGroupVersions
 
 class TroveCache(object):
     def __init__(self, repos, callback):
@@ -818,7 +834,12 @@ class CloneChooser(object):
         sourceTup = (sourceName, sourceVersion, noFlavor)
         self.byDefaultMap[sourceTup] = True
 
-    def shouldClone(self, troveTup, sourceName=None):
+    def shouldPotentiallyClone(self, troveTup):
+        """
+            returns True if you definitely should clone this trove
+            returns False if you definitely should not clone this trove
+            returns None if it's undecided.
+        """
         name, version, flavor = troveTup
         if self.byDefaultMap is not None:
             if troveTup not in self.byDefaultMap:
@@ -832,6 +853,11 @@ class CloneChooser(object):
                 return True
         elif self.options.fullRecurse:
             return True
+
+    def shouldClone(self, troveTup, sourceName=None):
+        shouldClone = self.shouldPotentiallyClone(troveTup)
+        if shouldClone is not None:
+            return shouldClone
         return self._matchesPrimaryTrove(troveTup, sourceName)
 
     def _matchesPrimaryTrove(self, troveTup, sourceName):
@@ -998,9 +1024,10 @@ class CloneMap(object):
 
 
 class LeafMap(object):
-    def __init__(self):
+    def __init__(self, options):
         self.clonedFrom = {}
         self.branchMap = {}
+        self.options = options
 
     def addTrove(self, troveTup, clonedFrom=None):
         name, version, flavor = troveTup
@@ -1099,7 +1126,23 @@ class LeafMap(object):
                      set([y[0] for y in x[1]]), # all names
                      set([y[2] for y in x[1]])) # all flavors
                         for x in sourceBinaryList]
-        return nextVersions(repos, None, troveList)
+        bumpList = {True: [], False: []}
+        for idx, item in enumerate(troveList):
+            nameList = item[1]
+            if (self.options.bumpGroupVersions
+                and iter(nameList).next().startswith('group-')):
+                bumpList[True].append((idx, item))
+            else:
+                bumpList[False].append((idx, item))
+        allVersions = [None] * len(troveList)
+        for bumpVersions, troveList in bumpList.items():
+            indexes = [ x[0] for x in troveList ]
+            troveList = [ x[1] for x in troveList ]
+            newVersions = nextVersions(repos, None, troveList,
+                                       alwaysBumpCount=bumpVersions)
+            for idx, newVersion in itertools.izip(indexes, newVersions):
+                allVersions[idx] = newVersion
+        return allVersions
 
 class CloneError(errors.ClientError):
     pass

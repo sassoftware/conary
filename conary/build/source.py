@@ -212,7 +212,7 @@ class addArchive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tar, cpio, or zip archive, or binary/source RPM,
+    optionally compressed tar, cpio, xpi or zip archive, or binary/source RPM,
     and unpacks it to the proper directory.
 
     If the specified I{archivename} is only a URL in the form of
@@ -384,9 +384,9 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
-	if f.endswith(".zip"):
+	if f.endswith(".zip") or f.endswith(".xpi"):
             if self.preserveOwnership:
-                raise SourceError('cannot preserveOwnership for zip archives')
+                raise SourceError('cannot preserveOwnership for xpi or zip archives')
 
             util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
 
@@ -994,7 +994,8 @@ class addAction(action.RecipeAction):
     ===========
 
     The C{r.addAction()} class executes a shell command during the source
-    preparation stage, in a manner similar to C{r.Run}.
+    preparation stage, in a manner similar to C{r.Run}, except that
+    C{r.Run} executes shell commands later, during the build stage.
 
     KEYWORDS
     ========
@@ -1350,7 +1351,7 @@ class addSvnSnapshot(_RevisionControl):
                             self.url.split('/')[-1]
         util.execute("svn -q export '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
-                        (self.url, stagePath,
+                        (lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 

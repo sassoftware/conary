@@ -83,6 +83,12 @@ class SysLog:
         if not self.f:
             raise IOError, 'could not open any of: ' + ', '.join(logList)
 
+    def close(self):
+        """Close the logger's open files"""
+        if self.f is not None:
+            self.f.close()
+            self.f = None
+
     def __init__(self, root, path):
         self.root = root
         if not isinstance(path, (list, tuple)):

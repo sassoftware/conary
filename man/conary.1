@@ -52,7 +52,13 @@ Arguments include
 .TP 4
 .B \-\-show-passwords
 Normally, conary config will mask paswords in repository maps, to avoid their
-accidental display.  You can override this masking with --show-passwords.  
+accidental display.  You can override this masking with --show-passwords.
+.RE
+.B \-\-show-lines
+Displays as comments the line number that each configuration item came
+from.  If no line is given, then that item is the default.  If an
+item is read in from multiple places, all places are mentioned, in the order
+in which they are read in.
 .RE
 .TP
 .B emerge \fI<file>\fP.recipe\fI|<component>[=<version>]...
@@ -212,13 +218,33 @@ a chroot, therefore it requires the \fB\-\-root \fI<root>\fR option
 to be used.
 .TP
 .B \-\-replace-files
-When a normal file (not a configuration file or a transient file) has
-changed on the system between updates to that file, or if a file
-already exists when conary tries to create it, conary normally
-aborts the operation with an error message.
-If you want conary to update anyway, replacing the contents
-of the file with the new version from the changeset, you will need
-to provide the \-\-replace-files option.
+Equivalent to specifying \fB\-\-replace\-managed\-files\fR,
+\fB\-\-replace\-unmanaged\-files\fR, \fB\-\-replace\-modified\-files\fR,
+and \fB\-\-replace\-config\-files\fR simultaneously.
+.TP
+.B \-\-replace-config-files
+Config files owned by the old verson of the trove being updated which
+have been modified and have changed in the new version of the trove are
+replaced with the new versions and the local changes are lost (though
+they are preserved in the rollback).
+.TP
+.B \-\-replace-managed-files
+Files which are owned by other troves are replaced by files from the trove
+being updated. If multiple troves are being installed which conflict with
+one another, files from the later troves override files from the earlier
+ones.
+.TP
+.B \-\-replace-modified-files
+Non-config files owned by the old verson of the trove being updated which
+have been modified and have changed in the new version of the trove are
+replaced with the new versions and the local changes are lost (though
+they are preserved in the rollback).
+.TP
+.B \-\-replace-unmanaged-files
+Files which conflict with new files being installed, but which are not
+owned by any trove on the system, are replaced with the contents from
+that trove. The original files are lost and will not be recovered by
+a rollback.
 .TP
 .B \-\-sync-to-parents
 Only allow updates to versions that are referenced by other troves on the 
@@ -237,6 +263,11 @@ Perform all actions up to the point of writing to the filesystem.
 .B \-\-apply-critical
 If the given update involves critical updates, apply only those critical 
 updates and then stop.
+.TP
+.B \-\-exact-flavors
+Match only the exact flavors specified at the command line. This turns off
+conary's automatic merging of your system flavor with any flavor specified at
+the command line and only uses the flavors you explicitly specify.
 .TP
 .B updateall
 Iterates through all the top-level troves installed on the system
@@ -279,7 +310,6 @@ installs it. This could help if the locally installed client is too
 old (or otherwise misbehaves) and cannot perform a regular upgrade
 through a \fBconary update conary\fP invocation.
 .RE
-.TP
 .TP
 .B verify [--all] \fI<trove>[=version]*\fP
 Compares the files in the given \fItrove\fP (or all troves if the --all 
@@ -430,6 +460,9 @@ Return all troves that match the system flavor + any specified flavors
 .TP
 .B \-\-best-flavors [default]
 Return the best trove flavor based on your system flavor,
+.TP
+.B \-\-exact-flavors
+Return only troves that have exactly the flavor you specify.
 .TP
 .B \-\-affinity
 Turn on flavor and branch affinity.  For example, when  using --best-flavors 
@@ -855,7 +888,6 @@ version of frob first, and then fall back to find a version on
 contrib.rpath.org@rpl:1 if one could not be found in group-os.  If frob has
 any dependencies that need to be resolved, they will be resolved first
 against group-os; then contrib.rpath.org@rpl:1 will be searched.
-.TP
 .TP
 .B shortenGroupFlavors
 Decreases the number of items in group flavors to the bare minimum needed

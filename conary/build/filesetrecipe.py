@@ -81,6 +81,13 @@ class FilesetRecipe(Recipe):
 
     def addFile(self, pattern, component, versionStr = None, recurse = True,
 		remap = []):
+        pattern = pattern % self.macros
+        component = component % self.macros
+        if versionStr:
+            versionStr = versionStr % self.macros
+        if remap:
+            remap = [ (old % self.macros, new % self.macros)
+                      for (old,new) in remap ]
         self.requestedFiles.setdefault(
             (component, versionStr), []).append((pattern, recurse, remap))
 
