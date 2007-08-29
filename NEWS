@@ -3,6 +3,7 @@ Changes in @NEW@:
     * clone is now more efficient and does not download unnecessary packages
       this also makes it possible to clone packages where access to some of
       the included troves is unavailable at the time of the clone (CNY-1913)
+    * clone and promote now work when cloning over removed packages. (CNY-1955)
 
 Changes in 1.1.92:
   o Bug Fixes:

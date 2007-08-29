@@ -50,6 +50,7 @@ from conary.build.nextversion import nextVersions
 from conary.deps import deps
 from conary.lib import log
 from conary.repository import changeset
+from conary.repository import trovesource
 from conary.repository import errors as neterrors
 
 V_LOADED = 0
@@ -281,7 +282,8 @@ class ClientClone:
             query.append((binTup[0], targetBranch, binTup[2]))
         result = self.repos.findTroves(None, query,
                                        defaultFlavor = deps.parseFlavor(''),
-                                       getLeaves=False, allowMissing=True)
+                                       getLeaves=False, allowMissing=True,
+                                       troveTypes=trovesource.TROVE_QUERY_ALL)
         if not result:
             return leafMap
         leafMap.addLeafResults(result)
