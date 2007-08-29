@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Server Changes
     * a bug which triggered an exception while migrating postgresql
       repositories has been fixed (CNY-1912)
+  o Client Changes:
+    * a bug which prevented the mirror client from using hidden comitts
+      when mirroring to a single target has been fixed (CNY-1981)
 
 Changes in 1.1.31.4:
   o Server changes:
