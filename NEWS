@@ -23,8 +23,8 @@ Changes in @NEW@:
       repositories has been fixed. (CNY-1912)
 
   o Client Changes:
-    * a bug which prevented the mirror client from using hidden comitts
-      when mirroring to a single target has been fixed (CNY-1981)
+    * A bug which prevented the mirror client from using hidden comits
+      when mirroring to a single target has been fixed. (CNY-1981)
 
 Changes in 1.1.92:
   o Bug Fixes:
@@ -74,7 +74,7 @@ Changes in 1.1.91:
     * A 'cvc checkout' of multiple projects uses far fewer repository
       calls now, and uses a single changeset.
     * The 'cvc update' and 'cvc diff' commands now accept a source
-      version arguemnt without a source count. (CNY-1921)
+      version argument without a source count. (CNY-1921)
 
 Changes in 1.1.31.4:
   o Server changes:
