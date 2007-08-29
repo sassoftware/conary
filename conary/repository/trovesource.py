@@ -115,7 +115,7 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def findTroves(self, labelPath, troves, defaultFlavor=None, 
-                   acrossLabels=False, acrossFlavors=True, 
+                   acrossLabels=False, acrossFlavors=False, 
                    affinityDatabase=None, allowMissing=False, 
                    bestFlavor=None, getLeaves=None, 
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
@@ -137,7 +137,7 @@ class AbstractTroveSource:
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossSources = True, 
-                  acrossFlavors = True, affinityDatabase = None,
+                  acrossFlavors = False, affinityDatabase = None,
                   bestFlavor = None, getLeaves = None, 
                   troveTypes=TROVE_QUERY_PRESENT, **kw):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
@@ -1411,7 +1411,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
         return True
 
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
-                   acrossLabels=False, acrossFlavors=True,
+                   acrossLabels=False, acrossFlavors=False,
                    affinityDatabase=None, allowMissing=False,
                    bestFlavor=None, getLeaves=None,
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,

@@ -4,6 +4,9 @@ Changes in @NEW@:
       this also makes it possible to clone packages where access to some of
       the included troves is unavailable at the time of the clone (CNY-1913)
     * clone and promote now work when cloning over removed packages. (CNY-1955)
+    * searchPath will now only return the best flavor match when matching
+      against groups with more than one version of a package available.
+      (CNY-1881)
 
 Changes in 1.1.92:
   o Bug Fixes:

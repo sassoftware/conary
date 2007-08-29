@@ -439,7 +439,8 @@ class QueryByLabelPath(QueryMethod):
                         del(self.query[name])
                         continue
 
-                if self.acrossLabels or name in self.acrossLabelsPerTrove:
+                if req and (self.acrossLabels 
+                            or name in self.acrossLabelsPerTrove):
                     # if we're searching across repositories, 
                     # we are trying to find one match per label
                     # if we've already found a match for a label, 
@@ -447,6 +448,8 @@ class QueryByLabelPath(QueryMethod):
                     for label in req.keys():
                         if (name, label) in foundNameLabels:
                             req.pop(label)
+                    if not req:
+                        continue
                 elif name in foundNames:
                     continue
                 labelQuery[name] = req
@@ -475,7 +478,7 @@ class QueryByLabelPath(QueryMethod):
 
                     if self.acrossLabels or name in self.acrossLabelsPerTrove:
                         foundNameLabels.add((name, 
-                                             version.branch().label()))
+                                             version.trailingLabel()))
                 finalMap.setdefault(self.map[name][0], []).extend(pkgList)
             index +=1
         self._findLocalTroves(finalMap)
