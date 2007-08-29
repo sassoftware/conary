@@ -7,6 +7,7 @@ Changes in @NEW@:
     * searchPath will now only return the best flavor match when matching
       against groups with more than one version of a package available.
       (CNY-1881)
+    * crossRequires are now ignored when not cross compiling (CNY-1950)
 
 Changes in 1.1.92:
   o Bug Fixes:

@@ -246,7 +246,7 @@ class AbstractPackageRecipe(Recipe):
 	db = database.Database(cfg.root, cfg.dbPath)
 
 
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             if not self.macros.sysroot:
                 err = ("cross requirements needed but %(sysroot)s undefined")
                 if raiseError:
@@ -277,7 +277,7 @@ class AbstractPackageRecipe(Recipe):
         time = sourceVersion.timeStamps()[-1]
 
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
                                                        crossDb)
         else:
