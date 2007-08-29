@@ -237,6 +237,9 @@ class ClientClone:
                 if (info[0].startswith("fileset")
                     and not info[0].endswith(':source')):
                     raise CloneError("File sets cannot be cloned")
+                if (trove.troveIsPackage(info[0])
+                    and chooser.shouldPotentiallyClone(info) is False):
+                    continue
 
                 if info not in seen:
                     needed.append(info)
@@ -829,7 +832,12 @@ class CloneChooser(object):
         sourceTup = (sourceName, sourceVersion, noFlavor)
         self.byDefaultMap[sourceTup] = True
 
-    def shouldClone(self, troveTup, sourceName=None):
+    def shouldPotentiallyClone(self, troveTup):
+        """
+            returns True if you definitely should clone this trove
+            returns False if you definitely should not clone this trove
+            returns None if it's undecided.
+        """
         name, version, flavor = troveTup
         if self.byDefaultMap is not None:
             if troveTup not in self.byDefaultMap:
@@ -843,6 +851,11 @@ class CloneChooser(object):
                 return True
         elif self.options.fullRecurse:
             return True
+
+    def shouldClone(self, troveTup, sourceName=None):
+        shouldClone = self.shouldPotentiallyClone(troveTup)
+        if shouldClone is not None:
+            return shouldClone
         return self._matchesPrimaryTrove(troveTup, sourceName)
 
     def _matchesPrimaryTrove(self, troveTup, sourceName):
