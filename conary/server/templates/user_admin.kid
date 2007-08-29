@@ -68,9 +68,9 @@
             </table>
             <p><a href="addUserForm">Add User</a></p>
 
-            <h2>Groups</h2>
+            <h2>Roles</h2>
             <table class="user-admin" id="groups">
-                <thead><tr><td style="width: 25%;">Group Name</td><td>Admin</td><td>Mirror</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
+                <thead><tr><td style="width: 25%;">Role</td><td>Admin</td><td>Mirror</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
                 <tbody>
                     <tr py:for="i, group in enumerate(netAuth.getGroupList())"
                         class="${i % 2 and 'even' or 'odd'}">
@@ -84,12 +84,12 @@
                         <td py:if="not netAuth.groupCanMirror(group)" py:content="'no'"/>
                         <td py:if="rows" py:content="permTable(group, rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
-                        <td style="text-align: right;"><a href="addPermForm?userGroupName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteGroup?userGroupName=${group}">Delete&nbsp;Group</a>&nbsp;|&nbsp;<a href="manageGroupForm?userGroupName=${group}">Edit&nbsp;Group</a></td>
+                        <td style="text-align: right;"><a href="addPermForm?userGroupName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?userGroupName=${group}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?userGroupName=${group}">Edit&nbsp;Role</a></td>
                     </tr>
                 </tbody>
             </table>
             <p>
-                <a href="addGroupForm">Add Group</a>
+                <a href="addRoleForm">Add Role</a>
             </p>
         </div>
     </body>

@@ -527,7 +527,7 @@ class HttpHandler(WebHandler):
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    def addGroupForm(self, auth):
+    def addRoleForm(self, auth):
         users = self.repServer.auth.userAuth.getUserList()
         return self._write("add_group", modify = False, userGroupName = None,
                            users = users, members = [], canMirror = False,
@@ -535,7 +535,7 @@ class HttpHandler(WebHandler):
 
     @checkAuth(admin = True)
     @strFields(userGroupName = None)
-    def manageGroupForm(self, auth, userGroupName):
+    def manageRoleForm(self, auth, userGroupName):
         users = self.repServer.auth.userAuth.getUserList()
         members = set(self.repServer.auth.getGroupMembers(userGroupName))
         canMirror = self.repServer.auth.groupCanMirror(userGroupName)
@@ -551,7 +551,7 @@ class HttpHandler(WebHandler):
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
     @intFields(isAdmin = False)
-    def manageGroup(self, auth, userGroupName, newUserGroupName, memberList,
+    def manageRole(self, auth, userGroupName, newUserGroupName, memberList,
                     canMirror, isAdmin):
         if userGroupName != newUserGroupName:
             try:
@@ -573,7 +573,7 @@ class HttpHandler(WebHandler):
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
     @intFields(isAdmin = False)
-    def addGroup(self, auth, newUserGroupName, memberList, canMirror,
+    def addRole(self, auth, newUserGroupName, memberList, canMirror,
                  isAdmin):
         try:
             self.repServer.auth.addGroup(newUserGroupName)
@@ -589,7 +589,7 @@ class HttpHandler(WebHandler):
 
     @checkAuth(admin = True)
     @strFields(userGroupName = None)
-    def deleteGroup(self, auth, userGroupName):
+    def deleteRole(self, auth, userGroupName):
         self.repServer.auth.deleteGroup(userGroupName)
         self._redirect("userlist")
 
