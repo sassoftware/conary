@@ -235,9 +235,6 @@ class ClientClone:
             needed = []
 
             for info in toClone:
-                if (info[0].startswith("fileset")
-                    and not info[0].endswith(':source')):
-                    raise CloneError("File sets cannot be cloned")
                 if (trove.troveIsPackage(info[0])
                     and chooser.shouldPotentiallyClone(info) is False):
                     continue
@@ -610,9 +607,13 @@ class ClientClone:
                 _updateVersion(trv, mark, newVersion)
             elif chooser.troveInfoNeedsErase(mark, src):
                 _updateVersion(trv, mark, None)
+        if trove.troveIsFileSet(trv.getName()):
+            needsRewriteFn = chooser.filesetFileNeedsRewrite
+        else:
+            needsRewriteFn = chooser.fileNeedsRewrite
 
         for (pathId, path, fileId, version) in trv.iterFileList():
-            if chooser.fileNeedsRewrite(troveBranch, targetBranch, version):
+            if needsRewriteFn(troveBranch, targetBranch, version):
                 needsNewVersions.append((pathId, path, fileId))
 
         # need to be reversioned
@@ -908,6 +909,12 @@ class CloneChooser(object):
             # on same branch
             return False
         return self.options.updateBuildInfo
+
+    def filesetFileNeedsRewrite(self, troveBranch, targetBranch, fileVersion):
+        targetMap = self.targetMap
+        return (fileVersion.branch() in targetMap or
+            fileVersion.trailingLabel() in targetMap
+            or None in targetMap)
 
     def fileNeedsRewrite(self, troveBranch, targetBranch, fileVersion):
         if fileVersion.depth() == targetBranch.depth():

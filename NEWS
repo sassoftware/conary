@@ -10,6 +10,8 @@ Changes in @NEW@:
     * crossRequires are now ignored when not cross compiling (CNY-1950)
   o Build Changes:
     * Filesets now accept macros (CNY-148)
+  o Client Changes:
+    * Filesets are now cloneable (CNY-1297)
 
 Changes in 1.1.92:
   o Bug Fixes:
