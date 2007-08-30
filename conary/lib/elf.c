@@ -511,12 +511,12 @@ static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
     return rc;
 }
 
-static PyObject *doGetSectionSymbols(Elf * elf, Elf32_Word sh_type,
+static PyObject *doGetSectionSymbols(Elf * elf, GElf_Word sh_type,
                                      const char *sect_name) {
     Elf_Scn * sect = NULL;
     Elf_Data * data;
-    Elf32_Sym *esym;
-    Elf32_Sym *lastsym;
+    GElf_Sym *esym;
+    GElf_Sym *lastsym;
     GElf_Ehdr ehdr;
     GElf_Shdr shdr;
     char * name;
@@ -550,13 +550,13 @@ static PyObject *doGetSectionSymbols(Elf * elf, Elf32_Word sh_type,
         if (data == NULL || data->d_buf == NULL || data->d_size == 0) {
             continue;
         }
-        esym = (Elf32_Sym*) data->d_buf;
-        lastsym = (Elf32_Sym*) ((char*) data->d_buf + data->d_size);
+        esym = (GElf_Sym*) data->d_buf;
+        lastsym = (GElf_Sym*) ((char*) data->d_buf + data->d_size);
         for (; esym < lastsym; esym++){
             if ((esym->st_value == 0) ||
-                 (ELF32_ST_BIND(esym->st_info) == STB_WEAK) ||
-                 (ELF32_ST_BIND(esym->st_info) == STB_NUM) ||
-                 (ELF32_ST_TYPE(esym->st_info)!= STT_FUNC))
+                 (GELF_ST_BIND(esym->st_info) == STB_WEAK) ||
+                 (GELF_ST_BIND(esym->st_info) == STB_NUM) ||
+                 (GELF_ST_TYPE(esym->st_info) != STT_FUNC))
                 continue;
             name = elf_strptr(elf, shdr.sh_link , (size_t)esym->st_name);
             PyList_Append(rlist, PyString_FromString(name));
