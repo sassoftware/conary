@@ -7,24 +7,25 @@ Changes in @NEW@:
       Previously, it would return all matches.  (CNY-1881)
 
   o Build Changes:
-    * The cvc promote and clone commands are now more efficient and do
-      not download unnecessary packages.  This also makes it possible
-      to clone packages where access to some of the included troves
-      is unavailable at the time of the promote or clone operation.
-      (CNY-1913)
     * Filesets now accept macros. (CNY-148)
     * crossRequires are now ignored when not cross compiling. (CNY-1950)
     * Malformed .jar files are now ignored when computing Java
       dependencies.  Previously, Conary exited with an error while
       attempting to process them. (CNY-1983)
 
+  o Client Changes:
+    * The cvc promote and clone commands are now more efficient and do
+      not download unnecessary packages.  This also makes it possible
+      to clone packages where access to some of the included troves
+      is unavailable at the time of the promote or clone operation.
+      (CNY-1913)
+    * A bug which prevented the mirror client from using hidden commits
+      when mirroring to a single target has been fixed. (CNY-1981)
+    * Filesets are now cloneable. (CNY-1297)
+
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
       repositories has been fixed. (CNY-1912)
-
-  o Client Changes:
-    * A bug which prevented the mirror client from using hidden commits
-      when mirroring to a single target has been fixed. (CNY-1981)
 
 Changes in 1.1.92:
   o Bug Fixes:

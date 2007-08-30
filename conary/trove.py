@@ -48,6 +48,10 @@ def troveIsPackage(troveName):
 def troveIsComponent(troveName):
     return ":" in troveName
 
+def troveIsFileSet(troveName):
+    return (troveName.startswith('fileset-')
+            and not troveName.endswith(':source'))
+
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
