@@ -2,9 +2,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * The clone and promote commands now work when cloning over removed
       packages. (CNY-1955)
-    * searchPath will now provide only the best flavor match when matching
-      against groups with more than one version of a package available.
-      Previously, it would return all matches.  (CNY-1881)
+    * searchPath will now provide only the best flavor match when
+      matching against groups with more than one version of a package
+      available. Previously, it would return all matches. (CNY-1881)
 
   o Build Changes:
     * Filesets now accept macros. (CNY-148)
@@ -16,8 +16,8 @@ Changes in @NEW@:
       and when bootstrapping python, modules are now sought in system
       python directories as well as in the destdir. (CNY-1986)
     * Extension python modules (.so files) are now exposing the proper
-      dependency by not providing, for example, itertoolsmodule.
-      (CNY-1077)
+      dependencies by providing, for example, itertoolsmodule as well as
+      itertools, but requiring the shorter one if available). (CNY-1077)
 
   o Client Changes:
     * The cvc promote and clone commands are now more efficient and do
