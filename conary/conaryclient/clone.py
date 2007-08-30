@@ -56,7 +56,6 @@ from conary.repository import errors as neterrors
 V_LOADED = 0
 V_BREQ = 1
 V_REFTRV = 2
-V_REDIRECT = 2
 
 # don't change 
 DEFAULT_MESSAGE = 1
@@ -203,8 +202,6 @@ class ClientClone:
         troveTups = cloneJob.getTrovesToClone()
         unmetNeeds = self._checkNeedsFulfilled(troveTups, chooser, cloneMap,
                                                leafMap, troveCache)
-        unmetNeeds += self._checkRedirectsMatched(troveTups, chooser, cloneMap,
-                                                  leafMap, troveCache)
         if unmetNeeds:
             _logMe('could not clone')
             raise CloneIncomplete(unmetNeeds)
@@ -489,63 +486,15 @@ class ClientClone:
         for queryItem, (sourceTup, markList) in query.items():
             newVersion = leafMap.isAlreadyCloned(sourceTup, queryItem[1])
             if not newVersion:
-                newVersion = leafMap.hasAncestor(sourceTup, queryItem[1],
-                                                 self.repos)
+                newVersion = leafMap.hasAncestor(sourceTup, queryItem[1], self.repos)
             if newVersion:
                 cloneMap.target(sourceTup, newVersion)
                 del query[queryItem]
         return query.values()
-
-    def _checkRedirectsFulfilled(self, troveTups, chooser, cloneMap, leafMap,
-                                  troveCache):
-        query = {}
-        neededInfoTroveTups = {}
-
-        _logMe("Checking needs are fulfilled for %s troves" % (len(troveTups)))
-        for troveTup in troveTups:
-            trv = troveCache.getTrove(troveTup, withFiles=False)
-            for mark, src in _iterRedirects(trv):
-                if chooser.troveInfoNeedsRewrite(mark, src):
-                    neededInfoTroveTups.setdefault(src, []).append(mark)
-
-        _logMe("Checking clonedFrom info for %s needed troves" % (
-                                            len(neededInfoTroveTups)))
-        for troveSpec in neededInfoTroveTups:
-            targetBranch = chooser.getTargetBranch(troveTup[1])
-            marks = neededInfoTroveTups[troveSpec]
-
-            queryItem = troveTup[0], targetBranch, troveTup[2]
-            if queryItem not in query:
-                query[queryItem] = troveSpec, marks
-            query[queryItem][1].extend(marks)
-        results = self.repos.findTroves(None, query, None, bestFlavor=True,
-                                        allowMissing=True)
-        leafMap.addLeafResults(results)
-        matches = []
-        for queryItem, tupList in results.iteritems():
-            sourceTup = query[queryItem][0]
-            upstreamVersion = sourceTup[1].trailingRevision().getVersion()
-            for troveTup in tupList:
-                if (troveTup[1].trailingRevision().getVersion() == upstreamVersion
-                    and sourceTup[2] == troveTup[2]):
-                    matches.append(troveTup)
-        _logMe("Checking clonedFrom info for %s matching nodes" % (len(matches)))
-        self._addClonedFromInfo(troveCache, leafMap, matches)
-        for queryItem, (sourceTup, markList) in query.items():
-            newVersion = leafMap.isAlreadyCloned(sourceTup, queryItem[1])
-            if not newVersion:
-                newVersion = leafMap.hasAncestor(sourceTup, queryItem[1],
-                                                 self.repos)
-            if newVersion:
-                cloneMap.target(sourceTup, newVersion)
-                del query[queryItem]
-        return query.values()
-
-
 
     def _recheckPreClones(self, cloneJob, cloneMap, troveCache, chooser, 
                           leafMap):
-        # We only check for missing trove references, not build reqs for 
+        # We only child for missing trove references, not build reqs for 
         # reclones.  Otherwise you could have to reclone when minor details
         # about the entironment have changed.
         troveTups = cloneJob.getPreclonedTroves()
@@ -756,10 +705,6 @@ def _iterAllVersions(trv, rewriteTroveInfo=True):
     for troveInfo in [ x for x in trv.iterTroveList(strongRefs=True,
                                                     weakRefs=True) ]:
         yield ((V_REFTRV, troveInfo), troveInfo)
-    import epdb
-    epdb.st()
-    for troveSpec in [ x for x in trv.iterRedirects() ]:
-        yield ((V_REDIRECT, troveSpec), troveSpec)
 
 def _updateVersion(trv, mark, newVersion):
     """ 
@@ -954,9 +899,6 @@ class CloneChooser(object):
         if self.byDefaultMap is not None and troveTup not in self.byDefaultMap:
             return False
 
-        if kind == V_REDIRECT:
-            return True
-
         if kind == V_REFTRV:
             # only rewrite trove info if we're cloning that trove.
             # otherwise, assume it's correct.
@@ -1002,7 +944,6 @@ class CloneMap(object):
         self.trovesByTargetBranch = {}
         self.trovesBySource = {}
         self.sourcesByTrove = {}
-        self.specMap = {}
 
     def addTrove(self, troveTup, targetBranch, sourceName=None):
         name, version, flavor = troveTup
@@ -1056,9 +997,6 @@ class CloneMap(object):
 
     def getSourceVersion(self, troveTup):
         return self.sourcesByTrove[troveTup]
-
-    def targetSpec(self, troveSpec, targetBranch):
-        self.targetSpecMap[troveSpec] = targetBranch
 
     def target(self, troveTup, targetVersion):
         oldBranch = troveTup[1].branch()
@@ -1223,7 +1161,6 @@ class CloneIncomplete(CloneError):
         loadRecipes = []
         buildReqs = []
         refTroves = []
-        redirects = []
 
         for src, markList in self.needs:
             for mark in markList:
@@ -1234,16 +1171,12 @@ class CloneIncomplete(CloneError):
                     buildReqs.append(what)
                 elif mark[0] == V_REFTRV:
                     refTroves.append(what)
-                elif mark[0] == V_REDIRECT:
-                    redirects.append(what)
         l.extend(["build requirement: %s" % x
                   for x in sorted(set(buildReqs))])
         l.extend(["loadRecipe:        %s" % x
                   for x in sorted(set(loadRecipes))])
         l.extend(["referenced trove:  %s" % x
                   for x in sorted(set(refTroves))])
-        l.extend(["redirects:  %s" % x
-                  for x in sorted(set(redirects))])
 
         return "Clone cannot be completed because some troves are not " + \
                "available on the target branch.\n\t" + \
