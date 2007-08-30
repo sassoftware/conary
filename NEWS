@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.93:
   o Bug Fixes:
     * The clone and promote commands now work when cloning over removed
       packages. (CNY-1955)
@@ -10,7 +10,7 @@ Changes in @NEW@:
     * Filesets now accept macros. (CNY-148)
     * crossRequires are now ignored when not cross compiling. (CNY-1950)
     * Malformed .jar files are now ignored when computing Java
-      dependencies.  Previously, Conary exited with an error while
+      dependencies. Previously, Conary exited with an error while
       attempting to process them. (CNY-1983)
     * Conary dependencies are no longer attempted when cross-compiling,
       and when bootstrapping python, modules are now sought in system
@@ -21,7 +21,7 @@ Changes in @NEW@:
 
   o Client Changes:
     * The cvc promote and clone commands are now more efficient and do
-      not download unnecessary packages.  This also makes it possible
+      not download unnecessary packages. This also makes it possible
       to clone packages where access to some of the included troves
       is unavailable at the time of the promote or clone operation.
       (CNY-1913)
