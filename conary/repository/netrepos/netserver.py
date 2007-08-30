@@ -1060,53 +1060,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if not labelStr:
             cu.execute("""
-                select distinct item from usergroupinstancescache 
-                    join instances using (instanceId)
-                    join items using (itemId)
-                    where usergroupid in (%s)
+            select distinct item
+            from UserGroupInstancesCache as ugi
+            join Instances using (instanceId)
+            join Items using (itemId)
+            where ugi.userGroupId in (%s)
             """ % (",".join("%d" % x for x in groupIds)))
         else:
             cu.execute("""
-                select distinct item from labels
-                    join labelMap using (labelId)
-                    join nodes using (itemId, branchId)
-                    join instances using (itemId, versionId)
-                    join usergroupinstancescache using (instanceId)
-                    join items on
-                        instances.itemId = items.itemId
-                    where
-                        label = ? and
-                        userGroupId in (%s)
+            select distinct item
+            from Labels
+            join LabelMap using (labelId)
+            join Nodes using (itemId, branchId)
+            join Instances using (itemId, versionId)
+            join UserGroupInstancesCache using (instanceId)
+            join Items using(itemId)
+            where label = ?
+              and userGroupId in (%s)
             """ % (",".join("%d" % x for x in groupIds)), labelStr)
 
         return [ x[0] for x in cu ]
-
-        groupIds = self.auth.getAuthGroups(cu, authToken)
-        if not groupIds:
-            return {}
-        self.log(2, labelStr)
-        # now get them troves
-        args = [ ]
-        labelQ = ""
-        if labelStr:
-            labelQ = "and Labels.label = ?"
-            args.append(labelStr)
-        query = """
-        select distinct Items.Item
-        from Items
-        join CheckTroveCache as ctc using (itemId)
-        join Permissions on ctc.patternId = Permissions.itemId
-        join LabelMap on
-            (Permissions.labelId = LabelMap.labelId or Permissions.labelId = 0)
-            and Items.itemId = LabelMap.itemId
-        join Labels on LabelMap.labelId = Labels.labelId
-        where Permissions.userGroupId in (%s)
-          and Items.hasTrove = 1
-          %s
-        """ % (",".join("%d" % x for x in groupIds),labelQ)
-        cu.execute(query, args)
-        names = [ x[0] for x in cu ]
-        return names
 
     @accessReadOnly
     def getTroveVersionList(self, authToken, clientVersion, troveSpecs,

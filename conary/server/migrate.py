@@ -536,29 +536,8 @@ class MigrateTo_16(SchemaMigration):
     # create a primary key for labelmap
     def migrate(self):
         return updateLabelMap(self.db)
-    # populate the UserGroupInstances map
-    def migrate1(self):
-        schema.createAccessMaps(self.db)
-        if not createCheckTroveCache(self.db):
-            return False
-        if not createUserGroupInstances(self.db):
-            return False
-        return True
-    def migrate2(self):
-        # need to rebuild flavormap
-        logMe(2, "Recreating the FlavorMap table...")
-        cu = self.db.cursor()
-        cu.execute("drop table FlavorMap")
-        self.db.loadSchema()
-        schema.createFlavors(self.db)
-        cu.execute("select flavorId, flavor from Flavors")
-        flavTable = flavors.Flavors(self.db)
-        for (flavorId, flavorStr) in cu.fetchall():
-            flavor = deps.ThawFlavor(flavorStr)
-            flavTable.createFlavorMap(flavorId, flavor, cu)
-        return True
     # move the admin field from Permissions into UserGroups
-    def migrate3(self):
+    def migrate1(self):
         logMe(2, "Relocating the admin field from Permissions to UserGroups...")
         cu = self.db.cursor()
         self.db.loadSchema()
@@ -581,6 +560,27 @@ class MigrateTo_16(SchemaMigration):
                    "select distinct %s from OldPermissions " %(fields, fields))
         cu.execute("drop table OldPermissions")
         self.db.loadSchema()
+        return True
+    def migrate2(self):
+        # need to rebuild flavormap
+        logMe(2, "Recreating the FlavorMap table...")
+        cu = self.db.cursor()
+        cu.execute("drop table FlavorMap")
+        self.db.loadSchema()
+        schema.createFlavors(self.db)
+        cu.execute("select flavorId, flavor from Flavors")
+        flavTable = flavors.Flavors(self.db)
+        for (flavorId, flavorStr) in cu.fetchall():
+            flavor = deps.ThawFlavor(flavorStr)
+            flavTable.createFlavorMap(flavorId, flavor, cu)
+        return True
+    # populate the UserGroupInstances map
+    def migrate3(self):
+        schema.createAccessMaps(self.db)
+        if not createCheckTroveCache(self.db):
+            return False
+        if not createUserGroupInstances(self.db):
+            return False
         return True
     
 def _getMigration(major):
