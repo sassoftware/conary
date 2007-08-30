@@ -892,6 +892,8 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
 
 def main(argv=sys.argv):
     sys.stdout = util.FileIgnoreEpipe(sys.stdout)
+    from conary.lib import epdb
+    epdb.st()
     try:
         argv = list(argv)
         debugAll = '--debug-all' in argv
