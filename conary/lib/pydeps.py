@@ -148,6 +148,8 @@ def main():
         elif type == 'init':
             destdir, sysPath = path.split('\0', 1)
             sysPath = sysPath.split('\0')
+            # set sys.path in order to find modules outside the bootstrap
+            sys.path = sysPath
             finder = DirBasedModuleFinder(destdir, sysPath)
             continue
         elif type == 'exit':
