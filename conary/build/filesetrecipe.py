@@ -86,6 +86,8 @@ class FilesetRecipe(Recipe):
         if versionStr:
             versionStr = versionStr % self.macros
         if remap:
+            if isinstance(remap, tuple):
+                remap = [ remap ]
             remap = [ (old % self.macros, new % self.macros)
                       for (old,new) in remap ]
         self.requestedFiles.setdefault(
@@ -103,9 +105,6 @@ class FilesetRecipe(Recipe):
 	"""
 
         for (pattern, recurse, remap) in itemList:
-            if type(remap) == tuple:
-                remap = [ remap ]
-
             foundIt = False
             for sub in self.repos.walkTroveSet(pkg):
                 foundIt = foundIt or self.addFileFromPackage(
