@@ -136,12 +136,12 @@ class AbstractTroveSource:
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
-                  defaultFlavor=None, acrossSources = True, 
+                  defaultFlavor=None, acrossLabels = False, 
                   acrossFlavors = False, affinityDatabase = None,
                   bestFlavor = None, getLeaves = None, 
                   troveTypes=TROVE_QUERY_PRESENT, **kw):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
-                              defaultFlavor, acrossSources, acrossFlavors,
+                              defaultFlavor, acrossLabels, acrossFlavors,
                               affinityDatabase, bestFlavor=bestFlavor,
                               getLeaves=getLeaves, troveTypes=troveTypes,
                               **kw)
@@ -1416,7 +1416,6 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                    bestFlavor=None, getLeaves=None,
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
                    **kw):
-
         sourceBestFlavor = bestFlavor
         sourceGetLeaves = getLeaves
         troveSpecs = list(troveSpecs)
