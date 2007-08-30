@@ -15,6 +15,9 @@ Changes in @NEW@:
     * Conary dependencies are no longer attempted when cross-compiling,
       and when bootstrapping python, modules are now sought in system
       python directories as well as in the destdir. (CNY-1986)
+    * Extension python modules (.so files) are now exposing the proper
+      dependency by not providing, for example, itertoolsmodule.
+      (CNY-1077)
 
   o Client Changes:
     * The cvc promote and clone commands are now more efficient and do
