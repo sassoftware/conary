@@ -12,6 +12,9 @@ Changes in @NEW@:
     * Malformed .jar files are now ignored when computing Java
       dependencies.  Previously, Conary exited with an error while
       attempting to process them. (CNY-1983)
+    * Conary dependencies are no longer attempted when cross-compiling,
+      and when bootstrapping python, modules are now sought in system
+      python directories as well as in the destdir. (CNY-1986)
 
   o Client Changes:
     * The cvc promote and clone commands are now more efficient and do
