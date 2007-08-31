@@ -14,12 +14,13 @@
 
 from conary import trove, versions
 from conary.dbstore import idtable
+from conary.repository import trovesource
 from conary.repository.errors import DuplicateBranch, InvalidSourceNameError
 from conary.repository.netrepos import instances, items
 
-LATEST_TYPE_ANY     = 0         # redirects, removed, and normal
-LATEST_TYPE_PRESENT = 1         # redirects and normal
-LATEST_TYPE_NORMAL  = 2         # hide branches which end in redirects
+LATEST_TYPE_ANY     = trovesource.TROVE_QUERY_ALL     # redirects, removed, and normal
+LATEST_TYPE_PRESENT = trovesource.TROVE_QUERY_PRESENT # redirects and normal
+LATEST_TYPE_NORMAL  = trovesource.TROVE_QUERY_NORMAL  # hide branches which end in redirects
 
 class BranchTable(idtable.IdTable):
     def __init__(self, db):
@@ -82,71 +83,74 @@ class LabelTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
+# class and methods for handling LatestCache operations
 class LatestTable:
     def __init__(self, db):
         self.db = db
-
-    def _findLatest(self, cu, itemId, branchId, flavorId, troveTypeFilter = ""):
-        cu.execute("""
-            SELECT versionId, troveType FROM Nodes
-                JOIN Instances USING (itemId, versionId)
-                WHERE
-                    Nodes.itemId = ? AND
-                    Nodes.branchId = ? AND
-                    flavorId = ? AND
-                    isPresent = %d
-                    %s
-                ORDER BY finalTimestamp DESC
-                LIMIT 1
-        """ % (instances.INSTANCE_PRESENT_NORMAL, troveTypeFilter),
-                   (itemId, branchId, flavorId))
-        try:
-            latestVersionId, troveType = cu.next()
-        except StopIteration:
-            latestVersionId = None
-            troveType = None
-
-        return latestVersionId, troveType
-
-    def _add(self, cu, itemId, branchId, flavorId, versionId, latestType):
-        cu.execute("""INSERT INTO Latest
-                        (itemId, branchId, flavorId, versionId, latestType)
-                        VALUES (?, ?, ?, ?, ?)""",
-                    itemId, branchId, flavorId, versionId, latestType)
-
-    def update(self, itemId, branchId, flavorId):
+    def rebuild(self):
         cu = self.db.cursor()
+        # populate the LatestCache table. We need to split the inserts
+        # into chunks to make sure the backend can handle all the data
+        # we're inserting.
+        def _insertView(cu, latestType):
+            latest = None
+            if latestType == LATEST_TYPE_ANY:
+                latest = "LatestViewAny"
+            elif latestType == LATEST_TYPE_PRESENT:
+                latest = "LatestViewPresent"
+            elif latestType == LATEST_TYPE_NORMAL:
+                latest = "LatestViewNormal"
+            else:
+                raise RuntimeError("Invalid Latest type requested in rebuild %s" %(
+                    latestType))
+            cu.execute("""
+            insert into LatestCache
+                (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+            select
+                %d, userGroupId, itemId, branchId, flavorId, versionId
+            from %s
+            """ % (latestType, latest))
+        _insertView(cu, LATEST_TYPE_ANY)
+        _insertView(cu, LATEST_TYPE_PRESENT)
+        _insertView(cu, LATEST_TYPE_NORMAL)
+        return
+    
+    def update(self, itemId, branchId, flavorId, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
+        cu.execute("delete from LatestCache where "
+                   "itemId = ? and branchId = ? and flavorId = ?",
+                   (itemId, branchId, flavorId))
         cu.execute("""
-        DELETE FROM Latest
-        WHERE itemId=? AND branchId=? AND flavorId=?
+        insert into LatestCache
+            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+        select
+            latestType, userGroupId, itemId, branchId, flavorId, versionId
+        from LatestView
+        where itemId = ? and branchId = ? and flavorId = ?
         """, (itemId, branchId, flavorId))
 
-        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId)
+    def updateInstanceId(self, instanceId, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
+        cu.execute("""
+        select itemId, flavorId, branchId
+        from Instances join Nodes using(itemId, versionId)
+        where instanceId = ?""", instanceId)
+        for itemId, flavorId, branchId in cu.fetchall():
+            self.update(itemId, branchId, flavorId, cu)
 
-        if versionId is None:
-            return
-
-        self._add(cu, itemId, branchId, flavorId, versionId, LATEST_TYPE_ANY)
-
-        if troveType == trove.TROVE_TYPE_NORMAL:
-            self._add(cu, itemId, branchId, flavorId, versionId,
-                      LATEST_TYPE_PRESENT)
-            self._add(cu, itemId, branchId, flavorId, versionId,
-                      LATEST_TYPE_NORMAL)
-            return
-
-        presentVersionId, troveType = \
-            self._findLatest(cu, itemId, branchId, flavorId,
-                            "AND troveType != %d" % trove.TROVE_TYPE_REMOVED)
-        if presentVersionId is not None:
-            self._add(cu, itemId, branchId, flavorId, presentVersionId,
-                      LATEST_TYPE_PRESENT)
-
-        normalVersionId, troveType = self._findLatest(cu, itemId, branchId,
-                     flavorId, "AND troveType = %d" % trove.TROVE_TYPE_NORMAL)
-        if normalVersionId is not None and normalVersionId == presentVersionId:
-            self._add(cu, itemId, branchId, flavorId, normalVersionId,
-                      LATEST_TYPE_NORMAL)
+    def updateUserGroupId(self, userGroupId):
+        cu = self.db.cursor()
+        cu.execute("delete from LatestCache where userGroupId = ?", userGroupId)
+        cu.execute("""
+        insert into LatestCache
+            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+        select
+            latestType, userGroupId, itemId, branchId, flavorId, versionId
+        from LatestView where userGroupId = ?
+        """, userGroupId)
+    
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
@@ -220,7 +224,6 @@ class SqlVersioning:
     def __init__(self, db, versionTable, branchTable):
         self.items = items.Items(db)
 	self.labels = LabelTable(db)
-	self.latest = LatestTable(db)
 	self.labelMap = LabelMap(db)
 	self.versionTable = versionTable
         self.branchTable = branchTable
@@ -299,9 +302,6 @@ class SqlVersioning:
 				   version.timeStamps())
 
 	return (nodeId, versionId)
-
-    def updateLatest(self, itemId, branchId, flavorId):
-        self.latest.update(itemId, branchId, flavorId)
 
     def createBranch(self, itemId, branch):
 	"""

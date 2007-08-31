@@ -68,8 +68,9 @@ class TroveStore:
 	self.versionOps = versionops.SqlVersioning(
             self.db, self.versionTable, self.branchTable)
 	self.instances = instances.InstanceTable(self.db)
+        self.latest = versionops.LatestTable(self.db)
         self.ugi = accessmap.UserGroupInstances(self.db)
-
+        
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db, create = False)
@@ -191,20 +192,17 @@ class TroveStore:
         for (item,) in cu:
             yield item
 
+    # refresh the latest for all the recently presented troves
     def presentHiddenTroves(self):
         cu = self.db.cursor()
-
         cu.execute("""
-        SELECT Instances.instanceId, Instances.itemId, Nodes.branchId, Instances.flavorId
-        FROM Instances
-        JOIN Nodes USING (itemId, versionId)
-        WHERE isPresent = ?
-        """, instances.INSTANCE_PRESENT_HIDDEN)
-
+        select i.instanceId, i.itemId, n.branchId, i.flavorId
+        from Instances as i join Nodes as n using(itemId, versionId)
+        where i.isPresent = ?""", instances.INSTANCE_PRESENT_HIDDEN)
         for (instanceId, itemId, branchId, flavorId) in cu.fetchall():
             cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=?",
-                       instances.INSTANCE_PRESENT_NORMAL, instanceId)
-            self.versionOps.updateLatest(itemId, branchId, flavorId)
+                       (instances.INSTANCE_PRESENT_NORMAL, instanceId))
+            self.latest.update(itemId, branchId, flavorId, cu)
 
     def addTrove(self, trv, hidden = False):
 	cu = self.db.cursor()
@@ -319,9 +317,9 @@ class TroveStore:
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
         troveBranchId = self.branchTable[troveVersion.branch()]
-        self.versionOps.updateLatest(troveItemId, troveBranchId, troveFlavorId)
         self.depTables.add(cu, trv, troveInstanceId)
         self.ugi.updateInstanceId(troveInstanceId)
+        self.latest.update(troveItemId, troveBranchId, troveFlavorId, cu)
         
         # Fold tmpNewFiles into FileStreams
         #
@@ -1077,7 +1075,7 @@ class TroveStore:
             # as removed instead
             cu.execute("UPDATE Instances SET troveType=? WHERE instanceId=?",
                        trove.TROVE_TYPE_REMOVED, instanceId)
-            self.versionOps.updateLatest(itemId, branchId, flavorId)
+            self.latest.update(itemId, branchId, flavorId, cu)
         else:
             cu.execute("DELETE FROM UserGroupInstancesCache WHERE instanceId = ?",
                        instanceId)
@@ -1109,7 +1107,7 @@ class TroveStore:
         """)
 
         # Now update the latest table
-        self.versionOps.updateLatest(itemId, branchId, flavorId)
+        self.latest.update(itemId, branchId, flavorId, cu)
 
         # Delete flavors which are no longer needed
         cu.execute("""
@@ -1117,9 +1115,9 @@ class TroveStore:
         WHERE flavorId IN (
             SELECT tmpRemovals.flavorId
             FROM tmpRemovals
-            LEFT JOIN Latest ON tmpRemovals.flavorId = Latest.flavorId
+            LEFT JOIN LatestCache ON tmpRemovals.flavorId = LatestCache.flavorId
             LEFT JOIN TroveRedirects ON tmpRemovals.flavorId = TroveRedirects.flavorId
-            WHERE Latest.flavorId IS NULL
+            WHERE LatestCache.flavorId IS NULL
               AND TroveRedirects.flavorId IS NULL
         )""")
         cu.execute("""

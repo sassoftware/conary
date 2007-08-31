@@ -12,10 +12,9 @@
 # full details.
 #
 
-from conary.dbstore import sqlerrors
 from conary.server import schema
 from conary.repository import errors
-from conary.repository.netrepos import instances
+from conary.repository.netrepos import instances, versionops
 
 # class and methods for handling UserGroupTroves operations
 class UserGroupTroves:
@@ -216,15 +215,6 @@ class UserGroupInstances:
         self.update(cu)
         self.db.analyze("UserGroupInstancesCache")
         
-# class and methods for handling UserGroupInstancesCache operations
-class UserGroupLatest:
-    def __init__(self, db):
-        self.db = db
-    def rebuild(self):
-        raise NotImplementedError
-    def updateUserGroupId(self, userGroupId):
-        pass
-
 # generic wrapper operations that handle updating and syncing all the
 # relevant usergroup access maps
 class UserGroupOps:
@@ -232,7 +222,7 @@ class UserGroupOps:
         self.db = db
         self.ugt = UserGroupTroves(db)
         self.ugi = UserGroupInstances(db)
-        self.ugl = UserGroupLatest(db)
+        self.latest = versionops.LatestTable(db)
 
     def _getGroupId(self, userGroup):
         cu = self.db.cursor()
@@ -249,20 +239,19 @@ class UserGroupOps:
         # add is simpler because we can only add the new stuff to UserGroupInstances
         self.ugt.update(userGroupId)
         # need to recompute the latest stuff for this userGroupId
-        self.ugl.updateUserGroupId(userGroupId)
+        self.latest.updateUserGroupId(userGroupId)
 
     def deleteTroveAccess(self, userGroup, troveList):
         userGroupId = self._getGroupId(userGroup)
-        self.ugt.delete(userGroupId, troveList)
         # in the remove access case, we need to recompute the entire
         # UserGroupInstances and UserGroupLatest for this userGroupId
+        self.ugt.delete(userGroupId, troveList)
         # rebuild the UserGroupInstances
         self.ugi.updateUserGroupId(userGroupId)
         # add extra troves allowed by UserGroupTroves
         self.ugt.update(userGroupId)
-        # in the remove access case, we need to recompute the entire
-        # and recompute the Latest entries for this user
-        self.ugl.updateUserGroupId(userGroupId)
+        # recompute the Latest entries for this user
+        self.latest.updateUserGroupId(userGroupId)
 
     def listTroveAccess(self, userGroup):
         userGroupId = self._getGroupId(userGroup)
@@ -272,14 +261,14 @@ class UserGroupOps:
     def updateUserGroupId(self, userGroupId):
         self.ugi.updateUserGroupId(userGroupId)
         self.ugt.update(userGroupId)
-        self.ugl.updateUserGroupId(userGroupId)
+        self.latest.updateUserGroupId(userGroupId)
     def updateUserGroup(self, userGroup):
         userGroupId = self._getGroupId(userGroup)
         self.updateUserGroupId(userGroupId)
-        
+
     # rebuild all caches
     def rebuild(self):
         self.ugi.rebuild()
         self.ugt.rebuild()
-        self.ugl.rebuild()
+        self.latest.rebuild()
         

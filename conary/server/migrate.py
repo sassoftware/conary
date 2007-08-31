@@ -589,34 +589,10 @@ class MigrateTo_16(SchemaMigration):
             cu.execute("drop table Latest")
         logMe(2, "creating the Latest by role tables...")
         schema.createLatest(self.db, withIndexes=False)
-        # populate the LatestCache table. We need to split the inserts
-        # into chunks to make sure the backend can handle all the data
-        # we're inserting
-        logMe(3, "versionops.LATEST_TYPE_ANY")
-        cu.execute("""
-        insert into LatestCache
-            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
-        select
-            %d, userGroupId, itemId, branchId, flavorId, versionId
-        from LatestViewAny
-        """ %(versionops.LATEST_TYPE_ANY,))
-        logMe(3, "versionops.LATEST_TYPE_PRESENT")
-        cu.execute("""
-        insert into LatestCache
-            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
-        select
-            %d, userGroupId, itemId, branchId, flavorId, versionId
-        from LatestViewPresent
-        """ % (versionops.LATEST_TYPE_PRESENT,))
-        logMe(3, "versionops.LATEST_TYPE_NORMAL")
-        cu.execute("""
-        insert into LatestCache
-            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
-        select
-            %d, userGroupId, itemId, branchId, flavorId, versionId
-        from LatestViewNormal
-        """ % (versionops.LATEST_TYPE_NORMAL,))
-        logMe(3, "Creating latest indexes...")
+        logMe(3, "rebuilding the LatestCache entries...")
+        latest = versionops.LatestTable(self.db)
+        latest.rebuild()
+        logMe(3, "creating the LatestCache indexes...")
         schema.createLatest(self.db)
         self.db.analyze("LatestCache")
         return True

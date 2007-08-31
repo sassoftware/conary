@@ -276,6 +276,22 @@ def createLatest(db, withIndexes = True):
         db.views["LatestViewNormal"] = True
         commit = True
 
+    # LatestView is a union of the 3 smaller latest views
+    if "LatestView" not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestView AS
+        SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
+        FROM LatestViewAny
+        UNION ALL
+        SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
+        FROM LatestViewPresent
+        UNION ALL
+        SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
+        FROM LatestViewNormal
+        """ % (LATEST_TYPE_ANY,LATEST_TYPE_PRESENT,LATEST_TYPE_NORMAL))
+        db.views["LatestView"] = True
+        commit = True
+
     # Latest, as seen by each usergroup
     if "LatestCache" not in db.tables:
         assert("Items" in db.tables)
@@ -313,7 +329,7 @@ def createLatest(db, withIndexes = True):
     if withIndexes:
         # sanity index that isn't very useful as an index due to its size...
         db.createIndex("LatestCache", "LC_userGroupId_uniq",
-                       "userGroupId,itemId,branchId,flavorId,latestType",
+                       "userGroupId,latestType,itemId,branchId,flavorId",
                        unique=True)
         # create needed FKs
         db.createIndex("LatestCache", "LC_itemId_fk", "itemId")

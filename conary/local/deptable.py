@@ -845,7 +845,7 @@ class DependencyChecker:
         # troves being removed. since those dependencies will be broken
         # after this operation, we don't need to order on them (it's likely
         # they are filled by some other trove being added, and the edge
-        # in newNewEdges will make that work out
+        # in newNewEdges will make that work out)
         del newOldEdges
 
         # Now build up a unified node list. The different kinds of edges
@@ -1138,18 +1138,19 @@ class DependencyTables:
             LabelMap.branchId = Nodes.branchId
         JOIN Labels ON Labels.labelId = LabelMap.labelId """
         restrictWhere = """ WHERE Labels.label = '%s' """ % label
-        # FIXME: avoid sprintf() here
         if leavesOnly:
             # this call only makes sense from the server.
             # limit the import to server-side only to avoid extra deps.
-            from conary.repository.netrepos import versionops
+            from conary.repository import trovesource
+            raise RuntimeError("make sure we process usergroupid here!")
             restrictJoin += """
-                JOIN Latest ON (Instances.itemId = Latest.itemId
-                                AND Nodes.branchId = Latest.branchId
-                                AND Instances.flavorId = Latest.flavorId
-                                AND Instances.versionId = Latest.versionId
-                                AND Latest.latestType = %s)
-            """ % versionops.LATEST_TYPE_NORMAL
+            JOIN LatestCache ON
+                Instances.itemId = LatestCache.itemId AND
+                Nodes.branchId = LatestCache.branchId AND
+                Instances.flavorId = LatestCache.flavorId AND
+                Instances.versionId = LatestCache.versionId AND
+                LatestCache.latestType = %d """ % (
+                trovesource.QUERY_TYPE_NORMAL,)
 
         return restrictJoin, restrictWhere
 
