@@ -515,11 +515,10 @@ static PyObject *doGetSectionSymbols(Elf * elf, GElf_Word sh_type,
                                      const char *sect_name) {
     Elf_Scn * sect = NULL;
     Elf_Data * data;
-    GElf_Sym *esym;
-    GElf_Sym *lastsym;
     GElf_Ehdr ehdr;
     GElf_Shdr shdr;
     char * name;
+    int entries, i;
 
     PyObject *rlist;
 
@@ -550,15 +549,16 @@ static PyObject *doGetSectionSymbols(Elf * elf, GElf_Word sh_type,
         if (data == NULL || data->d_buf == NULL || data->d_size == 0) {
             continue;
         }
-        esym = (GElf_Sym*) data->d_buf;
-        lastsym = (GElf_Sym*) ((char*) data->d_buf + data->d_size);
-        for (; esym < lastsym; esym++){
-            if ((esym->st_value == 0) ||
-                 (GELF_ST_BIND(esym->st_info) == STB_WEAK) ||
-                 (GELF_ST_BIND(esym->st_info) == STB_NUM) ||
-                 (GELF_ST_TYPE(esym->st_info) != STT_FUNC))
+        entries = shdr.sh_size / shdr.sh_entsize;
+        for (i = 0; i < entries; i++) {
+            GElf_Sym sym;
+            gelf_getsym(data, i, &sym);
+            if ((sym.st_value == 0) ||
+                 (GELF_ST_BIND(sym.st_info) == STB_WEAK) ||
+                 (GELF_ST_BIND(sym.st_info) == STB_NUM) ||
+                 (GELF_ST_TYPE(sym.st_info) != STT_FUNC))
                 continue;
-            name = elf_strptr(elf, shdr.sh_link , (size_t)esym->st_name);
+            name = elf_strptr(elf, shdr.sh_link, sym.st_name);
             PyList_Append(rlist, PyString_FromString(name));
         }
     }
