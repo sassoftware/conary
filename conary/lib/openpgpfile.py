@@ -64,7 +64,7 @@ PKT_LITERAL_DATA       = 11 # Literal Data Packet
 PKT_TRUST              = 12 # Trust Packet
 PKT_USERID             = 13 # User ID Packet
 PKT_PUBLIC_SUBKEY      = 14 # Public Subkey Packet
-# Additions from http://tools.ietf.org/html/draft-ietf-openpgp-rfc2440bis-17
+# Additions from http://tools.ietf.org/html/draft-ietf-openpgp-rfc2440bis-22
 PKT_USER_ATTRIBUTE     = 17 # User Attribute Packet
 PKT_DATA_PACKET        = 18 # Sym. Encrypted and Integrity Protected Data Packet
 PKT_MOD_DETECTION      = 19 # Modification Detection Code Packet
@@ -143,6 +143,9 @@ ENCRYPTION_TYPE_SHA1_CHECK = 0xfe
 OLD_PKT_LEN_ONE_OCTET  = 0
 OLD_PKT_LEN_TWO_OCTET  = 1
 OLD_PKT_LEN_FOUR_OCTET = 2
+
+# User Attribute Subpackets (5.12)
+USR_ATTR_SUBPKT_IMG = 1
 
 # trust levels
 TRUST_UNTRUSTED = 0
@@ -1279,11 +1282,17 @@ class PGP_UserID(PGP_BasePacket):
     __slots__ = ['id', 'signatures']
     tag = PKT_USERID
 
+    # Constant used for signing. See #5.2.4
+    signingConstant = 0xB4
     def validate(self):
         self.resetBody()
-        self.id = self.readBody()
+        self.parseBody()
         # Signatures for this user ID
         self.signatures = None
+
+    def parseBody(self):
+        # A user ID's data is just the user ID
+        self.id = self.readBody()
 
     def toString(self):
         return self.id
@@ -1313,12 +1322,22 @@ class PGP_UserID(PGP_BasePacket):
     def writeHash(self, stream):
         """Write a UserID packet in a stream, in order to be hashed.
         Described in RFC 2440 5.2.4 computing signatures."""
-        assert len(self.id) == self.bodyLength
-        stream.write(chr(0xB4))
+        stream.write(chr(self.signingConstant))
         stream.write(struct.pack("!I", self.bodyLength))
-        stream.write(self.id)
+        self.writeBody(stream)
 
 PacketTypeDispatcher.addPacketType(PGP_UserID)
+
+class PGP_UserAttribute(PGP_UserID):
+    __slots__ = ['id', 'signatures', 'subpackets']
+    tag = PKT_USER_ATTRIBUTE
+
+    signingConstant = 0xD1
+
+    def parseBody(self):
+        self.id = '[image]'
+
+PacketTypeDispatcher.addPacketType(PGP_UserAttribute)
 
 class PGP_Key(PGP_BaseKeySig):
     __slots__ = ['_parsed', 'version', 'createdTimestamp', 'pubKeyAlg',
