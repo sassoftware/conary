@@ -216,7 +216,6 @@ def rebuildLatest(db, recreate=False):
       and instances.troveType = %(trove)d
     """ % {"type" : versionops.LATEST_TYPE_NORMAL,
            "present" :  instances.INSTANCE_PRESENT_NORMAL,
-           "latest" : versionops.LATEST_TYPE_PRESENT,
            "trove" : trove.TROVE_TYPE_NORMAL, })
     return True
     
@@ -531,7 +530,7 @@ def updateLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16,3)
+    Version = (16,4)
     # migrate to 16.0
     # create a primary key for labelmap
     def migrate(self):
@@ -582,7 +581,46 @@ class MigrateTo_16(SchemaMigration):
         if not createUserGroupInstances(self.db):
             return False
         return True
-    
+    # drop the old Latest table and create views instead
+    def migrate4(self):
+        cu = self.db.cursor()
+        self.db.loadSchema()
+        if "Latest" in self.db.tables:
+            cu.execute("drop table Latest")
+        logMe(2, "creating the Latest by role tables...")
+        schema.createLatest(self.db, withIndexes=False)
+        # populate the LatestCache table. We need to split the inserts
+        # into chunks to make sure the backend can handle all the data
+        # we're inserting
+        logMe(3, "versionops.LATEST_TYPE_ANY")
+        cu.execute("""
+        insert into LatestCache
+            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+        select
+            %d, userGroupId, itemId, branchId, flavorId, versionId
+        from LatestViewAny
+        """ %(versionops.LATEST_TYPE_ANY,))
+        logMe(3, "versionops.LATEST_TYPE_PRESENT")
+        cu.execute("""
+        insert into LatestCache
+            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+        select
+            %d, userGroupId, itemId, branchId, flavorId, versionId
+        from LatestViewPresent
+        """ % (versionops.LATEST_TYPE_PRESENT,))
+        logMe(3, "versionops.LATEST_TYPE_NORMAL")
+        cu.execute("""
+        insert into LatestCache
+            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+        select
+            %d, userGroupId, itemId, branchId, flavorId, versionId
+        from LatestViewNormal
+        """ % (versionops.LATEST_TYPE_NORMAL,))
+        logMe(3, "Creating latest indexes...")
+        schema.createLatest(self.db)
+        self.db.analyze("LatestCache")
+        return True
+
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]

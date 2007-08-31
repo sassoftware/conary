@@ -167,53 +167,163 @@ def createNodes(db):
         db.commit()
         db.loadSchema()
 
-def createLatest(db):
+def createLatest(db, withIndexes = True):
+    assert("Instances" in db.tables)
+    assert("Nodes" in db.tables)
+    assert("UserGroupInstancesCache" in db.tables)
     cu = db.cursor()
     commit = False
-    if 'Latest' not in db.tables:
+    from conary.repository.netrepos.versionops import LATEST_TYPE_ANY,\
+         LATEST_TYPE_PRESENT, LATEST_TYPE_NORMAL
+    from conary.repository.netrepos.instances import INSTANCE_PRESENT_MISSING,\
+        INSTANCE_PRESENT_NORMAL, INSTANCE_PRESENT_HIDDEN
+    from conary.trove import TROVE_TYPE_NORMAL, TROVE_TYPE_REDIRECT, \
+         TROVE_TYPE_REMOVED
+    # redirects, removed, and normal
+    if "LatestViewAny"  not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewAny AS
+        SELECT
+            tmp.userGroupId AS userGroupId,
+            tmp.itemId AS itemId,
+            tmp.branchId AS branchId,
+            tmp.flavorId AS flavorId,
+            Nodes.versionId AS versionId
+        FROM
+        ( SELECT
+            ugi.userGroupId AS userGroupId,
+            n.itemId AS itemId,
+            n.branchId AS branchId,
+            i.flavorId AS flavorId,
+            max(n.finalTimestamp) AS finalTimestamp
+          FROM UserGroupInstancesCache AS ugi
+          JOIN Instances AS i USING(instanceId)
+          JOIN Nodes AS n USING(itemId, versionId)
+          WHERE i.isPresent = %(present)d
+          GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        ) as tmp
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = tmp.flavorId
+          AND Instances.isPresent = %(present)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL, })
+        db.views["LatestViewAny"] = True
+        commit = True
+    # redirects and normal
+    if "LatestViewPresent"  not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewPresent AS
+        SELECT
+            tmp.userGroupId AS userGroupId,
+            tmp.itemId AS itemId,
+            tmp.branchId AS branchId,
+            tmp.flavorId AS flavorId,
+            Nodes.versionId AS versionId
+        FROM
+        ( SELECT
+            ugi.userGroupId AS userGroupId,
+            n.itemId AS itemId,
+            n.branchId AS branchId,
+            i.flavorId AS flavorId,
+            max(n.finalTimestamp) AS finalTimestamp
+          FROM UserGroupInstancesCache AS ugi
+          JOIN Instances AS i USING(instanceId)
+          JOIN Nodes AS n USING(itemId, versionId)
+          WHERE i.isPresent = %(present)d
+          AND i.troveType != %(trove)d
+          GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        ) as tmp
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = tmp.flavorId
+          AND Instances.isPresent = %(present)d
+          AND Instances.troveType != %(trove)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL,
+               "trove" : TROVE_TYPE_REMOVED, })
+        db.views["LatestViewPresent"] = True
+        commit = True
+    # hide branches which end in redirects
+    if "LatestViewNormal"  not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewNormal AS
+        SELECT
+            tmp.userGroupId AS userGroupId,
+            tmp.itemId AS itemId,
+            tmp.branchId AS branchId,
+            tmp.flavorId AS flavorId,
+            Nodes.versionId AS versionId
+        FROM
+        ( SELECT
+            ugi.userGroupId AS userGroupId,
+            n.itemId AS itemId,
+            n.branchId AS branchId,
+            i.flavorId AS flavorId,
+            max(n.finalTimestamp) AS finalTimestamp
+          FROM UserGroupInstancesCache AS ugi
+          JOIN Instances AS i USING(instanceId)
+          JOIN Nodes AS n USING(itemId, versionId)
+          WHERE i.isPresent = %(present)d
+          AND i.troveType = %(trove)d
+          GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        ) as tmp
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = tmp.flavorId
+          AND Instances.isPresent = %(present)d
+          AND Instances.troveType = %(trove)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL,
+               "trove" : TROVE_TYPE_NORMAL, })
+        db.views["LatestViewNormal"] = True
+        commit = True
+
+    # Latest, as seen by each usergroup
+    if "LatestCache" not in db.tables:
         assert("Items" in db.tables)
         assert("Branches" in db.tables)
         assert("Flavors" in db.tables)
         assert("Versions" in db.tables)
-        assert("Caps" in db.tables)
+        assert("UserGroups" in db.tables)
         cu.execute("""
-        CREATE TABLE Latest(
+        CREATE TABLE LatestCache(
+            userGroupId     INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             latestType      INTEGER NOT NULL,
-            capId           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT Latest_itemId_fk
+            CONSTRAINT LC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT LC_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Latest_branchId_fk
+            CONSTRAINT LC_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Latest_flavorId_fk
+            CONSTRAINT LC_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Latest_versionId_fk
+            CONSTRAINT LC_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Latest_capId_fk
-                FOREIGN KEY (capId) REFERENCES Caps(capId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tables["Latest"] = []
+        db.tables["LatestCache"] = []
         commit = True
-    # this serves as a substitute for a fk index
-    db.createIndex("Latest", "LatestCheckIdx",
-                   "itemId, branchId, flavorId, latestType", unique = True)
-    db.createIndex("Latest", "LatestBranchId_fk", "branchId, itemId")
-    db.createIndex("Latest", "LatestFlavorId_fk", "flavorId, itemId")
-    db.createIndex("Latest", "LatestVersionId_fk", "versionId, itemId")
-    db.createIndex("Latest", "LatestCapId_fk", "capId")
-    db.createIndex("Latest", "LatestChangedIdx", "changed, latestType")
-    if createTrigger(db, "Latest"):
-        commit = True
-
+    if withIndexes:
+        # sanity index that isn't very useful as an index due to its size...
+        db.createIndex("LatestCache", "LC_userGroupId_uniq",
+                       "userGroupId,itemId,branchId,flavorId,latestType",
+                       unique=True)
+        # create needed FKs
+        db.createIndex("LatestCache", "LC_itemId_fk", "itemId")
+        db.createIndex("LatestCache", "LC_branchId_fk", "branchId")
+        db.createIndex("LatestCache", "LC_flavorId_fk", "flavorId")
+        db.createIndex("LatestCache", "LC_versionId_fk", "versionId")
+        if createTrigger(db, "LatestCache"):
+            commit = True
+    
+    # a cache table for netauth.checktrove calls for use in SQL
     if commit:
         db.commit()
         db.loadSchema()
@@ -774,52 +884,6 @@ def createAccessMaps(db):
                    unique=True)
     db.createIndex("UserGroupInstancesCache", "UGIC_instanceId_fk", "instanceId")
 
-    # Latest, as seen by each usergroup
-    if "UserGroupLatestCache" not in db.tables:
-        assert("Items" in db.tables)
-        assert("Branches" in db.tables)
-        assert("Flavors" in db.tables)
-        assert("Versions" in db.tables)
-        assert("UserGroups" in db.tables)
-        cu.execute("""
-        CREATE TABLE UserGroupLatestCache(
-            userGroupId     INTEGER NOT NULL,
-            itemId          INTEGER NOT NULL,
-            branchId        INTEGER NOT NULL,
-            flavorId        INTEGER NOT NULL,
-            versionId       INTEGER NOT NULL,
-            latestType      INTEGER NOT NULL,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT UGLC_userGroupId_fk
-                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT UGLC_itemId_fk
-                FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT UGLC_branchId_fk
-                FOREIGN KEY (branchId) REFERENCES Branches(branchId)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT UGLC_flavorId_fk
-                FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
-                ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT UGLC_versionId_fk
-                FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE CASCADE ON UPDATE CASCADE
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tables["UserGroupLatestCache"] = []
-        commit = True
-    # sanity index that isn't very useful as an index due to its size...
-    db.createIndex("UserGroupLatestCache", "UGLC_userGroupId_uniq",
-                   "userGroupId,itemId,branchId,flavorId,latestType",
-                   unique=True)
-    # create needed FKs
-    db.createIndex("UserGroupLatestCache", "UGLC_itemId_fk", "itemId,branchId,userGroupId")
-    db.createIndex("UserGroupLatestCache", "UGLC_branchId_fk", "branchId,userGroupId")
-    db.createIndex("UserGroupLatestCache", "UGLC_flavorId_fk", "flavorId")
-    db.createIndex("UserGroupLatestCache", "UGLC_versionId_fk", "versionId")
-    if createTrigger(db, "UserGroupLatestCache"):
-        commit = True
-    
     # a cache table for netauth.checktrove calls for use in SQL
     if 'CheckTroveCache' not in db.tables:
         cu.execute("""
