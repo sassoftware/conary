@@ -143,30 +143,6 @@ class TroveStore:
 	itemId = self.getItemId(troveName)
 	self.versionOps.createBranch(itemId, branch)
 
-    def troveLatestVersion(self, troveName, branch):
-	"""
-	Returns None if no versions of troveName exist on the branch.
-	"""
-	cu = self.db.cursor()
-	cu.execute("""
-        SELECT Versions.version, Nodes.timeStamps
-        FROM LabelMap
-        JOIN Latest using (itemId, branchId)
-        JOIN Nodes using (itemId, versionId)
-        JOIN Versions using (versionId)
-        JOIN Items on LabelMap.itemId = Items.itemId
-        JOIN Branches on LabelMap.branchId = Branches.branchId
-        WHERE Items.item = ?
-          AND Branches.branch = ?
-        ORDER BY Nodes.finalTimeStamp
-        LIMIT 1""", (troveName, branch.asString()))
-        try:
-	    (verStr, timeStamps) = cu.next()
-            return versions.VersionFromString(verStr,
-		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
-        except StopIteration:
-            raise KeyError, (troveName, branch)
-
     def getTroveFlavors(self, troveDict):
 	cu = self.db.cursor()
 	vMap = {}
