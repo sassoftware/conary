@@ -8,6 +8,7 @@ Changes in 2.0.0:
       setUserGroupIsAdmin() call instead of addAcl/editAcl (CNY-1782)
     * Removed (unimplemented) concept of caps for permissions
     * Added @requireClientProtocol decorator for server methods
+    * Renamed usergroups to roles in the repository web user interface
 
 Changes in @NEW@:
   o Bug Fixes:
