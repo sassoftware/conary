@@ -266,11 +266,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                  exception = e)
 
         if isinstance(e, sqlerrors.DatabaseLocked):
-            return (False, True, ('RepositoryLocked',))
-        elif isinstance(e, errors.RepositoryMismatch):
-            return (False, True, (e.__class__.__name__,
-                                  e.right, e.wrong))
-        elif hasattr(e, 'marshall'):
+            e = RepositoryLocked()
+
+        if hasattr(e, 'marshall'):
             return (False, True, (e.__class__.__name__,) +
                         e.marshall(self))
 	else:

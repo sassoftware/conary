@@ -21,6 +21,14 @@ from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions
 
 class RepositoryMismatch(RepositoryError):
+
+    def marshall(self, marshaller):
+        return (self.right, self.wrong)
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return tup[0:2]
+
     def __init__(self, right = None, wrong = None):
         self.right = right
         self.wrong = wrong
@@ -320,6 +328,10 @@ class EntitlementTimeout(RepositoryError):
     def marshall(self, marshaller):
         return tuple(self.entitlements)
 
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return tup,
+
     def __str__(self):
         return "EntitlementTimeout for %s" % ",".join(self.entitlements)
 
@@ -349,15 +361,9 @@ class CannotCalculateDownloadSize(RepositoryError):
 # class back to the client.  The str() value of the exception will
 # be returned as the exception argument.
 simpleExceptions = (
-    (AlreadySignedError,         'AlreadySignedError'),
     (BadSelfSignature,           'BadSelfSignature'),
     (DigitalSignatureVerificationError, 'DigitalSignatureVerificationError'),
-    (GroupAlreadyExists,         'GroupAlreadyExists'),
     (IncompatibleKey,            'IncompatibleKey'),
     (KeyNotFound,                'KeyNotFound'),
-    (UserNotFound,               'UserNotFound'),
-    (DuplicateBranch,            'DuplicateBranch'),
     (InvalidRegex,               'InvalidRegex'),
-    (InvalidName,                'InvalidName'),
-    (ProxyError,                 'ProxyError'),
     )

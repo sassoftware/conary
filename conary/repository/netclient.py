@@ -119,26 +119,33 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         if usedAnonymous:
             self.__anonymousCallback()
 
-        if isException:
-            if retryOnEntitlementTimeout and result[0] == 'EntitlementTimeout':
-                entList = self._transport.getEntitlements()
-                exception = errors.EntitlementTimeout(result[1])
-
-                singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
-                                                      self.__serverName)
-                # remove entitlement(s) which timed out
-                newEntList = [ x for x in entList if x[1] not in
-                                    exception.getEntitlements() ]
-                newEntList.insert(0, singleEnt[1:])
-
-                # try again with the new entitlement
-                self._transport.setEntitlements(newEntList)
-                return self.__doCall(clientVersion, argList,
-                                     retryOnEntitlementTimeout = False)
-
-            self.handleError(result)
-        else:
+        if not isException:
             return result
+
+        try:
+            self.handleError(result)
+        except errors.EntitlementTimeout:
+            if not retryOnEntitlementTimeout:
+                raise
+
+            entList = self._transport.getEntitlements()
+            exception = errors.EntitlementTimeout(result[1])
+
+            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
+                                                  self.__serverName)
+            # remove entitlement(s) which timed out
+            newEntList = [ x for x in entList if x[1] not in
+                                exception.getEntitlements() ]
+            newEntList.insert(0, singleEnt[1:])
+
+            # try again with the new entitlement
+            self._transport.setEntitlements(newEntList)
+            return self.__doCall(clientVersion, argList,
+                                 retryOnEntitlementTimeout = False)
+        else:
+            # this can't happen as handleError should always result in
+            # an exception
+            assert(0)
 
     def doCall(self, clientVersion, *args):
         try:
@@ -181,20 +188,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 	exceptionArgs = result[1:]
 
         if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
-            # old repositories give TIE w/ no
-            # trove information or with a string error message.
-            # exceptionArgs[0] is that message if exceptionArgs[1]
-            # is not set or is empty.
+            # old repositories give TIE w/ no trove information or with a
+            # string error message. exceptionArgs[0] is that message if
+            # exceptionArgs[1] is not set or is empty.
             raise errors.TroveIntegrityError(error=exceptionArgs[0], 
                                         *self.toTroveTup(exceptionArgs[1]))
-        elif exceptionName == errors.RepositoryMismatch.__name__:
-            raise errors.RepositoryMismatch(*exceptionArgs)
-        elif exceptionName == errors.EntitlementTimeout.__name__:
-            raise errors.EntitlementTimeout(*exceptionArgs)
-        elif exceptionName == 'RepositoryLocked':
-            raise errors.RepositoryLocked
-        elif exceptionName == 'RepositoryError':
-            raise errors.RepositoryError(exceptionArgs[0])
         elif not hasattr(errors, exceptionName):
             raise errors.UnknownException(exceptionName, exceptionArgs)
         else:
