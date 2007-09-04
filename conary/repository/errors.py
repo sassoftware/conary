@@ -44,7 +44,6 @@ class RepositoryMismatch(RepositoryError):
                    'repositoryMap entries.')
         ConaryError.__init__(self, msg)
 
-
 class InsufficientPermission(ConaryError):
 
     def __init__(self, server = None):
@@ -55,11 +54,15 @@ class InsufficientPermission(ConaryError):
             msg = "Insufficient permission"
         ConaryError.__init__(self, msg)
 
-class IntegrityError(RepositoryError, InternalConaryError):
+class IntegrityError(RepositoryError):
     """Files were added which didn't match the expected sha1"""
 
 class MethodNotSupported(RepositoryError):
     """Attempt to call a server method which does not exist"""
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return tup[0]
 
 class RepositoryLocked(RepositoryError):
     def __str__(self):
@@ -75,11 +78,21 @@ class DuplicateBranch(RepositoryError):
     """Error occurred commiting a trove"""
 
 class InvalidSourceNameError(RepositoryError):
+
+    def marshall(self, marshaller):
+        return (self.name, self.version, self.oldSourceItem,
+                self.newSourceItem)
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return tup[0:4]
+
     def __init__(self, n, v, oldItem, newItem, *args):
         self.name = n
         self.version = v
         self.oldSourceItem = oldItem
         self.newSourceItem = newItem
+
     def __str__(self):
         return """
 SourceItem conflict detected for node %s=%s: %s cannot change to %s
@@ -89,6 +102,29 @@ Try to update the version number of the troves being comitted and retry.
         
 class TroveMissing(RepositoryError, InternalConaryError):
     troveType = "trove"
+
+    def marshall(self, marshaller):
+        trvName = self.troveName
+        trvVersion = self.version
+        if not trvName:
+            trvName = trvVersion = ""
+        elif not trvVersion:
+            trvVersion = ""
+        else:
+            if not isinstance(self.version, str):
+                trvVersion = marshaller.fromVersion(trvVersion)
+        return (trvName, trvVersion)
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        (name, version) = tup[0:2]
+        if not name: name = None
+        if not version:
+            version = None
+        else:
+            version = marshaller.toVersion(version)
+        return (name, version)
+
     def __str__(self):
         if type(self.version) == list:
             return ('%s %s does not exist for any of '
@@ -153,6 +189,13 @@ class TroveChecksumMissing(RepositoryError):
     _error = ('Checksum Missing Error: Trove %s=%s[%s] has no sha1 checksum'
               ' calculated, so it was rejected.  Please upgrade conary.')
 
+    def marshall(self, marshaller):
+        return str(self), marshaller.fromTroveTup(self.nvf)
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return marshaller.toTroveTup(tup[1])
+
     def __init__(self, name, version, flavor):
         self.nvf = (name, version, flavor)
         RepositoryError.__init__(self, self._error % self.nvf)
@@ -160,6 +203,17 @@ class TroveChecksumMissing(RepositoryError):
 class TroveSchemaError(RepositoryError):
     _error = ("Trove Schema Error: attempted to commit %s=%s[%s] with version"
               " %s, but repository only supports %s")
+
+    def marshall(self, marshaller):
+        return (str(self), marshaller.fromTroveTup(self.nvf), self.troveSchema,
+                self.supportedSchema)
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        # value 0 is the full message, for older clients that don't
+        # know about this exception so the text for unknown description is
+        # at least helpful
+        return marshaller.toTroveTup(tup[1]) + tuple(tup[2:4])
 
     def __init__(self, name, version, flavor, troveSchema, supportedSchema):
         self.nvf = (name, version, flavor)
@@ -189,6 +243,15 @@ class InvalidServerVersion(RepositoryError):
 
 class GetFileContentsError(RepositoryError):
     error = 'Base GetFileContentsError: %s %s'
+
+    def marshall(self, marshaller):
+        return (marshaller.fromFileId(self.fileId),
+                marshaller.fromVersion(self.fileVer))
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return (marshaller.toFileId(tup[0]), marshaller.toVersion(tup[1])),
+
     def __init__(self, (fileId, fileVer)):
         self.fileId = fileId
         self.fileVer = fileVer
@@ -220,6 +283,13 @@ class FileStreamMissing(RepositoryError):
     # This, instead of FileStreamNotFound, is returned when no version
     # is available for the file stream the server tried to lookup.
 
+    def marshall(self, marshaller):
+        return (marshaller.fromFileId(self.fileId), )
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return (marshaller.toFileId(tup[0]), )
+
     def __init__(self, fileId):
         self.fileId = fileId
         RepositoryError.__init__(self, '''File Stream Missing
@@ -246,6 +316,9 @@ class ProxyError(RepositoryError):
     pass
 
 class EntitlementTimeout(RepositoryError):
+
+    def marshall(self, marshaller):
+        return tuple(self.entitlements)
 
     def __str__(self):
         return "EntitlementTimeout for %s" % ",".join(self.entitlements)
@@ -281,19 +354,10 @@ simpleExceptions = (
     (DigitalSignatureVerificationError, 'DigitalSignatureVerificationError'),
     (GroupAlreadyExists,         'GroupAlreadyExists'),
     (IncompatibleKey,            'IncompatibleKey'),
-    (IntegrityError,             'IntegrityError'),
-    (InvalidClientVersion,       'InvalidClientVersion'),
     (KeyNotFound,                'KeyNotFound'),
-    (UserAlreadyExists,          'UserAlreadyExists'),
     (UserNotFound,               'UserNotFound'),
-    (GroupNotFound,              'GroupNotFound'),
-    (CommitError,                'CommitError'),
     (DuplicateBranch,            'DuplicateBranch'),
-    (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
-    (InvalidEntitlement,         'InvalidEntitlement'),
-    (CannotChangePassword,       'CannotChangePassword'),
     (InvalidRegex,               'InvalidRegex'),
     (InvalidName,                'InvalidName'),
-    (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
     (ProxyError,                 'ProxyError'),
     )

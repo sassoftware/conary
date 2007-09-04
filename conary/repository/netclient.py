@@ -180,58 +180,29 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 	exceptionName = result[0]
 	exceptionArgs = result[1:]
 
-	if exceptionName == "TroveMissing":
-	    (name, version) = exceptionArgs
-	    if not name: name = None
-	    if not version:
-		version = None
-	    else:
-		version = shims.toVersion(version)
-	    raise errors.TroveMissing(name, version)
-        elif exceptionName == "MethodNotSupported":
-	    raise errors.MethodNotSupported(exceptionArgs[0])
-        elif exceptionName == "IntegrityError":
-	    raise errors.IntegrityError(exceptionArgs[0])
-        elif exceptionName == "TroveIntegrityError":
-            if len(exceptionArgs) > 1:
-                # old repositories give TIE w/ no
-                # trove information or with a string error message.
-                # exceptionArgs[0] is that message if exceptionArgs[1]
-                # is not set or is empty.
-                raise errors.TroveIntegrityError(error=exceptionArgs[0], 
-                                            *self.toTroveTup(exceptionArgs[1]))
-            else:
-                raise errors.TroveIntegrityError(error=exceptionArgs[0])
-        elif exceptionName == "TroveSchemaError":
-            # value 0 is the full message, for older clients that don't
-            # know about this exception
-            n, v, f = self.toTroveTup(exceptionArgs[1])
-            raise errors.TroveSchemaError(n, v, f,
-                                          exceptionArgs[2], exceptionArgs[3])
-        elif exceptionName == errors.TroveChecksumMissing.__name__:
-            raise errors.TroveChecksumMissing(*self.toTroveTup(exceptionArgs[1]))
+        if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
+            # old repositories give TIE w/ no
+            # trove information or with a string error message.
+            # exceptionArgs[0] is that message if exceptionArgs[1]
+            # is not set or is empty.
+            raise errors.TroveIntegrityError(error=exceptionArgs[0], 
+                                        *self.toTroveTup(exceptionArgs[1]))
         elif exceptionName == errors.RepositoryMismatch.__name__:
             raise errors.RepositoryMismatch(*exceptionArgs)
         elif exceptionName == errors.EntitlementTimeout.__name__:
             raise errors.EntitlementTimeout(*exceptionArgs)
-        elif exceptionName == 'FileContentsNotFound':
-            raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
-                                               self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileStreamNotFound':
-            raise errors.FileStreamNotFound((self.toFileId(exceptionArgs[0]),
-                                             self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileHasNoContents':
-            raise errors.FileHasNoContents((self.toFileId(exceptionArgs[0]),
-                                            self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileStreamMissing':
-            raise errors.FileStreamMissing((self.toFileId(exceptionArgs[0])))
         elif exceptionName == 'RepositoryLocked':
             raise errors.RepositoryLocked
         elif exceptionName == 'RepositoryError':
             raise errors.RepositoryError(exceptionArgs[0])
-        elif exceptionName == "InvalidSourceNameError":
-            raise errors.InvalidSourceNameError(*exceptionArgs)
-	else:
+        elif not hasattr(errors, exceptionName):
+            raise errors.UnknownException(exceptionName, exceptionArgs)
+        else:
+            exceptionClass = getattr(errors, exceptionName)
+            if hasattr(exceptionClass, 'demarshall'):
+                raise exceptionClass(
+                            *exceptionClass.demarshall(self, exceptionArgs))
+
             for klass, marshall in errors.simpleExceptions:
                 if exceptionName == marshall:
                     raise klass(exceptionArgs[0])

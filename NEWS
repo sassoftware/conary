@@ -1,6 +1,8 @@
 Changes in 2.0.0:
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
+    * Most repository exceptions are demarshalled using logic in the
+      exception class itself rather than in a large if/elif block
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
@@ -9,6 +11,8 @@ Changes in 2.0.0:
     * Removed (unimplemented) concept of caps for permissions
     * Added @requireClientProtocol decorator for server methods
     * Renamed usergroups to roles in the repository web user interface
+    * Reworked server exceptions to have marshalling logic in the exception
+      class instead of in a large if/elif block
 
 Changes in @NEW@:
   o Bug Fixes:
