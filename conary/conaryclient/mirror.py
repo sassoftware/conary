@@ -110,7 +110,7 @@ def checkConfig(cfg):
             log.error("ERROR: label %s is not on host %s", label, cfg.host)
             raise RuntimeError("label %s is not on host %s", label, cfg.host)
 
-def mainWorkflow(cfg = None, callback=ChangesetCallback(), ):
+def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=False, infoSync=False):
     if cfg.lockFile:
         try:
             log.debug('checking for lock file')
@@ -144,18 +144,18 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(), ):
             downloadRateLimit = cfg.downloadRateLimit,
             entitlementDir = cfg.entitlementDirectory,
             entitlements=secCfg.entitlement)
-        target = TargetRepository(target, cfg, name, test=options.test)
+        target = TargetRepository(target, cfg, name, test=test)
         targets.append(target)
     # we pass in the sync flag only the first time around, because after
     # that we need the targetRepos mark to advance accordingly after being
     # reset to -1
     callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                 test = options.test, sync = options.sync,
-                                 syncSigs = options.infoSync,
+                                 test = test, sync = sync,
+                                 syncSigs = infoSync,
                                  callback = callback)
     while callAgain:
         callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                     test = options.test, callback = callback)
+                                     test = test, callback = callback)
 
 
 def Main(argv=sys.argv[1:]):
@@ -174,7 +174,7 @@ def Main(argv=sys.argv[1:]):
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
 
-    mainWorkflow(cfg, callback)
+    mainWorkflow(cfg, callback, options.test, options.sync, options.infoSync)
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
