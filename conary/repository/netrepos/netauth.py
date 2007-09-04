@@ -430,7 +430,7 @@ class NetworkAuthorization:
 
         if len(groupIds) < 1:
             return False
-        elif not label and not trove and not remove:
+        elif not label and not trove and not remove and not write:
             # no more checks to do -- the authentication information is valid
             return True
 
