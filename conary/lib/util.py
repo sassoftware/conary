@@ -574,11 +574,17 @@ class ObjectCache(dict):
     def setdefault(self, key, value):
         return dict.setdefault(self, ref(key, self._remove), ref(value))()
 
-def memsize():
-    return memusage()[0]
+def memsize(pid = None):
+    return memusage(pid = pid)[0]
 
-def memusage():
-    pfn = "/proc/self/statm"
+def memusage(pid = None):
+    """Get the memory usage.
+    @param pid: Process to analyze (None for current process)
+    """
+    if pid is None:
+        pfn = "/proc/self/statm"
+    else:
+        pfn = "/proc/%d/statm" % pid
     line = open(pfn).readline()
     # Assume page size is 4k (true for i386). This can be adjusted by reading
     # resource.getpagesize() 
