@@ -32,7 +32,7 @@ class DepResolutionMethod(object):
         self.flavor = flavor
         self.flavorPreferences = []
 
-    def setFlavorPreferences(flavorPreferences):
+    def setFlavorPreferences(self, flavorPreferences):
         self.flavorPreferences = flavorPreferences
 
     def setTroveSource(self, troveSource):
@@ -185,7 +185,7 @@ class DepResolutionMethod(object):
         # Now filter by flavor preferences.
         newFlavors = []
         if self.flavorPreferences:
-            for flavor in flavorPreferences:
+            for flavor in self.flavorPreferences:
                 for trvFlavor in allFlavors:
                     if trvFlavor.stronglySatisfies(flavor):
                        newFlavors.append(trvFlavor)
