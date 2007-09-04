@@ -512,7 +512,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getUserGroups(self, authToken, clientVersion):
-        if not self.auth.authCheck(authToken, admin = True):
+        if not self.auth.check(authToken):
             raise errors.InsufficientPermission
         self.log(2)
         r = self.auth.getUserGroups(authToken[0])
