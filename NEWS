@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.94:
   o Bug Fixes:
     * Python extension modules installed at the top level of the Python
       search path no longer produce a traceback when computing
