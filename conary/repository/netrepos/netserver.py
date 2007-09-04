@@ -265,55 +265,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  exception = e)
 
-        if isinstance(e, errors.TroveMissing):
-            trvName = e.troveName
-            trvVersion = e.version
-            if not trvName:
-                trvName = trvVersion = ""
-            elif not trvVersion:
-                trvVersion = ""
-            else:
-                if not isinstance(e.version, str):
-                    trvVersion = self.fromVersion(trvVersion)
-            return (False, True, ("TroveMissing", trvName, trvVersion))
-        elif isinstance(e, errors.FileContentsNotFound):
-            return (False, True, ('FileContentsNotFound',
-                           self.fromFileId(e.fileId),
-                           self.fromVersion(e.fileVer)))
-        elif isinstance(e, errors.FileStreamNotFound):
-            return (False, True, ('FileStreamNotFound',
-                           self.fromFileId(e.fileId),
-                           self.fromVersion(e.fileVer)))
-        elif isinstance(e, errors.FileHasNoContents):
-            return (False, True, ('FileHasNoContents',
-                           self.fromFileId(e.fileId),
-                           self.fromVersion(e.fileVer)))
-        elif isinstance(e, errors.FileStreamMissing):
-            return (False, True, ('FileStreamMissing',
-                           self.fromFileId(e.fileId)))
-        elif isinstance(e, sqlerrors.DatabaseLocked):
-            return (False, True, ('RepositoryLocked',))
-        elif isinstance(e, errors.TroveIntegrityError):
-            return (False, True, (e.__class__.__name__, str(e),
-                                  self.fromTroveTup(e.nvf)))
-        elif isinstance(e, errors.TroveChecksumMissing):
-            return (False, True, (e.__class__.__name__, str(e),
-                                  self.fromTroveTup(e.nvf)))
-        elif isinstance(e, errors.RepositoryMismatch):
-            return (False, True, (e.__class__.__name__,
-                                  e.right, e.wrong))
-        elif isinstance(e, errors.InvalidSourceNameError):
-            return (False, True, (e.__class__.__name__,
-                                  e.name, e.version,
-                                  e.oldSourceItem, e.newSourceItem))
-        elif isinstance(e, errors.EntitlementTimeout):
-            return (False, True, (e.__class__.__name__,
-                                  e.getEntitlements()))
-        elif isinstance(e, errors.TroveSchemaError):
-            return (False, True, (errors.TroveSchemaError.__name__, str(e),
-                                  self.fromTroveTup(e.nvf),
-                                  e.troveSchema,
-                                  e.supportedSchema))
+        if isinstance(e, sqlerrors.DatabaseLocked):
+            e = RepositoryLocked()
+
+        if hasattr(e, 'marshall'):
+            return (False, True, (e.__class__.__name__,) +
+                        e.marshall(self))
 	else:
             for klass, marshall in errors.simpleExceptions:
                 if isinstance(e, klass):
@@ -512,7 +469,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getUserGroups(self, authToken, clientVersion):
-        if not self.auth.authCheck(authToken, admin = True):
+        if not self.auth.check(authToken):
             raise errors.InsufficientPermission
         self.log(2)
         r = self.auth.getUserGroups(authToken[0])

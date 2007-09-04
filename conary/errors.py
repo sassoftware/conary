@@ -67,7 +67,13 @@ class RepositoryError(ConaryError):
         Base class for errors communicating to the repository, though not
         necessarily with the returned values.
     """
-    pass
+
+    def marshall(self, marshaller):
+        return str(self),
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return tup[0],
 
 class WebError(ConaryError):
     """ Base class for errors with the web client """
