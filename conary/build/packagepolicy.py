@@ -2472,9 +2472,15 @@ class Provides(_dependency):
                 syms = elf.getDynSym(fname)
                 # Does this module have an init<blah> function?
                 initfuncs = [ x[4:] for x in syms if x.startswith('init') ]
-                for initfunc in initfuncs:
-                    dp, _ = depPath.rsplit('.', 1)
-                    depPaths.append(dp + '.' + initfunc)
+                # This is the equivalent of dirname()
+                comps = depPath.rsplit('.', 1)
+                dpPrefix = comps[0]
+                if len(comps) == 1:
+                    # Top-level python module
+                    depPaths.extend(initfuncs)
+                else:
+                    for initfunc in initfuncs:
+                        depPaths.append('.'.join([dpPrefix, initfunc]))
             except elf.error:
                 pass
 
