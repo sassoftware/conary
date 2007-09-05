@@ -2059,7 +2059,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 start = fileIdLen * i
                 end = start + fileIdLen
                 yield cu.binary(fileIds[start : end])
-        self.log(2, sourceName, branch, filePrefixes, "fileIdLen=%d" % fileIdLen)
+        self.log(2, sourceName, branch, filePrefixes, "fileIdCount=%d" % fileIdCount)
 
         cu = self.db.cursor()
         query = """
