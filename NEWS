@@ -2,6 +2,7 @@ Changes in @NEW@:
   o Server Changes
     * a bug which triggered an exception while migrating postgresql
       repositories has been fixed (CNY-1912)
+    * the getNewTroveInfo call works now faster for mirror operations (CNY-2006)
   o Client Changes:
     * a bug which prevented the mirror client from using hidden comitts
       when mirroring to a single target has been fixed (CNY-1981)

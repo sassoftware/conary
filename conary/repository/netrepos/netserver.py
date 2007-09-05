@@ -2049,7 +2049,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
 	    raise errors.InsufficientPermission
-        self.log(2, sourceName, branch, clientVersion, fileIds)
+        # decode the fileIds to check before doing heavy work
+        fileIds = base64.b64decode(fileIds)
+        fileIdLen = 20
+        assert(len(fileIds) % fileIdLen == 0)
+        fileIdCount = len(fileIds) // fileIdLen
+        def splitFileIds(cu):
+            for i in range(fileIdCount):
+                start = fileIdLen * i
+                end = start + fileIdLen
+                yield cu.binary(fileIds[start : end])
+        self.log(2, sourceName, branch, filePrefixes, "fileIdLen=%d" % fileIdLen)
+
         cu = self.db.cursor()
         query = """
         SELECT DISTINCT
@@ -2066,7 +2077,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Instances.instanceId = TroveFiles.instanceId
         JOIN Versions ON
             TroveFiles.versionId = Versions.versionId
-        INNER JOIN FileStreams ON
+        JOIN FileStreams ON
             TroveFiles.streamId = FileStreams.streamId
         JOIN tmpFilePrefixes ON
             TroveFiles.path LIKE tmpFilePrefixes.prefix
@@ -2096,19 +2107,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                    self.fromFileId(fileId))
         if not fileIds:
             return ids
-
-        fileIds = base64.b64decode(fileIds)
-
-        # Length of a fileId - same as len of sha1
-        fileIdLen = 20
-        assert(len(fileIds) % fileIdLen == 0)
-        fileIdCount = len(fileIds) // fileIdLen
-
-        def splitFileIds(cu):
-            for i in range(fileIdCount):
-                start = fileIdLen * i
-                end = start + fileIdLen
-                yield cu.binary(fileIds[start : end])
 
         schema.resetTable(cu, 'tmpFileId')
         cu.executemany("INSERT INTO tmpFileId (fileId) VALUES (?)", splitFileIds(cu),
@@ -2675,6 +2673,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
                         labels):
+        import epdb
+        epdb.st()
         # only show troves the user is allowed to see
         try:
             mark = long(mark)

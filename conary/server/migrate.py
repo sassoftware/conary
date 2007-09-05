@@ -220,7 +220,7 @@ def rebuildLatest(db, recreate=False):
     return True
     
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 7)
+    Version = (15, 8)
     def updateLatest(self):
         return rebuildLatest(self.db, recreate=True)
 
@@ -470,6 +470,10 @@ class MigrateTo_15(SchemaMigration):
     # 15.7 - rebuild the Latest table to consider only the isPresent = NORMAL instances
     def migrate7(self):
         return rebuildLatest(self.db)
+    # 15.8 - add an index on TroveInfo
+    def migrate8(self):
+        db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
+        return True
     
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
