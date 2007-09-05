@@ -151,8 +151,11 @@ def _handler(req):
             log.error("tmpDir cannot include symbolic links")
 
         if cfg.closed:
-            repositories[repName] = netserver.ClosedRepositoryServer(cfg)
+            repos = netserver.ClosedRepositoryServer(cfg)
+            repositories[repName] = proxy.SimpleRepositoryFilter(
+                                                cfg, urlBase, repos)
             repositories[repName].forceSecure = False
+            repositories[repName].cfg = cfg
         elif cfg.proxyContentsDir:
             repositories[repName] = proxy.ProxyRepositoryServer(cfg, urlBase)
             repositories[repName].forceSecure = False

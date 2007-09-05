@@ -2,9 +2,14 @@ Changes in @NEW@:
   o Server Changes
     * a bug which triggered an exception while migrating postgresql
       repositories has been fixed (CNY-1912)
-    * the getNewTroveInfo call works now faster for mirror operations (CNY-2006)
+    * the getNewTroveInfo call works faster for mirror operations (CNY-2006)
+    * An issue that prevented the server from responding with the
+      proper error message when in maintenance mode has been fixed.
+      (CNY-2005)
+    * An issue that was affecting cooking performance when looking
+      up path IDs has been fixed. (CNY-1996)
   o Client Changes:
-    * a bug which prevented the mirror client from using hidden comitts
+    * a bug which prevented the mirror client from using hidden commits
       when mirroring to a single target has been fixed (CNY-1981)
 
 Changes in 1.1.31.4:
