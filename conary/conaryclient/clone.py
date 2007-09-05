@@ -121,7 +121,7 @@ class ClientClone:
                             message=message,
                             cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
                             updateBuildInfo=updateBuildInfo,
-                            infoOnly=infoOnly, 
+                            infoOnly=infoOnly,
                             bumpGroupVersions=True)
         chooser = CloneChooser(targetMap, troveList, cloneOptions)
         return self._createCloneChangeSet(chooser, cloneOptions)
@@ -198,15 +198,12 @@ class ClientClone:
         _logMe('recheck preclones')
         self._recheckPreClones(cloneJob, cloneMap, troveCache, chooser,
                                leafMap)
-
         troveTups = cloneJob.getTrovesToClone()
         unmetNeeds = self._checkNeedsFulfilled(troveTups, chooser, cloneMap,
                                                leafMap, troveCache)
         if unmetNeeds:
             _logMe('could not clone')
             raise CloneIncomplete(unmetNeeds)
-
-
         _logMe('Got clone job')
         return cloneJob, cloneMap, leafMap
 
@@ -490,7 +487,9 @@ class ClientClone:
             if newVersion:
                 cloneMap.target(sourceTup, newVersion)
                 del query[queryItem]
-        return query.values()
+        unmetNeeds = query.values()
+        unmetNeeds = chooser.filterUnmetTroveInfoItems(unmetNeeds)
+        return unmetNeeds
 
     def _recheckPreClones(self, cloneJob, cloneMap, troveCache, chooser, 
                           leafMap):
@@ -604,6 +603,8 @@ class ClientClone:
         for mark, src in _iterAllVersions(trv):
             if chooser.troveInfoNeedsRewrite(mark, src):
                 newVersion = cloneMap.getTargetVersion(src)
+                if newVersion is None:
+                    continue
                 _updateVersion(trv, mark, newVersion)
             elif chooser.troveInfoNeedsErase(mark, src):
                 _updateVersion(trv, mark, None)
@@ -762,7 +763,8 @@ class CloneOptions(object):
     def __init__(self, fullRecurse=True, cloneSources=True,
                  trackClone=True, callback=None,
                  message=DEFAULT_MESSAGE, cloneOnlyByDefaultTroves=False,
-                 updateBuildInfo=True, infoOnly=False, bumpGroupVersions=False):
+                 updateBuildInfo=True, infoOnly=False, bumpGroupVersions=False,
+                 enforceFullBuildInfoCloning=False):
         self.fullRecurse = fullRecurse
         self.cloneSources = cloneSources
         self.trackClone = trackClone
@@ -774,6 +776,7 @@ class CloneOptions(object):
         self.updateBuildInfo = updateBuildInfo
         self.infoOnly = infoOnly
         self.bumpGroupVersions = bumpGroupVersions
+        self.enforceFullBuildInfoCloning = enforceFullBuildInfoCloning
 
 class TroveCache(object):
     def __init__(self, repos, callback):
@@ -937,6 +940,12 @@ class CloneChooser(object):
             return False
         return (self.byDefaultMap is not None 
                 and troveTup not in self.byDefaultMap)
+
+    def filterUnmetTroveInfoItems(self, unmetTroveInfoItems):
+        if self.options.enforceFullBuildInfoCloning:
+            return unmetTroveInfoItems
+        return [ (mark,troveTup) for (mark,troveTup) in unmetTroveInfoItems 
+                  if mark[0] == V_REFTRV ]
 
 class CloneMap(object):
     def __init__(self):

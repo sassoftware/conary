@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Client changes:
+    * Clone/promote no longer complains when a buildreq is not also being
+      cloned to the new location. (CNY-1844)
 
 Changes in 1.1.94:
   o Bug Fixes:
