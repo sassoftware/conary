@@ -2675,8 +2675,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
                         labels):
-        import epdb
-        epdb.st()
         # only show troves the user is allowed to see
         try:
             mark = long(mark)
