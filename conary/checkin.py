@@ -394,7 +394,7 @@ def commit(repos, cfg, message, callback=None, test=False):
                         allowMissingFiles = bool(callback))
             for srcFileObj, (pathId, path, fileId, version) in \
                             itertools.izip(srcFiles, srcPkg.iterFileList() ):
-                if path not in sourceFiles:
+                if not state.hasFile(pathId):
                     # the file no longer exists
                     continue
                 elif not state.fileIsAutoSource(pathId):

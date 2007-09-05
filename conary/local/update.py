@@ -979,16 +979,6 @@ class FilesystemJob:
                 # another trove. treat it as an update later on.
                 continue
 
-            # these files are placed directly into the lookaside at build
-            # time; we don't worry about them.  We still need to put them
-            # in the fsTrove, though, since we update the CONARY state
-            # from that and want to note these new files.
-            if headFile.flags.isAutoSource():
-                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId,
-                                isConfig = headFile.flags.isConfig(),
-                                isAutoSource = True)
-                continue
-
             if isSrcTrove:
                 # in source operations we could have a file which was added
                 # manually also be added in the repository. the pathId's
@@ -996,7 +986,7 @@ class FilesystemJob:
                 # If the file really is new and the sha1's are the same, let
                 # the file from the repository win out
                 dup = [ x for x in fsTrove.iterFileList() if x[1] == headPath ]
-                if dup:
+                if dup and not headFile.flags.isAutoSource():
                     fsFile = files.FileFromFilesystem(headRealPath, pathId)
                     fsFile.flags.thaw(headFile.flags.freeze())
                     if (isinstance(dup[0][3], versions.NewVersion) and
@@ -1014,6 +1004,26 @@ class FilesystemJob:
                         self.errors.append(DuplicatePath(headPath))
 
                     continue
+                elif dup:
+                    # autosource file duplicated; just take it from the
+                    # repository
+                    fsTrove.removeFile(dup[0][0])
+                    fsTrove.addFile(pathId, headPath, headFileVersion,
+                            headFileId, isConfig = headFile.flags.isConfig(),
+                            isAutoSource = True)
+
+                    continue
+
+            # these files are placed directly into the lookaside at build
+            # time; we don't worry about them.  We still need to put them
+            # in the fsTrove, though, since we update the CONARY state
+            # from that and want to note these new files.
+            if headFile.flags.isAutoSource():
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId,
+                                isConfig = headFile.flags.isConfig(),
+                                isAutoSource = True)
+                continue
+
 
             restoreFile = True
 
@@ -1882,8 +1892,14 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
         if isSrcTrove:
             if path in curTrove.pathMap:
-                realPath = curTrove.pathMap[path]
-                isAutoSource = True
+                if type(curTrove.pathMap[path]) is tuple:
+                    # this is an autosourced file which existed somewhere
+                    # else with a different pathId. The contents haven't
+                    # changed though, and the fileId/version is valid
+                    continue
+                else:
+                    realPath = curTrove.pathMap[path]
+                    isAutoSource = True
             else:
                 realPath = os.getcwd() + "/" + path
                 isAutoSource = False

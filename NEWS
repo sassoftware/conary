@@ -22,6 +22,8 @@ Changes in @NEW@:
     * A bug which prevented the mirror client from using hidden commits
       when mirroring to a single target has been fixed. (CNY-1981)
     * Filesets are now cloneable. (CNY-1297)
+    * Autosouced files added to both a shadow and it's parent now merge
+      properly (CNY-1856)
 
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
