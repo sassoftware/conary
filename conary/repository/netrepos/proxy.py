@@ -89,7 +89,9 @@ class ProxyCaller:
             raise
 
         if rc[1]:
-            # exception occured
+            # exception occured. this lets us tunnel the error through
+            # without instantiating it (which would be demarshalling the
+            # thing just to remarshall it again)
             raise ProxyRepositoryError(rc[2])
 
         return (rc[0], rc[2])
@@ -147,38 +149,9 @@ class ProxyCallFactory:
 class RepositoryCaller(xmlshims.NetworkConvertors):
 
     def callByName(self, methodname, *args, **kwargs):
-        try:
-            result = self.repos.callWrapper(self.protocol, self.port,
-                                methodname, self.authToken, args, kwargs,
-                                remoteIp = self.remoteIp)
-        except Exception, e:
-            if hasattr(e, 'marshall'):
-                raise ProxyRepositoryError(
-                                (e.__class__.__name__,) + e.marshall(self))
-            else:
-                for klass, marshall in errors.simpleExceptions:
-                    if isinstance(e, klass):
-                        raise ProxyRepositoryError((marshall, str(e)))
-
-                # this exception is not marshalled back to the client.
-                # re-raise it now.  comment the next line out to fall into
-                # the debugger
-                raise
-
-                # uncomment the next line to translate exceptions into
-                # nicer errors for the client.
-                #return (True, ("Unknown Exception", str(e)))
-
-                # fall-through to debug this exception - this code should
-                # not run on production servers
-                import traceback
-                from conary.lib import debugger
-                excInfo = sys.exc_info()
-                lines = traceback.format_exception(*excInfo)
-                print "".join(lines)
-                if 1 or sys.stdout.isatty() and sys.stdin.isatty():
-                    debugger.post_mortem(excInfo[2])
-                raise
+        result = self.repos.callWrapper(self.protocol, self.port,
+                            methodname, self.authToken, args, kwargs,
+                            remoteIp = self.remoteIp)
 
         return (False, result)
 
@@ -294,6 +267,35 @@ class BaseProxy(xmlshims.NetworkConvertors):
             r = caller.callByName(methodname, *args, **kwargs)
         except ProxyRepositoryError, e:
             return (False, True, e.args, None)
+        except Exception, e:
+            if hasattr(e, 'marshall'):
+                return (False, True,
+                        (e.__class__.__name__,) + e.marshall(self),
+                        None)
+            else:
+                for klass, marshall in errors.simpleExceptions:
+                    if isinstance(e, klass):
+                        return (False, True, (marshall, str(e)), None)
+
+                # this exception is not marshalled back to the client.
+                # re-raise it now.  comment the next line out to fall into
+                # the debugger
+                raise
+
+                # uncomment the next line to translate exceptions into
+                # nicer errors for the client.
+                #return (True, ("Unknown Exception", str(e)))
+
+                # fall-through to debug this exception - this code should
+                # not run on production servers
+                import traceback
+                from conary.lib import debugger
+                excInfo = sys.exc_info()
+                lines = traceback.format_exception(*excInfo)
+                print "".join(lines)
+                if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+                    debugger.post_mortem(excInfo[2])
+                raise
 
         return (r[0], False, r[1], caller.getExtraInfo())
 
@@ -306,10 +308,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         # cut off older clients entirely, no negotiation
         if clientVersion < self.SERVER_VERSIONS[0]:
-            raise ProxyRepositoryError(("InvalidClientVersion",
+            raise errors.InvalidClientVersion(
                'Invalid client version %s.  Server accepts client versions %s '
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
-               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS))))
+               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS)))
 
         useAnon, parentVersions = caller.checkVersion(clientVersion)
 
@@ -432,8 +434,7 @@ class ChangesetFilter(BaseProxy):
             else:
                 # this really was marked as a removed trove.
                 # raise a TroveMissing exception
-                raise ProxyRepositoryError(("TroveMissing", trvName,
-                    self.fromVersion(trvNewVersion)))
+                raise errors.TroveMissing(trvName, trvNewVersion)
 
         # we need to re-write the munged changeset for an
         # old client
@@ -502,9 +503,9 @@ class ChangesetFilter(BaseProxy):
         # This is important; if it doesn't work out the cache is likely
         # not working.
         if verPath[-1] != wireCsVersion:
-            raise ProxyRepositoryError(('InvalidClientVersion',
+            raise errors.InvalidClientVersion(
                 "Unable to produce changeset version %s "
-                "with upstream server %s" % (neededCsVersion, wireCsVersion)))
+                "with upstream server %s" % (neededCsVersion, wireCsVersion))
 
         fingerprints = [ '' ] * len(chgSetList)
         if self.csCache:
@@ -518,12 +519,9 @@ class ChangesetFilter(BaseProxy):
                             chgSetList, recurse, withFiles, withFileContents,
                             excludeAutoSource)
 
-            except ProxyRepositoryError, e:
+            except errors.MethodNotSupported:
                 # old server; act like no fingerprints were returned
-                if e.args[0] == 'MethodNotSupported':
-                    pass
-                else:
-                    raise
+                pass
 
         changeSetList = [ None ] * len(chgSetList)
 
@@ -632,7 +630,7 @@ class ChangesetFilter(BaseProxy):
             try:
                 inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
             except transport.TransportError, e:
-                raise ProxyRepositoryError(("RepositoryError", e.args[0]))
+                raise errors.RepositoryError(e.args[0])
 
             for (jobIdx, (rawJob, fingerprint)), csInfo in \
                             itertools.izip(neededHere, csInfoList):
@@ -752,10 +750,10 @@ class ChangesetFilter(BaseProxy):
             else:
                 for size in allSizes:
                     if size >= 0x80000000:
-                        raise ProxyRepositoryError(('InvalidClientVersion',
+                        raise errors.InvalidClientVersion(
                          'This version of Conary does not support downloading '
                          'changesets larger than 2 GiB.  Please install a new '
-                         'Conary client.'))
+                         'Conary client.')
 
             if clientVersion < 38:
                 return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
@@ -895,11 +893,10 @@ class ProxyRepositoryServer(ChangesetFilter):
             else:
                 for size in sizeList:
                     if size >= 0x80000000:
-                        raise ProxyRepositoryError(
-                            ('InvalidClientVersion',
+                        raise errors.InvalidClientVersion(
                              'This version of Conary does not support '
                              'downloading file contents larger than 2 '
-                             'GiB.  Please install a new Conary client.'))
+                             'GiB.  Please install a new Conary client.')
             return False, (url, sizeList)
         finally:
             os.close(fd)
