@@ -14,6 +14,7 @@ Changes in 2.0.0:
       (CNY-1973)
     * Reworked server exceptions to have marshalling logic in the exception
       class instead of in a large if/elif block (CNY-747)
+    * Call log now tracks cache misses (CNY-1843)
 
 Changes in @NEW@:
   o Bug Fixes:

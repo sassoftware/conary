@@ -233,7 +233,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                     if self.callLog:
                         self.callLog.log(remoteIp, authToken, methodname,
-                                         orderedArgs)
+                                         orderedArgs, kwArgs)
 
                     return (False, False, r)
             except sqlerrors.DatabaseLocked, e:
@@ -259,11 +259,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if self.callLog:
             if isinstance(e, HiddenException):
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
-                                 exception = e.forLog)
+                                 kwArgs, exception = e.forLog)
                 e = e.forReturn
             else:
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
-                                 exception = e)
+                                 kwArgs, exception = e)
 
         if isinstance(e, sqlerrors.DatabaseLocked):
             e = RepositoryLocked()

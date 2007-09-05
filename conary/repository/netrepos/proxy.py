@@ -524,6 +524,10 @@ class ChangesetFilter(BaseProxy):
                     enumerate(itertools.izip(chgSetList, fingerprints))
                     if changeSetList[x[0]] is None ]
 
+        if self.callLog and changeSetsNeeded:
+            self.callLog.log(None, authToken, '__createChangeSets',
+                             changeSetsNeeded)
+
         # This is a loop to make supporting single-request changeset generation
         # easy; we need that not only for old servers we proxy, but for an
         # internal server as well (since internal servers only support
