@@ -5,6 +5,8 @@ Changes in @NEW@:
     * An issue that prevented the server from responding with the
       proper error message when in maintenance mode has been fixed.
       (CNY-2005)
+    * An issue that was affecting cooking performance when looking
+      up path IDs has been fixed. (CNY-1996)
   o Client Changes:
     * a bug which prevented the mirror client from using hidden comitts
       when mirroring to a single target has been fixed (CNY-1981)

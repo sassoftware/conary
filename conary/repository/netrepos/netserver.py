@@ -2135,6 +2135,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             TroveFiles.streamId = FileStreams.streamId
         JOIN tmpFileId ON
             FileStreams.fileId = tmpFileId.fileId
+        JOIN tmpFilePrefixes ON
+            TroveFiles.path LIKE tmpFilePrefixes.prefix
         WHERE
             Items.item = ? AND
             Branches.branch = ?
