@@ -1,13 +1,12 @@
 Changes in @NEW@:
 
-Changes in 1.1.93:
+Changes in 1.1.94:
   o Bug Fixes:
-    * The clone and promote commands now work when cloning over removed
-      packages. (CNY-1955)
-    * searchPath will now provide only the best flavor match when
-      matching against groups with more than one version of a package
-      available. Previously, it would return all matches. (CNY-1881)
+    * Python extension modules installed at the top level of the Python
+      search path no longer produce a traceback when computing
+      dependencies. (CNY-1995)
 
+Changes in 1.1.93:
   o Build Changes:
     * Filesets now accept macros. (CNY-148)
     * crossRequires are now ignored when not cross compiling. (CNY-1950)
@@ -36,6 +35,13 @@ Changes in 1.1.93:
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
       repositories has been fixed. (CNY-1912)
+
+  o Bug Fixes:
+    * The clone and promote commands now work when cloning over removed
+      packages. (CNY-1955)
+    * searchPath will now provide only the best flavor match when
+      matching against groups with more than one version of a package
+      available. Previously, it would return all matches. (CNY-1881)
 
 Changes in 1.1.92:
   o Bug Fixes:
