@@ -144,18 +144,43 @@ class ProxyCallFactory:
 
         return ProxyCaller(url, proxy, transporter)
 
-class RepositoryCaller:
+class RepositoryCaller(xmlshims.NetworkConvertors):
 
     def callByName(self, methodname, *args, **kwargs):
-        rc = self.repos.callWrapper(self.protocol, self.port, methodname,
-                                    self.authToken, args, kwargs,
-                                    remoteIp = self.remoteIp)
+        try:
+            result = self.repos.callWrapper(self.protocol, self.port,
+                                methodname, self.authToken, args, kwargs,
+                                remoteIp = self.remoteIp)
+        except Exception, e:
+            if hasattr(e, 'marshall'):
+                raise ProxyRepositoryError(
+                                (e.__class__.__name__,) + e.marshall(self))
+            else:
+                for klass, marshall in errors.simpleExceptions:
+                    if isinstance(e, klass):
+                        raise ProxyRepositoryError((marshall, str(e)))
 
-        if rc[1]:
-            # exception occured
-            raise ProxyRepositoryError(rc[2])
+                # this exception is not marshalled back to the client.
+                # re-raise it now.  comment the next line out to fall into
+                # the debugger
+                raise
 
-        return (rc[0], rc[2])
+                # uncomment the next line to translate exceptions into
+                # nicer errors for the client.
+                #return (True, ("Unknown Exception", str(e)))
+
+                # fall-through to debug this exception - this code should
+                # not run on production servers
+                import traceback
+                from conary.lib import debugger
+                excInfo = sys.exc_info()
+                lines = traceback.format_exception(*excInfo)
+                print "".join(lines)
+                if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+                    debugger.post_mortem(excInfo[2])
+                raise
+
+        return (False, result)
 
     def getExtraInfo(self):
         """No extra information available for a RepositoryCaller"""

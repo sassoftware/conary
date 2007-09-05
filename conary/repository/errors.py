@@ -68,10 +68,6 @@ class IntegrityError(RepositoryError):
 class MethodNotSupported(RepositoryError):
     """Attempt to call a server method which does not exist"""
 
-    @staticmethod
-    def demarshall(marshaller, tup):
-        return tup[0]
-
 class RepositoryLocked(RepositoryError):
     def __str__(self):
         return 'The repository is currently busy.  Try again in a few moments.'

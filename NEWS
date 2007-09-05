@@ -15,6 +15,10 @@ Changes in 2.0.0:
     * Reworked server exceptions to have marshalling logic in the exception
       class instead of in a large if/elif block (CNY-747)
     * Call log now tracks cache misses (CNY-1843)
+    * Repository no longer passes anonymous-hint to proxy layer (it has
+      been False since 1.1.29)
+    * Server exceptions are marshalled in the proxy layer now instead of
+      in both the proxy and server layers
 
 Changes in @NEW@:
   o Bug Fixes:

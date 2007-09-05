@@ -193,10 +193,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     orderedArgs, kwArgs,
                     remoteIp = None, rawUrl = None):
         """
-        Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
-        is a Boolean stating whether the operation was performed as the
-        anonymous user (due to a failure w/ the passed authToken). Exception
-        is a Boolean stating whether an error occurred.
+        Returns a tuple of (Exception, result).  Exception is a Boolean
+        stating whether an error occurred.
         """
 	# reopens the sqlite db if it's changed
 	self.reopen()
@@ -204,20 +202,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self._protocol = protocol
 
         if methodname not in self.publicCalls:
-            return (False, True, ("MethodNotSupported", methodname, ""))
+            raise errors.MethodNotSupported(methodname)
+
         method = self.__getattribute__(methodname)
 
         # Repository in read-only mode?
         if method._accessType == 'readWrite' and self.readOnlyRepository:
-            return (False, True,
-                ('ReadOnlyRepositoryError', "Repository is read only"))
+            raise errors.ReadOnlyRepositoryError("Repository is read only")
 
         if (hasattr(method, '_minimumClientProtocol') and
                         method._minimumClientProtocol > orderedArgs[0]):
-            return (False, True,
-                    ('InvalidClientVersion',
-                     '%s call only supports protocol versions %s '
-                     'and later' % (methodname, method._minimumClientProtocol)))
+            raise errors.InvalidClientVersion(
+                    '%s call only supports protocol versions %s '
+                    'and later' % (methodname, method._minimumClientProtocol))
 
         attempt = 1
         # nested try:...except statements.... Yeeee-haaa!
@@ -235,7 +232,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         self.callLog.log(remoteIp, authToken, methodname,
                                          orderedArgs, kwArgs)
 
-                    return (False, False, r)
+                    return r
             except sqlerrors.DatabaseLocked, e:
                 # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d while calling %s: %s",
@@ -268,32 +265,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if isinstance(e, sqlerrors.DatabaseLocked):
             e = RepositoryLocked()
 
-        if hasattr(e, 'marshall'):
-            return (False, True, (e.__class__.__name__,) +
-                        e.marshall(self))
-	else:
-            for klass, marshall in errors.simpleExceptions:
-                if isinstance(e, klass):
-                    return (False, True, (marshall, str(e)))
-            # this exception is not marshalled back to the client.
-            # re-raise it now.  comment the next line out to fall into
-            # the debugger
-            raise
-
-            # uncomment the next line to translate exceptions into
-            # nicer errors for the client.
-            #return (True, ("Unknown Exception", str(e)))
-
-            # fall-through to debug this exception - this code should
-            # not run on production servers
-            import traceback
-            from conary.lib import debugger
-            excInfo = sys.exc_info()
-            lines = traceback.format_exception(*excInfo)
-            print "".join(lines)
-            if 1 or sys.stdout.isatty() and sys.stdin.isatty():
-		debugger.post_mortem(excInfo[2])
-            raise
+        raise e
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
