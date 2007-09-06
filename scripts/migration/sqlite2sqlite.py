@@ -48,15 +48,6 @@ for stmt in getTables("sqlite"):
     cp.execute(stmt)
 dest.loadSchema()
 
-for t in source.tables.keys():
-    if t in dest.tables:
-        continue
-    print "Only in source:", t
-for t in dest.tables.keys():
-    if t in source.tables:
-        continue
-    print "Only in dest:", t
-
 tList = [
     'Branches',
     'Items',
@@ -72,6 +63,8 @@ tList = [
     'EntitlementGroups',
     'Entitlements',
     'EntitlementOwners',
+    'EntitlementAccessMap',
+    'Caps',
     'Permissions',
     'Instances',
     'Dependencies',
@@ -84,11 +77,34 @@ tList = [
     'PGPFingerprints',
     'Provides',
     'Requires',
+    'TroveRedirects',
     'TroveTroves',
     'TroveInfo',
     'FileStreams',
     'TroveFiles',
     ]
+ignored = [ "LatestMirror", "DatabaseVersion" ]
+missing = []
+
+# sanity checks
+for t in source.tables.keys():
+    if t in dest.tables:
+        continue
+    print "Only in source:", t
+for t in tList:
+    if t not in source.tables:
+        missing.append(t)
+if missing:
+    raise RuntimeError("Source is missing tables: %s" % (str(missing),))
+for t in dest.tables.keys():
+    if t not in tList:
+        if t not in ignored:
+            missing.append(t)
+    if t in source.tables:
+        continue
+    print "Only in dest:", t
+if missing:
+    raise RuntimeError("This code does not process tables: %s" % (str(missing),))
 
 def timings(current, total, tstart):
     tnow = time.time()
