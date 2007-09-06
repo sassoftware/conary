@@ -3124,6 +3124,7 @@ class Requires(_addInfo, _dependency):
             if depPath.startswith(destdir):
                 depPath = depPath[destDirLen:]
                 flags = self._getPythonFlagsFromPath(depPath)
+
                 # The file providing this dependency is part of this package.
                 absPath = depPath
             for sysPathEntry in sysPath:
@@ -3182,6 +3183,9 @@ class Requires(_addInfo, _dependency):
             return depNames[-1]
         fileProvides = pkg[depPath][1].provides()
 
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+
         # Walk the depNames list in order, pick the first dependency
         # available.
         for dp in depNames:
@@ -3195,6 +3199,9 @@ class Requires(_addInfo, _dependency):
         return depNames[-1]
 
     def _checkSystemPythonDeps(self, depNames, flags):
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+
         for dp in depNames:
             depSet = deps.DependencySet()
             depSet.addDep(deps.PythonDependencies, deps.Dependency(dp, flags))
