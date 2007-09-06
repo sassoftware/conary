@@ -3,6 +3,7 @@ Version 60:
   - server side support for setUserGroupIsAdmin
   - addAcl and editAcl cannot be used for setting the admin flag anymore
   - fixed keyword arguments to work through proxy
+  - pass exceptions as (useAnonymous, True, (exceptName, args, kwwargs))
 
 Version 51:
   - getChangeSet supports infoOnly parameter

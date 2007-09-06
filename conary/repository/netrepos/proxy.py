@@ -92,7 +92,11 @@ class ProxyCaller:
             # exception occured. this lets us tunnel the error through
             # without instantiating it (which would be demarshalling the
             # thing just to remarshall it again)
-            raise ProxyRepositoryError(rc[2])
+            if args[0] < 60:
+                raise ProxyRepositoryError(rc[2][0], rc[2][1:], None)
+            else:
+                # keyword args to exceptions appear
+                raise ProxyRepositoryError(rc[2][0], rc[2][1], rc[2][2])
 
         return (rc[0], rc[2])
 
@@ -252,6 +256,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
             kwargs = args[2]
             args = [ args[0], ] + args[1]
 
+        extraInfo = None
+
         try:
             if hasattr(self, methodname):
                 # handled internally
@@ -261,43 +267,50 @@ class BaseProxy(xmlshims.NetworkConvertors):
                     self.callLog.log(remoteIp, authToken, methodname, args,
                                      kwargs)
 
-                anon, r = method(caller, authToken, *args, **kwargs)
-                return (anon, False, r, caller.getExtraInfo())
+                r = method(caller, authToken, *args, **kwargs)
+            else:
+                r = caller.callByName(methodname, *args, **kwargs)
 
-            r = caller.callByName(methodname, *args, **kwargs)
+            r = (r[0], False, r[1], {})
+            extraInfo = caller.getExtraInfo()
         except ProxyRepositoryError, e:
-            return (False, True, e.args, None)
+            r = (False, True, (e.name,) + e.args, e.kwArgs)
         except Exception, e:
             if hasattr(e, 'marshall'):
-                return (False, True,
-                        (e.__class__.__name__,) + e.marshall(self),
-                        None)
+                r = (False, True,
+                        (e.__class__.__name__,) + e.marshall(self), {})
             else:
+                r = None
                 for klass, marshall in errors.simpleExceptions:
                     if isinstance(e, klass):
-                        return (False, True, (marshall, str(e)), None)
+                        r = (False, True, (marshall, str(e)), {})
 
-                # this exception is not marshalled back to the client.
-                # re-raise it now.  comment the next line out to fall into
-                # the debugger
-                raise
+                if r is None:
+                    # this exception is not marshalled back to the client.
+                    # re-raise it now.  comment the next line out to fall into
+                    # the debugger
+                    raise
 
-                # uncomment the next line to translate exceptions into
-                # nicer errors for the client.
-                #return (True, ("Unknown Exception", str(e)))
+                    # uncomment the next line to translate exceptions into
+                    # nicer errors for the client.
+                    #return (True, ("Unknown Exception", str(e)))
 
-                # fall-through to debug this exception - this code should
-                # not run on production servers
-                import traceback
-                from conary.lib import debugger
-                excInfo = sys.exc_info()
-                lines = traceback.format_exception(*excInfo)
-                print "".join(lines)
-                if 1 or sys.stdout.isatty() and sys.stdin.isatty():
-                    debugger.post_mortem(excInfo[2])
-                raise
+                    # fall-through to debug this exception - this code should
+                    # not run on production servers
+                    import traceback
+                    from conary.lib import debugger
+                    excInfo = sys.exc_info()
+                    lines = traceback.format_exception(*excInfo)
+                    print "".join(lines)
+                    if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+                        debugger.post_mortem(excInfo[2])
+                    raise
 
-        return (r[0], False, r[1], caller.getExtraInfo())
+        if r[1] is True and protocol >= 60:
+            # return (useAnon, isException, (exceptName, ordArgs, kwArgs) )
+            return (False, True, (r[2][0], r[2][1:], r[3]), None )
+
+        return r[0:3] + (extraInfo,)
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -981,8 +994,10 @@ def formatViaHeader(localAddr, protocolString):
 
 class ProxyRepositoryError(Exception):
 
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, name, args, kwArgs):
+        self.name = name
+        self.args = tuple(args)
+        self.kwArgs = kwArgs
 
 # ewtroan: for the internal proxy, we support client version 38 but need to talk to a server which is at least version 41
 # ewtroan: for external proxy, we support client version 41 and need a server which is at least 41

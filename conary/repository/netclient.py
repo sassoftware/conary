@@ -123,7 +123,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             return result
 
         try:
-            self.handleError(result)
+            self.handleError(clientVersion, result)
         except errors.EntitlementTimeout:
             if not retryOnEntitlementTimeout:
                 raise
@@ -183,9 +183,15 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             pt = 'Conary'
         err.url = "%s (via %s proxy %s)" % (err.url, pt, proxyHost)
 
-    def handleError(self, result):
-	exceptionName = result[0]
-	exceptionArgs = result[1:]
+    def handleError(self, clientVersion, result):
+        if clientVersion < 60:
+            exceptionName = result[0]
+            exceptionArgs = result[1:]
+            exceptionKwArgs = {}
+        else:
+            exceptionName = result[0]
+            exceptionArgs = result[1]
+            exceptionKwArgs = result[2]
 
         if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
             # old repositories give TIE w/ no trove information or with a
