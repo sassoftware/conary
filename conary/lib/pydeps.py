@@ -20,8 +20,22 @@ import struct
 import subprocess
 import sys
 
-from conary import errors
-from conary.lib import coveragehook
+if __name__ != "__main__":
+    # We may not be able to find these when being run as a program
+    # via the moduleFinderProxy
+    from conary.lib import coveragehook
+    from conary import errors
+
+    # only in the conary module case do we carre about a
+    # ModuleFinderProtocolError inheriting from
+    # conary.errors.InternalConaryError
+    class ModuleFinderProtocolError(errors.InternalConaryError):
+        pass
+else:
+    class ModuleFinderProtocolError(IOError):
+        pass
+
+
 
 class DirBasedModuleFinder(modulefinder.ModuleFinder):
     def __init__(self, baseDir, *args, **kw):
@@ -84,17 +98,18 @@ def getData(inFile):
         while remaining > 0:
             partial = inFile.read(remaining)
             if not partial:
-                raise ModuleFinderProtocolError
+                raise ModuleFinderProtocolError('No data available to read')
             remaining -= len(partial)
             data += partial
         return data
     size = readAll(4)
     if len(size) != 4:
-        raise ModuleFinderProtocolError
+        raise ModuleFinderProtocolError('Wrong length prefix %s' %len(size))
     size = struct.unpack('!I', size)[0]
     data = readAll(size)
     if len(data) != size:
-        raise ModuleFinderProtocolError
+        raise ModuleFinderProtocolError(
+            'Insufficient data: got %s expected %s', len(data), size)
     return data
 
 def putData(outFile, data):
@@ -115,6 +130,13 @@ class moduleFinderProxy:
         sysPath = '\0'.join(sysPath)
         data = '\0'.join(('init', destdir, sysPath))
         putData(self.proxyProcess.stdin, data)
+        self.poll()
+
+    def poll(self):
+        if self.proxyProcess.poll() is not None:
+            raise ModuleFinderProtocolError(
+                'Python dependency discovery process died unexpectedly'
+                ' with exit code %n' %self.proxyProcess.returncode)
 
     def close(self):
         putData(self.proxyProcess.stdin, 'exit')
@@ -124,9 +146,11 @@ class moduleFinderProxy:
 
     def run_script(self, path):
         putData(self.proxyProcess.stdin, '\0'.join(('script', path)))
+        self.poll()
 
     def load_file(self, path):
         putData(self.proxyProcess.stdin, '\0'.join(('file', path)))
+        self.poll()
 
     def getDepsForPath(self, path):
         return getData(self.proxyProcess.stdout).split('\0')
@@ -137,7 +161,6 @@ def main():
     # being used to build (bootstrap, different major version of python,
     # or both).
 
-    finder = DirBasedModuleFinder('/', sys.path)
     while True:
         data = getData(sys.stdin)
         type, path = data.split('\0', 1)
@@ -167,10 +190,6 @@ def main():
 
         depPathList = finder.getDepsForPath(path)
         putData(sys.stdout, '\0'.join(depPathList))
-
-
-class ModuleFinderProtocolError(errors.InternalConaryError):
-    pass
 
 
 if __name__ == "__main__":

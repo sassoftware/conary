@@ -132,6 +132,7 @@ class AbstractTroveSource:
                                             bestFlavor=bestFlavor,
                                             getLeaves=getLeaves,
                                             exactFlavors=exactFlavors,
+                                            troveTypes=troveTypes,
                                             **kw)
         return troveFinder.findTroves(troves, allowMissing)
 
