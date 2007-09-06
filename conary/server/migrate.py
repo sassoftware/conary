@@ -472,7 +472,7 @@ class MigrateTo_15(SchemaMigration):
         return rebuildLatest(self.db)
     # 15.8 - add an index on TroveInfo
     def migrate8(self):
-        db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
+        self.db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
         return True
     
 # looks like this LabelMap has to be recreated multiple times by
