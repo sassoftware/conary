@@ -3115,6 +3115,8 @@ class Requires(_addInfo, _dependency):
             return
 
         for depPath in pythonModuleFinder.getDepsForPath(fullpath):
+            if not depPath:
+                continue
             flags = None
             if depPath.startswith('///invalid'):
                 # same as exception handling above
