@@ -43,16 +43,8 @@ for stmt in getTables("postgresql"):
     cp.execute(stmt)
 pgsql.loadSchema()
 
-for t in sqlite.tables.keys():
-    if t in pgsql.tables:
-        continue
-    print "Only in sqlite:", t
-for t in pgsql.tables.keys():
-    if t in sqlite.tables:
-        continue
-    print "Only in pgsql:", t
-
 tList = [
+    'LatestMirror',
     'Branches',
     'Items',
     'Versions',
@@ -67,6 +59,8 @@ tList = [
     'EntitlementGroups',
     'Entitlements',
     'EntitlementOwners',
+    'EntitlementAccessMap',
+    'Caps',
     'Permissions',
     'Instances',
     'Dependencies',
@@ -79,11 +73,34 @@ tList = [
     'PGPFingerprints',
     'Provides',
     'Requires',
+    'TroveRedirects',
     'TroveTroves',
     'TroveInfo',
     'FileStreams',
     'TroveFiles',
     ]
+# sanity checks
+ignored = [ "DatabaseVersion" ]
+missing = []
+for t in sqlite.tables.keys():
+    if t in pgsql.tables:
+        continue
+    print "Only in source:", t
+for t in tList:
+    if t not in sqlite.tables:
+        missing.append(t)
+if missing:
+    raise RuntimeError("Source is missing tables: %s" % (str(missing),))
+for t in pgsql.tables.keys():
+    if t not in tList:
+        if t not in ignored:
+            missing.append(t)
+    if t in sqlite.tables:
+        continue
+    print "Only in dest:", t
+if missing:
+    raise RuntimeError("This code does not process tables: %s" % (str(missing),))
+
 
 def timings(current, total, tstart):
     tnow = time.time()

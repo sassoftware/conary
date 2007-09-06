@@ -49,6 +49,7 @@ for stmt in getTables("sqlite"):
 dest.loadSchema()
 
 tList = [
+    'LatestMirror',
     'Branches',
     'Items',
     'Versions',
@@ -83,10 +84,10 @@ tList = [
     'FileStreams',
     'TroveFiles',
     ]
-ignored = [ "LatestMirror", "DatabaseVersion" ]
-missing = []
 
 # sanity checks
+ignored = [ "DatabaseVersion" ]
+missing = []
 for t in source.tables.keys():
     if t in dest.tables:
         continue
