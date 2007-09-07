@@ -397,7 +397,7 @@ class QueryByLabelPath(QueryMethod):
                 requiredFlavor = deps.getInstructionSetFlavor(afFlavor)
                 flavorList = self.overrideFlavors(afFlavor)
                 flavorDict.setdefault(label, []).append((flavorList, requiredFlavor))
-        self.addQuery(troveTup, set(labelPath), flavorDict)
+        self.addQuery(troveTup, set(flavorDict), flavorDict)
 
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:

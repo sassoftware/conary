@@ -6,6 +6,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Bootstrapping python can now find system conary when using the
       bootstrapped python to determine python dependencies. (CNY-2001)
+    * Bug fixed in findTroves when using partial labels (introduced
+      in 1.1.90). (CNY-2011)
 
 Changes in 1.1.94:
   o Bug Fixes:
