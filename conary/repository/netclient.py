@@ -203,9 +203,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             raise errors.UnknownException(exceptionName, exceptionArgs)
         else:
             exceptionClass = getattr(errors, exceptionName)
+
             if hasattr(exceptionClass, 'demarshall'):
-                raise exceptionClass(
-                            *exceptionClass.demarshall(self, exceptionArgs))
+                args, kwArgs = exceptionClass.demarshall(self, exceptionArgs,
+                                                         exceptionKwArgs)
+                raise exceptionClass(*args, **kwArgs)
 
             for klass, marshall in errors.simpleExceptions:
                 if exceptionName == marshall:

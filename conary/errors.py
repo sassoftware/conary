@@ -69,11 +69,11 @@ class RepositoryError(ConaryError):
     """
 
     def marshall(self, marshaller):
-        return str(self),
+        return (str(self),), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return tup[0],
+    def demarshall(marshaller, tup, kwArgs):
+        return (tup[0],), {}
 
 class WebError(ConaryError):
     """ Base class for errors with the web client """

@@ -23,11 +23,11 @@ from conary import versions
 class RepositoryMismatch(RepositoryError):
 
     def marshall(self, marshaller):
-        return (self.right, self.wrong)
+        return (self.right, self.wrong), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return tup[0:2]
+    def demarshall(marshaller, tup, kwArgs):
+        return tup[0:2], {}
 
     def __init__(self, right = None, wrong = None):
         self.right = right
@@ -85,11 +85,11 @@ class InvalidSourceNameError(RepositoryError):
 
     def marshall(self, marshaller):
         return (self.name, self.version, self.oldSourceItem,
-                self.newSourceItem)
+                self.newSourceItem), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return tup[0:4]
+    def demarshall(marshaller, tup, kwArgs):
+        return tup[0:4], {}
 
     def __init__(self, n, v, oldItem, newItem, *args):
         self.name = n
@@ -117,17 +117,17 @@ class TroveMissing(RepositoryError, InternalConaryError):
         else:
             if not isinstance(self.version, str):
                 trvVersion = marshaller.fromVersion(trvVersion)
-        return (trvName, trvVersion)
+        return (trvName, trvVersion), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
+    def demarshall(marshaller, tup, kwArgs):
         (name, version) = tup[0:2]
         if not name: name = None
         if not version:
             version = None
         else:
             version = marshaller.toVersion(version)
-        return (name, version)
+        return (name, version), {}
 
     def __str__(self):
         if type(self.version) == list:
@@ -194,11 +194,11 @@ class TroveChecksumMissing(RepositoryError):
               ' calculated, so it was rejected.  Please upgrade conary.')
 
     def marshall(self, marshaller):
-        return str(self), marshaller.fromTroveTup(self.nvf)
+        return (str(self), marshaller.fromTroveTup(self.nvf)), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return marshaller.toTroveTup(tup[1])
+    def demarshall(marshaller, tup, kwArgs):
+        return marshaller.toTroveTup(tup[1]), {}
 
     def __init__(self, name, version, flavor):
         self.nvf = (name, version, flavor)
@@ -210,14 +210,14 @@ class TroveSchemaError(RepositoryError):
 
     def marshall(self, marshaller):
         return (str(self), marshaller.fromTroveTup(self.nvf), self.troveSchema,
-                self.supportedSchema)
+                self.supportedSchema), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
+    def demarshall(marshaller, tup, kwArgs):
         # value 0 is the full message, for older clients that don't
         # know about this exception so the text for unknown description is
         # at least helpful
-        return marshaller.toTroveTup(tup[1]) + tuple(tup[2:4])
+        return marshaller.toTroveTup(tup[1]) + tuple(tup[2:4]), {}
 
     def __init__(self, name, version, flavor, troveSchema, supportedSchema):
         self.nvf = (name, version, flavor)
@@ -250,11 +250,11 @@ class GetFileContentsError(RepositoryError):
 
     def marshall(self, marshaller):
         return (marshaller.fromFileId(self.fileId),
-                marshaller.fromVersion(self.fileVer))
+                marshaller.fromVersion(self.fileVer)), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return (marshaller.toFileId(tup[0]), marshaller.toVersion(tup[1])),
+    def demarshall(marshaller, tup, kwArgs):
+        return (marshaller.toFileId(tup[0]), marshaller.toVersion(tup[1])), {}
 
     def __init__(self, (fileId, fileVer)):
         self.fileId = fileId
@@ -288,11 +288,11 @@ class FileStreamMissing(RepositoryError):
     # is available for the file stream the server tried to lookup.
 
     def marshall(self, marshaller):
-        return (marshaller.fromFileId(self.fileId), )
+        return (marshaller.fromFileId(self.fileId), ), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return (marshaller.toFileId(tup[0]), )
+    def demarshall(marshaller, tup, kwArgs):
+        return (marshaller.toFileId(tup[0]), ), {}
 
     def __init__(self, fileId):
         self.fileId = fileId
@@ -322,11 +322,11 @@ class ProxyError(RepositoryError):
 class EntitlementTimeout(RepositoryError):
 
     def marshall(self, marshaller):
-        return tuple(self.entitlements)
+        return tuple(self.entitlements), {}
 
     @staticmethod
-    def demarshall(marshaller, tup):
-        return tup,
+    def demarshall(marshaller, tup, kwArgs):
+        return tup, {}
 
     def __str__(self):
         return "EntitlementTimeout for %s" % ",".join(self.entitlements)

@@ -249,6 +249,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                remoteIp)
 
         # args[0] is the protocol version
+        protocolVersion = args[0]
         if args[0] < 51:
             kwargs = {}
         else:
@@ -271,19 +272,22 @@ class BaseProxy(xmlshims.NetworkConvertors):
             else:
                 r = caller.callByName(methodname, *args, **kwargs)
 
-            r = (r[0], False, r[1], {})
+            r = (r[0], False, r[1])
             extraInfo = caller.getExtraInfo()
         except ProxyRepositoryError, e:
-            r = (False, True, (e.name,) + e.args, e.kwArgs)
+            r = (False, True, (e.name, e.args, e.kwArgs))
         except Exception, e:
             if hasattr(e, 'marshall'):
+                marshalled = e.marshall(self)
+                args, kwArgs = marshalled
+
                 r = (False, True,
-                        (e.__class__.__name__,) + e.marshall(self), {})
+                        (e.__class__.__name__, args, kwArgs) )
             else:
                 r = None
                 for klass, marshall in errors.simpleExceptions:
                     if isinstance(e, klass):
-                        r = (False, True, (marshall, str(e)), {})
+                        r = (False, True, (marshall, str(e), {}) )
 
                 if r is None:
                     # this exception is not marshalled back to the client.
@@ -306,9 +310,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
                         debugger.post_mortem(excInfo[2])
                     raise
 
-        if r[1] is True and protocol >= 60:
-            # return (useAnon, isException, (exceptName, ordArgs, kwArgs) )
-            return (False, True, (r[2][0], r[2][1:], r[3]), None )
+        if r[1] is True and protocolVersion < 60:
+            # return (useAnon, isException, (exceptName,) + ordArgs) )
+            return (False, True, (r[2][0],)  + r[2][1], None )
 
         return r[0:3] + (extraInfo,)
 
