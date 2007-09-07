@@ -10,6 +10,8 @@ Changes in @NEW@:
       in 1.1.90). (CNY-2011)
     * Don't traceback when you cannot access the current working directory.
       (CNY-2014)
+    * Redirects to nothing are now displayed when using --trove-flags.
+      (CNY-2025)
 
 Changes in 1.1.94:
   o Bug Fixes:
