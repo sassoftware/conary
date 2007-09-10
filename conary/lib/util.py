@@ -182,6 +182,10 @@ def genExcepthook(debug=True,
             sys.exit(1)
 
         out = BoundedStringIO()
+        out.write(str(typ))
+        out.write(": ")
+        out.write(str(value))
+        out.write("\n\n")
         formatTrace(typ, value, tb, stream = out, withLocals = False)
         out.write("\nFull stack:\n")
         formatTrace(typ, value, tb, stream = out, withLocals = True)
@@ -574,11 +578,17 @@ class ObjectCache(dict):
     def setdefault(self, key, value):
         return dict.setdefault(self, ref(key, self._remove), ref(value))()
 
-def memsize():
-    return memusage()[0]
+def memsize(pid = None):
+    return memusage(pid = pid)[0]
 
-def memusage():
-    pfn = "/proc/self/statm"
+def memusage(pid = None):
+    """Get the memory usage.
+    @param pid: Process to analyze (None for current process)
+    """
+    if pid is None:
+        pfn = "/proc/self/statm"
+    else:
+        pfn = "/proc/%d/statm" % pid
     line = open(pfn).readline()
     # Assume page size is 4k (true for i386). This can be adjusted by reading
     # resource.getpagesize() 
@@ -1230,9 +1240,10 @@ class ProtectedTemplate(str):
 def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     import types
     import inspect
+    import itertools
     import repr as reprmod
     class Repr(reprmod.Repr):
-        def __init__(self):
+        def __init__(self, subsequentIndent = ""):
             reprmod.Repr.__init__(self)
             self.maxtuple = 20
             self.maxset = 160
@@ -1241,10 +1252,61 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             self.maxstring = 160
             self.maxother = 160
 
+            self.maxLineLen = 160
+
+            self.subsequentIndent = subsequentIndent
+            # Pretty-print?
+            self._pretty = True
+
         def repr_str(self, x, level):
             if hasattr(x, '__safe_str__'):
-                return x.__safe_str__()
+                return reprmod.Repr.repr_str(x.__safe_str__())
             return reprmod.Repr.repr_str(self, x, level)
+
+        def _pretty_repr(self, pieces, iterLen, level):
+            ret = ', '.join(pieces)
+            if not self._pretty or len(ret) < self.maxLineLen:
+                return ret
+            padding = self.subsequentIndent + "  " * (self.maxlevel - level)
+            sep = ',\n' + padding
+            return '\n' + padding + sep.join(pieces)
+
+        def _repr_iterable(self, x, level, left, right, maxiter, trail=''):
+            n = len(x)
+            if level <= 0 and n:
+                s = '...'
+            else:
+                newlevel = level - 1
+                repr1 = self.repr1
+                pieces = [repr1(elem, newlevel) for elem in itertools.islice(x, maxiter)]
+                if n > maxiter:  pieces.append('...')
+                s = self._pretty_repr(pieces, n, level)
+                if n == 1 and trail:  right = trail + right
+            return '%s%s%s' % (left, s, right)
+
+        def repr_dict(self, x, level):
+            n = len(x)
+            if n == 0: return '{}'
+            if level <= 0: return '{...}'
+            newlevel = level - 1
+            repr1 = self.repr1
+            pieces = []
+            for key in itertools.islice(sorted(x), self.maxdict):
+                oldPretty = self._pretty
+                self._pretty = False
+                keyrepr = repr1(key, newlevel)
+                self._pretty = oldPretty
+
+                oldSubsequentIndent = self.subsequentIndent
+                self.subsequentIndent += ' ' * 4;
+                valrepr = repr1(x[key], newlevel)
+                self.subsequentIndent = oldSubsequentIndent
+
+                pieces.append('%s: %s' % (keyrepr, valrepr))
+            if n > self.maxdict: pieces.append('...')
+            s = self._pretty_repr(pieces, n, level)
+            return '{%s}' % (s,)
+
 
     def formatOneFrame(tb, stream):
         fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
@@ -1267,7 +1329,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     else:
         msg = "Traceback (most recent call last):\n"
 
-    r = Repr()
+    r = Repr(subsequentIndent = " " * 27)
     ignoredTypes = (types.ClassType, types.ModuleType, types.FunctionType,
                     types.TypeType)
 

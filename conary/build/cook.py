@@ -1305,7 +1305,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         while True:
             # Generate the file prefixes
             filePrefixes = _computeCommonPrefixes(fileIdsPathMap.keys())
-            fileIds = sorted(fileIdsPathMap.values())
+            fileIds = sorted(set(fileIdsPathMap.values()))
             if not fileIds:
                 break
             d = repos.getPackageBranchPathIds(sourceName, searchBranch,

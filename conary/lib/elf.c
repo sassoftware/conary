@@ -511,6 +511,60 @@ static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
     return rc;
 }
 
+static PyObject *doGetSectionSymbols(Elf * elf, GElf_Word sh_type,
+                                     const char *sect_name) {
+    Elf_Scn * sect = NULL;
+    Elf_Data * data;
+    GElf_Ehdr ehdr;
+    GElf_Shdr shdr;
+    char * name;
+    int entries, i;
+
+    PyObject *rlist;
+
+    if (!gelf_getehdr(elf, &ehdr)) {
+        PyErr_SetString(ElfError, "failed to get ELF header");
+        return NULL;
+    }
+
+    rlist = PyList_New(0);
+    while ((sect = elf_nextscn(elf, sect))) {
+        if (!gelf_getshdr(sect, &shdr)) {
+            PyErr_SetString(ElfError, "error getting section header");
+            Py_DECREF(rlist);
+            return NULL;
+        }
+
+        if (shdr.sh_type != sh_type) {
+            continue;
+        }
+        name = elf_strptr (elf, ehdr.e_shstrndx, shdr.sh_name);
+        if (strncmp(name, sect_name, strlen(sect_name))) {
+            PyErr_SetString(ElfError, "Mismatching section header");
+            Py_DECREF(rlist);
+            return NULL;
+        }
+
+        data = elf_getdata(sect, NULL);
+        if (data == NULL || data->d_buf == NULL || data->d_size == 0) {
+            continue;
+        }
+        entries = shdr.sh_size / shdr.sh_entsize;
+        for (i = 0; i < entries; i++) {
+            GElf_Sym sym;
+            gelf_getsym(data, i, &sym);
+            if ((sym.st_value == 0) ||
+                 (GELF_ST_BIND(sym.st_info) == STB_WEAK) ||
+                 (GELF_ST_BIND(sym.st_info) == STB_NUM) ||
+                 (GELF_ST_TYPE(sym.st_info) != STT_FUNC))
+                continue;
+            name = elf_strptr(elf, shdr.sh_link, sym.st_name);
+            PyList_Append(rlist, PyString_FromString(name));
+        }
+    }
+    return rlist;
+}
+
 static PyObject *doGetRPATH(Elf * elf) {
     Elf_Scn * sect = NULL;
     Elf_Data * data;
@@ -573,6 +627,35 @@ static PyObject *doGetRPATH(Elf * elf) {
 	return Py_None;
     }
 }
+
+static PyObject * getDynSym(PyObject *self, PyObject *args) {
+    char * fileName;
+    int fd;
+    Elf * elf;
+    PyObject *rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    rc = doGetSectionSymbols(elf, SHT_DYNSYM, ".dynsym");
+    elf_end(elf);
+    close(fd);
+
+    return rc;
+}
+
 
 static PyObject * getRPATH(PyObject *self, PyObject *args) {
     char * fileName;
@@ -649,6 +732,8 @@ static PyMethodDef ElfMethods[] = {
 	"returns whether or not an ELF file has unresolved symbols" },
     { "getRPATH", getRPATH, METH_VARARGS,
         "returns the RPATH or RUNPATH set in an ELF file (if any)" },
+    { "getDynSym", getDynSym, METH_VARARGS,
+        "returns the list of dynamic symbols" },
     { "getType", getType, METH_VARARGS,
         "returns the ELF type of the file (elf.ET_EXEC, elf.ET_DYN, etc)" },
     { NULL, NULL, 0, NULL }
@@ -663,9 +748,11 @@ initelf(void)
 {
     PyObject* m;
 
-    ElfError = PyErr_NewException("elf.error", NULL, NULL);
     m = Py_InitModule3("elf", ElfMethods, 
                        "provides access to elf shared library dependencies");
+
+    ElfError = PyErr_NewException("elf.error", PyExc_Exception, NULL);
+    PyModule_AddObject(m, "error", ElfError);
 
     ADD_CONST(ET_NONE);
     ADD_CONST(ET_REL);

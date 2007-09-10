@@ -1,21 +1,46 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * The clone and promote commands now work when cloning over removed
-      packages. (CNY-1955)
-    * searchPath will now provide only the best flavor match when matching
-      against groups with more than one version of a package available.
-      Previously, it would return all matches.  (CNY-1881)
+  o Client changes:
+    * Clone/promote no longer complains when a buildreq is not also being
+      cloned to the new location. (CNY-1844)
 
+  o Bug Fixes:
+    * Bootstrapping python can now find system conary when using the
+      bootstrapped python to determine python dependencies. (CNY-2001)
+    * Bug fixed in findTroves when using partial labels (introduced
+      in 1.1.90). (CNY-2011)
+    * Don't traceback when you cannot access the current working directory.
+      (CNY-2014)
+    * Redirects to nothing are now displayed when using --trove-flags.
+      (CNY-2025)
+    * Stack frames are now wrapping long lines to make them easier to read.
+      (CNY-2016)
+    * Comparison of VersionSequence objects is now more robust. (CNY-2020)
+
+Changes in 1.1.94:
+  o Bug Fixes:
+    * Python extension modules installed at the top level of the Python
+      search path no longer produce a traceback when computing
+      dependencies. (CNY-1995)
+
+Changes in 1.1.93:
   o Build Changes:
     * Filesets now accept macros. (CNY-148)
     * crossRequires are now ignored when not cross compiling. (CNY-1950)
     * Malformed .jar files are now ignored when computing Java
-      dependencies.  Previously, Conary exited with an error while
+      dependencies. Previously, Conary exited with an error while
       attempting to process them. (CNY-1983)
+    * Conary dependencies are no longer attempted when cross-compiling,
+      and when bootstrapping python, modules are now sought in system
+      python directories as well as in the destdir. (CNY-1986)
+    * Python extension modules (.so files) now expose the proper
+      dependencies by providing, for example, itertools (the true
+      name) as well as itertoolsmodule (as it has previously), but
+      requiring the shorter name if it is available on the system.
+      (CNY-1077)
 
   o Client Changes:
     * The cvc promote and clone commands are now more efficient and do
-      not download unnecessary packages.  This also makes it possible
+      not download unnecessary packages. This also makes it possible
       to clone packages where access to some of the included troves
       is unavailable at the time of the promote or clone operation.
       (CNY-1913)
@@ -28,6 +53,13 @@ Changes in @NEW@:
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
       repositories has been fixed. (CNY-1912)
+
+  o Bug Fixes:
+    * The clone and promote commands now work when cloning over removed
+      packages. (CNY-1955)
+    * searchPath will now provide only the best flavor match when
+      matching against groups with more than one version of a package
+      available. Previously, it would return all matches. (CNY-1881)
 
 Changes in 1.1.92:
   o Bug Fixes:
