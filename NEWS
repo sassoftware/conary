@@ -12,6 +12,9 @@ Changes in @NEW@:
       (CNY-2014)
     * Redirects to nothing are now displayed when using --trove-flags.
       (CNY-2025)
+    * Stack frames are now wrapping long lines to make them easier to read.
+      (CNY-2016)
+    * Comparison of VersionSequence objects is now more robust. (CNY-2020)
 
 Changes in 1.1.94:
   o Bug Fixes:
