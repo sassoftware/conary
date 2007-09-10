@@ -1,31 +1,34 @@
 Changes in @NEW@:
   o Server Changes
-    * a bug which triggered an exception while migrating postgresql
-      repositories has been fixed (CNY-1912)
-    * the getNewTroveInfo call works faster for mirror operations (CNY-2006)
+    * A bug which triggered an exception while migrating postgresql
+      repositories has been fixed. (CNY-1912)
+    * The getNewTroveInfo call works faster for mirror operations.
+      (CNY-2006)
     * An issue that prevented the server from responding with the
       proper error message when in maintenance mode has been fixed.
       (CNY-2005)
     * An issue that was affecting cooking performance when looking
       up path IDs has been fixed. (CNY-1996)
+
   o Client Changes:
-    * a bug which prevented the mirror client from using hidden commits
-      when mirroring to a single target has been fixed (CNY-1981)
-    * Clone/promote no longer complains when a buildreq is not also being
-      cloned to the new location. (CNY-1844)
+    * A bug which prevented the mirror client from using hidden commits
+      when mirroring to a single target has been fixed. (CNY-1981)
+    * Clone/promote no longer complains when a buildreq is not also
+      being cloned to the new location. (CNY-1844)
 
   o Bug Fixes:
     * Bootstrapping python can now find system conary when using the
       bootstrapped python to determine python dependencies. (CNY-2001)
-    * Bug fixed in findTroves when using partial labels (introduced
-      in 1.1.90). (CNY-2011)
-    * cvc operations no longer trace back when it cannot access the
-      current working directory.  (CNY-2014)
+    * A bug in findTroves when using partial labels, introduced as
+      part of 1.1.90, has been fixed. (CNY-2011)
+    * cvc operations no longer trace back when the current working
+      directory can no longer be accessed. (CNY-2014)
     * Redirects to nothing are now displayed when using --trove-flags.
       (CNY-2025)
     * Stack frames now wrap long lines to make them easier to read.
       (CNY-2016)
-    * Comparison of VersionSequence objects is now more robust. (CNY-2020)
+    * Comparison of VersionSequence objects is now more robust.
+      (CNY-2020)
     * Autosourced files added to both a shadow and its parent now merge
       properly. (CNY-1856)
 
