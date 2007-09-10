@@ -13,6 +13,7 @@
 #
 
 filter_files =	\
+	cil.py \
 	data.py \
 	develdocs.py \
 	devellib.py \

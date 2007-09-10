@@ -30,6 +30,10 @@ class DepResolutionMethod(object):
         if isinstance(flavor, deps.Flavor):
             flavor = [flavor]
         self.flavor = flavor
+        self.flavorPreferences = []
+
+    def setFlavorPreferences(self, flavorPreferences):
+        self.flavorPreferences = flavorPreferences
 
     def setTroveSource(self, troveSource):
         self.troveSource = troveSource
@@ -75,8 +79,8 @@ class DepResolutionMethod(object):
                     else:
                         affTroveDict = dict.fromkeys(troveNames, {})
 
-                    # iterate over flavorpath -- use suggestions 
-                    # from first flavor on flavorpath that gets a match 
+                    # iterate over flavorpath -- use suggestions
+                    # from first flavor on flavorpath that gets a match
                     for installFlavor in self.flavor:
                         choice = self.selectResolutionTrove(troveTup, dep,
                                                             depClass,
@@ -125,62 +129,126 @@ class DepResolutionMethod(object):
             our system, we have to filter the troves locally.  
         """
         # we filter the troves in the following ways:
-        # 1. remove trove tups that don't match this installFlavor
-        #    (after modifying the flavor by any affinity flavor found
-        #     in an installed trove by the same name)
-        # 2. filter so that only the latest version of a trove is left
-        #    for each name,branch pair. (this ensures that a really old
-        #    version of a trove doesn't get preferred over a new one 
-        #    just because its got a better flavor)
-        # 3. pick the best flavor out of the remaining
+        # 1. prefer troves that match affinity flavor + are on the affinity
+        # label. (And don't drop an arch)
+        # 2. fall back to troves that match the install flavor.
 
+        # If we don't match an affinity flavor + label, then use flavor
+        # preferences and flavor scoring to select the best flavor.
+        # We'll have to check 
+
+        # Within these two categories:
+        # 1. filter via flavor preferences for each trove (this may result
+        # in an older version for some troves)
+        # 2. only leave the latest version for each trove
+        # 3. pick the best flavor out of the remaining
+        affinityMatches = []
+        affinityFlavors = []
+        otherMatches = []
+        otherFlavors = []
 
         if installFlavor is not None and not installFlavor.isEmpty():
             flavoredList = []
             for troveTup in troveTups:
-                f = installFlavor.copy()
-                affFlavors = affFlavorDict[troveTup[0]]
-                if affFlavors:
-                    affFlavor = affFlavors[0][2]
-                    flavorsMatch = True
-                    for newF in [x[2] for x in affFlavors[1:]]:
-                        if newF != affFlavor:
-                            flavorsMatch = False
-                            break
-                    if flavorsMatch:
-                        f.union(affFlavor,
-                                mergeType=deps.DEP_MERGE_TYPE_PREFS)
-
-                flavoredList.append((f, troveTup))
+                label = troveTup[1].trailingLabel()
+                affTroves = affFlavorDict[troveTup[0]]
+                found = False
+                if affTroves:
+                    for affName, affVersion, affFlavor in affTroves:
+                        if affVersion.trailingLabel() != label:
+                            continue
+                        newFlavor = deps.overrideFlavor(installFlavor,
+                                                        affFlavor,
+                                            mergeType=deps.DEP_MERGE_TYPE_PREFS)
+                        # implement never drop an arch for dep resolution
+                        currentArch = deps.getInstructionSetFlavor(affFlavor)
+                        if not troveTup[2].stronglySatisfies(currentArch):
+                            continue
+                        if newFlavor.satisfies(troveTup[2]):
+                            affinityMatches.append((newFlavor, troveTup))
+                            affinityFlavors.append(troveTup[2])
+                            found = True
+                if not found and not affinityMatches:
+                    if installFlavor.satisfies(troveTup[2]):
+                        otherMatches.append((installFlavor, troveTup))
+                        otherFlavors.append(troveTup[2])
         else:
-            flavoredList = [ (None, x) for x in troveTups ]
+            otherMatches = [ (None, x) for x in troveTups ]
+            otherFlavors = [x[2] for x in troveTups]
+        if affinityMatches:
+            allFlavors = affinityFlavors
+            flavoredList = affinityMatches
+        else:
+            allFlavors = otherFlavors
+            flavoredList = otherMatches
 
-        trovesByNB = {}
+        # Now filter by flavor preferences.
+        newFlavors = []
+        if self.flavorPreferences:
+            for flavor in self.flavorPreferences:
+                for trvFlavor in allFlavors:
+                    if trvFlavor.stronglySatisfies(flavor):
+                       newFlavors.append(trvFlavor)
+                if newFlavors:
+                    break
+        if newFlavors:
+            flavoredList = [ x for x in flavoredList if x[1][2] in newFlavors ]
+
+        # finally, filter by latest then score.
+
+        trovesByNL = {}
         for installFlavor, (n,v,f) in flavoredList:
-            b = v.branch()
+            l = v.trailingLabel()
             myTimeStamp = v.timeStamps()[-1]
             if installFlavor is None:
                 myScore = 0
             else:
+                # FIXME: we should cache this scoring from before.
                 myScore = installFlavor.score(f)
-                if myScore is False:
-                    continue
 
-            if (n,b) in trovesByNB:
-                curScore, curTimeStamp, curTup = trovesByNB[n,b]
+            if (n,l) in trovesByNL:
+                curScore, curTimeStamp, curTup = trovesByNL[n,l]
                 if curTimeStamp > myTimeStamp:
                     continue
                 if curTimeStamp == myTimeStamp:
                     if myScore < curScore:
                         continue
 
-            trovesByNB[n,b] = (myScore, myTimeStamp, (n,v,f))
+            trovesByNL[n,l] = (myScore, myTimeStamp, (n,v,f))
 
-        scoredList = sorted(trovesByNB.itervalues())
+        scoredList = sorted(trovesByNL.itervalues())
         if not scoredList:
             return None
         else:
+            # highest score, then latest timestamp, then name.
             return scoredList[-1][-1]
+
+    def filterResolutionsPostUpdate(self, db, jobSet, troveSource):
+        # Now that we know how conary would line up these dependencies
+        # to installed troves.
+        # We can't resolve deps in a way that would cause conary to
+        # switch the branch of a trove.
+        badJobs = [ x for x in jobSet
+                            if (x[1][0] and
+                                x[1][0].trailingLabel() != x[2][0].trailingLabel()) ]
+        badJobs += [ x for x in jobSet if
+                     (x[1][0]
+                      and not x[2][1].stronglySatisfies(
+                                    deps.getInstructionSetFlavor(x[1][1])))]
+        if badJobs:
+            jobSet.difference_update(badJobs)
+            oldTroves = db.getTroves(
+                  [ (x[0], x[1][0], x[1][1]) for x in badJobs ],
+                  withFiles = False)
+            newTroves = troveSource.getTroves(
+                  [ (x[0], x[2][0], x[2][1]) for x in badJobs ],
+                  withFiles = False)
+            for job, oldTrv, newTrv in itertools.izip(badJobs,
+                                                      oldTroves,
+                                                      newTroves):
+                if oldTrv.compatibleWith(newTrv):
+                    jobSet.add((job[0], (None, None), job[2], False))
+        return jobSet
 
     def searchLeavesOnly(self):
         pass

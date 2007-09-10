@@ -244,9 +244,15 @@ class PromoteCommand(CvcCommand):
                                      ' being cloned'),
              'default-only'    : (VERBOSE_HELP, 'EXPERIMENTAL - '
                                    ' Clones only those components'
-                                   'that are installed by default.'),
+                                   ' that are installed by default.'),
              'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
-                                           ' to the repository')
+                                           ' to the repository'),
+             'all-flavors' : (VERBOSE_HELP, 'Promote all flavors of a'
+                                            ' package/group at the same time'
+                                            ' (now the default)'),
+             'exact-flavors' : (VERBOSE_HELP, 'Specified flavors must match'
+                                              'the package/group flavors'
+                                              'exactly to promote')
            }
 
     def addParameters(self, argDef):
@@ -256,10 +262,12 @@ class PromoteCommand(CvcCommand):
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
         argDef["all-flavors"] = NO_PARAM
+        argDef["exact-flavors"] = NO_PARAM
         argDef["without-sources"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
         argDef["default-only"] = NO_PARAM
         argDef["to-file"] = ONE_PARAM
+        argDef["exact-flavors"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -279,17 +287,18 @@ class PromoteCommand(CvcCommand):
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        allFlavors = argSet.pop("all-flavors", False)
+        allFlavors = argSet.pop("all-flavors", True)
         cloneSources = not argSet.pop("without-sources", False)
         argSet.pop("with-sources", False)
         targetFile = argSet.pop("to-file", False)
         defaultOnly = argSet.pop("default-only", False)
+        exactFlavors = argSet.pop("exact-flavors", False)
         clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test,
                             cloneSources=cloneSources, allFlavors=allFlavors,
                             cloneOnlyByDefaultTroves=defaultOnly,
-                            targetFile=targetFile)
+                            targetFile=targetFile, exactFlavors=exactFlavors)
 _register(PromoteCommand)
 
 
@@ -788,18 +797,17 @@ _register(StatCommand)
 
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
-    paramHelp = "[<version>]"
-    help = 'Update files in current directory to a different version'
+    paramHelp = "[<dir>=<version>]*"
+    help = 'Update files in one or more directories to a different version'
     commandGroup = 'File Operations'
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
-        args = args[1:]
-        if argSet or not args or len(args) > 2: return self.usage()
+        args = args[2:]
+        if argSet: return self.usage()
 
-        args[0] = repos
         kwargs = {'callback': callback}
-        checkin.updateSrc(*args, **kwargs)
+        checkin.updateSrc(repos, versionList = args, **kwargs)
 _register(UpdateCommand)
 
 
@@ -883,6 +891,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
                                   repos=repos)
 
 def main(argv=sys.argv):
+    sys.stdout = util.FileIgnoreEpipe(sys.stdout)
     try:
         argv = list(argv)
         debugAll = '--debug-all' in argv
