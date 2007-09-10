@@ -667,8 +667,9 @@ class ConaryConfiguration(SectionedConfigFile):
         # buildFlavor is installFlavor + overrides
         self.buildFlavor = deps.overrideFlavor(self.flavor[0], 
                                                     self.buildFlavor)
-        if self.isDefault('flavorPreferences'):
-            self.flavorPreferences = arch.getFlavorPreferences()
+        # disable flavorPreferences for now
+        #if self.isDefault('flavorPreferences'):
+        #    self.flavorPreferences = arch.getFlavorPreferences()
 	self.flavorConfig.populateBuildFlags()
 
 def selectSignatureKey(cfg, label):

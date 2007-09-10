@@ -286,8 +286,10 @@ class QueryByLabelPath(QueryMethod):
                                 affQueries.append(affDict)
                             else:
                                 affDict = affQueries[idx]
-                            affDict[label] = [(x, requiredFlavor)
-                                                for x in flavorList ]
+                            affDict[label] = flavorList
+                            # Turned off until CNY-525 is resolved
+                            #affDict[label] = [(x, requiredFlavor)
+                            #                    for x in flavorList ]
                     d = affQueries.pop(0)
                     if affQueries:
                         self.affQueries[name] = affQueries
@@ -315,7 +317,10 @@ class QueryByLabelPath(QueryMethod):
                                     queryList.append(d)
                                 else:
                                     d = queryList[idx]
-                                d[label] = [(flavor, requiredFlavor)]
+                                #d[label] = [(flavor, requiredFlavor)]
+                                # turn off never drop an arch for
+                                # flavorPreferences (CNY-525)
+                                d[label] = [flavor]
                     self.query[name] = affQueries.pop(0)
                     if affQueries:
                         self.affQueries[name] = affQueries
@@ -538,7 +543,9 @@ class QueryByBranch(QueryMethod):
             flavorList = self.overrideFlavors(f)
 
         self.addQuery(troveTup, branch, flavorList,
-                      requiredFlavor=requiredFlavor)
+                      # turn off until CNY-525 issues are resolved
+                      #requiredFlavor=requiredFlavor
+                      )
 
     def findAll(self, troveSource, missing, finalMap):
         self._findAllNoFlavor(troveSource, missing, finalMap)
