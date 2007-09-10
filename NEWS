@@ -8,13 +8,15 @@ Changes in @NEW@:
       bootstrapped python to determine python dependencies. (CNY-2001)
     * Bug fixed in findTroves when using partial labels (introduced
       in 1.1.90). (CNY-2011)
-    * Don't traceback when you cannot access the current working directory.
-      (CNY-2014)
+    * cvc operations no longer trace back when it cannot access the
+      current working directory.  (CNY-2014)
     * Redirects to nothing are now displayed when using --trove-flags.
       (CNY-2025)
-    * Stack frames are now wrapping long lines to make them easier to read.
+    * Stack frames now wrap long lines to make them easier to read.
       (CNY-2016)
     * Comparison of VersionSequence objects is now more robust. (CNY-2020)
+    * Autosourced files added to both a shadow and its parent now merge
+      properly. (CNY-1856)
 
 Changes in 1.1.94:
   o Bug Fixes:
@@ -47,8 +49,6 @@ Changes in 1.1.93:
     * A bug which prevented the mirror client from using hidden commits
       when mirroring to a single target has been fixed. (CNY-1981)
     * Filesets are now cloneable. (CNY-1297)
-    * Autosouced files added to both a shadow and it's parent now merge
-      properly (CNY-1856)
 
   o Server Changes
     * A bug which triggered an exception while migrating postgresql

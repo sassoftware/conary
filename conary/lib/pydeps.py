@@ -26,7 +26,7 @@ if __name__ != "__main__":
     from conary.lib import coveragehook
     from conary import errors
 
-    # only in the conary module case do we carre about a
+    # only in the conary module case do we care about
     # ModuleFinderProtocolError inheriting from
     # conary.errors.InternalConaryError
     class ModuleFinderProtocolError(errors.InternalConaryError):
