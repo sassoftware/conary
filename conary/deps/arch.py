@@ -60,7 +60,9 @@ def flags_x86_64():
     x86_64 = x86flags('x86_64', baseArch, baseFlagMap, ofInterest)
     multiarch = flags_i686()
     multiarch[0].append(x86_64)
-    return multiarch
+    # switch to just return muliarch when flavorPreferences are switched on.
+    # return multiarch
+    return [[ x86_64 ]] + multiarch
 
 def current():
     return currentArch
