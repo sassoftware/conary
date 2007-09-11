@@ -219,6 +219,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         attempt = 1
         # nested try:...except statements.... Yeeee-haaa!
         while True:
+            exceptionOverride = None
+
             try:
                 # the first argument is a version number
                 try:
@@ -257,15 +259,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if isinstance(e, HiddenException):
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  kwArgs, exception = e.forLog)
-                e = e.forReturn
+                exceptionOverride = e.forReturn
             else:
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  kwArgs, exception = e)
 
         if isinstance(e, sqlerrors.DatabaseLocked):
-            e = RepositoryLocked()
+            exceptionOverride = RepositoryLocked()
 
-        raise e
+        if exceptionOverride:
+            raise exceptionOverride
+
+        raise
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
