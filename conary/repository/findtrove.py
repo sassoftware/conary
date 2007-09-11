@@ -453,6 +453,17 @@ class QueryByLabelPath(QueryMethod):
                     for label in req.keys():
                         if (name, label) in foundNameLabels:
                             req.pop(label)
+                    if not req and name in self.affQueries:
+                        # we completed all the searches for this name.
+                        # so add the next affinityQuery onto the end
+                        # of the search.
+                        self.query[name][index:] = []
+                        self.query[name].extend(self.affQueries[name].pop())
+                        if not self.affQueries[name]:
+                            del self.affQueries[name]
+                        req = self.query[name][index]
+                        for label in req.keys():
+                            foundNameLabels.discard((name, label))
                     if not req:
                         continue
                 elif name in foundNames:
