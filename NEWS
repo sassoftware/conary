@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.95:
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
       repositories has been fixed. (CNY-1912)
@@ -15,8 +15,8 @@ Changes in @NEW@:
       when mirroring to a single target has been fixed. (CNY-1981)
     * Clone/promote no longer complains when a buildreq is not also
       being cloned to the new location. (CNY-1844)
-    * Turned off flavorPreferences for 1.2 release, as they are not quite
-      ready (CNY-2023)
+    * Turned off flavorPreferences for 1.2 release, as they are not
+      quite ready. (CNY-2023)
 
   o Bug Fixes:
     * Bootstrapping python can now find system conary when using the
