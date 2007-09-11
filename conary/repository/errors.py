@@ -62,7 +62,7 @@ class InsufficientPermission(ConaryError):
             msg = "Insufficient permission"
         ConaryError.__init__(self, msg)
 
-class IntegrityError(RepositoryError):
+class IntegrityError(RepositoryError, InternalConaryError):
     """Files were added which didn't match the expected sha1"""
 
 class MethodNotSupported(RepositoryError):
