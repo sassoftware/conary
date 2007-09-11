@@ -1300,6 +1300,41 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             versionDict = repos.getTroveLeavesByBranch(versionDict)
 
         log.info('looking up pathids from repository history')
+        # We've got all of the latest packages for each flavor.
+        # Now we'll search their components for matching pathIds.
+        # We do this manually for these latest packages to avoid having
+        # to make the getPackageBranchPathIds repository call unnecessarily
+        # because it is very heavy weight.
+        trovesToGet = []
+        for name, versionFlavorDict in versionDict.iteritems():
+            for version, flavorList in versionFlavorDict.iteritems():
+                for flavor in flavorList:
+                    trovesToGet.append((name, version, flavor))
+        # get packages
+        latestTroves = repos.getTroves(trovesToGet, withFiles=False)
+        trovesToGet = list(itertools.chain(*[ x.iterTroveList(strongRefs=True)
+                                            for x in latestTroves ]))
+        # get components
+        latestTroves = repos.getTroves(trovesToGet, withFiles=True)
+        d = {}
+        for trv in sorted(latestTroves):
+            for pathId, path, fileId, fileVersion in trv.iterFileList():
+                if path in fileIdsPathMap:
+                    newFileId = fileIdsPathMap[path]
+                    if path in d and newFileId != fileId:
+                        # if the fileId already exists and we're not
+                        # a perfect match, don't override what already exists
+                        # there.
+                        continue
+                    d[path] = pathId, fileVersion, fileId
+        for path in d:
+            fileIdsPathMap.pop(path)
+        ident.merge(d)
+
+        # Any path in fileIdsPathMap beyond this point is a file that did not
+        # exist in the latest version(s) of this package, so fall back to
+        # getPackageBranchPathIds
+
         # look up the pathids for every file that has been built by
         # this source component, following our branch ancestry
         while True:
