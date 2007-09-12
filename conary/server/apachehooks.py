@@ -167,8 +167,7 @@ def _handler(req):
             repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]
-    # Rely on the client to tell us if we're using a secure protocol
-    secure = req.unparsed_uri.lower().startswith('https')
+    secure = (req.subprocess_env.get('HTTPS', 'off') == 'on')
 
     repos = repositories[repName]
     method = req.method.upper()
