@@ -19,7 +19,10 @@ Changes in 2.0.0:
       been False since 1.1.29)
     * Server exceptions are marshalled in the proxy layer now instead of
       in both the proxy and server layers
+
+o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
+    * No longer include useAnonymous flag in return value
 
 Changes in @NEW@:
   o Bug Fixes:

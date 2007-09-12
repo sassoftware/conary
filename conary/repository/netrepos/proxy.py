@@ -88,17 +88,21 @@ class ProxyCaller:
 
             raise
 
-        if rc[1]:
+        if args[0] < 60:
+            # strip off useAnonymous flag
+            rc = rc[1:3]
+
+        if rc[0]:
             # exception occured. this lets us tunnel the error through
             # without instantiating it (which would be demarshalling the
             # thing just to remarshall it again)
             if args[0] < 60:
-                raise ProxyRepositoryError(rc[2][0], rc[2][1:], None)
+                raise ProxyRepositoryError(rc[1][0], rc[1][1:], None)
             else:
                 # keyword args to exceptions appear
-                raise ProxyRepositoryError(rc[2][0], rc[2][1], rc[2][2])
+                raise ProxyRepositoryError(rc[1][0], rc[1][1], rc[1][2])
 
-        return rc[2]
+        return rc[1]
 
     def getExtraInfo(self):
         """Return extra information if available"""
@@ -230,7 +234,11 @@ class BaseProxy(xmlshims.NetworkConvertors):
         request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
-            return (False, True, ("MethodNotSupported", methodname, ""), None)
+            if protocolVersion < 60:
+                return (False, True, ("MethodNotSupported", methodname, ""),
+                        None)
+            else:
+                return (True, ("MethodNotSupported", methodname, ""), None)
 
         self._port = port
         self._protocol = protocol
@@ -310,11 +318,14 @@ class BaseProxy(xmlshims.NetworkConvertors):
                         debugger.post_mortem(excInfo[2])
                     raise
 
-        if r[0] is True and protocolVersion < 60:
-            # return (useAnon, isException, (exceptName,) + ordArgs) )
-            return (False, True, (r[1][0],)  + r[1][1], None )
+        if protocolVersion < 60:
+            if r[0] is True:
+                # return (useAnon, isException, (exceptName,) + ordArgs) )
+                return (False, True, (r[1][0],)  + r[1][1], None )
+            else:
+                return (False, False, r[1], None )
 
-        return (False, r[0], r[1]) + (extraInfo,)
+        return r + (extraInfo,)
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
