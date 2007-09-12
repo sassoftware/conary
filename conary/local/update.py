@@ -292,6 +292,7 @@ class FilesystemJob:
         # this is part of a hard link group, attempt making a
         # hardlink.
         linkPath = self.linkGroups[linkGroup]
+        opJournal.backup(target)
 
         try:
             util.createLink(linkPath, target)
@@ -559,7 +560,6 @@ class FilesystemJob:
                 if self.linkGroups.has_key(linkGroup):
                     # this could create spurious backups, but they won't
                     # hurt anything
-                    opJournal.backup(target)
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
                         opJournal.create(target)
                         continue

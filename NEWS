@@ -19,6 +19,9 @@ Changes in 1.1.95:
       being cloned to the new location. (CNY-1844)
     * Turned off flavorPreferences for 1.2 release, as they are not
       quite ready. (CNY-2023)
+    * Update journal did not have an entry for hard links which were made
+      to targets which already existed on the system, causing system
+      corruption if the journal had to be rolled back (CNY-1671)
 
   o Bug Fixes:
     * Bootstrapping python can now find system conary when using the
