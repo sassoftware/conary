@@ -194,8 +194,12 @@ class DepResolutionMethod(object):
         if newFlavors:
             flavoredList = [ x for x in flavoredList if x[1][2] in newFlavors ]
 
-        # finally, filter by latest then score.
+        return self._selectMatchingResolutionTrove(requiredBy, dep,
+                                                   depClass, flavoredList)
 
+    def _selectMatchingResolutionTrove(self, requiredBy, dep, depClass,
+                                       flavoredList):
+        # finally, filter by latest then score.
         trovesByNL = {}
         for installFlavor, (n,v,f) in flavoredList:
             l = v.trailingLabel()
