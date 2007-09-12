@@ -2050,7 +2050,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			       label = self.toBranch(branch).label()):
 	    raise errors.InsufficientPermission
         # decode the fileIds to check before doing heavy work
-        fileIds = base64.b64decode(fileIds)
+        if fileIds:
+            fileIds = base64.b64decode(fileIds)
+        else:
+            fileIds = ""
         def splitFileIds(fileIds):
             fileIdLen = 20
             assert(len(fileIds) % fileIdLen == 0)
