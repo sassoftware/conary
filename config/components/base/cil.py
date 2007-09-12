@@ -15,5 +15,5 @@
 # Note that cil components have %(lib)s in them; we depend on the
 # NonMultilibComponent policy to ensure that cil is multilib-safe.
 
-filters = ('cil', ('/usr/(%(lib)s|lib)/mono/',))
+filters = ('cil', ('%(prefix)s/(%(lib)s|lib)/(mono|[^/]*-sharp-[^/]*)/', ))
 precedes = ('devellib', 'lib', 'devel')
