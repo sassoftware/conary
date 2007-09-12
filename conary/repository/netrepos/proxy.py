@@ -43,7 +43,7 @@ class RepositoryVersionCache:
         if uri not in self.d:
             # checkVersion protocol is stopped at 50; we don't support kwargs
             # for that call, ever
-            useAnon, parentVersions = caller.checkVersion(50)
+            parentVersions = caller.checkVersion(50)
             self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
@@ -98,7 +98,7 @@ class ProxyCaller:
                 # keyword args to exceptions appear
                 raise ProxyRepositoryError(rc[2][0], rc[2][1], rc[2][2])
 
-        return (rc[0], rc[2])
+        return rc[2]
 
     def getExtraInfo(self):
         """Return extra information if available"""
@@ -157,7 +157,7 @@ class RepositoryCaller(xmlshims.NetworkConvertors):
                             methodname, self.authToken, args, kwargs,
                             remoteIp = self.remoteIp)
 
-        return (False, result)
+        return result
 
     def getExtraInfo(self):
         """No extra information available for a RepositoryCaller"""
@@ -272,22 +272,22 @@ class BaseProxy(xmlshims.NetworkConvertors):
             else:
                 r = caller.callByName(methodname, *args, **kwargs)
 
-            r = (r[0], False, r[1])
+            r = (False, r)
             extraInfo = caller.getExtraInfo()
         except ProxyRepositoryError, e:
-            r = (False, True, (e.name, e.args, e.kwArgs))
+            r = (True, (e.name, e.args, e.kwArgs))
         except Exception, e:
             if hasattr(e, 'marshall'):
                 marshalled = e.marshall(self)
                 args, kwArgs = marshalled
 
-                r = (False, True,
+                r = (True,
                         (e.__class__.__name__, args, kwArgs) )
             else:
                 r = None
                 for klass, marshall in errors.simpleExceptions:
                     if isinstance(e, klass):
-                        r = (False, True, (marshall, str(e), {}) )
+                        r = (True, (marshall, str(e), {}) )
 
                 if r is None:
                     # this exception is not marshalled back to the client.
@@ -310,11 +310,11 @@ class BaseProxy(xmlshims.NetworkConvertors):
                         debugger.post_mortem(excInfo[2])
                     raise
 
-        if r[1] is True and protocolVersion < 60:
+        if r[0] is True and protocolVersion < 60:
             # return (useAnon, isException, (exceptName,) + ordArgs) )
-            return (False, True, (r[2][0],)  + r[2][1], None )
+            return (False, True, (r[1][0],)  + r[1][1], None )
 
-        return r[0:3] + (extraInfo,)
+        return (False, r[0], r[1]) + (extraInfo,)
 
     def urlBase(self):
         return self.basicUrl % { 'port' : self._port,
@@ -330,7 +330,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
                (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS)))
 
-        useAnon, parentVersions = caller.checkVersion(clientVersion)
+        parentVersions = caller.checkVersion(clientVersion)
 
         if self.SERVER_VERSIONS is not None:
             commonVersions = sorted(list(set(self.SERVER_VERSIONS) &
@@ -338,7 +338,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         else:
             commonVersions = parentVersions
 
-        return useAnon, commonVersions
+        return commonVersions
 
 class ChangeSetInfo(object):
 
@@ -528,11 +528,11 @@ class ChangesetFilter(BaseProxy):
         if self.csCache:
             try:
                 if mirrorMode:
-                    useAnon, fingerprints = caller.getChangeSetFingerprints(49,
+                    fingerprints = caller.getChangeSetFingerprints(49,
                             chgSetList, recurse, withFiles, withFileContents,
                             excludeAutoSource, mirrorMode)
                 else:
-                    useAnon, fingerprints = caller.getChangeSetFingerprints(43,
+                    fingerprints = caller.getChangeSetFingerprints(43,
                             chgSetList, recurse, withFiles, withFileContents,
                             excludeAutoSource)
 
@@ -593,19 +593,19 @@ class ChangesetFilter(BaseProxy):
                                      recurse, withFiles, withFileContents,
                                      excludeAutoSource,
                                      neededCsVersion, mirrorMode,
-                                     infoOnly)[1]
+                                     infoOnly)
             elif getCsVersion >= 49:
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
                                      excludeAutoSource,
-                                     wireCsVersion, mirrorMode)[1]
+                                     wireCsVersion, mirrorMode)
             else:
                 # We don't support requesting specific changeset versions
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
-                                     excludeAutoSource)[1]
+                                     excludeAutoSource)
 
             csInfoList = []
             url = rc[0]
@@ -773,13 +773,13 @@ class ChangesetFilter(BaseProxy):
                          'Conary client.')
 
             if clientVersion < 38:
-                return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
+                return (url, allSizes, allTrovesNeeded, allFilesNeeded)
 
-            return False, (url, allSizes, allTrovesNeeded, allFilesNeeded,
-                          allTrovesRemoved)
+            return (url, allSizes, allTrovesNeeded, allFilesNeeded,
+                    allTrovesRemoved)
 
         # clientVersion >= 50
-        return False, (url, (
+        return (url, (
                 [ (x.size, x.trovesNeeded, x.filesNeeded, x.removedTroves)
                     for x in changeSetList ] ) )
 
@@ -850,7 +850,7 @@ class ProxyRepositoryServer(ChangesetFilter):
         if neededFiles:
             # now get the contents we don't have cached
             (url, sizes) = caller.getFileContents(
-                    clientVersion, neededFiles, False)[1]
+                    clientVersion, neededFiles, False)
             # insure that the size is an integer -- protocol version
             # 44 returns a string to avoid XML-RPC marshal limits
             sizes = [ int(x) for x in sizes ]
@@ -914,7 +914,7 @@ class ProxyRepositoryServer(ChangesetFilter):
                              'This version of Conary does not support '
                              'downloading file contents larger than 2 '
                              'GiB.  Please install a new Conary client.')
-            return False, (url, sizeList)
+            return (url, sizeList)
         finally:
             os.close(fd)
 
