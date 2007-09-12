@@ -491,8 +491,9 @@ class ServerCache:
             url = _cleanseUrl(protocol, url)
             if not errmsg:
                 errmsg = '%r' % e
+            tb = sys.exc_traceback
             raise errors.OpenError('Error occurred opening repository '
-                        '%s: %s' % (url, errmsg))
+                        '%s: %s' % (url, errmsg)), None, tb
 
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)
         if not intersection:
