@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Other Changes
+    * InodeStreams and FileStreams now preserve unknown elements, allowing
+      future additions to those without breaking fileId computation
+
   o Client Changes:
     * Update journal did not have an entry for hard links which were made
       to targets which already existed on the system, causing system
@@ -41,6 +45,8 @@ Changes in 1.1.95:
       (CNY-2016)
     * Comparison of VersionSequence objects is now more robust.
       (CNY-2020)
+    * Autosourced files added to both a shadow and its parent now merge
+      properly. (CNY-1856)
 
 Changes in 1.1.94:
   o Bug Fixes:
