@@ -1,7 +1,7 @@
 Changes in @NEW@:
   o Other Changes
     * InodeStreams and FileStreams now preserve unknown elements, allowing
-      future additions to those without breaking fileId computation
+      future additions to those without breaking fileId computation (CNY-1971)
 
   o Client Changes:
     * Update journal did not have an entry for hard links which were made
