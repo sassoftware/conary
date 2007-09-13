@@ -87,23 +87,28 @@ class changeset(Magic):
 class jar(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
-        fullpath = basedir+path
-        jar = zipfile.ZipFile(fullpath)
-        namelist = [ i.filename for i in jar.infolist()
-                     if not i.filename.endswith('/') and i.file_size > 0 ]
         self.contents['files'] = set()
         self.contents['provides'] = set()
         self.contents['requires'] = set()
-        for name in namelist:
-            contents = jar.read(name)
-            if not _javaMagic(contents):
-                continue
-            prov, req = javadeps.getDeps(contents)
-            self.contents['files'].add(name)
-            if prov:
-                self.contents['provides'].add(prov)
-            if req:
-                self.contents['requires'].update(req)
+
+        fullpath = basedir+path
+        try:
+            jar = zipfile.ZipFile(fullpath)
+            namelist = [ i.filename for i in jar.infolist()
+                         if not i.filename.endswith('/') and i.file_size > 0 ]
+            for name in namelist:
+                contents = jar.read(name)
+                if not _javaMagic(contents):
+                    continue
+                prov, req = javadeps.getDeps(contents)
+                self.contents['files'].add(name)
+                if prov:
+                    self.contents['provides'].add(prov)
+                if req:
+                    self.contents['requires'].update(req)
+        except (IOError, zipfile.BadZipfile):
+            # zipfile raises IOError on some malformed zip files
+            pass
 
 
 class ZIP(Magic):
