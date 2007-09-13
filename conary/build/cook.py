@@ -1343,8 +1343,13 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             fileIds = sorted(set(fileIdsPathMap.values()))
             if not fileIds:
                 break
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                                              filePrefixes, fileIds)
+            try:
+                d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                                                  filePrefixes, fileIds)
+            except errors.InsufficientPermission:
+                # No permissions to search on this branch. Keep going
+                d = {}
+                #raise
             # Remove the paths we've found already from fileIdsPathMap, so we
             # don't ask the next server the same questions
             for k in d.iterkeys():

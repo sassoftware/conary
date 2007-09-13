@@ -11,6 +11,8 @@ Changes in @NEW@:
   o Build Changes:
     * More paths (/usr/lib/.*-sharp.*/) have been added to :cil
       components. (CNY-2032)
+    * Path ID lookups now ignore permission errors; in such a case, a
+      new path ID is computed. (CNY-1911)
 
 Changes in 1.1.95:
   o Server Changes
