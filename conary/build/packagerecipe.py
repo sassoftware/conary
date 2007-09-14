@@ -33,6 +33,8 @@ from conary.deps import deps
 from conary.lib import log, magic, util
 from conary.local import database
 
+from conary.repository import errors as repoerrors
+
 
 
 crossMacros = {
@@ -223,12 +225,8 @@ class AbstractPackageRecipe(Recipe):
                 (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
                 # XXX move this to use more of db.findTrove's features, instead
                 # of hand parsing
-                try:
-                    troves = db.trovesByName(name)
-                    troves = db.getTroves(troves)
-                except errors.TroveNotFound:
-                    missingReqs.append(buildReq)
-                    continue
+                troves = db.trovesByName(name)
+                troves = db.getTroves(troves)
 
                 versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
 
