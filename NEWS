@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Update journal did not have an entry for hard links which were made
       to targets which already existed on the system, causing system
       corruption if the journal had to be rolled back. (CNY-1671)
+    * The critical update information now includes enough data to re-create
+      the original update job. (CNY-1608)
 
   o Build Changes:
     * More paths (/usr/lib/.*-sharp.*/) have been added to :cil
