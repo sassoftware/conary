@@ -16,6 +16,10 @@ Changes in @NEW@:
     * Path ID lookups now ignore permission errors; in such a case, a
       new path ID is computed. (CNY-1911)
 
+  o Bug Fixes:
+    * When running in threaded mode, don't install signal handlers, since
+      that is not supported. (CNY-2040)
+
 Changes in 1.1.95:
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
