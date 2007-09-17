@@ -37,6 +37,7 @@ CHANGESET_VERSIONS_PRECEDENCE = {
 class RepositoryVersionCache:
 
     def get(self, caller):
+        import epdb;epdb.st()
         basicUrl = util.stripUserPassFromUrl(caller.url)
         uri = basicUrl.split(':', 1)[1]
 
@@ -142,7 +143,8 @@ class RepositoryCaller:
     def callByName(self, methodname, *args):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
                                     self.authToken, args,
-                                    remoteIp = self.remoteIp)
+                                    remoteIp = self.remoteIp,
+                                    rawUrl = self.rawUrl)
 
         if rc[1]:
             # exception occured
@@ -157,13 +159,14 @@ class RepositoryCaller:
     def __getattr__(self, method):
         return lambda *args: self.callByName(method, *args)
 
-    def __init__(self, protocol, port, authToken, repos, remoteIp):
+    def __init__(self, protocol, port, authToken, repos, remoteIp, rawUrl):
         self.repos = repos
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
         self.url = None
         self.remoteIp = remoteIp
+        self.rawUrl = rawUrl
 
 class RepositoryCallFactory:
 
@@ -177,7 +180,7 @@ class RepositoryCallFactory:
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos,
-                                remoteIp)
+                                remoteIp, rawUrl)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -226,6 +229,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self._port = port
         self._protocol = protocol
 
+        if rawUrl:
+            self._baseUrlOverride = rawUrl
+
         targetServerName = headers.get('X-Conary-Servername', None)
 
         # simple proxy. FIXME: caching these might help; building all
@@ -257,6 +263,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         return (r[0], False, r[1], caller.getExtraInfo())
 
     def urlBase(self):
+        if self._baseUrlOverride is not None:
+            return self._baseUrlOverride
+
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 

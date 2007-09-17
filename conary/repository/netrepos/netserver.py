@@ -261,6 +261,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.reopen()
         self._port = port
         self._protocol = protocol
+        self._baseUrlOverride = rawUrl
 
         if methodname not in self.publicCalls:
             return (False, True, ("MethodNotSupported", methodname, ""))
@@ -390,7 +391,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		debugger.post_mortem(excInfo[2])
             raise
 
-    def urlBase(self):
+    def urlBase(self, urlName = True):
+        if urlName and self._baseUrlOverride:
+            return self._baseUrlOverride
+
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 
@@ -1900,7 +1904,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.commitAction:
 	    return True
 
-        d = { 'reppath' : self.urlBase(), 'user' : authToken[0], }
+        d = { 'reppath' : self.urlBase(urlName = False),
+              'user' : authToken[0], }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
         try:
@@ -1935,6 +1940,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we need to make sure we don't look up the same fileId multiple
         # times to avoid asking the sql server to do busy work
         fileIdMap = {}
+        i = 0               # protect against empty fileIdGen
         for i, fileId in enumerate(fileIdGen):
             fileIdMap.setdefault(fileId, []).append(i)
         uniqIdList = fileIdMap.keys()
