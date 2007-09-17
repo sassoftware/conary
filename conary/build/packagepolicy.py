@@ -2133,7 +2133,14 @@ class _dependency(policy.Policy):
                 self._enforceProvidedPath(pythonDestPath)
                 return (pythonDestPath, False)
 
-        # No python?  How is cvc running at all?
+        # Specified python not found on system (usually because of
+        # bad interpreter path -- CNY-2050)
+        if len(pythonPath) == 1:
+            missingPythonPath = '%s ' % pythonPath[0]
+        else:
+            missingPythonPath = ''
+        self.warn('Python interpreter %snot found for %s',
+                  missingPythonPath, path)
         return (None, None)
 
 
@@ -2380,8 +2387,9 @@ class Provides(_dependency):
         """
 
         pythonPath, bootstrapPython = self._getPython(self.macros, path)
-        # conary is a python program...
-        assert(pythonPath)
+        if not pythonPath:
+            # Most likely bad interpreter path in a .py file
+            return (None, None)
 
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
@@ -2440,6 +2448,8 @@ class Provides(_dependency):
             return
 
         sysPath, pythonVersion = self._getPythonProvidesSysPath(path)
+        if not sysPath:
+            return
 
         depPath = None
         for sysPathEntry in sysPath:
@@ -3012,8 +3022,8 @@ class Requires(_addInfo, _dependency):
         #  (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
 
         pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
-        # conary is a python program...
-        assert(pythonPath)
+        if not pythonPath:
+            return (None, None, None, None)
 
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
@@ -3097,6 +3107,10 @@ class Requires(_addInfo, _dependency):
         
         (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion
         )= self._getPythonRequiresSysPath(path)
+
+        if not sysPath:
+            # Probably a bad interpreter path
+            return
 
         if not pythonModuleFinder:
             # We cannot (reliably) determine runtime python requirements

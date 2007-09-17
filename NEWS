@@ -15,6 +15,10 @@ Changes in @NEW@:
       components. (CNY-2032)
     * Path ID lookups now ignore permission errors; in such a case, a
       new path ID is computed. (CNY-1911)
+    * Conary now handles python files that specify a python interpreter
+      that is not available on the system or in the builddir.  It will
+      print a warning and not attempt to compute dependency information
+      for those files. (CNY-2050)
 
   o Bug Fixes:
     * When running in threaded mode, don't install signal handlers, since
