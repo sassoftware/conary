@@ -182,10 +182,6 @@ def genExcepthook(debug=True,
             sys.exit(1)
 
         out = BoundedStringIO()
-        out.write(str(typ))
-        out.write(": ")
-        out.write(str(value))
-        out.write("\n\n")
         formatTrace(typ, value, tb, stream = out, withLocals = False)
         out.write("\nFull stack:\n")
         formatTrace(typ, value, tb, stream = out, withLocals = True)
@@ -1317,6 +1313,11 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             # If the source file is not available, we may not be able to get 
             # the line
             stream.write('    %s\n' % text[idx].strip())
+
+    stream.write(str(excType))
+    stream.write(": ")
+    stream.write(str(excValue))
+    stream.write("\n\n")
 
     tbStack = []
     while tb:
