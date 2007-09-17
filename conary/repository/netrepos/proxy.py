@@ -37,7 +37,6 @@ CHANGESET_VERSIONS_PRECEDENCE = {
 class RepositoryVersionCache:
 
     def get(self, caller):
-        import epdb;epdb.st()
         basicUrl = util.stripUserPassFromUrl(caller.url)
         uri = basicUrl.split(':', 1)[1]
 
