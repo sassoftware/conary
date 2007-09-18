@@ -764,8 +764,7 @@ class addSource(_Source):
 
     SYNOPSIS
     ========
-
-    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
+    C{r.addSource(I{sourcename}, [I{apply}=,] [I{dest}=,] [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{macros}=,] [I{mode}=,] [I{package}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
