@@ -167,7 +167,8 @@ def _handler(req):
             repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]
-    secure =  (port == 443)
+
+    secure = (req.subprocess_env.get('HTTPS', 'off') == 'on')
 
     repos = repositories[repName]
     method = req.method.upper()

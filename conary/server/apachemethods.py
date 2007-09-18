@@ -85,7 +85,8 @@ def post(port, isSecure, repos, req):
                                            rawUrl = req.unparsed_uri,
                                            localAddr = localAddr,
                                            protocolString = req.protocol,
-                                           headers = req.headers_in)
+                                           headers = req.headers_in,
+                                           isSecure = isSecure)
                 # Get the extra information from the end of result
                 extraInfo = result[-1]
                 result = result[:-1]
