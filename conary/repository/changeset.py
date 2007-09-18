@@ -25,7 +25,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary import files, streams, trove, versions
-from conary.lib import enum, fixeddifflib, log, misc, patch, sha1helper, util
+from conary.lib import enum, log, misc, patch, sha1helper, util
 from conary.repository import filecontainer, filecontents, errors
 
 # "refr" being the same length as "file" matters
@@ -1380,15 +1380,8 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont, mirrorMode = False):
 	first = oldCont.get().readlines()
 	second = newCont.get().readlines()
 
-        # XXX difflib (and probably our patch as well) don't work properly
-        # for files w/o trailing newlines.  But it can handle empty files.
-        # Though we do need either the first or the second to do
-        # a diff.  Diffing two empty files yields an empty file.
-	if ((first or second) and
-            (not first or first[-1][-1] == '\n') and
-            (not second or second[-1][-1] == '\n')):
-            diff = fixeddifflib.unified_diff(first, second, 
-                                             "old", "new")
+	if first or second:
+            diff = patch.unifiedDiff(first, second, "old", "new")
             diff.next()
             diff.next()
 	    cont = filecontents.FromString("".join(diff))

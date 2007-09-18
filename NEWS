@@ -11,9 +11,11 @@ Changes in @NEW@:
     * URLs returned by prepareChangeSet, getChangeSet, and getFileContents
       are all based on the URL the client used to call the repository
       instead of built internally by the repository (CNY-2034)
+
   o Client Changes:
     * a bug which prevented the mirror client from using hidden commits
       when mirroring to a single target has been fixed (CNY-1981)
+    * diff and patch now support files without trailing newlines (CNY-1979)
 
 Changes in 1.1.31.4:
   o Server changes:
