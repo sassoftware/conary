@@ -14,6 +14,8 @@ Changes in @NEW@:
     * An issue that was preventing the repository server, under certain
       circumstances, to determine the proper URL to use has been fixed.
       (CNY-2056, CNY-2058)
+    * External entitlement servers can now specify per-entitlement
+      timeouts and automatic retry values (CNY-2060)
 
   o Client Changes:
     * A bug which prevented the mirror client from using hidden commits

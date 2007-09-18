@@ -674,7 +674,8 @@ def selectSignatureKey(cfg, label):
             return fingerprint
     return cfg.signatureKey
 
-def emitEntitlement(serverName, className = None, key = None):
+def emitEntitlement(serverName, className = None, key = None, timeout = None,
+                    retryOnTimeout = None):
 
     # XXX This probably should be emitted using a real XML DOM writer,
     # but this will probably do for now. And yes, all that mess is required
@@ -684,19 +685,37 @@ def emitEntitlement(serverName, className = None, key = None):
     else:
         classInfo = "<class>%s</class>" % className
 
-    return """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+    s = """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <!DOCTYPE entitlement [
     <!ELEMENT entitlement (server, class, key)>
     <!ELEMENT server (#PCDATA)>
     <!ELEMENT class (#PCDATA)>
     <!ELEMENT key (#PCDATA)>
+    <!ELEMENT timeout EMPTY>
+    <!ATTLIST
+    timeout retry (True|False) "True"
+    val CDATA #IMPLIED>
 ]>
 <entitlement>
     <server>%s</server>
     %s
     <key>%s</key>
-</entitlement>
 """ % (serverName, classInfo, key)
+
+    if timeout is not None or retryOnTimeout is not None:
+        s += "<timeout "
+        if timeout is not None:
+            s += 'val="%d" ' % timeout
+        if retryOnTimeout:
+            s += 'retry="True" '
+        elif retryOnTimeout is not None:
+            s += 'retry="False" '
+
+        s += '/>\n'
+
+    s += "</entitlement>\n"
+
+    return s
 
 def loadEntitlementFromString(xmlContent, *args, **kw):
     # handle old callers
@@ -715,6 +734,9 @@ def loadEntitlementFromString(xmlContent, *args, **kw):
         import warnings
         warnings.warn("The serverName argument to loadEntitlementFromString "
                       "has been deprecated", DeprecationWarning)
+
+    returnTimeout = kw.pop('returnTimeout', False)
+
     p = EntitlementParser()
 
     # wrap this in an <entitlement> top level tag (making it optional
@@ -739,6 +761,10 @@ def loadEntitlementFromString(xmlContent, *args, **kw):
     except Exception, err:
         raise errors.ConaryError("Malformed entitlement at %s:"
                                  " %s" % (source, err))
+
+
+    if returnTimeout:
+        return (p['server'], entClass, entKey, p['timeout'], p['retry'])
 
     return (p['server'], entClass, entKey)
 
@@ -836,15 +862,20 @@ def loadEntitlement(dirName, serverName):
 class EntitlementParser(dict):
 
     def StartElementHandler(self, name, attrs):
-        if name not in [ 'entitlement', 'server', 'class', 'key' ]:
+        if name not in [ 'entitlement', 'server', 'class', 'key', 'timeout' ]:
             raise SyntaxError
-        self.state.append(str(name))
+        self.state.append((str(name), attrs))
         self.data = None
 
     def EndElementHandler(self, name):
-        state = self.state.pop()
-        # str() converts from unicode
-        self[state] = str(self.data)
+        state, attrs = self.state.pop()
+        if state == 'timeout':
+            self['retry'] = (str(attrs['retry']) == 'True')
+            if 'val' in attrs:
+                self['timeout'] = int(attrs['val'])
+        else:
+            # str() converts from unicode
+            self[state] = str(self.data)
 
     def CharacterDataHandler(self, data):
         self.data = data
@@ -859,6 +890,8 @@ class EntitlementParser(dict):
         self.p.EndElementHandler = self.EndElementHandler
         self.p.CharacterDataHandler = self.CharacterDataHandler
         dict.__init__(self)
+        self['retry'] = True
+        self['timeout'] = None
 
 def getProxyFromConfig(cfg):
     """Get the proper proxy configuration variable from the supplied config
