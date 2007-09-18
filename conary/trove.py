@@ -764,12 +764,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
-<<<<<<< /home/ewt/c/1.2/conary/conary/trove.py
-        # for compatibility with 1.1.9x and later
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
-=======
-        _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
->>>>>>> /tmp/trove.py~other.UEkH_i
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
