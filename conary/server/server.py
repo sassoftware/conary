@@ -490,7 +490,7 @@ def addUser(netRepos, userName, admin = False, mirror = False):
     netRepos.auth.addAcl(userName, None, None, write, False, admin)
     netRepos.auth.setMirror(userName, mirror)
 
-def getServer():
+def getServer(argv = sys.argv, reqClass = HttpRequests):
     argDef = {}
     cfgMap = {
         'contents-dir'  : 'contentsDir',
@@ -517,7 +517,8 @@ def getServer():
     argDef['mirror'] = options.NO_PARAM
 
     try:
-        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+                                                argv = argv)
     except options.OptionError, msg:
         print >> sys.stderr, msg
         sys.exit(1)
@@ -534,8 +535,8 @@ def getServer():
     if not os.access(cfg.tmpDir, os.R_OK | os.W_OK | os.X_OK):
         print cfg.tmpDir + " needs to allow full read/write access"
         sys.exit(1)
-    HttpRequests.tmpDir = cfg.tmpDir
-    HttpRequests.cfg = cfg
+    reqClass.tmpDir = cfg.tmpDir
+    reqClass.cfg = cfg
 
     profile = 0
     if profile:
@@ -581,7 +582,7 @@ def getServer():
         if len(otherArgs) > 1:
             usage()
 
-        HttpRequests.netProxy = ProxyRepositoryServer(cfg, baseUrl)
+        reqClass.netProxy = ProxyRepositoryServer(cfg, baseUrl)
     elif cfg.repositoryDB:
         if len(otherArgs) > 1:
             usage()
@@ -622,7 +623,7 @@ def getServer():
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)
         netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
-        HttpRequests.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
+        reqClass.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
 
         if 'add-user' in argSet:
             admin = argSet.pop('admin', False)
@@ -643,9 +644,9 @@ def getServer():
 
     if cfg.useSSL:
         ctx = createSSLContext(cfg)
-        httpServer = SecureHTTPServer(("", cfg.port), HttpRequests, ctx)
+        httpServer = SecureHTTPServer(("", cfg.port), reqClass, ctx)
     else:
-        httpServer = HTTPServer(("", cfg.port), HttpRequests)
+        httpServer = HTTPServer(("", cfg.port), reqClass)
     return httpServer, profile
 
 def serve(httpServer, profile=False):
