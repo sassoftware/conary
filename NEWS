@@ -1,3 +1,10 @@
+Changes in 1.1.35:
+
+  o Client Changes:
+    * Unknown trove info types in the database are stored in extracted
+      trove info properly (CNY-2059)
+    * diff and patch now support files without trailing newlines (CNY-1979)
+
 Changes in 1.1.34:
   o Build Changes:
     * The default settings from r.add() will now override the default
@@ -9,10 +16,6 @@ Changes in 1.1.34:
     * A bug that caused an error message in the rPath Appliance
       Platform Agent (rAPA) when using an entitlement generator has
       been fixed. (CNY-1946)
-
-  o Client Changes:
-    * Unknown trove info types in the database are stored in extracted
-      trove info properly (CNY-2059)
 
 Changes in 1.1.33:
   o Build Changes:
