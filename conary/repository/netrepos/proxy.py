@@ -229,7 +229,11 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self._protocol = protocol
 
         if rawUrl:
-            self._baseUrlOverride = rawUrl
+            if not rawUrl.startswith("/"):
+                self._baseUrlOverride = rawUrl
+            elif headers and "Host" in headers:
+                self._baseUrlOverride = "http://%s%s" % (headers['Host'],
+                                        rawUrl)
 
         targetServerName = headers.get('X-Conary-Servername', None)
 
