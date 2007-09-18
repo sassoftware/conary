@@ -679,6 +679,7 @@ _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through
                                     # a fix for incompleteness. only used on
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
+_TROVEINFO_TAG_COMPAT_CLASS   = 19
 # items added below this point must be DYNAMIC for proper unknown troveinfo
 # handling
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
