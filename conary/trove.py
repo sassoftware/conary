@@ -676,7 +676,10 @@ _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
 _TROVEINFO_TAG_COMPAT_CLASS   = 19
-_TROVEINFO_TAG_LAST           = 19
+_TROVEINFO_TAG_BUILD_FLAVOR   = 20
+# items added below this point must be DYNAMIC for proper unknown troveinfo
+# handling
+_TROVEINFO_TAG_LAST           = 20
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -758,6 +761,8 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
+        # for compatibility with 1.1.9x and later
+        _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)

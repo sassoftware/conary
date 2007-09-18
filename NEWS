@@ -10,6 +10,10 @@ Changes in 1.1.34:
       Platform Agent (rAPA) when using an entitlement generator has
       been fixed. (CNY-1946)
 
+  o Client Changes:
+    * Unknown trove info types in the database are stored in extracted
+      trove info properly (CNY-2059)
+
 Changes in 1.1.33:
   o Build Changes:
     * The addArchive() source action now handles xpi archives. (CNY-1793)

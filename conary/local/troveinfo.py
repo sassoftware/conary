@@ -10,7 +10,19 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+from conary import streams
 from conary.local import schema
+
+def createFreezer(tag):
+
+    class Freezer(streams.StreamSet):
+
+        pass
+
+    Freezer.streamDict = { tag : (streams.DYNAMIC, streams.StringStream,
+                                  'val' ) }
+
+    return Freezer
 
 class TroveInfoTable:
     def __init__(self, db):
@@ -45,9 +57,18 @@ class TroveInfoTable:
     def getInfo(self, cu, trove, idNum):
         cu.execute("SELECT infoType, data FROM TroveInfo WHERE instanceId=?",
                    idNum)
+        unknown = ''
         for (tag, frz) in cu:
-            if tag == -1:
-                trove.troveInfo.thaw(cu.frombinary(frz))
-            else:
+            if tag in trove.troveInfo.streamDict:
                 name = trove.troveInfo.streamDict[tag][2]
                 trove.troveInfo.__getattribute__(name).thaw(cu.frombinary(frz))
+            elif tag == -1:
+                unknown += cu.frombinary(frz)
+            else:
+                Freezer = createFreezer(tag)
+                f = Freezer()
+                f.val.set(frz)
+                unknown += f.freeze()
+
+        if unknown:
+            trove.troveInfo.thaw(unknown)
