@@ -1,8 +1,8 @@
 Changes in @NEW@:
   o Server Changes
-    * a bug which triggered an exception while migrating postgresql
-      repositories has been fixed (CNY-1912)
-    * the getNewTroveInfo call works faster for mirror operations (CNY-2006)
+    * A bug which triggered an exception while migrating postgresql
+      repositories has been fixed. (CNY-1912)
+    * The getNewTroveInfo call works faster for mirror operations (CNY-2006)
     * An issue that prevented the server from responding with the
       proper error message when in maintenance mode has been fixed.
       (CNY-2005)
@@ -10,12 +10,15 @@ Changes in @NEW@:
       up path IDs has been fixed. (CNY-1996)
     * URLs returned by prepareChangeSet, getChangeSet, and getFileContents
       are all based on the URL the client used to call the repository
-      instead of built internally by the repository (CNY-2034)
+      instead of built internally by the repository. (CNY-2034)
+    * An issue that was preventing the repository server, under certain
+      circumstances, to determine the proper URL to use has been fixed.
+      (CNY-2056, CNY-2058)
 
   o Client Changes:
-    * a bug which prevented the mirror client from using hidden commits
-      when mirroring to a single target has been fixed (CNY-1981)
-    * diff and patch now support files without trailing newlines (CNY-1979)
+    * A bug which prevented the mirror client from using hidden commits
+      when mirroring to a single target has been fixed. (CNY-1981)
+    * diff and patch now support files without trailing newlines. (CNY-1979)
 
 Changes in 1.1.31.4:
   o Server changes:
