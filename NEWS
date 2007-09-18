@@ -26,6 +26,12 @@ Changes in @NEW@:
   o Bug Fixes:
     * When running in threaded mode, don't install signal handlers, since
       that is not supported. (CNY-2040)
+    * URLs returned by prepareChangeSet, getChangeSet, and getFileContents
+      are all based on the URL the client used to call the repository
+      instead of built internally by the repository. (CNY-2034)
+    * An issue that was preventing the repository server, under certain
+      circumstances, to determine the proper URL to use has been fixed.
+      (CNY-2056, CNY-2058)
 
 Changes in 1.1.95:
   o Server Changes

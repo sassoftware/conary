@@ -112,7 +112,7 @@ class ProxyCallFactory:
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
-                     remoteIp):
+                     remoteIp, isSecure):
         entitlementList = authToken[2][:]
         entitlementList += cfg.entitlement.find(targetServerName)
 
@@ -134,7 +134,7 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
-        transporter = transport.Transport(https = url.startswith('https:'),
+        transporter = transport.Transport(https = isSecure,
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
@@ -149,7 +149,8 @@ class RepositoryCaller:
     def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
                                     self.authToken, args, kwargs,
-                                    remoteIp = self.remoteIp)
+                                    remoteIp = self.remoteIp,
+                                    isSecure = self.isSecure)
 
         if rc[1]:
             # exception occured
@@ -164,13 +165,16 @@ class RepositoryCaller:
     def __getattr__(self, method):
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
-    def __init__(self, protocol, port, authToken, repos, remoteIp):
+    def __init__(self, protocol, port, authToken, repos, remoteIp, rawUrl,
+                 isSecure):
         self.repos = repos
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
         self.url = None
         self.remoteIp = remoteIp
+        self.rawUrl = rawUrl
+        self.isSecure = isSecure
 
 class RepositoryCallFactory:
 
@@ -180,11 +184,11 @@ class RepositoryCallFactory:
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
                      localAddr, protocolString, headers, cfg,
-                     targetServerName, remoteIp):
+                     targetServerName, remoteIp, isSecure):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos,
-                                remoteIp)
+                                remoteIp, rawUrl, isSecure)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -218,7 +222,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
                     remoteIp = None, rawUrl = None, localAddr = None,
-                    protocolString = None, headers = None):
+                    protocolString = None, headers = None, isSecure = False):
         """
         @param localAddr: if set, a string host:port identifying the address
         the client used to talk to us.
@@ -233,6 +237,15 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self._port = port
         self._protocol = protocol
 
+        if rawUrl:
+            if not rawUrl.startswith("/"):
+                self._baseUrlOverride = rawUrl
+            elif headers and "Host" in headers:
+                proto = (isSecure and "https") or "http"
+                self._baseUrlOverride = "%s://%s%s" % (proto,
+                                                       headers['Host'],
+                                                       rawUrl)
+
         targetServerName = headers.get('X-Conary-Servername', None)
 
         # simple proxy. FIXME: caching these might help; building all
@@ -244,7 +257,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                localAddr, protocolString,
                                                headers, self.cfg,
                                                targetServerName,
-                                               remoteIp)
+                                               remoteIp, isSecure)
 
         # args[0] is the protocol version
         if args[0] < 51:
@@ -273,6 +286,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         return (r[0], False, r[1], caller.getExtraInfo())
 
     def urlBase(self):
+        if self._baseUrlOverride is not None:
+            return self._baseUrlOverride
+
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 

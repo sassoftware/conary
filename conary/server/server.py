@@ -260,7 +260,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                             params, remoteIp = self.connection.getpeername()[0],
                             rawUrl = self.path, localAddr = localAddr,
                             protocolString = self.request_version,
-                            headers = self.headers)
+                            headers = self.headers,
+                            isSecure = self.server.isSecure)
             except errors.InsufficientPermission:
                 self.send_error(403)
                 return None
@@ -386,6 +387,8 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
         self.createUser('anonymous', 'anonymous', admin = False, write = False)
 
 class HTTPServer(BaseHTTPServer.HTTPServer):
+    isSecure = False
+
     def close_request(self, request):
         pollObj = select.poll()
         pollObj.register(request, select.POLLIN)
@@ -401,6 +404,8 @@ class HTTPServer(BaseHTTPServer.HTTPServer):
 
 if SSL:
     class SecureHTTPServer(HTTPServer):
+        isSecure = True
+
         def __init__(self, server_address, RequestHandlerClass, sslContext):
             self.sslContext = sslContext
             HTTPServer.__init__(self, server_address, RequestHandlerClass)
