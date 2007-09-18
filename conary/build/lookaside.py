@@ -48,7 +48,8 @@ def _truncateName(name):
 def createCacheName(cfg, name, location, negative=''):
     name = _truncateName(name)
     cachedname = os.sep.join((cfg.lookaside, negative + location, name))
-    return cachedname
+    normcachedname = os.path.normpath(cachedname)
+    return normcachedname
 
 def _createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we

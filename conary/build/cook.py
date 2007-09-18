@@ -692,7 +692,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         use.resetUsed()
         use.clearLocalFlags()
-        use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
+        use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor, error=False)
         if hasattr(recipeClass, '_localFlavor'):
             # this will only be set if loadRecipe is used.  Allow for some
             # other way (like our testsuite) to be used to load the recipe
@@ -771,6 +771,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             compatClass = group.compatibilityClass
             if compatClass is not None:
                 grpTrv.setCompatibilityClass(compatClass)
+            # Add build flavor
+            grpTrv.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (group.postInstallScripts, False,
@@ -901,6 +903,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
     fileset.setIsCollection(False)
+    fileset.setBuildFlavor(use.allFlagsToFlavor(fullName))
     fileset.computePathHashes()
     
     filesetDiff = fileset.diff(None, absolute = 1)[0]
@@ -1242,20 +1245,26 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
     buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
                     for x in recipeObj.buildReqMap.itervalues())
+    packageReqs = [ x for x in recipeObj.buildReqMap.itervalues() 
+                    if trove.troveIsCollection(x.getName()) ]
+    for package in packageReqs:
+        childPackages = [ x for x in package.iterTroveList(strongRefs=True,
+                                                           weakRefs=True) ]
+        hasTroves = db.hasTroves(childPackages)
+        buildReqs.update(x[0] for x in itertools.izip(childPackages,
+                                                      hasTroves) if x[1])
     buildReqs = getRecursiveRequirements(db, buildReqs, cfg.flavor)
 
     # create all of the package troves we need, and let each package provide
     # itself
     grpMap = {}
-    filePrefixes = set()
-    fileIds = set()
+    fileIdsPathMap = {}
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
         # Extract file prefixes and file ids
         for (path, (realPath, f)) in buildPkg.iteritems():
-            filePrefixes.add(os.path.dirname(path))
-            fileIds.add(f.fileId())
+            fileIdsPathMap[path] = f.fileId()
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
@@ -1266,27 +1275,12 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                 grpMap[main].setPolicyProviders(policyTroves)
             grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
             grpMap[main].setBuildRequirements(buildReqs)
+            grpMap[main].setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
-
-
-    filePrefixes = list(filePrefixes)
-    filePrefixes.sort()
-    # Now eliminate prefixes of prefixes
-    ret = []
-    oldp = None
-    for p in filePrefixes:
-        if oldp and p.startswith(oldp):
-            continue
-        ret.append(p)
-        oldp = p
-    filePrefixes = ret
-
-    # Sort the file ids to make sure we get consistent behavior
-    fileIds = sorted(fileIds)
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -1306,11 +1300,61 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
             versionDict = repos.getTroveLeavesByBranch(versionDict)
 
         log.info('looking up pathids from repository history')
+        # We've got all of the latest packages for each flavor.
+        # Now we'll search their components for matching pathIds.
+        # We do this manually for these latest packages to avoid having
+        # to make the getPackageBranchPathIds repository call unnecessarily
+        # because it is very heavy weight.
+        trovesToGet = []
+        for name, versionFlavorDict in versionDict.iteritems():
+            for version, flavorList in versionFlavorDict.iteritems():
+                for flavor in flavorList:
+                    trovesToGet.append((name, version, flavor))
+        # get packages
+        latestTroves = repos.getTroves(trovesToGet, withFiles=False)
+        trovesToGet = list(itertools.chain(*[ x.iterTroveList(strongRefs=True)
+                                            for x in latestTroves ]))
+        # get components
+        latestTroves = repos.getTroves(trovesToGet, withFiles=True)
+        d = {}
+        for trv in sorted(latestTroves):
+            for pathId, path, fileId, fileVersion in trv.iterFileList():
+                if path in fileIdsPathMap:
+                    newFileId = fileIdsPathMap[path]
+                    if path in d and newFileId != fileId:
+                        # if the fileId already exists and we're not
+                        # a perfect match, don't override what already exists
+                        # there.
+                        continue
+                    d[path] = pathId, fileVersion, fileId
+        for path in d:
+            fileIdsPathMap.pop(path)
+        ident.merge(d)
+
+        # Any path in fileIdsPathMap beyond this point is a file that did not
+        # exist in the latest version(s) of this package, so fall back to
+        # getPackageBranchPathIds
+
         # look up the pathids for every file that has been built by
         # this source component, following our branch ancestry
         while True:
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                                              filePrefixes, fileIds)
+            # Generate the file prefixes
+            filePrefixes = _computeCommonPrefixes(fileIdsPathMap.keys())
+            fileIds = sorted(set(fileIdsPathMap.values()))
+            if not fileIds:
+                break
+            try:
+                d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                                                  filePrefixes, fileIds)
+            except errors.InsufficientPermission:
+                # No permissions to search on this branch. Keep going
+                d = {}
+                #raise
+            # Remove the paths we've found already from fileIdsPathMap, so we
+            # don't ask the next server the same questions
+            for k in d.iterkeys():
+                fileIdsPathMap.pop(k, None)
+
             ident.merge(d)
 
             if not searchBranch.hasParentBranch():
@@ -1339,6 +1383,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
         p.setIsDerived(recipeObj._isDerived)
+
+        # Add build flavor
+        p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 
         _signTrove(p, signatureKey)
 
@@ -1387,6 +1434,20 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         changeSet.newTrove(grpDiff)
 
     return changeSet, built
+
+def _computeCommonPrefixes(filePaths):
+    # Eliminate prefixes of prefixes
+    ret = []
+    oldp = None
+    filePaths = sorted(filePaths)
+    for p in filePaths:
+        # Get the dirname
+        p = os.path.dirname(p)
+        if oldp and p.startswith(oldp):
+            continue
+        ret.append(p)
+        oldp = p
+    return ret
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write
