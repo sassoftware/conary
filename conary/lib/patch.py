@@ -15,7 +15,7 @@
 Applies unified format diffs
 """
 
-from conary.lib import log
+from conary.lib import fixeddifflib, log
 import types
 
 class Hunk:
@@ -150,6 +150,9 @@ def patch(oldLines, unifiedDiff):
 		fromCount += 1
 	    elif ch == "+":
 		toCount += 1
+            elif unifiedDiff[i] == '\ No newline at end of file\n':
+                del lines[-1]
+                lines[-1] = lines[-1][:-1]
 	    else:
 		raise BadHunk()
 
@@ -248,4 +251,20 @@ def reverse(lines):
 		    "+" + fields[1][1:], fields[3] ]
 	    yield " ".join(new) + "\n"
 
-	    
+def unifiedDiff(first, second, *args, **kwargs):
+    # return a unified diff like difflib.unified_diff, but add the right magic
+    # for missing trailing newlines
+
+    diff = list(fixeddifflib.unified_diff(first, second, *args, **kwargs))
+    missingNewLines = []
+    for i, line in enumerate(diff):
+        if line[-1] != '\n':
+            missingNewLines.append(i)
+
+    for i in reversed(missingNewLines):
+        diff.insert(i + 1, '\ No newline at end of file\n')
+        diff[i] += '\n'
+
+    # be a drop in replacement for difflib.unified_diff
+    for line in diff:
+        yield line

@@ -679,7 +679,8 @@ _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through
                                     # a fix for incompleteness. only used on
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
-_TROVEINFO_TAG_COMPAT_CLASS   = 19
+# items added below this point must be DYNAMIC for proper unknown troveinfo
+# handling
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_LAST           = 20
 
@@ -763,7 +764,12 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
+<<<<<<< /home/ewt/c/1.2/conary/conary/trove.py
+        # for compatibility with 1.1.9x and later
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
+=======
+        _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
+>>>>>>> /tmp/trove.py~other.UEkH_i
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)

@@ -9,6 +9,9 @@ Changes in @NEW@:
       corruption if the journal had to be rolled back. (CNY-1671)
     * The critical update information now includes enough data to re-create
       the original update job. (CNY-1608)
+    * Unknown trove info types in the database are stored in extracted
+      trove info properly (CNY-2059)
+    * diff and patch now support files without trailing newlines (CNY-1979)
 
   o Build Changes:
     * More paths (/usr/lib/.*-sharp.*/) have been added to :cil
@@ -314,6 +317,7 @@ Changes in 1.1.31.3:
   o Other changes:
     * Logcat now works for calls which passed lists of entitlements
 
+>>>>>>> /tmp/NEWS~other.EdVTMy
 Changes in 1.1.34:
   o Build Changes:
     * The default settings from r.add() will now override the default
