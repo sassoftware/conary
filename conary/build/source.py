@@ -194,9 +194,6 @@ class _Source(_AnySource):
 
 
 class addArchive(_Source):
-    keywords = dict(_Source.keywords)
-    keywords['preserveOwnership'] = None
-
     """
     NAME
     ====
@@ -308,6 +305,8 @@ class addArchive(_Source):
     Demonstrates use with mirror URL and C{sourceforge} mirrors list for
     retrieving package source from SourceForge.
     """
+    keywords = dict(_Source.keywords)
+    keywords['preserveOwnership'] = None
 
     def __init__(self, recipe, *args, **keywords):
         """
