@@ -370,7 +370,10 @@ def _getPrivateKey(keyId, stream, passPhrase):
         pkt = msg.iterByKeyId(keyId).next()
     except StopIteration:
         raise KeyNotFound(keyId)
-    pkt.verifySelfSignatures()
+    try:
+        pkt.verifySelfSignatures()
+    except BadSelfSignature:
+        sys.stderr.write("Warning: self-signature on private key does not verify\n")
     return pkt.makePgpKey(passPhrase)
 
 def getPublicKeyFromString(keyId, data):
