@@ -36,6 +36,8 @@ Changes in @NEW@:
     * An issue that was preventing the repository server, under certain
       circumstances, to determine the proper URL to use has been fixed.
       (CNY-2056, CNY-2058)
+    * A regression from Conary 1.1.34 related to self-signature
+      verification on private PGP keys has been fixed. (CNY-2047)
 
 Changes in 1.1.95:
   o Server Changes
