@@ -1,21 +1,18 @@
-Changes in @NEW@:
+Changes in 1.1.96:
   o Server Changes
     * External entitlement servers can now specify per-entitlement
       timeouts and automatic retry values (CNY-2060)
 
-  o Other Changes
-    * InodeStreams and FileStreams now preserve unknown elements, allowing
-      future additions to those without breaking fileId computation (CNY-1971)
-
   o Client Changes:
-    * Update journal did not have an entry for hard links which were made
-      to targets which already existed on the system, causing system
-      corruption if the journal had to be rolled back. (CNY-1671)
-    * The critical update information now includes enough data to re-create
-      the original update job. (CNY-1608)
-    * Unknown trove info types in the database are stored in extracted
-      trove info properly (CNY-2059)
-    * diff and patch now support files without trailing newlines (CNY-1979)
+    * Update journal did not have an entry for hard links which were
+      made to targets which already existed on the system, causing
+      system corruption if the journal had to be rolled back. (CNY-1671)
+    * The critical update information now includes enough data to
+      re-create the original update job. (CNY-1608)
+    * Unknown trove info types in the database are properly stored in
+      extracted trove info. (CNY-2059)
+    * diff and patch now support files without trailing newlines.
+      (CNY-1979)
 
   o Build Changes:
     * More paths (/usr/lib/.*-sharp.*/) have been added to :cil
@@ -28,16 +25,22 @@ Changes in @NEW@:
       for those files. (CNY-2050)
 
   o Bug Fixes:
-    * When running in threaded mode, don't install signal handlers, since
-      that is not supported. (CNY-2040)
-    * URLs returned by prepareChangeSet, getChangeSet, and getFileContents
-      are all based on the URL the client used to call the repository
-      instead of built internally by the repository. (CNY-2034)
+    * When running in threaded mode, don't install signal handlers,
+      since that is not supported. (CNY-2040)
+    * URLs returned by prepareChangeSet, getChangeSet, and
+      getFileContents are all based on the URL the client used to call
+      the repository instead of built internally by the repository.
+      (CNY-2034)
     * An issue that was preventing the repository server, under certain
       circumstances, to determine the proper URL to use has been fixed.
       (CNY-2056, CNY-2058)
     * A regression from Conary 1.1.34 related to self-signature
       verification on private PGP keys has been fixed. (CNY-2047)
+
+  o Other Changes
+    * InodeStreams and FileStreams now preserve unknown elements,
+      allowing future additions to those without breaking fileId
+      computation. (CNY-1971)
 
 Changes in 1.1.95:
   o Server Changes
