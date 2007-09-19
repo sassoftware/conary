@@ -16,6 +16,7 @@ import os
 import sha
 import md5
 import struct
+import sys
 
 try:
     from Crypto.Hash import RIPEMD
@@ -1251,7 +1252,7 @@ class PGP_Signature(PGP_BaseKeySig):
         # We've added 6 bytes for the header
         dataLen = hSubPktLen + 6
 
-        # Append trailer - 5-byte header
+        # Append trailer - 6-byte trailer
         self._writeBin(dataFile, [ 0x04, 0xFF,
             (dataLen // 0x1000000) & 0xFF, (dataLen // 0x10000) & 0xFF,
             (dataLen // 0x100) & 0xFF, dataLen & 0xFF ])
@@ -1718,7 +1719,7 @@ class PGP_MainKey(PGP_Key):
             try:
                 sig._finalizeSelfSig(sio, pgpKey)
             except BadSelfSignature:
-                raise BadSelfSignature(keyId)
+                raise BadSelfSignature(keyId), None, sys.exc_traceback
         for uid in self.iterUserIds():
             for sig in uid.iterKeySignatures(keyId):
                 sio = util.ExtendedStringIO()
@@ -1727,7 +1728,7 @@ class PGP_MainKey(PGP_Key):
                 try:
                     sig._finalizeSelfSig(sio, pgpKey)
                 except BadSelfSignature:
-                    raise BadSelfSignature(keyId)
+                    raise BadSelfSignature(keyId), None, sys.exc_traceback
                 # Only verify the first sig on the user ID.
                 # XXX Why? No idea yet
                 break
