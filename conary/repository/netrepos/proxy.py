@@ -150,6 +150,7 @@ class RepositoryCaller:
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
                                     self.authToken, args, kwargs,
                                     remoteIp = self.remoteIp,
+                                    rawUrl = self.rawUrl,
                                     isSecure = self.isSecure)
 
         if rc[1]:
