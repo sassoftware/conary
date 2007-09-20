@@ -244,7 +244,11 @@ def getKeyId(keyRing):
 
 def seekKeyById(keyId, keyRing):
     if isinstance(keyRing, str):
-        keyRing = util.ExtendedFile(keyRing, buffering = False)
+        try:
+            keyRing = util.ExtendedFile(keyRing, buffering = False)
+        except (IOError, OSError), e:
+            # if we can't read/find the key, it's not there.
+            return False
     msg = PGP_Message(keyRing)
     try:
         return msg.iterByKeyId(keyId).next()
