@@ -1743,7 +1743,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
   	os.close(fd)
 	fileName = os.path.basename(path)
 
-        return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
+        # this needs to match up exactly with the parsing of the url we do
+        # in commitChangeSet.
+        return self.urlBase() + "?%s" % fileName[:-3]
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
