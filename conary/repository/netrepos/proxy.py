@@ -134,7 +134,7 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
-        transporter = transport.Transport(https = isSecure,
+        transporter = transport.Transport(https = url.startswith('https:'),
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
