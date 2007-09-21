@@ -296,6 +296,10 @@ class URLOpener(urllib.FancyURLopener):
             headers.append(('Host', realhost))
         else:
             headers.append(('Host', host))
+        if useConaryProxy:
+            # Add a custom header to tell the proxy which name we contacted it
+            # on
+            headers.append(('X-Conary-Proxy-Host', host))
         if auth:
             headers.append(('Authorization', 'Basic %s' % auth))
         return h, url, selector, headers
