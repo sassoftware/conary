@@ -1,3 +1,8 @@
+Changes in 1.1.31.7:
+  o Bug Fixes:
+    * Related to CNY-2034, Conary proxies are now properly computing
+      the return URL. (CNY-2069)
+
 Changes in 1.1.31.6:
   o Bug Fixes:
     * An issue related to Conary proxies running in non-SSL mode,
@@ -24,8 +29,6 @@ Changes in 1.1.31.5:
       (CNY-2056, CNY-2058)
     * External entitlement servers can now specify per-entitlement
       timeouts and automatic retry values. (CNY-2060)
-    * Related to CNY-2034, Conary proxies are now properly computing
-      the return URL. (CNY-2069)
 
   o Client Changes:
     * A bug which prevented the mirror client from using hidden commits
