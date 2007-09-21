@@ -615,6 +615,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                     oldBuildFlavor = buildFlavor
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+            log.info('Loading %s from %s' % (name, localfile))
             loader = RecipeLoader(localfile, cfg, repos=repos,
                                   ignoreInstalled=alwaysIgnoreInstalled,
                                   buildFlavor=buildFlavor,
@@ -692,6 +693,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             usedFlavor = use.createFlavor(name, recipe._trackedFlags)
             troveTuple = (recipe._trove.getName(), recipe._trove.getVersion(),
                           usedFlavor)
+            log.info('Loaded %s from %s=%s[%s]' % ((name,) + troveTuple))
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
             callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)

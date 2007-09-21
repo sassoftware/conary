@@ -23,6 +23,8 @@ Changes in 1.1.96:
       that is not available on the system or in the builddir.  It will
       print a warning and not attempt to compute dependency information
       for those files. (CNY-2050)
+    * loadSuperClass and loadInstalled now print out name, version 
+      flavor of the package that was used when loading. (CNY-1967)
 
   o Bug Fixes:
     * When running in threaded mode, don't install signal handlers,
