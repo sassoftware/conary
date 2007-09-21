@@ -401,6 +401,9 @@ def copyfileobj(source, dest, callback = None, digest = None,
         copied += len(buf)
         write(buf)
 
+        if digest:
+            digest.update(buf)
+
         now = time.time()
         if now == starttime:
             rate = 0 # don't bother limiting download until now > starttime.
@@ -415,8 +418,6 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
         if rateLimit > 0 and rate > rateLimit:
             time.sleep((copied / rateLimit) - (copied / rate))
-
-        if digest: digest.update(buf)
 
     return copied
 
