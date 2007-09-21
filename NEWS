@@ -39,6 +39,8 @@ Changes in 1.1.96:
     * An issue related to Conary proxies running in non-SSL mode,
       talking to SSL-enabled repository servers has been fixed.
       (CNY-2067)
+    * Related to CNY-2034, Conary proxies are now properly computing
+      the return URL. (CNY-2069)
 
   o Other Changes
     * InodeStreams and FileStreams now preserve unknown elements,
