@@ -915,11 +915,6 @@ class TroveStore:
         del retr
         return d
 
-    def resolveRequirements(self, label, depSetList, troveList=[],
-                            leavesOnly=False):
-        return self.depTables.resolve(label, depSetList, troveList=troveList,
-                                      leavesOnly=leavesOnly)
-
     def _cleanCache(self):
         self.versionIdCache = {}
         self.itemIdCache = {}

@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -27,7 +26,7 @@ from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims
-from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap
+from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap, deptable
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
@@ -153,12 +152,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # this is ugly, but for now it is the only way to break the
         # circular dep created by self.repos back to us
         self.repos.troveStore = self.repos.reposSet = None
-        self.auth = None
+        self.auth = self.ugo = None
         try:
             if self.__delDB: self.db.close()
         except:
             pass
-        self.troveStore = self.repos = self.db = None
+        self.troveStore = self.repos = self.deptable = self.db = None
 
     def open(self, connect = True):
         self.log(3, "connect=", connect)
@@ -178,6 +177,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             passwordURL = self.externalPasswordURL,
             entCheckURL = self.entitlementCheckURL)
         self.ugo = accessmap.UserGroupOps(self.db)
+        self.deptable = deptable.DependencyTables(self.db)
         self.log.reset()
 
     def reopen(self):
@@ -186,7 +186,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if self.db.reopen():
             # help the garbage collector with the magic from __del__
             self.repos.troveStore = self.repos.reposSet = None
-	    self.troveStore = self.repos = self.auth = None
+	    self.troveStore = self.repos = self.auth = self.deptable = None
             self.open(connect=False)
 
     def callWrapper(self, protocol, port, methodname, authToken, 
@@ -1593,46 +1593,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList,
-                          leavesOnly=False):
+                          leavesOnly = False):
 	if not self.auth.check(authToken, write = False,
 			       label = self.toLabel(label)):
 	    raise errors.InsufficientPermission
         self.log(2, label, requiresList)
-	requires = {}
-	for dep in requiresList:
-	    requires[self.toDepSet(dep)] = dep
-
-        label = self.toLabel(label)
-
-	sugDict = self.troveStore.resolveRequirements(label, requires.keys(),
-                                                      leavesOnly=leavesOnly)
-
-        result = {}
-        for (key, val) in sugDict.iteritems():
-            result[requires[key]] = val
-
-        return result
-
+        cu = self.db.cursor()
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+	    raise errors.InsufficientPermission
+        ret = self.deptable.resolve(userGroupIds, label,
+                                    depList = requiresList,
+                                    leavesOnly = leavesOnly)
+        return ret
+    
     @accessReadOnly
     def getDepSuggestionsByTroves(self, authToken, clientVersion, requiresList,
                                   troveList):
-        troveList = [ self.toTroveTup(x) for x in troveList ]
-
-        if False in self.auth.batchCheck(authToken, [(x[0], x[1]) for x in troveList]):
-            raise errors.InsufficientPermission
+        # the query will run through the UserGroupInstancesCache filter
+        # and only return stuff this user has access to....
         self.log(2, troveList, requiresList)
-        requires = {}
-        for dep in requiresList:
-            requires[self.toDepSet(dep)] = dep
-
-        sugDict = self.troveStore.resolveRequirements(None, requires.keys(),
-                                                      troveList)
-
-        result = {}
-        for (key, val) in sugDict.iteritems():
-            result[requires[key]] = val
-
-        return result
+        cu = self.db.cursor()
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        if not userGroupIds:
+	    raise errors.InsufficientPermission
+        ret = self.deptable.resolve(userGroupIds, label = None,
+                                    depList = requiresList,
+                                    troveList = troveList)
+        return ret
 
     def _checkCommitPermissions(self, authToken, verList, mirror, hidden):
         if (mirror or hidden) and \

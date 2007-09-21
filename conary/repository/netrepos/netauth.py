@@ -336,7 +336,7 @@ class NetworkAuthorization:
         retlist = [ False ] * len(troveList)
         if not authToken[0]:
             return retlist
-        # check groupIds. this is teh same as the self.check() function
+        # check groupIds. this is the same as the self.check() function
         cu = self.db.cursor()
         try:
             groupIds = self.getAuthGroups(cu, authToken)

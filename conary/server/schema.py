@@ -1076,7 +1076,7 @@ def setupTempTables(db):
         # XXX: this index helps postgresql and hurts mysql.
         #db.createIndex("tmpTroves", "tmpTrovesIdx", "item",
         #               check = False)
-        
+    # for processing getPackageBranchpathIds
     if "tmpFilePrefixes" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpFilePrefixes(
@@ -1085,7 +1085,7 @@ def setupTempTables(db):
         db.tempTables["tmpFilePrefixes"] = True
         db.createIndex("tmpFilePrefixes", "tmpFilePrefixesPrefixIdx", "prefix",
                        check = False)
-
+    # for processing markRemoved
     if "tmpRemovals" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpRemovals(
@@ -1098,7 +1098,33 @@ def setupTempTables(db):
         db.tempTables["tmpRemovals"] = True
         db.createIndex("tmpRemovals", "tmpRemovalsInstances", "instanceId",
                        check = False)
-
+    # for processing getDepSuggestion
+    if "tmpDeps" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpDeps(
+            idx         INTEGER,
+            depNum      INTEGER NOT NULL,
+            class       INTEGER NOT NULL,
+            name        VARCHAR(254) NOT NULL,
+            flag        VARCHAR(254) NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpDeps"] = True
+        db.createIndex("tmpDeps", "tmpDepsIdx", "idx",
+                       check = False)
+        db.createIndex("tmpDeps", "tmpDepsClassIdx", "class",
+                       check = False)
+        db.createIndex("tmpDeps", "tmpDepsNameIdx", "name",
+                       check = False)
+    if "tmpDepNum" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpDepNum(
+            idx         INTEGER NOT NULL,
+            depNum      INTEGER NOT NULL,
+            flagCount   INTEGER NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpDepNum"] = True
+        db.createIndex("tmpDepNum", "tmpDepNumIdx", "idx, depNum",
+                       check = False, unique=True)
     db.commit()
 
 def resetTable(cu, name):
