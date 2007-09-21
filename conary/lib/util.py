@@ -1525,6 +1525,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
         # magic method dispatcher
         if name.startswith('__'):
             raise AttributeError(name)
+        #from conary.lib import log
+        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name)
         return self._createMethod(name)
 
     def _createMethod(self, name):
