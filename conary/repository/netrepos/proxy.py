@@ -12,7 +12,7 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib
+import base64, cPickle, itertools, os, tempfile, urllib, urlparse
 
 from conary import constants, conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
@@ -134,7 +134,7 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
-        transporter = transport.Transport(https = isSecure,
+        transporter = transport.Transport(https = url.startswith('https:'),
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
@@ -238,14 +238,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self._port = port
         self._protocol = protocol
 
-        if rawUrl:
-            if not rawUrl.startswith("/"):
-                self._baseUrlOverride = rawUrl
-            elif headers and "Host" in headers:
-                proto = (isSecure and "https") or "http"
-                self._baseUrlOverride = "%s://%s%s" % (proto,
-                                                       headers['Host'],
-                                                       rawUrl)
+        self.setBaseUrlOverride(rawUrl, headers, isSecure)
 
         targetServerName = headers.get('X-Conary-Servername', None)
 
@@ -286,10 +279,24 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         return (r[0], False, r[1], caller.getExtraInfo())
 
+
+    def setBaseUrlOverride(self, rawUrl, headers, isSecure):
+        if not rawUrl:
+            return
+        if not rawUrl.startswith("/"):
+            self._baseUrlOverride = rawUrl
+        elif headers and "Host" in headers:
+            proto = (isSecure and "https") or "http"
+            self._baseUrlOverride = "%s://%s%s" % (proto,
+                                                   headers['Host'],
+                                                   rawUrl)
     def urlBase(self):
         if self._baseUrlOverride is not None:
             return self._baseUrlOverride
 
+        return self._getUrlBase()
+
+    def _getUrlBase(self):
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 
@@ -786,6 +793,26 @@ class ProxyRepositoryServer(ChangesetFilter):
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
 
         self.callFactory = ProxyCallFactory()
+
+    def setBaseUrlOverride(self, rawUrl, headers, isSecure):
+        # Setting it to None here will make urlBase() do the right thing
+        proxyHost = headers.get('X-Conary-Proxy-Host', None)
+        if not proxyHost:
+            self._baseUrlOverride = None
+            return
+        # We really don't want to use rawUrl in the proxy, that points to the
+        # server and it won't help rewriting URLs with that address
+        self._baseUrlOverride = headers.get('X-Conary-Proxy-Host', None)
+
+        proto = (isSecure and "https") or "http"
+
+        if rawUrl.startswith('/'):
+            self._baseUrlOverride = '%s://%s%s' % (proto, proxyHost, rawUrl)
+        else:
+            items = list(urlparse.urlparse(rawUrl))
+            items[0] = proto
+            items[1] = proxyHost
+            self._baseUrlOverride = urlparse.urlunparse(items)
 
     def getFileContents(self, caller, authToken, clientVersion, fileList,
                         authCheckOnly = False):
