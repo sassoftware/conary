@@ -113,6 +113,9 @@ class URLOpener(urllib.FancyURLopener):
     localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
         socket.gethostname()])
 
+    # For debugging purposes only
+    _sendConaryProxyHostHeader = True
+
     def __init__(self, *args, **kw):
         self.compress = False
         self.abortCheck = None
@@ -296,7 +299,7 @@ class URLOpener(urllib.FancyURLopener):
             headers.append(('Host', realhost))
         else:
             headers.append(('Host', host))
-        if useConaryProxy:
+        if useConaryProxy and self._sendConaryProxyHostHeader:
             # Add a custom header to tell the proxy which name we contacted it
             # on
             headers.append(('X-Conary-Proxy-Host', host))
