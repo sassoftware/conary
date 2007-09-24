@@ -16,7 +16,7 @@ Changes in 1.1.96:
 
   o Build Changes:
     * More paths (/usr/lib/.*-sharp.*/) have been added to :cil
-      components. (CNY-2032)
+      components. (CNY-2080)
     * Path ID lookups now ignore permission errors; in such a case, a
       new path ID is computed. (CNY-1911)
     * Conary now handles python files that specify a python interpreter
