@@ -188,33 +188,17 @@ def rebuildLatest(db, recreate=False):
     """ % {"type" : versionops.LATEST_TYPE_PRESENT,
            "present" : instances.INSTANCE_PRESENT_NORMAL,
            "trove" : trove.TROVE_TYPE_REMOVED, })
-    # latest type normal excludes the removed and redirect troves from computation
+    # for the LATEST_TYPE_NORMAL we only consider the PRESENT latest
+    # entries that are not redirects. Branches that end in redirects
+    # shouldn't have an entry in LATEST_TYPE_NORMAL
     cu.execute("""
     insert into Latest (itemId, branchId, flavorId, versionId, latestType)
-    select
-        instances.itemid as itemid,
-        nodes.branchid as branchid,
-        instances.flavorid as flavorid,
-        nodes.versionid as versionid,
-        %(type)d
-    from
-    ( select
-        i.itemid as itemid,
-        n.branchid as branchid,
-        i.flavorid as flavorid,
-        max(n.finalTimestamp) as finaltimestamp
-      from instances as i join nodes as n using(itemId, versionId)
-      where i.isPresent = %(present)d
-        and i.troveType = %(trove)d
-      group by i.itemid, n.branchid, i.flavorid
-    ) as tmp
-    join nodes using(itemId, branchId, finalTimestamp)
-    join instances using(itemId, versionId)
-    where instances.flavorid = tmp.flavorid
-      and instances.isPresent = %(present)d
-      and instances.troveType = %(trove)d
+    select itemId, branchId, flavorId, versionId, %(type)d
+    from Latest
+    join Instances using(itemId, versionId, flavorId)
+    where Latest.latestType = %(latest)d
+      and Instances.troveType = %(trove)d
     """ % {"type" : versionops.LATEST_TYPE_NORMAL,
-           "present" :  instances.INSTANCE_PRESENT_NORMAL,
            "latest" : versionops.LATEST_TYPE_PRESENT,
            "trove" : trove.TROVE_TYPE_NORMAL, })
     return True
