@@ -45,6 +45,9 @@ Changes in 1.1.96:
       the return URL. (CNY-2069)
     * The client is now properly computing the downloaded file's
       digest if a size limit was specified. (CNY-2072)
+    * A regression from Conary 1.1.94 that caused some local cooks to fail  
+      to be installable due to incorrect primary trove information has 
+      been fixed (CNY-2078)
 
   o Other Changes
     * InodeStreams and FileStreams now preserve unknown elements,

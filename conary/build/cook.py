@@ -1306,10 +1306,12 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         # to make the getPackageBranchPathIds repository call unnecessarily
         # because it is very heavy weight.
         trovesToGet = []
-        for name, versionFlavorDict in versionDict.iteritems():
-            for version, flavorList in versionFlavorDict.iteritems():
-                for flavor in flavorList:
-                    trovesToGet.append((name, version, flavor))
+        for n, versionFlavorDict in versionDict.iteritems():
+            # use n,v,f to avoid overlapping with name,version,flavor used by
+            # surrounding code
+            for v, flavorList in versionFlavorDict.iteritems():
+                for f in flavorList:
+                    trovesToGet.append((n, v, f))
         # get packages
         latestTroves = repos.getTroves(trovesToGet, withFiles=False)
         trovesToGet = list(itertools.chain(*[ x.iterTroveList(strongRefs=True)
