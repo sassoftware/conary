@@ -204,7 +204,7 @@ def rebuildLatest(db, recreate=False):
     return True
     
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 8)
+    Version = (15, 9)
     def updateLatest(self):
         return rebuildLatest(self.db, recreate=True)
 
@@ -458,6 +458,9 @@ class MigrateTo_15(SchemaMigration):
     def migrate8(self):
         self.db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
         return True
+    # 15.9 - rebuild the Latest table to eliminate entries for branches that end in redirects
+    def migrate9(self):
+        return rebuildLatest(self.db)
     
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
