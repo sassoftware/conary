@@ -4,6 +4,8 @@ Changes in @NEW@:
       branches that end in redirects. (CNY-2081)
     * The client is now properly computing the downloaded file's
       digest if a size limit was specified. (CNY-2072)
+    * Adding a large number of user maps is now more efficient
+      if the new addServerGlobs method is used. (CNY-2083)
 
 Changes in 1.1.31.7:
   o Bug Fixes:
