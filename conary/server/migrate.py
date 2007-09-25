@@ -453,6 +453,7 @@ class MigrateTo_15(SchemaMigration):
         return True
     # 15.7 - rebuild the Latest table to consider only the isPresent = NORMAL instances
     def migrate7(self):
+        # no longer rebuild here because we're rebuilding in migrate9 anyway
         return True
     # 15.8 - add an index on TroveInfo
     def migrate8(self):
