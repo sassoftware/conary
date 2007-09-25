@@ -1,7 +1,9 @@
 Changes in @NEW@:
   o Bug Fixes:
-    * schema migration for the Latest table now correctly ahndles
-      branches that end in redirects (CNY-2081)
+    * Schema migration for the Latest table now correctly handles
+      branches that end in redirects. (CNY-2081)
+    * The client is now properly computing the downloaded file's
+      digest if a size limit was specified. (CNY-2072)
 
 Changes in 1.1.31.7:
   o Bug Fixes:
