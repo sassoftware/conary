@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.31.8:
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles
       branches that end in redirects. (CNY-2081)
