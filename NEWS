@@ -1,10 +1,13 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * schema migration for the Latest table now correctly ahndles
+      branches that end in redirects (CNY-2081)
+
 Changes in 1.1.31.7:
   o Bug Fixes:
     * Related to CNY-2034, Conary proxies are now properly computing
       the return URL. (CNY-2069)
     * includeConfigFile now sorts files that are matched in globs
-    * schema migration for the Latest table now correctly ahndles
-      branches that end in redirects (CNY-2081)
 
 Changes in 1.1.31.6:
   o Bug Fixes:
