@@ -1,3 +1,6 @@
+Changes in 1.2.0:
+  No changes have been made relative to release candidate 1.1.96.
+
 Changes in 1.1.96:
   o Server Changes
     * External entitlement servers can now specify per-entitlement
