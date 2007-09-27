@@ -1773,7 +1773,7 @@ class _dependency(policy.Policy):
                     foundPath = True
                 pythonFlags = set()
                 f = files.ThawFile(db.getFileStream(fileid), pathid)
-                for dep in f.requires().iterDepsByClass(
+                for dep in f.provides().iterDepsByClass(
                         deps.PythonDependencies):
                     flagNames = [x[0] for x in dep.getFlags()[0]]
                     pythonFlags.update(flagNames)

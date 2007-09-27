@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Build Changes:
+    * A bug which caused Conary to incorrectly determine the flags
+      for python dependencies on 64-bit systems has been fixed.
+      (CNY-2091)
+
 Changes in 1.2.0:
   o Build Changes:
     * A bug which caused Conary to compute python dependencies
