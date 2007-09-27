@@ -187,6 +187,7 @@ def main():
             inspector(path)
         except:
             putData(sys.stdout, '///invalid')
+            continue
 
         depPathList = finder.getDepsForPath(path)
         putData(sys.stdout, '\0'.join(depPathList))

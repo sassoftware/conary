@@ -1,5 +1,8 @@
 Changes in 1.2.0:
-  No changes have been made relative to release candidate 1.1.96.
+  o Build Changes:
+    * A bug which caused Conary to compute python dependencies
+      incorrectly when using an external version of python (such
+      as when building python itself) has been fixed. (CNY-2087)
 
 Changes in 1.1.96:
   o Server Changes
