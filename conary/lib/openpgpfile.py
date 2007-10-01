@@ -1615,6 +1615,7 @@ class PGP_MainKey(PGP_Key):
         # Start reading signatures until we hit a UserID or another key
         limit = set(PKT_SUB_KEYS)
         limit.add(PKT_USERID)
+        limit.add(PKT_USER_ATTRIBUTE)
         i = 0
         for pkt in subpkts:
             if pkt.tag in limit:
