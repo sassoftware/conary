@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 1.1.31.8
+export VERSION = 1.2.0
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr

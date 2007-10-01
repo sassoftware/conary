@@ -159,7 +159,7 @@ class Recipe(object):
             Useful for determining where used in the recipe are located.
         """
         files = []
-        for src in self._sources:
+        for src in self.getSourcePathList():
             f = src.fetchLocal()
             if f:
                 if type(f) in (tuple, list):

@@ -167,7 +167,7 @@ def _handler(req):
             repositories[repName].cfg = cfg
 
     port = req.connection.local_addr[1]
-
+    # newer versions of mod_python provide a req.is_https() method
     secure = (req.subprocess_env.get('HTTPS', 'off') == 'on')
 
     repos = repositories[repName]
