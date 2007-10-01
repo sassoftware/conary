@@ -163,7 +163,7 @@ class RepositoryCaller(xmlshims.NetworkConvertors):
                                     rawUrl = self.rawUrl,
                                     isSecure = self.isSecure)
 
-        return result
+        return rc
 
     def getExtraInfo(self):
         """No extra information available for a RepositoryCaller"""
