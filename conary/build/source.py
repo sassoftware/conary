@@ -1120,6 +1120,82 @@ class _RevisionControl(addArchive):
     def doDownload(self):
         return self.fetch()
 
+class addGitSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addGitSnapshot()}} - Adds a snapshot from a git
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addGitSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addGitSnapshot()} class extracts sources from a
+    git repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : Git tag to use for the snapshot.
+    """
+
+    name = 'git'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[0]
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag)
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        util.execute('git clone -q %s \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        util.execute("cd '%s' && git pull -q %s" % (lookasideDir, self.url))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.url,
+                 self.tag)
+        util.execute("cd '%s' && git archive --prefix=%s-%s/ HEAD | "
+                        "bzip2 > '%s'" %
+                        (lookasideDir, self.recipe.name, self.tag, target))
+
+    def __init__(self, recipe, url, tag = 'HEAD', **kwargs):
+        self.url = url % recipe.macros
+        self.tag = tag % recipe.macros
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+
 class addMercurialSnapshot(_RevisionControl):
 
     """

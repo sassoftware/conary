@@ -3,6 +3,7 @@ Changes in @NEW@:
     * A bug which caused Conary to incorrectly determine the flags
       for python dependencies on 64-bit systems has been fixed.
       (CNY-2091)
+    * Added addGitSnapshot (CNY-1965)
 
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles
