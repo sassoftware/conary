@@ -110,12 +110,18 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         newArgs = ( clientVersion, ) + argList
 
         try:
-            usedAnonymous, isException, result = self.__send(self.__name,
-                                                             newArgs)
+            rc = self.__send(self.__name, newArgs)
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission(e.url.split("/")[2])
             raise
+
+        if clientVersion < 60:
+            usedAnonymous, isException, result = rc
+        else:
+            usedAnonymous = False
+            isException, result = rc
+
         if usedAnonymous:
             self.__anonymousCallback()
 
