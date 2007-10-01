@@ -38,6 +38,9 @@ class NodeData(object):
         new.index = self.index
         return new
 
+    def __contains__(self, item):
+        return item in self.data
+
     def get(self, index):
         return self.data[index]
 
@@ -74,6 +77,9 @@ class NodeDataByHash(NodeData):
         self.hashedData = {}
         self.data = []
 
+    def iterNodes(self):
+        return iter(self.hashedData)
+
     def sort(self, sortAlg=None):
         return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), 
                       sortAlg)
@@ -83,6 +89,9 @@ class NodeDataByHash(NodeData):
         new.data = list(self.data)
         new.hashedData = self.hashedData.copy()
         return new
+
+    def __contains__(self, node):
+        return node in self.hashedData
 
     def getIndex(self, item):
         idx = self.hashedData.setdefault(item, self.index)
@@ -156,6 +165,9 @@ class DirectedGraph:
                     for x in self.edges[self.data.getIndex(node)].iteritems())
         return (self.data.get(idx)
                     for idx in self.edges[self.data.getIndex(node)])
+
+    def __contains__(self, node):
+        return node in self.data
 
     def getIndex(self, node):
         return self.data.getIndex(node)
@@ -338,7 +350,8 @@ class DirectedGraph:
                 self.edges[node].update(self.edges.get(child, []))
                 seen.add(child)
 
-    def generateDotFile(self, out, labelFormatFn=str, edgeFormatFn=None):
+    def generateDotFile(self, out, labelFormatFn=str, edgeFormatFn=None,
+                        filterFn=None):
         """
             Generates a dot file based on the contents of the graph.
             @param out: file-like object we write to
@@ -346,18 +359,25 @@ class DirectedGraph:
               and returns the output string
             @edgeFormatFn: function that takes fromNode, toNode, value as 
                            parameters and returns a string for the edge.
+            @filterFn: if given, is a function that returns true if a node
+            should be included in the graph.
         """
         if isinstance(out, str):
             out = open(out, 'w')
         out.write('digraph graphName {\n')
         nodes = {}
         for node in self.iterNodes():
-            idx = self.data.getIndex(node)
-            nodes[idx] = node
-            out.write('   n%s [label="%s"]\n' % (idx, labelFormatFn(node)))
+            if not filterFn or filterFn(node):
+                idx = self.data.getIndex(node)
+                nodes[idx] = node
+                out.write('   n%s [label="%s"]\n' % (idx, labelFormatFn(node)))
         for fromIdx, toIdxDict in self.edges.iteritems():
+            if fromIdx not in nodes:
+                continue
             fromNode = nodes[fromIdx]
             for toIdx, value in toIdxDict.iteritems():
+                if toIdx not in nodes:
+                    continue
                 out.write('   n%s -> n%s' % (fromIdx, toIdx))
                 if edgeFormatFn:
                     labelStr = edgeFormatFn(fromNode,

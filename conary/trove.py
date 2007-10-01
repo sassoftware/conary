@@ -48,6 +48,10 @@ def troveIsPackage(troveName):
 def troveIsComponent(troveName):
     return ":" in troveName
 
+def troveIsFileSet(troveName):
+    return (troveName.startswith('fileset-')
+            and not troveName.endswith(':source'))
+
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
@@ -676,6 +680,8 @@ _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
 _TROVEINFO_TAG_COMPAT_CLASS   = 19
+# items added below this point must be DYNAMIC for proper unknown troveinfo
+# handling
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_LAST           = 20
 

@@ -30,10 +30,11 @@ import subprocess
 import sys
 import tempfile
 import time
-import traceback
 import urllib
 import urlparse
 import weakref
+import xmlrpclib
+import zlib
 
 from conary.lib import fixedglob, log
 
@@ -404,7 +405,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
             while not l:
                 if abortCheck():
                     return None
-                l = pollObj.poll(5)
+                l = pollObj.poll(5000)
 
         buf = source.read(bufSize)
         if not buf:
@@ -574,11 +575,17 @@ class ObjectCache(dict):
     def setdefault(self, key, value):
         return dict.setdefault(self, ref(key, self._remove), ref(value))()
 
-def memsize():
-    return memusage()[0]
+def memsize(pid = None):
+    return memusage(pid = pid)[0]
 
-def memusage():
-    pfn = "/proc/self/statm"
+def memusage(pid = None):
+    """Get the memory usage.
+    @param pid: Process to analyze (None for current process)
+    """
+    if pid is None:
+        pfn = "/proc/self/statm"
+    else:
+        pfn = "/proc/%d/statm" % pid
     line = open(pfn).readline()
     # Assume page size is 4k (true for i386). This can be adjusted by reading
     # resource.getpagesize() 
@@ -1230,9 +1237,10 @@ class ProtectedTemplate(str):
 def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     import types
     import inspect
+    import itertools
     import repr as reprmod
     class Repr(reprmod.Repr):
-        def __init__(self):
+        def __init__(self, subsequentIndent = ""):
             reprmod.Repr.__init__(self)
             self.maxtuple = 20
             self.maxset = 160
@@ -1241,17 +1249,76 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             self.maxstring = 160
             self.maxother = 160
 
+            self.maxLineLen = 160
+
+            self.subsequentIndent = subsequentIndent
+            # Pretty-print?
+            self._pretty = True
+
         def repr_str(self, x, level):
             if hasattr(x, '__safe_str__'):
-                return x.__safe_str__()
+                return reprmod.Repr.repr_str(x.__safe_str__())
             return reprmod.Repr.repr_str(self, x, level)
+
+        def _pretty_repr(self, pieces, iterLen, level):
+            ret = ', '.join(pieces)
+            if not self._pretty or len(ret) < self.maxLineLen:
+                return ret
+            padding = self.subsequentIndent + "  " * (self.maxlevel - level)
+            sep = ',\n' + padding
+            return '\n' + padding + sep.join(pieces)
+
+        def _repr_iterable(self, x, level, left, right, maxiter, trail=''):
+            n = len(x)
+            if level <= 0 and n:
+                s = '...'
+            else:
+                newlevel = level - 1
+                repr1 = self.repr1
+                pieces = [repr1(elem, newlevel) for elem in itertools.islice(x, maxiter)]
+                if n > maxiter:  pieces.append('...')
+                s = self._pretty_repr(pieces, n, level)
+                if n == 1 and trail:  right = trail + right
+            return '%s%s%s' % (left, s, right)
+
+        def repr_dict(self, x, level):
+            n = len(x)
+            if n == 0: return '{}'
+            if level <= 0: return '{...}'
+            newlevel = level - 1
+            repr1 = self.repr1
+            pieces = []
+            for key in itertools.islice(sorted(x), self.maxdict):
+                oldPretty = self._pretty
+                self._pretty = False
+                keyrepr = repr1(key, newlevel)
+                self._pretty = oldPretty
+
+                oldSubsequentIndent = self.subsequentIndent
+                self.subsequentIndent += ' ' * 4;
+                valrepr = repr1(x[key], newlevel)
+                self.subsequentIndent = oldSubsequentIndent
+
+                pieces.append('%s: %s' % (keyrepr, valrepr))
+            if n > self.maxdict: pieces.append('...')
+            s = self._pretty_repr(pieces, n, level)
+            return '{%s}' % (s,)
+
 
     def formatOneFrame(tb, stream):
         fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
         frame = tb.tb_frame
         stream.write('  File "%s", line %d, in %s\n' % 
             (fileName, lineNo, funcName))
-        stream.write('    %s\n' % text[idx].strip())
+        if text is not None:
+            # If the source file is not available, we may not be able to get 
+            # the line
+            stream.write('    %s\n' % text[idx].strip())
+
+    stream.write(str(excType))
+    stream.write(": ")
+    stream.write(str(excValue))
+    stream.write("\n\n")
 
     tbStack = []
     while tb:
@@ -1264,7 +1331,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     else:
         msg = "Traceback (most recent call last):\n"
 
-    r = Repr()
+    r = Repr(subsequentIndent = " " * 27)
     ignoredTypes = (types.ClassType, types.ModuleType, types.FunctionType,
                     types.TypeType)
 
@@ -1291,3 +1358,213 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
                 vstr = r.repr(v)
             stream.write("        %15s : %s\n" % (k, vstr))
         stream.write("  %s\n\n" % ("*" * 70))
+
+class XMLRPCMarshaller(xmlrpclib.Marshaller):
+    """Marshaller for XMLRPC data"""
+    dispatch = xmlrpclib.Marshaller.dispatch.copy()
+    def dump_string(self, value, write, escape=xmlrpclib.escape):
+        try:
+            value = value.encode("ascii")
+        except UnicodeError:
+            sio = StringIO.StringIO()
+            xmlrpclib.Binary(value).encode(sio)
+            write(sio.getvalue())
+            return
+        return xmlrpclib.Marshaller.dump_string(self, value, write, escape)
+
+    def dump(self, values, stream):
+        write = stream.write
+        if isinstance(values, xmlrpclib.Fault):
+            # Fault instance
+            write("<fault>\n")
+            self._dump({'faultCode' : values.faultCode,
+                        'faultString' : values.faultString},
+                       write)
+            write("</fault>\n")
+        else:
+            write("<params>\n")
+            for v in values:
+                write("<param>\n")
+                self._dump(v, write)
+                write("</param>\n")
+            write("</params>\n")
+
+    def dumps(self, values):
+        sio = StringIO.StringIO()
+        self.dump(values, sio)
+        return sio.getvalue()
+
+    def _dump(self, value, write):
+        # Incorporates Patch #1070046: Marshal new-style objects like
+        # InstanceType
+        try:
+            f = self.dispatch[type(value)]
+        except KeyError:
+            # check if this object can be marshalled as a structure
+            try:
+                value.__dict__
+            except:
+                raise TypeError, "cannot marshal %s objects" % type(value)
+            # check if this class is a sub-class of a basic type,
+            # because we don't know how to marshal these types
+            # (e.g. a string sub-class)
+            for type_ in type(value).__mro__:
+                if type_ in self.dispatch.keys():
+                    raise TypeError, "cannot marshal %s objects" % type(value)
+            f = self.dispatch[InstanceType]
+        f(self, value, write)
+
+    dispatch[str] = dump_string
+    dispatch[ProtectedString] = dump_string
+    dispatch[ProtectedTemplate] = dump_string
+
+class XMLRPCUnmarshaller(xmlrpclib.Unmarshaller):
+    dispatch = xmlrpclib.Unmarshaller.dispatch.copy()
+    def end_base64(self, data):
+        value = xmlrpclib.Binary()
+        value.decode(data)
+        self.append(value.data)
+        self._value = 0
+
+    dispatch["base64"] = end_base64
+
+    def _stringify(self, data):
+        try:
+            return data.encode("ascii")
+        except UnicodeError:
+            return xmlrpclib.Binary(data)
+
+def xmlrpcGetParser():
+    parser, target = xmlrpclib.getparser()
+    # Use our own marshaller
+    target = XMLRPCUnmarshaller()
+    # Reuse the parser class as computed by xmlrpclib
+    parser = parser.__class__(target)
+    return parser, target
+
+def xmlrpcDump(params, methodname=None, methodresponse=None, stream=None,
+               encoding=None, allow_none=False):
+    assert isinstance(params, tuple) or isinstance(params, xmlrpclib.Fault),\
+           "argument must be tuple or Fault instance"
+    if isinstance(params, xmlrpclib.Fault):
+        methodresponse = 1
+    elif methodresponse and isinstance(params, tuple):
+        assert len(params) == 1, "response tuple must be a singleton"
+
+    if not encoding:
+        encoding = "utf-8"
+
+    m = XMLRPCMarshaller(encoding, allow_none)
+    if encoding != "utf-8":
+        xmlheader = "<?xml version='1.0' encoding='%s'?>\n" % str(encoding)
+    else:
+        xmlheader = "<?xml version='1.0'?>\n" # utf-8 is default
+
+    if stream is None:
+        io = StringIO.StringIO(stream)
+    else:
+        io = stream
+
+    # standard XML-RPC wrappings
+    if methodname:
+        if not isinstance(methodname, str):
+            methodname = methodname.encode(encoding)
+        io.write(xmlheader)
+        io.write("<methodCall>\n")
+        io.write("<methodName>%s</methodName>\n" % methodname)
+        m.dump(params, io)
+        io.write("</methodCall>\n")
+    elif methodresponse:
+        io.write(xmlheader)
+        io.write("<methodResponse>\n")
+        m.dump(params, io)
+        io.write("</methodResponse>\n")
+    else:
+        # Return as-is
+        m.dump(params, io)
+
+    if stream is None:
+        return io.getvalue()
+    return ""
+
+def xmlrpcLoad(stream):
+    p, u = xmlrpcGetParser()
+    if hasattr(stream, "read"):
+        # A real stream
+        while 1:
+            data = stream.read(16384)
+            if not data:
+                break
+            p.feed(data)
+    else:
+        # Assume it's a string
+        p.feed(stream)
+    p.close()
+    return u.close(), u.getmethodname()
+
+
+class ServerProxy(xmlrpclib.ServerProxy):
+
+    def _request(self, methodname, params):
+        # Call a method on the remote server
+        request = xmlrpcDump(params, methodname,
+            encoding = self.__encoding, allow_none=self.__allow_none)
+
+        response = self.__transport.request(
+            self.__host,
+            self.__handler,
+            request,
+            verbose=self.__verbose)
+
+        if len(response) == 1:
+            response = response[0]
+
+        return response
+
+    def __getattr__(self, name):
+        # magic method dispatcher
+        if name.startswith('__'):
+            raise AttributeError(name)
+        #from conary.lib import log
+        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name)
+        return self._createMethod(name)
+
+    def _createMethod(self, name):
+        return xmlrpclib._Method(self._request, name)
+
+def copyStream(src, dest, length = None, bufferSize = 16384):
+    """Copy from one stream to another, up to a specified length"""
+    amtread = 0
+    while amtread != length:
+        if length is None:
+            bsize = bufferSize
+        else:
+            bsize = min(bufferSize, length - amtread)
+        buf = src.read(bsize)
+        if not buf:
+            break
+        dest.write(buf)
+        amtread += len(buf)
+    return amtread
+
+def decompressStream(src, bufferSize = 8092):
+    sio = BoundedStringIO()
+    z = zlib.decompressobj()
+    while 1:
+        buf = src.read(bufferSize)
+        if not buf:
+            break
+        sio.write(z.decompress(buf))
+    sio.write(z.flush())
+    return sio
+
+def compressStream(src, level = 5, bufferSize = 16384):
+    sio = BoundedStringIO()
+    z = zlib.compressobj(level)
+    while 1:
+        buf = src.read(bufferSize)
+        if not buf:
+            break
+        sio.write(z.compress(buf))
+    sio.write(z.flush())
+    return sio

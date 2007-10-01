@@ -220,7 +220,7 @@ def rebuildLatest(db, recreate=False):
     return True
     
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 7)
+    Version = (15, 8)
     def updateLatest(self):
         return rebuildLatest(self.db, recreate=True)
 
@@ -478,6 +478,11 @@ class MigrateTo_15(SchemaMigration):
     def migrate7(self):
         return rebuildLatest(self.db)
 
+    # 15.8 - add an index on TroveInfo
+    def migrate8(self):
+        self.db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
+        return True
+    
 # populate the CheckTroveCache table
 def createCheckTroveCache(db):
     db.loadSchema()

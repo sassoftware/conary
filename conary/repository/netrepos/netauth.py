@@ -180,14 +180,15 @@ class EntitlementAuthorization:
 
     def getAuthorizedGroups(self, cu, serverName, remoteIp,
                             entitlementGroup, entitlement):
-        if self.cacheTimeout:
-            cacheEntry = sha1helper.sha1String("%s%s%s" % (
-                serverName, entitlementGroup, entitlement))
-            userGroupIds, timeout = self.cache.get(cacheEntry, (None, None))
-            if (timeout is not None) and time.time() < timeout:
-                return userGroupIds
-            elif (timeout is not None):
-                del self.cache[cacheEntry]
+        cacheEntry = sha1helper.sha1String("%s%s%s" % (
+            serverName, entitlementGroup, entitlement))
+        userGroupIds, timeout, autoRetry = \
+                self.cache.get(cacheEntry, (None, None, None))
+        if (timeout is not None) and time.time() < timeout:
+            return userGroupIds
+        elif (timeout is not None):
+            del self.cache[cacheEntry]
+            if autoRetry is not True:
                 raise errors.EntitlementTimeout([entitlement])
 
         if self.entCheckUrl:
@@ -222,6 +223,14 @@ class EntitlementAuthorization:
 
             entitlementGroup = p['class']
             entitlement = p['key']
+            entitlementRetry = p['retry']
+            if p['timeout'] is None:
+                entitlementTimeout = self.cacheTimeout
+            else:
+                entitlementTimeout = p['timeout']
+
+            if entitlementTimeout is None:
+                entitlementTimeout = -1
 
         # look up entitlements
         cu.execute("""
@@ -232,10 +241,11 @@ class EntitlementAuthorization:
 
         userGroupIds = set(x[0] for x in cu)
 
-        if self.cacheTimeout:
+        if self.entCheckUrl:
             # cacheEntry is still set from the cache check above
             self.cache[cacheEntry] = (userGroupIds,
-                                      time.time() + self.cacheTimeout)
+                                      time.time() + entitlementTimeout,
+                                      entitlementRetry)
 
         return userGroupIds
 

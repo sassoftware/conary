@@ -129,7 +129,8 @@ class Flavor(packagepolicy.Flavor):
         pkg = componentMap[path]
         f = pkg.getFile(path)
 
-        if f.flavor().isEmpty():
+        # Only recompute the file's flavor if the file has changed
+        if self.mtimeChanged(path):
             packagepolicy.Flavor.doFile(self, path)
         else:
             self.packageFlavor.union(f.flavor())

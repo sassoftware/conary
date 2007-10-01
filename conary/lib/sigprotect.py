@@ -64,6 +64,12 @@ def sigprotect(*signals):
     def decorator(fn):
 
         def call(*args, **kwargs):
+            # If not in the main thread, don't bother to set up the signal
+            # handlers
+            import threading
+            if not isinstance(threading.currentThread(), threading._MainThread):
+                return fn(*args, **kwargs)
+
             exception = None
             rekill = False
             try:

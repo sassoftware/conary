@@ -33,6 +33,8 @@ from conary.deps import deps
 from conary.lib import log, magic, util
 from conary.local import database
 
+from conary.repository import errors as repoerrors
+
 
 
 crossMacros = {
@@ -223,12 +225,8 @@ class AbstractPackageRecipe(Recipe):
                 (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
                 # XXX move this to use more of db.findTrove's features, instead
                 # of hand parsing
-                try:
-                    troves = db.trovesByName(name)
-                    troves = db.getTroves(troves)
-                except errors.TroveNotFound:
-                    missingReqs.append(buildReq)
-                    continue
+                troves = db.trovesByName(name)
+                troves = db.getTroves(troves)
 
                 versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
 
@@ -246,7 +244,7 @@ class AbstractPackageRecipe(Recipe):
 	db = database.Database(cfg.root, cfg.dbPath)
 
 
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             if not self.macros.sysroot:
                 err = ("cross requirements needed but %(sysroot)s undefined")
                 if raiseError:
@@ -277,7 +275,7 @@ class AbstractPackageRecipe(Recipe):
         time = sourceVersion.timeStamps()[-1]
 
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
                                                        crossDb)
         else:

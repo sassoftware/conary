@@ -32,7 +32,7 @@ class DepResolutionMethod(object):
         self.flavor = flavor
         self.flavorPreferences = []
 
-    def setFlavorPreferences(flavorPreferences):
+    def setFlavorPreferences(self, flavorPreferences):
         self.flavorPreferences = flavorPreferences
 
     def setTroveSource(self, troveSource):
@@ -185,7 +185,7 @@ class DepResolutionMethod(object):
         # Now filter by flavor preferences.
         newFlavors = []
         if self.flavorPreferences:
-            for flavor in flavorPreferences:
+            for flavor in self.flavorPreferences:
                 for trvFlavor in allFlavors:
                     if trvFlavor.stronglySatisfies(flavor):
                        newFlavors.append(trvFlavor)
@@ -194,8 +194,12 @@ class DepResolutionMethod(object):
         if newFlavors:
             flavoredList = [ x for x in flavoredList if x[1][2] in newFlavors ]
 
-        # finally, filter by latest then score.
+        return self._selectMatchingResolutionTrove(requiredBy, dep,
+                                                   depClass, flavoredList)
 
+    def _selectMatchingResolutionTrove(self, requiredBy, dep, depClass,
+                                       flavoredList):
+        # finally, filter by latest then score.
         trovesByNL = {}
         for installFlavor, (n,v,f) in flavoredList:
             l = v.trailingLabel()

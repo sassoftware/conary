@@ -77,6 +77,7 @@ class ChangesetCallback(callbacks.ChangesetCallback):
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
     user                  =  conarycfg.CfgUserInfo
+    entitlement           =  conarycfg.CfgEntitlement
 
 class MirrorFileConfiguration(cfg.SectionedConfigFile):
     host                  =  cfg.CfgString
@@ -102,12 +103,60 @@ class MirrorConfiguration(MirrorFileConfiguration):
 def checkConfig(cfg):
     if not cfg.host:
         log.error("ERROR: cfg.host is not defined")
-        sys.exit(-1)
+        raise RuntimeError("cfg.host is not defined")
     # make sure that each label belongs to the host we're mirroring
     for label in cfg.labels:
         if label.getHost() != cfg.host:
             log.error("ERROR: label %s is not on host %s", label, cfg.host)
-            sys.exit(-1)
+            raise RuntimeError("label %s is not on host %s", label, cfg.host)
+
+def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=False, infoSync=False):
+    if cfg.lockFile:
+        try:
+            log.debug('checking for lock file')
+            lock = open(cfg.lockFile, 'w')
+            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except IOError:
+            log.warn('lock held by another process, exiting')
+            return
+
+    # need to make sure we have a 'source' section
+    if not cfg.hasSection('source'):
+        log.debug("ERROR: mirror configuration file is missing a [source] section")
+        raise RuntimeError("Mirror configuration file is missing a [source] section")
+    srcCfg = cfg.getSection('source')
+    sourceRepos = netclient.NetworkRepositoryClient(
+        srcCfg.repositoryMap, srcCfg.user,
+        uploadRateLimit = cfg.uploadRateLimit,
+        downloadRateLimit = cfg.downloadRateLimit,
+        entitlementDir = cfg.entitlementDirectory,
+        entitlements=srcCfg.entitlement)
+    # we need to build a target repo client for each of the "target*"
+    # sections in the config file
+    targets = []
+    for name in cfg.iterSectionNames():
+        if not name.startswith("target"):
+            continue
+        secCfg = cfg.getSection(name)
+        target = netclient.NetworkRepositoryClient(
+            secCfg.repositoryMap, secCfg.user,
+            uploadRateLimit = cfg.uploadRateLimit,
+            downloadRateLimit = cfg.downloadRateLimit,
+            entitlementDir = cfg.entitlementDirectory,
+            entitlements=secCfg.entitlement)
+        target = TargetRepository(target, cfg, name, test=test)
+        targets.append(target)
+    # we pass in the sync flag only the first time around, because after
+    # that we need the targetRepos mark to advance accordingly after being
+    # reset to -1
+    callAgain = mirrorRepository(sourceRepos, targets, cfg,
+                                 test = test, sync = sync,
+                                 syncSigs = infoSync,
+                                 callback = callback)
+    while callAgain:
+        callAgain = mirrorRepository(sourceRepos, targets, cfg,
+                                     test = test, callback = callback)
+
 
 def Main(argv=sys.argv[1:]):
     try:
@@ -125,50 +174,7 @@ def Main(argv=sys.argv[1:]):
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
 
-    if cfg.lockFile:
-        try:
-            log.debug('checking for lock file')
-            lock = open(cfg.lockFile, 'w')
-            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except IOError:
-            log.debug('lock held by another process, exiting')
-            sys.exit(0)
-
-    # need to make sure we have a 'source' section
-    if not cfg.hasSection('source'):
-        log.debug("ERROR: mirror configuration file is missing a [source] section")
-        sys,exit(-1)
-    srcCfg = cfg.getSection('source')
-    sourceRepos = netclient.NetworkRepositoryClient(
-        srcCfg.repositoryMap, srcCfg.user,
-        uploadRateLimit = cfg.uploadRateLimit,
-        downloadRateLimit = cfg.downloadRateLimit,
-        entitlementDir = cfg.entitlementDirectory)
-    # we need to build a target repo client for each of the "target*"
-    # sections in the config file
-    targets = []
-    for name in cfg.iterSectionNames():
-        if not name.startswith("target"):
-            continue
-        secCfg = cfg.getSection(name)
-        target = netclient.NetworkRepositoryClient(
-            secCfg.repositoryMap, secCfg.user,
-            uploadRateLimit = cfg.uploadRateLimit,
-            downloadRateLimit = cfg.downloadRateLimit,
-            entitlementDir = cfg.entitlementDirectory)
-        target = TargetRepository(target, cfg, name, test=options.test)
-        targets.append(target)
-    # we pass in the sync flag only the first time around, because after
-    # that we need the targetRepos mark to advance accordingly after being
-    # reset to -1
-    callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                 test = options.test, sync = options.sync,
-                                 syncSigs = options.infoSync,
-                                 callback = callback)
-    while callAgain:
-        callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                     test = options.test, callback = callback)
-
+    mainWorkflow(cfg, callback, options.test, options.sync, options.infoSync)
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
@@ -663,7 +669,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             raise RuntimeError("Can not handle unknown target repository type", t)
     log.debug("-" * 20 + " start loop " + "-" * 20)
 
-    hidden = len(targets) > 1 and cfg.useHiddenCommits
+    hidden = len(targets) > 1 or cfg.useHiddenCommits
     if hidden:
         log.debug("will use hidden commits to syncronize target mirrors")
 

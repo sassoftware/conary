@@ -30,6 +30,8 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from conary.lib import util
+
 class InfoURL(urllib.addinfourl):
     def __init__(self, fp, headers, url, protocolVersion):
         urllib.addinfourl.__init__(self, fp, headers, url)
@@ -112,6 +114,9 @@ class URLOpener(urllib.FancyURLopener):
 
     localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
         socket.gethostname()])
+
+    # For debugging purposes only
+    _sendConaryProxyHostHeader = True
 
     def __init__(self, *args, **kw):
         self.compress = False
@@ -296,6 +301,10 @@ class URLOpener(urllib.FancyURLopener):
             headers.append(('Host', realhost))
         else:
             headers.append(('Host', host))
+        if useConaryProxy and self._sendConaryProxyHostHeader:
+            # Add a custom header to tell the proxy which name we contacted it
+            # on
+            headers.append(('X-Conary-Proxy-Host', host))
         if auth:
             headers.append(('Authorization', 'Basic %s' % auth))
         return h, url, selector, headers
@@ -338,7 +347,8 @@ class URLOpener(urllib.FancyURLopener):
             if encoding == 'deflate':
                 # disable until performace is better
                 #fp = DecompressFileObj(fp)
-                fp = StringIO(zlib.decompress(fp.read()))
+                fp = util.decompressStream(fp)
+                fp.seek(0)
 
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
             return InfoURL(fp, headers, selector, protocolVersion)
@@ -370,7 +380,7 @@ class URLOpener(urllib.FancyURLopener):
             if check():
                 raise AbortError
             # wait 5 seconds for a response
-            l = pollObj.poll(5)
+            l = pollObj.poll(5000)
 
             if not l:
                 # still no response from the server.  send a space to
@@ -537,6 +547,9 @@ class Transport(xmlrpclib.Transport):
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc
+
+    def getparser(self):
+        return util.xmlrpcGetParser()
 
 class AbortError(Exception): pass
 

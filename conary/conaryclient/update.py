@@ -2333,7 +2333,7 @@ conary erase '%s=%s[%s]'
         return _loadRestartInfo(restartInfo, self.lzCache)
 
     def saveRestartInfo(self, updJob, remainingJobs):
-        return _storeJobInfo(remainingJobs, updJob.getTroveSource())
+        return _storeJobInfo(remainingJobs, updJob)
 
     def cleanRestartInfo(self, restartInfo):
         if not restartInfo:
@@ -2905,14 +2905,17 @@ conary erase '%s=%s[%s]'
             resolveRepos = resolveRepos,
             syncChildren = syncChildren,
             updateOnly = updateOnly,
+            resolveGroupList = resolveGroupList,
             installMissing = installMissing,
             removeNotByDefault = removeNotByDefault,
             keepRequired = keepRequired,
-            migrate = migrate)
+            migrate = migrate,
+            exactFlavors = False)
         # Make sure we store them as booleans
         kwargs = dict( (k, bool(v)) for k, v in kwargs.iteritems())
         uJob.setItemList(itemList)
         uJob.setKeywordArguments(kwargs)
+        uJob.setFromChangesets(fromChangesets)
 
         return (uJob, suggMap)
 
@@ -3397,7 +3400,8 @@ class InstallPathConflicts(UpdateError):
     def __init__(self, conflicts):
         self.conflicts = conflicts
 
-def _storeJobInfo(remainingJobs, changeSetSource):
+def _storeJobInfo(remainingJobs, updJob):
+    changeSetSource = updJob.getTroveSource()
     restartDir = tempfile.mkdtemp(prefix='conary-restart-')
     csIndexPath = os.path.join(restartDir, 'changesets')
     csIndex = open(csIndexPath, "w")
@@ -3456,6 +3460,11 @@ def _storeJobInfo(remainingJobs, changeSetSource):
     versionFile = open(versionFilePath, "w+")
     versionFile.write("version %s\n" % constants.version)
     versionFile.close()
+
+    # Save restart infromation
+    invocationInfoPath = os.path.join(restartDir, "job-invocation")
+    updJob.saveInvocationInfo(invocationInfoPath)
+
     return restartDir
 
 def _loadRestartInfo(restartDir, lazyFileCache):

@@ -191,7 +191,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def callWrapper(self, protocol, port, methodname, authToken, 
                     orderedArgs, kwArgs,
-                    remoteIp = None, rawUrl = None):
+                    remoteIp = None, rawUrl = None, isSecure = False):
         """
         Returns a tuple of (Exception, result).  Exception is a Boolean
         stating whether an error occurred.
@@ -200,6 +200,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.reopen()
         self._port = port
         self._protocol = protocol
+        self._baseUrlOverride = rawUrl
 
         if methodname not in self.publicCalls:
             raise errors.MethodNotSupported(methodname)
@@ -267,7 +268,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         raise e
 
-    def urlBase(self):
+    def urlBase(self, urlName = True):
+        if urlName and self._baseUrlOverride:
+            return self._baseUrlOverride
+
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 
@@ -1661,7 +1665,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
   	os.close(fd)
 	fileName = os.path.basename(path)
 
-        return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
+        # this needs to match up exactly with the parsing of the url we do
+        # in commitChangeSet.
+        return self.urlBase() + "?%s" % fileName[:-3]
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
@@ -1757,7 +1763,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.commitAction:
 	    return True
 
-        d = { 'reppath' : self.urlBase(), 'user' : authToken[0], }
+        d = { 'reppath' : self.urlBase(urlName = False),
+              'user' : authToken[0], }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
         try:
@@ -1792,6 +1799,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # we need to make sure we don't look up the same fileId multiple
         # times to avoid asking the sql server to do busy work
         fileIdMap = {}
+        i = 0               # protect against empty fileIdGen
         for i, fileId in enumerate(fileIdGen):
             fileIdMap.setdefault(fileId, []).append(i)
         uniqIdList = fileIdMap.keys()
@@ -1887,73 +1895,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                trove = sourceName,
 			       label = self.toBranch(branch).label()):
 	    raise errors.InsufficientPermission
-        self.log(2, sourceName, branch, clientVersion, fileIds)
-        cu = self.db.cursor()
-        query = """
-        SELECT DISTINCT
-            TroveFiles.pathId, TroveFiles.path, Versions.version,
-            FileStreams.fileId, Nodes.finalTimestamp
-        FROM Instances
-        JOIN Nodes ON
-            Instances.itemid = Nodes.itemId AND
-            Instances.versionId = Nodes.versionId
-        JOIN Branches using (branchId)
-        JOIN Items ON
-            Nodes.sourceItemId = Items.itemId
-        JOIN TroveFiles ON
-            Instances.instanceId = TroveFiles.instanceId
-        JOIN Versions ON
-            TroveFiles.versionId = Versions.versionId
-        INNER JOIN FileStreams ON
-            TroveFiles.streamId = FileStreams.streamId
-        JOIN tmpFilePrefixes ON
-            TroveFiles.path LIKE tmpFilePrefixes.prefix
-        WHERE
-            Items.item = ? AND
-            Branches.branch = ?
-        ORDER BY
-            Nodes.finalTimestamp DESC
-        """
-
-        schema.resetTable(cu, 'tmpFilePrefixes')
-        if filePrefixes is None:
-            # Will look for anything - gets expanded as "LIKE '%'" which is a
-            # bit lame
-            filePrefixes = ['']
-        cu.executemany("INSERT INTO tmpFilePrefixes (prefix) VALUES (?)",
-                       ( f + '%' for f in filePrefixes ),
-                       start_transaction=False)
-        self.db.analyze("tmpFilePrefixes")
-        cu.execute(query, sourceName, branch)
-        ids = {}
-        for (pathId, path, version, fileId, timeStamp) in cu:
-            encodedPath = self.fromPath(path)
-            if not encodedPath in ids:
-                ids[encodedPath] = (self.fromPathId(pathId),
-                                   version,
-                                   self.fromFileId(fileId))
-        if not fileIds:
-            return ids
-
-        fileIds = base64.b64decode(fileIds)
-
-        # Length of a fileId - same as len of sha1
-        fileIdLen = 20
-        assert(len(fileIds) % fileIdLen == 0)
-        fileIdCount = len(fileIds) // fileIdLen
-
-        def splitFileIds(cu):
+        # decode the fileIds to check before doing heavy work
+        if fileIds:
+            fileIds = base64.b64decode(fileIds)
+        else:
+            fileIds = ""
+        def splitFileIds(fileIds):
+            fileIdLen = 20
+            assert(len(fileIds) % fileIdLen == 0)
+            fileIdCount = len(fileIds) // fileIdLen
             for i in range(fileIdCount):
                 start = fileIdLen * i
                 end = start + fileIdLen
-                yield cu.binary(fileIds[start : end])
+                yield fileIds[start : end]
+        # fileIds need to unique at for performance reasons
+        fileIds = set(splitFileIds(fileIds))
+        self.log(2, sourceName, branch, filePrefixes, fileIds)
+        cu = self.db.cursor()
 
-        schema.resetTable(cu, 'tmpFileId')
-        cu.executemany("INSERT INTO tmpFileId (fileId) VALUES (?)", splitFileIds(cu),
-                       start_transaction=False)
-        self.db.analyze("tmpFileId")
-        
-        # Fetch paths by file id too
+        prefixQuery = ""
+        if filePrefixes:
+            schema.resetTable(cu, 'tmpFilePrefixes')
+            cu.executemany("INSERT INTO tmpFilePrefixes (prefix) VALUES (?)",
+                           ( f + '%' for f in filePrefixes ),
+                           start_transaction=False)
+            self.db.analyze("tmpFilePrefixes")
+            prefixQuery = """JOIN tmpFilePrefixes ON
+            TroveFiles.path LIKE tmpFilePrefixes.prefix """
+
         query = """
         SELECT DISTINCT
             TroveFiles.pathId, TroveFiles.path, Versions.version,
@@ -1969,27 +1938,32 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Instances.instanceId = TroveFiles.instanceId
         JOIN Versions ON
             TroveFiles.versionId = Versions.versionId
-        INNER JOIN FileStreams ON
+        JOIN FileStreams ON
             TroveFiles.streamId = FileStreams.streamId
-        JOIN tmpFileId ON
-            FileStreams.fileId = tmpFileId.fileId
+        %s
         WHERE
             Items.item = ? AND
             Branches.branch = ?
         ORDER BY
             Nodes.finalTimestamp DESC
-        """
+        """ % (prefixQuery,)
 
-        cu.execute(query, sourceName, branch)
-
-        newids = {}
+        cu.execute(query, (sourceName, branch))
+        ids = {}
         for (pathId, path, version, fileId, timeStamp) in cu:
             encodedPath = self.fromPath(path)
-            if not encodedPath in newids:
-                newids[encodedPath] = (self.fromPathId(pathId),
-                                       version,
-                                       self.fromFileId(fileId))
-        ids.update(newids)
+            currVal = ids.get(encodedPath, None)
+            newVal = (cu.frombinary(pathId), version, cu.frombinary(fileId))
+            if currVal is None:
+                ids[encodedPath] = newVal
+                continue
+            # if we already had a value set, we prefer to use the one
+            # that has a fileId in the set we were sent
+            if newVal[2] in fileIds and not (currVal[2] in fileIds):
+                ids[encodedPath] = newVal
+        # prepare for return
+        ids = dict([(k, (self.fromPathId(v[0]), v[1], self.fromFileId(v[2])))
+                    for k,v in ids.iteritems()])
         return ids
 
     @accessReadOnly

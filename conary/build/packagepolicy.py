@@ -34,6 +34,26 @@ from conary.local import database
 from elementtree import ElementTree
 
 
+# Helper class
+class _DatabaseDepCache(object):
+    __slots__ = ['db', 'cache']
+    def __init__(self, db):
+        self.db = db
+        self.cache = {}
+
+    def getProvides(self, depSetList):
+        ret = {}
+        missing = []
+        for depSet in depSetList:
+            if depSet in self.cache:
+                ret[depSet] = self.cache[depSet]
+            else:
+                missing.append(depSet)
+        newresults = self.db.getTrovesWithProvides(missing)
+        ret.update(newresults)
+        self.cache.update(newresults)
+        return ret
+
 
 class _filterSpec(policy.Policy):
     """
@@ -1753,7 +1773,7 @@ class _dependency(policy.Policy):
                     foundPath = True
                 pythonFlags = set()
                 f = files.ThawFile(db.getFileStream(fileid), pathid)
-                for dep in f.requires().iterDepsByClass(
+                for dep in f.provides().iterDepsByClass(
                         deps.PythonDependencies):
                     flagNames = [x[0] for x in dep.getFlags()[0]]
                     pythonFlags.update(flagNames)
@@ -2113,7 +2133,14 @@ class _dependency(policy.Policy):
                 self._enforceProvidedPath(pythonDestPath)
                 return (pythonDestPath, False)
 
-        # No python?  How is cvc running at all?
+        # Specified python not found on system (usually because of
+        # bad interpreter path -- CNY-2050)
+        if len(pythonPath) == 1:
+            missingPythonPath = '%s ' % pythonPath[0]
+        else:
+            missingPythonPath = ''
+        self.warn('Python interpreter %snot found for %s',
+                  missingPythonPath, path)
         return (None, None)
 
 
@@ -2360,8 +2387,9 @@ class Provides(_dependency):
         """
 
         pythonPath, bootstrapPython = self._getPython(self.macros, path)
-        # conary is a python program...
-        assert(pythonPath)
+        if not pythonPath:
+            # Most likely bad interpreter path in a .py file
+            return (None, None)
 
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
@@ -2420,6 +2448,8 @@ class Provides(_dependency):
             return
 
         sysPath, pythonVersion = self._getPythonProvidesSysPath(path)
+        if not sysPath:
+            return
 
         depPath = None
         for sysPathEntry in sysPath:
@@ -2436,7 +2466,7 @@ class Provides(_dependency):
             return
 
         # remove extension
-        depPath = depPath.rsplit('.', 1)[0]
+        depPath, extn = depPath.rsplit('.', 1)
 
         if depPath == '__future__':
             return
@@ -2444,11 +2474,31 @@ class Provides(_dependency):
             depPath = depPath.replace('/__init__', '')
         depPath = depPath.replace('/', '.')
 
+        depPaths = [ depPath ]
+
+        if extn == 'so':
+            fname = util.joinPaths(macros.destdir, path)
+            try:
+                syms = elf.getDynSym(fname)
+                # Does this module have an init<blah> function?
+                initfuncs = [ x[4:] for x in syms if x.startswith('init') ]
+                # This is the equivalent of dirname()
+                comps = depPath.rsplit('.', 1)
+                dpPrefix = comps[0]
+                if len(comps) == 1:
+                    # Top-level python module
+                    depPaths.extend(initfuncs)
+                else:
+                    for initfunc in initfuncs:
+                        depPaths.append('.'.join([dpPrefix, initfunc]))
+            except elf.error:
+                pass
+
         flags = self._getPythonFlagsFromPath(path)
         flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
-        dep = deps.Dependency(depPath, flags)
-        self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
-
+        for dpath in depPaths:
+            dep = deps.Dependency(dpath, flags)
+            self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
 
     def _addOneCILProvide(self, pkg, path, name, ver):
         self._addDepToMap(path, pkg.providesMap, deps.CILDependencies,
@@ -2702,6 +2752,8 @@ class Requires(_addInfo, _dependency):
 	'%(docdir)s/',
     )
 
+    dbDepCacheClass = _DatabaseDepCache
+
     def __init__(self, *args, **keywords):
         self.sonameSubtrees = set()
         self.bootstrapPythonFlags = set()
@@ -2721,6 +2773,8 @@ class Requires(_addInfo, _dependency):
         self.pythonSysPathMap = {}
         self.pythonModuleFinderMap = {}
         policy.Policy.__init__(self, *args, **keywords)
+        self.db = None
+        self.depCache = self.dbDepCacheClass(self._getDb())
 
     def updateArgs(self, *args, **keywords):
         # _privateDepMap is used only for Provides to talk to Requires
@@ -2968,8 +3022,8 @@ class Requires(_addInfo, _dependency):
         #  (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
 
         pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
-        # conary is a python program...
-        assert(pythonPath)
+        if not pythonPath:
+            return (None, None, None, None)
 
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
@@ -3033,6 +3087,8 @@ class Requires(_addInfo, _dependency):
 
     def _getPythonRequiresModuleFinder(self, pythonPath, destdir, sysPath, bootstrapPython):
 
+        if self.recipe.isCrossCompiling():
+            return None
         if pythonPath not in self.pythonModuleFinderMap:
             if not bootstrapPython and pythonPath == sys.executable:
                 self.pythonModuleFinderMap[pythonPath] = pydeps.DirBasedModuleFinder(destdir, sysPath)
@@ -3052,6 +3108,16 @@ class Requires(_addInfo, _dependency):
         (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion
         )= self._getPythonRequiresSysPath(path)
 
+        if not sysPath:
+            # Probably a bad interpreter path
+            return
+
+        if not pythonModuleFinder:
+            # We cannot (reliably) determine runtime python requirements
+            # in the cross-compile case, so don't even try (for
+            # consistency).
+            return
+
         try:
             if script:
                 pythonModuleFinder.run_script(fullpath)
@@ -3063,14 +3129,20 @@ class Requires(_addInfo, _dependency):
             return
 
         for depPath in pythonModuleFinder.getDepsForPath(fullpath):
+            if not depPath:
+                continue
             flags = None
             if depPath.startswith('///invalid'):
                 # same as exception handling above
                 self.info('File %s is not a valid python file', path)
                 return
+            absPath = None
             if depPath.startswith(destdir):
                 depPath = depPath[destDirLen:]
                 flags = self._getPythonFlagsFromPath(depPath)
+
+                # The file providing this dependency is part of this package.
+                absPath = depPath
             for sysPathEntry in sysPath:
                 if depPath.startswith(sysPathEntry):
                     newDepPath = depPath[len(sysPathEntry)+1:]
@@ -3090,27 +3162,76 @@ class Requires(_addInfo, _dependency):
                 # a python file not found in sys.path will not have been
                 # provided, so we must not depend on it either
                 return
-            if depPath.endswith('.py') or depPath.endswith('.pyc') or depPath.endswith('.so'):
-                # remove extension
-                depPath = depPath.rsplit('.', 1)[0]
-            else:
+            if not (depPath.endswith('.py') or depPath.endswith('.pyc') or 
+                    depPath.endswith('.so')):
                 # Not something we provide, so not something we can
                 # require either.  Drop it and go on.  We have seen
                 # this when a script in /usr/bin has ended up in the
                 # requires list.
                 continue
 
-            depPath = depPath.replace('/', '.')
-            depPath = depPath.replace('.__init__', '')
-
-            if depPath == '__future__':
-                continue
-
             # in order to limit requiring flags, we remove from flags
             # anything that is not provided by systemPythonFlags
             flags.intersection_update(systemPythonFlags)
-            self._addRequirement(path, depPath, flags, pkg,
+
+            if depPath.endswith('module.so'):
+                # Strip 'module.so' from the end, make it a candidate
+                cands = [ depPath[:-9] + '.so', depPath ]
+                cands = [ self._normalizePythonDep(x) for x in cands ]
+                if absPath:
+                    depName = self._checkPackagePythonDeps(pkg, absPath, cands,
+                                                          flags)
+                else:
+                    depName = self._checkSystemPythonDeps(cands, flags)
+            else:
+                depName = self._normalizePythonDep(depPath)
+                if depName == '__future__':
+                    continue
+
+            self._addRequirement(path, depName, flags, pkg,
                                  deps.PythonDependencies)
+
+    def _checkPackagePythonDeps(self, pkg, depPath, depNames, flags):
+        # Try to match depNames against the current package
+        # Use the last value in depNames as the fault value
+        assert depNames, "No dependencies passed"
+        if depPath not in pkg:
+            return depNames[-1]
+        fileProvides = pkg[depPath][1].provides()
+
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+
+        # Walk the depNames list in order, pick the first dependency
+        # available.
+        for dp in depNames:
+            depSet = deps.DependencySet()
+            depSet.addDep(deps.PythonDependencies, deps.Dependency(dp, flags))
+            if fileProvides.intersection(depSet):
+                # this dep is provided
+                return dp
+        # If we got here, the file doesn't provide this dep. Return the last
+        # candidate and hope for the best
+        return depNames[-1]
+
+    def _checkSystemPythonDeps(self, depNames, flags):
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+
+        for dp in depNames:
+            depSet = deps.DependencySet()
+            depSet.addDep(deps.PythonDependencies, deps.Dependency(dp, flags))
+            troves = self.depCache.getProvides([depSet])
+            if troves:
+                return dp
+        return depNames[-1]
+
+    def _normalizePythonDep(self, depName):
+        # remove extension
+        depName = depName.rsplit('.', 1)[0]
+        depName = depName.replace('/', '.')
+        depName = depName.replace('.__init__', '')
+        return depName
 
     def _addRubyRequirements(self, path, fullpath, pkg, script=False):
         macros = self.recipe.macros

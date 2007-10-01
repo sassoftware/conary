@@ -115,7 +115,7 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def findTroves(self, labelPath, troves, defaultFlavor=None, 
-                   acrossLabels=False, acrossFlavors=True, 
+                   acrossLabels=False, acrossFlavors=False, 
                    affinityDatabase=None, allowMissing=False, 
                    bestFlavor=None, getLeaves=None, 
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
@@ -132,16 +132,17 @@ class AbstractTroveSource:
                                             bestFlavor=bestFlavor,
                                             getLeaves=getLeaves,
                                             exactFlavors=exactFlavors,
+                                            troveTypes=troveTypes,
                                             **kw)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
-                  defaultFlavor=None, acrossSources = True, 
-                  acrossFlavors = True, affinityDatabase = None,
+                  defaultFlavor=None, acrossLabels = False, 
+                  acrossFlavors = False, affinityDatabase = None,
                   bestFlavor = None, getLeaves = None, 
                   troveTypes=TROVE_QUERY_PRESENT, **kw):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
-                              defaultFlavor, acrossSources, acrossFlavors,
+                              defaultFlavor, acrossLabels, acrossFlavors,
                               affinityDatabase, bestFlavor=bestFlavor,
                               getLeaves=getLeaves, troveTypes=troveTypes,
                               **kw)
@@ -1411,12 +1412,11 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
         return True
 
     def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
-                   acrossLabels=False, acrossFlavors=True,
+                   acrossLabels=False, acrossFlavors=False,
                    affinityDatabase=None, allowMissing=False,
                    bestFlavor=None, getLeaves=None,
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
                    **kw):
-
         sourceBestFlavor = bestFlavor
         sourceGetLeaves = getLeaves
         troveSpecs = list(troveSpecs)
@@ -1469,12 +1469,15 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
 
         source = self.sources[-1]
 
-        if source._allowNoLabel:
-            sourceLabelPath = None
+        if source._flavorCheck == _CHECK_TROVE_STRONG_FLAVOR:
             sourceDefaultFlavor = None
         else:
-            sourceLabelPath = labelPath
             sourceDefaultFlavor = defaultFlavor
+
+        if source._allowNoLabel:
+            sourceLabelPath = None
+        else:
+            sourceLabelPath = labelPath
         if source.searchableByType():
             sourceTroveTypes = troveTypes
         else:

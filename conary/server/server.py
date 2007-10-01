@@ -21,7 +21,6 @@ import posixpath
 import select
 import socket
 import sys
-import xmlrpclib
 import urllib
 import zlib
 import BaseHTTPServer
@@ -232,13 +231,20 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
-        data = self.rfile.read(contentLength)
+        sio = util.BoundedStringIO()
+
+        actual = util.copyStream(self.rfile, sio, contentLength)
+        if contentLength != actual:
+            raise Exception(contentLength, actual)
+
+        sio.seek(0)
 
         encoding = self.headers.get('Content-Encoding', None)
         if encoding == 'deflate':
-            data = zlib.decompress(data)
+            sio = util.decompressStream(sio)
+            sio.seek(0)
 
-        (params, method) = xmlrpclib.loads(data)
+        (params, method) = util.xmlrpcLoad(sio)
         logMe(3, "decoded xml-rpc call %s from %d bytes request" %(method, contentLength))
 
         if self.netProxy:
@@ -254,7 +260,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                             params, remoteIp = self.connection.getpeername()[0],
                             rawUrl = self.path, localAddr = localAddr,
                             protocolString = self.request_version,
-                            headers = self.headers)
+                            headers = self.headers,
+                            isSecure = self.server.isSecure)
             except errors.InsufficientPermission:
                 self.send_error(403)
                 return None
@@ -265,16 +272,20 @@ class HttpRequests(SimpleHTTPRequestHandler):
         extraInfo = result[-1]
         result = result[1:-1]
 
-	resp = xmlrpclib.dumps((result,), methodresponse=1)
-        logMe(3, "encoded xml-rpc response to %d bytes" % (len(resp),))
+        sio = util.BoundedStringIO()
+	util.xmlrpcDump((result,), stream = sio, methodresponse=1)
+        respLen = sio.tell()
+        logMe(3, "encoded xml-rpc response to %d bytes" % respLen)
 
 	self.send_response(200)
         encoding = self.headers.get('Accept-encoding', '')
-        if len(resp) > 200 and 'deflate' in encoding:
-            resp = zlib.compress(resp, 5)
+        if respLen > 200 and 'deflate' in encoding:
+            sio.seek(0)
+            sio = util.compressStream(sio, level = 5)
+            respLen = sio.tell()
             self.send_header('Content-encoding', 'deflate')
 	self.send_header("Content-type", "text/xml")
-	self.send_header("Content-length", str(len(resp)))
+	self.send_header("Content-length", str(respLen))
         if usedAnonymous:
             self.send_header("X-Conary-UsedAnonymous", '1')
         if extraInfo:
@@ -291,9 +302,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header('Via', via)
 
 	self.end_headers()
-	self.wfile.write(resp)
-        logMe(3, "sent response to client", len(resp), "bytes")
-	return resp
+        sio.seek(0)
+        util.copyStream(sio, self.wfile)
+        logMe(3, "sent response to client", respLen, "bytes")
+        return respLen
 
     def do_PUT(self):
         chunked = False
@@ -375,6 +387,8 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
         self.createUser('anonymous', 'anonymous', admin = False, write = False)
 
 class HTTPServer(BaseHTTPServer.HTTPServer):
+    isSecure = False
+
     def close_request(self, request):
         pollObj = select.poll()
         pollObj.register(request, select.POLLIN)
@@ -390,6 +404,8 @@ class HTTPServer(BaseHTTPServer.HTTPServer):
 
 if SSL:
     class SecureHTTPServer(HTTPServer):
+        isSecure = True
+
         def __init__(self, server_address, RequestHandlerClass, sslContext):
             self.sslContext = sslContext
             HTTPServer.__init__(self, server_address, RequestHandlerClass)
@@ -480,7 +496,7 @@ def addUser(netRepos, userName, admin = False, mirror = False):
     netRepos.auth.setMirror(userName, mirror)
     netRepos.auth.setAdmin(userName, admin)
 
-def getServer():
+def getServer(argv = sys.argv, reqClass = HttpRequests):
     argDef = {}
     cfgMap = {
         'contents-dir'  : 'contentsDir',
@@ -507,7 +523,8 @@ def getServer():
     argDef['mirror'] = options.NO_PARAM
 
     try:
-        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+                                                argv = argv)
     except options.OptionError, msg:
         print >> sys.stderr, msg
         sys.exit(1)
@@ -524,8 +541,8 @@ def getServer():
     if not os.access(cfg.tmpDir, os.R_OK | os.W_OK | os.X_OK):
         print cfg.tmpDir + " needs to allow full read/write access"
         sys.exit(1)
-    HttpRequests.tmpDir = cfg.tmpDir
-    HttpRequests.cfg = cfg
+    reqClass.tmpDir = cfg.tmpDir
+    reqClass.cfg = cfg
 
     profile = 0
     if profile:
@@ -571,7 +588,7 @@ def getServer():
         if len(otherArgs) > 1:
             usage()
 
-        HttpRequests.netProxy = ProxyRepositoryServer(cfg, baseUrl)
+        reqClass.netProxy = ProxyRepositoryServer(cfg, baseUrl)
     elif cfg.repositoryDB:
         if len(otherArgs) > 1:
             usage()
@@ -612,7 +629,7 @@ def getServer():
 
         #netRepos = NetworkRepositoryServer(cfg, baseUrl)
         netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
-        HttpRequests.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
+        reqClass.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
 
         if 'add-user' in argSet:
             admin = argSet.pop('admin', False)
@@ -633,9 +650,9 @@ def getServer():
 
     if cfg.useSSL:
         ctx = createSSLContext(cfg)
-        httpServer = SecureHTTPServer(("", cfg.port), HttpRequests, ctx)
+        httpServer = SecureHTTPServer(("", cfg.port), reqClass, ctx)
     else:
-        httpServer = HTTPServer(("", cfg.port), HttpRequests)
+        httpServer = HTTPServer(("", cfg.port), reqClass)
     return httpServer, profile
 
 def serve(httpServer, profile=False):

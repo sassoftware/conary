@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2006 rPath, Inc.
+# Copyright (c) 2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,34 +12,8 @@
 # full details.
 #
 
-filter_files =	\
-	cil.py \
-	data.py \
-	develdocs.py \
-	devellib.py \
-	devel.py \
-	doc.py \
-	emacs.py \
-	gnomehelpmenu.py \
-	late.py \
-	lib.py \
-	locale.py \
-	perl.py \
-	python.py \
-	supdoc.py
+# Note that cil components have %(lib)s in them; we depend on the
+# NonMultilibComponent policy to ensure that cil is multilib-safe.
 
-dist_files = Makefile $(filter_files)
-
-all: default-all
-
-install:
-	mkdir -p $(DESTDIR)/etc/conary/components/base/; \
-	for f in $(filter_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/components/base/$$f; \
-	done
-
-dist: default-dist
-
-clean: default-clean
-
-include ../../../Make.rules
+filters = ('cil', ('%(prefix)s/(%(lib)s|lib)/(mono|[^/]*-sharp-[^/]*)/', ))
+precedes = ('devellib', 'lib', 'devel')

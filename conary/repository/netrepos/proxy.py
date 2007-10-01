@@ -12,7 +12,7 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib, xmlrpclib
+import base64, cPickle, itertools, os, tempfile, urllib, urlparse
 
 from conary import constants, conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
@@ -51,7 +51,7 @@ class RepositoryVersionCache:
     def __init__(self):
         self.d = {}
 
-class ProxyClient(xmlrpclib.ServerProxy):
+class ProxyClient(util.ServerProxy):
 
     pass
 
@@ -82,7 +82,7 @@ class ProxyCaller:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
             rc = [ False, True, [ 'ProxyError', e.strerror[1] ] ]
-        except xmlrpclib.ProtocolError, e:
+        except util.xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission
 
@@ -118,7 +118,7 @@ class ProxyCallFactory:
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
-                     remoteIp):
+                     remoteIp, isSecure):
         entitlementList = authToken[2][:]
         entitlementList += cfg.entitlement.find(targetServerName)
 
@@ -153,11 +153,16 @@ class ProxyCallFactory:
 class RepositoryCaller(xmlshims.NetworkConvertors):
 
     def callByName(self, methodname, *args, **kwargs):
-        result = self.repos.callWrapper(self.protocol, self.port,
-                            methodname, self.authToken, args, kwargs,
-                            remoteIp = self.remoteIp)
+        rc = self.repos.callWrapper(self.protocol, self.port, methodname,
+                                    self.authToken, args, kwargs,
+                                    remoteIp = self.remoteIp,
+                                    rawUrl = self.rawUrl,
+                                    isSecure = self.isSecure)
 
-        return (False, result)
+        if rc[1]:
+            # exception occured
+            raise ProxyRepositoryError(rc[2])
+        return (False, rc)
 
     def getExtraInfo(self):
         """No extra information available for a RepositoryCaller"""
@@ -166,13 +171,16 @@ class RepositoryCaller(xmlshims.NetworkConvertors):
     def __getattr__(self, method):
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
-    def __init__(self, protocol, port, authToken, repos, remoteIp):
+    def __init__(self, protocol, port, authToken, repos, remoteIp, rawUrl,
+                 isSecure):
         self.repos = repos
         self.protocol = protocol
         self.port = port
         self.authToken = authToken
         self.url = None
         self.remoteIp = remoteIp
+        self.rawUrl = rawUrl
+        self.isSecure = isSecure
 
 class RepositoryCallFactory:
 
@@ -182,11 +190,11 @@ class RepositoryCallFactory:
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
                      localAddr, protocolString, headers, cfg,
-                     targetServerName, remoteIp):
+                     targetServerName, remoteIp, isSecure):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos,
-                                remoteIp)
+                                remoteIp, rawUrl, isSecure)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -220,7 +228,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
     def callWrapper(self, protocol, port, methodname, authToken, args,
                     remoteIp = None, rawUrl = None, localAddr = None,
-                    protocolString = None, headers = None):
+                    protocolString = None, headers = None, isSecure = False):
         """
         @param localAddr: if set, a string host:port identifying the address
         the client used to talk to us.
@@ -235,6 +243,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self._port = port
         self._protocol = protocol
 
+        self.setBaseUrlOverride(rawUrl, headers, isSecure)
+
         targetServerName = headers.get('X-Conary-Servername', None)
 
         # simple proxy. FIXME: caching these might help; building all
@@ -246,7 +256,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                localAddr, protocolString,
                                                headers, self.cfg,
                                                targetServerName,
-                                               remoteIp)
+                                               remoteIp, isSecure)
 
         # args[0] is the protocol version
         protocolVersion = args[0]
@@ -316,7 +326,24 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         return r[0:3] + (extraInfo,)
 
+
+    def setBaseUrlOverride(self, rawUrl, headers, isSecure):
+        if not rawUrl:
+            return
+        if not rawUrl.startswith("/"):
+            self._baseUrlOverride = rawUrl
+        elif headers and "Host" in headers:
+            proto = (isSecure and "https") or "http"
+            self._baseUrlOverride = "%s://%s%s" % (proto,
+                                                   headers['Host'],
+                                                   rawUrl)
     def urlBase(self):
+        if self._baseUrlOverride is not None:
+            return self._baseUrlOverride
+
+        return self._getUrlBase()
+
+    def _getUrlBase(self):
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 
@@ -813,6 +840,26 @@ class ProxyRepositoryServer(ChangesetFilter):
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
 
         self.callFactory = ProxyCallFactory()
+
+    def setBaseUrlOverride(self, rawUrl, headers, isSecure):
+        # Setting it to None here will make urlBase() do the right thing
+        proxyHost = headers.get('X-Conary-Proxy-Host', None)
+        if not proxyHost:
+            self._baseUrlOverride = None
+            return
+        # We really don't want to use rawUrl in the proxy, that points to the
+        # server and it won't help rewriting URLs with that address
+        self._baseUrlOverride = headers.get('X-Conary-Proxy-Host', None)
+
+        proto = (isSecure and "https") or "http"
+
+        if rawUrl.startswith('/'):
+            self._baseUrlOverride = '%s://%s%s' % (proto, proxyHost, rawUrl)
+        else:
+            items = list(urlparse.urlparse(rawUrl))
+            items[0] = proto
+            items[1] = proxyHost
+            self._baseUrlOverride = urlparse.urlunparse(items)
 
     def getFileContents(self, caller, authToken, clientVersion, fileList,
                         authCheckOnly = False):

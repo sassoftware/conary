@@ -17,7 +17,6 @@ import errno, fcntl
 import itertools
 import os
 import shutil
-import xmlrpclib
 
 #conary
 from conary import constants, files, trove, versions
@@ -197,7 +196,7 @@ class UpdateJob:
         assert isinstance(self.troveSource, 
             trovesource.ChangesetFilesTroveSource), "Unsupported %s" % self.troveSource
 
-        drep = {'dumpVersion' : self._dumpVersion}
+        drep = self._saveInvocationInfo()
 
         drep['troveSource'] = self._freezeChangesetFilesTroveSource(
                         self.troveSource, frzdir, withChangesetReferences)
@@ -206,28 +205,63 @@ class UpdateJob:
         drep['critical'] = self.getCriticalJobs()
         drep['transactionCounter'] = self.transactionCounter
         drep['jobsCsList'] = self.jobsCsList
-        drep['itemList'] = self._freezeItemList()
-        drep['keywordArguments'] = self.getKeywordArguments()
         drep['invalidateRollbackStack'] = int(self._invalidateRollbackStack)
         drep['jobPreScripts'] = list(self._freezeJobPreScripts())
         drep['changesetsDownloaded'] = int(self._changesetsDownloaded)
 
-        # Save the Conary version
-        drep['conaryVersion'] = constants.version
-
         jobfile = os.path.join(frzdir, "jobfile")
-        f = open(jobfile, "w+")
-        f.write(xmlrpclib.dumps((drep, )))
+
+        self._saveFrozenRepr(jobfile, drep)
 
         return drep
 
-    def thaw(self, frzdir):
-        jobfile = os.path.join(frzdir, "jobfile")
-        ((drep, ), _) = xmlrpclib.loads(open(jobfile).read())
+    def _saveFrozenRepr(self, jobfile, drep):
+        f = open(jobfile, "w+")
+        util.xmlrpcDump((drep, ), stream=f)
+        return drep
+
+    def _loadFrozenRepr(self, jobfile):
+        ((drep, ), _) = util.xmlrpcLoad(open(jobfile))
 
         if 'dumpVersion' not in drep or drep['dumpVersion'] > self._dumpVersion:
             # We don't understand this format
             raise errors.InternalConaryError("Unknown dump format")
+
+        return drep
+
+    def saveInvocationInfo(self, jobfile):
+        """Only save the information that is critical to re-create this update
+        job"""
+        drep = self._saveInvocationInfo()
+        self._saveFrozenRepr(jobfile, drep)
+        return drep
+
+    def _saveInvocationInfo(self):
+        drep = {}
+        # Add some info that is critical and common
+        drep['dumpVersion'] = self._dumpVersion
+        # Save the Conary version
+        drep['conaryVersion'] = constants.version
+
+        # Now invocation info
+        drep['itemList'] = self._freezeItemList()
+        drep['keywordArguments'] = self.getKeywordArguments()
+        drep['fromChangesets'] = self._freezeFromChangesets()
+        return drep
+
+    def loadInvocationInfo(self, jobfile):
+        drep = self._loadFrozenRepr(jobfile)
+        return self._loadInvocationInfo(drep)
+
+    def _loadInvocationInfo(self, drep):
+        self.setItemList(self._thawItemList(drep['itemList']))
+        self.setKeywordArguments(drep['keywordArguments'])
+        self.setFromChangesets(self._thawFromChangesets(drep.get('fromChangesets', [])))
+        return drep
+
+    def thaw(self, frzdir):
+        jobfile = os.path.join(frzdir, "jobfile")
+        drep = self._loadFrozenRepr(jobfile)
 
         # Need to keep a reference to the lazy cache, or else the changesets
         # are invalid
@@ -246,6 +280,7 @@ class UpdateJob:
         self._jobPreScripts = list(self._thawJobPreScripts(
             list(drep.get('jobPreScripts', []))))
         self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
+        self._fromChangesets = self._thawFromChangesets(drep.get('fromChangesets', []))
 
     def _freezeJobs(self, jobs):
         for jobList in jobs:
@@ -343,6 +378,16 @@ class UpdateJob:
 
         return self.lzCache
 
+    def _freezeFromChangesets(self):
+        ret = [ x.fileName for x in self._fromChangesets if x.fileName ]
+        return ret
+
+    def _thawFromChangesets(self, rlist):
+        if not rlist:
+            return []
+        return [ changeset.ChangeSetFromFile(self.lzCache.open(x))
+                 for x in rlist ]
+
     def __freezeVF(self, tup):
         ver = tup[0]
         if ver is None:
@@ -425,6 +470,12 @@ class UpdateJob:
     def setChangesetsDownloaded(self, downloaded):
         self._changesetsDownloaded = downloaded
 
+    def setFromChangesets(self, fromChangesets):
+        self._fromChangesets = fromChangesets
+
+    def getFromChangesets(self):
+        return self._fromChangesets
+
     def __init__(self, db, searchSource = None, lazyCache = None):
         # 20070714: lazyCache can be None for the users of the old API (when
         # an update job was instantiated directly, instead of using the
@@ -448,6 +499,7 @@ class UpdateJob:
         # The options that created this update job
         self._itemList = []
         self._kwargs = {}
+        self._fromChangesets = []
         # Applying this update job invalidates the rollback stack
         self._invalidateRollbackStack = False
         # List of pre scripts to run for a particular job. This is ordered.
@@ -676,10 +728,16 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	self.db.commit()
 
     def close(self):
+        if self.dbpath == ':memory:':
+            # No resources associated with an in-memory database
+            # And no locks either
+            return
+
         if self._db:
             self.db.close()
             self._db = None
-            # Close the lock file as well
+
+        # Close the lock file as well
         self.commitLock(False)
 
     def eraseTrove(self, troveName, version, flavor):

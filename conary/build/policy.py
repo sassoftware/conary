@@ -367,7 +367,7 @@ class Policy(action.RecipeAction):
         return False
 
     def mtimeChanged(self, path):
-        newPath = util.joinPaths(self.rootdir, path)
+        newPath = util.joinPaths(self.macros.destdir, path)
         if not util.exists(newPath):
             return True
         oldMtime = self.recipe._derivedFiles.get(path, None)

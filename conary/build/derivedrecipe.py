@@ -156,7 +156,8 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
         else:
             parentRevision = None
 
-        if not self.sourceVersion.isShadow():
+        sourceBranch = versions.VersionFromString(self.macros.buildbranch)
+        if not sourceBranch.isShadow():
             raise builderrors.RecipeFileError(
                     "only shadowed sources can be derived packages")
 
@@ -168,7 +169,7 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                     "derived package recipe")
 
         # find all the flavors of the parent
-        parentBranch = self.sourceVersion.branch().parentBranch()
+        parentBranch = sourceBranch.parentBranch()
 
         if parentRevision:
             parentVersion = parentBranch.createVersion(parentRevision)
@@ -247,7 +248,6 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
-
         log.info('Warning: Derived packages are experimental and subject to change')
 
         self._addBuildAction('Ant', build.Ant)

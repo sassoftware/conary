@@ -394,12 +394,16 @@ def commit(repos, cfg, message, callback=None, test=False):
                         allowMissingFiles = bool(callback))
             for srcFileObj, (pathId, path, fileId, version) in \
                             itertools.izip(srcFiles, srcPkg.iterFileList() ):
-                if path not in sourceFiles:
-                    # the file no longer exists
+                if not state.hasFile(pathId):
+                    # this path no longer exists (it was manually removed)
                     continue
                 elif not state.fileIsAutoSource(pathId):
                     # the file is no longer autosourced, so we need to
                     # take the file from the current directoy
+                    continue
+                elif path not in sourceFiles:
+                    # this path is no longer an autosourced file (it's not
+                    # referenced in the recipe)
                     continue
                 elif state.fileNeedsRefresh(pathId):
                     # the file has been refreshed; we need to make sure

@@ -286,8 +286,10 @@ class QueryByLabelPath(QueryMethod):
                                 affQueries.append(affDict)
                             else:
                                 affDict = affQueries[idx]
-                            affDict[label] = [(x, requiredFlavor)
-                                                for x in flavorList ]
+                            affDict[label] = flavorList
+                            # Turned off until CNY-525 is resolved
+                            #affDict[label] = [(x, requiredFlavor)
+                            #                    for x in flavorList ]
                     d = affQueries.pop(0)
                     if affQueries:
                         self.affQueries[name] = affQueries
@@ -315,7 +317,10 @@ class QueryByLabelPath(QueryMethod):
                                     queryList.append(d)
                                 else:
                                     d = queryList[idx]
-                                d[label] = [(flavor, requiredFlavor)]
+                                #d[label] = [(flavor, requiredFlavor)]
+                                # turn off never drop an arch for
+                                # flavorPreferences (CNY-525)
+                                d[label] = [flavor]
                     self.query[name] = affQueries.pop(0)
                     if affQueries:
                         self.affQueries[name] = affQueries
@@ -397,7 +402,7 @@ class QueryByLabelPath(QueryMethod):
                 requiredFlavor = deps.getInstructionSetFlavor(afFlavor)
                 flavorList = self.overrideFlavors(afFlavor)
                 flavorDict.setdefault(label, []).append((flavorList, requiredFlavor))
-        self.addQuery(troveTup, set(labelPath), flavorDict)
+        self.addQuery(troveTup, set(flavorDict), flavorDict)
 
     def callQueryFunction(self, troveSource, query):
         if self.getLeaves:
@@ -439,7 +444,8 @@ class QueryByLabelPath(QueryMethod):
                         del(self.query[name])
                         continue
 
-                if self.acrossLabels or name in self.acrossLabelsPerTrove:
+                if req and (self.acrossLabels 
+                            or name in self.acrossLabelsPerTrove):
                     # if we're searching across repositories, 
                     # we are trying to find one match per label
                     # if we've already found a match for a label, 
@@ -447,6 +453,19 @@ class QueryByLabelPath(QueryMethod):
                     for label in req.keys():
                         if (name, label) in foundNameLabels:
                             req.pop(label)
+                    if not req and name in self.affQueries:
+                        # we completed all the searches for this name.
+                        # so add the next affinityQuery onto the end
+                        # of the search.
+                        self.query[name][index:] = []
+                        self.query[name].extend(self.affQueries[name].pop())
+                        if not self.affQueries[name]:
+                            del self.affQueries[name]
+                        req = self.query[name][index]
+                        for label in req.keys():
+                            foundNameLabels.discard((name, label))
+                    if not req:
+                        continue
                 elif name in foundNames:
                     continue
                 labelQuery[name] = req
@@ -475,7 +494,7 @@ class QueryByLabelPath(QueryMethod):
 
                     if self.acrossLabels or name in self.acrossLabelsPerTrove:
                         foundNameLabels.add((name, 
-                                             version.branch().label()))
+                                             version.trailingLabel()))
                 finalMap.setdefault(self.map[name][0], []).extend(pkgList)
             index +=1
         self._findLocalTroves(finalMap)
@@ -535,7 +554,9 @@ class QueryByBranch(QueryMethod):
             flavorList = self.overrideFlavors(f)
 
         self.addQuery(troveTup, branch, flavorList,
-                      requiredFlavor=requiredFlavor)
+                      # turn off until CNY-525 issues are resolved
+                      #requiredFlavor=requiredFlavor
+                      )
 
     def findAll(self, troveSource, missing, finalMap):
         self._findAllNoFlavor(troveSource, missing, finalMap)

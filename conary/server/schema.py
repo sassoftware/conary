@@ -660,6 +660,7 @@ def createTroves(db):
     db.createIndex("TroveInfo", "TroveInfoIdx", "instanceId")
     db.createIndex("TroveInfo", "TroveInfoTypeIdx", "infoType, instanceId",
                    unique = True)
+    db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
     if createTrigger(db, "TroveInfo"):
         commit = True
 

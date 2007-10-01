@@ -16,6 +16,7 @@ import os
 import sha
 import md5
 import struct
+import sys
 
 try:
     from Crypto.Hash import RIPEMD
@@ -64,7 +65,7 @@ PKT_LITERAL_DATA       = 11 # Literal Data Packet
 PKT_TRUST              = 12 # Trust Packet
 PKT_USERID             = 13 # User ID Packet
 PKT_PUBLIC_SUBKEY      = 14 # Public Subkey Packet
-# Additions from http://tools.ietf.org/html/draft-ietf-openpgp-rfc2440bis-17
+# Additions from http://tools.ietf.org/html/draft-ietf-openpgp-rfc2440bis-22
 PKT_USER_ATTRIBUTE     = 17 # User Attribute Packet
 PKT_DATA_PACKET        = 18 # Sym. Encrypted and Integrity Protected Data Packet
 PKT_MOD_DETECTION      = 19 # Modification Detection Code Packet
@@ -143,6 +144,9 @@ ENCRYPTION_TYPE_SHA1_CHECK = 0xfe
 OLD_PKT_LEN_ONE_OCTET  = 0
 OLD_PKT_LEN_TWO_OCTET  = 1
 OLD_PKT_LEN_FOUR_OCTET = 2
+
+# User Attribute Subpackets (5.12)
+USR_ATTR_SUBPKT_IMG = 1
 
 # trust levels
 TRUST_UNTRUSTED = 0
@@ -240,7 +244,11 @@ def getKeyId(keyRing):
 
 def seekKeyById(keyId, keyRing):
     if isinstance(keyRing, str):
-        keyRing = util.ExtendedFile(keyRing, buffering = False)
+        try:
+            keyRing = util.ExtendedFile(keyRing, buffering = False)
+        except (IOError, OSError), e:
+            # if we can't read/find the key, it's not there.
+            return False
     msg = PGP_Message(keyRing)
     try:
         return msg.iterByKeyId(keyId).next()
@@ -366,7 +374,10 @@ def _getPrivateKey(keyId, stream, passPhrase):
         pkt = msg.iterByKeyId(keyId).next()
     except StopIteration:
         raise KeyNotFound(keyId)
-    pkt.verifySelfSignatures()
+    try:
+        pkt.verifySelfSignatures()
+    except BadSelfSignature:
+        sys.stderr.write("Warning: self-signature on private key does not verify\n")
     return pkt.makePgpKey(passPhrase)
 
 def getPublicKeyFromString(keyId, data):
@@ -1248,7 +1259,7 @@ class PGP_Signature(PGP_BaseKeySig):
         # We've added 6 bytes for the header
         dataLen = hSubPktLen + 6
 
-        # Append trailer - 5-byte header
+        # Append trailer - 6-byte trailer
         self._writeBin(dataFile, [ 0x04, 0xFF,
             (dataLen // 0x1000000) & 0xFF, (dataLen // 0x10000) & 0xFF,
             (dataLen // 0x100) & 0xFF, dataLen & 0xFF ])
@@ -1279,11 +1290,17 @@ class PGP_UserID(PGP_BasePacket):
     __slots__ = ['id', 'signatures']
     tag = PKT_USERID
 
+    # Constant used for signing. See #5.2.4
+    signingConstant = 0xB4
     def validate(self):
         self.resetBody()
-        self.id = self.readBody()
+        self.parseBody()
         # Signatures for this user ID
         self.signatures = None
+
+    def parseBody(self):
+        # A user ID's data is just the user ID
+        self.id = self.readBody()
 
     def toString(self):
         return self.id
@@ -1313,12 +1330,22 @@ class PGP_UserID(PGP_BasePacket):
     def writeHash(self, stream):
         """Write a UserID packet in a stream, in order to be hashed.
         Described in RFC 2440 5.2.4 computing signatures."""
-        assert len(self.id) == self.bodyLength
-        stream.write(chr(0xB4))
+        stream.write(chr(self.signingConstant))
         stream.write(struct.pack("!I", self.bodyLength))
-        stream.write(self.id)
+        self.writeBody(stream)
 
 PacketTypeDispatcher.addPacketType(PGP_UserID)
+
+class PGP_UserAttribute(PGP_UserID):
+    __slots__ = ['id', 'signatures', 'subpackets']
+    tag = PKT_USER_ATTRIBUTE
+
+    signingConstant = 0xD1
+
+    def parseBody(self):
+        self.id = '[image]'
+
+PacketTypeDispatcher.addPacketType(PGP_UserAttribute)
 
 class PGP_Key(PGP_BaseKeySig):
     __slots__ = ['_parsed', 'version', 'createdTimestamp', 'pubKeyAlg',
@@ -1699,7 +1726,7 @@ class PGP_MainKey(PGP_Key):
             try:
                 sig._finalizeSelfSig(sio, pgpKey)
             except BadSelfSignature:
-                raise BadSelfSignature(keyId)
+                raise BadSelfSignature(keyId), None, sys.exc_traceback
         for uid in self.iterUserIds():
             for sig in uid.iterKeySignatures(keyId):
                 sio = util.ExtendedStringIO()
@@ -1708,7 +1735,7 @@ class PGP_MainKey(PGP_Key):
                 try:
                     sig._finalizeSelfSig(sio, pgpKey)
                 except BadSelfSignature:
-                    raise BadSelfSignature(keyId)
+                    raise BadSelfSignature(keyId), None, sys.exc_traceback
                 # Only verify the first sig on the user ID.
                 # XXX Why? No idea yet
                 break

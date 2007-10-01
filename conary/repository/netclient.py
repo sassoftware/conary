@@ -214,7 +214,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                     raise klass(exceptionArgs[0])
 	    raise errors.UnknownException(exceptionName, exceptionArgs)
 
-class ServerProxy(xmlrpclib.ServerProxy):
+class ServerProxy(util.ServerProxy):
 
     def __passwordCallback(self):
         if self.__pwCallback is None:
@@ -267,12 +267,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
         else:
             return False
 
-    def __getattr__(self, name):
-        #from conary.lib import log
-        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name))
-        if name.startswith('__'):
-            raise AttributeError(name)
-        return _Method(self.__request, name, self.__host, 
+    def _createMethod(self, name):
+        return _Method(self._request, name, self.__host,
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.getProtocolVersion(),
                        self.__transport, self.__serverName,
@@ -293,7 +289,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
     def __init__(self, url, serverName, transporter, pwCallback, usedMap,
                  entitlementDir):
         try:
-            xmlrpclib.ServerProxy.__init__(self, url, transporter)
+            util.ServerProxy.__init__(self, url, transporter)
         except IOError, e:
             proto, url = urllib.splittype(url)
             raise errors.OpenError('Error occurred opening repository '
@@ -472,8 +468,9 @@ class ServerCache:
             url = _cleanseUrl(protocol, url)
             if not errmsg:
                 errmsg = '%r' % e
+            tb = sys.exc_traceback
             raise errors.OpenError('Error occurred opening repository '
-                        '%s: %s' % (url, errmsg))
+                        '%s: %s' % (url, errmsg)), None, tb
 
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)
         if not intersection:
