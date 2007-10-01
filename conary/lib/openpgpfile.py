@@ -1343,7 +1343,11 @@ class PGP_UserAttribute(PGP_UserID):
     signingConstant = 0xD1
 
     def parseBody(self):
-        self.id = '[image]'
+        # Digest the packet
+        m = sha.new()
+        self._updateHash(m, self.getBodyStream())
+
+        self.id = '[image, digest = %s]' % m.hexdigest().upper()
 
 PacketTypeDispatcher.addPacketType(PGP_UserAttribute)
 
