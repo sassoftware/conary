@@ -10,6 +10,9 @@ Changes in @NEW@:
       branches that end in redirects. (CNY-2081)
     * Adding a large number of user maps is now more efficient
       if the new addServerGlobs method is used. (CNY-2083)
+    * redirects between branches on the same label, which were
+      necessary before conary 1.2.0, are now handled correctly 
+      again (CNY-2103)
 
 Changes in 1.2.0:
   o Build Changes:

@@ -2224,6 +2224,15 @@ def followRedirect(recipeObj, trove, ref, reason):
                                     trove.getNameVersionFlavor()))
     searchSource = recipeObj._getSearchSource(ref)
     troveSpecs = [(x[0], str(x[1].label()), x[2]) for x in trove.iterRedirects()]
+    for troveSpec in troveSpecs:
+        if (troveSpec[0] == trove.getName()
+            and troveSpec[1] == str(trove.getVersion().trailingLabel())
+            and troveSpec[2] is None):
+            # this is a redirect to the same label w/ no flavor information.
+            # use the entire branch information to ensure we find the redirect
+            # target (otherwise we might get in an infinite loop)
+            troveSpecs = list(trove.iterRedirects())
+            break
     try:
         results = searchSource.findTroves(troveSpecs)
     except errors.TroveNotFound, err:
@@ -2233,6 +2242,8 @@ def followRedirect(recipeObj, trove, ref, reason):
         log.info('Found %s=%s[%s] following redirect' % troveTup)
     if not troveTups:
         log.info('Redirect is to nothing')
+    if trv.getNameVersionFlavor() in troveTups:
+        raise CookError('Redirect redirects to itself: %s=%s[%s].  Check your search path or remove redirect from recipe: %s' % trove.getNameVersionFlavor()
     return troveTups
 
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
