@@ -674,8 +674,9 @@ class addPatch(_Source):
             logFile = os.fdopen(fd, 'w+')
 
             inFd, outFd = os.pipe()
-            p2 = subprocess.Popen(patchArgs, stdin=inFd, stderr=logFile,
-                                  shell=False, stdout=logFile, close_fds=True)
+            p2 = subprocess.Popen(patchArgs + ['--dry-run'], stdin=inFd, 
+                                  stderr=logFile, shell=False, stdout=logFile, 
+                                  close_fds=True)
 
             os.close(inFd)
             offset=0
@@ -693,7 +694,19 @@ class addPatch(_Source):
                 # later
                 logFiles.append((patchlevel, logFile))
                 continue
-            # patch was successful
+            # patch was successful - re-run this time actually applying
+            inFd, outFd = os.pipe()
+            p2 = subprocess.Popen(patchArgs, stdin=inFd, 
+                                  stderr=logFile, shell=False, stdout=logFile, 
+                                  close_fds=True)
+            offset=0
+            while len(patch[offset:]):
+                offset += os.write(outFd, patch[offset:])
+            os.close(outFd) # since stdin is closed, we can't
+                            # answer y/n questions.
+
+
+
             log.info(logFile.read().strip())
             logFile.close()
             log.info('applied successfully with patch level %s'
