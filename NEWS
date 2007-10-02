@@ -5,6 +5,10 @@ Changes in @NEW@:
       (CNY-2091)
     * The addGitSnapshot() source action is added. (CNY-1965)
 
+  o Client Changes:
+    * The Conary client is now less aggressive in sending keepalive
+      packets with long-running requests. (CNY-2104)
+
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles
       branches that end in redirects. (CNY-2081)
