@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Multiple entitlements to the same host name are now properly
+      handled. (CNY-2105)
+    * The URL sent via prepareChangeSet now matches the one used by
+      commitChangeSet.
+
 Changes in 1.1.31.8:
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles
