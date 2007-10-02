@@ -13,6 +13,8 @@ Changes in @NEW@:
     * redirects between branches on the same label, which were
       necessary before conary 1.2.0, are now handled correctly 
       again (CNY-2103)
+    * The --replace-files flag passed to 'conary updateall' properly
+      works. (CNY-2102)
 
 Changes in 1.2.0:
   o Build Changes:

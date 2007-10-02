@@ -362,6 +362,7 @@ def doUpdate(cfg, changeSpecs, **kwargs):
 def _updateTroves(cfg, applyList, **kwargs):
     # Take out the apply-related keyword arguments
     applyDefaults = dict(
+                        replaceFiles = False,
                         replaceManagedFiles = False,
                         replaceUnmanagedFiles = False,
                         replaceModifiedFiles = False,
