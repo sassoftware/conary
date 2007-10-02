@@ -969,9 +969,21 @@ class PGP_BasePacket(object):
 
     @staticmethod
     def checkStreamLength(stream, length):
-        """Checks that the stream has exactly the length specified"""
+        """Checks that the stream has exactly the length specified extra
+        bytes from the current position"""
         pos = stream.tell()
         stream.seek(0, SEEK_END)
+        if length != stream.tell() - pos:
+            raise ShortReadError(length, stream.tell() - pos)
+        # SeekableNestedFiles will happily pass the previous test, so be more
+        # devious: seek to the (end - 1), try to read one byte
+        # Determining the actual length is hard, but worth it
+        i = stream.tell() - 1
+        while i > pos:
+            stream.seek(i, SEEK_SET)
+            if len(stream.read(1)) == 1:
+                break
+            i -= 1
         if length != stream.tell() - pos:
             raise ShortReadError(length, stream.tell() - pos)
         # Rewind
@@ -1184,7 +1196,7 @@ class PGP_Signature(PGP_BaseKeySig):
             return binSeqToString(self.signerKeyId)
         # Version 3 packets should have already set signerKeyId
         assert self.version == 4
-        for spktType, dataf in self.decodeSigSubpackets(self.unhashedFile):
+        for spktType, dataf in self.decodeUnhashedSubpackets():
             if spktType != SIG_SUBPKT_ISSUER_KEYID:
                 continue
             # Verify it only contains 8 bytes
@@ -1196,38 +1208,47 @@ class PGP_Signature(PGP_BaseKeySig):
             self.signerKeyId = self._readBin(dataf, 8)
             return binSeqToString(self.signerKeyId)
 
-    def decodeSigSubpackets(self, fobj):
+    def decodeHashedSubpackets(self):
+        return self._decodeSigSubpackets(self.hashedFile)
+
+    def decodeUnhashedSubpackets(self):
+        return self._decodeSigSubpackets(self.unhashedFile)
+
+    @staticmethod
+    def _decodeSigSubpackets(fobj):
         fobj.seek(0)
         while fobj.size != fobj.tell():
-            yield self._getNextSubpacket(fobj)
+            yield PGP_Signature._getNextSubpacket(fobj)
 
-    def _getNextSubpacket(self, fobj):
-        len0, = self._readBin(fobj, 1)
+    @staticmethod
+    def _getNextSubpacket(fobj):
+        len0, = PGP_BaseKeySig._readBin(fobj, 1)
 
         # Sect 5.2.3.1 of RFC2440 implies there should be a 2-octet scalar
         # count of the length of the set of subpackets, but I can't seem to
         # find it here.
 
-        if len0 & 0xC0 == 0:
+        if len0 < 0xC0:
             pktlenlen = 1
             pktlen = len0
         elif len0 == 0xFF:
             pktlenlen = 5
-            data = self._readBin(fobj, 4)
+            data = PGP_BaseKeySig._readBin(fobj, 4)
             pktlen = len4bytes(*data)
         else:
             pktlenlen = 2
-            len1, = self._readBin(fobj, 1)
+            len1, = PGP_BaseKeySig._readBin(fobj, 1)
             pktlen = len2bytes(len0, len1)
 
-        spktType, = self._readBin(fobj, 1)
+        spktType, = PGP_BaseKeySig._readBin(fobj, 1)
 
         # The packet length includes the subpacket type
         dataf = util.SeekableNestedFile(fobj, pktlen - 1)
         # Do we have enough data?
-        dataf.seek(0, SEEK_END)
-        if dataf.tell() != pktlen - 1:
-            raise ShortReadError(pktlen + pktlenlen, dataf.tell())
+        try:
+            PGP_Signature.checkStreamLength(dataf, pktlen - 1)
+        except ShortReadError, e:
+            raise ShortReadError(pktlen + pktlenlen, e.actual + pktlenlen + 1)
         dataf.seek(0, SEEK_SET)
 
         # Skip the data
@@ -1485,7 +1506,7 @@ class PGP_Key(PGP_BaseKeySig):
         for pkt in self.iterAllSelfSignatures():
             if pkt.sigType in SIG_CERTS:
                 eTimestamp = cTimestamp = 0
-                for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                for spktType, dataf in pkt.decodeHashedSubpackets():
                     if spktType == SIG_SUBPKT_KEY_EXPIRE:
                         eTimestamp = self.readTimestamp(dataf)
                     elif spktType == SIG_SUBPKT_CREATION:
@@ -1499,7 +1520,7 @@ class PGP_Key(PGP_BaseKeySig):
             elif pkt.sigType in SIG_KEY_REVOCS:
                 # parse this revocation to look for the creation timestamp
                 # we're ultimately looking for the most stringent revocation
-                for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                for spktType, dataf in pkt.decodeHashedSubpackets():
                     if spktType == SIG_SUBPKT_CREATION:
                         ts = self.readTimestamp(dataf)
                         if revocTimestamp:
@@ -1574,7 +1595,7 @@ class PGP_Key(PGP_BaseKeySig):
         # Look for a self signature
         for pkt in self.iterAllSelfSignatures():
             # We know it's a ver4 packet, otherwise getSigId would have failed
-            for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+            for spktType, dataf in pkt.decodeHashedSubpackets():
                 if spktType == SIG_SUBPKT_KEY_FLAGS:
                     # RFC 2440, sect. 5.2.3.20
                     foct, = self._readBin(dataf, 1)
