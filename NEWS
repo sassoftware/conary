@@ -19,6 +19,7 @@ Changes in @NEW@:
       (CNY-2103)
     * The 'conary updateall' command again properly handles the
       --replace-files command-line argument. (CNY-2102)
+    * Patches are no longer ever partially applied when building (CNY-2017)
 
 Changes in 1.2.0:
   o Build Changes:
