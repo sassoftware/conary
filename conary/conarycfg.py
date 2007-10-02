@@ -58,9 +58,16 @@ class ServerGlobList(list):
         # Look for the first item which globs to this, and insert the new
         # item before it. That makes sure find always matches on the
         # most-specific instance
+        for newItem in reversed(itemList):
+            self.append(newItem)
+
+    def extendSort(self, itemList):
+        """Extend the current list with the new items, categorizing them and
+        eliminating duplicates"""
         nlist = sorted(self + [ x for x in reversed(itemList)], self._fncmp)
         # Walk the list, remove duplicates
         del self[:]
+
         lasti = None
         for ent in nlist:
             if lasti is not None and lasti[0] == ent[0]:
@@ -99,7 +106,7 @@ class UserInformation(ServerGlobList):
         ServerGlobList.append(self, args)
 
     def addServerGlobs(self, globList):
-        ServerGlobList.extend(self, globList)
+        ServerGlobList.extendSort(self, globList)
 
     def extend(self, other):
         for item in other:
