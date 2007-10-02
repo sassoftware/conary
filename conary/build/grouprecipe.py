@@ -2242,7 +2242,7 @@ def followRedirect(recipeObj, trove, ref, reason):
         log.info('Found %s=%s[%s] following redirect' % troveTup)
     if not troveTups:
         log.info('Redirect is to nothing')
-    if trv.getNameVersionFlavor() in troveTups:
+    if trove.getNameVersionFlavor() in troveTups:
         raise CookError('Redirect redirects to itself: %s=%s[%s].  Check your search path or remove redirect from recipe: %s' % trove.getNameVersionFlavor())
     return troveTups
 
