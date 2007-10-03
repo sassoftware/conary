@@ -2000,18 +2000,12 @@ class _dependency(policy.Policy):
             rubyLoadPath = [ destdir+x for x in rubyLoadPath ]
             rubyInvocation = ('LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
                     ' RUBYLIB="'+':'.join(rubyLoadPath)+'"'
-                    ' %(destdir)s/%(ruby)s' %macros)
+                    ' %(destdir)s/%(ruby)s') % macros
         return (rubyInvocation, loadPathList)
 
-    def _getRubyVersion(self, macros, ruby, bootstrap):
-        if bootstrap:
-            rubyInvocation = ('LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
-                    ' %(destdir)s/%(ruby)s'
-                    " -e 'puts RUBY_VERSION'" %macros)
-        else:
-            rubyInvocation = ('%(ruby)s'
-                    " -e 'puts RUBY_VERSION'" %macros)
-        rubyVersion = util.popen(rubyInvocation).read()
+    def _getRubyVersion(self, macros):
+        cmd = self.rubyInvocation + (" -e 'puts RUBY_VERSION'" % macros)
+        rubyVersion = util.popen(cmd).read()
         rubyVersion = '.'.join(rubyVersion.split('.')[0:2])
         return rubyVersion
 
@@ -2562,10 +2556,9 @@ class Provides(_dependency):
                 self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
                 if not self.rubyInterpreter:
                     return False
-                self.rubyVersion = self._getRubyVersion(macros,
-                    self.rubyInterpreter, bootstrap)
                 self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
                     macros, self.rubyInterpreter, bootstrap)
+                self.rubyVersion = self._getRubyVersion(macros)
                 # we need to look deep first
                 self.rubyLoadPath = sorted(list(self.rubyLoadPath),
                                            key=len, reverse=True)
@@ -3253,10 +3246,9 @@ class Requires(_addInfo, _dependency):
             self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
             if not self.rubyInterpreter:
                 return
-            self.rubyVersion = self._getRubyVersion(macros,
-                self.rubyInterpreter, bootstrap)
             self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
                 macros, self.rubyInterpreter, bootstrap)
+            self.rubyVersion = self._getRubyVersion(macros)
         elif self.rubyInterpreter is False:
             return
 
