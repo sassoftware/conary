@@ -6,6 +6,10 @@ Changes in @NEW@:
     * The addGitSnapshot() source action is added. (CNY-1965)
     * Cooking derived packages no longer warns about their
       experimental state. (CNY-2092)
+    * loadInstalled does not search the local database for a matching
+      package on checkin but instead searches the repository.  This makes
+      it easier to develop packages that are correct but won't run on the
+      current machine (CNY-2027)
 
   o Client Changes:
     * The Conary client is now less aggressive in sending keepalive

@@ -320,9 +320,13 @@ def commit(repos, cfg, message, callback=None, test=False):
             return
 
     use.allowUnknownFlags(True)
+    # turn off loadInstalled for committing - it ties you too closely
+    # to actually being able to build what you are developing locally - often
+    # not the case.
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
-                                     branch=state.getBranch())
+                                     branch=state.getBranch(),
+                                     ignoreInstalled=True)
 
     srcMap = {}
     cwd = os.getcwd()
@@ -1374,7 +1378,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         use.allowUnknownFlags(True)
         loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                          cfg=cfg, repos=repos,
-                                         branch=state.getBranch())
+                                         branch=state.getBranch(),
+                                         ignoreInstalled=True)
         recipeClass = loader.getRecipe()
     else:
         recipeClass = None.__class__
@@ -1977,7 +1982,8 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     use.allowUnknownFlags(True)
     loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                      cfg=cfg, repos=repos,
-                                     branch=state.getBranch())
+                                     branch=state.getBranch(),
+                                     ignoreInstalled=True)
 
     # fetch all the sources
     recipeClass = loader.getRecipe()
