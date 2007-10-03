@@ -4,6 +4,8 @@ Changes in @NEW@:
       for python dependencies on 64-bit systems has been fixed.
       (CNY-2091)
     * The addGitSnapshot() source action is added. (CNY-1965)
+  o Client Changes:
+    * Promote and clone callbacks are more verbose. (CNY-2063)
 
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles

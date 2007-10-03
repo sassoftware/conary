@@ -2114,7 +2114,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             fileList = [ (self.fromFileId(x[1][0]), 
                           self.fromVersion(x[1][1])) for x in itemList ]
             if callback:
-                callback.requestingFileContents()
+                if hasattr(callback, 'requestingFileContentsWithCount'):
+                    callback.requestingFileContentsWithCount(len(fileList))
+                else:
+                    callback.requestingFileContents()
             (url, sizes) = self.c[server].getFileContents(fileList)
             # protocol version 44 and later return sizes as strings rather
             # than ints to avoid 2 GiB limits
