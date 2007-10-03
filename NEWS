@@ -10,6 +10,7 @@ Changes in @NEW@:
   o Client Changes:
     * The Conary client is now less aggressive in sending keepalive
       packets with long-running requests. (CNY-2104)
+    * Promote and clone callbacks are more verbose. (CNY-2063)
 
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles
