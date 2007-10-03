@@ -1990,7 +1990,14 @@ class _dependency(policy.Policy):
     def _getRubyLoadPath(self, macros, rubyInvocation, bootstrap):
         # Returns tuple of (invocationString, loadPathList)
         destdir = macros.destdir
-        rubyLoadPath = util.popen("%s -e 'puts $:'" %rubyInvocation).readlines()
+
+        if bootstrap:
+            cmd = 'LD_LIBRARY_PATH=%(destdir)s%(libdir)s ' % macros
+        else:
+            cmd = ''
+        cmd += rubyInvocation
+
+        rubyLoadPath = util.popen("%s -e 'puts $:'" % cmd).readlines()
         rubyLoadPath = [ x.strip() for x in rubyLoadPath if x.startswith('/') ]
         loadPathList = rubyLoadPath[:]
         if bootstrap:

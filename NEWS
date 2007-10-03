@@ -22,6 +22,8 @@ Changes in @NEW@:
     * The 'conary updateall' command again properly handles the
       --replace-files command-line argument. (CNY-2102)
     * Patches are no longer ever partially applied when building (CNY-2017)
+    * Ruby dependencies are now properly computed for the ruby package.
+      (CNY-2109)
 
 Changes in 1.2.0:
   o Build Changes:
