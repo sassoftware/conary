@@ -4,6 +4,8 @@ Changes in @NEW@:
       for python dependencies on 64-bit systems has been fixed.
       (CNY-2091)
     * The addGitSnapshot() source action is added. (CNY-1965)
+    * Cooking derived packages no longer warns about their
+      experimental state. (CNY-2092)
 
   o Client Changes:
     * The Conary client is now less aggressive in sending keepalive
