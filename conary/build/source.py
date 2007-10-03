@@ -673,17 +673,14 @@ class addPatch(_Source):
             os.unlink(path)
             logFile = os.fdopen(fd, 'w+')
 
-            inFd, outFd = os.pipe()
-            p2 = subprocess.Popen(patchArgs + ['--dry-run'], stdin=inFd, 
-                                  stderr=logFile, shell=False, stdout=logFile, 
+            p2 = subprocess.Popen(patchArgs + ['--dry-run'],
+                                  stdin=subprocess.PIPE,
+                                  stderr=logFile, shell=False, stdout=logFile,
                                   close_fds=True)
 
-            os.close(inFd)
-            offset=0
-            while len(patch[offset:]):
-                offset += os.write(outFd, patch[offset:])
-            os.close(outFd) # since stdin is closed, we can't
-                            # answer y/n questions.
+            p2.stdin.write(patch)
+            p2.stdin.close() # since stdin is closed, we can't
+                             # answer y/n questions.
 
             failed = p2.wait()
 
@@ -695,17 +692,13 @@ class addPatch(_Source):
                 logFiles.append((patchlevel, logFile))
                 continue
             # patch was successful - re-run this time actually applying
-            inFd, outFd = os.pipe()
-            p2 = subprocess.Popen(patchArgs, stdin=inFd, 
+            p2 = subprocess.Popen(patchArgs, stdin=subprocess.PIPE,
                                   stderr=logFile, shell=False, stdout=logFile, 
                                   close_fds=True)
-            offset=0
-            while len(patch[offset:]):
-                offset += os.write(outFd, patch[offset:])
-            os.close(outFd) # since stdin is closed, we can't
-                            # answer y/n questions.
 
-
+            p2.stdin.write(patch)
+            p2.stdin.close() # since stdin is closed, we can't
+                             # answer y/n questions.
 
             log.info(logFile.read().strip())
             logFile.close()
