@@ -248,7 +248,6 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
-        log.info('Warning: Derived packages are experimental and subject to change')
 
         self._addBuildAction('Ant', build.Ant)
         self._addBuildAction('Automake', build.Automake)

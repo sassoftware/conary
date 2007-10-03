@@ -376,6 +376,7 @@ class URLOpener(urllib.FancyURLopener):
         pollObj = select.poll()
         pollObj.register(h.sock.fileno(), select.POLLIN)
 
+        lastTimeout = time.time()
         while True:
             if check():
                 raise AbortError
@@ -387,7 +388,10 @@ class URLOpener(urllib.FancyURLopener):
                 # keep the connection alive - in case the server is
                 # behind a load balancer/firewall with short
                 # connection timeouts.
-                h.send(' ')
+                now = time.time()
+                if now - lastTimeout > 14.9:
+                    h.send(' ')
+                    lastTimeout = now
             else:
                 # ready to read response
                 break

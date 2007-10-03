@@ -4,7 +4,12 @@ Changes in @NEW@:
       for python dependencies on 64-bit systems has been fixed.
       (CNY-2091)
     * The addGitSnapshot() source action is added. (CNY-1965)
+    * Cooking derived packages no longer warns about their
+      experimental state. (CNY-2092)
+
   o Client Changes:
+    * The Conary client is now less aggressive in sending keepalive
+      packets with long-running requests. (CNY-2104)
     * Promote and clone callbacks are more verbose. (CNY-2063)
 
   o Bug Fixes:
@@ -18,6 +23,8 @@ Changes in @NEW@:
     * The 'conary updateall' command again properly handles the
       --replace-files command-line argument. (CNY-2102)
     * Patches are no longer ever partially applied when building (CNY-2017)
+    * Ruby dependencies are now properly computed for the ruby package.
+      (CNY-2109)
 
 Changes in 1.2.0:
   o Build Changes:
