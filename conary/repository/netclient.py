@@ -1615,7 +1615,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 raise errors.FilesystemError(e.errno, e.filename, e.strerror,
                     strerr)
         else:
-            (outFd, tmpName) = util.mkstemp()
+            (outFd, tmpName) = util.mkstemp(suffix = '.ccs')
             outFile = util.ExtendedFile(tmpName, "w+", buffering = False)
             os.close(outFd)
             os.unlink(tmpName)
@@ -2147,7 +2147,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 start = tmpFile.tell()
                 outF = tmpFile
             else:
-                (fd, path) = util.mkstemp()
+                (fd, path) = util.mkstemp(suffix = 'filecontents')
                 outF = util.ExtendedFile(path, "r+", buffering = False)
                 os.close(fd)
                 os.unlink(path)

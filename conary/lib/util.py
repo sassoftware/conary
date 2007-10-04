@@ -15,6 +15,7 @@
 import bdb
 import bz2
 import debugger
+import fcntl
 import errno
 import log
 import misc
@@ -675,6 +676,7 @@ class ExtendedFile(file):
     def __init__(self, path, mode = "r", buffering = True):
         assert(not buffering)
         file.__init__(self, path, mode, buffering)
+        fcntl.fcntl(self.fileno(), fcntl.F_SETFD, 1)
 
     def pread(self, bytes, offset):
         return misc.pread(self.fileno(), bytes, offset)
@@ -1149,6 +1151,7 @@ class BoundedStringIO(object):
         fd, name = tempfile.mkstemp(suffix=".tmp", prefix="tmpBSIO")
         # Get rid of the file from the filesystem, we'll keep an open fd to it
         os.unlink(name)
+        fcntl.fcntl(fd, fcntl.F_SETFD, 1)
         backendFile = os.fdopen(fd, "w+")
         # Copy the data from the current StringIO (up to the current position)
         backend.seek(0)
