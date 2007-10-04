@@ -59,6 +59,9 @@ class AbstractSearchSource(object):
     def getTroveSource(self):
         raise NotImplementedError
 
+    def _filterSpecsForSource(self, troveSpecs):
+        return [], dict(zip(troveSpecs, [[x] for x in troveSpecs]))
+
     def findTrove(self, troveSpec, useAffinity=False, **kw):
         raise NotImplementedError
 
@@ -125,11 +128,74 @@ class NetworkSearchSource(SearchSource):
     """
         Search source using an installLabelPath.
     """
-    def __init__(self, repos, installLabelPath, flavor, db=None, 
+    def __init__(self, repos, installLabelPath, flavor, db=None,
                  resolveSearchMethod=resolvemethod.RESOLVE_ALL):
         SearchSource.__init__(self, repos, flavor, db)
         self.installLabelPath = installLabelPath
         self.resolveSearchMethod = resolveSearchMethod
+
+    def _filterSpecsForSource(self, troveSpecs):
+        troveSpecMap = {}
+        rejected = []
+        for name, versionStr, flavor in troveSpecs:
+            labelStrs = self._getLabelsFromStr(versionStr)
+            if not labelStrs:
+                rejected.append((name, versionStr, flavor))
+            else:
+                for labelStr in labelStrs:
+                    troveSpecMap.setdefault((name, labelStr, flavor), []).append(
+                                                            (name, versionStr, flavor))
+        return rejected, troveSpecMap
+
+    def _getLabelsFromStr(self, versionStr):
+        if not versionStr:
+            return [versionStr]
+        if not isinstance(versionStr, str):
+            versionStr = str(versionStr)
+
+        firstChar = versionStr[0]
+        lastChar = versionStr[-1]
+        if firstChar == '/':
+            try:
+                version = versions.VersionFromString(versionStr)
+            except baseerrors.ParseError, e:
+                raise errors.TroveNotFound, 'Error parsing version "%s": %s' % (versionStr, str(e))
+            if isinstance(version, versions.Branch):
+                label = version.label()
+            else:
+                label = version.trailingLabel()
+            if label in self.installLabelPath:
+                return [versionStr]
+            else:
+                return None
+        if firstChar == '@':
+            if '/' in versionStr:
+                item, remainder = versionStr[1:].split('/')
+                namespace, tag = item.split(':', 1)
+                return [ '%s/%s' % (x, remainder) for x in self.installLabelPath
+                         if (x.getNamespace(), x.getLabel()) == (namespace, tag) ]
+            else:
+                namespace, tag = versionStr[1:].split(':', 1)
+                return [ str(x) for x in self.installLabelPath
+                         if (x.getNamespace(), x.getLabel()) == (namespace, tag) ]
+        if firstChar == ':':
+            if '/' in versionStr:
+                tag, remainder = versionStr[1:].split('/')
+                return [ '%s/%s' % (x, remainder) for x in self.installLabelPath if x.getLabel() == tag ]
+            else:
+                tag = versionStr[1:]
+                return [ str(x) for x in self.installLabelPath if x.getLabel() == tag ]
+        elif lastChar == '@':
+            host = versionStr[:-1]
+            return [ str(x) for x in self.installLabelPath if x.getHost() == host ]
+        elif '@' in versionStr:
+            if '/' in versionStr:
+                label, remainder = versionStr.split('/')
+                return [ '%s/%s' % (x, remainder) for x in self.installLabelPath 
+                         if str(x) == label ]
+            return [ str(x) for x in self.installLabelPath if str(x) == versionStr ]
+        # version/revision only are all ok - they don't modify the label we search on.
+        return [ versionStr ]
 
     def getResolveMethod(self):
         """
@@ -187,6 +253,7 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
             return self.sources[0].getTroveSource()
         return trovesource.stack(*[ x.getTroveSource() for x in self.sources])
 
+
     def findTrove(self, troveSpec, useAffinity=False, **kw):
         """
             Finds the trove matching the given (name, versionSpec, flavor)
@@ -204,20 +271,36 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
             uses the associated database for branch/flavor affinity.
         """
         troveSpecs = list(troveSpecs)
+        reposSpecs = {}
         results = {}
-        for source in self.sources[:-1]:
-            foundTroves = source.findTroves(troveSpecs, allowMissing=True)
-            newTroveSpecs = []
-            for troveSpec in troveSpecs:
-                if troveSpec in foundTroves:
-                    results[troveSpec] = foundTroves[troveSpec]
-                else:
-                    newTroveSpecs.append(troveSpec)
+        networkSource = None
+        for source in self.sources:
+            if isinstance(source, NetworkSearchSource):
+                networkSource = source
+            newTroveSpecs, specsToUse = source._filterSpecsForSource(troveSpecs)
+            foundTroves = source.findTroves(specsToUse, allowMissing=True)
+            for troveSpec in specsToUse:
+                for origSpec in specsToUse[troveSpec]:
+                    if troveSpec in foundTroves:
+                        results.setdefault(origSpec, []).extend(foundTroves[troveSpec])
+                    else:
+                        newTroveSpecs.append(origSpec)
             troveSpecs = newTroveSpecs
-
-        results.update(self.sources[-1].findTroves(troveSpecs,
-                                              useAffinity=useAffinity,
-                                              allowMissing=allowMissing, **kw))
+        if troveSpecs:
+            if networkSource:
+                # All the explicit search sources are exhausted.  Fall back
+                # to searching the repository without any label restrictions.
+                results.update(networkSource.findTroves(troveSpecs,
+                                                        useAffinity=useAffinity,
+                                                        allowMissing=allowMissing,
+                                                        **kw))
+            elif not allowMissing:
+                # search again with allowMissing=False to raise the appropriate
+                # exception (only troves that weren't found before will be in
+                # this list.
+                results.update(self.sources[-1].findTroves(troveSpecs,
+                                            useAffinity=useAffinity,
+                                            allowMissing=False, **kw))
         return results
 
     def getResolveMethod(self):
@@ -276,7 +359,7 @@ def createSearchPathFromStrings(searchPath):
     return tuple(finalPath)
 
 def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
-                                       db=None):
+                                       db=None, fallBackToRepos=True):
     """
         Creates a list of items that can be passed into createSearchSource.
 
@@ -288,14 +371,15 @@ def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
     try:
         strings = searchPath
         searchPath = createSearchPathFromStrings(searchPath)
-        return createSearchSourceStack(searchSource, searchPath, flavor, db)
+        return createSearchSourceStack(searchSource, searchPath, flavor, db,
+                                       fallBackToRepos=fallBackToRepos)
     except baseerrors.ConaryError, err:
         raise baseerrors.ConaryError('Could not create search path "%s": %s' % (
                                      ' '.join(strings), err))
 
 def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
                             resolveLeavesFirst=True, troveSource=None, 
-                            useAffinity=True):
+                            useAffinity=True, fallBackToRepos=True):
     """
         Creates a searchSourceStack based on a searchPath.
 
@@ -313,6 +397,7 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
     else:
         searchMethod = resolvemethod.RESOLVE_ALL
 
+    hasNetworkSearchSource = False
     for item in searchPath:
         if not isinstance(item, (list, tuple)):
             item = [item]
@@ -320,6 +405,7 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
             searchStack.addSource(NetworkSearchSource(troveSource,
                                               item, flavor, db,
                                               resolveSearchMethod=searchMethod))
+            hasNetworkSearchSource = True
         elif isinstance(item[0], trove.Trove):
             s = TroveSearchSource(searchSource.getTroveSource(), item, flavor)
             searchStack.addSource(s)
@@ -332,4 +418,7 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
             searchStack.addSource(s)
         else:
             raise baseerrors.ParseError('unknown search path item %s' % (item,))
+    if fallBackToRepos and not hasNetworkSearchSource:
+        searchStack.addSource(NetworkSearchSource(troveSource, [], flavor, db,
+                                                  resolveSearchMethod=searchMethod))
     return searchStack

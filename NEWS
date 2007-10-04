@@ -4,9 +4,21 @@ Changes in 1.2.1:
     * Cooking derived packages no longer warns about their
       experimental state. (CNY-2092)
     * loadInstalled does not search the local database for a matching
+      package on checkin but instead searches the repository.  This makes
+      it easier to develop packages that are correct but won't run on the
+      current machine (CNY-2027)
+    * loadInstalled does not search the local database for a matching
       package on checkin, but instead searches the repository. This
       makes it easier to develop packages that are correct, with the
       potential of not building on the current machine. (CNY-2027)
+    * groups using searchPath now prefer packages on the labels and troves 
+      listed explicitly in the searchPath over other labels, even if the label 
+      is specified in the   For example, if your searchPath includes
+      foo=conary.rpath.com@rpl:1/1-1-1, then 
+      r.add('foo', 'conary.rpath.com@rpl:1') in a group recipe will now find 
+      version 1-1-1 over later versions.  Before it would find the latest 
+      version in the repository if you specified the label in the r.add()
+      command (CNY-1993).
 
   o Client Changes:
     * The Conary client is now less aggressive in sending keepalive
