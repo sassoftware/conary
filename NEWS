@@ -1,12 +1,12 @@
-Changes in @NEW@:
+Changes in 1.2.1:
   o Build Changes:
-    * The addGitSnapshot() source action is added. (CNY-1965)
+    * The addGitSnapshot() source action is now available. (CNY-1965)
     * Cooking derived packages no longer warns about their
       experimental state. (CNY-2092)
     * loadInstalled does not search the local database for a matching
-      package on checkin but instead searches the repository.  This makes
-      it easier to develop packages that are correct but won't run on the
-      current machine (CNY-2027)
+      package on checkin, but instead searches the repository. This
+      makes it easier to develop packages that are correct, with the
+      potential of not building on the current machine. (CNY-2027)
 
   o Client Changes:
     * The Conary client is now less aggressive in sending keepalive
@@ -23,13 +23,13 @@ Changes in @NEW@:
       (CNY-2103)
     * The 'conary updateall' command again properly handles the
       --replace-files command-line argument. (CNY-2102)
-    * Patches are no longer ever partially applied when building.
-      (CNY-2017)
+    * Patches are no longer partially applied when building. A
+      partially applying patch results now in a failure. (CNY-2017)
     * A bug which caused Conary to incorrectly determine the flags
       for python dependencies on 64-bit systems has been fixed.
       (CNY-2091)
-    * Ruby dependencies are now function in a bootstrap build of
-      the ruby package. (CNY-2109)
+    * Ruby dependencies now function properly in a bootstrap build
+      of the ruby package. (CNY-2109)
 
 Changes in 1.2.0:
   o Build Changes:
@@ -62,7 +62,7 @@ Changes in 1.1.96:
       that is not available on the system or in the builddir.  It will
       print a warning and not attempt to compute dependency information
       for those files. (CNY-2050)
-    * loadSuperClass and loadInstalled now print out name, version 
+    * loadSuperClass and loadInstalled now print out name, version
       flavor of the package that was used when loading. (CNY-1967)
 
   o Bug Fixes:
@@ -84,9 +84,9 @@ Changes in 1.1.96:
       the return URL. (CNY-2069)
     * The client is now properly computing the downloaded file's
       digest if a size limit was specified. (CNY-2072)
-    * A regression from Conary 1.1.94 that caused some local cooks to fail  
-      to be installable due to incorrect primary trove information has 
-      been fixed (CNY-2078)
+    * A regression from Conary 1.1.94 that caused some local cooks to
+      fail to be installable due to incorrect primary trove information
+      has been fixed (CNY-2078)
 
   o Other Changes
     * InodeStreams and FileStreams now preserve unknown elements,
