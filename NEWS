@@ -22,7 +22,7 @@ Changes in 1.2.1:
       necessary before Conary 1.2.0, are again handled correctly.
       (CNY-2103)
     * The 'conary updateall' command again properly handles the
-      --replace-files command-line argument. (CNY-2102)
+      --replace-files command-line argument. (CNY-2112)
     * Patches are no longer partially applied when building. A
       partially applying patch results now in a failure. (CNY-2017)
     * A bug which caused Conary to incorrectly determine the flags
