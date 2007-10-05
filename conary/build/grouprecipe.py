@@ -168,10 +168,12 @@ class GroupRecipe(_BaseGroupRecipe):
     B{autoResolve} : (False) If set to C{True}, Conary will include any extra
     troves needed to make this group dependency complete.
 
-    B{checkOnlyByDefaultDeps} : (True) By default, Conary checks only the
-    dependencies of the troves in a group that are installed by default.
-    Conary will check the dependencies of B{byDefault} C{False} troves as well
-    if this parameter is set to C{True}.
+    B{checkOnlyByDefaultDeps} : (True) Conary only checks the
+    dependencies of troves that are installed by default, referenced in the
+    group.  If set to C{False}, Conary will also check the dependencies of
+    B{byDefault} C{False} troves.  Doing this, however, will prevent groups
+    with C{autoResolve}=C{True} from changing the C{byDefault} status of
+    required troves.
 
     B{checkPathConflicts} : (True) Conary checks for path conflicts in each
     group by default to ensure that the group can be installed without path
