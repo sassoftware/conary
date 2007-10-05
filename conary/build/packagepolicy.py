@@ -3580,6 +3580,7 @@ class Flavor(policy.Policy):
         self.archFlavor = use.createFlavor(None, use.Arch._iterUsed())
         self.packageFlavor = deps.Flavor()
         self.troveMarked = False
+        self.componentMap = self.recipe.autopkg.componentMap
 
     def postProcess(self):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3588,8 +3589,18 @@ class Flavor(policy.Policy):
         for pkg in componentMap.values():
             pkg.flavor.union(self.packageFlavor)
 
-    def hasLib(self, path):
+    def hasLibInPath(self, path):
         return self.libRe.match(path) and not self.libReException.match(path)
+
+    def hasLibInRequiresFlag(self, path, f):
+        for depType in (deps.PythonDependencies, deps.RubyDependencies):
+            for dep in ([x for x in f.requires.deps.iterDepsByClass(depType)] +
+                        [x for x in f.provides.deps.iterDepsByClass(depType)]):
+                flagNames = [x[0] for x in dep.getFlags()[0]]
+                flagNames = [x for x in flagNames if x.startswith('lib')]
+                if flagNames:
+                    return True
+        return False
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3600,7 +3611,7 @@ class Flavor(policy.Policy):
         m = self.recipe.magic[path]
         if m and m.name == 'ELF' and 'isnset' in m.contents:
             isnset = m.contents['isnset']
-        elif self.hasLib(path):
+        elif self.hasLibInPath(path) or self.hasLibInRequiresFlag(path, f):
             # all possible paths in a %(lib)s-derived path get default
             # instruction set assigned if they don't have one already
             if f.hasContents:

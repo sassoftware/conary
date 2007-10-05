@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Build Changes:
+    * Python and Ruby dependencies with lib-specific flags now cause
+      the package to be architecture-flavored. (CNY-2110)
+
 Changes in 1.2.1:
   o Build Changes:
     * The addGitSnapshot() source action is now available. (CNY-1965)
