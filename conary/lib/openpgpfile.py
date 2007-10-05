@@ -621,7 +621,11 @@ class PGP_Message(object):
         """Iterate over main keys"""
         for pkt in self.iterPackets():
             if isinstance(pkt, PGP_MainKey):
-                pkt.initSubPackets()
+                try:
+                    pkt.initSubPackets()
+                except InvalidBodyError:
+                    # Skip this key
+                    continue
                 yield pkt
 
     def iterByKeyId(self, keyId):
@@ -2049,7 +2053,10 @@ def newKeyFromStream(stream):
         return None
     if not isinstance(pkt, PGP_MainKey):
         return None
-    pkt.initSubPackets()
+    try:
+        pkt.initSubPackets()
+    except InvalidBodyError:
+        return None
     return pkt
 
 
