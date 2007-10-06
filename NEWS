@@ -1,11 +1,11 @@
-Changes in @NEW@:
+Changes in 1.1.31.9:
   o Bug Fixes:
     * Multiple entitlements to the same host name are now properly
       handled. (CNY-2105)
     * The URL sent via prepareChangeSet now matches the one used by
       commitChangeSet.
-    * The URL sent back to the client is correct when connecting
-      through an HTTP proxy. (CNY-2117)
+    * The URL sent back to the client when connecting through an
+      HTTP proxy was corrected. (CNY-2117)
 
 Changes in 1.1.31.8:
   o Bug Fixes:
