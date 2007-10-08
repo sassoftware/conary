@@ -1175,7 +1175,8 @@ class addGitSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag)
@@ -1251,7 +1252,8 @@ class addMercurialSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag)
@@ -1406,9 +1408,9 @@ class addSvnSnapshot(_RevisionControl):
     def getFilename(self):
         urlBits = self.url.split('//', 1)
         if urlBits[0] == 'file:':
-            dirPath = urlBits[1]
+            dirPath = urlBits[1].replace('/', '_')
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[0].replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.project,
                                        self.url.split('/')[-1])
@@ -1480,7 +1482,8 @@ class addBzrSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag or '')

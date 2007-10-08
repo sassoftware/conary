@@ -15,6 +15,9 @@ Changes in @NEW@:
     * When parsing the GPG keyring, PGP version 2 keys are now ignored.
       (CNY-2115)
     * Direct key signatures for PGP keys are now accepted. (CNY-2120)
+    * addMercurialSnapshot, along with the rest of the source control
+      recipe actions, no longer produce directory names that can
+      collide. (CNY-2124)
 
 Changes in 1.2.1:
   o Build Changes:
