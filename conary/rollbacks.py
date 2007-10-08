@@ -20,8 +20,26 @@ from conary.local import database
 def listRollbacks(db, cfg):
     return formatRollbacks(cfg, db.iterRollbacksList(), stream=sys.stdout)
 
-def verStr(cfg, version, flavor):
-    ret = util.verFormat(cfg, version)
+def versionFormat(cfg, version, defaultLabel = None):
+    """Format the version according to the options in the cfg object"""
+    if cfg.fullVersions:
+        return str(version)
+
+    if cfg.showLabels:
+        ret = "%s/%s" % (version.branch().label(), version.trailingRevision())
+        return ret
+
+    if defaultLabel and (version.branch().label() == defaultLabel):
+        return str(version.trailingRevision())
+
+    ret = "%s/%s" % (version.branch().label(), version.trailingRevision())
+    return ret
+
+def verStr(cfg, version, flavor, defaultLabel = None):
+    if defaultLabel is None:
+        defaultLabel = cfg.installLabel
+
+    ret = versionFormat(cfg, version, defaultLabel = defaultLabel)
     if cfg.fullFlavors:
         return "%s[%s]" % (ret, str(flavor))
     return ret
@@ -50,8 +68,32 @@ def formatRollbacks(cfg, rollbacks, stream=None):
             oldList = [ x[0:3] for x in cs.getOldTroveList() ]
 
             newList.sort()
+
+            # looks for components-of-packages and collapse those into the
+            # package itself (just like update does)
+            compByPkg = {}
+
+            for info in newList:
+                name = info[0]
+                if ':' in name:
+                    pkg, component = name.split(':')
+                    pkgInfo = (pkg,) + info[1:]
+                    l = compByPkg.setdefault(pkgInfo, [])
+                    l.append(component)
+
             oldList.sort()
-            for (name, oldVersion, oldFlavor, newVersion, newFlavor) in newList:
+            for info in newList:
+                (name, oldVersion, oldFlavor, newVersion, newFlavor) = info
+                if ':' in name:
+                    pkgInfo = (name.split(':')[0],) + info[1:]
+                    if pkgInfo in compByPkg:
+                        # this component was displayed with its package
+                        continue
+
+                if info in compByPkg:
+                    name += ('(%s)' %
+                       " ".join([ ":" + x for x in compByPkg[info] ]))
+
                 if newVersion.onLocalLabel():
                     # Don't display changes to local branch
                     continue
@@ -65,10 +107,29 @@ def formatRollbacks(cfg, rollbacks, stream=None):
                         # Avoid displaying changes to rollback branch
                         continue
                     pn = "%s -> %s" % (verStr(cfg, newVersion, newFlavor),
-                                       verStr(cfg, oldVersion, oldFlavor))
+                                       verStr(cfg, oldVersion, oldFlavor,
+                                              defaultLabel =
+                                                newVersion.branch().label()))
                     w_(templ % ('updated', name, pn))
 
+            compByPkg = {}
+
+            for name, version, flavor in oldList:
+                if ':' in name:
+                    pkg, component = name.split(':')
+                    l = compByPkg.setdefault((pkg, version, flavor), [])
+                    l.append(component)
+
             for (name, version, flavor) in oldList:
+                if (':' in name and
+                        (name.split(':')[0], version, flavor) in compByPkg):
+                    # this component was displayed with its package
+                    continue
+
+                if (name, version, flavor) in compByPkg:
+                    name = '%s(%s)' % (name,
+                       " ".join([ ":" + x for x in
+                                    compByPkg[(name, version, flavor)] ]))
                 w_(templ % ('installed', name, verStr(cfg, version, flavor)))
 
         w_('\n')

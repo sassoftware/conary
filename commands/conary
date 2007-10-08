@@ -344,7 +344,7 @@ class ListRollbackCommand(ConaryCommand):
 _register(ListRollbackCommand)
 
 class RollbackCommand(ConaryCommand):
-    commands = ['rollback']
+    commands = ['rollback', 'rb']
     paramHelp = "<rollback>"
     help = 'Roll back operations stored in the rollback stack'
     commandGroup = 'System Modification'
