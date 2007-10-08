@@ -3592,7 +3592,7 @@ class Flavor(policy.Policy):
     def hasLibInPath(self, path):
         return self.libRe.match(path) and not self.libReException.match(path)
 
-    def hasLibInRequiresFlag(self, path, f):
+    def hasLibInDependencyFlag(self, path, f):
         for depType in (deps.PythonDependencies, deps.RubyDependencies):
             for dep in ([x for x in f.requires.deps.iterDepsByClass(depType)] +
                         [x for x in f.provides.deps.iterDepsByClass(depType)]):
@@ -3611,7 +3611,7 @@ class Flavor(policy.Policy):
         m = self.recipe.magic[path]
         if m and m.name == 'ELF' and 'isnset' in m.contents:
             isnset = m.contents['isnset']
-        elif self.hasLibInPath(path) or self.hasLibInRequiresFlag(path, f):
+        elif self.hasLibInPath(path) or self.hasLibInDependencyFlag(path, f):
             # all possible paths in a %(lib)s-derived path get default
             # instruction set assigned if they don't have one already
             if f.hasContents:
