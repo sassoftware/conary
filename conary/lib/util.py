@@ -661,6 +661,7 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
 
 def verFormat(cfg, version):
     """Format the version according to the options in the cfg object"""
+    print >> sys.stderr, 'util.verFormat is obsolete as of Conary 1.2'
     if cfg.fullVersions:
         return str(version)
     if cfg.showLabels:

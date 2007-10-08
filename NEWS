@@ -1,3 +1,7 @@
+    * The conary command line now accepts 'rb' as an alias for 'rollback'
+    * The output of 'rblist' now combines packages and their components in
+      a single line (similar to the output of 'update')
+
 Changes in 1.2.1:
   o Build Changes:
     * The addGitSnapshot() source action is now available. (CNY-1965)
