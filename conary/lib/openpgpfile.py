@@ -1628,8 +1628,8 @@ class PGP_MainKey(PGP_Key):
             if not isinstance(pkt, PGP_Signature):
                 continue
             pkt.parse()
-            if pkt.sigType == SIG_TYPE_KEY_REVOC:
-                # Key revocation
+            if pkt.sigType in (SIG_TYPE_KEY_REVOC, SIG_TYPE_DIRECT_KEY):
+                # Key revocation, or direct key signature
                 self.revsigs.append(pkt)
                 continue
             # According to sect. 10.1, there should not be other signatures
