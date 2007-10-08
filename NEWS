@@ -3,6 +3,8 @@ Changes in 2.0.0:
     * Added getTroveLatestByLabel as a client-side call
     * Most repository exceptions are demarshalled using logic in the
       exception class itself rather than in a large if/elif block (CNY-747)
+    * troveNames and troveNamesByServer methods now accept a troveTypes
+      argument and return present troves only by default (CNY-1838)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
@@ -21,6 +23,7 @@ Changes in 2.0.0:
       in both the proxy and server layers
     * When the repository database is locked, RepositoryLocked exceptions
       are now returned for all code paths (CNY-1596)
+    * troveNames method now filter by troveTypes argument (CNY-1838)
 
 o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)

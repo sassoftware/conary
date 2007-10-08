@@ -858,11 +858,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def listAccessGroups(self, serverName):
         return self.c[serverName].listAccessGroups()
 
-    def troveNames(self, label):
-	return self.c[label].troveNames(self.fromLabel(label))
+    def troveNames(self, label, troveTypes = TROVE_QUERY_PRESENT):
+        if self.c[label].getProtocolVersion() < 60:
+            return self.c[label].troveNames(self.fromLabel(label))
 
-    def troveNamesOnServer(self, server):
-        return self.c[server].troveNames("")
+        return self.c[label].troveNames(self.fromLabel(label),
+                                        troveTypes = troveTypes)
+
+    def troveNamesOnServer(self, server, troveTypes = TROVE_QUERY_PRESENT):
+        if self.c[server].getProtocolVersion() < 60:
+            return self.c[server].troveNames("")
+
+        return self.c[server].troveNames("", troveTypes = troveTypes)
 
     def getTroveLeavesByPath(self, pathList, label):
         l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), 

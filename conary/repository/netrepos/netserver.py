@@ -987,13 +987,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return troveVersions
 
     @accessReadOnly
-    def troveNames(self, authToken, clientVersion, labelStr):
+    def troveNames(self, authToken, clientVersion, labelStr,
+                   troveTypes = TROVE_QUERY_ALL):
         cu = self.db.cursor()
 
-        
         groupIds = self.auth.getAuthGroups(cu, authToken)
         if not groupIds:
             return {}
+
+        if troveTypes == TROVE_QUERY_PRESENT:
+            troveTypeClause = \
+                'and Instances.troveType != %d' % trove.TROVE_TYPE_REMOVED
+        elif troveTypes == TROVE_QUERY_NORMAL:
+            troveTypeClause = \
+                'and Instances.troveType == %d' % trove.TROVE_TYPE_NORMAL
+        else:
+            troveTypeClause = ''
 
         if not labelStr:
             cu.execute("""
@@ -1002,7 +1011,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Instances using (instanceId)
             join Items using (itemId)
             where ugi.userGroupId in (%s)
-            """ % (",".join("%d" % x for x in groupIds)))
+              %s
+            """ % (",".join("%d" % x for x in groupIds),
+                   troveTypeClause))
         else:
             cu.execute("""
             select distinct item
@@ -1014,7 +1025,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Items on Items.itemId = LabelMap.itemId
             where label = ?
               and userGroupId in (%s)
-            """ % (",".join("%d" % x for x in groupIds)), labelStr)
+              %s
+            """ % (",".join("%d" % x for x in groupIds), troveTypeClause),
+                   labelStr)
 
         return [ x[0] for x in cu ]
 
