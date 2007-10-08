@@ -266,7 +266,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                  kwArgs, exception = e)
 
         if isinstance(e, sqlerrors.DatabaseLocked):
-            exceptionOverride = RepositoryLocked()
+            exceptionOverride = errors.RepositoryLocked()
 
         if exceptionOverride:
             raise exceptionOverride
@@ -1731,7 +1731,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # Figure out what to return back
         if isinstance(e, sqlerrors.DatabaseLocked):
             # too many retries
-            raise errors.CommitError("DeadlockError", e.args)
+            raise errors.RepositoryLocked()
         raise
 
     def _commitChangeSet(self, authToken, cs, mirror = False, hidden = False):
