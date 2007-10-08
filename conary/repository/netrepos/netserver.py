@@ -549,7 +549,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
         self.ugo.addTroveAccess(userGroup, troveList, recursive=True)
         return ""
-    
+
     @accessReadWrite
     def deleteTroveAccess(self, authToken, clientVersion, userGroup, troveList):
         if not self.auth.authCheck(authToken, admin = True):
@@ -1909,10 +1909,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # In practical terms, this means that we could jump several revisions
         # back in a file's history.
         # Added as part of protocol version 42
-	if not self.auth.check(authToken, write = False,
-                               trove = sourceName,
-			       label = self.toBranch(branch).label()):
-	    raise errors.InsufficientPermission
         # decode the fileIds to check before doing heavy work
         if fileIds:
             fileIds = base64.b64decode(fileIds)
@@ -1930,6 +1926,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         fileIds = set(splitFileIds(fileIds))
         self.log(2, sourceName, branch, filePrefixes, fileIds)
         cu = self.db.cursor()
+
+        userGroupIds = self.auth.getAuthGroups(cu, authToken)
 
         prefixQuery = ""
         if filePrefixes:
@@ -1952,6 +1950,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Branches using (branchId)
         JOIN Items ON
             Nodes.sourceItemId = Items.itemId
+        JOIN UserGroupInstancesCache as ugi ON
+            Instances.instanceId = ugi.instanceId
         JOIN TroveFiles ON
             Instances.instanceId = TroveFiles.instanceId
         JOIN Versions ON
@@ -1961,10 +1961,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         %s
         WHERE
             Items.item = ? AND
-            Branches.branch = ?
+            Branches.branch = ? AND
+            ugi.userGroupId in (%s)
         ORDER BY
             Nodes.finalTimestamp DESC
-        """ % (prefixQuery,)
+        """ % (prefixQuery, ",".join("%d" % x for x in userGroupIds))
 
         cu.execute(query, (sourceName, branch))
         ids = {}

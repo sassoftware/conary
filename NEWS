@@ -24,6 +24,9 @@ Changes in 2.0.0:
     * When the repository database is locked, RepositoryLocked exceptions
       are now returned for all code paths (CNY-1596)
     * troveNames method now filter by troveTypes argument (CNY-1838)
+    * getPackageBranchPathIds method no longer requires an acl for the
+      branch; it returns the pathIds and fileIds for troves the user is
+      allowed to see (CNY-2038)
 
 o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
