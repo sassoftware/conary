@@ -122,7 +122,7 @@ def formatRollbacks(cfg, rollbacks, stream=None):
                 if ':' in name:
                     pkg, component = name.split(':')
                 else:
-                    pkgInfo = info
+                    pkg = name
                     component = None
                 l = compByPkg.setdefault((pkg, version, flavor), [])
                 l.append(component)
