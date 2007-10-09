@@ -75,7 +75,7 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
         for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
             if sourceVersion.isOnLocalHost():
                 continue
-            pkgNames = set([x.split(':')[-1] for x in troveNames])
+            pkgNames = set([x.split(':')[0] for x in troveNames])
             for pkgName in pkgNames:
                 if pkgName not in query:
                     query[pkgName] = {}
@@ -98,7 +98,7 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
 
 def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
                           troveFlavorSet, alwaysBumpCount=False):
-    pkgNames = set([x.split(':')[-1] for x in troveNames])
+    pkgNames = set([x.split(':')[0] for x in troveNames])
     latest = None
     relVersions = []
     for pkgName in pkgNames:
@@ -112,14 +112,23 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
                     relVersions.append((version, query[pkgName][version]))
     del pkgName
 
-    if relVersions:
+    desiredShadowCount = sourceVersion.depth() - 1
+    matches = [ x for x in relVersions
+                if x[0].trailingRevision().shadowCount() == desiredShadowCount ]
+
+
+    if matches:
         # all these versions only differ by build count.
         # but we can't rely on the timestamp sort, because the build counts
         # are on different packages that might have come from different commits
+        # All these packages should have the same shadow count though,
+        # - which is the shadow could that should
         # XXX does this deal with shadowed versions correctly?
-        relVersions.sort(lambda a, b: cmp(a[0].trailingRevision().buildCount,
-                                          b[0].trailingRevision().buildCount))
-        latest, flavors = relVersions[-1]
+
+        relVersions.sort()
+        matches.sort(key=lambda x: x[0].trailingRevision().buildCount)
+        latest, flavors = matches[-1]
+        latestByStamp = relVersions[-1][0]
         incCount = False
 
         if alwaysBumpCount:
@@ -135,8 +144,19 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
             elif latest.getSourceVersion() == sourceVersion:
                 # case 3.  There is a binary trove with this source
                 # version, and our flavor does not exist at this build
-                # count, so reuse the latest binary version
-                pass
+                # count.
+
+                if latestByStamp != latest:
+                    # case 3a. the latest possible match for our branch
+                    # is not the _latest_ as defined by getTroveLatestByLabel.
+                    # Avoid adding a new package
+                    # to some older spot in the version tree
+                    incCount = True
+                else:
+                    # case 3b. development has been occuring on this branch
+                    # on this label, and there is an open spot for this
+                    # flavor, so reuse this version.
+                    pass
             else:
                 # case 4. There is a binary trove on a different branch
                 # (but the same label)

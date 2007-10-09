@@ -24,6 +24,9 @@ Changes in @NEW@:
       no longer produce directory names that can collide. (CNY-2124)
     * Tag scripts are now closing file descriptors larger than stderr
       before calling exec(). (CNY-2114)
+    * A bug in determining the correct binary version for packages when
+      multiple branches of that package exist on the same label has been fixed.
+      (CNY-2128)
 
 Changes in 1.2.1:
   o Build Changes:
