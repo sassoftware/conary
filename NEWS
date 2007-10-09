@@ -2,19 +2,19 @@ Changes in @NEW@:
   o Build Changes:
     * Python and Ruby dependencies with lib-specific flags now cause
       the package to be architecture-flavored. (CNY-2110)
-    * Groups using searchPath now prefer packages on the labels and troves 
-      listed explicitly in the searchPath over other labels, even if the label 
-      is specified in the add() command.  For example, if your searchPath 
-      includes foo=conary.rpath.com@rpl:1/1-1-1, then
-      r.add('foo', 'conary.rpath.com@rpl:1') in a group recipe will now find
-      version 1-1-1 over later versions.  Before it would find the latest 
-      version in the repository if you specified the label in the r.add()
-      command (CNY-1993).
+    * Groups using setSearchPath now prefer packages on the labels and
+      troves listed explicitly in the searchPath over other labels,
+      even if the label is specified in the add() command. For example,
+      if your searchPath includes foo=conary.rpath.com@rpl:1/1-1-1, then
+      r.add('foo', 'conary.rpath.com@rpl:1') in a group recipe will now
+      find version 1-1-1 over later versions. Before, it would find the
+      latest version in the repository if you specified the label in the
+      r.add() command. (CNY-1993)
 
   o Client Changes:
     * The conary command line now accepts 'rb' as an alias for 'rollback'
-    * The output of 'rblist' now combines packages and their components in
-      a single line (similar to the output of 'update').
+    * The output of 'rblist' now combines packages and their components
+      in a single line (similar to the output of 'update'). (CNY-2134)
 
   o Bug Fixes:
     * When parsing the GPG keyring, PGP version 2 keys are now ignored.
@@ -25,12 +25,10 @@ Changes in @NEW@:
     * Tag scripts are now closing file descriptors larger than stderr
       before calling exec(). (CNY-2114)
     * A bug in determining the correct version for packages when
-      multiple branches of that package exist on the same label has been fixed.
-      (CNY-2128)
+      multiple branches of that package exist on the same label has
+      been fixed. (CNY-2128)
     * Multiple entitlements to the same host name are now properly
       handled. (CNY-2105)
-    * The URL sent via prepareChangeSet now matches the one used by
-      commitChangeSet.
     * The URL sent back to the client when connecting through an
       HTTP proxy was corrected. (CNY-2117)
 
