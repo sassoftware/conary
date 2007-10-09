@@ -1572,3 +1572,8 @@ def compressStream(src, level = 5, bufferSize = 16384):
         sio.write(z.compress(buf))
     sio.write(z.flush())
     return sio
+
+def massCloseFileDescriptors(start, unusedCount):
+    """Close all file descriptors starting with start, until we hit
+    unusedCount consecutive file descriptors that were already closed"""
+    return misc.massCloseFileDescriptors(start, unusedCount, 0);
