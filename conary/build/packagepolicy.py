@@ -34,6 +34,26 @@ from conary.local import database
 from elementtree import ElementTree
 
 
+# Helper class
+class _DatabaseDepCache(object):
+    __slots__ = ['db', 'cache']
+    def __init__(self, db):
+        self.db = db
+        self.cache = {}
+
+    def getProvides(self, depSetList):
+        ret = {}
+        missing = []
+        for depSet in depSetList:
+            if depSet in self.cache:
+                ret[depSet] = self.cache[depSet]
+            else:
+                missing.append(depSet)
+        newresults = self.db.getTrovesWithProvides(missing)
+        ret.update(newresults)
+        self.cache.update(newresults)
+        return ret
+
 
 class _filterSpec(policy.Policy):
     """
@@ -1664,6 +1684,9 @@ class _dependency(policy.Policy):
         # interpolate macros, using canonical path form with no trailing /
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
                                   for x in self.sonameSubtrees)
+        self.pythonFlagCache = {}
+        self.pythonTroveFlagCache = {}
+        self.pythonVersionCache = {}
 
     def _hasContents(self, m, contents):
         """
@@ -1685,6 +1708,107 @@ class _dependency(policy.Policy):
 
     def _isPythonModuleCandidate(self, path):
         return path.endswith('.so') or self._isPython(path)
+
+    def _getPythonVersion(self, pythonPath):
+        if pythonPath not in self.pythonVersionCache:
+            self.pythonVersionCache[pythonPath] = util.popen(
+                r"""%s -Ec 'import sys;"""
+                 """ print "%%d.%%d" %%sys.version_info[0:2]'"""
+                %pythonPath).read().strip()
+        return self.pythonVersionCache[pythonPath]
+
+    def _getPythonSysPath(self, pythonPath):
+        return [x.strip() for x in util.popen(
+                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
+                %pythonPath).read().split('\0')
+                if x]
+
+    def _warnPythonPathNotInDB(self, pathName):
+        self.warn('%s found on system but not provided by'
+                  ' system database; python requirements'
+                  ' may be generated incorrectly as a result', pathName)
+        return set([])
+
+    def _getPythonTroveFlags(self, pathName):
+        if pathName in self.pythonTroveFlagCache:
+            return self.pythonTroveFlagCache[pathName]
+        db = self._getDb()
+        foundPath = False
+        pythonFlags = set()
+        pythonTroveList = db.iterTrovesByPath(pathName)
+        if pythonTroveList:
+            depContainer = pythonTroveList[0]
+            assert(depContainer.getName())
+            foundPath = True
+            for dep in depContainer.getRequires().iterDepsByClass(
+                    deps.PythonDependencies):
+                flagNames = [x[0] for x in dep.getFlags()[0]]
+                pythonFlags.update(flagNames)
+            self.pythonTroveFlagCache[pathName] = pythonFlags
+
+        if not foundPath:
+            self.pythonTroveFlagCache[pathName] = self._warnPythonPathNotInDB(
+                pathName)
+
+        return self.pythonTroveFlagCache[pathName]
+
+    def _getPythonFlags(self, pathName, bootstrapPythonFlags=None):
+        if pathName in self.pythonFlagCache:
+            return self.pythonFlagCache[pathName]
+
+        if bootstrapPythonFlags:
+            self.pythonFlagCache[pathName] = bootstrapPythonFlags
+            return self.pythonFlagCache[pathName]
+
+        db = self._getDb()
+        foundPath = False
+
+        # FIXME: This should be iterFilesByPath when implemented (CNY-1833)
+        # For now, cache all the python deps in all the files in the
+        # trove(s) so that we iterate over each trove only once
+        containingTroveList = db.iterTrovesByPath(pathName)
+        for containerTrove in containingTroveList:
+            for pathid, p, fileid, v in containerTrove.iterFileList():
+                if pathName == p:
+                    foundPath = True
+                pythonFlags = set()
+                f = files.ThawFile(db.getFileStream(fileid), pathid)
+                for dep in f.provides().iterDepsByClass(
+                        deps.PythonDependencies):
+                    flagNames = [x[0] for x in dep.getFlags()[0]]
+                    pythonFlags.update(flagNames)
+                self.pythonFlagCache[p] = pythonFlags
+
+        if not foundPath:
+            self.pythonFlagCache[pathName] = self._warnPythonPathNotInDB(
+                pathName)
+
+        return self.pythonFlagCache[pathName]
+
+    def _getPythonFlagsFromPath(self, pathName):
+        pathList = pathName.split('/')
+        foundLib = False
+        foundVer = False
+        flags = set()
+        for dirName in pathList:
+            if not foundVer and not foundLib and dirName.startswith('lib'):
+                # lib will always come before ver
+                foundLib = True
+                flags.add(dirName)
+            elif not foundVer and dirName.startswith('python'):
+                foundVer = True
+                flags.add(dirName[6:])
+            if foundLib and foundVer:
+                break
+        return flags
+
+    def _getPythonVersionFromPath(self, pathName):
+        pathList = pathName.split('/')
+        for dirName in pathList:
+            if dirName.startswith('python') and not set(dirName[6:]).difference(set('.0123456789')):
+                # python2.4 or python2.5 or python3.9 but not python.so
+                return dirName
+        return ''
 
     def _isCIL(self, m):
         return m and m.name == 'CIL'
@@ -1847,6 +1971,61 @@ class _dependency(policy.Policy):
 
         return troveName
 
+    def _getRuby(self, macros, path):
+        # For bootstrapping purposes, prefer the just-built version if
+        # it exists
+        # Returns tuple: (pathToRubyInterpreter, bootstrap)
+        ruby = '%(ruby)s' %macros
+        if os.access('%(destdir)s/%(ruby)s' %macros, os.X_OK):
+            return '%(destdir)s/%(ruby)s' %macros, True
+        elif os.access(ruby, os.X_OK):
+            # Enforce the build requirement, since it is not in the package
+            self._enforceProvidedPath(ruby)
+            return ruby, False
+        else:
+            self.warn('%s not available for Ruby dependency discovery'
+                      ' for path %s' %(ruby, path))
+        return False, None
+
+    def _getRubyLoadPath(self, macros, rubyInvocation, bootstrap):
+        # Returns tuple of (invocationString, loadPathList)
+        destdir = macros.destdir
+        if bootstrap:
+            rubyInvocation = (('LD_LIBRARY_PATH=%(destdir)s%(libdir)s '
+                               +rubyInvocation)%macros)
+        rubyLoadPath = util.popen("%s -e 'puts $:'" %rubyInvocation).readlines()
+        rubyLoadPath = [ x.strip() for x in rubyLoadPath if x.startswith('/') ]
+        loadPathList = rubyLoadPath[:]
+        if bootstrap:
+            rubyLoadPath = [ destdir+x for x in rubyLoadPath ]
+            rubyInvocation = ('LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
+                    ' RUBYLIB="'+':'.join(rubyLoadPath)+'"'
+                    ' %(destdir)s/%(ruby)s') % macros
+        return (rubyInvocation, loadPathList)
+
+    def _getRubyVersion(self, macros):
+        cmd = self.rubyInvocation + (" -e 'puts RUBY_VERSION'" % macros)
+        rubyVersion = util.popen(cmd).read()
+        rubyVersion = '.'.join(rubyVersion.split('.')[0:2])
+        return rubyVersion
+
+    def _getRubyFlagsFromPath(self, pathName, rubyVersion):
+        pathList = pathName.split('/')
+        pathList = [ x for x in pathList if x ]
+        foundLib = False
+        foundVer = False
+        flags = set()
+        for dirName in pathList:
+            if not foundLib and dirName.startswith('lib'):
+                foundLib = True
+                flags.add(dirName)
+            elif not foundVer and dirName == rubyVersion:
+                foundVer = True
+                flags.add(dirName)
+            if foundLib and foundVer:
+                break
+        return flags
+
 
     def _getmonodis(self, macros, path):
         # For bootstrapping purposes, prefer the just-built version if
@@ -1861,7 +2040,7 @@ class _dependency(policy.Policy):
             self._enforceProvidedPath(monodis)
             return monodis
         else:
-            self.warn('%s not available for dependency discovery'
+            self.warn('%s not available for CIL dependency discovery'
                       ' for path %s' %(monodis, path))
         return None
 
@@ -1925,22 +2104,49 @@ class _dependency(policy.Policy):
         return ['', '']
 
 
-    def _getpython(self, macros):
+    def _getPython(self, macros, path):
         """
-        Returns the preferred instance of python to use.
+        Takes a path
+        Returns, for that path, a tuple of
+            the preferred instance of python to use
+            whether that instance is in the destdir
         """
-        pythonDestPath = '%(destdir)s%(bindir)s/python' %macros
-        # not %(bindir)s so that package modifications do not affect
-        # the search for system python
-        pythonPath = '/usr/bin/python'
+        m = self.recipe.magic[path]
+        if m and m.name == 'script' and 'python' in m.contents['interpreter']:
+            pythonPath = [m.contents['interpreter']]
+        else:
+            pythonVersion = self._getPythonVersionFromPath(path)
+            if pythonVersion:
+                # After %(bindir)s, fall back to /usr/bin so that package
+                # modifications do not break the search for system python
+                # Include unversioned as a last resort for confusing
+                # cases.
+                pythonPath = [ '%(bindir)s/' + pythonVersion,
+                               '/usr/bin/' + pythonVersion,
+                               '%(bindir)s/python',
+                               '/usr/bin/python', ]
+            else:
+                pythonPath = [ '/usr/bin/python' ]
 
-        if os.access(pythonDestPath, os.X_OK):
-            return pythonDestPath
-        elif os.access(pythonPath, os.X_OK):
-            self._enforceProvidedPath(pythonPath)
-            return pythonPath
-        # No python?  How is cvc running at all?
-        return None
+        for pathElement in pythonPath:
+            pythonDestPath = ('%(destdir)s'+pathElement) %macros
+            if os.access(pythonDestPath, os.X_OK):
+                return (pythonDestPath, True)
+        for pathElement in pythonPath:
+            pythonDestPath = pathElement %macros
+            if os.access(pythonDestPath, os.X_OK):
+                self._enforceProvidedPath(pythonDestPath)
+                return (pythonDestPath, False)
+
+        # Specified python not found on system (usually because of
+        # bad interpreter path -- CNY-2050)
+        if len(pythonPath) == 1:
+            missingPythonPath = '%s ' % pythonPath[0]
+        else:
+            missingPythonPath = ''
+        self.warn('Python interpreter %snot found for %s',
+                  missingPythonPath, path)
+        return (None, None)
 
 
     def _stripDestDir(self, pathList, destdir):
@@ -1996,10 +2202,10 @@ class Provides(_dependency):
     EXAMPLES
     ========
 
-    C{r.Provides('file', '/usr/sbin/sendmail')}
+    C{r.Provides('file', '/usr/share/dict/words')}
 
     Demonstrates using C{r.Provides} to specify the file provision
-    C{/usr/sbin/sendmail}.
+    C{/usr/share/dict/words}, so that other files can now require that file.
 
     C{r.Provides('soname: libperl.so', '%(libdir)s/perl5/.*/CORE/libperl.so')}
 
@@ -2026,7 +2232,12 @@ class Provides(_dependency):
         self.sonameSubtrees = set()
         self.sysPath = None
         self.monodisPath = None
+        self.rubyInterpreter = None
+        self.rubyVersion = None
+        self.rubyInvocation = None
+        self.rubyLoadPath = None
         self.perlIncPath = None
+        self.pythonSysPathMap = {}
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2098,6 +2309,10 @@ class Provides(_dependency):
             if self._isPythonModuleCandidate(path):
                 self._addPythonProvides(path, m, pkg, macros)
 
+            rubyProv = self._isRubyModule(path, macros, fullpath)
+            if rubyProv:
+                self._addRubyProvides(path, m, pkg, macros, rubyProv)
+
             elif self._isCIL(m):
                 self._addCILProvides(path, m, pkg, macros)
 
@@ -2167,30 +2382,41 @@ class Provides(_dependency):
                                   path=path))
 
 
-    def _generatePythonProvidesSysPath(self):
+    def _getPythonProvidesSysPath(self, path):
         """ Generate a correct sys.path based on both the installed
             system (in case a buildreq affects the sys.path) and the
             destdir (for newly added sys.path directories).  Use site.py
             to generate a list of such dirs.  Note that this list of dirs
             should NOT have destdir in front.
+            Returns tuple: (sysPath, pythonVersion)
         """
+
+        pythonPath, bootstrapPython = self._getPython(self.macros, path)
+        if not pythonPath:
+            # Most likely bad interpreter path in a .py file
+            return (None, None)
+
+        if pythonPath in self.pythonSysPathMap:
+            return self.pythonSysPathMap[pythonPath]
+
         oldSysPath = sys.path
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = self._getpython(self.macros)
-        # conary is a python program...
-        assert(pythonPath)
+        systemPythonFlags = set()
 
         try:
             # get preferred sys.path (not modified by Conary wrapper)
             # from python just built in destdir, or if that is not
             # available, from system conary
-            systemPaths = set(x.strip() for x in util.popen(
-                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
-                %pythonPath).read().split('\0')
-                if x)
-            systemPaths = set(self._stripDestDir(systemPaths, destdir))
+            systemPaths = set(self._stripDestDir(
+                self._getPythonSysPath(pythonPath), destdir))
+
+            pythonVersion = self._getPythonVersion(pythonPath)
+
+            # Unlike Requires, we always provide version and
+            # libname (lib/lib64/...) in order to facilitate
+            # migration.
 
             # determine created destdir site-packages, and add them to
             # the list of acceptable provide paths
@@ -2201,11 +2427,14 @@ class Provides(_dependency):
             systemPaths.update(self._stripDestDir(sys.path, destdir))
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath = sorted(systemPaths, key=len, reverse=True)
+            sysPath = sorted(systemPaths, key=len, reverse=True)
         finally:
             sys.path = oldSysPath
             sys.prefix = oldSysPrefix
             sys.exec_prefix = oldSysExecPrefix
+
+        self.pythonSysPathMap[pythonPath] = (sysPath, pythonVersion)
+        return self.pythonSysPathMap[pythonPath]
 
     def _fetchPerlIncPath(self):
         """
@@ -2223,11 +2452,12 @@ class Provides(_dependency):
         if not self._isPythonModuleCandidate(path):
             return
 
-        if self.sysPath is None:
-            self._generatePythonProvidesSysPath()
+        sysPath, pythonVersion = self._getPythonProvidesSysPath(path)
+        if not sysPath:
+            return
 
         depPath = None
-        for sysPathEntry in self.sysPath:
+        for sysPathEntry in sysPath:
             if path.startswith(sysPathEntry):
                 newDepPath = path[len(sysPathEntry)+1:]
                 if newDepPath not in ('__init__.py', '__init__'):
@@ -2241,17 +2471,39 @@ class Provides(_dependency):
             return
 
         # remove extension
-        depPath = depPath.rsplit('.', 1)[0]
+        depPath, extn = depPath.rsplit('.', 1)
 
+        if depPath == '__future__':
+            return
         if depPath.endswith('/__init__'):
             depPath = depPath.replace('/__init__', '')
         depPath = depPath.replace('/', '.')
-        if depPath == '__future__':
-            return
 
-        dep = deps.Dependency(depPath)
-        self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
+        depPaths = [ depPath ]
 
+        if extn == 'so':
+            fname = util.joinPaths(macros.destdir, path)
+            try:
+                syms = elf.getDynSym(fname)
+                # Does this module have an init<blah> function?
+                initfuncs = [ x[4:] for x in syms if x.startswith('init') ]
+                # This is the equivalent of dirname()
+                comps = depPath.rsplit('.', 1)
+                dpPrefix = comps[0]
+                if len(comps) == 1:
+                    # Top-level python module
+                    depPaths.extend(initfuncs)
+                else:
+                    for initfunc in initfuncs:
+                        depPaths.append('.'.join([dpPrefix, initfunc]))
+            except elf.error:
+                pass
+
+        flags = self._getPythonFlagsFromPath(path)
+        flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
+        for dpath in depPaths:
+            dep = deps.Dependency(dpath, flags)
+            self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
 
     def _addOneCILProvide(self, pkg, path, name, ver):
         self._addDepToMap(path, pkg.providesMap, deps.CILDependencies,
@@ -2294,6 +2546,35 @@ class Provides(_dependency):
         if not name or not ver:
             return
         self._addOneCILProvide(pkg, path, name, ver)
+
+    def _isRubyModule(self, path, macros, fullpath):
+        if not util.isregular(fullpath) or os.path.islink(fullpath):
+            return False
+        if '/ruby/' in path:
+            # load up ruby opportunistically; this is our first chance
+            if self.rubyInterpreter is None:
+                self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
+                if not self.rubyInterpreter:
+                    return False
+                self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
+                    macros, self.rubyInterpreter, bootstrap)
+                self.rubyVersion = self._getRubyVersion(macros)
+                # we need to look deep first
+                self.rubyLoadPath = sorted(list(self.rubyLoadPath),
+                                           key=len, reverse=True)
+            elif self.rubyInterpreter is False:
+                return False
+
+            for pathElement in self.rubyLoadPath:
+                if path.startswith(pathElement) and '.' in os.path.basename(path):
+                    return path[len(pathElement)+1:].rsplit('.', 1)[0]
+        return False
+
+    def _addRubyProvides(self, path, m, pkg, macros, prov):
+        flags = self._getRubyFlagsFromPath(path, self.rubyVersion)
+        flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
+        self._addDepToMap(path, pkg.providesMap, 
+            deps.RubyDependencies, deps.Dependency(prov, flags))
 
     def _addJavaProvides(self, path, m, pkg):
         if 'provides' not in m.contents or not m.contents['provides']:
@@ -2475,18 +2756,29 @@ class Requires(_addInfo, _dependency):
 	'%(docdir)s/',
     )
 
+    dbDepCacheClass = _DatabaseDepCache
+
     def __init__(self, *args, **keywords):
         self.sonameSubtrees = set()
+        self.bootstrapPythonFlags = set()
         self._privateDepMap = {}
         self.rpathFixup = []
         self.exceptDeps = []
         self.sysPath = None
         self.monodisPath = None
+        self.rubyInterpreter = None
+        self.rubyVersion = None
+        self.rubyInvocation = None
+        self.rubyLoadPath = None
         self.perlReqs = None
         self.perlPath = None
         self.perlIncPath = None
         self._CILPolicyProvides = {}
+        self.pythonSysPathMap = {}
+        self.pythonModuleFinderMap = {}
         policy.Policy.__init__(self, *args, **keywords)
+        self.db = None
+        self.depCache = self.dbDepCacheClass(self._getDb())
 
     def updateArgs(self, *args, **keywords):
         # _privateDepMap is used only for Provides to talk to Requires
@@ -2499,6 +2791,12 @@ class Requires(_addInfo, _dependency):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
                 self.sonameSubtrees.add(sonameSubtrees)
+        bootstrapPythonFlags = keywords.pop('bootstrapPythonFlags', None)
+        if bootstrapPythonFlags:
+            if type(bootstrapPythonFlags) in (list, tuple):
+                self.bootstrapPythonFlags.update(set(bootstrapPythonFlags))
+            else:
+                self.bootstrapPythonFlags.add(bootstrapPythonFlags)
         _CILPolicyProvides = keywords.pop('_CILPolicyProvides', None)
         if _CILPolicyProvides:
             self._CILPolicyProvides.update(_CILPolicyProvides)
@@ -2523,6 +2821,8 @@ class Requires(_addInfo, _dependency):
         macros = self.macros
         self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
+        self.bootstrapPythonFlags= set(x%macros
+                                       for x in self.bootstrapPythonFlags)
         # anything that any buildreqs have caused to go into ld.so.conf
         # is a system library by definition
         self.systemLibPaths |= set(os.path.normpath(x[:-1])
@@ -2539,6 +2839,9 @@ class Requires(_addInfo, _dependency):
                 self.error('Bad regular expression %s for file spec %s: %s', rE, fE, e)
         self.exceptDeps= exceptDeps
         _dependency.preProcess(self)
+
+    def postProcess(self):
+        self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -2582,6 +2885,12 @@ class Requires(_addInfo, _dependency):
             self._addPythonRequirements(path, fullpath, pkg, script=True)
         elif self._isPython(path):
             self._addPythonRequirements(path, fullpath, pkg, script=False)
+
+        if (f.inode.perms() & 0111 and m and m.name == 'script' and
+            os.path.basename(m.contents['interpreter']).startswith('ruby')):
+            self._addRubyRequirements(path, fullpath, pkg, script=True)
+        elif '/ruby/' in path:
+            self._addRubyRequirements(path, fullpath, pkg, script=False)
 
         if self._isCIL(m):
             if not self.monodisPath:
@@ -2706,30 +3015,49 @@ class Requires(_addInfo, _dependency):
                 path=path))
 
 
-    def _generatePythonRequiresSysPath(self):
+    def _getPythonRequiresSysPath(self, pathName):
         # Generate the correct sys.path for finding the required modules.
         # we use the built in site.py to generate a sys.path for the
         # current system and another one where destdir is the root.
         # note the below code is similar to code in Provides,
         # but it creates an ordered path list with and without destdir prefix,
         # while provides only needs a complete list without destdir prefix.
+        # Returns tuple:
+        #  (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
+
+        pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
+        if not pythonPath:
+            return (None, None, None, None)
+
+        if pythonPath in self.pythonSysPathMap:
+            return self.pythonSysPathMap[pythonPath]
 
         oldSysPath = sys.path
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
-        pythonPath = self._getpython(self.macros)
-        # conary is a python program...
-        assert(pythonPath)
+        pythonVersion = None
+        systemPythonFlags = set()
 
         try:
             # get preferred sys.path (not modified by Conary wrapper)
             # from python just built in destdir, or if that is not
             # available, from system conary
-            systemPaths = [x.strip() for x in util.popen(
-                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
-                %pythonPath).read().split('\0')
-                if x]
+            systemPaths = self._getPythonSysPath(pythonPath)
+
+            pythonVersion = self._getPythonVersion(pythonPath)
+            if not bootstrapPython:
+                # determine dynamically whether to require version
+                # and libname (lib/lib64/...) based on whether the
+                # python in the destdir provides them.  Note that
+                # this means that when building python itself,
+                # we'll have to provide this information from the
+                # recipe.
+                systemPythonFlags.update(
+                    self._getPythonTroveFlags(pythonPath))
+
+            if bootstrapPython and self.bootstrapPythonFlags:
+                systemPythonFlags = set(self.bootstrapPythonFlags)
 
             # generate site-packages list for destdir
             # (look in python base directory first)
@@ -2744,7 +3072,7 @@ class Requires(_addInfo, _dependency):
             sysPathForModuleFinder = list(systemPaths)
 
             # later, we will need to truncate paths using longest path first
-            self.sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
+            sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
                                   key=len, reverse=True)
 
         finally:
@@ -2754,39 +3082,83 @@ class Requires(_addInfo, _dependency):
 
         # load module finder after sys.path is restored
         # in case delayed importer is installed.
-        self.pythonModuleFinder = pydeps.DirBasedModuleFinder(
-                                            destdir, sysPathForModuleFinder)
+        pythonModuleFinder = self._getPythonRequiresModuleFinder(
+            pythonPath, destdir, sysPathForModuleFinder, bootstrapPython)
+
+        self.pythonSysPathMap[pythonPath] = (
+            sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
+        return self.pythonSysPathMap[pythonPath]
+
+    def _getPythonRequiresModuleFinder(self, pythonPath, destdir, sysPath, bootstrapPython):
+
+        if self.recipe.isCrossCompiling():
+            return None
+        if pythonPath not in self.pythonModuleFinderMap:
+            if not bootstrapPython and pythonPath == sys.executable:
+                self.pythonModuleFinderMap[pythonPath] = pydeps.DirBasedModuleFinder(destdir, sysPath)
+            else:
+                self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, sysPath, self.error)
+        return self.pythonModuleFinderMap[pythonPath]
+
+    def _delPythonRequiresModuleFinder(self):
+        for finder in self.pythonModuleFinderMap.values():
+            finder.close()
 
 
     def _addPythonRequirements(self, path, fullpath, pkg, script=False):
-        # FIXME: we really should check for python in destdir and shell
-        # out to use that python to discover the dependencies if it exists.
         destdir = self.recipe.macros.destdir
         destDirLen = len(destdir)
+        
+        (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion
+        )= self._getPythonRequiresSysPath(path)
 
-        if not self.sysPath:
-            self._generatePythonRequiresSysPath()
+        if not sysPath:
+            # Probably a bad interpreter path
+            return
+
+        if not pythonModuleFinder:
+            # We cannot (reliably) determine runtime python requirements
+            # in the cross-compile case, so don't even try (for
+            # consistency).
+            return
 
         try:
             if script:
-                self.pythonModuleFinder.run_script(fullpath)
+                pythonModuleFinder.run_script(fullpath)
             else:
-                self.pythonModuleFinder.load_file(fullpath)
+                pythonModuleFinder.load_file(fullpath)
         except:
             # not a valid python file
             self.info('File %s is not a valid python file', path)
             return
 
-        for depPath in self.pythonModuleFinder.getDepsForPath(fullpath):
+        for depPath in pythonModuleFinder.getDepsForPath(fullpath):
+            if not depPath:
+                continue
+            flags = None
+            if depPath.startswith('///invalid'):
+                # same as exception handling above
+                self.info('File %s is not a valid python file', path)
+                return
+            absPath = None
             if depPath.startswith(destdir):
                 depPath = depPath[destDirLen:]
-            for sysPathEntry in self.sysPath:
+                flags = self._getPythonFlagsFromPath(depPath)
+
+                # The file providing this dependency is part of this package.
+                absPath = depPath
+            for sysPathEntry in sysPath:
                 if depPath.startswith(sysPathEntry):
                     newDepPath = depPath[len(sysPathEntry)+1:]
                     if newDepPath not in ('__init__', '__init__.py'):
                         # we don't allow bare __init__'s as dependencies.
                         # hopefully we'll find this at deeper level in
                         # in the sysPath
+                        if flags is None:
+                            # this is provided by the system, so we have
+                            # to see with which flags it is provided with
+                            flags = self._getPythonFlags(depPath,
+                                self.bootstrapPythonFlags)
                         depPath = newDepPath
                         break
 
@@ -2794,24 +3166,155 @@ class Requires(_addInfo, _dependency):
                 # a python file not found in sys.path will not have been
                 # provided, so we must not depend on it either
                 return
-            if depPath.endswith('.py') or depPath.endswith('.pyc') or depPath.endswith('.so'):
-                # remove extension
-                depPath = depPath.rsplit('.', 1)[0]
-            else:
+            if not (depPath.endswith('.py') or depPath.endswith('.pyc') or 
+                    depPath.endswith('.so')):
                 # Not something we provide, so not something we can
                 # require either.  Drop it and go on.  We have seen
                 # this when a script in /usr/bin has ended up in the
                 # requires list.
                 continue
 
-            depPath = depPath.replace('/', '.')
-            depPath = depPath.replace('.__init__', '')
+            # in order to limit requiring flags, we remove from flags
+            # anything that is not provided by systemPythonFlags
+            flags.intersection_update(systemPythonFlags)
 
-            if depPath == '__future__':
-                continue
+            if depPath.endswith('module.so'):
+                # Strip 'module.so' from the end, make it a candidate
+                cands = [ depPath[:-9] + '.so', depPath ]
+                cands = [ self._normalizePythonDep(x) for x in cands ]
+                if absPath:
+                    depName = self._checkPackagePythonDeps(pkg, absPath, cands,
+                                                          flags)
+                else:
+                    depName = self._checkSystemPythonDeps(cands, flags)
+            else:
+                depName = self._normalizePythonDep(depPath)
+                if depName == '__future__':
+                    continue
 
-            self._addRequirement(path, depPath, [], pkg,
+            self._addRequirement(path, depName, flags, pkg,
                                  deps.PythonDependencies)
+
+    def _checkPackagePythonDeps(self, pkg, depPath, depNames, flags):
+        # Try to match depNames against the current package
+        # Use the last value in depNames as the fault value
+        assert depNames, "No dependencies passed"
+        if depPath not in pkg:
+            return depNames[-1]
+        fileProvides = pkg[depPath][1].provides()
+
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+
+        # Walk the depNames list in order, pick the first dependency
+        # available.
+        for dp in depNames:
+            depSet = deps.DependencySet()
+            depSet.addDep(deps.PythonDependencies, deps.Dependency(dp, flags))
+            if fileProvides.intersection(depSet):
+                # this dep is provided
+                return dp
+        # If we got here, the file doesn't provide this dep. Return the last
+        # candidate and hope for the best
+        return depNames[-1]
+
+    def _checkSystemPythonDeps(self, depNames, flags):
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+
+        for dp in depNames:
+            depSet = deps.DependencySet()
+            depSet.addDep(deps.PythonDependencies, deps.Dependency(dp, flags))
+            troves = self.depCache.getProvides([depSet])
+            if troves:
+                return dp
+        return depNames[-1]
+
+    def _normalizePythonDep(self, depName):
+        # remove extension
+        depName = depName.rsplit('.', 1)[0]
+        depName = depName.replace('/', '.')
+        depName = depName.replace('.__init__', '')
+        return depName
+
+    def _addRubyRequirements(self, path, fullpath, pkg, script=False):
+        macros = self.recipe.macros
+        destdir = macros.destdir
+        destDirLen = len(destdir)
+
+        if self.rubyInterpreter is None:
+            self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
+            if not self.rubyInterpreter:
+                return
+            self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
+                macros, self.rubyInterpreter, bootstrap)
+            self.rubyVersion = self._getRubyVersion(macros)
+        elif self.rubyInterpreter is False:
+            return
+
+        if not script:
+            if not util.isregular(fullpath) or os.path.islink(fullpath):
+                return
+            foundInLoadPath = False
+            for pathElement in self.rubyLoadPath:
+                if path.startswith(pathElement):
+                    foundInLoadPath = True
+                    break
+            if not foundInLoadPath:
+                return
+
+        # This is a very limited hack, but will work for the 90% case
+        # better parsing may be written later
+        # Note that we only honor "require" at the beginning of
+        # the line and only requirements enclosed in single quotes
+        # to avoid conditional requirements and requirements that
+        # do any sort of substitution.  Because most ruby packages
+        # contain multiple ruby modules, getting 90% of the ruby
+        # dependencies will find most of the required packages in
+        # practice
+        depEntries = [x.strip() for x in file(fullpath)
+                      if x.startswith('require')]
+        depEntries = (x.split() for x in depEntries)
+        depEntries = (x[1].strip("\"'") for x in depEntries
+                      if len(x) == 2 and x[1].startswith("'") and
+                                         x[1].endswith("'"))
+        depEntries = set(depEntries)
+
+        # I know of no way to ask ruby to report deps from scripts
+        # Unfortunately, so far it seems that there are too many
+        # Ruby modules which have code that runs in the body; this
+        # code runs slowly, has not been useful in practice for
+        # filtering out bogus dependencies, and has been hanging
+        # and causing other unintended side effects from modules
+        # that have code in the main body.
+        #if not script:
+        #    depClosure = util.popen(r'''%s -e "require '%s'; puts $\""'''
+        #        %(self.rubyInvocation%macros, fullpath)).readlines()
+        #    depClosure = set([x.split('.')[0] for x in depClosure])
+        #    # remove any entries from the guessed immediate requirements
+        #    # that are not in the closure
+        #    depEntries = set(x for x in depEntries if x in depClosure)
+
+        def _getDepEntryPath(depEntry):
+            for prefix in (destdir, ''):
+                for pathElement in self.rubyLoadPath:
+                    for suffix in ('.rb', '.so'):
+                        candidate = util.joinPaths(pathElement, depEntry+suffix)
+                        if util.exists(prefix+candidate):
+                            return candidate
+            return None
+        
+        for depEntry in depEntries:
+            depEntryPath = _getDepEntryPath(depEntry)
+            if depEntryPath is None:
+                continue
+            if depEntryPath.startswith(destdir):
+                depPath = depEntryPath[destDirLen:]
+            else:
+                depPath = depEntryPath
+            flags = self._getRubyFlagsFromPath(depPath, self.rubyVersion)
+            self._addRequirement(path, depEntry, flags, pkg,
+                                 deps.RubyDependencies)
 
     def _fetchPerl(self):
         """
@@ -3071,12 +3574,13 @@ class Flavor(policy.Policy):
             '|/%(lib)s'
             '|%(x11prefix)s/%(lib)s'
             '|%(krbprefix)s/%(lib)s)(/|$)' %self.recipe.macros)
-	self.libReException = re.compile('^/usr/(lib|%(lib)s)/python.*$')
+	self.libReException = re.compile('^/usr/(lib|%(lib)s)/(python|ruby).*$')
         self.baseIsnset = use.Arch.getCurrentArch()._name
         self.baseArchFlavor = use.Arch.getCurrentArch()._toDependency()
         self.archFlavor = use.createFlavor(None, use.Arch._iterUsed())
         self.packageFlavor = deps.Flavor()
         self.troveMarked = False
+        self.componentMap = self.recipe.autopkg.componentMap
 
     def postProcess(self):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3085,8 +3589,18 @@ class Flavor(policy.Policy):
         for pkg in componentMap.values():
             pkg.flavor.union(self.packageFlavor)
 
-    def hasLib(self, path):
+    def hasLibInPath(self, path):
         return self.libRe.match(path) and not self.libReException.match(path)
+
+    def hasLibInDependencyFlag(self, path, f):
+        for depType in (deps.PythonDependencies, deps.RubyDependencies):
+            for dep in ([x for x in f.requires.deps.iterDepsByClass(depType)] +
+                        [x for x in f.provides.deps.iterDepsByClass(depType)]):
+                flagNames = [x[0] for x in dep.getFlags()[0]]
+                flagNames = [x for x in flagNames if x.startswith('lib')]
+                if flagNames:
+                    return True
+        return False
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3097,7 +3611,7 @@ class Flavor(policy.Policy):
         m = self.recipe.magic[path]
         if m and m.name == 'ELF' and 'isnset' in m.contents:
             isnset = m.contents['isnset']
-        elif self.hasLib(path):
+        elif self.hasLibInPath(path) or self.hasLibInDependencyFlag(path, f):
             # all possible paths in a %(lib)s-derived path get default
             # instruction set assigned if they don't have one already
             if f.hasContents:
@@ -3133,20 +3647,20 @@ class reportMissingBuildRequires(policy.Policy):
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
-	self.warnings = set()
+	self.errors = set()
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
         for arg in args:
             if type(arg) in (list, tuple, set):
-                self.warnings.update(arg)
+                self.errors.update(arg)
             else:
-                self.warnings.add(arg)
+                self.errors.add(arg)
 
     def do(self):
-	if self.warnings:
+	if self.errors:
             self.warn('Suggested buildRequires additions: %s',
-                      str(sorted(list(self.warnings))))
+                      str(sorted(list(self.errors))))
 
 
 class reportErrors(policy.Policy):
@@ -3159,15 +3673,15 @@ class reportErrors(policy.Policy):
     filetree = policy.NO_FILES
 
     def __init__(self, *args, **keywords):
-	self.warnings = []
+	self.errors = []
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
 	"""
 	Called once, with printf-style arguments, for each warning.
 	"""
-	self.warnings.append(args[0] %tuple(args[1:]))
+	self.errors.append(args[0] %tuple(args[1:]))
 
     def do(self):
-	if self.warnings:
-	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)
+	if self.errors:
+	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.errors)

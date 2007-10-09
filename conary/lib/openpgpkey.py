@@ -212,10 +212,14 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                     trustDbPath = self.trustDbPaths[i]
                 except:
                     pass
+
                 # translate the keyId to a full fingerprint for consistency
-                fingerprint = getFingerprint(keyId, publicPath)
-                revoked, timestamp = getKeyEndOfLife(keyId, publicPath)
-                cryptoKey = getPublicKey(keyId, publicPath)
+                key = seekKeyById(keyId, publicPath)
+                if not key:
+                    continue
+                fingerprint = key.getKeyId()
+                revoked, timestamp = key.getEndOfLife()
+                cryptoKey = key.makePgpKey()
                 trustLevel = getKeyTrust(trustDbPath, fingerprint)
                 self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
                                                     revoked, timestamp,
@@ -374,17 +378,8 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
             return False
 
         # decide if we found the key or not.
-        try:
-            keyRing = open(self.pubRing)
-        except IOError:
-            return False
-        keyRing.seek(0, SEEK_END)
-        limit = keyRing.tell()
-        keyRing.seek(0, SEEK_SET)
-        seekKeyById(keyId, keyRing)
-        found = keyRing.tell() != limit
-        keyRing.close()
-        return found
+        pkt = seekKeyById(keyId, self.pubRing)
+        return (pkt is not None)
 
     def __init__(self, *args, **kw):
         callbacks.KeyCacheCallback.__init__(self, *args, **kw)

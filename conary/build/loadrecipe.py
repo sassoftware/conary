@@ -614,7 +614,8 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 else:
                     oldBuildFlavor = buildFlavor
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, buildFlavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+            log.info('Loading %s from %s' % (name, localfile))
             loader = RecipeLoader(localfile, cfg, repos=repos,
                                   ignoreInstalled=alwaysIgnoreInstalled,
                                   buildFlavor=buildFlavor,
@@ -661,11 +662,11 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             if buildFlavor is None:
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor, error=False)
             else:
                 oldBuildFlavor = buildFlavor
                 buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, buildFlavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
         loader = recipeLoaderFromSourceComponent(name, cfg, repos,
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
@@ -692,6 +693,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             usedFlavor = use.createFlavor(name, recipe._trackedFlags)
             troveTuple = (recipe._trove.getName(), recipe._trove.getVersion(),
                           usedFlavor)
+            log.info('Loaded %s from %s=%s[%s]' % ((name,) + troveTuple))
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
             callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)
@@ -701,7 +703,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         else:
             buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
-        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor)
+        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor, error=False)
 
     # stash a reference to the module in the namespace
     # of the recipe that loaded it, or else it will be destroyed

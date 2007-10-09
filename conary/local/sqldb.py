@@ -404,9 +404,6 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        if not readOnly:
-            self.db.analyze()
-
         self.needsCleanup = False
         self.addVersionCache = {}
         self.flavorsNeeded = {}
@@ -1022,11 +1019,17 @@ order by
         cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
                        ((x[0], x[1][1]) for x in enumerate(l)),
                        start_transaction = False)
-	cu.execute("""
-	    SELECT DISTINCT row, stream FROM getFilesTbl
-                JOIN DBTroveFiles ON
-		    getFilesTbl.fileId = DBTroveFiles.fileId
-	""")
+
+        # there may be duplicate fileId entries in getFilesTbl
+        # and DBTrovefiles.  To avoid searching through potentially
+        # millions of rows, we perform some more complicated sql.
+        cu.execute("""
+                SELECT row, (SELECT stream
+                              FROM DBTroveFiles AS dbt 
+                              WHERE dbt.fileId = gft.fileId LIMIT 1) AS stream
+                    FROM getfilesTbl AS gft
+                    WHERE stream IS NOT NULL
+        """)
 
         l2 = [ None ] * len(l)
 
@@ -1229,14 +1232,14 @@ order by
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT DBTroveFiles.versionId FROM DBTroveFiles
                         WHERE
-                            DBTroveFiles.instanceId = ?""")
+                            DBTroveFiles.instanceId = ?""", troveInstanceId)
         cu.execute("""
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT Instances.versionId FROM
                         TroveTroves JOIN Instances ON
-                            TroveTroves.instanceId = Instances.instanceId
+                            TroveTroves.includedId = Instances.instanceId
                         WHERE
-                            TroveTroves.instanceId = ?""")
+                            TroveTroves.instanceId = ?""", troveInstanceId)
 
         wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ]
 

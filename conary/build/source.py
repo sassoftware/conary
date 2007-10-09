@@ -194,9 +194,6 @@ class _Source(_AnySource):
 
 
 class addArchive(_Source):
-    keywords = dict(_Source.keywords)
-    keywords['preserveOwnership'] = None
-
     """
     NAME
     ====
@@ -212,7 +209,7 @@ class addArchive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting of an
-    optionally compressed tar, cpio, or zip archive, or binary/source RPM,
+    optionally compressed tar, cpio, xpi or zip archive, or binary/source RPM,
     and unpacks it to the proper directory.
 
     If the specified I{archivename} is only a URL in the form of
@@ -308,34 +305,36 @@ class addArchive(_Source):
     Demonstrates use with mirror URL and C{sourceforge} mirrors list for
     retrieving package source from SourceForge.
     """
+    keywords = dict(_Source.keywords)
+    keywords['preserveOwnership'] = None
 
     def __init__(self, recipe, *args, **keywords):
-	"""
-	@param recipe: The recipe object currently being built is provided
+        """
+        @param recipe: The recipe object currently being built is provided
         automatically by the C{PackageRecipe} object. Passing in  C{recipe}
         from within a recipe is unnecessary.
-    @keyword dir: Instructs C{r.addArchive} to change to the directory
+        @keyword dir: Instructs C{r.addArchive} to change to the directory
         specified by C{dir} prior to unpacking the source archive. 
         An absolute C{dir} value will be considered relative to 
         C{%(destdir)s}, whereas a relative C{dir} value will be
         considered relative to C{%(builddir)s}.
-    @keyword keyid: Using the C{keyid} keyword indicates the eight-digit
+        @keyword keyid: Using the C{keyid} keyword indicates the eight-digit
         GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
         source code archive signature should be sought, and checked.
         If you provide the C{keyid} keyword, C{r.addArchive} will
         search for a file named I{archivename}C{.{sig,sign,asc}} and
         ensure it is signed with the appropriate GPG key. A missing signature
         results in a warning; a failed signature check is fatal.
-    @keyword rpm: If the C{rpm} keyword is used, C{r.addArchive} looks in the
+        @keyword rpm: If the C{rpm} keyword is used, C{r.addArchive} looks in the
         file, or URL specified by C{rpm} for an RPM containing I{archivename}.
-    @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
+        @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
-    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
-    @keyword package: A string that specifies the package, component, or package and
+        @keyword package: A string that specifies the package, component, or package and
         component in which to place the files added while executing this command
-	"""
+        """
 	_Source.__init__(self, recipe, *args, **keywords)
 
     def doDownload(self):
@@ -384,9 +383,9 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
-	if f.endswith(".zip"):
+	if f.endswith(".zip") or f.endswith(".xpi"):
             if self.preserveOwnership:
-                raise SourceError('cannot preserveOwnership for zip archives')
+                raise SourceError('cannot preserveOwnership for xpi or zip archives')
 
             util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
 
@@ -609,50 +608,50 @@ class addPatch(_Source):
 
 
     def __init__(self, recipe, *args, **keywords):
-	"""
-    @param recipe: The recipe object currently being built is provided
+        """
+        @param recipe: The recipe object currently being built is provided
         automatically by the PackageRecipe object. Passing in  C{recipe} from
         within a recipe is unnecessary.
-    @keyword backup: The suffix to use when storing file versions before
+        @keyword backup: The suffix to use when storing file versions before
         applying the patch.
-    @keyword extraArgs: As a last resort, arbitrary arguments may be passed
+        @keyword extraArgs: As a last resort, arbitrary arguments may be passed
         to the patch program  with the C{extraArgs} keyword. This should not
         normally be required, and is indicative of a possible bug which
         should be reported with the suggestion of direct support for the
         patch arguments in question.
-    @keyword dir: Instructs C{r.addPatch} to change to the directory
+        @keyword dir: Instructs C{r.addPatch} to change to the directory
         specified by C{dir} prior to applying the patch. An absolute C{dir}
         value will be considered relative to C{%(destdir)s}, whereas a
         relative C{dir} value will be considered
         relative to C{%(builddir)s}.
-    @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
+        @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
         C{keyid} keyword, {r.addPatch} will search for a file named
         I{patchname}C{.{sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
-    @keyword level: By default, conary attempts to patch the source using
+        @keyword level: By default, conary attempts to patch the source using
         levels 1, 0, 2, and 3, in that order. The C{level} keyword can
         be given an integer value to resolve ambiguity, or if an even
         higher level is required.  (This is the C{-p} option to the
         patch program.)
-    @keyword macros: The C{macros} keyword accepts a boolean value, and
+        @keyword macros: The C{macros} keyword accepts a boolean value, and
         defaults to false. However, if the value of C{macros} is true, recipe
         macros in the body  of the patch will be interpolated before applying
         the patch. For example, a patch which modifies the value
         C{CFLAGS = -02} using C{CFLAGS = %(cflags)s} will update the C{CFLAGS}
         parameter based upon the current setting of C{recipe.macros.cflags}.
-    @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
+        @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
         or URL specified by C{rpm} for an RPM containing I{patchname}.
-    @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
+        @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked, or merely stored in the archive.
-    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
-    @keyword package: A string that specifies the package, component, or package
+        @keyword package: A string that specifies the package, component, or package
         and component in which to place the files added while executing this command
-	"""
+        """
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
 
@@ -674,16 +673,14 @@ class addPatch(_Source):
             os.unlink(path)
             logFile = os.fdopen(fd, 'w+')
 
-            inFd, outFd = os.pipe()
-            p2 = subprocess.Popen(patchArgs, stdin=inFd, stderr=logFile,
-                                  shell=False, stdout=logFile, close_fds=True)
+            p2 = subprocess.Popen(patchArgs + ['--dry-run'],
+                                  stdin=subprocess.PIPE,
+                                  stderr=logFile, shell=False, stdout=logFile,
+                                  close_fds=True)
 
-            os.close(inFd)
-            offset=0
-            while len(patch[offset:]):
-                offset += os.write(outFd, patch[offset:])
-            os.close(outFd) # since stdin is closed, we can't
-                            # answer y/n questions.
+            p2.stdin.write(patch)
+            p2.stdin.close() # since stdin is closed, we can't
+                             # answer y/n questions.
 
             failed = p2.wait()
 
@@ -694,7 +691,15 @@ class addPatch(_Source):
                 # later
                 logFiles.append((patchlevel, logFile))
                 continue
-            # patch was successful
+            # patch was successful - re-run this time actually applying
+            p2 = subprocess.Popen(patchArgs, stdin=subprocess.PIPE,
+                                  stderr=logFile, shell=False, stdout=logFile, 
+                                  close_fds=True)
+
+            p2.stdin.write(patch)
+            p2.stdin.close() # since stdin is closed, we can't
+                             # answer y/n questions.
+
             log.info(logFile.read().strip())
             logFile.close()
             log.info('applied successfully with patch level %s'
@@ -765,8 +770,7 @@ class addSource(_Source):
 
     SYNOPSIS
     ========
-
-    C{r.addSource(I{sourcename}, [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=])}
+    C{r.addSource(I{sourcename}, [I{apply}=,] [I{dest}=,] [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{macros}=,] [I{mode}=,] [I{package}=,] [I{rpm}=,] [I{use}=])}
 
     DESCRIPTION
     ===========
@@ -860,13 +864,11 @@ class addSource(_Source):
 
 
     def __init__(self, recipe, *args, **keywords):
-
-
-	"""
-	@param recipe: The recipe object currently being built is provided
+        """
+        @param recipe: The recipe object currently being built is provided
         automatically by the PackageRecipe object. Passing in C{recipe} from
         within a recipe is unnecessary.
-    @keyword dest: If set, provides the target name of the file in the build
+        @keyword dest: If set, provides the target name of the file in the build
         directory. A full pathname can be used. Use either B{dir}, or 
         B{dest} to specify directory information, but not both. Useful mainly
         when fetching the file from an source outside your direct control, such
@@ -874,37 +876,37 @@ class addSource(_Source):
         RPM package. An absolute C{dest} value will be considered relative to
         C{%(destdir)s}, whereas a relative C{dest} value will be considered
         relative to C{%(builddir)s}.
-    @keyword dir: The directory in which to store the file, relative to
+        @keyword dir: The directory in which to store the file, relative to
         the build directory. An absolute C{dir} value will be considered
         relative to C{%(destdir)s}, whereas a relative C{dir} value will be
         considered relative to C{%(builddir)s}. Defaults to storing file
         directly in the build directory.
-    @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
+        @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
         Privacy Guard (GPG) key ID, without leading C{0x} for the source code
         archive signature should be sought, and checked. If you provide the
         C{keyid} keyword, C{r.addArchive} will search for a file named
         I{sourcename}C{.{sig,sign,asc}}, and ensure it is signed with the
         appropriate GPG key. A missing signature results in a warning; a
         failed signature check is fatal.
-    @keyword macros: If True, interpolate recipe macros in the body of a
+        @keyword macros: If True, interpolate recipe macros in the body of a
         patch before applying it.  For example, you might have a patch that
         changes C{CFLAGS = -O2} to C{CFLAGS = %(cflags)s}, which will cause
         C{%(cflags)s} to be replaced with the current setting of
         C{recipe.macros.cflags}. Defaults to False.
-    @keyword mode: If set, provides the mode to set on the file.
-    @keyword use : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
+        @keyword mode: If set, provides the mode to set on the file.
+        @keyword use : A Use flag, or boolean, or a tuple of Use flags, and/or boolean
         values which determine whether the source code archive is actually
         unpacked, or merely stored in the archive.
-    @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
+        @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
         or URL specified by C{rpm} for an RPM containing I{sourcename}.
-    @keyword use: A Use flag or boolean, or a tuple of Use flags and/or
+        @keyword use: A Use flag or boolean, or a tuple of Use flags and/or
         booleans, that determine whether the archive is actually unpacked or
         merely stored in the archive.
-    @keyword httpHeaders: A dictionary containing headers to add to an http request
+        @keyword httpHeaders: A dictionary containing headers to add to an http request
         when downloading the source code archive.
-    @keyword package: A string that specifies the package, component, or package
+        @keyword package: A string that specifies the package, component, or package
         and component in which to place the files added while executing this command
-	"""
+        """
 	_Source.__init__(self, recipe, *args, **keywords)
 	if self.dest:
 	    # make sure that user did not pass subdirectory in
@@ -994,7 +996,8 @@ class addAction(action.RecipeAction):
     ===========
 
     The C{r.addAction()} class executes a shell command during the source
-    preparation stage, in a manner similar to C{r.Run}.
+    preparation stage, in a manner similar to C{r.Run}, except that
+    C{r.Run} executes shell commands later, during the build stage.
 
     KEYWORDS
     ========
@@ -1041,19 +1044,19 @@ class addAction(action.RecipeAction):
     keywords = {'dir': '', 'package': None }
 
     def __init__(self, recipe, *args, **keywords):
-	"""
-	@param recipe: The recipe object currently being built is provided
+        """
+        @param recipe: The recipe object currently being built is provided
         automatically by the PackageRecipe object. Passing in  C{recipe} from
         within a recipe is unnecessary.
-    @keyword dir: Specify a directory to change into prior to executing the
+        @keyword dir: Specify a directory to change into prior to executing the
         command. An absolute directory specified as the C{dir} value 
         is considered relative to C{%(destdir)s}.
-    @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
+        @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the source code archive is
         actually unpacked or merely stored in the archive.
-    @keyword package: A string that specifies the package, component, or package
+        @keyword package: A string that specifies the package, component, or package
         and component in which to place the files added while executing this command
-	"""
+        """
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.action = args[0]
 
@@ -1123,6 +1126,83 @@ class _RevisionControl(addArchive):
     def doDownload(self):
         return self.fetch()
 
+class addGitSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addGitSnapshot()}} - Adds a snapshot from a git
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addGitSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addGitSnapshot()} class extracts sources from a
+    git repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : Git tag to use for the snapshot.
+    """
+
+    name = 'git'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag)
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        util.execute('git clone -q %s \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        util.execute("cd '%s' && git pull -q %s" % (lookasideDir, self.url))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.url,
+                 self.tag)
+        util.execute("cd '%s' && git archive --prefix=%s-%s/ HEAD | "
+                        "bzip2 > '%s'" %
+                        (lookasideDir, self.recipe.name, self.tag, target))
+
+    def __init__(self, recipe, url, tag = 'HEAD', **kwargs):
+        self.url = url % recipe.macros
+        self.tag = tag % recipe.macros
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+
 class addMercurialSnapshot(_RevisionControl):
 
     """
@@ -1172,7 +1252,8 @@ class addMercurialSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag)
@@ -1327,9 +1408,9 @@ class addSvnSnapshot(_RevisionControl):
     def getFilename(self):
         urlBits = self.url.split('//', 1)
         if urlBits[0] == 'file:':
-            dirPath = urlBits[1]
+            dirPath = urlBits[1].replace('/', '_')
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[0].replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.project,
                                        self.url.split('/')[-1])
@@ -1350,7 +1431,7 @@ class addSvnSnapshot(_RevisionControl):
                             self.url.split('/')[-1]
         util.execute("svn -q export '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
-                        (self.url, stagePath,
+                        (lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
@@ -1401,7 +1482,8 @@ class addBzrSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag or '')
@@ -1655,6 +1737,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
                 os.close(wpipe)
                 os.dup2(rpipe, 0)
                 os.chdir(directory)
+                util.massCloseFileDescriptors(3, 252)
                 os.execl(*cpioArgs)
             except Exception, e:
                 print 'Could not execute %s: %s' % (cpioArgs[0], e)

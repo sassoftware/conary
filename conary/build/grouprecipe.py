@@ -168,10 +168,12 @@ class GroupRecipe(_BaseGroupRecipe):
     B{autoResolve} : (False) If set to C{True}, Conary will include any extra
     troves needed to make this group dependency complete.
 
-    B{checkOnlyByDefaultDeps} : (True) By default, Conary checks only the
-    dependencies of the troves in a group that are installed by default.
-    Conary will check the dependencies of B{byDefault} C{False} troves as well
-    if this parameter is set to C{True}.
+    B{checkOnlyByDefaultDeps} : (True) Conary only checks the
+    dependencies of troves that are installed by default, referenced in the
+    group.  If set to C{False}, Conary will also check the dependencies of
+    B{byDefault} C{False} troves.  Doing this, however, will prevent groups
+    with C{autoResolve}=C{True} from changing the C{byDefault} status of
+    required troves.
 
     B{checkPathConflicts} : (True) Conary checks for path conflicts in each
     group by default to ensure that the group can be installed without path
@@ -229,7 +231,7 @@ class GroupRecipe(_BaseGroupRecipe):
         self.cfg = cfg
         self.flavor = flavor
         self.keyFlavor = None
-        self.macros = macros.Macros()
+        self.macros = macros.Macros(ignoreUnknown=lightInstance)
         self.macros.update(extraMacros)
         self.defaultSource = None
         if not lightInstance:
@@ -259,16 +261,27 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         return findSourcesForGroup(repos, self, callback)
 
-    def _getSearchSource(self):
-        if isinstance(self.defaultSource, (list, tuple)):
-            return searchsource.createSearchSourceStack(self.searchSource,
+    def _getSearchSource(self, ref=None):
+        if ref is None:
+            if isinstance(self.defaultSource, (list, tuple)):
+                return searchsource.createSearchSourceStack(self.searchSource,
                                                         self.defaultSource,
                                                         self.getSearchFlavor())
-        else:
-            return searchsource.createSearchSourceStack(None,
+            else:
+                return searchsource.createSearchSourceStack(None,
                                                 [self.getLabelPath()],
                                                 self.getSearchFlavor(),
                                                 troveSource=self.troveSource)
+        elif isinstance(ref, (tuple, list)):
+            source = searchsource.createSearchSourceStack(searchSource,
+                                                      item, searchFlavor)
+        else:
+            source = ref
+            assert(isinstance(source, GroupReference))
+            source.findSources(defaultSource, searchFlavor)
+        return source
+
+
 
     def _parseFlavor(self, flavor):
         assert(flavor is None or isinstance(flavor, str))
@@ -1415,7 +1428,7 @@ class GroupRecipe(_BaseGroupRecipe):
         The C{r.createGroup()} command accepts the following parameters, with
         default values shown in parentheses:
 
-        B{autoResolve} : (current group setting) Whether to resolve
+        B{autoResolve} : (False) Whether to resolve
         dependencies for this group.
 
         B{byDefault} : (Current group setting) Whether to add troves to this
@@ -1427,7 +1440,7 @@ class GroupRecipe(_BaseGroupRecipe):
         B{checkPathConflicts} :  (Current group setting) Whether to check path
         conflicts for this group.
 
-        B{depCheck} : (Current group setting) Whether to check for dependency
+        B{depCheck} : (False) Whether to check for dependency
         closure for this group.
 
         B{groupName} : (None) The name of the group to be created. Must start
@@ -1834,6 +1847,9 @@ class GroupReference:
     def getTroves(self, *args, **kw):
         return self.source.getTroves(*args, **kw)
 
+    def getTrove(self, *args, **kw):
+        return self.source.getTrove(*args, **kw)
+
     def getSourceTroves(self):
         """ Returns the list of troves that form this reference
             (without their children).
@@ -1922,6 +1938,10 @@ class TroveCache(dict):
     def getTroves(self, troveList, *args, **kw):
         self.cacheTroves(troveList)
         return [self[x] for x in troveList]
+
+    def getTrove(self, troveTup, *args, **kw):
+        self.cacheTroves([troveTup])
+        return self[troveTup]
 
     def cacheTroves(self, troveTupList):
         troveTupList = [x for x in troveTupList if x not in self]
@@ -2108,8 +2128,8 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
         # add troves to this group.
         unmatchedGlobalReplaceSpecs &= addTrovesToGroup(group, troveMap, cache,
-                                                    childGroups, repos, 
-                                                    groupMap)
+                                                    childGroups, repos,
+                                                    groupMap, recipeObj)
 
         log.debug('Troves in %s:' % group.name)
         for troveTup, isStrong, byDefault, _ in sorted(group.iterTroveListInfo()):
@@ -2201,6 +2221,33 @@ def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs,
 
     return results
 
+def followRedirect(recipeObj, trove, ref, reason):
+    log.info('Following redirects for trove %s=%s[%s]' % (
+                                    trove.getNameVersionFlavor()))
+    searchSource = recipeObj._getSearchSource(ref)
+    troveSpecs = [(x[0], str(x[1].label()), x[2]) for x in trove.iterRedirects()]
+    for troveSpec in troveSpecs:
+        if (troveSpec[0] == trove.getName()
+            and troveSpec[1] == str(trove.getVersion().trailingLabel())
+            and troveSpec[2] is None):
+            # this is a redirect to the same label w/ no flavor information.
+            # use the entire branch information to ensure we find the redirect
+            # target (otherwise we might get in an infinite loop)
+            troveSpecs = list(trove.iterRedirects())
+            break
+    try:
+        results = searchSource.findTroves(troveSpecs)
+    except errors.TroveNotFound, err:
+        raise CookError('Could not find redirect target for %s=%s[%s].  Check your search path or remove redirect from recipe: %s' % (trove.getNameVersionFlavor() + (err,)))
+    troveTups = list(chain(*results.itervalues()))
+    for troveTup in troveTups:
+        log.info('Found %s=%s[%s] following redirect' % troveTup)
+    if not troveTups:
+        log.info('Redirect is to nothing')
+    if trove.getNameVersionFlavor() in troveTups:
+        raise CookError('Redirect redirects to itself: %s=%s[%s].  Check your search path or remove redirect from recipe: %s' % trove.getNameVersionFlavor())
+    return troveTups
+
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
         groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
@@ -2213,6 +2260,14 @@ def processAddAllDirectives(recipeObj, troveMap, cache, repos):
 def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
                               repos):
     topTrove = repos.getTrove(withFiles=False, *troveTup)
+    if topTrove.isRedirect():
+        troveTups = followRedirect(recipeObj, topTrove, flags.ref, 'addAll')
+        cache.cacheTroves(troveTups)
+        for troveTup in troveTups:
+            processOneAddAllDirective(parentGroup, troveTup, flags,
+                                      recipeObj, cache, repos)
+        return
+
     topGroup = parentGroup
 
     if flags.recurse:
@@ -2328,7 +2383,8 @@ def removeDifferences(group, differenceGroupList, differenceSpecs, troveMap,
                 group.delTrove(*troveTup)
 
 
-def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
+def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap,
+                      recipeObj):
     def _componentMatches(troveName, compList):
         if ':' not in troveName:
             return False
@@ -2345,9 +2401,17 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
         if byDefault is None:
             byDefault = group.getByDefault()
 
+        cache.getTroves(troveTupList, withFiles=False)
         for troveTup in troveTupList:
-            group.addTrove(troveTup, True, byDefault, components,
-                           reason=(ADD_REASON_ADDED,))
+            if cache.isRedirect(troveTup):
+                troveTups = followRedirect(recipeObj, cache.getTrove(troveTup),
+                                           refSource, 'add')
+                cache.cacheTroves(troveTups)
+            else:
+                troveTups = [troveTup]
+            for troveTup in troveTups:
+                group.addTrove(troveTup, True, byDefault, components,
+                               reason=(ADD_REASON_ADDED,))
 
     # remove/replace explicit troves
     removeSpecs = dict(group.iterRemoveSpecs())
@@ -2435,17 +2499,24 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap):
         assert(explicit)
 
         if cache.isRedirect(troveTup):
+
             # children of redirect troves are special, and not included.
             continue
 
         for (childTup, childByDefault, _) in cache.iterTroveListInfo(troveTup):
             childName = childTup[0]
 
-            addAllDefault = group.checkAddAllForByDefault(troveTup, childTup)
+            childByDefault = childByDefault and byDefault
+            addAllDefault = group.checkAddAllForByDefault(troveTup,
+                                                          childTup)
             if addAllDefault is not None:
-                childByDefault = addAllDefault
-            else:
-                childByDefault = childByDefault and byDefault
+                # only use addAll default settings if that's the reason
+                # why this trove was added, otherwise those settings
+                # are overridden by some other reason to add this package.
+                if group.getReason(*troveTup)[0] == ADD_REASON_ADDALL:
+                    childByDefault = addAllDefault
+                else:
+                    childByDefault = childByDefault or addAllDefault
 
             if componentsToRemove and _componentMatches(childName,
                                                         componentsToRemove):

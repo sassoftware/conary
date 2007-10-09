@@ -288,13 +288,31 @@ class CloneCallback(ChangesetCallback):
     def getCloneChangeLog(self, trv):
         return trv.getChangeLog()
 
-    def determiningCloneTroves(self):
+    def determiningCloneTroves(self, current=0, total=0):
         pass
 
-    def determiningTargets(self):
+    def determiningTargets(self, current=0, total=0):
         pass
 
-    def rewritingFileVersions(self):
+    def targetSources(self, current=0, total=0):
+        pass
+
+    def targetBinaries(self, current=0, total=0):
+        pass
+
+    def checkNeedsFulfilled(self, current=0, total=0):
+        pass
+
+    def rewriteTrove(self, current=0, total=0):
+        pass
+
+    def rewritingFileVersions(self, current=0, total=0):
+        pass
+
+    def requestingFiles(self, number):
+        pass
+
+    def requestingFileContentsWithCount(self, count):
         pass
 
     def gettingCloneData(self):
@@ -327,6 +345,7 @@ class LineOutput:
                 i = self.last - len(msg)
                 self.out.write(" " * i + "\b" * i)
             self.out.flush()
+            self.lastMessage = msg
             self.last = len(msg)
 
     def __del__(self):
@@ -337,4 +356,5 @@ class LineOutput:
 
     def __init__(self, f = sys.stdout):
         self.last = 0
+        self.lastMessage = ''
         self.out = f

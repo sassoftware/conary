@@ -21,6 +21,7 @@
 #include <malloc.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)
@@ -35,6 +36,7 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
+static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -50,6 +52,7 @@ static PyMethodDef MiscMethods[] = {
     { "unpack", unpack, METH_VARARGS },
     { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
+    { "massCloseFileDescriptors", py_massCloseFDs, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -185,7 +188,7 @@ static PyObject * exists(PyObject *self, PyObject *args) {
         return NULL;
 
     if (lstat(fn, &sb)) {
-        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG) {
+        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG || errno == EACCES) {
             Py_INCREF(Py_False);
             return Py_False;
         }
@@ -475,6 +478,74 @@ static PyObject * py_pread(PyObject *self, PyObject *args) {
     buf = PyString_FromStringAndSize(data, rc);
     free(data);
     return buf;
+}
+
+static PyObject * py_massCloseFDs(PyObject *self, PyObject *args) {
+    int start, contcount, end, i, count;
+    PyObject *pystart, *pycontcount, *pyend;
+
+    if (PyTuple_GET_SIZE(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "exactly three arguments expected");
+        return NULL;
+    }
+
+    pystart = PyTuple_GET_ITEM(args, 0);
+    pycontcount = PyTuple_GET_ITEM(args, 1);
+    pyend = PyTuple_GET_ITEM(args, 2);
+
+    if (!PyInt_CheckExact(pystart)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
+        return NULL;
+    } else if (!PyInt_CheckExact(pycontcount)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
+        return NULL;
+    } else if (!PyInt_CheckExact(pyend)) {
+        PyErr_SetString(PyExc_TypeError, "third argument must be an int");
+        return NULL;
+    }
+
+    start = PyLong_AsUnsignedLong(pystart);
+    contcount = PyLong_AsUnsignedLong(pycontcount);
+    end = PyLong_AsUnsignedLong(pyend);
+    if (PyErr_Occurred())
+        return NULL;
+
+    if (((contcount ? 1 : 0) ^ (end ? 1 : 0)) == 0) {
+        PyErr_SetString(PyExc_TypeError, "Exactly one of the second and third "
+                                         "argument must be zero");
+        return NULL;
+    }
+
+    i = start - 1;
+    count = contcount;
+    while (1) {
+        int ret;
+        i++;
+        if (contcount) {
+            /* Requested to stop after a continous number of closed fds */
+            if (count == 0) {
+                break;
+            }
+        } else if (i == end) {
+            /* Requested to stop at the end */
+            break;
+        }
+        ret = close(i);
+        if (ret == 0) {
+            /* Successful close; reset continous count */
+            count = contcount;
+            continue;
+        }
+        if (errno == EBADF) {
+            count--;
+            continue;
+        }
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 

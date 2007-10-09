@@ -23,6 +23,7 @@ For example::
    log.error("%s not found", foo)
 """
 
+import fcntl
 import logging
 import os
 import sys
@@ -77,11 +78,18 @@ class SysLog:
             try:
                 util.mkdirChain(os.path.dirname(pathElement))
                 self.f = open(pathElement, "a")
+                fcntl.fcntl(self.f.fileno(), fcntl.F_SETFD, 1)
                 break
             except:
                 pass
         if not self.f:
             raise IOError, 'could not open any of: ' + ', '.join(logList)
+
+    def close(self):
+        """Close the logger's open files"""
+        if self.f is not None:
+            self.f.close()
+            self.f = None
 
     def __init__(self, root, path):
         self.root = root

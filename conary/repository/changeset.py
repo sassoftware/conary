@@ -433,6 +433,10 @@ class ChangeSet(streams.StreamSet):
                             invertedTrove.newTroveVersion(name, version, flavor,
                                trv.includeTroveByDefault(name, version, flavor),
                                weakRef = weak)
+                        elif oper == "~":
+                            # invert byDefault flag
+                            invertedTrove.changedTrove(name, version, flavor, not byDef,
+                                                       weakRef = weak)
 
 	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)
@@ -1420,6 +1424,7 @@ def CreateFromFilesystem(troveList):
     return cs
 
 class DictAsCsf:
+    maxMemSize = 16384
 
     def getNextFile(self):
         if self.next >= len(self.items):
@@ -1429,27 +1434,18 @@ class DictAsCsf:
         self.next += 1
 
         f = contObj.get()
-        contents = f.read(16384)
-        if len(contents) == 16384:
-            # too big; compress using a temporary file
-            (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
-            os.unlink(path)
-            gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
-            gzf.write(contents)
-            util.copyfileobj(f, gzf)
-            # don't close the result of contObj.get(); we may need it again
-            # but do close gzf, so we're sure that any buffers are flushed
-            # to disk
-            gzf.close()
-            os.lseek(fd, 0, 0)
-            f = os.fdopen(fd, "r")
-            return (name, contType, f)
-        else:
-            compressedFile = StringIO()
-            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-            gzf.write(contents)
-            gzf.close()
-            compressedFile.seek(0)
+        compressedFile = util.BoundedStringIO(maxMemorySize = self.maxMemSize)
+        bufSize = 16384
+
+        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+        while 1:
+            buf = f.read(bufSize)
+            if not buf:
+                break
+            gzf.write(buf)
+        gzf.close()
+
+        compressedFile.seek(0)
 
         return (name, contType, compressedFile)
 
