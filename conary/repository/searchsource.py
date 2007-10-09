@@ -247,6 +247,12 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         as a single searchSource:
             findTroves(troveSpecs, useAffinity=False)
     """
+    def __init__(self, *args, **kw):
+        trovesource.SourceStack.__init__(self, *args)
+        AbstractSearchSource.__init__(self)
+        self.resolveSearchMethod =  kw.pop('resolveSearchMethod',
+                                           resolvemethod.RESOLVE_ALL)
+
 
     def getTroveSource(self):
         if len(self.sources) == 1:
@@ -304,8 +310,29 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         return results
 
     def getResolveMethod(self):
-        return resolvemethod.stack(
-                            [x.getResolveMethod() for x in self.sources])
+        methods = []
+        if self.resolveSearchMethod == resolvemethod.RESOLVE_LEAVES_FIRST:
+            # special handling for resolveLeavesFirst stack:
+            # first search only the leaves for _everything_
+            # then go back and search the remainder.
+            # If we just left this up to the individual resolveMethods
+            # then for source [a,b,c] it would search a-leaves only
+            # a-rest, b-leaves only, b-rest, where we want a-leaves, b-leaves,
+            # c-leaves, etc.
+            for source in self.sources:
+                method = source.getResolveMethod()
+                if hasattr(method, 'searchLeavesOnly'):
+                    method.searchLeavesOnly()
+                methods.append(method)
+            for source in self.sources:
+                method = source.getResolveMethod()
+                if hasattr(method, 'searchLeavesOnly'):
+                    method.searchAllVersions()
+                    methods.append(method)
+            return resolvemethod.stack(methods)
+        else:
+            return resolvemethod.stack(
+                                [x.getResolveMethod() for x in self.sources])
 
 def stack(*sources):
     """ create a search source that will search first source1, then source2 """
@@ -391,11 +418,12 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
     """
     if troveSource is None:
         troveSource = searchSource.getTroveSource()
-    searchStack = SearchSourceStack()
     if resolveLeavesFirst:
         searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
     else:
         searchMethod = resolvemethod.RESOLVE_ALL
+    searchStack = SearchSourceStack(
+                    resolveSearchMethod=searchMethod)
 
     hasNetworkSearchSource = False
     for item in searchPath:
@@ -413,8 +441,7 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
             if not isinstance(item[0][1], versions.Version):
                 item = searchSource.findTroves(item, useAffinity=useAffinity)
                 item = list(itertools.chain(*item.itervalues()))
-            s = TroveSearchSource(searchSource.getTroveSource(), item,
-                                  flavor)
+            s = TroveSearchSource(searchSource.getTroveSource(), item, flavor)
             searchStack.addSource(s)
         else:
             raise baseerrors.ParseError('unknown search path item %s' % (item,))

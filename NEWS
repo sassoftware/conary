@@ -33,6 +33,10 @@ Changes in @NEW@:
       commitChangeSet.
     * The URL sent back to the client when connecting through an
       HTTP proxy was corrected. (CNY-2117)
+    * setSearchPath now searches the leaves for every source on the 
+      searchPath before falling back and searching the rest of the repository.
+      Before it would search the leaves for each label, then the rest 
+      of the labels, and then groups. (CNY-2131)
 
 Changes in 1.2.1:
   o Build Changes:
