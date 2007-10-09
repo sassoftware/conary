@@ -995,13 +995,14 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
 def _cookPackageObjWrap(*args, **kwargs):
+    logBuild = kwargs.get('logBuild', True)
     targetLabel = kwargs.pop('targetLabel', None)
     isOnLocalHost = isinstance(targetLabel,
                             (versions.CookLabel, versions.EmergeLabel,
                             versions.RollbackLabel, versions.LocalLabel))
 
-    if not isOnLocalHost or not (hasattr(sys.stdin, "isatty") and 
-                                 sys.stdin.isatty()):
+    if logBuild and (not isOnLocalHost or not (hasattr(sys.stdin, "isatty") and 
+                     sys.stdin.isatty())):
         # For repository cooks, or for recipe cooks that had stdin not a tty,
         # redirect stdin from /dev/null
         redirectStdin = True
