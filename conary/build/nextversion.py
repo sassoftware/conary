@@ -112,9 +112,13 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
                     relVersions.append((version, query[pkgName][version]))
     del pkgName
 
-    desiredShadowCount = sourceVersion.depth() - 1
+    defaultLatest = sourceVersion.copy()
+    defaultLatest = defaultLatest.getBinaryVersion()
+    defaultLatest.incrementBuildCount()
+    shadowCount = defaultLatest.trailingRevision().shadowCount()
+
     matches = [ x for x in relVersions
-                if x[0].trailingRevision().shadowCount() == desiredShadowCount ]
+                if x[0].trailingRevision().shadowCount() == shadowCount ]
 
 
     if matches:
@@ -169,11 +173,8 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
 
     if not latest:
         # case 4.  There is no binary trove derived from this source 
-        # version.  
-        latest = sourceVersion.copy()
-
-        latest = latest.getBinaryVersion()
-        latest.incrementBuildCount()
+        # version.
+        latest = defaultLatest
     if latest.isOnLocalHost():
         return nextLocalVersion(db, troveNames, latest, troveFlavorSet)
     else:
