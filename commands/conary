@@ -1181,6 +1181,7 @@ def main(argv=sys.argv):
             args = e.execParams
         else:
             args = sys.argv
+        util.massCloseFileDescriptors(3, 252)
         os.execve(sys.argv[0], args, os.environ)
     except debuggerException:
         raise

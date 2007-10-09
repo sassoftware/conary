@@ -18,6 +18,8 @@ Changes in @NEW@:
     * addMercurialSnapshot, along with the rest of the source control
       recipe actions, no longer produce directory names that can
       collide. (CNY-2124)
+    * Tag scripts are now closing file descriptors larger than stderr
+      before calling exec(). (CNY-2114)
 
 Changes in 1.2.1:
   o Build Changes:

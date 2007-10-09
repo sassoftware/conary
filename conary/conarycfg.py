@@ -826,6 +826,7 @@ def loadEntitlementFromProgram(fullPath, serverName):
                 os.dup2(stdErrWrite, 2)
                 os.close(writeFd)
                 os.close(stdErrWrite)
+                util.massCloseFileDescriptors(3, 252)
                 os.execl(fullPath, fullPath, serverName)
             except Exception, err:
                 traceback.print_exc(sys.stderr)

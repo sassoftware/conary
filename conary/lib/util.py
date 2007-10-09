@@ -1575,16 +1575,4 @@ def compressStream(src, level = 5, bufferSize = 16384):
 def massCloseFileDescriptors(start, unusedCount):
     """Close all file descriptors starting with start, until we hit
     unusedCount consecutive file descriptors that were already closed"""
-    fd = start - 1
-    count = unusedCount
-    while count > 0:
-        fd += 1
-        try:
-            os.close(fd)
-        except OSError, e:
-            if e.errno != errno.EBADF:
-                raise
-            count -= 1
-        else:
-            # We need to reset the counter, we found a good fd
-            count = unusedCount
+    return misc.massCloseFileDescriptors(start, unusedCount, 0);
