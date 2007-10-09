@@ -2,7 +2,7 @@ Changes in @NEW@:
   o Build Changes:
     * Python and Ruby dependencies with lib-specific flags now cause
       the package to be architecture-flavored. (CNY-2110)
-    * groups using searchPath now prefer packages on the labels and troves 
+    * Groups using searchPath now prefer packages on the labels and troves 
       listed explicitly in the searchPath over other labels, even if the label 
       is specified in the   For example, if your searchPath includes
       foo=conary.rpath.com@rpl:1/1-1-1, then 
@@ -14,15 +14,14 @@ Changes in @NEW@:
   o Client Changes:
     * The conary command line now accepts 'rb' as an alias for 'rollback'
     * The output of 'rblist' now combines packages and their components in
-      a single line (similar to the output of 'update')
+      a single line (similar to the output of 'update').
 
   o Bug Fixes:
     * When parsing the GPG keyring, PGP version 2 keys are now ignored.
       (CNY-2115)
     * Direct key signatures for PGP keys are now accepted. (CNY-2120)
-    * addMercurialSnapshot, along with the rest of the source control
-      recipe actions, no longer produce directory names that can
-      collide. (CNY-2124)
+    * Source control recipe actions such as addMercurialSnapshot()
+      no longer produce directory names that can collide. (CNY-2124)
     * Tag scripts are now closing file descriptors larger than stderr
       before calling exec(). (CNY-2114)
 
