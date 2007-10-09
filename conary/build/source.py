@@ -1655,6 +1655,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
                 os.close(wpipe)
                 os.dup2(rpipe, 0)
                 os.chdir(directory)
+                util.massCloseFileDescriptors(3, 252)
                 os.execl(*cpioArgs)
             except Exception, e:
                 print 'Could not execute %s: %s' % (cpioArgs[0], e)

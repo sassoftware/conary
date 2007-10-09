@@ -1052,3 +1052,8 @@ def stripUserPassFromUrl(url):
     userPass, host = urllib.splituser(hostUserPass)
     arr[1] = host
     return urlparse.urlunparse(arr)
+
+def massCloseFileDescriptors(start, unusedCount):
+    """Close all file descriptors starting with start, until we hit
+    unusedCount consecutive file descriptors that were already closed"""
+    return misc.massCloseFileDescriptors(start, unusedCount, 0);

@@ -2065,6 +2065,7 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
 	log.debug("running ldconfig")
 	pid = os.fork()
 	if not pid:
+            util.massCloseFileDescriptors(3, 252)
 	    os.chroot(root)
 	    os.chdir('/')
 	    try:
@@ -2429,6 +2430,8 @@ class TagCommand:
                         os.close(stderrPipe[0])
                         os.close(stderrPipe[1])
 
+                        util.massCloseFileDescriptors(3, 252)
+
                         # CNY-1158: control the child process' environment
                         env = { 'PATH' : "/sbin:/bin:/usr/sbin:/usr/bin" }
                         os.chdir(root)
@@ -2547,6 +2550,8 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
             os.dup2(stderrPipe[1], 2)
             os.close(stdoutPipe[1])
             os.close(stderrPipe[1])
+
+            util.massCloseFileDescriptors(3, 252)
 
             if root != '/':
                 scriptName = scriptName[len(root):]
