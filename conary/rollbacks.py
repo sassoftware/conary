@@ -78,21 +78,25 @@ def formatRollbacks(cfg, rollbacks, stream=None):
                 if ':' in name:
                     pkg, component = name.split(':')
                     pkgInfo = (pkg,) + info[1:]
-                    l = compByPkg.setdefault(pkgInfo, [])
-                    l.append(component)
+                else:
+                    pkgInfo = info
+                    component = None
+                l = compByPkg.setdefault(pkgInfo, [])
+                l.append(component)
 
             oldList.sort()
             for info in newList:
                 (name, oldVersion, oldFlavor, newVersion, newFlavor) = info
                 if ':' in name:
                     pkgInfo = (name.split(':')[0],) + info[1:]
-                    if pkgInfo in compByPkg:
+                    if None in compByPkg[pkgInfo]:
                         # this component was displayed with its package
                         continue
 
                 if info in compByPkg:
-                    name += ('(%s)' %
-                       " ".join([ ":" + x for x in compByPkg[info] ]))
+                    comps = [":" + x for x in compByPkg[info] if x is not None]
+                    if comps:
+                        name += '(%s)' % " ".join(comps)
 
                 if newVersion.onLocalLabel():
                     # Don't display changes to local branch
@@ -117,19 +121,25 @@ def formatRollbacks(cfg, rollbacks, stream=None):
             for name, version, flavor in oldList:
                 if ':' in name:
                     pkg, component = name.split(':')
-                    l = compByPkg.setdefault((pkg, version, flavor), [])
-                    l.append(component)
+                else:
+                    pkgInfo = info
+                    component = None
+                l = compByPkg.setdefault((pkg, version, flavor), [])
+                l.append(component)
 
             for (name, version, flavor) in oldList:
-                if (':' in name and
-                        (name.split(':')[0], version, flavor) in compByPkg):
-                    # this component was displayed with its package
-                    continue
+                if ':' in name:
+                    pkgInfo = (name.split(':')[0], version, flavor)
+                    if None in compByPkg[pkgInfo]:
+                        # this component was displayed with its package
+                        continue
 
                 if (name, version, flavor) in compByPkg:
-                    name = '%s(%s)' % (name,
-                       " ".join([ ":" + x for x in
-                                    compByPkg[(name, version, flavor)] ]))
+                    comps = [ ":" + x 
+                                for x in compByPkg[(name, version, flavor)]
+                                if x is not None ]
+                    if comps:
+                        name += '(%s)' % " ".join(comps)
                 w_(templ % ('installed', name, verStr(cfg, version, flavor)))
 
         w_('\n')
