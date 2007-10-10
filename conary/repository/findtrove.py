@@ -135,12 +135,13 @@ class QueryMethod:
 
     def _addLocalTrove(self, troveTup):
         name = troveTup[0]
-        self.map[name] = troveTup
-        self.localTroves.add(name)
+        if name not in self.map:
+            self.map[name] = troveTup
+        self.localTroves.add((name, troveTup))
 
     def _findLocalTroves(self, finalMap):
-        for name in self.localTroves:
-            finalMap.setdefault(self.map[name], [])
+        for name, troveTup in self.localTroves:
+            finalMap.setdefault(troveTup, [])
 
     def addMissing(self, missing, name):
         troveTup = self.map[name][0]
