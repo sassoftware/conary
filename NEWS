@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.2:
   o Build Changes:
     * Python and Ruby dependencies with lib-specific flags now cause
       the package to be architecture-flavored. (CNY-2110)
@@ -12,7 +12,8 @@ Changes in @NEW@:
       r.add() command. (CNY-1993)
 
   o Client Changes:
-    * The conary command line now accepts 'rb' as an alias for 'rollback'
+    * The conary command line now accepts 'rb' as an alias for
+      'rollback'.
     * The output of 'rblist' now combines packages and their components
       in a single line (similar to the output of 'update'). (CNY-2134)
 
@@ -21,20 +22,22 @@ Changes in @NEW@:
       (CNY-2115)
     * Direct key signatures for PGP keys are now accepted. (CNY-2120)
     * Source control recipe actions such as addMercurialSnapshot()
-      no longer produce directory names that can collide. (CNY-2124)
-    * Tag scripts are now closing file descriptors larger than stderr
-      before calling exec(). (CNY-2114)
+      no longer produce directory names that can collide with
+      a trove with the same name on a different label, producing
+      a snapshot of a different source control repository. (CNY-2124)
+    * Tag scripts are now closing file descriptors larger than 2
+      before calling a function from the exec family. (CNY-2114)
     * A bug in determining the correct version for packages when
       multiple branches of that package exist on the same label has
       been fixed. (CNY-2128)
     * Multiple entitlements to the same host name are now properly
       handled. (CNY-2105)
     * The URL sent back to the client when connecting through an
-      HTTP proxy was corrected. (CNY-2117)
-    * setSearchPath now searches the leaves for every source on the 
-      searchPath before falling back and searching the rest of the repository.
-      Before it would search the leaves for each label, then the rest 
-      of the labels, and then groups. (CNY-2131)
+      HTTP proxy is now correctly computed by repositories. (CNY-2117)
+    * setSearchPath now searches the leaves for every source in the
+      search path before falling back and searching the rest of the
+      repository. Before, it would search the leaves for each label,
+      then the rest of the labels, and finally groups. (CNY-2131)
 
 Changes in 1.2.1:
   o Build Changes:
