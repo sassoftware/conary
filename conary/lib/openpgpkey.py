@@ -358,11 +358,10 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
     def _formatSource(self, serverName):
         """Network-aware source formatter"""
         server = None
-        if self.repositoryMap and serverName not in self.repositoryMap:
+        if serverName not in (self.repositoryMap or []):
             server = "http://%s/conary/" % serverName
         else:
-            if serverName in self.repositoryMap:
-                server = self.repositoryMap[serverName]
+            server = self.repositoryMap[serverName]
         return server
 
     def getPublicKey(self, keyId, serverName, warn=True):
