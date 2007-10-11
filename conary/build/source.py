@@ -655,59 +655,68 @@ class addPatch(_Source):
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
 
-    def patchme(self, patch, f, destDir, patchlevels):
+    def _applyPatch(self, patchlevel, patch, destDir, dryRun=True):
+        patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
+        if self.backup:
+            patchArgs.extend(['-b', '-z', self.backup])
+        if self.extraArgs:
+            if isinstance(self.extraArgs, str):
+                patchArgs.append(self.extraArgs)
+            else:
+                patchArgs.extend(self.extraArgs)
+
+        fd, path = tempfile.mkstemp()
+        os.unlink(path)
+        logFile = os.fdopen(fd, 'w+')
+        if dryRun:
+            patchArgs.append('--dry-run')
+
+        p2 = subprocess.Popen(patchArgs,
+                              stdin=subprocess.PIPE,
+                              stderr=logFile, shell=False, stdout=logFile,
+                              close_fds=True)
+
+        p2.stdin.write(patch)
+        p2.stdin.close() # since stdin is closed, we can't
+                         # answer y/n questions.
+
+        failed = p2.wait()
+
+        logFile.flush()
+        logFile.seek(0,0)
+        return failed, logFile
+
+
+    def _patchAtLevels(self, patchPath, patch, destDir, patchlevels):
         logFiles = []
         log.info('attempting to apply %s to %s with patch level(s) %s'
-                 %(f, destDir, ', '.join(str(x) for x in patchlevels)))
+                 %(patchPath, destDir, ', '.join(str(x) for x in patchlevels)))
+        partiallyApplied = []
         for patchlevel in patchlevels:
-            patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
-            if self.backup:
-                patchArgs.extend(['-b', '-z', self.backup])
-            if self.extraArgs:
-                if isinstance(self.extraArgs, str):
-                    patchArgs.append(self.extraArgs)
-                else:
-                    patchArgs.extend(self.extraArgs)
+            failed, logFile = self._applyPatch(patchlevel, patch, destDir,
+                                              dryRun=True)
 
-            fd, path = tempfile.mkstemp()
-            os.unlink(path)
-            logFile = os.fdopen(fd, 'w+')
-
-            p2 = subprocess.Popen(patchArgs + ['--dry-run'],
-                                  stdin=subprocess.PIPE,
-                                  stderr=logFile, shell=False, stdout=logFile,
-                                  close_fds=True)
-
-            p2.stdin.write(patch)
-            p2.stdin.close() # since stdin is closed, we can't
-                             # answer y/n questions.
-
-            failed = p2.wait()
-
-            logFile.flush()
-            logFile.seek(0,0)
             if failed:
                 # patch failed - keep patchlevel and logfile for display
                 # later
                 logFiles.append((patchlevel, logFile))
                 continue
-            # patch was successful - re-run this time actually applying
-            p2 = subprocess.Popen(patchArgs, stdin=subprocess.PIPE,
-                                  stderr=logFile, shell=False, stdout=logFile, 
-                                  close_fds=True)
 
-            p2.stdin.write(patch)
-            p2.stdin.close() # since stdin is closed, we can't
-                             # answer y/n questions.
+            failed, logFile = self._applyPatch(patchlevel, patch, destDir,
+                                              dryRun=False)
 
             log.info(logFile.read().strip())
             logFile.close()
-            log.info('applied successfully with patch level %s'
-                     %patchlevel)
             # close any saved log files before we return
-            for patchlevel, f in logFiles:
+            for _, f in logFiles:
                 f.close()
+            if failed:
+                # this shouldn't happen.
+                raise SourceError('could not apply patch %s - applied with --dry-run but not normally' % patchPath)
+            # patch was successful - re-run this time actually applying
+            log.info('applied successfully with patch level %s' %patchlevel)
             return
+
         # all attemps were unsuccessful.  display relevant logs
         rightLevels = []
         # do two passes over all the log files.  Once to find
@@ -718,6 +727,30 @@ class addPatch(_Source):
             if "can't find file to patch" not in s:
                 rightLevels.append(idx)
             logFiles[idx] = (patchlevel, s)
+            logFile.close()
+
+        # attempt one more time for the cases where --dry-run causes
+        # patches to fail to apply because they modify the same file
+        # more than once.
+        if len(rightLevels) == 1:
+            fallbackLevel = logFiles[rightLevels[0]][0]
+        elif len(patchlevels) == 1:
+            fallbackLevel = patchlevels[0]
+        else:
+            fallbackLevel = 1
+        log.info('patch did not apply with --dry-run, trying level %s directly' % fallbackLevel)
+        failed, logFile = self._applyPatch(fallbackLevel, patch, destDir,
+                                           dryRun=False)
+        if not failed:
+            logFile.close()
+            log.info('applied successfully with patch level %s' % fallbackLevel)
+            return
+        # update the logFile value to match what we had here
+        idx = [idx for (idx, (patchlevel, _)) in enumerate(logFiles)
+               if patchlevel == fallbackLevel ][0]
+        logFiles[idx] = (fallbackLevel, logFile.read().strip())
+
+
         for idx, (patchlevel, s) in enumerate(logFiles):
             if rightLevels and idx not in rightLevels:
                 log.info('patch level %s failed - probably wrong level'
@@ -725,9 +758,9 @@ class addPatch(_Source):
                 continue
             log.info('patch level %s FAILED' % patchlevel)
             log.info(s)
-            logFile.close()
-        log.error('could not apply patch %s in directory %s', f, destDir)
-        raise SourceError, 'could not apply patch %s' % f
+        log.error('could not apply patch %s in directory %s', patchPath, 
+                  destDir)
+        raise SourceError, 'could not apply patch %s' % patchPath
 
     def doDownload(self):
 	f = self._findSource()
@@ -735,7 +768,7 @@ class addPatch(_Source):
         return f
 
     def do(self):
-        f = self.doDownload()
+        patchPath = self.doDownload()
         # FIXME: we should probably read in the patch directly now
         # that we aren't just applying in a pipeline
 	provides = "cat"
@@ -752,13 +785,13 @@ class addPatch(_Source):
             leveltuple = (1, 0, 2, 3,)
         util.mkdirChain(destDir)
 
-        pin = util.popen("%s '%s'" %(provides, f))
+        pin = util.popen("%s '%s'" %(provides, patchPath))
 	if self.applymacros:
             patch = pin.read() % self.recipe.macros
 	else:
             patch = pin.read()
         pin.close()
-        self.patchme(patch, f, destDir, leveltuple)
+        self._patchAtLevels(patchPath, patch, destDir, leveltuple)
 Patch = addPatch
 
 class addSource(_Source):

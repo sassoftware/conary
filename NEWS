@@ -3,6 +3,8 @@ Changes in @NEW@:
     * An update failure that would occur when two versions of a package
       have been installed, one local, one from a repository, has been fixed.
       (CNY-2127)
+    * A regression introduced in 1.2.1 affecting patch files that apply
+      multiple changes to the same file has been fixed.  (CNY-2141)
 
 Changes in 1.2.2:
   o Build Changes:
