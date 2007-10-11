@@ -1057,3 +1057,16 @@ def massCloseFileDescriptors(start, unusedCount):
     """Close all file descriptors starting with start, until we hit
     unusedCount consecutive file descriptors that were already closed"""
     return misc.massCloseFileDescriptors(start, unusedCount, 0);
+
+def nullifyFileDescriptor(fdesc):
+    """Connects the file descriptor to /dev/null or an open file (if /dev/null
+    does not exist)"""
+    try:
+        fd = os.open('/dev/null', os.O_RDONLY)
+    except OSError:
+        # in case /dev/null does not exist
+        fd, fn = tempfile.mkstemp()
+        os.unlink(fn)
+    if fd != fdesc:
+        os.dup2(fd, fdesc)
+        os.close(fd)
