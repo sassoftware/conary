@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.1.31.10:
   o Client Changes:
     * Unknown trove info types in the database are stored in extracted
       trove info properly (CNY-2059)
