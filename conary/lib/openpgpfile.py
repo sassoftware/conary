@@ -1250,8 +1250,10 @@ class PGP_Signature(PGP_BaseKeySig):
 
     @staticmethod
     def _decodeSigSubpackets(fobj):
+        fobj.seek(0, SEEK_END)
+        ocount = fobj.tell()
         fobj.seek(0)
-        while fobj.size != fobj.tell():
+        while fobj.tell() < ocount:
             yield PGP_Signature._getNextSubpacket(fobj)
 
     @staticmethod
@@ -1334,12 +1336,16 @@ class PGP_Signature(PGP_BaseKeySig):
             self._writeSubpacket(stream, spktType, spktStream)
         self.unhashedFile = stream
 
-    def _writeSubpacket(self, stream, spktType, spktStream):
+    @staticmethod
+    def _writeSubpacket(stream, spktType, spktStream):
         """Write the subpacket into the stream"""
         # First, determine the subpacket length
         spktStream.seek(0, SEEK_END)
         spktLen = spktStream.tell()
         spktStream.seek(0, SEEK_SET)
+
+        # The subpacket length includes the type octet
+        spktLen += 1
 
         header = []
         if spktLen < 192:
@@ -1347,7 +1353,7 @@ class PGP_Signature(PGP_BaseKeySig):
             header.append(spktLen)
         elif spktLen < 16320:
             # 2-octet length
-            header.append(((spktLen - 192) >> 8) & 0xFF)
+            header.append((((spktLen - 192) >> 8) & 0xFF) + 192)
             header.append((spktLen - 192) & 0xFF)
         else:
             # 5-octet length
@@ -1356,7 +1362,9 @@ class PGP_Signature(PGP_BaseKeySig):
                 header.append((spktLen >> ((4 - i) << 3)) & 0xff)
         for d in header:
             stream.write(chr(d))
-        self._copyStream(spktStream, stream)
+        # Type
+        stream.write(chr(spktType))
+        PGP_Signature._copyStream(spktStream, stream)
 
     def _computeSignatureHash(self, dataFile):
         """Compute the signature digest for this signature, using the
