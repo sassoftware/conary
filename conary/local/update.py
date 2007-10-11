@@ -2544,6 +2544,15 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
 
         if pid == 0:
             os.close(0)
+            try:
+                # POSIX guarantees that this open() will get fd 0,
+                # the lowest unused fd
+                os.open('/dev/null', os.O_RDONLY)
+            except OSError:
+                # in case /dev/null does not exist
+                fd, fn = tmpfile.mkstemp()
+                os.dup2(fd, 0)
+                os.unlink(fn)
             os.close(stdoutPipe[0])
             os.close(stderrPipe[0])
             os.dup2(stdoutPipe[1], 1)

@@ -6,6 +6,10 @@ Changes in 1.1.31.10:
   o Bug Fixes:
     * Tag scripts are now closing file descriptors larger than stderr
       before calling exec(). (CNY-2114)
+    * Group scripts now have file descriptor 0 (stdin) connected to
+      /dev/null. Previously, stdin was closed, a potential problem
+      for scripts that open file descriptors and then disconnect from
+      the terminal. (CNY-2143)
 
 Changes in 1.1.31.9:
   o Bug Fixes:
