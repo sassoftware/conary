@@ -292,6 +292,11 @@ def binSeqToString(sequence):
     Return the string with a corresponding char for each item"""
     return "".join([ chr(x) for x in sequence ])
 
+def stringToAscii(sequence):
+    """sequence is a sequence of characters.
+    Return the string with the hex representation for each character"""
+    return "".join("%02x" % ord(c) for c in sequence).upper()
+
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
     r = ''
@@ -923,7 +928,6 @@ class PGP_BasePacket(object):
 
     def writeBody(self, stream):
         self.resetBody()
-        self._bodyStream.seek(0)
         self._copyStream(self._bodyStream, stream)
 
     def write(self, stream):
@@ -1217,6 +1221,49 @@ class PGP_Signature(PGP_BaseKeySig):
         self.hashedFile = hSubpktsFile
         self.unhashedFile = uSubpktsFile
 
+    def _writeSigV4(self):
+        if not self._parsed:
+            self.parse()
+
+        stream = util.ExtendedStringIO()
+        self.hashedFile.seek(0, SEEK_END)
+
+        self.unhashedFile.seek(0, SEEK_END)
+        unhashedLen = self.unhashedFile.tell()
+
+        self._writeBin(stream, [4, self.sigType, self.pubKeyAlg, self.hashAlg])
+
+        for sstream in [ self.hashedFile, self.unhashedFile ]:
+            # Determine length
+            sstream.seek(0, SEEK_END)
+            slen = sstream.tell()
+            # subpackets data length
+            b0 = (slen >> 8) & 0xFF
+            b1 = slen & 0xFF
+            self._writeBin(stream, [b0, b1])
+            # And the stream itself
+            sstream.seek(0)
+            self._copyStream(sstream, stream)
+
+        # 2-octet hash sig
+        self._writeBin(stream, self.hashSig)
+
+        # MPI file
+        self.mpiFile.seek(0)
+        self.mpiFile.seek(0)
+        self._copyStream(self.mpiFile, stream)
+        return stream
+
+    def writeBody(self, stream):
+        if isinstance(self.unhashedFile, util.ExtendedStringIO):
+            bodyStream = self._writeSigV4()
+            ns, nsp = self._nextStream, self._nextStreamPos
+            parentPkt = self._parentPacket
+            self.__init__(bodyStream, newStyle = self._newStyle)
+            self.setNextStream(ns, nsp)
+            self.setParentPacket(parentPkt)
+        return PGP_BaseKeySig.writeBody(self, stream)
+
     def getSigId(self):
         """Get the key ID of the issuer for this signature.
         Return None if the packet did not contain an issuer key ID"""
@@ -1259,10 +1306,6 @@ class PGP_Signature(PGP_BaseKeySig):
     @staticmethod
     def _getNextSubpacket(fobj):
         len0, = PGP_BaseKeySig._readBin(fobj, 1)
-
-        # Sect 5.2.3.1 of RFC2440 implies there should be a 2-octet scalar
-        # count of the length of the set of subpackets, but I can't seem to
-        # find it here.
 
         if len0 < 0xC0:
             pktlenlen = 1
@@ -1573,7 +1616,7 @@ class PGP_Key(PGP_BaseKeySig):
             self._readCountMPIs(self.mpiFile, 1, discard = True)
             pos = self.mpiFile.tell()
             octets = self.mpiFile.pread(8, pos - 8)
-            self._keyId = "".join("%02x" % ord(x) for x in octets).upper()
+            self._keyId = stringToAscii(octets)
             return self._keyId
 
         # Convert to public key
