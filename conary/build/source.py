@@ -1225,9 +1225,9 @@ class addGitSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
                  self.tag)
-        util.execute("cd '%s' && git archive --prefix=%s-%s/ HEAD | "
+        util.execute("cd '%s' && git archive --prefix=%s-%s/ %s | "
                         "bzip2 > '%s'" %
-                        (lookasideDir, self.recipe.name, self.tag, target))
+                        (lookasideDir, self.recipe.name, self.tag, self.tag, target))
 
     def __init__(self, recipe, url, tag = 'HEAD', **kwargs):
         self.url = url % recipe.macros
