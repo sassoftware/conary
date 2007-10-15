@@ -2589,6 +2589,11 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
 
         if pid == 0:
             os.close(0)
+            # POSIX guarantees that this open() will get fd 0,
+            # the lowest unused fd. Some of the complexity in
+            # nullifyFileDescriptor should be bypassed, opening /dev/null or
+            # mkstemp should pick fd 0 automatically
+            util.nullifyFileDescriptor(0)
             os.close(stdoutPipe[0])
             os.close(stderrPipe[0])
             os.dup2(stdoutPipe[1], 1)
