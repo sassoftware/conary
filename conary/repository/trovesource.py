@@ -458,7 +458,6 @@ class SearchableTroveSource(AbstractTroveSource):
                 assert(False)
         return versionResults
 
-
     def _filterByFlavorQuery(self, versionFlavorDict, flavorQueryList,
                              flavorFilter, flavorCheck, latestFilter,
                              scoreCache):
@@ -517,14 +516,19 @@ class SearchableTroveSource(AbstractTroveSource):
                     fSet = results.setdefault(version, set())
                     fSet.update(flavorList)
             return results
+        if flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+            flavorPreferenceList = []
+        else:
+            flavorPreferenceList = self._flavorPreferences
 
         results = {}
         for flavorQuery in flavorQueryList:
+            newerEmptyMatches = []
             usedFlavors = set()
             queryResults = {}
-            # lower preference score is better, means you've got a 
+            # lower preference score is better, means you've got a
             # flavor that matches a flavor preference earlier in the list.
-            currentPreferenceScore = len(self._flavorPreferences) + 1
+            currentPreferenceScore = len(flavorPreferenceList) + 1
 
             if isinstance(flavorQuery, (tuple, list)):
                 flavorQuery, primaryFlavorQuery = flavorQuery
@@ -546,30 +550,28 @@ class SearchableTroveSource(AbstractTroveSource):
 
                 if not flavorList:
                     continue
-                if (flavorFilter == _GET_TROVE_BEST_FLAVOR
-                    and latestFilter == _GET_TROVE_VERY_LATEST):
+
+                preferenceScore, flavorList, emptyMatches = \
+                                                self._filterByPreferences(
+                                                        flavorList,
+                                                        currentPreferenceScore,
+                                                        flavorPreferenceList)
+                if preferenceScore is None:
+                    # didn't find any results better/equal to the current
+                    # preference score
+                    continue
+                elif (flavorFilter == _GET_TROVE_BEST_FLAVOR
+                      and latestFilter == _GET_TROVE_VERY_LATEST
+                      and preferenceScore == currentPreferenceScore
+                      and queryResults):
                     # we match all flavors associated w/ one version
                     # at the same time.  So if we're trying to grab the 
-                    # latest viable troves, and we've already got a 
-                    # preference score of 2 for some later version, 
+                    # latest viable troves, and we've already got a
+                    # preference score of 2 for some later version,
                     # there's no point finding earlier versions that
                     # also have a preference score of 2, since they'll
                     # be filtered out by the requirement to have the latest
                     # version.
-                    scoreToMatch = currentPreferenceScore - 1
-                else:
-                    # If we're getting all matching flavors or not all
-                    # latest then we can accept another package w/ the
-                    # same preference score.  Worse preference scores are
-                    # disallowed though.
-                    scoreToMatch = currentPreferenceScore
-
-                preferenceScore, flavorList = self._filterByPreferences(
-                                                flavorList,
-                                                scoreToMatch)
-                if preferenceScore is None:
-                    # didn't find any results better/equal to the current
-                    # preference score
                     continue
                 elif preferenceScore < currentPreferenceScore:
                     currentPreferenceScore = preferenceScore
@@ -581,22 +583,29 @@ class SearchableTroveSource(AbstractTroveSource):
                     # throw out the x86 trove - it's no longer a valid result.
                     queryResults = {}
                     usedFlavors = set()
-
-                troveFlavors = set()
-
-                if flavorFilter == _GET_TROVE_BEST_FLAVOR:
-                    bestFlavor = max([(scoreCache[flavorQuery, x], x) 
-                                        for x in flavorList ])[1]
-                    troveFlavors.add(bestFlavor)
-                elif flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
-                    troveFlavors.update(flavorList)
-                    if latestFilter == _GET_TROVE_VERY_LATEST:
-                        troveFlavors.difference_update(usedFlavors)
-                        usedFlavors.update(flavorList)
+                    for emptyVersion, emptyFlavorList in newerEmptyMatches:
+                        self._addFilteredFlavorsToResults(emptyVersion, 
+                                    emptyFlavorList, flavorQuery, usedFlavors,
+                                    queryResults, latestFilter,
+                                    flavorFilter, scoreCache)
+                    if latestFilter != _GET_TROVE_VERY_LATEST or not newerEmptyMatches:
+                        self._addFilteredFlavorsToResults(version, flavorList, 
+                                    flavorQuery, usedFlavors, queryResults,
+                                    latestFilter, flavorFilter, scoreCache)
                 else:
-                    assert(0)
-                if troveFlavors:
-                    queryResults[version] = troveFlavors
+                    self._addFilteredFlavorsToResults(version, flavorList,
+                                                      flavorQuery,
+                                                      usedFlavors, queryResults,
+                                                      latestFilter,
+                                                      flavorFilter, scoreCache)
+
+                if emptyMatches:
+                    if latestFilter == _GET_TROVE_VERY_LATEST:
+                        if not newerEmptyMatches:
+                            newerEmptyMatches = [(version, emptyMatches)]
+                    else:
+                        newerEmptyMatches.append((version, emptyMatches))
+
 
                 if (currentPreferenceScore == 0
                     and latestFilter == _GET_TROVE_VERY_LATEST
@@ -606,17 +615,15 @@ class SearchableTroveSource(AbstractTroveSource):
                 results.setdefault(version, set()).update(flavorList)
         return results
 
-    def _filterByPreferences(self, flavorList, scoreToMatch):
-        preferenceList = self._flavorPreferences
+    def _filterByPreferences(self, flavorList, scoreToMatch, 
+                             preferenceList):
         if not preferenceList:
-            return 0, flavorList
+            return 0, flavorList, []
         strongList = [ (x.toStrongFlavor(), x) for x in flavorList ]
         indexedList = list(enumerate(preferenceList[:scoreToMatch + 1]))
         nomatches = []
         minScore = None
         matchingFlavors = []
-        import epdb
-        epdb.st('f')
         for strongFlavor, flavor in strongList:
             for prefScore, preferenceFlavor in indexedList:
                 if strongFlavor.satisfies(preferenceFlavor):
@@ -630,13 +637,17 @@ class SearchableTroveSource(AbstractTroveSource):
             else:
                 # no matching flavors
                 nomatches.append(flavor)
-        if scoreToMatch >= len(preferenceList) and nomatches:
-            return 0, matchingFlavors + nomatches
-        elif not matchingFlavors:
-            return None, []
-        elif scoreToMatch >= minScore:
-            return minScore, matchingFlavors + nomatches
-        return None, []
+        if matchingFlavors:
+            if scoreToMatch >= minScore:
+                return minScore, matchingFlavors + nomatches, nomatches
+            elif nomatches:
+                return scoreToMatch, nomatches, nomatches
+            else:
+                return None, [], []
+        elif nomatches:
+            return scoreToMatch, nomatches, nomatches
+        else:
+            return None, [], []
 
     def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList, 
                                scoreCache):
@@ -654,6 +665,25 @@ class SearchableTroveSource(AbstractTroveSource):
             scores = ((flavorQuery.score(x), x) for x in flavorList)
 
         scoreCache.update(((flavorQuery, x[1]),x[0]) for x in scores)
+
+    def _addFilteredFlavorsToResults(self, version, flavorList, flavorQuery,
+                                   usedFlavors, queryResults, latestFilter,
+                                   flavorFilter, scoreCache):
+        troveFlavors = set()
+        if flavorFilter == _GET_TROVE_BEST_FLAVOR:
+            bestFlavor = max([(scoreCache[flavorQuery, x], x) 
+                                for x in flavorList ])[1]
+            troveFlavors.add(bestFlavor)
+        elif flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+            troveFlavors.update(flavorList)
+            if latestFilter == _GET_TROVE_VERY_LATEST:
+                troveFlavors.difference_update(usedFlavors)
+                usedFlavors.update(flavorList)
+        else:
+            assert(0)
+        if troveFlavors:
+            queryResults[version] = troveFlavors
+
 
     def getTroveLeavesByLabel(self, troveSpecs, bestFlavor=True,
                               troveTypes=TROVE_QUERY_PRESENT):
