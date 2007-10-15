@@ -61,8 +61,8 @@ def flags_x86_64():
     multiarch = flags_i686()
     multiarch[0].append(x86_64)
     # switch to just return muliarch when flavorPreferences are switched on.
-    # return multiarch
-    return [[ x86_64 ]] + multiarch
+    return multiarch
+    #return [[ x86_64 ]] + multiarch
 
 def current():
     return currentArch
@@ -93,17 +93,12 @@ class FlavorPreferences:
 
     # The flavor preferences table is keyed on the current arch
     flavorPreferences = {
-        'alpha'         : ['is: alpha'],
-        'ppc'           : ['is: ppc'],
-        'ppc64'         : ['is: ppc ppc64', 'is: ppc64', 'is: ppc'],
-        'ppc ppc64'     : ['is: ppc ppc64', 'is: ppc64', 'is: ppc'],
-        's390'          : ['is: s390'],
-        'sparc'         : ['is: sparc'],
-        'sparc64'       : ['is: sparc sparc64', 'is: sparc64', 'is: sparc'],
-        'sparc sparc64' : ['is: sparc sparc64', 'is: sparc64', 'is: sparc'],
-        'x86'           : ['is: x86'],
-        'x86_64'        : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
-        'x86 x86_64'    : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
+        'ppc64'         : ['is: ppc64', 'is:ppc'],
+        'ppc ppc64'     : ['is: ppc64', 'is:ppc'],
+        'sparc64'       : ['is: sparc64', 'is:sparc'],
+        'sparc sparc64' : ['is: sparc64', 'is:sparc'],
+        'x86_64'        : ['is: x86_64', 'is:x86' ],
+        'x86 x86_64'    : ['is: x86_64', 'is:x86'],
     }
 
     @staticmethod

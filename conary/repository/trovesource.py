@@ -49,6 +49,9 @@ class AbstractTroveSource:
             preferenceList = []
         self._flavorPreferences = preferenceList
 
+    def getFlavorPreferenceList(self):
+        return self._flavorPreferences
+
     def requiresLabelPath(self):
         return not self._allowNoLabel
 
@@ -608,15 +611,31 @@ class SearchableTroveSource(AbstractTroveSource):
         if not preferenceList:
             return 0, flavorList
         strongList = [ (x.toStrongFlavor(), x) for x in flavorList ]
-        indexedList = enumerate(preferenceList[:scoreToMatch + 1])
-        for prefScore, preferenceFlavor in indexedList:
-            matchingFlavors = [ x[1] for x in strongList
-                                if x[0].satisfies(preferenceFlavor) ]
-            if matchingFlavors:
-                return prefScore, matchingFlavors
-        curScore = len(preferenceList)
-        if curScore <= scoreToMatch:
-            return len(preferenceList), flavorList
+        indexedList = list(enumerate(preferenceList[:scoreToMatch + 1]))
+        nomatches = []
+        minScore = None
+        matchingFlavors = []
+        import epdb
+        epdb.st('f')
+        for strongFlavor, flavor in strongList:
+            for prefScore, preferenceFlavor in indexedList:
+                if strongFlavor.satisfies(preferenceFlavor):
+                    if minScore is None or minScore < prefScore:
+                        matchingFlavors = []
+                    elif minScore > prefScore:
+                        break
+                    minScore = prefScore
+                    matchingFlavors.append(flavor)
+                    break
+            else:
+                # no matching flavors
+                nomatches.append(flavor)
+        if scoreToMatch >= len(preferenceList) and nomatches:
+            return 0, matchingFlavors + nomatches
+        elif not matchingFlavors:
+            return None, []
+        elif scoreToMatch >= minScore:
+            return minScore, matchingFlavors + nomatches
         return None, []
 
     def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList, 

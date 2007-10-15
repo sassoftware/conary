@@ -15,6 +15,7 @@ import itertools
 
 from conary.lib import log
 from conary.repository import errors as repoerrors
+from conary.repository import trovesource
 from conary.deps import deps
 
 class DepResolutionMethod(object):
@@ -147,52 +148,47 @@ class DepResolutionMethod(object):
         otherMatches = []
         otherFlavors = []
 
-        if installFlavor is not None and not installFlavor.isEmpty():
-            flavoredList = []
-            for troveTup in troveTups:
-                label = troveTup[1].trailingLabel()
-                affTroves = affFlavorDict[troveTup[0]]
-                found = False
-                if affTroves:
-                    for affName, affVersion, affFlavor in affTroves:
-                        if affVersion.trailingLabel() != label:
-                            continue
-                        newFlavor = deps.overrideFlavor(installFlavor,
-                                                        affFlavor,
-                                            mergeType=deps.DEP_MERGE_TYPE_PREFS)
-                        # implement never drop an arch for dep resolution
-                        currentArch = deps.getInstructionSetFlavor(affFlavor)
-                        if not troveTup[2].stronglySatisfies(currentArch):
-                            continue
-                        if newFlavor.satisfies(troveTup[2]):
-                            affinityMatches.append((newFlavor, troveTup))
-                            affinityFlavors.append(troveTup[2])
-                            found = True
-                if not found and not affinityMatches:
-                    if installFlavor.satisfies(troveTup[2]):
-                        otherMatches.append((installFlavor, troveTup))
-                        otherFlavors.append(troveTup[2])
-        else:
-            otherMatches = [ (None, x) for x in troveTups ]
-            otherFlavors = [x[2] for x in troveTups]
-        if affinityMatches:
-            allFlavors = affinityFlavors
-            flavoredList = affinityMatches
-        else:
-            allFlavors = otherFlavors
-            flavoredList = otherMatches
 
-        # Now filter by flavor preferences.
-        newFlavors = []
-        if self.flavorPreferences:
-            for flavor in self.flavorPreferences:
-                for trvFlavor in allFlavors:
-                    if trvFlavor.stronglySatisfies(flavor):
-                       newFlavors.append(trvFlavor)
-                if newFlavors:
-                    break
-        if newFlavors:
-            flavoredList = [ x for x in flavoredList if x[1][2] in newFlavors ]
+        troveNames = set([x[0] for x in troveTups])
+        allAffinityTroves = list(itertools.chain(*[affFlavorDict[x]
+                                                 for x in troveNames]))
+        db = trovesource.SimpleTroveSource(allAffinityTroves)
+        repos = trovesource.SimpleTroveSource(troveTups)
+        repos.searchWithFlavor()
+        repos.setFlavorPreferenceList(self.flavorPreferences)
+        if installFlavor is not None and installFlavor.isEmpty():
+            installFlavor = None
+
+        # search for resolutions that would update an installed package.
+        results = repos.findTroves(None, [(x, None, None)
+                                     for x in troveNames], installFlavor,
+                                     getLeaves=False,
+                                     affinityDatabase=db,
+                                     allowMissing=True)
+        if results:
+            flavoredList = []
+            troveTups = list(itertools.chain(*results.itervalues()))
+            for troveTup in troveTups:
+                if troveTup in allAffinityTroves:
+                    continue
+                affTups = affFlavorDict[troveTup[0]]
+                if affTups:
+                    for affTup in affTups:
+                        affFlavor = deps.overrideFlavor(installFlavor, affTup[2],
+                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                        if affFlavor.satisfies(troveTup[2]):
+                            flavoredList.append((affFlavor, troveTup))
+                else:
+                    flavoredList.append((installFlavor, troveTup))
+        else:
+            # fall back to searching for things that could be installed
+            # side-by-side.
+            results = repos.findTroves(None, [(x, None, None)
+                                     for x in troveNames], installFlavor,
+                                     getLeaves=False,
+                                     allowMissing=True)
+            troveTups = list(itertools.chain(*results.itervalues()))
+            flavoredList = [ (installFlavor, x) for x in troveTups ]
 
         return self._selectMatchingResolutionTrove(requiredBy, dep,
                                                    depClass, flavoredList)
@@ -235,10 +231,10 @@ class DepResolutionMethod(object):
         badJobs = [ x for x in jobSet
                             if (x[1][0] and
                                 x[1][0].trailingLabel() != x[2][0].trailingLabel()) ]
-        badJobs += [ x for x in jobSet if
-                     (x[1][0]
-                      and not x[2][1].stronglySatisfies(
-                                    deps.getInstructionSetFlavor(x[1][1])))]
+        badJobs += [ x for x in jobSet \
+                     if (x[1][0] and \
+                         deps.getInstructionSetFlavor(x[1][1]) \
+                         != deps.getInstructionSetFlavor(x[2][1])) ]
         if badJobs:
             jobSet.difference_update(badJobs)
             oldTroves = db.getTroves(

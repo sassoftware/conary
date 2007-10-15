@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Client Changes:
+    * Conary now allows a biarch system to have one flavor that expresses
+      both the x86 and x86_64 support.  The flavorPreferences configuration
+      option informs conary to prefer x86_64 packages. This change allows
+      group building to automatically resolve x86 packages. (CNY-525)
   o Bug Fixes:
     * An update failure that would occur when two versions of a package
       have been installed, one local, one from a repository, has been fixed.
