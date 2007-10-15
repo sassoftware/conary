@@ -12,9 +12,10 @@
 #
 
 import base64
+import itertools
+import md5
 import os
 import sha
-import md5
 import struct
 import sys
 
@@ -91,11 +92,13 @@ SIG_TYPE_CERT_1        = 0x11
 SIG_TYPE_CERT_2        = 0x12
 SIG_TYPE_CERT_3        = 0x13
 SIG_TYPE_SUBKEY_BIND   = 0x18
+SIG_TYPE_PRKEY_BIND    = 0x19
 SIG_TYPE_DIRECT_KEY    = 0x1F
 SIG_TYPE_KEY_REVOC     = 0x20
 SIG_TYPE_SUBKEY_REVOC  = 0x28
 SIG_TYPE_CERT_REVOC    = 0x30
 SIG_TYPE_TIMESTAMP     = 0x40
+SIG_TYPE_THIRD_PARTY_CONFIRM    = 0x50
 
 SIG_CERTS = (SIG_TYPE_CERT_0, SIG_TYPE_CERT_1,
              SIG_TYPE_CERT_2, SIG_TYPE_CERT_3, )
@@ -123,6 +126,9 @@ SIG_SUBPKT_POLICY_URL     = 26
 SIG_SUBPKT_KEY_FLAGS      = 27
 SIG_SUBPKT_SIGNERS_UID    = 28
 SIG_SUBPKT_REVOC_REASON   = 29
+SIG_SUBPKT_FEATURES       = 30
+SIG_SUBPKT_SIG_TARGET     = 31
+SIG_SUBPKT_EMBEDDED_SIG   = 32
 SIG_SUBPKT_INTERNAL_0     = 100
 SIG_SUBPKT_INTERNAL_1     = 101
 SIG_SUBPKT_INTERNAL_2     = 102
@@ -503,6 +509,49 @@ def parseAsciiArmorKey(asciiData):
 
     keyData = base64.b64decode(buf)
     return keyData
+
+class CRC24(object):
+    __slots__ = [ '_crc' ]
+    CRC24_INIT = 0xb704ce
+    CRC24_POLY = 0x1864cfb
+
+    def __init__(self, data=''):
+        self._crc = self.CRC24_INIT
+        self.update(data)
+
+    def update(self, data):
+        crc = self._crc
+        for ch in data:
+            crc ^= (ord(ch) << 16)
+            for i in range(8):
+                crc <<= 1
+                if crc & 0x1000000:
+                    crc ^= self.CRC24_POLY
+        self._crc = crc
+
+    def digest(self):
+        r = self._crc & 0xffffff
+        return chr((r >> 16) & 0xff) + chr((r >> 8) & 0xff) + chr(r & 0xff)
+
+    def base64digest(self):
+        return base64.b64encode(self.digest())
+
+def _crc24(stream):
+    if isinstance(stream, str):
+        stream = StringIO(stream)
+    crc = CRC24()
+    while 1:
+        buf = stream.read(8192)
+        if not buf:
+            break
+        crc.update(buf)
+    return crc
+
+def crc24(stream):
+    return _crc24(stream).digest()
+
+def crc24base64(stream):
+    return _crc24(stream).base64digest()
 
 # this function will enforce the following rules
 # rule 1: cannot switch main keys
@@ -1335,6 +1384,8 @@ class PGP_Signature(PGP_BaseKeySig):
         return spktType, dataf
 
     def _writeSigPacketsToStream(self):
+        if not self._parsed:
+            self.parse()
         sio = util.ExtendedStringIO()
         parentPacket = self.getParentPacket()
         # XXX we could probably rewrite this if/then/else
@@ -1361,14 +1412,25 @@ class PGP_Signature(PGP_BaseKeySig):
         self._sigDigest = self._computeSignatureHash(sio)
         return self._sigDigest
 
+    def getShortSigHash(self):
+        """Return the 16-leftmost bits for the signature hash"""
+        if not self._parsed:
+            self.parse()
+        return tuple(self.hashSig)
+
     def merge(self, other):
         """Merge this signature with the other signature.
-        Modifies the current packet"""
+        Returns True if it modified the current packet"""
         # The signed part of the signature is immutable, there is no way we
         # can merge it. The only things we might be able to merge are the
         # unhashed signature subpackets
+        # However, gpg does not do that, so we will not do that either
+        if self.hashSig != other.hashSig:
+            raise MergeError("Signature packets with different hash")
         if self.getSignatureHash() != other.getSignatureHash():
             raise MergeError("Signature packets with different hash")
+        # Not much more to do here
+        return False
 
     def _prepareUnhashedSubpackets(self):
         if self._unhashedSubPackets is None:
@@ -1523,6 +1585,21 @@ class PGP_UserID(PGP_BasePacket):
         stream.write(chr(self.signingConstant))
         stream.write(struct.pack("!I", self.bodyLength))
         self.writeBody(stream)
+
+    def merge(self, other):
+        """Merges this UserID packet to the other one.
+        Returns True if it changed the current packet"""
+        assert self.tag == other.tag
+
+        if self.id != other.id:
+            raise MergeError("User packets with different identifier")
+
+        finalsigs = _mergeSignatures(self.iterSignatures(),
+                                     other.iterSignatures())
+        if self.signatures == finalsigs:
+            return False
+        self.signatures = finalsigs
+        return True
 
 PacketTypeDispatcher.addPacketType(PGP_UserID)
 
@@ -1979,6 +2056,73 @@ class PGP_MainKey(PGP_Key):
     def getUserIds(self):
         return [ pkt.id for pkt in self.iterUserIds() ]
 
+    def merge(self, other):
+        """Merge this key with the other key
+        Return True if the key was modified"""
+
+        if self.getKeyId() != other.getKeyId():
+            raise MergeError("Merging keys with a different ID")
+
+        # Both keys must verify their self-signing signatures
+        self.verifySelfSignatures()
+        other.verifySelfSignatures()
+
+        # Merge revocations / direct keys
+        finalsigs = _mergeSignatures(self.iterSignatures(),
+                                     other.iterSignatures())
+        changed = False
+        if self.revsigs != finalsigs:
+            changed = True
+            self.revsigs = finalsigs
+
+        # Now merge user ids
+        changed = self._mergeUserIds(other) or changed
+
+        # And merge subkeys
+        changed = self._mergeSubkeys(other) or changed
+        return changed
+
+    def _mergeUserIds(self, other):
+        luids = {}
+        # Preserve order
+        finaluids = []
+        for uid in itertools.chain(self.iterUserIds(), other.iterUserIds()):
+            luidlist = luids.setdefault(uid.id, [])
+            # We may have UserID and UserAttribute packets that can collide
+            # (though it's very unlikely)
+            for luid in luidlist:
+                if uid.tag == luid.tag:
+                    luid.merge(uid)
+                    break
+            else: # for
+                luidlist.append(uid)
+                finaluids.append(uid)
+        if self.uids == finaluids:
+            return False
+        self.uids = finaluids
+        return True
+
+    def _mergeSubkeys(self, other):
+        # Subkeys can only have one revocation (revoking a subkey effectively
+        # invalidates the key)
+        lkids = {}
+        # Preserve order
+        finalkeys = []
+        for skey in itertools.chain(self.iterSubKeys(), other.iterSubKeys()):
+            # Verify self signatures
+            skey.verifySelfSignatures()
+
+            keyId = skey.getKeyId()
+            if keyId not in lkids:
+                lkids[keyId] = skey
+                finalkeys.append(skey)
+                continue
+            skey.merge(lkids[keyId])
+        if self.subkeys == finalkeys:
+            return False
+        self.subkeys = finalkeys
+        return True
+
 class PGP_PublicAnyKey(PGP_Key):
     pubTag = None
     def toPublicKey(self, minHeaderLen = 2):
@@ -2167,7 +2311,7 @@ class PGP_SubKey(PGP_Key):
         return self.getParentPacket()
 
     def verifySelfSignatures(self):
-        # seek the main key associated with this subkey
+        # Get the main key associated with this subkey
         mainKey = self.getParentPacket()
         # since this is a subkey, let's go ahead and make sure the
         # main key is valid before we continue
@@ -2176,14 +2320,16 @@ class PGP_SubKey(PGP_Key):
         # Convert this subkey to a public key
         pkpkt = self.toPublicKey(minHeaderLen = 3)
 
-        # Only verify direct signatures
         keyId = pkpkt.getKeyId()
+
+        # We should have a binding signature or a revocation
+        if self.bindingSig is None and self.bindingSigRevoc is None:
+            raise BadSelfSignature(keyId)
+
+        # Only verify direct signatures
         for sig in self.iterSelfSignatures():
             # There should be exactly one signature, according to
             # RFC 2440 11.1
-            sio = util.ExtendedStringIO()
-            mainpkpkt.write(sio)
-            pkpkt.write(sio)
             try:
                 sig._finalizeSelfSig(mainPgpKey)
             except BadSelfSignature:
@@ -2194,6 +2340,31 @@ class PGP_SubKey(PGP_Key):
             # No signatures on the subkey
             raise BadSelfSignature(keyId)
 
+        if self.bindingSig is None:
+            # No binding sig to further check (must have been revoked)
+            return
+
+        # Iterate over the unhashed packets of the binding signature, there
+        # may be a SIG_TYPE_PRKEY_BIND (0x19) embedded signature. See #12.1
+        # (Enhanced Key Formats) from the draft spec for details
+        embeddedSigs = [ x[1]
+                         for x in self.bindingSig.decodeUnhashedSubpackets()
+                         if x[0] == SIG_SUBPKT_EMBEDDED_SIG ]
+        if not embeddedSigs:
+            return
+        for sigStream in embeddedSigs:
+            sig = PGP_Signature(bodyStream = sigStream)
+            sig.parse()
+            if sig.sigType != SIG_TYPE_PRKEY_BIND:
+                # Non-signing keys can have this packet missing
+                continue
+            intKeyId = fingerprintToInternalKeyId(keyId)
+            if sig.getSigId() != intKeyId:
+                continue
+            sig.setParentPacket(self)
+            # Verify the signature with the subkey's public key
+            sig._finalizeSelfSig(self.makePgpKey())
+
     def iterSubKeys(self):
         # Nothing to iterate over, subkeys don't have subkeys
         return []
@@ -2202,6 +2373,60 @@ class PGP_SubKey(PGP_Key):
         for pkt in self.iterSubPackets():
             yield pkt
 
+    def merge(self, other):
+        """Merge this subkey with the other key"""
+        # Subkeys MUST have a key binding signature (unless it's been revoked,
+        # in which case only the revocation 
+        # They MAY also have an optional revocation.
+        # Revoking a subkey effectively terminates that key. Reconciling
+        # revocation signatures is therefore not a big issue - probably
+        # keeping one of the revocations would be enough -- misa
+        if other.bindingSigRevoc is not None:
+            # The other key is revoked.
+            if self.bindingSig is None:
+                if self.bindingSigRevoc == other.bindingSigRevoc:
+                    # Same key
+                    return False
+                # Our key verifies, so it must have a revocation (since it
+                # doesn't have a key binding sig)
+                assert(self.bindingSigRevoc is not None)
+
+                # we already have a revocation, keep ours
+                return False
+
+            # We have a binding sig; we can remove it, since we also have a
+            # revocation
+            self.bindingSig = None
+            # Prefer our own revocation
+            if self.bindingSigRevoc is None:
+                self.bindingSigRevoc = other.bindingSigRevoc
+            # We modified the key (at the very least we dropped the binding
+            # sig)
+            return True
+
+        # We verified the other key before we tried to merge, so this should
+        # not be possible
+        assert(other.bindingSig is not None)
+
+        if self.bindingSigRevoc is not None:
+            if self.bindingSig is not None:
+                # Drop the binding signature
+                self.bindingSig = None
+                return True
+            # This key is revoked, nothing else to do
+            return False
+
+        # self.bindingSigRevoc is None, we verified the key, so we must have a
+        # binding sig.
+        assert(self.bindingSig is not None)
+
+        if self.bindingSig.getSignatureHash() != other.bindingSig.getSignatureHash():
+            # This is very unlikely, since the binding signature is produced
+            # at the time the subkey is created, there should be only one
+            raise MergeError("Different binding signatures")
+
+        # Same binding sig, and no revocation
+        return False
 
 class PGP_PublicSubKey(PGP_SubKey, PGP_PublicAnyKey):
     __slots__ = []
@@ -2247,6 +2472,24 @@ def newKeyFromStream(stream):
     pkt.initSubPackets()
     return pkt
 
+
+def _mergeSignatures(*sources):
+    # Merge all signatures from the specified sources
+    lsigs = {}
+    # Preserve order
+    finalsigs = []
+    for sig in itertools.chain(*sources):
+        lsiglist = lsigs.setdefault(sig.getShortSigHash(), [])
+        # Do we already have this sig?
+        for lsig in lsiglist:
+            if sig.getSignatureHash() == lsig.getSignatureHash():
+                lsig.merge(sig)
+                break
+        else: # for
+            # This signature was not found; add it
+            lsiglist.append(sig)
+            finalsigs.append(sig)
+    return finalsigs
 
 def len2bytes(v1, v2):
     """Return the packet body length when represented on 2 bytes"""
