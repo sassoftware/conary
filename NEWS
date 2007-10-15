@@ -13,6 +13,10 @@ Changes in @NEW@:
       for scripts that open file descriptors and then disconnect from
       the terminal. (CNY-2143)
 
+  o Client Changes:
+    * Added listkeys, addkey, and getkey commands to cvc for basic command
+      line key management (CNY-2150)
+
 Changes in 1.2.2:
   o Build Changes:
     * Python and Ruby dependencies with lib-specific flags now cause

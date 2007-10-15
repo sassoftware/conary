@@ -475,7 +475,6 @@ def getFingerprints(keyRing):
 def parseAsciiArmorKey(asciiData):
     data = StringIO(asciiData)
     nextLine=' '
-
     try:
         while(nextLine[0] != '-'):
             nextLine = data.readline()
@@ -483,7 +482,7 @@ def parseAsciiArmorKey(asciiData):
             nextLine = data.readline()
         buf = ""
         nextLine = data.readline()
-        while(nextLine[0] != '='):
+        while(nextLine[0] != '=' and nextLine[0] != '-'):
             buf = buf + nextLine
             nextLine = data.readline()
     except IndexError:

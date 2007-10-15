@@ -232,6 +232,44 @@ have been made in the current source directory since the last
 error occurs, diff returns a value of 2. If there are differences
 in the local directory, 1 is returned. If no differences are found, 0
 is returned (this convention is consistent with \fBdiff\fR(1).
+
+.TP
+.B addkey [\fI<user>\fP]
+Reads the ASCII armored public key from stdin and adds it as a key for
+the specified user.  If no user is specified, the default user for that
+server is used.
+.RS 4
+.TP 4
+.B \-\-server [\fI<servername>\fP]
+The named repository server is queried instead of the server for the
+current \fRbuildLabel\fP.
+.RE
+
+.TP
+.B getkey [\fI<keyid>\fP]
+Displays the ASCII armored public key for the given keyId (a full fingerprint
+may also be used).
+.RS 4
+.TP 4
+.B \-\-server [\fI<servername>\fP]
+The named repository server is queried instead of the server for the
+current \fRbuildLabel\fP.
+.RE
+
+.TP
+.B listkeys [\fI<user>\fP]
+Displays the keyIds for the public keys stored on a server for a user
+user. If no user is specified, the default user for that server is used.
+.RS 4
+.TP 4
+.B \-\-fingerprints
+Display the full fingerprint for each key instead of the key id.
+.TP
+.B \-\-server [\fI<servername>\fP]
+The named repository server is queried instead of the server for the
+current \fRbuildLabel\fP.
+.RE
+
 .TP
 .B log [\fI<branch>\fP]
 Prints the log messages for the branch specified by \fBbuildLabel\fP,
