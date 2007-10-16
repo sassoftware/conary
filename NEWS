@@ -1,3 +1,8 @@
+Changes in 1.2.4:
+  o Bug Fixes:
+    * A file that was mistakenly ommitted from packaging has been
+      added to the build. (CNY-2155)
+
 Changes in 1.2.3:
   o Build Changes:
     * addSvnSnapshot() now has the ability to add specific SVN
