@@ -11,7 +11,7 @@ Changes in 1.2.4:
 Changes in 1.2.3:
   o Build Changes:
     * The addSvnSnapshot() source action now has the ability to add
-      specific SVN revisions via the 'revision' argument.
+      specific SVN revisions via the 'revision' argument. (CNY-2156)
   o Bug Fixes:
     * An update failure that would occur when two versions of a package
       have been installed, one local, one from a repository, has been
