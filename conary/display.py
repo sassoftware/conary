@@ -617,6 +617,8 @@ class TroveFormatter(TroveTupFormatter):
                 # on failed getTrove calls 
             except errors.TroveMissing:
                 pass
+            except errors.InsufficientPermission:
+                pass
 
         elif n.endswith(':source'):
             sourceTrove = trove
