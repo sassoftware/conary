@@ -1584,7 +1584,7 @@ class SingleGroup(object):
                copyScripts = False, copyCompatibilityClass = False):
         if flatten:
             if recurse:
-                raise RecipeFileError('Can only specify one of'
+                raise RecipeFileError('Can only specify one of '
                                       'flatten + recurse')
             recurse = ADDALL_FLATTEN
         elif recurse is None or recurse:
