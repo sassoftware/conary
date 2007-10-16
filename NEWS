@@ -5,8 +5,8 @@ Changes in @NEW@:
 
 Changes in 1.2.3:
   o Build Changes:
-    * addSvnSnapshot() now has the ability to add specific SVN
-      revisions via the 'revision' argument.
+    * The addSvnSnapshot() source action now has the ability to add
+      specific SVN revisions via the 'revision' argument.
   o Bug Fixes:
     * An update failure that would occur when two versions of a package
       have been installed, one local, one from a repository, has been
