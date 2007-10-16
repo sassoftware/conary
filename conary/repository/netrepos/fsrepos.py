@@ -52,7 +52,6 @@ class FilesystemChangeSetJob(ChangeSetJob):
                 raise errors.TroveIntegrityError(error=err, *nvf)
 
     def checkTroveSignatures(self, trv, callback):
-        return
         assert(hasattr(callback, 'verifyTroveSignatures'))
         if callback.keyCache is None:
             callback.keyCache = openpgpkey.getKeyCache()
@@ -140,17 +139,44 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    assert(not withContents)
 	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
 
-	file = self.troveStore.getFile(pathId, fileId)
+        fileObj = self.troveStore.getFile(pathId, fileId)
 	if withContents:
-	    if file.hasContents:
+            if fileObj.hasContents:
 		cont = filecontents.FromDataStore(self.contentsStore,
 						    file.contents.sha1())
 	    else:
 		cont = None
 
-	    return (file, cont)
+            return (fileObj, cont)
 
-	return file
+        return fileObj
+
+    def getFileVersions(self, fileList, withContents = False):
+        # this is for compatibility with <= 1.0.13
+        crossRepos = False
+        for (pathId, fileId, fileVersion) in fileList:
+            if fileVersion.getHost() not in self.serverNameList:
+                crossRepos = True
+
+        if crossRepos:
+            for x in fileList:
+                yield self.getFileVersion(withContents = withContents, *x)
+        else:
+            fileDict = self.troveStore.getFiles(fileList)
+            for x in fileList:
+                # (pathId, fileId) lookup
+                fileObj = fileDict[x[0:2]]
+
+                if withContents:
+                    if file.hasContents:
+                        cont = filecontents.FromDataStore(self.contentsStore,
+                                                          file.contents.sha1())
+                    else:
+                        cont = None
+
+                    yield (fileObj, cont)
+
+                yield fileObj
 
     def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
                        fileVersion, fileStream = None):

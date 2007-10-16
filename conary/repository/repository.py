@@ -38,7 +38,8 @@ class AbstractTroveDatabase:
 	@type l: list
 	@rtype list
 	"""
-	raise NotImplementedError
+        for x in l:
+            yield self.getFileVersion(*x)
 
     def getFileContents(self, fileList):
         # troveName, troveVersion, pathId, fileVersion, fileObj
@@ -528,7 +529,55 @@ class ChangeSetJob:
                 self.addFileVersion(troveInfo, pathId, None, path, fileId,
                                     newVersion)
 
-	    for (pathId, path, fileId, newVersion) in csTrove.getChangedFileList():
+            filesNeeded = []
+            for i, (pathId, path, fileId, newVersion) in enumerate(csTrove.getChangedFileList()):
+                tuple = newFileMap[pathId]
+                (oldPath, oldFileId, oldVersion) = tuple[-3:]
+                if path is None:
+                    path = oldPath
+                if fileId is None:
+                    oldFileId = fileId
+                if newVersion is None:
+                    newVersion = oldVersion
+
+                keep = False
+
+                if (fileHostFilter
+                    and newVersion.getHost() not in fileHostFilter):
+                    fileObj = None
+                    fileStream = None
+                elif (oldVersion == newVersion and oldFileId == fileId):
+                    # the file didn't change between versions; we can just
+                    # ignore it
+                    fileObj = None
+                    fileStream = None
+                else:
+                    fileStream = cs.getFileChange(oldFileId, fileId)
+
+                    if fileStream[0] == "\x01":
+                        filesNeeded.append((i, (pathId, oldFileId, oldVersion)))
+                        continue
+
+                    fileObj = files.ThawFile(fileStream, pathId)
+
+                # None is the file object
+                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+                                    newVersion, fileStream = fileStream)
+
+                if fileStream is not None:
+                    _handleContents(pathId, fileStream, newVersion,
+                                    oldFileId = oldFileId,
+                                    oldVersion = oldVersion,
+                                    oldfile = None)
+
+            oldFileObjects = list(repos.getFileVersions(
+                                        [ x[1] for x in filesNeeded ]))
+
+            for i, (pathId, path, fileId, newVersion) in enumerate(csTrove.getChangedFileList()):
+                if not filesNeeded or filesNeeded[0][0] != i:
+                    continue
+                filesNeeded.pop(0)
+
                 tuple = newFileMap[pathId]
                 (oldPath, oldFileId, oldVersion) = tuple[-3:]
                 if path is None:
@@ -540,39 +589,24 @@ class ChangeSetJob:
 
                 restoreContents = True
 
-                if (fileHostFilter
-                    and newVersion.getHost() not in fileHostFilter):
-                    fileObj = None
-                    fileStream = None
-		elif (oldVersion == newVersion and oldFileId == fileId):
-		    # the file didn't change between versions; we can just
-		    # ignore it
-		    fileObj = None
-                    fileStream = None
-		else:
-		    diff = cs.getFileChange(oldFileId, fileId)
+                diff = cs.getFileChange(oldFileId, fileId)
 
-                    if diff[0] == "\x01":
-                        # stored as a diff (the file type is the same
-                        # and (for *repository* commits) the file
-                        # is in the same repository between versions
-                        oldfile = repos.getFileVersion(pathId, oldFileId, oldVersion)
-                        fileObj = oldfile.copy()
-                        fileObj.twm(diff, oldfile)
-                        assert(fileObj.pathId() == pathId)
-                        fileStream = fileObj.freeze()
+                # stored as a diff (the file type is the same
+                # and (for *repository* commits) the file
+                # is in the same repository between versions
+                oldfile = oldFileObjects.pop(0)
+                fileObj = oldfile.copy()
+                fileObj.twm(diff, oldfile)
+                assert(fileObj.pathId() == pathId)
+                fileStream = fileObj.freeze()
 
-                        if (not mirror) and (
-                            fileObj.hasContents and fileObj.contents.sha1() == oldfile.contents.sha1()
-                            and not (fileObj.flags.isConfig() and not oldfile.flags.isConfig())):
-                            # don't restore the contents here. we don't
-                            # need them, and they may be relative to
-                            # something from a different repository
-                            restoreContents = False
-                    else:
-                        fileObj = files.ThawFile(diff, pathId)
-                        fileStream = diff
-                        oldfile = None
+                if (not mirror) and (
+                    fileObj.hasContents and fileObj.contents.sha1() == oldfile.contents.sha1()
+                    and not (fileObj.flags.isConfig() and not oldfile.flags.isConfig())):
+                    # don't restore the contents here. we don't
+                    # need them, and they may be relative to
+                    # something from a different repository
+                    restoreContents = False
 
                 if fileObj and fileObj.fileId() != fileId:
                     raise trove.TroveIntegrityError(csTrove.getName(),

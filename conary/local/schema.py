@@ -380,6 +380,19 @@ def createDependencies(db):
         db.commit()
         db.loadSchema()
 
+def setupTempTables(db):
+    cu = db.cursor()
+
+    if "getFilesTbl" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE getFilesTbl(
+            row %(PRIMARYKEY)s,
+            fileId BINARY
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["getFilesTbl"] = True
+
+    db.commit()
+
 def createSchema(db):
     createVersions(db)
     createInstances(db)
