@@ -1303,15 +1303,19 @@ class PGP_Signature(PGP_BaseKeySig):
         self._copyStream(self.mpiFile, stream)
         return stream
 
-    def writeBody(self, stream):
-        if isinstance(self.unhashedFile, util.ExtendedStringIO):
-            bodyStream = self._writeSigV4()
-            ns, nsp = self._nextStream, self._nextStreamPos
-            parentPkt = self._parentPacket
-            self.__init__(bodyStream, newStyle = self._newStyle)
-            self.setNextStream(ns, nsp)
-            self.setParentPacket(parentPkt)
-        return PGP_BaseKeySig.writeBody(self, stream)
+    def rewriteBody(self):
+        """Re-writes the body after the signature has been modified"""
+        if not isinstance(self.unhashedFile, util.ExtendedStringIO):
+            # Not changed
+            return
+
+        # Re-write ourselves
+        bodyStream = self._writeSigV4()
+        ns, nsp = self._nextStream, self._nextStreamPos
+        parentPkt = self._parentPacket
+        self.__init__(bodyStream, newStyle = self._newStyle)
+        self.setNextStream(ns, nsp)
+        self.setParentPacket(parentPkt)
 
     def getSigId(self):
         """Get the key ID of the issuer for this signature.
@@ -1340,6 +1344,8 @@ class PGP_Signature(PGP_BaseKeySig):
         return self._decodeSigSubpackets(self.hashedFile)
 
     def decodeUnhashedSubpackets(self):
+        if not self._parsed:
+            self.parse()
         if self._unhashedSubPackets is None:
             self._unhashedSubPackets = list(self._decodeSigSubpackets(self.unhashedFile))
         return self._unhashedSubPackets
@@ -1421,6 +1427,7 @@ class PGP_Signature(PGP_BaseKeySig):
     def merge(self, other):
         """Merge this signature with the other signature.
         Returns True if it modified the current packet"""
+        assert self.tag == other.tag
         # The signed part of the signature is immutable, there is no way we
         # can merge it. The only things we might be able to merge are the
         # unhashed signature subpackets
@@ -1433,6 +1440,7 @@ class PGP_Signature(PGP_BaseKeySig):
         return False
 
     def _prepareUnhashedSubpackets(self):
+        # XXX this is most likely going to change
         if self._unhashedSubPackets is None:
             # Nothing to do here
             return
@@ -1516,6 +1524,10 @@ class PGP_Signature(PGP_BaseKeySig):
 
         # Compute the signature digest
         sigString = self.getSignatureHash()
+        # Validate it against the short sigest
+        shortSigString = binSeqToString(self.hashSig)
+        if sigString[:2] != shortSigString:
+            raise BadSelfSignature(None)
 
         # if this is an RSA signature, it needs to properly padded
         # RFC 2440 5.2.2 and RFC 2313 10.1.2
@@ -2059,6 +2071,7 @@ class PGP_MainKey(PGP_Key):
     def merge(self, other):
         """Merge this key with the other key
         Return True if the key was modified"""
+        assert self.tag == other.tag
 
         if self.getKeyId() != other.getKeyId():
             raise MergeError("Merging keys with a different ID")
@@ -2086,18 +2099,19 @@ class PGP_MainKey(PGP_Key):
         luids = {}
         # Preserve order
         finaluids = []
+        changed = False
         for uid in itertools.chain(self.iterUserIds(), other.iterUserIds()):
             luidlist = luids.setdefault(uid.id, [])
             # We may have UserID and UserAttribute packets that can collide
             # (though it's very unlikely)
             for luid in luidlist:
                 if uid.tag == luid.tag:
-                    luid.merge(uid)
+                    changed = luid.merge(uid) or changed
                     break
             else: # for
                 luidlist.append(uid)
                 finaluids.append(uid)
-        if self.uids == finaluids:
+        if self.uids == finaluids and not changed:
             return False
         self.uids = finaluids
         return True
@@ -2108,6 +2122,7 @@ class PGP_MainKey(PGP_Key):
         lkids = {}
         # Preserve order
         finalkeys = []
+        changed = False
         for skey in itertools.chain(self.iterSubKeys(), other.iterSubKeys()):
             # Verify self signatures
             skey.verifySelfSignatures()
@@ -2117,8 +2132,8 @@ class PGP_MainKey(PGP_Key):
                 lkids[keyId] = skey
                 finalkeys.append(skey)
                 continue
-            skey.merge(lkids[keyId])
-        if self.subkeys == finalkeys:
+            changed = lkids[keyId].merge(skey) or changed
+        if self.subkeys == finalkeys and not changed:
             return False
         self.subkeys = finalkeys
         return True
@@ -2333,7 +2348,7 @@ class PGP_SubKey(PGP_Key):
             try:
                 sig._finalizeSelfSig(mainPgpKey)
             except BadSelfSignature:
-                raise BadSelfSignature(keyId)
+                raise BadSelfSignature(keyId), None, sys.exc_traceback
             # Stop after the first sig
             break
         else: # for
@@ -2375,6 +2390,7 @@ class PGP_SubKey(PGP_Key):
 
     def merge(self, other):
         """Merge this subkey with the other key"""
+        assert self.tag == other.tag
         # Subkeys MUST have a key binding signature (unless it's been revoked,
         # in which case only the revocation 
         # They MAY also have an optional revocation.
@@ -2384,7 +2400,8 @@ class PGP_SubKey(PGP_Key):
         if other.bindingSigRevoc is not None:
             # The other key is revoked.
             if self.bindingSig is None:
-                if self.bindingSigRevoc == other.bindingSigRevoc:
+                if self.bindingSigRevoc.getShortSigHash() == \
+                        other.bindingSigRevoc.getShortSigHash():
                     # Same key
                     return False
                 # Our key verifies, so it must have a revocation (since it
@@ -2394,15 +2411,18 @@ class PGP_SubKey(PGP_Key):
                 # we already have a revocation, keep ours
                 return False
 
-            # We have a binding sig; we can remove it, since we also have a
-            # revocation
-            self.bindingSig = None
             # Prefer our own revocation
+            changed = False
             if self.bindingSigRevoc is None:
                 self.bindingSigRevoc = other.bindingSigRevoc
-            # We modified the key (at the very least we dropped the binding
-            # sig)
-            return True
+                changed = True
+            if changed:
+                # While we are at it, drop the binding key too, it's not
+                # needed
+                self.bindingSig = None
+                # We modified the key
+                return True
+            return False
 
         # We verified the other key before we tried to merge, so this should
         # not be possible
