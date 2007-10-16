@@ -480,9 +480,7 @@ class ChangeSetJob:
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
                     hidden = hidden)
 
-            handled = set()
             for (pathId, path, fileId, newVersion) in csTrove.getNewFileList():
-                handled.add(pathId)
                 if (fileHostFilter
                     and newVersion.getHost() not in fileHostFilter):
                     fileObj = None
@@ -519,20 +517,26 @@ class ChangeSetJob:
 
                 _handleContents(pathId, fileStream, newVersion)
 
-	    for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
-                if pathId in handled:
-                    # new file
+            for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
+                # handle files which haven't changed; we know which those
+                # are because they're in the merged trove but they aren't
+                # in the newFileMap
+                if pathId in newFileMap:
                     continue
-                elif pathId not in newFileMap:
-                    # unchanged file
-                    oldPath = None
-                    oldFileId = None
-                    oldVersion = None
-                    tuple = None
-                    oldfile = None
-                else:
-                    tuple = newFileMap[pathId]
-                    (oldPath, oldFileId, oldVersion) = tuple[-3:]
+
+                # None is the fileObj, which we don't have (or need)
+                self.addFileVersion(troveInfo, pathId, None, path, fileId,
+                                    newVersion)
+
+	    for (pathId, path, fileId, newVersion) in csTrove.getChangedFileList():
+                tuple = newFileMap[pathId]
+                (oldPath, oldFileId, oldVersion) = tuple[-3:]
+                if path is None:
+                    path = oldPath
+                if fileId is None:
+                    oldFileId = fileId
+                if newVersion is None:
+                    newVersion = oldVersion
 
                 restoreContents = True
 
@@ -540,8 +544,7 @@ class ChangeSetJob:
                     and newVersion.getHost() not in fileHostFilter):
                     fileObj = None
                     fileStream = None
-		elif tuple is None or (oldVersion == newVersion and
-                                       oldFileId == fileId):
+		elif (oldVersion == newVersion and oldFileId == fileId):
 		    # the file didn't change between versions; we can just
 		    # ignore it
 		    fileObj = None
