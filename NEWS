@@ -1,7 +1,7 @@
 Changes in @NEW@:
   o Bug Fixes:
-    * A bug that resulted in a KeyError when removing a trove from a group
-      that has 3 levels of subgroups has been fixed (CNY-1372)
+    * A bug that resulted in a KeyError when removing a trove from a
+      group that has 3 levels of subgroups has been fixed. (CNY-1372)
 
 Changes in 1.2.3:
   o Build Changes:
