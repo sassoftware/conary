@@ -1011,6 +1011,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Instances using (instanceId)
             join Items using (itemId)
             where ugi.userGroupId in (%s)
+              and Items.hasTrove = 1
               %s
             """ % (",".join("%d" % x for x in groupIds),
                    troveTypeClause))
@@ -1025,10 +1026,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Items on Items.itemId = LabelMap.itemId
             where label = ?
               and userGroupId in (%s)
+              and Items.hasTrove = 1
               %s
             """ % (",".join("%d" % x for x in groupIds), troveTypeClause),
-                   labelStr)
-
+                       labelStr)
         return [ x[0] for x in cu ]
 
     @accessReadOnly
