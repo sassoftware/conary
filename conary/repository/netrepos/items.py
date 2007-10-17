@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -22,7 +22,11 @@ class Items(idtable.IdTable):
         cu = self.db.cursor()
         if val: val = 1
         else:   val = 0
-	cu.execute("UPDATE Items SET hasTrove=? WHERE itemId=?", (val, itemId))
+        # we attempt to avoid doinf busywork here in order to reduce
+        # lock contention on the items table during multiple commits       
+	cu.execute("UPDATE Items SET hasTrove = ? "
+                   "WHERE itemId = ? AND hasTrove != ?",
+                   (val, itemId, val))
 
     def iterkeys(self):
         cu = self.db.cursor()
