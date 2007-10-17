@@ -936,16 +936,14 @@ class PGP_BasePacket(object):
             # 5-byte body length length, first byte is 255
             stream.write(chr(255))
             blen = self.bodyLength & 0xffffffff
-            stream.write(binSeqToString(len4ToBytes(blen)))
+            self._writeBin(stream, len4ToBytes(blen))
             return
         if self.headerLength == 3:
             # 2-byte body length length
             if not (192 <= self.bodyLength < 8384):
                 raise InvalidPacketError("Invalid body length %s for "
                     "header length %s" % (self.bodyLength, self.headerLength))
-            b0, b1 = len2ToBytes(self.bodyLength)
-            stream.write(chr(b0))
-            stream.write(chr(b1))
+            self._writeBin(stream, len2ToBytes(self.bodyLength))
             return 
         if self.headerLength == 2:
             # 1-byte body length length
@@ -1242,12 +1240,13 @@ class PGP_Signature(PGP_BaseKeySig):
 
         creation = self.readBin(4)
         self.signerKeyId = self.readBin(8)
-        pkAlg, hashAlg, sig0, sig1 = self.readBin(4)
+        pkAlg, hashAlg = self.readBin(2)
+        hashSig = self.readExact(2)
 
         self.sigType = sigType
         self.pubKeyAlg = pkAlg
         self.hashAlg = hashAlg
-        self.hashSig = (sig0, sig1)
+        self.hashSig = hashSig
 
     def _readSigV4(self):
         sigType, pkAlg, hashAlg = self.readBin(3)
@@ -1268,7 +1267,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self.seek(uSubPktLen, SEEK_CUR)
 
         # Two-octet field holding left 16 bits of signed hash value.
-        hashSig = self.readBin(2)
+        hashSig = self.readExact(2)
 
         # MPI data
         mpiFile = util.SeekableNestedFile(self._bodyStream,
@@ -1298,15 +1297,13 @@ class PGP_Signature(PGP_BaseKeySig):
             sstream.seek(0, SEEK_END)
             slen = sstream.tell()
             # subpackets data length
-            b0 = (slen >> 8) & 0xFF
-            b1 = slen & 0xFF
-            self._writeBin(stream, [b0, b1])
+            self._writeBin(stream, int2ToBytes(slen))
             # And the stream itself
             sstream.seek(0)
             self._copyStream(sstream, stream)
 
         # 2-octet hash sig
-        self._writeBin(stream, self.hashSig)
+        stream.write(self.hashSig)
 
         # MPI file
         self.mpiFile.seek(0)
@@ -1434,7 +1431,7 @@ class PGP_Signature(PGP_BaseKeySig):
     def getShortSigHash(self):
         """Return the 16-leftmost bits for the signature hash"""
         self.parse()
-        return tuple(self.hashSig)
+        return self.hashSig
 
     def merge(self, other):
         """Merge this signature with the other signature.
@@ -1451,15 +1448,19 @@ class PGP_Signature(PGP_BaseKeySig):
         # Not much more to do here
         return False
 
-    def _prepareUnhashedSubpackets(self):
+    def _prepareSubpackets(self):
         # XXX this is most likely going to change
-        if self._unhashedSubPackets is None:
-            # Nothing to do here
-            return
-        stream = util.ExtendedStringIO()
-        for spktType, spktStream in self._unhashedSubPackets:
-            self._writeSubpacket(stream, spktType, spktStream)
-        self.unhashedFile = stream
+        if self._unhashedSubPackets is not None:
+            stream = util.ExtendedStringIO()
+            for spktType, spktStream in self._unhashedSubPackets:
+                self._writeSubpacket(stream, spktType, spktStream)
+            self.unhashedFile = stream
+        if self._hashedSubPackets is not None:
+            stream = util.ExtendedStringIO()
+            for spktType, spktStream in self._hashedSubPackets:
+                self._writeSubpacket(stream, spktType, spktStream)
+            self.hashedFile = stream
+        self._parsed = True
 
     @staticmethod
     def _writeSubpacket(stream, spktType, spktStream):
@@ -1506,7 +1507,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self._writeBin(dataFile, [ self.version, self.sigType, self.pubKeyAlg,
                                    self.hashAlg ])
         # Write hashed data length
-        self._writeBin(dataFile, [ hSubPktLen // 256, hSubPktLen % 256 ])
+        self._writeBin(dataFile, int2ToBytes(hSubPktLen))
         # Write the hashed data
         self._copyStream(self.hashedFile, dataFile)
 
@@ -1534,8 +1535,7 @@ class PGP_Signature(PGP_BaseKeySig):
         # Compute the signature digest
         sigString = self.getSignatureHash()
         # Validate it against the short sigest
-        shortSigString = binSeqToString(self.hashSig)
-        if sigString[:2] != shortSigString:
+        if sigString[:2] != self.hashSig:
             raise BadSelfSignature(None)
 
         # if this is an RSA signature, it needs to properly padded
