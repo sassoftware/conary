@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 1.2.2
+export VERSION = 1.2.4
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -72,9 +72,12 @@ smoketest: archive
 	tar jxf $(DISTDIR).tar.bz2 ; \
 	cd $(DISTDIR); \
 	make > /dev/null; \
-	./bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
+	tmpdir=$$(mktemp -d); \
+	make install DESTDIR=$$tmpdir > /dev/null; \
+	PYTHONPATH=$$tmpdir/usr/lib/python2.4/site-packages $$tmpdir/usr/bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
+	PYTHONPATH=$$tmpdir/usr/lib/python2.4/site-packages $$tmpdir/usr/bin/cvc --version > /dev/null || echo "CVC DOES NOT WORK"; \
 	cd -; \
-	rm -rf $(DISTDIR)
+	rm -rf $(DISTDIR) $$tmpdir
 
 forcedist: $(dist_files) smoketest
 

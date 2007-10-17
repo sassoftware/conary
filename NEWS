@@ -5,11 +5,32 @@ Changes in @NEW@:
       option informs conary to prefer x86_64 packages. This change allows
       group building to automatically resolve x86 packages. (CNY-525)
   o Bug Fixes:
+    * A bug that resulted in a KeyError when removing a trove from a
+      group that has 3 levels of subgroups has been fixed. (CNY-1372)
+
+Changes in 1.2.4:
+  o Bug Fixes:
+    * A file that was mistakenly ommitted from packaging has been
+      added to the build. (CNY-2155)
+
+Changes in 1.2.3:
+  o Build Changes:
+    * The addSvnSnapshot() source action now has the ability to add
+      specific SVN revisions via the 'revision' argument. (CNY-2156)
+  o Bug Fixes:
     * An update failure that would occur when two versions of a package
-      have been installed, one local, one from a repository, has been fixed.
-      (CNY-2127)
+      have been installed, one local, one from a repository, has been
+      fixed. (CNY-2127)
     * A regression introduced in 1.2.1 affecting patch files that apply
-      multiple changes to the same file has been fixed.  (CNY-2141)
+      multiple changes to the same file has been fixed. (CNY-2141)
+    * Group scripts now have file descriptor 0 (stdin) connected to
+      /dev/null. Previously, stdin was closed, a potential problem
+      for scripts that open file descriptors and then disconnect from
+      the terminal. (CNY-2143)
+
+  o Client Changes:
+    * Added listkeys, addkey, and getkey commands to cvc for basic
+      command line PGP key management. (CNY-2150)
 
 Changes in 1.2.2:
   o Build Changes:

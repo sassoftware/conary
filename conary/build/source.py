@@ -1225,9 +1225,9 @@ class addGitSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
                  self.tag)
-        util.execute("cd '%s' && git archive --prefix=%s-%s/ HEAD | "
+        util.execute("cd '%s' && git archive --prefix=%s-%s/ %s | "
                         "bzip2 > '%s'" %
-                        (lookasideDir, self.recipe.name, self.tag, target))
+                        (lookasideDir, self.recipe.name, self.tag, self.tag, target))
 
     def __init__(self, recipe, url, tag = 'HEAD', **kwargs):
         self.url = url % recipe.macros
@@ -1445,31 +1445,45 @@ class addSvnSnapshot(_RevisionControl):
         else:
             dirPath = urlBits[0].replace('/', '_')
 
-        return '/%s/%s--%s.tar.bz2' % (dirPath, self.project,
-                                       self.url.split('/')[-1])
+        # we need to preserve backwards compatibility with conarys (conaries?)
+        # prior to 1.2.3, which do not have a revision tag. Without this bit,
+        # conary 1.2.3+ will see sources committed with <=1.2.2 as not having
+        # the svn tarball stored correctly
+        if self.revision == 'HEAD':
+            denoteRevision = ''
+        else:
+            denoteRevision = '-revision-%s' % self.revision
+
+        return '/%s/%s--%s%s.tar.bz2' % (dirPath, self.project,
+                        self.url.split('/')[-1], denoteRevision)
 
     def createArchive(self, lookasideDir):
         os.mkdir(lookasideDir)
-        log.info('Checking out %s', self.url)
-        util.execute('svn -q checkout \'%s\' \'%s\'' % (self.url, lookasideDir))
+        log.info('Checking out %s, revision %s' % (self.url, self.revision))
+        util.execute('svn --quiet checkout --revision \'%s\' \'%s\' \'%s\'' 
+                     % (self.revision, self.url, lookasideDir))
 
     def updateArchive(self, lookasideDir):
-        log.info('Updating repository %s', self.project)
-        util.execute("cd '%s' && svn -q update" % lookasideDir)
+        log.info('Updating repository %s to revision %s'
+                  % (self.project,self.revision))
+        util.execute('cd \'%s\' && svn --quiet update --revision \'%s\'' 
+                      % ( lookasideDir, self.revision ))
 
     def createSnapshot(self, lookasideDir, target):
-        log.info('Creating repository snapshot for %s', self.url)
+        log.info('Creating repository snapshot for %s, revision %s' 
+                  % (self.url, self.revision))
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
-        util.execute("svn -q export '%s' '%s' && cd '%s' && "
+        util.execute("svn --quiet export --revision '%s' '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
-                        (lookasideDir, stagePath,
+                        (self.revision, lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
-    def __init__(self, recipe, url, project = None, **kwargs):
+    def __init__(self, recipe, url, project = None, revision = 'HEAD', **kwargs):
         self.url = url % recipe.macros
+        self.revision = revision % recipe.macros
         if project is None:
             self.project = recipe.name
         else:
