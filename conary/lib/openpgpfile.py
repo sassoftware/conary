@@ -460,7 +460,7 @@ def verifyRFC2440Checksum(data):
     if len(data) < 2:
         return 0
     checksum = [ ord(x) for x in data[-2:] ]
-    checksum = int2bytes(*checksum)
+    checksum = int2FromBytes(*checksum)
     runningCount=0
     for i in range(len(data) - 2):
         runningCount += ord(data[i])
@@ -814,7 +814,7 @@ class PGP_PacketFromStream(object):
             self._f.seek(2)
 
             rest = PGP_BasePacket._readBin(self._f, 4)
-            self.bodyLength = int4bytes(*rest)
+            self.bodyLength = int4FromBytes(*rest)
             return
         # 4.2.2.4. Partial Body Lengths
         partialBodyLength = 1 << (body1 & 0x1F)
@@ -936,16 +936,16 @@ class PGP_BasePacket(object):
             # 5-byte body length length, first byte is 255
             stream.write(chr(255))
             blen = self.bodyLength & 0xffffffff
-            for i in range(1, 5):
-                stream.write(chr((blen >> ((4 - i) << 3)) & 0xff))
+            stream.write(binSeqToString(len4ToBytes(blen)))
             return
         if self.headerLength == 3:
             # 2-byte body length length
             if not (192 <= self.bodyLength < 8384):
                 raise InvalidPacketError("Invalid body length %s for "
                     "header length %s" % (self.bodyLength, self.headerLength))
-            stream.write(chr(((self.bodyLength - 192) >> 8) + 192))
-            stream.write(chr((self.bodyLength - 192) & 0xff))
+            b0, b1 = len2ToBytes(self.bodyLength)
+            stream.write(chr(b0))
+            stream.write(chr(b1))
             return 
         if self.headerLength == 2:
             # 1-byte body length length
@@ -1160,7 +1160,7 @@ class PGP_BaseKeySig(PGP_BasePacket):
         ret = []
         for i in range(count):
             buf = self._readBin(stream, 2)
-            mLen = (int2bytes(*buf) + 7) // 8
+            mLen = (int2FromBytes(*buf) + 7) // 8
             if discard:
                 # Skip the MPI len
                 self._readExact(stream, mLen)
@@ -1316,7 +1316,8 @@ class PGP_Signature(PGP_BaseKeySig):
 
     def rewriteBody(self):
         """Re-writes the body after the signature has been modified"""
-        if not isinstance(self.unhashedFile, util.ExtendedStringIO):
+        if not (isinstance(self.unhashedFile, util.ExtendedStringIO) or
+                isinstance(self.hashedFile, util.ExtendedStringIO)):
             # Not changed
             return
 
@@ -1477,13 +1478,11 @@ class PGP_Signature(PGP_BaseKeySig):
             header.append(spktLen)
         elif spktLen < 16320:
             # 2-octet length
-            header.append((((spktLen - 192) >> 8) & 0xFF) + 192)
-            header.append((spktLen - 192) & 0xFF)
+            header.extend(len2ToBytes(spktLen))
         else:
             # 5-octet length
             header.append(255)
-            for i in range(1, 5):
-                header.append((spktLen >> ((4 - i) << 3)) & 0xff)
+            header.extend(len4ToBytes(spktLen))
         for d in header:
             stream.write(chr(d))
         # Type
@@ -1681,7 +1680,7 @@ class PGP_Key(PGP_BaseKeySig):
 
         ## daysValid
         data = self.readBin(2)
-        self.daysValid = int2bytes(*data)
+        self.daysValid = int2FromBytes(*data)
 
         ## Public key algorithm
         self.pubKeyAlg, = self.readBin(1)
@@ -2527,8 +2526,22 @@ def len4bytes(v1, v2, v3, v4):
     """Return the packet body length when represented on 4 bytes"""
     return (v1 << 24) | (v2 << 16) | (v3 << 8) | v4
 
-def int2bytes(v1, v2):
+def len2ToBytes(v):
+    return (((v - 192) >> 8) & 0xFF) + 192, (v - 192) & 0xFF
+
+def len4ToBytes(v):
+    return int4ToBytes(v)
+
+def int2FromBytes(v1, v2):
     return (v1 << 8) + v2
 
-def int4bytes(v1, v2, v3, v4):
+def int4FromBytes(v1, v2, v3, v4):
     return len4bytes(v1, v2, v3, v4)
+
+def int2ToBytes(v):
+    return (v >> 8) & 0xFF, v & 0xFF
+
+def int4ToBytes(v):
+    b0, b1 = (v >> 24) & 0xFF, (v >> 16) & 0xFF
+    b2, b3 = (v >> 8) & 0xFF, v & 0xFF
+    return b0, b1, b2, b3
