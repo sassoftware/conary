@@ -840,7 +840,8 @@ class PGP_BasePacket(object):
         self._nextStream = None
         self._nextStreamPos = 0
         self._parentPacket = None
-        self.validate()
+        self.setUp()
+        self.initialize()
 
     def setNextStream(self, stream, pos):
         if stream:
@@ -876,8 +877,14 @@ class PGP_BasePacket(object):
         newPkt.setParentPacket(self.getParentPacket(), clone = False)
         return newPkt
 
-    def validate(self):
-        """To be overridden by various subclasses"""
+    def setUp(self):
+        """setUp is executed at object creation time."""
+        pass
+
+    def initialize(self):
+        """initialize is executed at object creation time, after setUp(),
+        and generally everywhere the state has to be reset.
+        To be overridden by various subclasses"""
         pass
 
     def _getHeaderLength(self, minHeaderLen = 2):
@@ -1181,7 +1188,7 @@ class PGP_Signature(PGP_BaseKeySig):
 
     _parentPacketTypes = set(PKT_ALL_KEYS).union(PKT_ALL_USER)
 
-    def validate(self):
+    def initialize(self):
         self.version = self.sigType = self.pubKeyAlg = self.hashAlg = None
         self.hashSig = self.mpiFile = self.signerKeyId = None
         self.hashedFile = self.unhashedFile = None
@@ -1197,7 +1204,7 @@ class PGP_Signature(PGP_BaseKeySig):
             return
         self.resetBody()
         # Reset all internal state
-        self.validate()
+        self.initialize()
 
         sigVersion, = self.readBin(1)
         if sigVersion not in [3, 4]:
@@ -1320,7 +1327,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self.__init__(bodyStream, newStyle = self._newStyle)
         self.setNextStream(ns, nsp)
         self.setParentPacket(parentPkt)
-        self.validate()
+        self.initialize()
 
     def getSigId(self):
         """Get the key ID of the issuer for this signature.
@@ -1556,7 +1563,7 @@ class PGP_UserID(PGP_BasePacket):
 
     # Constant used for signing. See #5.2.4
     signingConstant = 0xB4
-    def validate(self):
+    def initialize(self):
         self.resetBody()
         self.parseBody()
         # Signatures for this user ID
@@ -1639,7 +1646,7 @@ class PGP_Key(PGP_BaseKeySig):
     # Base class for public/secret keys/subkeys
     tag = None
 
-    def validate(self):
+    def initialize(self):
         self.version = self.createdTimestamp = self.pubKeyAlg = None
         self.mpiFile = self.mpiLen = None
         self.daysValid = None
@@ -1654,6 +1661,8 @@ class PGP_Key(PGP_BaseKeySig):
             return
 
         self.resetBody()
+        # Reset all internal state
+        self.initialize()
         keyVersion, = self.readBin(1)
         if keyVersion not in [3, 4]:
             raise InvalidBodyError("Invalid key version %s" % keyVersion)
@@ -1812,8 +1821,7 @@ class PGP_Key(PGP_BaseKeySig):
 
     def _iterSelfSignatures(self, keyId):
         """Iterate over all the self-signatures"""
-        if self._parsed is False:
-            self.parse()
+        self.parse()
 
         intKeyId = fingerprintToInternalKeyId(keyId)
         # Look for a self signature
@@ -1841,8 +1849,7 @@ class PGP_Key(PGP_BaseKeySig):
         # first search for the public key algortihm octet. if the key is really
         # old, this might be the only hint that it's legal to use this key to
         # make digital signatures.
-        if self._parsed is False:
-            self.parse()
+        self.parse()
 
         if self.pubKeyAlg in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
             # the public key algorithm octet satisfies this test. no more
@@ -1870,8 +1877,7 @@ class PGP_Key(PGP_BaseKeySig):
 
     def getPublicKeyTuple(self):
         """Return the key material"""
-        if not self._parsed:
-            self.parse()
+        self.parse()
         self.mpiFile.seek(0, SEEK_SET)
         return self.readMPIs(self.mpiFile, self.pubKeyAlg)
 
@@ -1892,8 +1898,7 @@ class PGP_MainKey(PGP_Key):
             # Already processed
             return
 
-        if not self._parsed:
-            self.parse()
+        self.parse()
 
         self.revsigs = []
         self.uids = []
@@ -2167,14 +2172,14 @@ class PGP_SecretAnyKey(PGP_Key):
                  (AES, 128), (AES, 192), (AES, 256), ]
     _legalCiphers = set([ 2, 3, 4, 7, 8, 9 ])
 
-    def validate(self):
-        PGP_Key.validate(self)
+    def initialize(self):
+        PGP_Key.initialize(self)
         self.s2k = self.symmEncAlg = self.s2kType = None
         self.hashAlg = self.salt = self.count = None
         self.initialVector = self.encMpiFile = None
 
     def parse(self, force = False):
-        PGP_Key.parse(self)
+        PGP_Key.parse(self, force = force)
 
         # Seek to the end of the MPI file, just to be safe (we should be there
         # already)
@@ -2207,8 +2212,7 @@ class PGP_SecretAnyKey(PGP_Key):
         raise PGPError("Unsupported public key algorithm %s" % self.pubKeyAlg)
 
     def toPublicKey(self, minHeaderLen = 2):
-        if not self._parsed:
-            self.parse()
+        self.parse()
 
         # Create a nested file starting at the beginning of the body's and
         # with the length equal to the position in the body up to the MPIs
@@ -2218,8 +2222,7 @@ class PGP_SecretAnyKey(PGP_Key):
         return pkt
 
     def decrypt(self, passPhrase):
-        if not self._parsed:
-            self.parse()
+        self.parse()
         self.encMpiFile.seek(0, SEEK_SET)
 
         if self.s2k == ENCRYPTION_TYPE_UNENCRYPTED:
@@ -2304,8 +2307,7 @@ class PGP_SubKey(PGP_Key):
 
     _parentPacketTypes = set(PKT_MAIN_KEYS)
 
-    def validate(self):
-        PGP_Key.validate(self)
+    def setUp(self):
         self.bindingSig = None
         self.bindingSigRevoc = None
 
