@@ -1176,7 +1176,7 @@ class PGP_Signature(PGP_BaseKeySig):
     __slots__ = ['version', 'sigType', 'pubKeyAlg', 'hashAlg', 'hashSig',
                  'mpiFile', 'signerKeyId', 'hashedFile', 'unhashedFile',
                  '_parsed', '_sigDigest', '_parentPacket',
-                 '_unhashedSubPackets']
+                 '_hashedSubPackets', '_unhashedSubPackets']
     tag = PKT_SIG
 
     _parentPacketTypes = set(PKT_ALL_KEYS).union(PKT_ALL_USER)
@@ -1187,12 +1187,18 @@ class PGP_Signature(PGP_BaseKeySig):
         self.hashedFile = self.unhashedFile = None
         self._parsed = False
         self._sigDigest = None
+        self._hashedSubPackets = None
         self._unhashedSubPackets = None
 
-    def parse(self):
+    def parse(self, force = False):
         """Parse the signature body and initializes the internal data
         structures for other operations"""
+        if self._parsed and not force:
+            return
         self.resetBody()
+        # Reset all internal state
+        self.validate()
+
         sigVersion, = self.readBin(1)
         if sigVersion not in [3, 4]:
             raise InvalidBodyError("Invalid signature version %s" % sigVersion)
@@ -1216,8 +1222,7 @@ class PGP_Signature(PGP_BaseKeySig):
         return numMPI
 
     def parseMPIs(self):
-        if not self._parsed:
-            self.parse()
+        self.parse()
         assert hasattr(self, 'mpiFile') and self.mpiFile is not None
         self.mpiFile.seek(0)
         return self.readMPIs(self.mpiFile, self.pubKeyAlg)
@@ -1271,8 +1276,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self.unhashedFile = uSubpktsFile
 
     def _writeSigV4(self):
-        if not self._parsed:
-            self.parse()
+        self.parse()
 
         stream = util.ExtendedStringIO()
         self.hashedFile.seek(0, SEEK_END)
@@ -1316,12 +1320,12 @@ class PGP_Signature(PGP_BaseKeySig):
         self.__init__(bodyStream, newStyle = self._newStyle)
         self.setNextStream(ns, nsp)
         self.setParentPacket(parentPkt)
+        self.validate()
 
     def getSigId(self):
         """Get the key ID of the issuer for this signature.
         Return None if the packet did not contain an issuer key ID"""
-        if not self._parsed:
-            self.parse()
+        self.parse()
         if self.version == 3:
             assert self.signerKeyId is not None
             return binSeqToString(self.signerKeyId)
@@ -1341,11 +1345,13 @@ class PGP_Signature(PGP_BaseKeySig):
             return binSeqToString(self.signerKeyId)
 
     def decodeHashedSubpackets(self):
-        return self._decodeSigSubpackets(self.hashedFile)
+        self.parse()
+        if self._hashedSubPackets is None:
+            self._hashedSubPackets = list(self._decodeSigSubpackets(self.hashedFile))
+        return self._hashedSubPackets
 
     def decodeUnhashedSubpackets(self):
-        if not self._parsed:
-            self.parse()
+        self.parse()
         if self._unhashedSubPackets is None:
             self._unhashedSubPackets = list(self._decodeSigSubpackets(self.unhashedFile))
         return self._unhashedSubPackets
@@ -1390,8 +1396,7 @@ class PGP_Signature(PGP_BaseKeySig):
         return spktType, dataf
 
     def _writeSigPacketsToStream(self):
-        if not self._parsed:
-            self.parse()
+        self.parse()
         sio = util.ExtendedStringIO()
         parentPacket = self.getParentPacket()
         # XXX we could probably rewrite this if/then/else
@@ -1420,8 +1425,7 @@ class PGP_Signature(PGP_BaseKeySig):
 
     def getShortSigHash(self):
         """Return the 16-leftmost bits for the signature hash"""
-        if not self._parsed:
-            self.parse()
+        self.parse()
         return tuple(self.hashSig)
 
     def merge(self, other):
@@ -1482,8 +1486,7 @@ class PGP_Signature(PGP_BaseKeySig):
     def _computeSignatureHash(self, dataFile):
         """Compute the signature digest for this signature, using the
         key serialized in dataFile"""
-        if not self._parsed:
-            self.parse()
+        self.parse()
         if self.version != 4:
             raise InvalidKey("Self signature is not a V4 signature")
         dataFile.seek(0, SEEK_END)
@@ -1644,9 +1647,12 @@ class PGP_Key(PGP_BaseKeySig):
         self._keyId = None
         self._parsed = False
 
-    def parse(self):
+    def parse(self, force = False):
         """Parse the signature body and initializes the internal data
         structures for other operations"""
+        if self._parsed and not force:
+            return
+
         self.resetBody()
         keyVersion, = self.readBin(1)
         if keyVersion not in [3, 4]:
@@ -2167,7 +2173,7 @@ class PGP_SecretAnyKey(PGP_Key):
         self.hashAlg = self.salt = self.count = None
         self.initialVector = self.encMpiFile = None
 
-    def parse(self):
+    def parse(self, force = False):
         PGP_Key.parse(self)
 
         # Seek to the end of the MPI file, just to be safe (we should be there
