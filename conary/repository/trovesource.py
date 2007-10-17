@@ -625,13 +625,13 @@ class SearchableTroveSource(AbstractTroveSource):
         minScore = None
         matchingFlavors = []
         for strongFlavor, flavor in strongList:
-            for prefScore, preferenceFlavor in indexedList:
+            for currentScore, preferenceFlavor in indexedList:
                 if strongFlavor.satisfies(preferenceFlavor):
-                    if minScore is None or minScore < prefScore:
+                    if minScore is None or currentScore < minScore:
                         matchingFlavors = []
-                    elif minScore > prefScore:
+                    elif currentScore > minScore:
                         break
-                    minScore = prefScore
+                    minScore = currentScore
                     matchingFlavors.append(flavor)
                     break
             else:
