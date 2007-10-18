@@ -2476,7 +2476,7 @@ class PGP_SubKey(PGP_Key):
 
     def setUp(self):
         self.bindingSig = None
-        self.bindingSigRevoc = None
+        self.revocationSig = None
 
     def setBindingSig(self, sig):
         self.bindingSig = sig
@@ -2485,17 +2485,17 @@ class PGP_SubKey(PGP_Key):
         sig.resetSignatureHash()
 
     def setRevocationSig(self, sig):
-        self.bindingSigRevoc = sig
+        self.revocationSig = sig
         # No circular reference here
-        self.bindingSigRevoc.setParentPacket(self)
+        self.revocationSig.setParentPacket(self)
         sig.resetSignatureHash()
 
     def iterSubPackets(self):
         # Stop at another key
         if self.bindingSig:
             yield self.bindingSig
-        if self.bindingSigRevoc:
-            yield self.bindingSigRevoc
+        if self.revocationSig:
+            yield self.revocationSig
 
     def iterUserIds(self):
         # Subkeys don't have user ids
@@ -2525,7 +2525,7 @@ class PGP_SubKey(PGP_Key):
         keyId = pkpkt.getKeyId()
 
         # We should have a binding signature or a revocation
-        if self.bindingSig is None and self.bindingSigRevoc is None:
+        if self.bindingSig is None and self.revocationSig is None:
             raise BadSelfSignature(keyId)
 
         # Only verify direct signatures
@@ -2582,24 +2582,24 @@ class PGP_SubKey(PGP_Key):
         # Revoking a subkey effectively terminates that key. Reconciling
         # revocation signatures is therefore not a big issue - probably
         # keeping one of the revocations would be enough -- misa
-        if other.bindingSigRevoc is not None:
+        if other.revocationSig is not None:
             # The other key is revoked.
             if self.bindingSig is None:
-                if self.bindingSigRevoc.getShortSigHash() == \
-                        other.bindingSigRevoc.getShortSigHash():
+                if self.revocationSig.getShortSigHash() == \
+                        other.revocationSig.getShortSigHash():
                     # Same key
                     return False
                 # Our key verifies, so it must have a revocation (since it
                 # doesn't have a key binding sig)
-                assert(self.bindingSigRevoc is not None)
+                assert(self.revocationSig is not None)
 
                 # we already have a revocation, keep ours
                 return False
 
             # Prefer our own revocation
             changed = False
-            if self.bindingSigRevoc is None:
-                self.bindingSigRevoc = other.bindingSigRevoc
+            if self.revocationSig is None:
+                self.revocationSig = other.revocationSig
                 changed = True
             if changed:
                 # While we are at it, drop the binding key too, it's not
@@ -2613,7 +2613,7 @@ class PGP_SubKey(PGP_Key):
         # not be possible
         assert(other.bindingSig is not None)
 
-        if self.bindingSigRevoc is not None:
+        if self.revocationSig is not None:
             if self.bindingSig is not None:
                 # Drop the binding signature
                 self.bindingSig = None
@@ -2621,7 +2621,7 @@ class PGP_SubKey(PGP_Key):
             # This key is revoked, nothing else to do
             return False
 
-        # self.bindingSigRevoc is None, we verified the key, so we must have a
+        # self.revocationSig is None, we verified the key, so we must have a
         # binding sig.
         assert(self.bindingSig is not None)
 
