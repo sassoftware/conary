@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -23,14 +23,15 @@ from conary import callbacks
 from conary.lib.util import log
 
 from Crypto.PublicKey import DSA
-from openpgpfile import getPrivateKey
-from openpgpfile import getPublicKey
+from openpgpfile import BadPassPhrase
 from openpgpfile import getFingerprint
 from openpgpfile import getKeyEndOfLife
 from openpgpfile import getKeyTrust
-from openpgpfile import seekKeyById
-from openpgpfile import BadPassPhrase
+from openpgpfile import getPrivateKey
+from openpgpfile import getPublicKey
 from openpgpfile import KeyNotFound
+from openpgpfile import num_getRelPrime
+from openpgpfile import seekKeyById
 from openpgpfile import SEEK_SET, SEEK_END
 
 #-----#
@@ -74,7 +75,7 @@ class OpenPGPKey:
         if isinstance(self.cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
-                K = openpgpfile.num_getRelPrime(self.cryptoKey.q)
+                K = num_getRelPrime(self.cryptoKey.q)
         else:
             K = 0
         timeStamp = int(time())
