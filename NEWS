@@ -5,6 +5,9 @@ Changes in 2.0.0:
       exception class itself rather than in a large if/elif block (CNY-747)
     * troveNames and troveNamesByServer methods now accept a troveTypes
       argument and return present troves only by default (CNY-1838)
+    * the mirror client supports a --fast-sync flag which will only
+      scan for new troves in the source and skip the time-expensive
+      scans for changed trove info records (CNY-1756)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)

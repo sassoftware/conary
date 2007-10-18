@@ -43,6 +43,10 @@ def parseArgs(argv):
                       action = "store_true", default = False,
                       help = "replace all the trove signatures and metadata "
                       "in the target repository")
+    parser.add_option("--fast-sync", dest = "fastSync",
+                      action = "store_true", default = False,
+                      help = "skip checking/mirroring of changed info records "
+                             "for already mirrored troves")
     parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
                       default = False,
                       help = "ignore the last-mirrored timestamp in the "
@@ -110,7 +114,9 @@ def checkConfig(cfg):
             log.error("ERROR: label %s is not on host %s", label, cfg.host)
             raise RuntimeError("label %s is not on host %s", label, cfg.host)
 
-def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=False, infoSync=False):
+def mainWorkflow(cfg = None, callback=ChangesetCallback(),
+                 test=False, sync=False, infoSync=False,
+                 fastSync=False):
     if cfg.lockFile:
         try:
             log.debug('checking for lock file')
@@ -152,10 +158,12 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=Fals
     callAgain = mirrorRepository(sourceRepos, targets, cfg,
                                  test = test, sync = sync,
                                  syncSigs = infoSync,
-                                 callback = callback)
+                                 callback = callback,
+                                 fastSync = fastSync)
     while callAgain:
         callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                     test = test, callback = callback)
+                                     test = test, callback = callback,
+                                     fastSync = fastSync)
 
 
 def Main(argv=sys.argv[1:]):
@@ -174,7 +182,9 @@ def Main(argv=sys.argv[1:]):
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
 
-    mainWorkflow(cfg, callback, options.test, options.sync, options.infoSync)
+    mainWorkflow(cfg, callback, options.test,
+                 sync = options.sync, infoSync = options.infoSync,
+                 fastSync = options.fastSync)
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
@@ -360,8 +370,8 @@ def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCa
         os.close(outFd)
         log.debug("jobsplit %d of %d %s" % (
             i + 1, len(jobs), displayBundle([(0,x) for x in smallJobList])))
-        cs = src.createChangeSetFile(smallJobList, tmpName, recurse = False,
-                                     callback = callback, mirrorMode = True)
+        src.createChangeSetFile(smallJobList, tmpName, recurse = False,
+                                callback = callback, mirrorMode = True)
         for target in targetSet:
             target.commitChangeSetFile(tmpName, hidden = hidden, callback = callback)
         os.unlink(tmpName)
@@ -655,7 +665,8 @@ def getTroveList(src, cfg, mark):
 # name for compatibility reasons
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
-                     callback = ChangesetCallback()):
+                     callback = ChangesetCallback(),
+                     fastSync = False):
     checkConfig(cfg)
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
@@ -689,7 +700,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     for t in targets:
         t.mirrorGPG(sourceRepos, cfg.host)
     # mirror changed trove information for troves already mirrored
-    updateCount = mirrorTroveInfo(sourceRepos, targets, currentMark, cfg, syncSigs)
+    if fastSync:
+        updateCount = 0
+        log.debug("skip trove info records sync because of fast-sync")
+    else:                  
+        updateCount = mirrorTroveInfo(sourceRepos, targets, currentMark, cfg, syncSigs)
     newMark, troveList = getTroveList(sourceRepos, cfg, currentMark)
     if not troveList:
         if newMark > currentMark: # something was returned, but filtered out
@@ -794,8 +809,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             os.close(outFd)
             log.debug("getting (%d of %d) %s" % (i + 1, len(bundles), displayBundle(bundle)))
             try:
-                cs = sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
-                                                     callback = callback, mirrorMode = True)
+                sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
+                                                callback = callback, mirrorMode = True)
             except changeset.ChangeSetKeyConflictError, e:
                 splitJobList(jobList, sourceRepos, targetSet, hidden=hidden,
                              callback=callback)
