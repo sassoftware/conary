@@ -2,14 +2,13 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug that resulted in a KeyError when removing a trove from a
       group that has 3 levels of subgroups has been fixed. (CNY-1372)
-    * A bug that  could result in a decremented source count when promoting
+    * A bug that could result in a decremented source count when promoting
       a package to a sibling of a parent branch has been fixed. (CNY-2108)
 
 Changes in 1.2.4:
   o Bug Fixes:
     * A file that was mistakenly ommitted from packaging has been
       added to the build. (CNY-2155)
->>>>>>> /tmp/NEWS~other.FKaLVW
 
 Changes in 1.2.3:
   o Build Changes:
