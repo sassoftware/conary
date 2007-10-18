@@ -70,37 +70,11 @@ class OpenPGPKey:
     def getTimestamp(self):
         return self.timestamp
 
-    def _gcf(self, a, b):
-        while b:
-            a, b = b, a % b
-        return a
-
-    def _bitLen(self, a):
-        r=0
-        while a:
-            a, r = a/2, r+1
-        return r
-
-    def _getRelPrime(self, q):
-        # Use os module to ensure reads are unbuffered so as not to
-        # artifically deflate entropy
-        randFD = os.open('/dev/urandom', os.O_RDONLY)
-        b = self._bitLen(q)/8 + 1
-        r = 0L
-        while r < 2:
-            for i in range(b):
-                r = r*256 + ord(os.read(randFD, 1))
-                r %= q
-            while self._gcf(r, q-1) != 1:
-                r = (r+1) % q
-        os.close(randFD)
-        return r
-
     def signString(self, data):
         if isinstance(self.cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
-                K = self._getRelPrime(self.cryptoKey.q)
+                K = openpgpfile.num_getRelPrime(self.cryptoKey.q)
         else:
             K = 0
         timeStamp = int(time())
