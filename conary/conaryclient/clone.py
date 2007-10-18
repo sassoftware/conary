@@ -1183,14 +1183,15 @@ class LeafMap(object):
                              if (x.trailingRevision().getVersion()
                                  == revision.getVersion()) ]
         if matchingUpstream:
-            def _upstreamCount(a):
-                return list(revision.getSourceCount().iterCounts())[:-1]
-            revisionCount = _upstreamCount(revision)
+            def _sourceCounts(revision):
+                return list(revision.getSourceCount().iterCounts())
+            revisionCount = _sourceCounts(revision)[:-1]
             matchingShadowCounts = [ x for x in matchingUpstream
-                                     if _upstreamCount(x) == revisionCount ]
+                                     if _sourceCounts(x)[:-1] == revisionCount ]
             if matchingShadowCounts:
-                latest = sorted(matchingShadowCounts)[-1]
-                if revision in matchingShadowCounts or latest > revision:
+                latest = sorted(matchingShadowCounts, key=_sourceCounts)[-1]
+                if (revision in matchingShadowCounts
+                    or _sourceCounts(latest) > _sourceCounts(revision)):
                     revision = latest.copy()
                     desiredVersion = targetBranch.createVersion(revision)
                     desiredVersion.incrementSourceCount()
