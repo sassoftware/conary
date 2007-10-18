@@ -8,6 +8,8 @@ Changes in 2.0.0:
     * the mirror client supports a --fast-sync flag which will only
       scan for new troves in the source and skip the time-expensive
       scans for changed trove info records (CNY-1756)
+    * the mirror client supports a --absolute flag which will make it
+      use only absolute changesets to mirror content (CNY-1755)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)

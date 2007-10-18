@@ -47,6 +47,9 @@ def parseArgs(argv):
                       action = "store_true", default = False,
                       help = "skip checking/mirroring of changed info records "
                              "for already mirrored troves")
+    parser.add_option("--absolute", dest = "absolute",
+                      action = "store_true", default = False,
+                      help = "use only absolute changesets when mirroring content")
     parser.add_option("--full-trove-sync", dest = "sync", action = "store_true",
                       default = False,
                       help = "ignore the last-mirrored timestamp in the "
@@ -93,6 +96,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     downloadRateLimit     =  (conarycfg.CfgInt, 0)
     lockFile              =  cfg.CfgString
     useHiddenCommits      =  (cfg.CfgBool, True)
+    absoluteChangesets    =  (cfg.CfgBool, False)
     
     _allowNewSections   = True
     _defaultSectionType = MirrorConfigurationSection
@@ -177,7 +181,8 @@ def Main(argv=sys.argv[1:]):
     cfg = MirrorFileConfiguration()
     cfg.read(options.configFile, exception = True)
     callback = ChangesetCallback()
-
+    if options.absolute:
+        cfg.absoluteChangesets = True
     if options.verbose:
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
@@ -200,7 +205,7 @@ def groupTroves(troveList):
     grouping.sort(lambda a,b: cmp(a[0][0], b[0][0]))
     return grouping
 
-def buildJobList(repos, groupList):
+def buildJobList(repos, groupList, absolute = False):
     # Match each trove with something we already have; this is to mirror
     # using relative changesets, which is a lot more efficient than using
     # absolute ones.
@@ -228,7 +233,7 @@ def buildJobList(repos, groupList):
         for mark, (name, version, flavor) in group:
             # name, version, versionDistance, flavorScore
             currentMatch = (None, None, None, None)
-            if name not in latestAvailable:
+            if absolute or name not in latestAvailable:
                 job = (name, (None, None), (version, flavor), True)
             else:
                 d = latestAvailable[name]
@@ -567,7 +572,7 @@ class TargetRepository:
     
     def addTroveList(self, tl):
         # Filter out troves which are already in the local repository. Since
-        # the marks aren't distinct (they increase, but not monotonially), it's
+        # the marks aren't distinct (they increase, but not monotonically), it's
         # possible that something new got committed with the same mark we
         # last updated to, so we have to look again at all of the troves in the
         # source repository with the last mark which made it into our target.
@@ -593,12 +598,12 @@ class TargetRepository:
         self.repo.presentHiddenTroves(self.cfg.host)
                                       
 # split a troveList in changeset jobs
-def buildBundles(target, troveList):
+def buildBundles(target, troveList, absolute=False):
     bundles = []
     log.debug("grouping %d troves based on version and flavor", len(troveList))
     groupList = groupTroves(troveList)
     log.debug("building grouped job list")
-    bundles = buildJobList(target.repo, groupList)
+    bundles = buildJobList(target.repo, groupList, absolute)
     return bundles
 
 # return the new list of troves to process after filtering and sanity checks
@@ -796,7 +801,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # since these troves are required for all targets, we can use
         # the "first" one to build the relative changeset requests
         target = list(targetSet)[0]
-        bundles = buildBundles(target, troveList)
+        bundles = buildBundles(target, troveList, cfg.absoluteChangesets)
         for i, bundle in enumerate(bundles):
             jobList = [ x[1] for x in bundle ]
             # XXX it's a shame we can't give a hint as to what server to use
