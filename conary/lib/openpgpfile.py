@@ -1438,6 +1438,9 @@ class PGP_Signature(PGP_BaseKeySig):
             raise InvalidPacketError("Unexpected parent", self._parentPacket)
         return sio
 
+    def resetSignatureHash(self):
+        self._sigDigest = None
+
     def getSignatureHash(self):
         """Compute the signature digest"""
         if self._sigDigest is not None:
@@ -1558,7 +1561,7 @@ class PGP_Signature(PGP_BaseKeySig):
 
         # Compute the signature digest
         sigString = self.getSignatureHash()
-        # Validate it against the short sigest
+        # Validate it against the short digest
         if sigString[:2] != self.hashSig:
             raise BadSelfSignature(None)
 
@@ -1659,6 +1662,15 @@ class PGP_UserID(PGP_BasePacket):
             # No circular reference here, setParentPacket does a clone
             sig.setParentPacket(self)
             self.signatures.append(sig)
+
+    def adoptSignature(self, sig):
+        """Adopt the signature, if it's not ours already"""
+        pp = sig.getParentPacket()
+        if isinstance(pp, self.__class__) and self.id == pp.id:
+            return
+
+        sig.resetSignatureHash()
+        sig.setParentPacket(self)
 
     def iterSignatures(self):
         """Iterate over this user's UserID"""
@@ -1967,6 +1979,15 @@ class PGP_Key(PGP_BaseKeySig):
             return DSA.construct((y, g, p, q))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+    def adoptSignature(self, sig):
+        """Adopt the signature, if it's not ours already"""
+        pp = sig.getParentPacket()
+        if isinstance(pp, self.__class__) and pp.getKeyId() == self.getKeyId():
+            return
+
+        sig.resetSignatureHash()
+        sig.setParentPacket(self)
+
 class PGP_MainKey(PGP_Key):
     def initSubPackets(self):
         if hasattr(self, "subkeys"):
@@ -2044,13 +2065,11 @@ class PGP_MainKey(PGP_Key):
                 # in the previous loop
                 subkey = self.subkeys[-1]
                 pkt.parse()
-                # No circular reference here, setParentPacket does a clone
-                pkt.setParentPacket(subkey)
                 if pkt.sigType == SIG_TYPE_SUBKEY_REVOC:
-                    subkey.bindingSigRevoc = pkt
+                    subkey.setRevocationSig(pkt)
                     continue
                 if pkt.sigType == SIG_TYPE_SUBKEY_BIND:
-                    subkey.bindingSig = pkt
+                    subkey.setBindingSig(pkt)
                     continue
                 # There should not be any other type of signature here
                 assert False, "Unexpected signature type %s" % pkt.sigType
@@ -2095,14 +2114,15 @@ class PGP_MainKey(PGP_Key):
         keyId = pkpkt.getKeyId()
         pgpKey = pkpkt.makePgpKey()
         for sig in self.iterSelfSignatures():
+            self.adoptSignature(sig)
             sig.verify(pgpKey, keyId)
         for uid in self.iterUserIds():
+            verified = False
             for sig in uid.iterKeySignatures(keyId):
+                uid.adoptSignature(sig)
                 sig.verify(pgpKey, keyId)
-                # Only verify the first sig on the user ID.
-                # XXX Why? No idea yet
-                break
-            else: # for
+                verified = True
+            if not verified:
                 # No signature. Not good, according to our standards
                 raise BadSelfSignature(keyId)
 
@@ -2458,6 +2478,16 @@ class PGP_SubKey(PGP_Key):
         self.bindingSig = None
         self.bindingSigRevoc = None
 
+    def setBindingSig(self, sig):
+        self.bindingSig = sig
+        # No circular reference here
+        self.bindingSig.setParentPacket(self)
+
+    def setRevocationSig(self, sig):
+        self.bindingSigRevoc = sig
+        # No circular reference here
+        self.bindingSigRevoc.setParentPacket(self)
+
     def iterSubPackets(self):
         # Stop at another key
         if self.bindingSig:
@@ -2500,6 +2530,8 @@ class PGP_SubKey(PGP_Key):
         verified = False
         for sig in self.iterSelfSignatures():
             # We verify both the key binding and the revocation, if available
+            # Also make sure we're verifying the right key
+            self.adoptSignature(sig)
             sig.verify(mainPgpKey, keyId)
             verified = True
         if not verified:
@@ -2527,7 +2559,7 @@ class PGP_SubKey(PGP_Key):
             intKeyId = fingerprintToInternalKeyId(keyId)
             if sig.getSigId() != intKeyId:
                 continue
-            sig.setParentPacket(self)
+            self.adoptSignature(sig)
             # Verify the signature with the subkey's public key
             sig.verify(self.makePgpKey(), keyId)
 
