@@ -2482,11 +2482,13 @@ class PGP_SubKey(PGP_Key):
         self.bindingSig = sig
         # No circular reference here
         self.bindingSig.setParentPacket(self)
+        sig.resetSignatureHash()
 
     def setRevocationSig(self, sig):
         self.bindingSigRevoc = sig
         # No circular reference here
         self.bindingSigRevoc.setParentPacket(self)
+        sig.resetSignatureHash()
 
     def iterSubPackets(self):
         # Stop at another key
