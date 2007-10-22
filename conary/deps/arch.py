@@ -126,27 +126,37 @@ class IncompatibleInstructionSets(Exception):
 
 def getMajorArch(depList):
     """Return the major architecture from an instruction set dependency
-    @type depList: list (iterable) of Dependency objects
+    @type depList: list (iterable) of Dependency objects representing
+    architectures.
     @param depGroupL a list (iterable) of Dependency objects.
     @raise IncompatibleInstructionSets: when incompatible architectures are
            present in the list.
     @rtype: instance of Dependency, or None
     @return: major architecture from the list, or None if the list is empty
     """
-
     # Compare instruction sets by looking at the flavor preferences -
-    # the major architecture should be a superset of all other arches
+    # If a minor architecture is allowed to be set for this arch,
+    # then it will have flavor preferences that describe the allowed
+    # flavors.
     majorArch = None
-    archTableSet = set([])
+    depList = list(depList) # accept generators
+    if len(depList) == 1:
+        return depList[0]
     for dep in depList:
-        prefs = getFlavorPreferences([[dep]])
-        prefsSet = set(prefs)
-        if archTableSet.issubset(prefsSet):
-            archTableSet = set(prefs)
-            majorArch = dep
+        prefs = set(getFlavorPreferences([[dep]]))
+        if not prefs:
             continue
-        if prefsSet.issubset(archTableSet):
-            continue
-        raise IncompatibleInstructionSets(majorArch.name, dep)
-
+        prefArches = set()
+        for depSet in prefs:
+            for dep in depSet.iterDepsByClass(deps.InstructionSetDependency):
+                prefArches.add(dep)
+        majorArch = dep
+        break
+    if not majorArch:
+        raise IncompatibleInstructionSets(depList[0].name, depList[1])
+    for dep in depList:
+        if dep != majorArch and getFlavorPreferences([[dep]]):
+            raise IncompatibleInstructionSets(majorArch.name, dep)
+        elif dep not in prefArches:
+            raise IncompatibleInstructionSets(majorArch.name, dep)
     return majorArch
