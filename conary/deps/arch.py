@@ -146,11 +146,11 @@ def getMajorArch(depList):
         prefs = set(getFlavorPreferences([[dep]]))
         if not prefs:
             continue
+        majorArch = dep
         prefArches = set()
         for depSet in prefs:
             for dep in depSet.iterDepsByClass(deps.InstructionSetDependency):
                 prefArches.add(dep)
-        majorArch = dep
         break
     if not majorArch:
         raise IncompatibleInstructionSets(depList[0].name, depList[1])
