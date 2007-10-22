@@ -150,8 +150,8 @@ class DepResolutionMethod(object):
 
 
         troveNames = set([x[0] for x in troveTups])
-        allAffinityTroves = list(itertools.chain(*[affFlavorDict[x]
-                                                 for x in troveNames]))
+        allAffinityTroves = list(itertools.chain(*[affFlavorDict[x] or []
+                                                   for x in troveNames]))
         db = trovesource.SimpleTroveSource(allAffinityTroves)
         repos = trovesource.SimpleTroveSource(troveTups)
         repos.searchWithFlavor()
@@ -162,7 +162,7 @@ class DepResolutionMethod(object):
         # search for resolutions that would update an installed package.
         results = repos.findTroves(None, [(x, None, None)
                                      for x in troveNames], installFlavor,
-                                     getLeaves=False,
+                                     getLeaves=True,
                                      affinityDatabase=db,
                                      allowMissing=True)
         if results:
@@ -185,7 +185,7 @@ class DepResolutionMethod(object):
             # side-by-side.
             results = repos.findTroves(None, [(x, None, None)
                                      for x in troveNames], installFlavor,
-                                     getLeaves=False,
+                                     getLeaves=True,
                                      allowMissing=True)
             troveTups = list(itertools.chain(*results.itervalues()))
             flavoredList = [ (installFlavor, x) for x in troveTups ]
