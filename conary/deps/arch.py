@@ -140,6 +140,8 @@ def getMajorArch(depList):
     # flavors.
     majorArch = None
     depList = list(depList) # accept generators
+    if not depList:
+        return None
     if len(depList) == 1:
         return depList[0]
     for dep in depList:
