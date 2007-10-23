@@ -162,24 +162,33 @@ class DepResolutionMethod(object):
         # search for resolutions that would update an installed package.
         results = repos.findTroves(None, [(x, None, None)
                                      for x in troveNames], installFlavor,
-                                     getLeaves=True,
+                                     getLeaves=False,
+                                     bestFlavor=False,
                                      affinityDatabase=db,
                                      allowMissing=True)
         if results:
             flavoredList = []
             troveTups = list(itertools.chain(*results.itervalues()))
+            trovesByName = {}
             for troveTup in troveTups:
                 if troveTup in allAffinityTroves:
                     continue
-                affTups = affFlavorDict[troveTup[0]]
+                trovesByName.setdefault(troveTup[0], []).append(troveTup)
+            for troveName, troveTups in trovesByName.items():
+                affTups = affFlavorDict[troveName]
                 if affTups:
                     for affTup in affTups:
                         affFlavor = deps.overrideFlavor(installFlavor, affTup[2],
                                         mergeType = deps.DEP_MERGE_TYPE_PREFS)
-                        if affFlavor.satisfies(troveTup[2]):
+                        allTups = [ x for x in troveTups
+                                   if affFlavor.satisfies(x[2]) ]
+                        allTups = repos.filterTrovesByPreferences(allTups)
+                        for troveTup in allTups:
                             flavoredList.append((affFlavor, troveTup))
                 else:
-                    flavoredList.append((installFlavor, troveTup))
+                    allTups = repos.filterTrovesByPreferences(troveTups)
+                    for troveTup in allTups:
+                        flavoredList.append((installFlavor, troveTup))
         else:
             # fall back to searching for things that could be installed
             # side-by-side.
@@ -188,7 +197,8 @@ class DepResolutionMethod(object):
                                      getLeaves=True,
                                      allowMissing=True)
             troveTups = list(itertools.chain(*results.itervalues()))
-            flavoredList = [ (installFlavor, x) for x in troveTups ]
+            allTups = repos.filterTrovesByPreferences(troveTups)
+            flavoredList = [ (installFlavor, x) for x in allTups ]
 
         return self._selectMatchingResolutionTrove(requiredBy, dep,
                                                    depClass, flavoredList)
