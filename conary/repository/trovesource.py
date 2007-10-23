@@ -649,6 +649,21 @@ class SearchableTroveSource(AbstractTroveSource):
         else:
             return None, [], []
 
+    def filterTrovesByPreferences(self, troveList):
+        preferenceList = self._flavorPreferences
+        if not preferenceList:
+            return troveList
+        bestPreference = []
+        matchingNone = set(troveList)
+        bestMatching = []
+        for pref in preferenceList:
+            matching = [ x for x in troveList
+                         if x[2].stronglySatisfies(pref) ]
+            matchingNone.difference_update(matching)
+            if not bestMatching:
+                bestMatching = matching
+        return bestMatching + list(matchingNone)
+
     def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList, 
                                scoreCache):
         assert(flavorQuery is not None)
