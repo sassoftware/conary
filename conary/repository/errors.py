@@ -256,7 +256,7 @@ class GetFileContentsError(RepositoryError):
     def demarshall(marshaller, tup, kwArgs):
         return (marshaller.toFileId(tup[0]), marshaller.toVersion(tup[1])), {}
 
-    def __init__(self, (fileId, fileVer)):
+    def __init__(self, fileId, fileVer):
         self.fileId = fileId
         self.fileVer = fileVer
         RepositoryError.__init__(self, self.error % 

@@ -1203,8 +1203,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                 itertools.izip(rawStreams, fileList):
                 if stream is None:
                     raise errors.FileStreamNotFound(
-                                    (self.toFileId(encFileId),
-                                     self.toVersion(encVersion)))
+                                    self.toFileId(encFileId),
+                                    self.toVersion(encVersion))
             return True
 
         try:
@@ -1238,8 +1238,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         exception = errors.FileContentsNotFound
 
                 if exception:
-                    raise exception((self.toFileId(encFileId),
-                                     self.toVersion(encVersion)))
+                    raise exception(self.toFileId(encFileId),
+                                    self.toVersion(encVersion))
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])

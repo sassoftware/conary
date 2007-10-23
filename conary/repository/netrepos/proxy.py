@@ -239,7 +239,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
-            if protocolVersion < 60:
+            if protocol < 60:
                 return (False, True, ("MethodNotSupported", methodname, ""),
                         None)
             else:
