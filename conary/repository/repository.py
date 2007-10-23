@@ -480,7 +480,7 @@ class ChangeSetJob:
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
                     hidden = hidden)
-
+ 
             for (pathId, path, fileId, newVersion) in csTrove.getNewFileList():
                 if (fileHostFilter
                     and newVersion.getHost() not in fileHostFilter):
@@ -511,7 +511,9 @@ class ChangeSetJob:
                         if fileObj and fileObj.fileId() != fileId:
                             raise trove.TroveIntegrityError(csTrove.getName(),
                                   csTrove.getNewVersion(), csTrove.getNewFlavor(),
-                                  "fileObj.fileId() != fileId in changeset")
+                                  "fileObj.fileId() != fileId in changeset "
+                                  "for pathId %s" %
+                                        sha1helper.md5ToString(pathId))
 
                 self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
                                     newVersion, fileStream = fileStream)
@@ -554,11 +556,15 @@ class ChangeSetJob:
                 else:
                     fileStream = cs.getFileChange(oldFileId, fileId)
 
-                    if fileStream[0] == "\x01":
+                    if fileStream and fileStream[0] == "\x01":
                         filesNeeded.append((i, (pathId, oldFileId, oldVersion)))
                         continue
-
-                    fileObj = files.ThawFile(fileStream, pathId)
+                    elif fileStream:
+                        fileObj = files.ThawFile(fileStream, pathId)
+                    else:
+                        # no contents are in the changeset; take it on
+                        # faith that we already have them
+                        fileObj = None
 
                 # None is the file object
                 self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,

@@ -1,4 +1,8 @@
 Changes in 2.0.0:
+  o Optimizations:
+    * Reworked commit path to pull all modified streams from the repository
+      or database with one query (CNY-2053)
+
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
     * Most repository exceptions are demarshalled using logic in the
