@@ -23,6 +23,7 @@ For example::
    log.error("%s not found", foo)
 """
 
+import fcntl
 import logging
 import os
 import sys
@@ -77,6 +78,7 @@ class SysLog:
             try:
                 util.mkdirChain(os.path.dirname(pathElement))
                 self.f = open(pathElement, "a")
+                fcntl.fcntl(self.f.fileno(), fcntl.F_SETFD, 1)
                 break
             except:
                 pass

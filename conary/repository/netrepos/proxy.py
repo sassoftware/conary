@@ -122,7 +122,7 @@ class ProxyCallFactory:
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
-                     remoteIp, isSecure):
+                     remoteIp, isSecure, baseUrl):
         entitlementList = authToken[2][:]
         entitlementList += cfg.entitlement.find(targetServerName)
 
@@ -191,11 +191,11 @@ class RepositoryCallFactory:
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
                      localAddr, protocolString, headers, cfg,
-                     targetServerName, remoteIp, isSecure):
+                     targetServerName, remoteIp, isSecure, baseUrl):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos,
-                                remoteIp, rawUrl, isSecure)
+                                remoteIp, baseUrl, isSecure)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -261,7 +261,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                localAddr, protocolString,
                                                headers, self.cfg,
                                                targetServerName,
-                                               remoteIp, isSecure)
+                                               remoteIp, isSecure,
+                                               self.urlBase())
 
         # args[0] is the protocol version
         protocolVersion = args[0]

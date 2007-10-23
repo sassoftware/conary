@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -28,7 +28,7 @@ from conary import conarycfg
 from conary import conaryclient
 from conary import constants
 from conary import deps
-from conary import errors
+from conary import errors, keymgmt
 from conary import state
 from conary import updatecmd
 from conary import versions
@@ -649,6 +649,80 @@ class RenameCommand(CvcCommand):
         if len(args) != 3: return self.usage()
         checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
+
+class AddKeyCommand(CvcCommand):
+    commands = ['addkey']
+    paramHelp = '<user>'
+    help = 'Adds a public key from stdin to a repository'
+    commandGroup = 'Key Management'
+    docs = {'server'       : 'Repository server to retrieve keys from' }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['server'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        if len(args) == 3:
+            user = args[2]
+        elif len(args) == 2:
+            user = None
+        else:
+            return self.usage()
+
+        server = argSet.pop('server', None)
+        keymgmt.addKey(cfg, server, user)
+_register(AddKeyCommand)
+
+class GetKeyCommand(CvcCommand):
+    commands = ['getkey']
+    paramHelp = 'fingerprint'
+    help = 'Retrieves a specified public key from a repository'
+    commandGroup = 'Key Management'
+    docs = {'server'       : 'Repository server to retrieve keys from' }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['server'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        if len(args) != 3:
+            return self.usage()
+        else:
+            fingerprint = args[2]
+
+        server = argSet.pop('server', None)
+        keymgmt.showKey(cfg, server, fingerprint)
+_register(GetKeyCommand)
+
+class ListKeysCommand(CvcCommand):
+    commands = ['listkeys']
+    paramHelp = '[user]'
+    help = 'Lists the public key fingerprints for a specified user'
+    commandGroup = 'Key Management'
+    docs = {'fingerprints' : 'Display fingerprints of keys',
+            'server'       : 'Repository server to retrieve keys from' }
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['server'] = ONE_PARAM
+        argDef['fingerprints'] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        if len(args) > 3:
+            return self.usage()
+        elif len(args) == 3:
+            user = args[2]
+        else:
+            user = None
+
+        server = argSet.pop('server', None)
+        showFps = 'fingerprints' in argSet
+
+        keymgmt.displayKeys(cfg, server, user, showFingerprints = showFps)
+_register(ListKeysCommand)
 
 class RevertCommand(CvcCommand):
     commands = ['revert']

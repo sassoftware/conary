@@ -1990,6 +1990,9 @@ class _dependency(policy.Policy):
     def _getRubyLoadPath(self, macros, rubyInvocation, bootstrap):
         # Returns tuple of (invocationString, loadPathList)
         destdir = macros.destdir
+        if bootstrap:
+            rubyInvocation = (('LD_LIBRARY_PATH=%(destdir)s%(libdir)s '
+                               +rubyInvocation)%macros)
         rubyLoadPath = util.popen("%s -e 'puts $:'" %rubyInvocation).readlines()
         rubyLoadPath = [ x.strip() for x in rubyLoadPath if x.startswith('/') ]
         loadPathList = rubyLoadPath[:]
@@ -1997,16 +2000,18 @@ class _dependency(policy.Policy):
             rubyLoadPath = [ destdir+x for x in rubyLoadPath ]
             rubyInvocation = ('LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
                     ' RUBYLIB="'+':'.join(rubyLoadPath)+'"'
-                    ' %(destdir)s/%(ruby)s' %macros)
+                    ' %(destdir)s/%(ruby)s') % macros
         return (rubyInvocation, loadPathList)
 
-    def _getRubyVersion(self, macros, ruby):
-        rubyVersion = util.popen("%s -e 'puts RUBY_VERSION'" %ruby).read()
+    def _getRubyVersion(self, macros):
+        cmd = self.rubyInvocation + (" -e 'puts RUBY_VERSION'" % macros)
+        rubyVersion = util.popen(cmd).read()
         rubyVersion = '.'.join(rubyVersion.split('.')[0:2])
         return rubyVersion
 
     def _getRubyFlagsFromPath(self, pathName, rubyVersion):
         pathList = pathName.split('/')
+        pathList = [ x for x in pathList if x ]
         foundLib = False
         foundVer = False
         flags = set()
@@ -2551,10 +2556,9 @@ class Provides(_dependency):
                 self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
                 if not self.rubyInterpreter:
                     return False
-                self.rubyVersion = self._getRubyVersion(macros,
-                    self.rubyInterpreter)
                 self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
                     macros, self.rubyInterpreter, bootstrap)
+                self.rubyVersion = self._getRubyVersion(macros)
                 # we need to look deep first
                 self.rubyLoadPath = sorted(list(self.rubyLoadPath),
                                            key=len, reverse=True)
@@ -3242,10 +3246,9 @@ class Requires(_addInfo, _dependency):
             self.rubyInterpreter, bootstrap = self._getRuby(macros, path)
             if not self.rubyInterpreter:
                 return
-            self.rubyVersion = self._getRubyVersion(macros,
-                self.rubyInterpreter)
             self.rubyInvocation, self.rubyLoadPath = self._getRubyLoadPath(
                 macros, self.rubyInterpreter, bootstrap)
+            self.rubyVersion = self._getRubyVersion(macros)
         elif self.rubyInterpreter is False:
             return
 
@@ -3577,6 +3580,7 @@ class Flavor(policy.Policy):
         self.archFlavor = use.createFlavor(None, use.Arch._iterUsed())
         self.packageFlavor = deps.Flavor()
         self.troveMarked = False
+        self.componentMap = self.recipe.autopkg.componentMap
 
     def postProcess(self):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3585,8 +3589,18 @@ class Flavor(policy.Policy):
         for pkg in componentMap.values():
             pkg.flavor.union(self.packageFlavor)
 
-    def hasLib(self, path):
+    def hasLibInPath(self, path):
         return self.libRe.match(path) and not self.libReException.match(path)
+
+    def hasLibInDependencyFlag(self, path, f):
+        for depType in (deps.PythonDependencies, deps.RubyDependencies):
+            for dep in ([x for x in f.requires.deps.iterDepsByClass(depType)] +
+                        [x for x in f.provides.deps.iterDepsByClass(depType)]):
+                flagNames = [x[0] for x in dep.getFlags()[0]]
+                flagNames = [x for x in flagNames if x.startswith('lib')]
+                if flagNames:
+                    return True
+        return False
 
     def doFile(self, path):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3597,7 +3611,7 @@ class Flavor(policy.Policy):
         m = self.recipe.magic[path]
         if m and m.name == 'ELF' and 'isnset' in m.contents:
             isnset = m.contents['isnset']
-        elif self.hasLib(path):
+        elif self.hasLibInPath(path) or self.hasLibInDependencyFlag(path, f):
             # all possible paths in a %(lib)s-derived path get default
             # instruction set assigned if they don't have one already
             if f.hasContents:

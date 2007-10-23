@@ -655,53 +655,68 @@ class addPatch(_Source):
 	_Source.__init__(self, recipe, *args, **keywords)
 	self.applymacros = self.macros
 
-    def patchme(self, patch, f, destDir, patchlevels):
+    def _applyPatch(self, patchlevel, patch, destDir, dryRun=True):
+        patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
+        if self.backup:
+            patchArgs.extend(['-b', '-z', self.backup])
+        if self.extraArgs:
+            if isinstance(self.extraArgs, str):
+                patchArgs.append(self.extraArgs)
+            else:
+                patchArgs.extend(self.extraArgs)
+
+        fd, path = tempfile.mkstemp()
+        os.unlink(path)
+        logFile = os.fdopen(fd, 'w+')
+        if dryRun:
+            patchArgs.append('--dry-run')
+
+        p2 = subprocess.Popen(patchArgs,
+                              stdin=subprocess.PIPE,
+                              stderr=logFile, shell=False, stdout=logFile,
+                              close_fds=True)
+
+        p2.stdin.write(patch)
+        p2.stdin.close() # since stdin is closed, we can't
+                         # answer y/n questions.
+
+        failed = p2.wait()
+
+        logFile.flush()
+        logFile.seek(0,0)
+        return failed, logFile
+
+
+    def _patchAtLevels(self, patchPath, patch, destDir, patchlevels):
         logFiles = []
         log.info('attempting to apply %s to %s with patch level(s) %s'
-                 %(f, destDir, ', '.join(str(x) for x in patchlevels)))
+                 %(patchPath, destDir, ', '.join(str(x) for x in patchlevels)))
+        partiallyApplied = []
         for patchlevel in patchlevels:
-            patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
-            if self.backup:
-                patchArgs.extend(['-b', '-z', self.backup])
-            if self.extraArgs:
-                if isinstance(self.extraArgs, str):
-                    patchArgs.append(self.extraArgs)
-                else:
-                    patchArgs.extend(self.extraArgs)
+            failed, logFile = self._applyPatch(patchlevel, patch, destDir,
+                                              dryRun=True)
 
-            fd, path = tempfile.mkstemp()
-            os.unlink(path)
-            logFile = os.fdopen(fd, 'w+')
-
-            inFd, outFd = os.pipe()
-            p2 = subprocess.Popen(patchArgs, stdin=inFd, stderr=logFile,
-                                  shell=False, stdout=logFile, close_fds=True)
-
-            os.close(inFd)
-            offset=0
-            while len(patch[offset:]):
-                offset += os.write(outFd, patch[offset:])
-            os.close(outFd) # since stdin is closed, we can't
-                            # answer y/n questions.
-
-            failed = p2.wait()
-
-            logFile.flush()
-            logFile.seek(0,0)
             if failed:
                 # patch failed - keep patchlevel and logfile for display
                 # later
                 logFiles.append((patchlevel, logFile))
                 continue
-            # patch was successful
+
+            failed, logFile = self._applyPatch(patchlevel, patch, destDir,
+                                              dryRun=False)
+
             log.info(logFile.read().strip())
             logFile.close()
-            log.info('applied successfully with patch level %s'
-                     %patchlevel)
             # close any saved log files before we return
-            for patchlevel, f in logFiles:
+            for _, f in logFiles:
                 f.close()
+            if failed:
+                # this shouldn't happen.
+                raise SourceError('could not apply patch %s - applied with --dry-run but not normally' % patchPath)
+            # patch was successful - re-run this time actually applying
+            log.info('applied successfully with patch level %s' %patchlevel)
             return
+
         # all attemps were unsuccessful.  display relevant logs
         rightLevels = []
         # do two passes over all the log files.  Once to find
@@ -712,6 +727,30 @@ class addPatch(_Source):
             if "can't find file to patch" not in s:
                 rightLevels.append(idx)
             logFiles[idx] = (patchlevel, s)
+            logFile.close()
+
+        # attempt one more time for the cases where --dry-run causes
+        # patches to fail to apply because they modify the same file
+        # more than once.
+        if len(rightLevels) == 1:
+            fallbackLevel = logFiles[rightLevels[0]][0]
+        elif len(patchlevels) == 1:
+            fallbackLevel = patchlevels[0]
+        else:
+            fallbackLevel = 1
+        log.info('patch did not apply with --dry-run, trying level %s directly' % fallbackLevel)
+        failed, logFile = self._applyPatch(fallbackLevel, patch, destDir,
+                                           dryRun=False)
+        if not failed:
+            logFile.close()
+            log.info('applied successfully with patch level %s' % fallbackLevel)
+            return
+        # update the logFile value to match what we had here
+        idx = [idx for (idx, (patchlevel, _)) in enumerate(logFiles)
+               if patchlevel == fallbackLevel ][0]
+        logFiles[idx] = (fallbackLevel, logFile.read().strip())
+
+
         for idx, (patchlevel, s) in enumerate(logFiles):
             if rightLevels and idx not in rightLevels:
                 log.info('patch level %s failed - probably wrong level'
@@ -719,9 +758,9 @@ class addPatch(_Source):
                 continue
             log.info('patch level %s FAILED' % patchlevel)
             log.info(s)
-            logFile.close()
-        log.error('could not apply patch %s in directory %s', f, destDir)
-        raise SourceError, 'could not apply patch %s' % f
+        log.error('could not apply patch %s in directory %s', patchPath, 
+                  destDir)
+        raise SourceError, 'could not apply patch %s' % patchPath
 
     def doDownload(self):
 	f = self._findSource()
@@ -729,7 +768,7 @@ class addPatch(_Source):
         return f
 
     def do(self):
-        f = self.doDownload()
+        patchPath = self.doDownload()
         # FIXME: we should probably read in the patch directly now
         # that we aren't just applying in a pipeline
 	provides = "cat"
@@ -746,13 +785,13 @@ class addPatch(_Source):
             leveltuple = (1, 0, 2, 3,)
         util.mkdirChain(destDir)
 
-        pin = util.popen("%s '%s'" %(provides, f))
+        pin = util.popen("%s '%s'" %(provides, patchPath))
 	if self.applymacros:
             patch = pin.read() % self.recipe.macros
 	else:
             patch = pin.read()
         pin.close()
-        self.patchme(patch, f, destDir, leveltuple)
+        self._patchAtLevels(patchPath, patch, destDir, leveltuple)
 Patch = addPatch
 
 class addSource(_Source):
@@ -1120,6 +1159,83 @@ class _RevisionControl(addArchive):
     def doDownload(self):
         return self.fetch()
 
+class addGitSnapshot(_RevisionControl):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addGitSnapshot()}} - Adds a snapshot from a git
+    repository.
+
+    SYNOPSIS
+    ========
+
+    C{r.addGitSnapshot([I{url},] [I{tag}=,])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addGitSnapshot()} class extracts sources from a
+    git repository, places a tarred, bzipped archive into
+    the source component, and extracts that into the build directory
+    in a manner similar to r.addArchive.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addAction}:
+
+    B{dir} : Specify a directory to change into prior to executing the
+    command. An absolute directory specified as the C{dir} value
+    is considered relative to C{%(destdir)s}.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe
+
+    B{tag} : Git tag to use for the snapshot.
+    """
+
+    name = 'git'
+
+    def getFilename(self):
+        urlBits = self.url.split('//', 1)
+        if len(urlBits) == 1:
+            dirPath = self.url
+        else:
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
+
+        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                                       self.tag)
+
+    def createArchive(self, lookasideDir):
+        log.info('Cloning repository from %s', self.url)
+        util.execute('git clone -q %s \'%s\'' % (self.url, lookasideDir))
+
+    def updateArchive(self, lookasideDir):
+        log.info('Updating repository %s', self.url)
+        util.execute("cd '%s' && git pull -q %s" % (lookasideDir, self.url))
+
+    def createSnapshot(self, lookasideDir, target):
+        log.info('Creating repository snapshot for %s tag %s', self.url,
+                 self.tag)
+        util.execute("cd '%s' && git archive --prefix=%s-%s/ %s | "
+                        "bzip2 > '%s'" %
+                        (lookasideDir, self.recipe.name, self.tag, self.tag, target))
+
+    def __init__(self, recipe, url, tag = 'HEAD', **kwargs):
+        self.url = url % recipe.macros
+        self.tag = tag % recipe.macros
+        sourceName = self.getFilename()
+        _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
+
+
 class addMercurialSnapshot(_RevisionControl):
 
     """
@@ -1169,7 +1285,8 @@ class addMercurialSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag)
@@ -1324,35 +1441,49 @@ class addSvnSnapshot(_RevisionControl):
     def getFilename(self):
         urlBits = self.url.split('//', 1)
         if urlBits[0] == 'file:':
-            dirPath = urlBits[1]
+            dirPath = urlBits[1].replace('/', '_')
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[0].replace('/', '_')
 
-        return '/%s/%s--%s.tar.bz2' % (dirPath, self.project,
-                                       self.url.split('/')[-1])
+        # we need to preserve backwards compatibility with conarys (conaries?)
+        # prior to 1.2.3, which do not have a revision tag. Without this bit,
+        # conary 1.2.3+ will see sources committed with <=1.2.2 as not having
+        # the svn tarball stored correctly
+        if self.revision == 'HEAD':
+            denoteRevision = ''
+        else:
+            denoteRevision = '-revision-%s' % self.revision
+
+        return '/%s/%s--%s%s.tar.bz2' % (dirPath, self.project,
+                        self.url.split('/')[-1], denoteRevision)
 
     def createArchive(self, lookasideDir):
         os.mkdir(lookasideDir)
-        log.info('Checking out %s', self.url)
-        util.execute('svn -q checkout \'%s\' \'%s\'' % (self.url, lookasideDir))
+        log.info('Checking out %s, revision %s' % (self.url, self.revision))
+        util.execute('svn --quiet checkout --revision \'%s\' \'%s\' \'%s\'' 
+                     % (self.revision, self.url, lookasideDir))
 
     def updateArchive(self, lookasideDir):
-        log.info('Updating repository %s', self.project)
-        util.execute("cd '%s' && svn -q update" % lookasideDir)
+        log.info('Updating repository %s to revision %s'
+                  % (self.project,self.revision))
+        util.execute('cd \'%s\' && svn --quiet update --revision \'%s\'' 
+                      % ( lookasideDir, self.revision ))
 
     def createSnapshot(self, lookasideDir, target):
-        log.info('Creating repository snapshot for %s', self.url)
+        log.info('Creating repository snapshot for %s, revision %s' 
+                  % (self.url, self.revision))
         tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
-        util.execute("svn -q export '%s' '%s' && cd '%s' && "
+        util.execute("svn --quiet export --revision '%s' '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
-                        (lookasideDir, stagePath,
+                        (self.revision, lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(stagePath)
 
-    def __init__(self, recipe, url, project = None, **kwargs):
+    def __init__(self, recipe, url, project = None, revision = 'HEAD', **kwargs):
         self.url = url % recipe.macros
+        self.revision = revision % recipe.macros
         if project is None:
             self.project = recipe.name
         else:
@@ -1398,7 +1529,8 @@ class addBzrSnapshot(_RevisionControl):
         if len(urlBits) == 1:
             dirPath = self.url
         else:
-            dirPath = urlBits[0]
+            dirPath = urlBits[1]
+        dirPath = dirPath.replace('/', '_')
 
         return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
                                        self.tag or '')
@@ -1652,6 +1784,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
                 os.close(wpipe)
                 os.dup2(rpipe, 0)
                 os.chdir(directory)
+                util.massCloseFileDescriptors(3, 252)
                 os.execl(*cpioArgs)
             except Exception, e:
                 print 'Could not execute %s: %s' % (cpioArgs[0], e)

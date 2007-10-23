@@ -168,10 +168,12 @@ class GroupRecipe(_BaseGroupRecipe):
     B{autoResolve} : (False) If set to C{True}, Conary will include any extra
     troves needed to make this group dependency complete.
 
-    B{checkOnlyByDefaultDeps} : (True) By default, Conary checks only the
-    dependencies of the troves in a group that are installed by default.
-    Conary will check the dependencies of B{byDefault} C{False} troves as well
-    if this parameter is set to C{True}.
+    B{checkOnlyByDefaultDeps} : (True) Conary only checks the
+    dependencies of troves that are installed by default, referenced in the
+    group.  If set to C{False}, Conary will also check the dependencies of
+    B{byDefault} C{False} troves.  Doing this, however, will prevent groups
+    with C{autoResolve}=C{True} from changing the C{byDefault} status of
+    required troves.
 
     B{checkPathConflicts} : (True) Conary checks for path conflicts in each
     group by default to ensure that the group can be installed without path
@@ -1582,7 +1584,7 @@ class SingleGroup(object):
                copyScripts = False, copyCompatibilityClass = False):
         if flatten:
             if recurse:
-                raise RecipeFileError('Can only specify one of'
+                raise RecipeFileError('Can only specify one of '
                                       'flatten + recurse')
             recurse = ADDALL_FLATTEN
         elif recurse is None or recurse:
@@ -2224,6 +2226,15 @@ def followRedirect(recipeObj, trove, ref, reason):
                                     trove.getNameVersionFlavor()))
     searchSource = recipeObj._getSearchSource(ref)
     troveSpecs = [(x[0], str(x[1].label()), x[2]) for x in trove.iterRedirects()]
+    for troveSpec in troveSpecs:
+        if (troveSpec[0] == trove.getName()
+            and troveSpec[1] == str(trove.getVersion().trailingLabel())
+            and troveSpec[2] is None):
+            # this is a redirect to the same label w/ no flavor information.
+            # use the entire branch information to ensure we find the redirect
+            # target (otherwise we might get in an infinite loop)
+            troveSpecs = list(trove.iterRedirects())
+            break
     try:
         results = searchSource.findTroves(troveSpecs)
     except errors.TroveNotFound, err:
@@ -2233,6 +2244,8 @@ def followRedirect(recipeObj, trove, ref, reason):
         log.info('Found %s=%s[%s] following redirect' % troveTup)
     if not troveTups:
         log.info('Redirect is to nothing')
+    if trove.getNameVersionFlavor() in troveTups:
+        raise CookError('Redirect redirects to itself: %s=%s[%s].  Check your search path or remove redirect from recipe: %s' % trove.getNameVersionFlavor())
     return troveTups
 
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
@@ -2605,7 +2618,7 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap,
         unmatchedRemoveSpecs.difference_update(
                                 (x[0] for x in results.iteritems() if x[1]))
         for troveTup in findAllWeakTrovesToRemove(group, troveTups, cache,
-                                                  childGroups):
+                                                  childGroups, groupMap):
             group.delTrove(*troveTup)
 
     removeDifferences(group, differenceGroupList, differenceSpecs, troveMap, 
@@ -2653,7 +2666,8 @@ def addCopiedComponents(fromGroup, componentsToCopy, componentMap):
                                reason=(ADD_REASON_COPIED, fromGroup.name))
     return newExplicitTups
 
-def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
+def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups,
+                              groupMap):
     # we only remove weak troves if either a) they are primary 
     # removes or b) they are referenced only by troves being removed
     primaryErases = list(primaryErases)
@@ -2662,19 +2676,21 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
     parents = {}
 
     troveQueue = util.IterableQueue()
-
+    groupQueue = util.IterableQueue()
+    groupQueue.add(group)
 
     # create temporary parents info for all troves.  Unfortunately
     # we don't have this anywhere helpful like we do in the erase
     # on the system in conaryclient.update
-    groups = [group] + [ x[0] for x in childGroups ] 
-    for thisGroup in groups:
+    for thisGroup in groupQueue:
         for troveTup in chain(thisGroup.iterTroveList(strongRefs=True), 
                               troveQueue):
             for childTup in cache.iterTroveList(troveTup, strongRefs=True):
                 parents.setdefault(childTup, []).append(troveTup)
                 if trove.troveIsCollection(childTup[0]):
                     troveQueue.add(childTup)
+        for groupInfo in thisGroup.iterNewGroupList():
+            groupQueue.add(groupMap[groupInfo[0]])
 
     for troveTup in chain(primaryErases, troveQueue):
         # BFS through erase troves.  If any of the parents is not
@@ -2699,7 +2715,8 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups):
 
             if not keepTrove:
                 toErase.add(childTup)
-                troveQueue.add(childTup)
+                if trove.troveIsCollection(childTup[0]):
+                    troveQueue.add(childTup)
     return toErase
 
 

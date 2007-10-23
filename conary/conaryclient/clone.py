@@ -88,7 +88,7 @@ class CloneJob(object):
     def isEmpty(self):
         return not self.cloneJob
 
-MAX_CLONE_FILES  = 20000
+MAX_CLONE_FILES  = 5000
 
 class ClientClone:
 
@@ -133,7 +133,6 @@ class ClientClone:
 
     def _createCloneChangeSet(self, chooser, cloneOptions):
         callback = cloneOptions.callback
-        callback.determiningCloneTroves()
         troveCache = TroveCache(self.repos, callback)
 
         cloneJob, cloneMap, leafMap = self._createCloneJob(cloneOptions,
@@ -144,7 +143,7 @@ class ClientClone:
             return False, None
 
         cs, newFilesNeeded = self._buildChangeSet(chooser, cloneMap, cloneJob,
-                                                  leafMap, troveCache)
+                                                  leafMap, troveCache, callback)
         if cs is None:
             return False, None
 
@@ -152,26 +151,33 @@ class ClientClone:
         if cloneOptions.infoOnly:
             callback.done()
             return True, cs
-        callback.gettingCloneData()
         finalCs = changeset.ReadOnlyChangeSet()
         finalCs.merge(cs)
         pathList = []
-        if newFilesNeeded > MAX_CLONE_FILES:
+        total = len(newFilesNeeded)
+        current = 0
+        callback.rewritingFileVersions(current, total)
+        if len(newFilesNeeded) > MAX_CLONE_FILES:
             while newFilesNeeded:
                 cs = changeset.ChangeSet()
                 files = newFilesNeeded[:MAX_CLONE_FILES]
-                self._addCloneFiles(cs, files, callback)
+                self._addCloneFiles(cs, files, callback, current, total)
                 newFilesNeeded = newFilesNeeded[MAX_CLONE_FILES:]
                 fd, path = tempfile.mkstemp(prefix='conary-promote-')
                 os.close(fd)
                 cs.writeToFile(path)
                 finalCs.merge(changeset.ChangeSetFromFile(path))
                 os.remove(path)
+                current += MAX_CLONE_FILES
+                callback.rewritingFileVersions(current, total)
         else:
             # don't bother writing to disk
             cs = changeset.ChangeSet()
-            self._addCloneFiles(cs, newFilesNeeded, callback)
+            self._addCloneFiles(cs, newFilesNeeded, callback, current, total)
             finalCs.merge(cs)
+            current += len(newFilesNeeded)
+            callback.rewritingFileVersions(current, total)
+        callback.prefix = ''
         callback.done()
         return True, finalCs
 
@@ -179,18 +185,22 @@ class ClientClone:
         cloneJob = CloneJob(cloneOptions)
         cloneMap = CloneMap()
         chooser.setCloneMap(cloneMap)
+        cloneOptions.callback.determiningCloneTroves()
         if cloneOptions.cloneOnlyByDefaultTroves:
             self._setByDefaultMap(chooser, troveCache)
         _logMe('determining troves to clone')
-        self._determineTrovesToClone(chooser, cloneMap, cloneJob, troveCache)
+        self._determineTrovesToClone(chooser, cloneMap, cloneJob, troveCache,
+                                     cloneOptions.callback)
         cloneOptions.callback.determiningTargets()
 
         _logMe('get existing leaves')
         leafMap = self._getExistingLeaves(cloneMap, troveCache, cloneOptions)
         _logMe('target sources')
-        self._targetSources(chooser, cloneMap, cloneJob, leafMap, troveCache)
+        self._targetSources(chooser, cloneMap, cloneJob, leafMap, troveCache,
+                            cloneOptions.callback)
         _logMe('target binaries')
-        self._targetBinaries(cloneMap, cloneJob, leafMap, troveCache)
+        self._targetBinaries(cloneMap, cloneJob, leafMap, troveCache,
+                             cloneOptions.callback)
 
         # some clones may rewrite the child troves (if cloneOnlyByDefaultTroves
         # is True).  We need to make sure that any precloned aren't having
@@ -200,7 +210,8 @@ class ClientClone:
                                leafMap)
         troveTups = cloneJob.getTrovesToClone()
         unmetNeeds = self._checkNeedsFulfilled(troveTups, chooser, cloneMap,
-                                               leafMap, troveCache)
+                                               leafMap, troveCache, 
+                                               cloneOptions.callback)
         if unmetNeeds:
             _logMe('could not clone')
             raise CloneIncomplete(unmetNeeds)
@@ -225,24 +236,34 @@ class ClientClone:
             byDefaultDict.update(defaults)
         chooser.setByDefaultMap(byDefaultDict)
 
-    def _determineTrovesToClone(self, chooser, cloneMap, cloneJob, troveCache):
+    def _determineTrovesToClone(self, chooser, cloneMap, cloneJob, troveCache,
+                                callback):
         seen = set()
         toClone = chooser.getPrimaryTroveList()
+        total = 0
+        current = 0
         while toClone:
+            total += len(toClone)
             needed = []
 
+            callback.determiningCloneTroves(current, total)
             for info in toClone:
                 if (trove.troveIsPackage(info[0])
                     and chooser.shouldPotentiallyClone(info) is False):
+                    current += 1
                     continue
 
                 if info not in seen:
                     needed.append(info)
                     seen.add(info)
+                else:
+                    current += 1
 
             troves = troveCache.getTroves(needed, withFiles = False)
             newToClone = []
             for info, trv in itertools.izip(needed, troves):
+                current += 1
+                callback.determiningCloneTroves(current, total)
                 troveTup = trv.getNameVersionFlavor()
                 if troveTup[0].endswith(':source'):
                     sourceName = None
@@ -343,7 +364,8 @@ class ClientClone:
         for troveTup, clonedFrom in clonedFromInfo.iteritems():
             leafMap.addTrove(troveTup, clonedFrom)
 
-    def _targetSources(self, chooser, cloneMap, cloneJob, leafMap, troveCache):
+    def _targetSources(self, chooser, cloneMap, cloneJob, leafMap, troveCache,
+                       callback):
         hasTroves = self.repos.hasTroves(
                         [x[0] for x in cloneMap.iterSourceTargetBranches()])
         presentTroveTups = [x[0] for x in hasTroves.items() if x[1]]
@@ -351,7 +373,11 @@ class ClientClone:
         self._addClonedFromInfo(troveCache, leafMap, presentTroveTups)
         _logMe("done")
 
+        total = len(list(cloneMap.iterSourceTargetBranches()))
+        current = 0
         for sourceTup, targetBranch in cloneMap.iterSourceTargetBranches():
+            current += 1
+            callback.targetSources(current, total)
             if hasTroves[sourceTup]:
                 newVersion = leafMap.isAlreadyCloned(sourceTup, targetBranch)
                 if newVersion:
@@ -387,13 +413,15 @@ class ClientClone:
                             "Cannot find required source %s on branch %s." \
                                      % (sourceTup[0], targetBranch))
 
-    def _targetBinaries(self, cloneMap, cloneJob, leafMap, troveCache):
+    def _targetBinaries(self, cloneMap, cloneJob, leafMap, troveCache, callback):
         allBinaries = itertools.chain(*[x[1] for x in
                                         cloneMap.getBinaryTrovesBySource()])
         _logMe("Getting clonedFromInfo for binaries")
         self._addClonedFromInfo(troveCache, leafMap, allBinaries)
         _logMe("Actually targeting binaries")
         versionsToGet = []
+        total = len(list(itertools.chain(*[x[0] for x in cloneMap.getBinaryTrovesBySource()])))
+        current = 0
         for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
             targetSourceVersion = cloneMap.getTargetVersion(sourceTup)
             if targetSourceVersion is None:
@@ -404,6 +432,8 @@ class ClientClone:
 
             byVersion = {}
             for binaryTup in binaryList:
+                current += 1
+                callback.targetBinaries(current, total)
                 byFlavor = byVersion.setdefault(binaryTup[1].getSourceVersion(),
                                                 {})
                 byFlavor.setdefault(binaryTup[2], []).append(binaryTup)
@@ -431,6 +461,7 @@ class ClientClone:
         if not versionsToGet:
             return
         _logMe("getting new version for %s binaries" % (len(versionsToGet)))
+        callback.targetBinaries()
         newVersions = leafMap.createBinaryVersions(self.repos,
                                                    versionsToGet)
         for newVersion, versionInfo in itertools.izip(newVersions,
@@ -441,13 +472,18 @@ class ClientClone:
                 cloneJob.target(binaryTup, newVersion)
 
     def _checkNeedsFulfilled(self, troveTups, chooser, cloneMap, leafMap,
-                             troveCache):
+                             troveCache, callback):
         query = {}
         neededInfoTroveTups = {}
+        callback.checkNeedsFulfilled()
+        total = len(troveTups)
+        current = 0
 
         _logMe("Checking needs are fulfilled for %s troves" % (len(troveTups)))
         troveCache.getTroves(troveTups, withFiles=False)
         for troveTup in troveTups:
+            current += 1
+            callback.checkNeedsFulfilled(current, total)
             trv = troveCache.getTrove(troveTup, withFiles=False)
             for mark, src in _iterAllVersions(trv):
                 if (chooser.troveInfoNeedsRewrite(mark, src)
@@ -457,7 +493,11 @@ class ClientClone:
         _logMe("Checking clonedFrom info for %s needed troves" % (len(neededInfoTroveTups)))
         self._addClonedFromInfo(troveCache, leafMap, neededInfoTroveTups)
 
+        total = len(neededInfoTroveTups)
+        current = 0
         for troveTup in neededInfoTroveTups:
+            callback.checkNeedsFulfilled(current, total)
+            current += 1
             targetBranch = chooser.getTargetBranch(troveTup[1])
             if leafMap.isAlreadyCloned(troveTup, targetBranch):
                 continue
@@ -480,7 +520,11 @@ class ClientClone:
                     matches.append(troveTup)
         _logMe("Checking clonedFrom info for %s matching nodes" % (len(matches)))
         self._addClonedFromInfo(troveCache, leafMap, matches)
+        total = len(query)
+        current = 0
         for queryItem, (sourceTup, markList) in query.items():
+            current += 1
+            callback.checkNeedsFulfilled(current, total)
             newVersion = leafMap.isAlreadyCloned(sourceTup, queryItem[1])
             if not newVersion:
                 newVersion = leafMap.hasAncestor(sourceTup, queryItem[1], self.repos)
@@ -543,12 +587,17 @@ class ClientClone:
             return False
         return True
 
-    def _buildChangeSet(self, chooser, cloneMap, cloneJob, leafMap, troveCache):
+    def _buildChangeSet(self, chooser, cloneMap, cloneJob, leafMap, troveCache,
+                        callback):
         allFilesNeeded = []
         cs = changeset.ChangeSet()
         allTroveList = [x[0] for x in cloneJob.iterTargetList()]
         allTroves = troveCache.getTroves(allTroveList, withFiles=True)
+        current = 0
+        total = len(list(cloneJob.iterTargetList()))
         for troveTup, newVersion in cloneJob.iterTargetList():
+            current += 1
+            callback.rewriteTrove(current, total)
             trv = troveCache.getTrove(troveTup, withFiles=True)
             newFilesNeeded = self._rewriteTrove(trv, newVersion, chooser,
                                                 cloneMap, cloneJob, leafMap,
@@ -657,8 +706,10 @@ class ClientClone:
 
         return filesNeeded
 
-    def _addCloneFiles(self, cs, newFilesNeeded, callback):
+    def _addCloneFiles(self, cs, newFilesNeeded, callback, current, total):
+        callback.requestingFiles(len(newFilesNeeded))
         fileObjs = self.repos.getFileVersions(newFilesNeeded)
+        callback.rewritingFileVersions(current, total)
         contentsNeeded = []
         pathIdsNeeded = []
         fileObjsNeeded = []
@@ -792,9 +843,12 @@ class TroveCache(object):
         theDict = self.troves[withFiles]
         needed = [ x for x in troveTups if x not in theDict ]
         if needed:
+            msg = getattr(self.callback, 'lastMessage', None)
             _logMe('getting %s troves from repos' % len(needed))
             troves = self.repos.getTroves(needed, withFiles=withFiles,
                                           callback=self.callback)
+            if msg:
+                self.callback._message(msg)
             theDict.update(itertools.izip(needed, troves))
         return [ theDict[x] for x in troveTups]
 
@@ -1123,10 +1177,26 @@ class LeafMap(object):
         # the last shadow count is not allowed to be a 0
         if [ x for x in revision.getSourceCount().iterCounts() ][-1] == 0:
             desiredVersion.incrementSourceCount()
+        # if 1-3.6 exists we don't want to be created 1-3.5.
+        matchingUpstream = [ x.trailingRevision()
+                             for x in targetBranchVersionList
+                             if (x.trailingRevision().getVersion()
+                                 == revision.getVersion()) ]
+        if matchingUpstream:
+            def _sourceCounts(revision):
+                return list(revision.getSourceCount().iterCounts())
+            revisionCount = _sourceCounts(revision)[:-1]
+            matchingShadowCounts = [ x for x in matchingUpstream
+                                     if _sourceCounts(x)[:-1] == revisionCount ]
+            if matchingShadowCounts:
+                latest = sorted(matchingShadowCounts, key=_sourceCounts)[-1]
+                if (revision in matchingShadowCounts
+                    or _sourceCounts(latest) > _sourceCounts(revision)):
+                    revision = latest.copy()
+                    desiredVersion = targetBranch.createVersion(revision)
+                    desiredVersion.incrementSourceCount()
 
-        while desiredVersion in targetBranchVersionList:
-            desiredVersion.incrementSourceCount()
-
+        assert(not desiredVersion in targetBranchVersionList)
         return desiredVersion
 
     def createBinaryVersion(self, repos, binaryList, sourceVersion):

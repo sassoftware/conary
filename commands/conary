@@ -344,7 +344,7 @@ class ListRollbackCommand(ConaryCommand):
 _register(ListRollbackCommand)
 
 class RollbackCommand(ConaryCommand):
-    commands = ['rollback']
+    commands = ['rollback', 'rb']
     paramHelp = "<rollback>"
     help = 'Roll back operations stored in the rollback stack'
     commandGroup = 'System Modification'
@@ -785,7 +785,7 @@ class _UpdateCommand(ConaryCommand):
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found '
                           '(equivalent to --replace-managed-files '
-                          '--replace-modified-files --replace-unmanaged-files',
+                          '--replace-modified-files --replace-unmanaged-files)',
         'replace-config-files':
                           'Replace config files on the system which have '
                           'been changed by something other than conary',
@@ -1181,6 +1181,7 @@ def main(argv=sys.argv):
             args = e.execParams
         else:
             args = sys.argv
+        util.massCloseFileDescriptors(3, 252)
         os.execve(sys.argv[0], args, os.environ)
     except debuggerException:
         raise

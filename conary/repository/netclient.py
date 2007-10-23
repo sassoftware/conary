@@ -1626,7 +1626,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 raise errors.FilesystemError(e.errno, e.filename, e.strerror,
                     strerr)
         else:
-            (outFd, tmpName) = util.mkstemp()
+            (outFd, tmpName) = util.mkstemp(suffix = '.ccs')
             outFile = util.ExtendedFile(tmpName, "w+", buffering = False)
             os.close(outFd)
             os.unlink(tmpName)
@@ -2125,7 +2125,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             fileList = [ (self.fromFileId(x[1][0]), 
                           self.fromVersion(x[1][1])) for x in itemList ]
             if callback:
-                callback.requestingFileContents()
+                if hasattr(callback, 'requestingFileContentsWithCount'):
+                    callback.requestingFileContentsWithCount(len(fileList))
+                else:
+                    callback.requestingFileContents()
             (url, sizes) = self.c[server].getFileContents(fileList)
             # protocol version 44 and later return sizes as strings rather
             # than ints to avoid 2 GiB limits
@@ -2155,7 +2158,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 start = tmpFile.tell()
                 outF = tmpFile
             else:
-                (fd, path) = util.mkstemp()
+                (fd, path) = util.mkstemp(suffix = 'filecontents')
                 outF = util.ExtendedFile(path, "r+", buffering = False)
                 os.close(fd)
                 os.unlink(path)

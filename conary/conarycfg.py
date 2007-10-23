@@ -47,12 +47,36 @@ class ServerGlobList(list):
 
         return l
 
+    def _fncmp(self, a, b):
+        # Comparison function
+        # Equal elements
+        if a[0] == b[0]:
+            return 0
+        if fnmatch.fnmatch(a[0], b[0]):
+            return -1
+        return 1
+
     def extend(self, itemList):
         # Look for the first item which globs to this, and insert the new
         # item before it. That makes sure find always matches on the
         # most-specific instance
         for newItem in reversed(itemList):
             self.append(newItem)
+
+    def extendSort(self, itemList):
+        """Extend the current list with the new items, categorizing them and
+        eliminating duplicates"""
+        nlist = sorted(self + [ x for x in reversed(itemList)], self._fncmp)
+        # Walk the list, remove duplicates
+        del self[:]
+
+        lasti = None
+        for ent in nlist:
+            if lasti is not None and lasti[0] == ent[0]:
+                self[-1] = ent
+            else:
+                list.append(self, ent)
+            lasti = ent
 
     def append(self, newItem):
         location = None
@@ -82,6 +106,9 @@ class UserInformation(ServerGlobList):
         if len(args) == 3:
             args = args[0], (args[1], args[2])
         ServerGlobList.append(self, args)
+
+    def addServerGlobs(self, globList):
+        ServerGlobList.extendSort(self, globList)
 
     def extend(self, other):
         for item in other:
@@ -799,6 +826,7 @@ def loadEntitlementFromProgram(fullPath, serverName):
                 os.dup2(stdErrWrite, 2)
                 os.close(writeFd)
                 os.close(stdErrWrite)
+                util.massCloseFileDescriptors(3, 252)
                 os.execl(fullPath, fullPath, serverName)
             except Exception, err:
                 traceback.print_exc(sys.stderr)
