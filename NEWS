@@ -8,6 +8,10 @@ Changes in @NEW@:
   o Build Changes:
     * MakeDirs now handles trailing '/' characters on directory names.
       (CNY-1526)
+    * In a UserGroupRecipe, you can now specify that the user's primary
+      group needs to be already on the system rather than be added while
+      creating the user, using the new provideGroup keyword argument
+      to the r.User() method. (CNY-2096)
 
   o Bug Fixes:
     * A bug that resulted in a KeyError when removing a trove from a
