@@ -352,6 +352,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         else:
             util.copyfileobj(self.rfile, out, sizeLimit=contentLength)
         self.send_response(200)
+        self.end_headers()
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     publicCalls = set(tuple(NetworkRepositoryServer.publicCalls) + ('reset',))
