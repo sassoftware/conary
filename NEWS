@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Build Changes:
+    * MakeDirs now handles trailing '/' characters on directory names.
+      (CNY-1526)
+
   o Bug Fixes:
     * A bug that resulted in a KeyError when removing a trove from a
       group that has 3 levels of subgroups has been fixed. (CNY-1372)
