@@ -1,8 +1,8 @@
 Changes in @NEW@:
   o Client Changes:
-    * The OpenPGP implementation is now merging PGP keys properly.
+    * The OpenPGP implementation now merges PGP keys properly.
       (CNY-1987)
-    * The OpenPGP implmenetation is capable of generating trust
+    * The OpenPGP implementation is capable of generating trust
       signatures. (CNY-1990)
 
   o Build Changes:
@@ -18,8 +18,8 @@ Changes in @NEW@:
       group that has 3 levels of subgroups has been fixed. (CNY-1372)
     * A bug that could result in a decremented source count when promoting
       a package to a sibling of a parent branch has been fixed. (CNY-2108)
-    * A problem resulting in derived packages corrupting files with the same
-      content was fixed. (CNY-2157)
+    * A problem resulting in derived packages corrupting files with the
+      same content was fixed. (CNY-2157)
 
 Changes in 1.2.4:
   o Bug Fixes:
