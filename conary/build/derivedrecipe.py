@@ -113,9 +113,9 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
 
             ptrId = pathId + fileId
             if pathId in delayedRestores:
-                ptrMap[pathId] = path
+                ptrMap[pathId] = destPath
             elif ptrId in delayedRestores:
-                ptrMap[ptrId] = path
+                ptrMap[ptrId] = destPath
 
             fileObj.restore(contents, root, root + destPath)
 
