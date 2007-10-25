@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A bug that caused internal server errors when retrieving
+      changeset that contained compressed file data over 4 GiB in size
+      has been fixed. (CNY-2170)
+
 Changes in 1.1.31.10:
   o Client Changes:
     * Unknown trove info types in the database are stored in extracted

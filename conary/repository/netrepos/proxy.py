@@ -710,7 +710,7 @@ class ChangesetFilter(BaseProxy):
 
         # clientVersion >= 50
         return False, (url, (
-                [ (x.size, x.trovesNeeded, x.filesNeeded, x.removedTroves)
+                [ (str(x.size), x.trovesNeeded, x.filesNeeded, x.removedTroves)
                     for x in changeSetList ] ) )
 
 class SimpleRepositoryFilter(ChangesetFilter):
