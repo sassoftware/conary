@@ -131,6 +131,22 @@ def post(port, isSecure, repos, req):
         httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port)
         return httpHandler._methodHandler()
 
+def sendfile(req, size, path):
+    # FIXME: apache 2.0 can't sendfile() a file > 2 GiB.
+    # we'll have to send the data ourselves
+    if size >= 0x80000000:
+        f = open(path, 'r')
+        # 2 MB buffer
+        bufsize = 2 * 1024 * 1024
+        while 1:
+            s = f.read(bufsize)
+            if not s:
+                break
+            req.write(s)
+    else:
+        # otherwise we can use the handy sendfile method
+        req.sendfile(path)
+
 def get(port, isSecure, repos, req):
     def _writeNestedFile(req, name, tag, size, f, sizeCb):
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
@@ -139,20 +155,7 @@ def get(port, isSecure, repos, req):
             size = os.stat(path).st_size
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
             sizeCb(size, tag)
-            # FIXME: apache 2.0 can't sendfile() a file > 2 GiB.
-            # we'll have to send the data ourselves
-            if size >= 0x80000000:
-                f = open(path, 'r')
-                # 2 MB buffer
-                bufsize = 2 * 1024 * 1024
-                while 1:
-                    s = f.read(bufsize)
-                    if not s:
-                        break
-                    req.write(s)
-            else:
-                # otherwise we can use the handy sendfile method
-                req.sendfile(path)
+            sendfile(req, size, path)
         else:
             # this is data from the changeset itself
             sizeCb(size, tag)
@@ -228,7 +231,7 @@ def get(port, isSecure, repos, req):
 
                 del cs
             else:
-                req.sendfile(path)
+                sendfile(req, size, path)
 
             if not preserveFile:
                 os.unlink(path)
