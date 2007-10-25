@@ -20,6 +20,9 @@ Changes in @NEW@:
       a package to a sibling of a parent branch has been fixed. (CNY-2108)
     * A problem resulting in derived packages corrupting files with the
       same content was fixed. (CNY-2157)
+    * A bug that caused internal server errors when retrieving
+      changeset that contained compressed file data over 4 GiB in size
+      has been fixed. (CNY-2170, CNY-2173)
 
 Changes in 1.2.4:
   o Bug Fixes:
