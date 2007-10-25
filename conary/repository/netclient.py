@@ -1264,7 +1264,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for singleJob in jobList:
             totalSize = 0
             if singleJob[2][0] is not None:
-                totalSize += sizeList.pop(0)
+                totalSize += int(sizeList.pop(0))
 
             jobSizes.append(totalSize)
 
