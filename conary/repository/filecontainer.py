@@ -194,9 +194,18 @@ class FileContainer:
         return (name, tag, size, offset, nextOffset)
 
     def dump(self, dumpString, dumpFile):
-        def sizeCallback(dumpString, name, tag, size):
-            hdr = struct.pack("!HHIH%ds%ds" % (len(name), len(tag)),
-                        SUBFILE_MAGIC, len(name), size, len(tag), name, tag)
+        def sizeCallback(dumpString, name, tag, size, realSize):
+            realSize[0] = size
+            if size < 0x100000000:
+                hdr = struct.pack("!HHIH%ds%ds" % (len(name), len(tag)),
+                                  SUBFILE_MAGIC, len(name), size, len(tag), name, tag)
+            else:
+                total = size + len(name) + len(tag)
+                hdr = struct.pack("!HII%ds%ds" % (len(name), len(tag)),
+                                  LARGE_SUBFILE_MAGIC,
+                                  total >> 32, total & 0xFFFFFFFF,
+                                  name, tag)
+
             dumpString(hdr)
 
 	assert(not self.mutable)
@@ -208,9 +217,13 @@ class FileContainer:
         while next is not None:
             (name, tag, fcf) = next
             size = fcf.size
+            realSize = [0]
             dumpFile(name, tag, size, fcf,
                      lambda size, newTag: 
-                        sizeCallback(dumpString, name, newTag, size))
+                        sizeCallback(dumpString, name, newTag, size, realSize))
+            if realSize[0] >= 0x100000000:
+                ftr = struct.pack("!HH", len(name), len(tag))
+                dumpString(ftr)
             next = self.getNextFile()
 
     def reset(self):
