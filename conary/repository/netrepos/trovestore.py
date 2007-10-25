@@ -1195,6 +1195,19 @@ class TroveStore:
               AND TroveRedirects.itemId IS NULL
         )""")
 
+        cu.execute("""
+        DELETE FROM CheckTroveCache
+        WHERE itemId IN (
+            SELECT tmpRemovals.itemId
+            FROM tmpRemovals
+            LEFT JOIN Instances ON tmpRemovals.itemId = Instances.itemId
+            LEFT JOIN Nodes ON tmpRemovals.itemId = Nodes.itemId
+            LEFT JOIN TroveRedirects ON tmpRemovals.itemId = TroveRedirects.itemId
+            WHERE Instances.itemId IS NULL
+              AND Nodes.itemId IS NULL
+              AND TroveRedirects.itemId IS NULL
+        )""")
+
         # XXX what about metadata?
         return filesToRemove
 
