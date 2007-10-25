@@ -362,7 +362,7 @@ class Database:
         try:
             self.db = dbstore.connect(path, driver = "sqlite",
                                       timeout=self.timeout)
-            self.schemaVersion = self.db.getVersion()
+            self.schemaVersion = self.db.getVersion().major
         except sqlerrors.DatabaseLocked:
             raise errors.DatabaseLockedError
         self.db.dbh._BEGIN = "BEGIN"
@@ -395,7 +395,7 @@ class Database:
         if self.schemaVersion == 0:
             schema.createSchema(self.db)
         schema.setupTempDepTables(self.db, cu)
-        schema.setupTempTables(self.db)
+        schema.setupTempTables(self.db, cu)
 
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
