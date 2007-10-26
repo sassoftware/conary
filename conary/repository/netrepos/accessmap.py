@@ -239,13 +239,11 @@ class UserGroupPermissions:
             whereStr = "where %s" % (' and '.join(where),)
         cu.execute("""
         insert into UserGroupAllPermissions
-            (permissionId, userGroupId, instanceId, canWrite, canRemove)
+            (permissionId, userGroupId, instanceId)
         select
             Permissions.permissionId as permissionId,
             Permissions.userGroupId as userGroupId,
-            Instances.instanceId as instanceId,
-            case when sum(Permissions.canWrite) = 0 then 0 else 1 end as canWrite,
-            case when sum(Permissions.canRemove) = 0 then 0 else 1 end as canRemove
+            Instances.instanceId as instanceId
         from Instances
         join Nodes using(itemId, versionId)
         join LabelMap using(itemId, branchId)
@@ -275,7 +273,6 @@ class UserGroupPermissions:
         cu.execute("delete from UserGroupAllPermissions %s" % (whereStr,), args)
         return True
     
-
 # this class takes care of the UserGroupInstancesCache table, which is a summary
 # of rows present in UserGroupAllTroves and UserGroupAllPermissions tables
 class UserGroupInstances:
@@ -370,11 +367,8 @@ class UserGroupInstances:
                    (permissionId, userGroupId))
         # update UsergroupInstancesCache
         cu.execute("""
-        insert into UserGroupInstancesCache
-              (userGroupId, instanceId, canWrite, canRemove)
-        select userGroupId, instanceId,
-               case when sum(canWrite) = 0 then 0 else 1 end as canWrite,
-               case when sum(canRemove) = 0 then 0 else 1 end as canRemove
+        insert into UserGroupInstancesCache (userGroupId, instanceId)
+        select userGroupId, instanceId
         from UserGroupAllPermissions
         where permissionId = ?
           and instanceId in (select instanceId from tmpInstances)
@@ -423,12 +417,10 @@ class UserGroupInstances:
         otherwise the rebuilding scope is limited
         """
         cu.execute("""
-        insert into UserGroupInstancesCache (instanceId, userGroupId, canWrite, canRemove)
+        insert into UserGroupInstancesCache (instanceId, userGroupId)
         select
             Instances.instanceId as instanceId,
-            Permissions.userGroupId as userGroupId,
-            case when sum(Permissions.canWrite) = 0 then 0 else 1 end as canWrite,
-            case when sum(Permissions.canRemove) = 0 then 0 else 1 end as canRemove
+            Permissions.userGroupId as userGroupId
         from Instances
         join Nodes using(itemId, versionId)
         join LabelMap using(itemId, branchId)
@@ -439,7 +431,6 @@ class UserGroupInstances:
             Permissions.itemId = CheckTroveCache.patternId and
             Instances.itemId = CheckTroveCache.itemId
         %s
-        group by Instances.instanceId, Permissions.userGroupId
         """ % (whereStr,), args)
         
     def updateInstanceId(self, instanceId):

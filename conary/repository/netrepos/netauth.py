@@ -555,12 +555,9 @@ class NetworkAuthorization:
         where userGroupId = ? and labelId = ? and itemId = ?""",
                    (userGroupId, labelId, troveId))
         permissionId = cu.fetchone()
-        if permissionId: # permissionId exists, figure out what sort of update was this
-            if oldLabelId == labelId and oldTroveId == troveId:
-                # just a change in permissions, no reason to recompute entire tables
-                self.ugi.setPermissionId(permissionId[0], canWrite, remove)
-            else: # this is the more expensive kind...
-                self.ugi.updatePermissionId(permissionId[0], userGroupId)
+        if permissionId and (oldLabelId != labelId or oldTroveId != troveId):
+            # a permission has changed the itemId or the labelId...
+            self.ugi.updatePermissionId(permissionId[0], userGroupId)
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
