@@ -329,9 +329,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         if protocolVersion < 60:
             if r[0] is True:
                 # return (useAnon, isException, (exceptName,) + ordArgs) )
-                return (False, True, (r[1][0],)  + r[1][1], None )
+                return (False, True, (r[1][0],) + r[1][1], extraInfo)
             else:
-                return (False, False, r[1], None )
+                return (False, False, r[1], extraInfo)
 
         return r + (extraInfo,)
 
