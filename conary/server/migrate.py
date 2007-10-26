@@ -220,7 +220,7 @@ def rebuildLatest(db, recreate=False):
     return True
     
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 8)
+    Version = (15, 9)
     def updateLatest(self):
         return rebuildLatest(self.db, recreate=True)
 
@@ -482,6 +482,10 @@ class MigrateTo_15(SchemaMigration):
     def migrate8(self):
         self.db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
         return True
+    # 15.9 - rebuild Latest - dummy for schema 16
+    def migrate9(self):
+        return True
+    
     
 # populate the CheckTroveCache table
 def createCheckTroveCache(db):
@@ -535,7 +539,7 @@ def updateLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16,4)
+    Version = (16,5)
     # migrate to 16.0
     # create a primary key for labelmap
     def migrate(self):
@@ -601,7 +605,13 @@ class MigrateTo_16(SchemaMigration):
         schema.createLatest(self.db)
         self.db.analyze("LatestCache")
         return True
-
+    def migrate5(self):
+        schema.setupTempTables(self.db)
+        ugo = accessmap.UserGroupOps(self.db)
+        ugo.updateUserGroupId(28)
+        logMe(2, "finished updating ugid", 28)
+        return False
+    
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]

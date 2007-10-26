@@ -115,20 +115,24 @@ class LatestTable:
         _insertView(cu, LATEST_TYPE_NORMAL)
         return
     
-    def update(self, itemId, branchId, flavorId, cu = None):
-        if cu is None:
-            cu = self.db.cursor()
-        cu.execute("delete from LatestCache where "
-                   "itemId = ? and branchId = ? and flavorId = ?",
-                   (itemId, branchId, flavorId))
+    def update(self, cu, itemId, branchId, flavorId, userGroupId = None):
+        cond = ""
+        args = [itemId, branchId, flavorId]
+        if userGroupId is not None:
+            cond = "and userGroupId = ?"
+            args.append(userGroupId)
+        cu.execute("""
+        delete from LatestCache
+        where itemId = ? and branchId = ? and flavorId = ? %s" % (cond,),
+                   args)
         cu.execute("""
         insert into LatestCache
             (latestType, userGroupId, itemId, branchId, flavorId, versionId)
         select
             latestType, userGroupId, itemId, branchId, flavorId, versionId
         from LatestView
-        where itemId = ? and branchId = ? and flavorId = ?
-        """, (itemId, branchId, flavorId))
+        where itemId = ? and branchId = ? and flavorId = ? %s""" % (cond,),
+                   args)
 
     def updateInstanceId(self, instanceId, cu = None):
         if cu is None:
@@ -138,18 +142,27 @@ class LatestTable:
         from Instances join Nodes using(itemId, versionId)
         where instanceId = ?""", instanceId)
         for itemId, flavorId, branchId in cu.fetchall():
-            self.update(itemId, branchId, flavorId, cu)
+            self.update(cu, itemId, branchId, flavorId)
 
-    def updateUserGroupId(self, userGroupId):
+    def updateUserGroupId(self, userGroupId, tmpInstances=False):
         cu = self.db.cursor()
-        cu.execute("delete from LatestCache where userGroupId = ?", userGroupId)
+        if not tmpInstances:
+            cu.execute("delete from LatestCache where userGroupId = ?", userGroupId)
+            cu.execute("""
+            insert into LatestCache
+                (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+            select
+                latestType, userGroupId, itemId, branchId, flavorId, versionId
+                from LatestView where userGroupId = ? """, userGroupId)
+            return
+        # we need to be more discriminate since we know what
+        # instanceIds are new (they are provided in tmpInstances table)
         cu.execute("""
-        insert into LatestCache
-            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
-        select
-            latestType, userGroupId, itemId, branchId, flavorId, versionId
-        from LatestView where userGroupId = ?
-        """, userGroupId)
+        select itemId, flavorId, branchId
+        from tmpInstances join Instances using(instanceId)
+        join Nodes using(itemId, versionId) """)
+        for itemId, flavorId, branchId in cu.fetchall():
+            self.update(cu, itemId, branchId, flavorId, userGroupId)
     
 
 class LabelMap(idtable.IdPairSet):

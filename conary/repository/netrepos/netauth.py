@@ -271,7 +271,7 @@ class NetworkAuthorization:
         self.entitlementAuth = EntitlementAuthorization(
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
         self.items = items.Items(db)
-        self.ugo = accessmap.UserGroupOps(db)
+        self.ugi = accessmap.UserGroupInstances(db)
         
     def getAuthGroups(self, cu, authToken, allowAnonymous = True):
         self.log(4, authToken[0], authToken[2])
@@ -521,7 +521,7 @@ class NetworkAuthorization:
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
-        self.ugo.updateUserGroupId(userGroupId)
+        self.ugi.addPermissionId(cu.lastrowid, userGroupId)
         self.db.commit()
 
     def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
@@ -534,8 +534,8 @@ class NetworkAuthorization:
         userGroupId = self._getGroupIdByName(userGroup)
 
         # these need to show up as 0/1 regardless of what we pass in
-        write = int(bool(write))
-        canRemove = int(bool(canRemove))
+        canWrite = int(bool(write))
+        remove = int(bool(remove))
 
         try:
             cu.execute("""
@@ -543,12 +543,24 @@ class NetworkAuthorization:
             SET labelId = ?, itemId = ?, canWrite = ?,
                 canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, canRemove,
+                       labelId, troveId, canWrite, remove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
             raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, troveId)
-        self.ugo.updateUserGroupId(userGroupId)
+
+        # find out what permission we have changed and update cahed permission tables
+        cu.execute("""
+        select permissionId from Permissions
+        where userGroupId = ? and labelId = ? and itemId = ?""",
+                   (userGroupId, labelId, troveId))
+        permissionId = cu.fetchone()
+        if permissionId: # permissionId exists, figure out what sort of update was this
+            if oldLabelId == labelId and oldTroveId == troveId:
+                # just a change in permissions, no reason to recompute entire tables
+                self.ugi.setPermissionId(permissionId[0], canWrite, remove)
+            else: # this is the more expensive kind...
+                self.ugi.updatePermissionId(permissionId[0], userGroupId)
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
@@ -561,13 +573,24 @@ class NetworkAuthorization:
         if label is None: label = 'ALL'
 
         cu = self.db.cursor()
+        # lock the Permissions records we are about to delete. This is
+        # a crude hack for sqlite's lack of "select for update"
         cu.execute("""
-        DELETE FROM Permissions
-        WHERE userGroupId = ?
-          AND labelId = (SELECT labelId FROM Labels WHERE label=?)
-          AND itemId = (SELECT itemId FROM Items WHERE item=?)
+        update Permissions set canWrite=0, canRemove=0
+        where userGroupId = ?
+          and labelId = (select labelId from Labels where label=?)
+          and itemId = (select itemId from Items where item=?)
         """, (userGroupId, label, item))
-        self.ugo.updateUserGroupId(userGroupId)
+        cu.execute("""
+        select permissionId from Permissions
+        where userGroupId = ?
+          and labelId = (select labelId from Labels where label=?)
+          and itemId = (select itemId from Items where item=?)
+        """, (userGroupId, label, item))
+        for permissionId, in cu.fetchall():
+            self.ugi.deletePermissionId(permissionId, userGroupId)
+            cu.execute("delete from Permissions where permissionId = ?",
+                       permissionId)
         self.db.commit()
 
     def addUser(self, user, password):

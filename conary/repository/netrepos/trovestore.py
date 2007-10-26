@@ -202,7 +202,7 @@ class TroveStore:
         for (instanceId, itemId, branchId, flavorId) in cu.fetchall():
             cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=?",
                        (instances.INSTANCE_PRESENT_NORMAL, instanceId))
-            self.latest.update(itemId, branchId, flavorId, cu)
+            self.latest.update(cu, itemId, branchId, flavorId)
 
     def addTrove(self, trv, hidden = False):
 	cu = self.db.cursor()
@@ -319,7 +319,7 @@ class TroveStore:
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depTables.add(cu, trv, troveInstanceId)
         self.ugi.updateInstanceId(troveInstanceId)
-        self.latest.update(troveItemId, troveBranchId, troveFlavorId, cu)
+        self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
         
         # Fold tmpNewFiles into FileStreams
         #
@@ -1070,7 +1070,7 @@ class TroveStore:
             # as removed instead
             cu.execute("UPDATE Instances SET troveType=? WHERE instanceId=?",
                        trove.TROVE_TYPE_REMOVED, instanceId)
-            self.latest.update(itemId, branchId, flavorId, cu)
+            self.latest.update(cu, itemId, branchId, flavorId)
         else:
             cu.execute("DELETE FROM UserGroupInstancesCache WHERE instanceId = ?",
                        instanceId)

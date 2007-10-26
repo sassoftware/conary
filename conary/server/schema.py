@@ -263,7 +263,7 @@ def createLatest(db, withIndexes = True):
           JOIN Instances AS i USING(instanceId)
           JOIN Nodes AS n USING(itemId, versionId)
           WHERE i.isPresent = %(present)d
-          AND i.troveType = %(trove)d
+          AND i.troveType != %(removed)d
           GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
         ) as tmp
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
@@ -272,7 +272,8 @@ def createLatest(db, withIndexes = True):
           AND Instances.isPresent = %(present)d
           AND Instances.troveType = %(trove)d
         """ % {"present" : INSTANCE_PRESENT_NORMAL,
-               "trove" : TROVE_TYPE_NORMAL, })
+               "trove" : TROVE_TYPE_NORMAL,
+               "removed" : TROVE_TYPE_REMOVED, })
         db.views["LatestViewNormal"] = True
         commit = True
 
@@ -858,6 +859,7 @@ def createAccessMaps(db):
         assert("Instances" in db.tables)
         cu.execute("""
         CREATE TABLE UserGroupTroves(
+            ugtId           %(PRIMARYKEY)s,
             userGroupId     INTEGER NOT NULL,
             instanceId      INTEGER NOT NULL,
             recursive       INTEGER NOT NULL DEFAULT 0,
@@ -871,14 +873,68 @@ def createAccessMaps(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroupTroves"] = []
         commit = True
-    db.createIndex("UserGroupTroves", "UserGroupTroves_userGroupIdIdx", "userGroupId,instanceId",
-                   unique=True)
+    db.createIndex("UserGroupTroves", "UserGroupTroves_userGroupIdIdx",
+                   "userGroupId,instanceId", unique=True)
     db.createIndex("UserGroupTroves", "UserGroupTroves_instanceId_fk", "instanceId")
     if createTrigger(db, "UserGroupTroves"):
         commit = True
 
-    # cache of what troves a usergroup can see. Based on acls in
-    # Permissions and the recursive group grants from UserGroupTroves
+    # this is a flattened version of UserGroupTroves
+    if "UserGroupAllTroves" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        assert("UserGroupTroves" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupAllTroves(
+            ugtId           INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            CONSTRAINT UGAT_ugtId_fk
+                FOREIGN KEY (ugtId) REFERENCES UserGroupTroves(ugtId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAT_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAT_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupAllTroves"] = []
+        commit = True
+    db.createIndex("UserGroupAllTroves", "UGAT_ugtId_fk", "ugtId")
+    db.createIndex("UserGroupAllTroves", "UGAT_userGroupId_fk", "userGroupId")
+    db.createIndex("UserGroupAllTroves", "UGAT_instanceId_fk", "instanceId")
+
+    # this holds in a flat structure the expansion of the Permissions table
+    if "UserGroupAllPermissions" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        assert("Permissions" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupAllPermissions(
+            permissionId    INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
+            canRemove       INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT UGAP_permissionId_fk
+                FOREIGN KEY (permissionId) REFERENCES Permissions(permissionId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAP_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAP_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupAllPermissions"] = []
+        commit = True
+    db.createIndex("UserGroupAllPermissions", "UGAP_permissionId_fk", "permissionId")
+    db.createIndex("UserGroupAllPermissions", "UGAP_userGroupId_fk", "userGroupId")
+    db.createIndex("UserGroupAllPermissions", "UGAP_instanceId_fk", "instanceId")
+
+    # cache of what troves a usergroup can see. Summarizes the stuff from
+    # UserGroupAllTroves and UserGroupAllPermissions
     if "UserGroupInstancesCache" not in db.tables:
         assert("UserGroups" in db.tables)
         assert("Instances" in db.tables)
