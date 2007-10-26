@@ -92,8 +92,9 @@ class UserInfoRecipe(UserGroupInfoRecipe):
         depSet = deps.DependencySet()
         depSet.addDep(deps.UserInfoDependencies,
                       deps.Dependency(self.infoname, []))
-        depSet.addDep(deps.GroupInfoDependencies,
-                      deps.Dependency(self.groupname, []))
+        if self.provideGroup:
+            depSet.addDep(deps.GroupInfoDependencies,
+                          deps.Dependency(self.groupname, []))
         f.provides.set(depSet)
 _addRecipeToCopy(UserInfoRecipe)
 

@@ -1275,7 +1275,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for singleJob in jobList:
             totalSize = 0
             if singleJob[2][0] is not None:
-                totalSize += sizeList.pop(0)
+                totalSize += int(sizeList.pop(0))
 
             jobSizes.append(totalSize)
 
@@ -2674,4 +2674,6 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                          rateLimit = rateLimit, sizeLimit = size)
 
     resp = c.getresponse()
+    if resp.status != 200:
+        opener.handleProxyErrors(resp.status)
     return resp.status, resp.reason

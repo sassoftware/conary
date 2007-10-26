@@ -2571,6 +2571,8 @@ class MakeDirs(_FileAction):
         for path in action._expandPaths(self.paths, macros, braceGlob=False):
             dirs = util.braceExpand(path)
             for d in dirs:
+                if d.endswith('/'):
+                    d = d[:-1]
                 log.info('creating directory %s', d)
 		self.setComponents(macros.destdir, d.replace('%', '%%'))
                 util.mkdirChain(d)

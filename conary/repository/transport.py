@@ -353,7 +353,22 @@ class URLOpener(urllib.FancyURLopener):
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
             return InfoURL(fp, headers, selector, protocolVersion)
         else:
+            self.handleProxyErrors(errcode)
             return self.http_error(selector, fp, errcode, errmsg, headers, data)
+
+    def handleProxyErrors(self, errcode):
+        if not self.proxyHost or not self.proxyProtocol.startswith('http'):
+            return
+        e = None
+        if errcode == 503:
+            # Service unavailable, make it a socket error
+            e = socket.error(111, "Repository service unavailable")
+        elif errcode == 502:
+            # Bad gateway (server responded with some broken answer)
+            e = socket.error(111, "Bad Gateway (repository error reported by proxy)")
+        if e:
+            self._processSocketError(e)
+            raise e
 
     def _processSocketError(self, error):
         if not self.proxyHost:

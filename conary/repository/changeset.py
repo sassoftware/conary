@@ -325,6 +325,9 @@ class ChangeSet(streams.StreamSet):
                     path = f.path()
                     realSize = os.stat(path).st_size
                     sizeCorrection += (realSize - len(path))
+                    if realSize >= 0x100000000:
+                        # add 4 bytes to store a 64-bit size
+                        sizeCorrection += 4
                     csf.addFile(hash, 
                                 filecontents.FromString(path),
                                 tag + ChangedFileTypes.refr[4:],
@@ -1152,6 +1155,9 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 path = f.read()
                 realSize = os.stat(path).st_size
                 correction += realSize - len(path)
+                if realSize >= 0x100000000:
+                    # add 4 bytes to store a 64-bit size
+                    correction += 4
                 f.seek(0)
                 contents = filecontents.FromString(path)
             else:
