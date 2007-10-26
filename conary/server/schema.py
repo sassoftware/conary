@@ -263,7 +263,7 @@ def createLatest(db, withIndexes = True):
           JOIN Instances AS i USING(instanceId)
           JOIN Nodes AS n USING(itemId, versionId)
           WHERE i.isPresent = %(present)d
-          AND i.troveType = %(trove)d
+          AND i.troveType != %(removed)d
           GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
         ) as tmp
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
@@ -272,7 +272,8 @@ def createLatest(db, withIndexes = True):
           AND Instances.isPresent = %(present)d
           AND Instances.troveType = %(trove)d
         """ % {"present" : INSTANCE_PRESENT_NORMAL,
-               "trove" : TROVE_TYPE_NORMAL, })
+               "trove" : TROVE_TYPE_NORMAL,
+               "removed" : TROVE_TYPE_REMOVED, })
         db.views["LatestViewNormal"] = True
         commit = True
 
