@@ -274,7 +274,8 @@ def createLatest(db, withIndexes = True):
           AND Instances.isPresent = %(present)d
           AND Instances.troveType = %(trove)d
         """ % {"present" : INSTANCE_PRESENT_NORMAL,
-               "trove" : TROVE_TYPE_NORMAL, })
+               "trove" : TROVE_TYPE_NORMAL,
+               "removed" : TROVE_TYPE_REMOVED, })
         db.views["LatestViewNormal"] = True
         commit = True
 

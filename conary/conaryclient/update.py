@@ -196,6 +196,16 @@ class ClientUpdate:
 
                 allTargets = [ (x[0], str(x[1].label()), x[2]) 
                                         for x in trv.iterRedirects() ]
+                for troveSpec in allTargets:
+                    if (troveSpec[0] == trv.getName()
+                       and troveSpec[1] == str(trv.getVersion().trailingLabel())
+                       and troveSpec[2] is None):
+                        # this is an pre-1.2 redirect from one branch to
+                        # another on the same label.  It only makes sense
+                        # with the branch information attached.
+                        allTargets = list(trv.iterRedirects())
+                        break
+
                 matches = self.repos.findTroves([], allTargets, self.cfg.flavor,
                                                 affinityDatabase = self.db)
                 if not matches:

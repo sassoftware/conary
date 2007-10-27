@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -23,14 +23,15 @@ from conary import callbacks
 from conary.lib.util import log
 
 from Crypto.PublicKey import DSA
-from openpgpfile import getPrivateKey
-from openpgpfile import getPublicKey
+from openpgpfile import BadPassPhrase
 from openpgpfile import getFingerprint
 from openpgpfile import getKeyEndOfLife
 from openpgpfile import getKeyTrust
-from openpgpfile import seekKeyById
-from openpgpfile import BadPassPhrase
+from openpgpfile import getPrivateKey
+from openpgpfile import getPublicKey
 from openpgpfile import KeyNotFound
+from openpgpfile import num_getRelPrime
+from openpgpfile import seekKeyById
 from openpgpfile import SEEK_SET, SEEK_END
 
 #-----#
@@ -70,37 +71,11 @@ class OpenPGPKey:
     def getTimestamp(self):
         return self.timestamp
 
-    def _gcf(self, a, b):
-        while b:
-            a, b = b, a % b
-        return a
-
-    def _bitLen(self, a):
-        r=0
-        while a:
-            a, r = a/2, r+1
-        return r
-
-    def _getRelPrime(self, q):
-        # Use os module to ensure reads are unbuffered so as not to
-        # artifically deflate entropy
-        randFD = os.open('/dev/urandom', os.O_RDONLY)
-        b = self._bitLen(q)/8 + 1
-        r = 0L
-        while r < 2:
-            for i in range(b):
-                r = r*256 + ord(os.read(randFD, 1))
-                r %= q
-            while self._gcf(r, q-1) != 1:
-                r = (r+1) % q
-        os.close(randFD)
-        return r
-
     def signString(self, data):
         if isinstance(self.cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
-                K = self._getRelPrime(self.cryptoKey.q)
+                K = num_getRelPrime(self.cryptoKey.q)
         else:
             K = 0
         timeStamp = int(time())
@@ -358,11 +333,10 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
     def _formatSource(self, serverName):
         """Network-aware source formatter"""
         server = None
-        if self.repositoryMap and serverName not in self.repositoryMap:
+        if serverName not in (self.repositoryMap or []):
             server = "http://%s/conary/" % serverName
         else:
-            if serverName in self.repositoryMap:
-                server = self.repositoryMap[serverName]
+            server = self.repositoryMap[serverName]
         return server
 
     def getPublicKey(self, keyId, serverName, warn=True):

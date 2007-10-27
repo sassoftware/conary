@@ -113,9 +113,9 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
 
             ptrId = pathId + fileId
             if pathId in delayedRestores:
-                ptrMap[pathId] = path
+                ptrMap[pathId] = destPath
             elif ptrId in delayedRestores:
-                ptrMap[ptrId] = path
+                ptrMap[ptrId] = destPath
 
             fileObj.restore(contents, root, root + destPath)
 
@@ -248,7 +248,6 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
-        log.info('Warning: Derived packages are experimental and subject to change')
 
         self._addBuildAction('Ant', build.Ant)
         self._addBuildAction('Automake', build.Automake)

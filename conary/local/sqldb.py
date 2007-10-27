@@ -362,7 +362,7 @@ class Database:
         try:
             self.db = dbstore.connect(path, driver = "sqlite",
                                       timeout=self.timeout)
-            self.schemaVersion = self.db.getVersion()
+            self.schemaVersion = self.db.getVersion().major
         except sqlerrors.DatabaseLocked:
             raise errors.DatabaseLockedError
         self.db.dbh._BEGIN = "BEGIN"
@@ -395,6 +395,7 @@ class Database:
         if self.schemaVersion == 0:
             schema.createSchema(self.db)
         schema.setupTempDepTables(self.db, cu)
+        schema.setupTempTables(self.db, cu)
 
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
@@ -1012,10 +1013,7 @@ order by
     def iterFiles(self, l):
 	cu = self.db.cursor()
 
-	cu.execute("""
-	    CREATE TEMPORARY TABLE getFilesTbl(row %(PRIMARYKEY)s,
-                                               fileId BINARY)
-	""" % self.db.keywords, start_transaction = False)
+        schema.resetTable(cu, 'getFilesTbl')
         cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
                        ((x[0], x[1][1]) for x in enumerate(l)),
                        start_transaction = False)
@@ -1037,8 +1035,6 @@ order by
             fObj = files.ThawFile(stream, l[row][0])
             assert(l[row][1] == fObj.fileId())
             l2[row] = fObj
-
-        cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
 
         return l2
 

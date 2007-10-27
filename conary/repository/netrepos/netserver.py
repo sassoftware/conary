@@ -1204,8 +1204,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                 itertools.izip(rawStreams, fileList):
                 if stream is None:
                     raise errors.FileStreamNotFound(
-                                    (self.toFileId(encFileId),
-                                     self.toVersion(encVersion)))
+                                    self.toFileId(encFileId),
+                                    self.toVersion(encVersion))
             return True
 
         try:
@@ -1239,8 +1239,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         exception = errors.FileContentsNotFound
 
                 if exception:
-                    raise exception((self.toFileId(encFileId),
-                                     self.toVersion(encVersion)))
+                    raise exception(self.toFileId(encFileId),
+                                    self.toVersion(encVersion))
 
             url = os.path.join(self.urlBase(),
                                "changeset?%s" % os.path.basename(path)[:-4])
@@ -2964,8 +2964,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ret
 
     @accessReadOnly
-    @requireClientProtocol(50)
     def checkVersion(self, authToken, clientVersion):
+        if clientVersion > 50:
+            raise errors.InvalidClientVersion(
+                    'checkVersion call only supports protocol versions 50 '
+                    'and lower')
+
 	if not self.auth.check(authToken):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)

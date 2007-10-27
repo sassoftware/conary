@@ -38,7 +38,8 @@ class AbstractTroveDatabase:
 	@type l: list
 	@rtype list
 	"""
-	raise NotImplementedError
+        for x in l:
+            yield self.getFileVersion(*x)
 
     def getFileContents(self, fileList):
         # troveName, troveVersion, pathId, fileVersion, fileObj
@@ -340,6 +341,51 @@ class ChangeSetJob:
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False, allowIncomplete = False,
                  hidden = False, mirror = False):
+                #
+        def _handleContents(pathId, fileStream, newVersion, oldFileId = None,
+                            oldVersion = None, oldfile = None,
+                            restoreContents = True):
+            # files with contents need to be tracked so we can stick
+            # there contents in the archive "soon"; config files need
+            # extra magic for tracking since we may have to merge
+            # contents
+            if not fileStream or not restoreContents:
+                # empty fileStream means there are no contents to restore
+                return
+
+            hasContents = files.frozenFileHasContents(fileStream)
+            if not hasContents:
+                return
+
+            fileFlags = files.frozenFileFlags(fileStream)
+            if self.storeOnlyConfigFiles and not fileFlags.isConfig():
+                return
+
+            contentInfo = files.frozenFileContentInfo(fileStream)
+
+            # we already have the contents of this file... we can go
+            # ahead and restore it reusing those contents
+            if repos._hasFileContents(contentInfo.sha1()):
+                # if we already have the file in the data store we can
+                # get the contents from there
+                fileContents = filecontents.FromDataStore(
+                                 repos.contentsStore, 
+                                 contentInfo.sha1())
+                contType = changeset.ChangedFileTypes.file
+                self.addFileContents(contentInfo.sha1(), newVersion, 
+                                     fileContents, restoreContents, 
+                                     fileFlags.isConfig())
+            elif fileFlags.isConfig():
+                tup = (pathId, fileId, contentInfo.sha1(),
+                       oldfile, newVersion, fileId, oldVersion, oldFileId,
+                       restoreContents)
+                configRestoreList.append(tup)
+            else:
+                tup = (pathId, fileId, contentInfo.sha1(), newVersion,
+                       restoreContents)
+                normalRestoreList.append(tup)
+
+        # def __init__ begins
 	self.repos = repos
 	self.cs = cs
         self.invalidateRollbacksFlag = False
@@ -416,6 +462,7 @@ class ChangeSetJob:
                 # from applyChangeSet
                 allowIncomplete = True
 
+            oldTrove = newTrove.copy()
 	    newFileMap = newTrove.applyChangeSet(csTrove,
                                                  allowIncomplete=allowIncomplete)
             if newTrove.troveInfo.incomplete():
@@ -433,119 +480,153 @@ class ChangeSetJob:
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
                     hidden = hidden)
-
-	    for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
-		tuple = newFileMap.get(pathId, None)
-		if tuple is not None:
-		    (oldPath, oldFileId, oldVersion) = tuple[-3:]
-		else:
-		    oldVersion = None
-                    oldFileId = None
-
+ 
+            for (pathId, path, fileId, newVersion) in csTrove.getNewFileList():
                 if (fileHostFilter
                     and newVersion.getHost() not in fileHostFilter):
                     fileObj = None
                     fileStream = None
-		elif tuple is None or (oldVersion == newVersion and
-                                       oldFileId == fileId):
-		    # the file didn't change between versions; we can just
-		    # ignore it
-		    fileObj = None
-                    fileStream = None
-		else:
-		    diff = cs.getFileChange(oldFileId, fileId)
-                    if diff is None:
+                else:
+                    # New files don't always have streams in the changeset.
+                    # Filesets and clones don't include them for files which
+                    # are already known to be in the repository.
+                    fileStream = cs.getFileChange(None, fileId)
+
+                    if fileStream is None:
                         if not fileHostFilter:
                             # We are trying to commit to a database, but the
                             # diff returned nothing
                             raise KeyError
 
-                        # Make sure the file is present in the repository
-                        if newVersion.getHost() in fileHostFilter:
-                            # Is the file in this repository?
-                            try:
-                                fileObj = repos.getFileVersion(pathId,
-                                    fileId, newVersion, withContents=False)
-                            except errors.FileStreamMissing:
-                                # Missing from the repo; raise exception
-                                raise errors.IntegrityError(
-                                    "Incomplete changeset specified: missing pathId %s fileId %s" % (
-                                    sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
-                        fileObj = None
-                        fileStream = None
+                        try:
+                            fileObj = repos.getFileVersion(pathId,
+                                fileId, newVersion, withContents=False)
+                        except errors.FileStreamMissing:
+                            # Missing from the repo; raise exception
+                            raise errors.IntegrityError(
+                                "Incomplete changeset specified: missing pathId %s fileId %s" % (
+                                sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
                     else:
-                        restoreContents = 1
-                        if oldVersion:
-                            if diff[0] == "\x01":
-                                # stored as a diff (the file type is the same
-                                # and (for *repository* commits) the file
-                                # is in the same repository between versions
-                                oldfile = repos.getFileVersion(pathId, oldFileId, oldVersion)
-                                fileObj = oldfile.copy()
-                                fileObj.twm(diff, oldfile)
-                                assert(fileObj.pathId() == pathId)
-                                fileStream = fileObj.freeze()
+                        fileObj = files.ThawFile(fileStream, pathId)
+                        if fileObj and fileObj.fileId() != fileId:
+                            raise trove.TroveIntegrityError(csTrove.getName(),
+                                  csTrove.getNewVersion(), csTrove.getNewFlavor(),
+                                  "fileObj.fileId() != fileId in changeset "
+                                  "for pathId %s" %
+                                        sha1helper.md5ToString(pathId))
 
-                                if (not mirror) and (
-                                    fileObj.hasContents and fileObj.contents.sha1() == oldfile.contents.sha1()
-                                    and not (fileObj.flags.isConfig() and not oldfile.flags.isConfig())):
-                                    restoreContents = 0
-                            else:
-                                fileObj = files.ThawFile(diff, pathId)
-                                fileStream = diff
-                                oldfile = None
-                        else:
-                            #fileObj = files.ThawFile(diff, pathId)
-                            fileObj = None
-                            fileStream = diff
-                            oldfile = None
+                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+                                    newVersion, fileStream = fileStream)
+
+                _handleContents(pathId, fileStream, newVersion)
+
+            for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
+                # handle files which haven't changed; we know which those
+                # are because they're in the merged trove but they aren't
+                # in the newFileMap
+                if pathId in newFileMap:
+                    continue
+
+                # None is the fileObj, which we don't have (or need)
+                self.addFileVersion(troveInfo, pathId, None, path, fileId,
+                                    newVersion)
+
+            filesNeeded = []
+            for i, (pathId, path, fileId, newVersion) in enumerate(csTrove.getChangedFileList()):
+                tuple = newFileMap[pathId]
+                (oldPath, oldFileId, oldVersion) = tuple[-3:]
+                if path is None:
+                    path = oldPath
+                if fileId is None:
+                    oldFileId = fileId
+                if newVersion is None:
+                    newVersion = oldVersion
+
+                keep = False
+
+                if (fileHostFilter
+                    and newVersion.getHost() not in fileHostFilter):
+                    fileObj = None
+                    fileStream = None
+                elif (oldVersion == newVersion and oldFileId == fileId):
+                    # the file didn't change between versions; we can just
+                    # ignore it
+                    fileObj = None
+                    fileStream = None
+                else:
+                    fileStream = cs.getFileChange(oldFileId, fileId)
+
+                    if fileStream and fileStream[0] == "\x01":
+                        filesNeeded.append((i, (pathId, oldFileId, oldVersion)))
+                        continue
+                    elif fileStream:
+                        fileObj = files.ThawFile(fileStream, pathId)
+                    else:
+                        # no contents are in the changeset; take it on
+                        # faith that we already have them
+                        fileObj = None
+
+                # None is the file object
+                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+                                    newVersion, fileStream = fileStream)
+
+                if fileStream is not None:
+                    _handleContents(pathId, fileStream, newVersion,
+                                    oldFileId = oldFileId,
+                                    oldVersion = oldVersion,
+                                    oldfile = None)
+
+            oldFileObjects = list(repos.getFileVersions(
+                                        [ x[1] for x in filesNeeded ]))
+
+            for i, (pathId, path, fileId, newVersion) in enumerate(csTrove.getChangedFileList()):
+                if not filesNeeded or filesNeeded[0][0] != i:
+                    continue
+                filesNeeded.pop(0)
+
+                tuple = newFileMap[pathId]
+                (oldPath, oldFileId, oldVersion) = tuple[-3:]
+                if path is None:
+                    path = oldPath
+                if fileId is None:
+                    oldFileId = fileId
+                if newVersion is None:
+                    newVersion = oldVersion
+
+                restoreContents = True
+
+                diff = cs.getFileChange(oldFileId, fileId)
+
+                # stored as a diff (the file type is the same
+                # and (for *repository* commits) the file
+                # is in the same repository between versions
+                oldfile = oldFileObjects.pop(0)
+                fileObj = oldfile.copy()
+                fileObj.twm(diff, oldfile)
+                assert(fileObj.pathId() == pathId)
+                fileStream = fileObj.freeze()
+
+                if (not mirror) and (
+                    fileObj.hasContents and fileObj.contents.sha1() == oldfile.contents.sha1()
+                    and not (fileObj.flags.isConfig() and not oldfile.flags.isConfig())):
+                    # don't restore the contents here. we don't
+                    # need them, and they may be relative to
+                    # something from a different repository
+                    restoreContents = False
 
                 if fileObj and fileObj.fileId() != fileId:
                     raise trove.TroveIntegrityError(csTrove.getName(),
                           csTrove.getNewVersion(), csTrove.getNewFlavor(),
                           "fileObj.fileId() != fileId in changeset")
+
                 self.addFileVersion(troveInfo, pathId, fileObj, path, fileId, 
                                     newVersion, fileStream = fileStream)
 
-		# files with contents need to be tracked so we can stick
-		# there contents in the archive "soon"; config files need
-		# extra magic for tracking since we may have to merge
-		# contents
-                if not fileStream or not restoreContents:
-		    # empty fileStream means there are no contents to restore
-                    continue
-                hasContents = files.frozenFileHasContents(fileStream)
-                if not hasContents:
-		    continue
-
-                fileFlags = files.frozenFileFlags(fileStream)
-                if self.storeOnlyConfigFiles and not fileFlags.isConfig():
-                    continue
-
-                contentInfo = files.frozenFileContentInfo(fileStream)
-
-		# we already have the contents of this file... we can go
-		# ahead and restore it reusing those contents
-                if repos._hasFileContents(contentInfo.sha1()):
-		    # if we already have the file in the data store we can
-		    # get the contents from there
-   		    fileContents = filecontents.FromDataStore(
- 				     repos.contentsStore, 
-                                     contentInfo.sha1())
- 		    contType = changeset.ChangedFileTypes.file
-                    self.addFileContents(contentInfo.sha1(), newVersion, 
- 					 fileContents, restoreContents, 
-                                         fileFlags.isConfig())
-                elif fileFlags.isConfig():
-                    tup = (pathId, fileId, contentInfo.sha1(), oldPath,
-                           oldfile, troveName, oldTroveVersion, troveFlavor,
-                           newVersion, fileId, oldVersion, oldFileId,
-                           restoreContents)
-		    configRestoreList.append(tup)
-		else:
-                    tup = (pathId, fileId, contentInfo.sha1(), newVersion,
-                           restoreContents)
-		    normalRestoreList.append(tup)
+                _handleContents(pathId, fileStream, newVersion,
+                                oldFileId = oldFileId,
+                                oldVersion = oldVersion,
+                                oldfile = oldfile,
+                                restoreContents = restoreContents)
 
 	    del newFileMap
 	    self.addTroveDone(troveInfo, mirror=mirror)
@@ -557,9 +638,8 @@ class ChangeSetJob:
 
         # config files are cached, so we don't have to worry about not
         # restoring the same fileId/pathId twice
-        for (pathId, newFileId, sha1, oldPath, oldfile, troveName,
-             oldTroveVersion, troveFlavor, newVersion, newFileId, oldVersion,
-             oldFileId, restoreContents) in configRestoreList:
+        for (pathId, newFileId, sha1, oldfile, newVersion, newFileId,
+             oldVersion, oldFileId, restoreContents) in configRestoreList:
             if cs.configFileIsDiff(pathId, newFileId):
                 (contType, fileContents) = cs.getFileContents(pathId, newFileId)
 
@@ -624,8 +704,8 @@ class ChangeSetJob:
         for sha1 in ptrRestores:
 	    self.addFileContents(sha1, None, None, False, 0)
 
-	del configRestoreList
-	del normalRestoreList
+	#del configRestoreList
+	#del normalRestoreList
 
         for csTrove in newList:
             if csTrove.troveType() != trove.TROVE_TYPE_REMOVED:

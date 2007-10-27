@@ -517,9 +517,9 @@ class Label(AbstractLabel):
 		(self.namespace, self.branch) = rest.split(":")
 
 	if not self.namespace:
-	    raise ParseError("namespace may not be empty: %s" % value)
+	    raise ParseError("namespace may not be empty")
 	if not self.branch:
-	    raise ParseError("branch tag not be empty: %s" % value)
+	    raise ParseError("branch tag may not be empty")
 
 class StaticLabel(Label):
 

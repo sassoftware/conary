@@ -2110,6 +2110,7 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
 	log.debug("running ldconfig")
 	pid = os.fork()
 	if not pid:
+            util.massCloseFileDescriptors(3, 252)
 	    os.chroot(root)
 	    os.chdir('/')
 	    try:
@@ -2474,6 +2475,8 @@ class TagCommand:
                         os.close(stderrPipe[0])
                         os.close(stderrPipe[1])
 
+                        util.massCloseFileDescriptors(3, 252)
+
                         # CNY-1158: control the child process' environment
                         env = { 'PATH' : "/sbin:/bin:/usr/sbin:/usr/bin" }
                         os.chdir(root)
@@ -2586,12 +2589,19 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
 
         if pid == 0:
             os.close(0)
+            # POSIX guarantees that this open() will get fd 0,
+            # the lowest unused fd. Some of the complexity in
+            # nullifyFileDescriptor should be bypassed, opening /dev/null or
+            # mkstemp should pick fd 0 automatically
+            util.nullifyFileDescriptor(0)
             os.close(stdoutPipe[0])
             os.close(stderrPipe[0])
             os.dup2(stdoutPipe[1], 1)
             os.dup2(stderrPipe[1], 2)
             os.close(stdoutPipe[1])
             os.close(stderrPipe[1])
+
+            util.massCloseFileDescriptors(3, 252)
 
             if root != '/':
                 scriptName = scriptName[len(root):]

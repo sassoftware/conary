@@ -617,6 +617,8 @@ class TroveFormatter(TroveTupFormatter):
                 # on failed getTrove calls 
             except errors.TroveMissing:
                 pass
+            except errors.InsufficientPermission:
+                pass
 
         elif n.endswith(':source'):
             sourceTrove = trove
@@ -674,6 +676,7 @@ class TroveFormatter(TroveTupFormatter):
                                 ("TroveVer  : %s" %
                                             trove.troveInfo.troveVersion()))
             yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
+            yield "%-30s" % (("Conary version : %s" % trove.troveInfo.conaryVersion()))
 
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):

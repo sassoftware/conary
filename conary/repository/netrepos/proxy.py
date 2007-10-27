@@ -122,7 +122,7 @@ class ProxyCallFactory:
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
-                     remoteIp, isSecure):
+                     remoteIp, isSecure, baseUrl):
         entitlementList = authToken[2][:]
         entitlementList += cfg.entitlement.find(targetServerName)
 
@@ -191,11 +191,11 @@ class RepositoryCallFactory:
 
     def createCaller(self, protocol, port, rawUrl, proxies, authToken,
                      localAddr, protocolString, headers, cfg,
-                     targetServerName, remoteIp, isSecure):
+                     targetServerName, remoteIp, isSecure, baseUrl):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos,
-                                remoteIp, rawUrl, isSecure)
+                                remoteIp, baseUrl, isSecure)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -239,7 +239,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
-            if protocolVersion < 60:
+            if protocol < 60:
                 return (False, True, ("MethodNotSupported", methodname, ""),
                         None)
             else:
@@ -261,7 +261,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                localAddr, protocolString,
                                                headers, self.cfg,
                                                targetServerName,
-                                               remoteIp, isSecure)
+                                               remoteIp, isSecure,
+                                               self.urlBase())
 
         # args[0] is the protocol version
         protocolVersion = args[0]
@@ -328,9 +329,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         if protocolVersion < 60:
             if r[0] is True:
                 # return (useAnon, isException, (exceptName,) + ordArgs) )
-                return (False, True, (r[1][0],)  + r[1][1], None )
+                return (False, True, (r[1][0],) + r[1][1], extraInfo)
             else:
-                return (False, False, r[1], None )
+                return (False, False, r[1], extraInfo)
 
         return r + (extraInfo,)
 
@@ -815,7 +816,7 @@ class ChangesetFilter(BaseProxy):
 
         # clientVersion >= 50
         return (url, (
-                [ (x.size, x.trovesNeeded, x.filesNeeded, x.removedTroves)
+                [ (str(x.size), x.trovesNeeded, x.filesNeeded, x.removedTroves)
                     for x in changeSetList ] ) )
 
 class SimpleRepositoryFilter(ChangesetFilter):

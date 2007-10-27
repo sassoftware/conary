@@ -15,6 +15,7 @@
 import bdb
 import bz2
 import debugger
+import fcntl
 import errno
 import log
 import misc
@@ -660,6 +661,7 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
 
 def verFormat(cfg, version):
     """Format the version according to the options in the cfg object"""
+    print >> sys.stderr, 'util.verFormat is obsolete as of Conary 1.2'
     if cfg.fullVersions:
         return str(version)
     if cfg.showLabels:
@@ -675,6 +677,7 @@ class ExtendedFile(file):
     def __init__(self, path, mode = "r", buffering = True):
         assert(not buffering)
         file.__init__(self, path, mode, buffering)
+        fcntl.fcntl(self.fileno(), fcntl.F_SETFD, 1)
 
     def pread(self, bytes, offset):
         return misc.pread(self.fileno(), bytes, offset)
@@ -1149,6 +1152,7 @@ class BoundedStringIO(object):
         fd, name = tempfile.mkstemp(suffix=".tmp", prefix="tmpBSIO")
         # Get rid of the file from the filesystem, we'll keep an open fd to it
         os.unlink(name)
+        fcntl.fcntl(fd, fcntl.F_SETFD, 1)
         backendFile = os.fdopen(fd, "w+")
         # Copy the data from the current StringIO (up to the current position)
         backend.seek(0)
@@ -1568,3 +1572,21 @@ def compressStream(src, level = 5, bufferSize = 16384):
         sio.write(z.compress(buf))
     sio.write(z.flush())
     return sio
+
+def massCloseFileDescriptors(start, unusedCount):
+    """Close all file descriptors starting with start, until we hit
+    unusedCount consecutive file descriptors that were already closed"""
+    return misc.massCloseFileDescriptors(start, unusedCount, 0);
+
+def nullifyFileDescriptor(fdesc):
+    """Connects the file descriptor to /dev/null or an open file (if /dev/null
+    does not exist)"""
+    try:
+        fd = os.open('/dev/null', os.O_RDONLY)
+    except OSError:
+        # in case /dev/null does not exist
+        fd, fn = tempfile.mkstemp()
+        os.unlink(fn)
+    if fd != fdesc:
+        os.dup2(fd, fdesc)
+        os.close(fd)

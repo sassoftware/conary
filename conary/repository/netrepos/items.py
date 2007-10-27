@@ -36,7 +36,11 @@ class Items(idtable.IdTable):
         cu = self.db.cursor()
         if val: val = 1
         else:   val = 0
-	cu.execute("UPDATE Items SET hasTrove=? WHERE itemId=?", (val, itemId))
+        # we attempt to avoid doinf busywork here in order to reduce
+        # lock contention on the items table during multiple commits       
+	cu.execute("UPDATE Items SET hasTrove = ? "
+                   "WHERE itemId = ? AND hasTrove != ?",
+                   (val, itemId, val))
 
     def iterkeys(self):
         cu = self.db.cursor()
