@@ -179,101 +179,102 @@ def createLatest(db, withIndexes = True):
         INSTANCE_PRESENT_NORMAL, INSTANCE_PRESENT_HIDDEN
     from conary.trove import TROVE_TYPE_NORMAL, TROVE_TYPE_REDIRECT, \
          TROVE_TYPE_REMOVED
-    # redirects, removed, and normal
+
+    # LATEST_TYPE_ANY: redirects, removed, and normal
+    if "LatestViewAny_sub" not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewAny_sub AS
+        SELECT
+            ugi.userGroupId AS userGroupId,
+            n.itemId AS itemId,
+            n.branchId AS branchId,
+            i.flavorId AS flavorId,
+            max(n.finalTimestamp) AS finalTimestamp
+        FROM UserGroupInstancesCache AS ugi
+        JOIN Instances AS i USING(instanceId)
+        JOIN Nodes AS n USING(itemId, versionId)
+        WHERE i.isPresent = %(present)d
+        GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        """ % {"present" : INSTANCE_PRESENT_NORMAL, })
+        db.views["LatestViewAny_sub"] = True
+        commit = True
     if "LatestViewAny"  not in db.views:
         cu.execute("""
         CREATE VIEW LatestViewAny AS
         SELECT
-            tmp.userGroupId AS userGroupId,
-            tmp.itemId AS itemId,
-            tmp.branchId AS branchId,
-            tmp.flavorId AS flavorId,
+            sub.userGroupId AS userGroupId,
+            sub.itemId AS itemId,
+            sub.branchId AS branchId,
+            sub.flavorId AS flavorId,
             Nodes.versionId AS versionId
-        FROM
-        ( SELECT
+        FROM LatestViewAny_sub as sub
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = sub.flavorId
+          AND Instances.isPresent = %(present)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL})
+        db.views["LatestViewAny"] = True
+        commit = True
+
+    # LATEST_TYPE_PRESENT: redirects and normal
+    if "LatestViewPresent_sub" not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewPresent_sub AS
+        SELECT
             ugi.userGroupId AS userGroupId,
             n.itemId AS itemId,
             n.branchId AS branchId,
             i.flavorId AS flavorId,
             max(n.finalTimestamp) AS finalTimestamp
-          FROM UserGroupInstancesCache AS ugi
-          JOIN Instances AS i USING(instanceId)
-          JOIN Nodes AS n USING(itemId, versionId)
-          WHERE i.isPresent = %(present)d
-          GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
-        ) as tmp
-        JOIN Nodes USING(itemId, branchId, finalTimestamp)
-        JOIN Instances USING(itemId, versionId)
-        WHERE Instances.flavorId = tmp.flavorId
-          AND Instances.isPresent = %(present)d
-        """ % {"present" : INSTANCE_PRESENT_NORMAL, })
-        db.views["LatestViewAny"] = True
+        FROM UserGroupInstancesCache AS ugi
+        JOIN Instances AS i USING(instanceId)
+        JOIN Nodes AS n USING(itemId, versionId)
+        WHERE i.isPresent = %(present)d
+          AND i.troveType != %(removed)d
+        GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        """ % { "present": INSTANCE_PRESENT_NORMAL,
+                "removed"  : TROVE_TYPE_REMOVED, })
+        db.views["LatestViewPresent_sub"] = True
         commit = True
-    # redirects and normal
     if "LatestViewPresent"  not in db.views:
         cu.execute("""
         CREATE VIEW LatestViewPresent AS
         SELECT
-            tmp.userGroupId AS userGroupId,
-            tmp.itemId AS itemId,
-            tmp.branchId AS branchId,
-            tmp.flavorId AS flavorId,
+            sub.userGroupId AS userGroupId,
+            sub.itemId AS itemId,
+            sub.branchId AS branchId,
+            sub.flavorId AS flavorId,
             Nodes.versionId AS versionId
-        FROM
-        ( SELECT
-            ugi.userGroupId AS userGroupId,
-            n.itemId AS itemId,
-            n.branchId AS branchId,
-            i.flavorId AS flavorId,
-            max(n.finalTimestamp) AS finalTimestamp
-          FROM UserGroupInstancesCache AS ugi
-          JOIN Instances AS i USING(instanceId)
-          JOIN Nodes AS n USING(itemId, versionId)
-          WHERE i.isPresent = %(present)d
-          AND i.troveType != %(trove)d
-          GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
-        ) as tmp
+        FROM LatestViewPresent_sub as sub
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
         JOIN Instances USING(itemId, versionId)
-        WHERE Instances.flavorId = tmp.flavorId
+        WHERE Instances.flavorId = sub.flavorId
           AND Instances.isPresent = %(present)d
           AND Instances.troveType != %(trove)d
         """ % {"present" : INSTANCE_PRESENT_NORMAL,
                "trove" : TROVE_TYPE_REMOVED, })
         db.views["LatestViewPresent"] = True
         commit = True
-    # hide branches which end in redirects
-    if "LatestViewNormal"  not in db.views:
+
+    # LATEST_TYPE_NORMAL: hide branches which end in redirects
+    if "LatestViewNormal" not in db.views:
+        assert("LatestViewPresent_sub" in db.views)
         cu.execute("""
         CREATE VIEW LatestViewNormal AS
         SELECT
-            tmp.userGroupId AS userGroupId,
-            tmp.itemId AS itemId,
-            tmp.branchId AS branchId,
-            tmp.flavorId AS flavorId,
+            sub.userGroupId AS userGroupId,
+            sub.itemId AS itemId,
+            sub.branchId AS branchId,
+            sub.flavorId AS flavorId,
             Nodes.versionId AS versionId
-        FROM
-        ( SELECT
-            ugi.userGroupId AS userGroupId,
-            n.itemId AS itemId,
-            n.branchId AS branchId,
-            i.flavorId AS flavorId,
-            max(n.finalTimestamp) AS finalTimestamp
-          FROM UserGroupInstancesCache AS ugi
-          JOIN Instances AS i USING(instanceId)
-          JOIN Nodes AS n USING(itemId, versionId)
-          WHERE i.isPresent = %(present)d
-          AND i.troveType != %(removed)d
-          GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
-        ) as tmp
+        FROM LatestViewPresent_sub as sub
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
         JOIN Instances USING(itemId, versionId)
-        WHERE Instances.flavorId = tmp.flavorId
+        WHERE Instances.flavorId = sub.flavorId
           AND Instances.isPresent = %(present)d
           AND Instances.troveType = %(trove)d
         """ % {"present" : INSTANCE_PRESENT_NORMAL,
-               "trove" : TROVE_TYPE_NORMAL,
-               "removed" : TROVE_TYPE_REMOVED, })
+               "trove" : TROVE_TYPE_NORMAL, })
         db.views["LatestViewNormal"] = True
         commit = True
 

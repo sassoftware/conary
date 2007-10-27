@@ -534,8 +534,8 @@ class NetworkAuthorization:
         userGroupId = self._getGroupIdByName(userGroup)
 
         # these need to show up as 0/1 regardless of what we pass in
-        canWrite = int(bool(write))
-        remove = int(bool(remove))
+        write = int(bool(write))
+        canRemove = int(bool(canRemove))
 
         try:
             cu.execute("""
@@ -543,7 +543,7 @@ class NetworkAuthorization:
             SET labelId = ?, itemId = ?, canWrite = ?,
                 canRemove = ?
             WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, canWrite, remove,
+                       labelId, troveId, write, canRemove,
                        userGroupId, oldLabelId, oldTroveId)
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()

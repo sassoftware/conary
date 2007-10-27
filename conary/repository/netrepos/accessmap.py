@@ -37,7 +37,7 @@ class UserGroupTable:
             where.append("%s = ?" % (key,))
             args.append(val)
         if len(where):
-            where = cond + " and ".join(where)
+            where = cond + " " + " and ".join(where)
         else:
             where = ""
         return (where, args)
@@ -52,7 +52,7 @@ class UserGroupTroves(UserGroupTable):
         schema.resetTable(cu, "tmpInstanceId")
         for (n,v,f) in troveList:
             cu.execute("insert into tmpNVF (name, version, flavor) "
-                       "values (?,?,?)", (n,v,f))
+                       "values (?,?,?)", (n,v,f), start_transaction=False)
         self.db.analyze("tmpNVF")
         cu.execute("""
         insert into tmpInstanceId (idx, instanceId)
@@ -67,7 +67,9 @@ class UserGroupTroves(UserGroupTable):
             Instances.flavorId = Flavors.flavorId
         where
             Instances.isPresent in (%d,%d)
-        """ % (instances.INSTANCE_PRESENT_NORMAL, instances.INSTANCE_PRESENT_HIDDEN))
+        """ % (instances.INSTANCE_PRESENT_NORMAL,
+               instances.INSTANCE_PRESENT_HIDDEN),
+                   start_transaction=False)
         self.db.analyze("tmpInstances")
         # check if any troves specified are missing
         cu.execute("""
@@ -164,11 +166,12 @@ class UserGroupTroves(UserGroupTable):
         cu.execute("""
         insert into tmpInstances(instanceId)
         select distinct ugat.instanceId
-        from UserGroupAllInstances as ugat
-        join tmpInstances using(instanceId)
+        from UserGroupAllTroves as ugat
         where ugat.userGroupId = ?
           and ugat.ugtId in (select id from tmpId)
-        """, userGroupId, start_transaction=False)
+        """, userGroupId, start_transaction = False)
+        cu.execute("delete from UserGroupAllTroves where ugtId in (select id from tmpId)")
+        cu.execute("delete from UserGroupTroves where ugtId in (select id from tmpId)")
         # filter out the ones that are still allowed based on other permissions
         cu.execute("""
         delete from tmpInstances
@@ -177,8 +180,6 @@ class UserGroupTroves(UserGroupTable):
             where userGroupId = ?
               and ugat.instanceId = tmpInstances.instanceId )
         """, userGroupId, start_transaction=False)
-        cu.execute("delete from UserGroupAllTroves where ugtId in (select id from tmpId)")
-        cu.execute("delete from UserGroupTroves where ugtId in (select id from tmpId)")
         return True
 
     # list what we have in the repository for a userGroupId
@@ -289,7 +290,7 @@ class UserGroupInstances(UserGroupTable):
                    (userGroupId, userGroupId), start_transaction=False)
         # insert into UGIC and recompute the latest table
         cu.execute("""
-        insert into UserGroupInstancesTable (userGroupId, instanceId)
+        insert into UserGroupInstancesCache (userGroupId, instanceId)
         select %d, instanceId from tmpInstances """ %(userGroupId,))
         # tmpInstances has instanceIds for which Latest needs to be recomputed
         self.db.analyze("tmpInstances")
@@ -308,7 +309,7 @@ class UserGroupInstances(UserGroupTable):
             select 1 from UserGroupAllPermissions as ugap
             where ugap.userGroupId = ?
               and ugap.instanceId = tmpInstances.instanceId )
-        """, userGroupId)
+        """, userGroupId, start_transaction = False)
         self.db.analyze("tmpInstances")
         # now we should have in tmpInstances the instanceIds of the
         # troves this user can no longer access.
@@ -339,7 +340,8 @@ class UserGroupInstances(UserGroupTable):
               select instanceId from UserGroupInstancesCache as ugi
               where ugi.userGroupId = ?
               and ugi.instanceId = ugap.instanceId ) """,
-                   (permissionId, userGroupId))
+                   (permissionId, userGroupId),
+                   start_transaction = False)
         # update UsergroupInstancesCache
         cu.execute("""
         insert into UserGroupInstancesCache (userGroupId, instanceId)
@@ -355,7 +357,7 @@ class UserGroupInstances(UserGroupTable):
         cu = self.db.cursor()
         schema.resetTable(cu, "tmpInstances")
         # figure out how the access is changing
-        self.cu.execute("""
+        cu.execute("""
         insert into tmpInstances(instanceId)
         select instanceId from UserGroupAllPermissions
         where permissionId = ? """, permissionId, start_transaction=False)
@@ -404,23 +406,24 @@ class UserGroupInstances(UserGroupTable):
         schema.resetTable(cu, "tmpInstances")
         cu.execute("""
         insert into tmpInstances(instanceId)
-        select instanceId from UserGroupInstancesCache as ugi
+        select ugi.instanceId from UserGroupInstancesCache as ugi
         where ugi.userGroupId = ?
           and not exists (
               select 1 from UserGroupAllPermissions as ugap
               where ugap.userGroupId = ? 
                 and ugap.instanceId = ugi.instanceId
-                and ugap.permissionId != ?
-              union all
-              select 2 from UserGroupAllTroves as ugat
+                and ugap.permissionId != ? )
+          and not exists (
+              select 1 from UserGroupAllTroves as ugat
               where ugat.instanceId = ugi.instanceId
                 and ugat.userGroupId = ? )""",
-                   (userGroupId, userGroupId, permissionId, userGroupId))
+                   (userGroupId, userGroupId, permissionId, userGroupId),
+                   start_transaction = False)
         # clean up the flattened table
         cu.execute("delete from UserGroupAllPermissions where permissionId = ?",
                    permissionId)
         # now we have only the troves which need to be erased out of UGIC
-        self.db.analyze(cu, "tmpInstances")
+        self.db.analyze("tmpInstances")
         cu.execute("""
         delete from UserGroupInstancesCache
         where userGroupId = ?
