@@ -176,7 +176,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             cacheTimeout = self.authCacheTimeout,
             passwordURL = self.externalPasswordURL,
             entCheckURL = self.entitlementCheckURL)
-        self.ugo = accessmap.UserGroupOps(self.db)
+        self.ugi = accessmap.UserGroupInstances(self.db)
         self.deptable = deptable.DependencyTables(self.db)
         self.log.reset()
 
@@ -547,21 +547,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addTroveAccess(self, authToken, clientVersion, userGroup, troveList):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.ugo.addTroveAccess(userGroup, troveList, recursive=True)
+        self.ugi.addTroveAccess(userGroup, troveList, recursive=True)
         return ""
 
     @accessReadWrite
     def deleteTroveAccess(self, authToken, clientVersion, userGroup, troveList):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.ugo.deleteTroveAccess(userGroup, troveList)
+        self.ugi.deleteTroveAccess(userGroup, troveList)
         return ""
     
     @accessReadOnly
     def listTroveAccess(self, authToken, clientVersion, userGroup):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        ret = self.ugo.listTroveAccess(userGroup)
+        ret = self.ugi.listTroveAccess(userGroup)
         # strip off the recurse flag; return just the name,version,flavor tuple
         return [ x[0] for x in ret ]
     
