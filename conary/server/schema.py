@@ -916,6 +916,7 @@ def createAccessMaps(db):
             permissionId    INTEGER NOT NULL,
             userGroupId     INTEGER NOT NULL,
             instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT UGAP_permissionId_fk
                 FOREIGN KEY (permissionId) REFERENCES Permissions(permissionId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -941,6 +942,7 @@ def createAccessMaps(db):
         CREATE TABLE UserGroupInstancesCache(
             userGroupId     INTEGER NOT NULL,
             instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT UGIC_userGroupId_fk
                 FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
                 ON DELETE CASCADE ON UPDATE CASCADE,

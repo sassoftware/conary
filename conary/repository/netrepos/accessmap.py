@@ -200,7 +200,8 @@ class UserGroupTroves(UserGroupTable):
 class UserGroupPermissions(UserGroupTable):
     # adds into the UserGroupAllPermissions table new entries
     # triggered by one or more recordIds
-    def addId(self, cu, permissionId = None, userGroupId = None, instanceId = None):
+    def addId(self, cu, permissionId = None, userGroupId = None,
+              instanceId = None):
         where = []
         args = []
         if permissionId is not None:
@@ -217,11 +218,12 @@ class UserGroupPermissions(UserGroupTable):
             whereStr = "where %s" % (' and '.join(where),)
         cu.execute("""
         insert into UserGroupAllPermissions
-            (permissionId, userGroupId, instanceId)
+            (permissionId, userGroupId, instanceId, canWrite)
         select
             Permissions.permissionId as permissionId,
             Permissions.userGroupId as userGroupId,
-            Instances.instanceId as instanceId
+            Instances.instanceId as instanceId,
+            Permissions.canWrite as canWrite
         from Instances
         join Nodes using(itemId, versionId)
         join LabelMap using(itemId, branchId)
@@ -344,11 +346,13 @@ class UserGroupInstances(UserGroupTable):
                    start_transaction = False)
         # update UsergroupInstancesCache
         cu.execute("""
-        insert into UserGroupInstancesCache (userGroupId, instanceId)
-        select userGroupId, instanceId
+        insert into UserGroupInstancesCache (userGroupId, instanceId, canWrite)
+        select userGroupId, instanceId,
+               case when sum(canWrite) = 0 then 0 else 1 end as canWrite
         from UserGroupAllPermissions
         where permissionId = ?
           and instanceId in (select instanceId from tmpInstances)
+        group by userGroupId, instanceId
         """, permissionId)
         # update Latest
         self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
@@ -389,17 +393,41 @@ class UserGroupInstances(UserGroupTable):
         """, userGroupId)
         # add the new troves now
         cu.execute("""
-        insert into UserGroupInstancesCache(userGroupId, instanceId)
-        select userGroupId, instanceId from UserGroupAllPermissions as ugap
+        insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
+        select userGroupId, instanceId,
+               case when sum(canWrite) = 0 then 0 else 1 end as canWrite
+        from UserGroupAllPermissions as ugap
         where ugap.permissionId = ?
           and not exists (
               select 1 from UserGroupInstancesCache as ugi
               where ugi.instanceId = ugap.instanceId
                 and ugi.userGroupId = ugap.userGroupId )
+        group by userGroupId, instanceId
         """, permissionId)
         self.latest.updateUserGroupId(cu, userGroupId)
         return True
-    
+    # updates the canWrite flag for an acl change
+    def updateCanWrite(self, permissionId, userGroupId):
+        cu = self.db.cursor()
+        # update the flattened table first
+        cu.execute("""
+        update UserGroupAllPermissions set canWrite = (
+            select canWrite from Permissions where permissionId = ? )
+        where permissionId = ? """, (permissionId, permissionId))
+        # update the UserGroupInstancesCache now. hopefully we won't
+        # do too many of these...
+        cu.execute("""
+        update UserGroupInstancesCache set canWrite = (
+            select case when sum(canWrite) = 0 then 0 else 1 end
+            from UserGroupAllPermissions as ugap
+            where ugap.userGroupId = UserGroupInstancesCache.userGroupId
+              and ugap.instanceId = UserGroupInstancesCache.instanceId )
+        where userGroupId = ? and instanceId in (
+            select instanceId from UserGroupAllPermissions as ugap2
+            where ugap2.permissionId = ? )
+        """, (userGroupId, permissionId))
+        return True
+        
     def deletePermissionId(self, permissionId, userGroupId):
         cu = self.db.cursor()
         # compute the list of troves for which no other UGAP/UGAT access exists
@@ -436,13 +464,16 @@ class UserGroupInstances(UserGroupTable):
         cu = self.db.cursor()
         self.ugp.addId(cu, instanceId = instanceId)
         cu.execute("""
-        insert into UserGroupInstancesCache(userGroupId, instanceId)
-        select distinct userGroupId, instanceId from UserGroupAllPermissions as ugap
+        insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
+        select userGroupId, instanceId,
+            case when sum(canWrite) = 0 then 0 else 1 end as canWrite
+        from UserGroupAllPermissions as ugap
         where ugap.instanceId = ?
           and not exists (
               select 1 from UserGroupInstancesCache as ugi
               where ugi.instanceId = ugap.instanceId
                 and ugi.userGroupId = ugap.userGroupId )
+        group by userGroupId, instanceId
         """, instanceId)
         self.latest.updateInstanceId(cu, instanceId)
 
@@ -475,13 +506,21 @@ class UserGroupInstances(UserGroupTable):
         self.ugp.rebuild(cu, userGroupId = userGroupId)
         # and now sum it up. The union keeps the values distinct
         cu.execute("""
-        insert into UserGroupInstancesCache(userGroupId, instanceId)
-        select userGroupId, instanceId from UserGroupAllPermissions
-        %s
-        union
-        select userGroupId, instanceId from UserGroupAllTroves
-        %s
-        """ % (where, where), args + args)
+        insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
+        select userGroupId, instanceId, case when sum(canWrite) = 0 then 0 else 1 end
+        from UserGroupAllPermissions %s
+        group by userGroupId, instanceId
+        """ % (where,), args)
+        cond, args = self.getWhereArgs("and", userGroupId = userGroupId)
+        cu.execute("""
+        insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
+        select distinct userGroupId, instanceId, 0 as canWrite
+        from UserGroupAllTroves as ugat
+        where not exists (
+            select 1 from UserGroupInstancesCache as ugi
+            where ugat.instanceId = ugi.instanceId
+              and ugat.userGroupId = ugi.userGroupId )
+        %s """ % (cond,), args)
         self.db.analyze("UserGroupInstancesCache")
         # need to rebuild the latest as well
         if userGroupId is not None:

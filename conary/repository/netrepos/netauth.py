@@ -555,9 +555,13 @@ class NetworkAuthorization:
         where userGroupId = ? and labelId = ? and itemId = ?""",
                    (userGroupId, labelId, troveId))
         permissionId = cu.fetchone()
-        if permissionId and (oldLabelId != labelId or oldTroveId != troveId):
-            # a permission has changed the itemId or the labelId...
-            self.ugi.updatePermissionId(permissionId[0], userGroupId)
+        if permissionId :
+            permissionId = permissionId[0]
+            if (oldLabelId != labelId or oldTroveId != troveId):
+                # a permission has changed the itemId or the labelId...
+                self.ugi.updatePermissionId(permissionId, userGroupId)
+            else: # just set the new canWrite flag
+                self.ugi.updateCanWrite(permissionId, userGroupId)
         self.db.commit()
 
     def deleteAcl(self, userGroup, label, item):
