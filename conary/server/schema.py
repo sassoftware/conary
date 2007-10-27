@@ -405,7 +405,6 @@ def createUsers(db):
         assert("Items" in db.tables)
         assert("Labels" in db.tables)
         assert("UserGroups" in db.tables)
-        assert("Caps" in db.tables)
         cu.execute("""
         CREATE TABLE Permissions (
             permissionId    %(PRIMARYKEY)s,
