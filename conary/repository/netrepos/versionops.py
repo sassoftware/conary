@@ -87,8 +87,11 @@ class LabelTable(idtable.IdTable):
 class LatestTable:
     def __init__(self, db):
         self.db = db
-    def rebuild(self):
-        cu = self.db.cursor()
+    def rebuild(self, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
+        # prepare for rebuild
+        cu.execute("delete from LatestCache")
         # populate the LatestCache table. We need to split the inserts
         # into chunks to make sure the backend can handle all the data
         # we're inserting.
@@ -113,6 +116,7 @@ class LatestTable:
         _insertView(cu, LATEST_TYPE_ANY)
         _insertView(cu, LATEST_TYPE_PRESENT)
         _insertView(cu, LATEST_TYPE_NORMAL)
+        self.db.analyze("LatestCache")
         return
     
     def update(self, cu, itemId, branchId, flavorId, userGroupId = None):
@@ -123,7 +127,7 @@ class LatestTable:
             args.append(userGroupId)
         cu.execute("""
         delete from LatestCache
-        where itemId = ? and branchId = ? and flavorId = ? %s" % (cond,),
+        where itemId = ? and branchId = ? and flavorId = ? %s""" % (cond,),
                    args)
         cu.execute("""
         insert into LatestCache
@@ -134,9 +138,7 @@ class LatestTable:
         where itemId = ? and branchId = ? and flavorId = ? %s""" % (cond,),
                    args)
 
-    def updateInstanceId(self, instanceId, cu = None):
-        if cu is None:
-            cu = self.db.cursor()
+    def updateInstanceId(self, cu, instanceId):
         cu.execute("""
         select itemId, flavorId, branchId
         from Instances join Nodes using(itemId, versionId)
@@ -144,8 +146,7 @@ class LatestTable:
         for itemId, flavorId, branchId in cu.fetchall():
             self.update(cu, itemId, branchId, flavorId)
 
-    def updateUserGroupId(self, userGroupId, tmpInstances=False):
-        cu = self.db.cursor()
+    def updateUserGroupId(self, cu, userGroupId, tmpInstances=False):
         if not tmpInstances:
             cu.execute("delete from LatestCache where userGroupId = ?", userGroupId)
             cu.execute("""

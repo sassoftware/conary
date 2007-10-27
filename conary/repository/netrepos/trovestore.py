@@ -318,7 +318,7 @@ class TroveStore:
 
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depTables.add(cu, trv, troveInstanceId)
-        self.ugi.updateInstanceId(troveInstanceId)
+        self.ugi.addInstanceId(troveInstanceId)
         self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
         
         # Fold tmpNewFiles into FileStreams
@@ -1059,8 +1059,7 @@ class TroveStore:
         self.db.analyze("tmpRemovals")
 
         # remove access to troves we're about to remove
-        cu.execute("DELETE FROM UserGroupInstancesCache WHERE instanceId "
-                   "in (SELECT instanceId FROM tmpRemovals)")
+        self.ugi.deleteInstanceIds("tmpRemovals")
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM TroveRedirects WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM Instances WHERE instanceId IN "
@@ -1072,10 +1071,7 @@ class TroveStore:
                        trove.TROVE_TYPE_REMOVED, instanceId)
             self.latest.update(cu, itemId, branchId, flavorId)
         else:
-            cu.execute("DELETE FROM UserGroupInstancesCache WHERE instanceId = ?",
-                       instanceId)
-            cu.execute("DELETE FROM UserGroupTroves WHERE instanceId = ?",
-                       instanceId)
+            self.ugi.deleteInstanceId(instanceId)
             cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
         # look for troves referenced by this one

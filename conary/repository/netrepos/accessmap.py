@@ -24,11 +24,26 @@ from conary.lib.tracelog import logMe
 # - Then, UserGroupAllTroves and UserGroupAllPermissions are summarized
 #   in the UserGroupInstancesCache table
 
-# class and methods for handling UserGroupTroves operations
-class UserGroupTroves:
+# base class for handling UGAP and UGAT
+class UserGroupTable:
     def __init__(self, db):
         self.db = db
-
+    def getWhereArgs(self, cond = "where", **kw):
+        where = []
+        args = []
+        for key, val in kw.items():
+            if val is None:
+                continue
+            where.append("%s = ?" % (key,))
+            args.append(val)
+        if len(where):
+            where = cond + " and ".join(where)
+        else:
+            where = ""
+        return (where, args)
+    
+# class and methods for handling UserGroupTroves operations
+class UserGroupTroves(UserGroupTable):
     # given a list of (n,v,f) tuples, convert them to instanceIds in
     # the tmpInstanceId table
     def _findInstanceIds(self, troveList, checkMissing=True):
@@ -62,12 +77,13 @@ class UserGroupTroves:
         where tmpInstanceId.instanceId is NULL
         """)
         if checkMissing:
+            # granting permissions to a !present trove has a fuzzy meaning
             for i, n, v, v in cu.fetchall():
                 raise errors.TroveMissing(n,v)
         return True
 
-    # update the UserGroupAllTroves table for a new ugtId
-    def _updateAllTroves(self, cu, ugtId = None, userGroupId = None):
+    # update the UserGroupAllTroves table
+    def rebuild(self, cu, ugtId = None, userGroupId = None):
         where = []
         args = {}
         if ugtId is not None:
@@ -84,14 +100,16 @@ class UserGroupTroves:
         # update the UserGroupAllTroves table
         cu.execute("delete from UserGroupAllTroves %s" % (whereCond,), args)
         cu.execute("""
-        insert into UserGroupAllTroves (ugtId, instanceId)
-        select ugtId, instanceId from UserGroupTroves %s
+        insert into UserGroupAllTroves (ugtId, userGroupId, instanceId)
+        select ugtId, userGroupId, instanceId from UserGroupTroves %s
         union
-        select ugtId, TroveTroves.includedId
-        from UserGroupTroves as ugt
-        join TroveTroves using (instanceId)
-        where ugt.recursive = 1 %s
+        select ugtId, userGroupId, TroveTroves.includedId
+        from UserGroupTroves join TroveTroves using (instanceId)
+        where UserGroupTroves.recursive = 1 %s
         """ %(whereCond, andCond), args)
+        if ugtId is None and userGroupId is None:
+            # this was a full rebuild
+            self.db.analyze("UserGroupAllTroves")
         return True
     
     # grant access on a troveList to userGroup
@@ -124,7 +142,7 @@ class UserGroupTroves:
             else: # not worth bothering with a rebuild
                 ugtId = None
             if ugtId: # we have a new (or changed) acl
-                self._updateAllTroves(cu, ugtId, userGroupId)
+                self.rebuild(cu, ugtId, userGroupId)
                 ugtList.append(ugtId)
         return ugtList
 
@@ -177,55 +195,11 @@ class UserGroupTroves:
         where ugt.userGroupId = ? """, userGroupId)
         return [ ((n,v,f),r) for n,v,f,r in cu.fetchall()]
 
-    # Assumes that UserGroupInstancesCache has been sanitized before calling in
-    def _updateInstancesCache(self, cu, userGroupId):
-        """updates the UserGroupInstancesCache table with permissions granted
-        by the UserGroupTroves table. """
-        # we have the troves we are granted access to in the UserGroupAllTroves
-        # we need to add the new stuff into the UserGroupInstancesCache table
-        schema.resetTable(cu, "tmpInstances")
-        cu.execute("""
-        insert into tmpInstances(instanceId)
-        select distinct instanceId from UserGroupAllTroves as ugat
-        where not exists
-        ( select 1 from UserGroupInstancesCache as ugi
-          where ugi.instanceId = ugat.instanceId
-            and ugi.userGroupId = ugat.userGroupId )
-        and ugat.userGroupId = ? """, userGroupId)
-        cu.execute("insert into UserGroupInstancesCache(userGroupId, instanceId) "
-                   "select %d, instanceId from tmpInstances" % (userGroupId,))
-        return True
-        
-    def update(self, userGroupId):
-        cu = self.db.cursor()
-        ret = self._updateInstancesCache(cu, userGroupId)
-        return ret
-    
-    # the UserGroupInstancesCache table should be scrubbed before calling this
-    def rebuild(self, userGroupId = None):
-        """ updates the access cache for all the usergroups that have
-        special accessmaps. """
-        cu = self.db.cursor()
-        # first, rebuild the UserGroupAllTroves table
-        self._updateAllTroves(cu, userGroupId = userGroupId)
-        if userGroupId is not None:
-            self._updateInstancesCache(cu, userGroupId)
-            return
-        cu.execute("select distinct userGroupId from UserGroupTroves")
-        # this is actually the fastest way to regenerate all the
-        # entries, because the individual steps are much reduced in
-        # complexity and simpler to execute for the database backend.
-        for userGroupId, in cu.fetchall():
-            self._updateInstancesCache(cu, userGroupId)
-        
 # class and methods for handling UserGroupAllPermissions operations
-class UserGroupPermissions:
-    def __init__(self, db):
-        self.db = db
-
-    def addId(self, cu, permissionId = None, instanceId = None):
-        # adds into the UserGroupAllPermissions table new entries
-        # triggered by one or more recordIds
+class UserGroupPermissions(UserGroupTable):
+    # adds into the UserGroupAllPermissions table new entries
+    # triggered by one or more recordIds
+    def addId(self, cu, permissionId = None, userGroupId = None, instanceId = None):
         where = []
         args = []
         if permissionId is not None:
@@ -234,6 +208,9 @@ class UserGroupPermissions:
         if instanceId is not None:
             where.append("Instances.instanceId = ?")
             args.append(instanceId)
+        if userGroupId is not None:
+            where.append("Permissions.userGroupId = ?")
+            args.append(userGroupId)
         whereStr = ""
         if len(where):
             whereStr = "where %s" % (' and '.join(where),)
@@ -256,31 +233,30 @@ class UserGroupPermissions:
         %s """ % (whereStr,), args)
         return True
 
-    def deleteId(self, cu, permissionId = None, instanceId = None,
-                 userGroupId = None):
-        if permissionId is not None:
-            where.append("permissionId = ?")
-            args.append(permissionId)
-        if instanceId is not None:
-            where.append("instanceId = ?")
-            args.append(instanceId)
-        if userGroupId is not None:
-            where.append("userGroupId = ?")
-            args.append(userGroupId)
-        whereStr = ""
-        if len(where):
-            whereStr = "where %s" % (' and '.join(where),)
-        cu.execute("delete from UserGroupAllPermissions %s" % (whereStr,), args)
+    def deleteId(self, cu, permissionId = None, userGroupId = None,
+                 instanceId = None):
+        where, args = self.getWhereArgs("where", permissionId=permissionId,
+            userGroupId=userGroupId, instanceId=instanceId)
+        cu.execute("delete from UserGroupAllPermissions %s" % (where,), args)
         return True
-    
+
+    def rebuild(self, cu, permissionId = None, userGroupId = None, instanceId = None):
+        self.deleteId(cu, permissionId, userGroupId, instanceId)
+        self.addId(cu, permissionId, userGroupId, instanceId)
+        if permissionId is None and userGroupId is None and instanceId is None:
+            # this was a full rebuild
+            self.db.analyze("UserGroupAllPermissions")
+        return True
+
 # this class takes care of the UserGroupInstancesCache table, which is a summary
 # of rows present in UserGroupAllTroves and UserGroupAllPermissions tables
-class UserGroupInstances:
+class UserGroupInstances(UserGroupTable):
     def __init__(self, db):
-        self.db = db
+        UserGroupTable.__init__(self, db)
         self.ugt = UserGroupTroves(db)
         self.ugp = UserGroupPermissions(db)
-        
+        self.latest = versionops.LatestTable(db)
+
     def _getGroupId(self, userGroup):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
@@ -317,7 +293,7 @@ class UserGroupInstances:
         select %d, instanceId from tmpInstances """ %(userGroupId,))
         # tmpInstances has instanceIds for which Latest needs to be recomputed
         self.db.analyze("tmpInstances")
-        self.latest.updateUserGroupId(userGroupId, tmpInstances=True)
+        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
 
     def deleteTroveAccess(self, userGroup, troveList):
         userGroupId = self._getGroupId(userGroup)
@@ -342,12 +318,11 @@ class UserGroupInstances:
           and instanceId in (select instanceId from tmpInstances)
         """, userGroupId)
         # tmpInstances has instanceIds for which Latest needs to be recomputed
-        self.latest.updateUserGroupId(userGroupId, tmpInstances=True)
+        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
 
     def listTroveAccess(self, userGroup):
         userGroupId = self._getGroupId(userGroup)
         return self.ugt.list(userGroupId)
-
 
     # changes in the Permissions table
     def addPermissionId(self, permissionId, userGroupId):
@@ -363,7 +338,7 @@ class UserGroupInstances:
           and not exists (
               select instanceId from UserGroupInstancesCache as ugi
               where ugi.userGroupId = ?
-              and ugi.instanceId = ugap.instanceId ) """.
+              and ugi.instanceId = ugap.instanceId ) """,
                    (permissionId, userGroupId))
         # update UsergroupInstancesCache
         cu.execute("""
@@ -374,11 +349,54 @@ class UserGroupInstances:
           and instanceId in (select instanceId from tmpInstances)
         """, permissionId)
         # update Latest
-        self.latest.updateUserGroupId(userGroupId, tmpInstances=True)
+        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
 
     def updatePermissionId(self, permissionId, userGroupId):
         cu = self.db.cursor()
-        pass
+        schema.resetTable(cu, "tmpInstances")
+        # figure out how the access is changing
+        self.cu.execute("""
+        insert into tmpInstances(instanceId)
+        select instanceId from UserGroupAllPermissions
+        where permissionId = ? """, permissionId, start_transaction=False)
+        # re-add 
+        self.ugp.deleteId(cu, permissionId = permissionId)
+        self.ugp.addId(cu, permissionId = permissionId)
+        # remove from consideration troves for which we still have access
+        cu.execute("""
+        delete from tmpInstances
+        where exists (
+            select 1 from UserGroupAllPermissions as ugap
+            where ugap.userGroupId = ?
+              and ugap.instanceId = tmpInstances.instanceId )
+        or exists (
+            select 1 from UserGroupAllTroves as ugat
+            where ugat.userGroupId = ?
+              and ugat.instanceId = tmpInstances.instanceId )
+        """, (userGroupId, userGroupId), start_transaction=False)
+        self.db.analyze("tmpInstances")
+        # remove trove access from troves that are left
+        cu.execute("""
+        delete from UserGroupInstancesCache
+        where userGroupId = ?
+          and instanceId in (select instanceId from tmpInstances)
+          and not exists (
+              select 1 from UserGroupAllTroves as ugat
+              where ugat.userGroupId = UserGroupInstancesCache.userGroupId
+                and ugat.instanceId = UserGroupInstancesCache.instanceId )
+        """, userGroupId)
+        # add the new troves now
+        cu.execute("""
+        insert into UserGroupInstancesCache(userGroupId, instanceId)
+        select userGroupId, instanceId from UserGroupAllPermissions as ugap
+        where ugap.permissionId = ?
+          and not exists (
+              select 1 from UserGroupInstancesCache as ugi
+              where ugi.instanceId = ugap.instanceId
+                and ugi.userGroupId = ugap.userGroupId )
+        """, permissionId)
+        self.latest.updateUserGroupId(cu, userGroupId)
+        return True
     
     def deletePermissionId(self, permissionId, userGroupId):
         cu = self.db.cursor()
@@ -408,77 +426,65 @@ class UserGroupInstances:
         where userGroupId = ?
         and instanceId in (select instanceId from tmpInstances)""", userGroupId)
         # update Latest
-        self.latest.updateUserGroupId(userGroupId, tmpInstances=True)
+        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
 
-
-    def update(self, cu, instanceId = None, userGroupId = None):
-        """rebuilds the UserGroupInstancesCache. If both instanceId
-        and userGroupId are None, it will rebuild the entire table;
-        otherwise the rebuilding scope is limited
-        """
+    # a new trove has been comitted to the system
+    def addInstanceId(self, instanceId):
+        cu = self.db.cursor()
+        self.ugp.addId(cu, instanceId = instanceId)
         cu.execute("""
-        insert into UserGroupInstancesCache (instanceId, userGroupId)
-        select
-            Instances.instanceId as instanceId,
-            Permissions.userGroupId as userGroupId
-        from Instances
-        join Nodes using(itemId, versionId)
-        join LabelMap using(itemId, branchId)
-        join Permissions on
-            Permissions.labelId = 0 or
-            Permissions.labelId = LabelMap.labelId
-        join CheckTroveCache on
-            Permissions.itemId = CheckTroveCache.patternId and
-            Instances.itemId = CheckTroveCache.itemId
+        insert into UserGroupInstancesCache(userGroupId, instanceId)
+        select distinct userGroupId, instanceId from UserGroupAllPermissions as ugap
+        where ugap.instanceId = ?
+          and not exists (
+              select 1 from UserGroupInstancesCache as ugi
+              where ugi.instanceId = ugap.instanceId
+                and ugi.userGroupId = ugap.userGroupId )
+        """, instanceId)
+        self.latest.updateInstanceId(cu, instanceId)
+
+    # these used used primarily by the markRemoved code
+    def deleteInstanceId(self, instanceId):
+        cu = self.db.cursor()
+        for t in [ "UserGroupInstancesCache", "UserGroupAllTroves",
+                   "UserGroupAllPermissions"]:
+            cu.execute("delete from %s where instanceId = ?" % (t,),
+                       instanceId)
+        self.latest.updateInstanceId(cu, instanceId)
+    def deleteInstanceIds(self, idTableName):
+        cu = self.db.cursor()
+        for t in [ "UserGroupInstancesCache", "UserGroupAllTroves",
+                   "UserGroupAllPermissions"]:
+            cu.execute("delete from %s where instanceId in (select instanceId from %s)"%(
+                t, idTableName))
+        # this case usually does not require recomputing the
+        # LatestCache since we only remove !present troves in bulk
+        return True
+    
+    # rebuild the UGIC table entries
+    def rebuild(self, userGroupId = None, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
+        where, args = self.getWhereArgs("where", userGroupId = userGroupId)
+        cu.execute("delete from UserGroupInstancesCache %s" % (where,), args)
+        # first, rebuild the flattened tables
+        self.ugt.rebuild(cu, userGroupId = userGroupId)
+        self.ugp.rebuild(cu, userGroupId = userGroupId)
+        # and now sum it up. The union keeps the values distinct
+        cu.execute("""
+        insert into UserGroupInstancesCache(userGroupId, instanceId)
+        select userGroupId, instanceId from UserGroupAllPermissions
         %s
-        """ % (whereStr,), args)
-        
-    def updateInstanceId(self, instanceId):
-        """update UserGroupInstancesCache for a changed instanceId"""
-        cu = self.db.cursor()
-        cu.execute("delete from UserGroupInstancesCache where instanceId = ?",
-                   instanceId)
-        self.update(cu, instanceId=instanceId)
-        
-    def updateUserGroupId(self, userGroupId):
-        """update UserGroupInstancesCache for acl changes for a userGroupId"""
-        cu = self.db.cursor()
-        cu.execute("delete from UserGroupInstancesCache where userGroupId = ?",
-                   userGroupId)
-        logMe(3, "deleted old stuff", userGroupId)
-        self.update(cu, userGroupId=userGroupId)
-
-    def rebuild(self):
-        """ rebuild the entire UserGroupInstancesCache  """
-        cu = self.db.cursor()
-        cu.execute("delete from UserGroupInstancesCache")
-        self.update(cu)
+        union
+        select userGroupId, instanceId from UserGroupAllTroves
+        %s
+        """ % (where, where), args + args)
         self.db.analyze("UserGroupInstancesCache")
-        
-# generic wrapper operations that handle updating and syncing all the
-# relevant usergroup access maps
-class UserGroupOps:
-    def __init__(self, db):
-        self.db = db
-        self.ugt = UserGroupTroves(db)
-        self.ugi = UserGroupInstances(db)
+        # need to rebuild the latest as well
+        if userGroupId is not None:
+            self.latest.updateUserGroupId(cu, userGroupId)
+        else: # this is a full rebuild
+            self.latest.rebuild()
+        return True
 
-    # rebuild the cache tables completely for a userGroup
-    def updateUserGroupId(self, userGroupId):
-        logMe(3, userGroupId)
-        self.ugi.updateUserGroupId(userGroupId)
-        logMe(3, "ugi.updateUserGroupId", userGroupId)
-##         self.ugt.update(userGroupId)
-##         logMe(3, "ugt.update", userGroupId)
-##         self.latest.updateUserGroupId(userGroupId)
-##         logMe(3, "latest.updateUserGroupId", userGroupId)
-    def updateUserGroup(self, userGroup):
-        userGroupId = self._getGroupId(userGroup)
-        self.updateUserGroupId(userGroupId)
 
-    # rebuild all caches
-    def rebuild(self):
-        self.ugi.rebuild()
-        self.ugt.rebuild()
-        self.latest.rebuild()
-        

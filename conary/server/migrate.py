@@ -513,16 +513,6 @@ def createCheckTroveCache(db):
     logMe(2, "done with CheckTroveCache")
     return True
         
-# populate (and create if not exists) the UserGroupInstances table
-def createUserGroupInstances(db):
-    db.loadSchema()
-    logMe(2, "creating UserGroupInstances table")
-    assert("UserGroupInstancesCache" in db.tables)
-    assert("CheckTroveCache" in db.tables)
-    ugi = accessmap.UserGroupInstances(db)
-    ugi.rebuild()
-    return True
-
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
 def updateLabelMap(db):
@@ -539,7 +529,7 @@ def updateLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16,5)
+    Version = (16,3)
     # migrate to 16.0
     # create a primary key for labelmap
     def migrate(self):
@@ -584,33 +574,21 @@ class MigrateTo_16(SchemaMigration):
         return True
     # populate the UserGroupInstances map
     def migrate3(self):
-        schema.createAccessMaps(self.db)
-        if not createCheckTroveCache(self.db):
-            return False
-        if not createUserGroupInstances(self.db):
-            return False
-        return True
-    # drop the old Latest table and create views instead
-    def migrate4(self):
         cu = self.db.cursor()
         self.db.loadSchema()
         if "Latest" in self.db.tables:
             cu.execute("drop table Latest")
-        logMe(2, "creating the Latest by role tables...")
+        schema.createAccessMaps(self.db)
         schema.createLatest(self.db, withIndexes=False)
-        logMe(3, "rebuilding the LatestCache entries...")
-        latest = versionops.LatestTable(self.db)
-        latest.rebuild()
+        if not createCheckTroveCache(self.db):
+            return False
+        logMe(2, "creating UserGroupInstancesCache table")
+        ugi = accessmap.UserGroupInstances(db)
+        ugi.rebuild()
         logMe(3, "creating the LatestCache indexes...")
         schema.createLatest(self.db)
         self.db.analyze("LatestCache")
         return True
-    def migrate5(self):
-        schema.setupTempTables(self.db)
-        ugo = accessmap.UserGroupOps(self.db)
-        ugo.updateUserGroupId(28)
-        logMe(2, "finished updating ugid", 28)
-        return False
     
 def _getMigration(major):
     try:
