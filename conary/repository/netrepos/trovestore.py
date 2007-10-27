@@ -1098,7 +1098,7 @@ class TroveStore:
         """)
 
         # Now update the latest table
-        self.latest.update(itemId, branchId, flavorId, cu)
+        self.latest.update(cu, itemId, branchId, flavorId)
 
         # Delete flavors which are no longer needed
         cu.execute("""
