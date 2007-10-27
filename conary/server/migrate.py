@@ -514,16 +514,15 @@ def updateLabelMap(db):
     return True
     
 class MigrateTo_16(SchemaMigration):
-    Version = (16,3)
+    Version = (16,1)
     # migrate to 16.0
-    # create a primary key for labelmap
     def migrate(self):
-        return updateLabelMap(self.db)
-    # move the admin field from Permissions into UserGroups
-    def migrate1(self):
-        logMe(2, "Relocating the admin field from Permissions to UserGroups...")
         cu = self.db.cursor()
         self.db.loadSchema()
+        # create a primary key for labelmap
+        updateLabelMap(self.db)
+        # move the admin field from Permissions into UserGroups
+        logMe(2, "Relocating the admin field from Permissions to UserGroups...")
         if "OldPermissions" in self.db.tables:
             cu.execute("drop table OldPermissions")
         cu.execute("create table OldPermissions as select * from Permissions")
@@ -537,14 +536,12 @@ class MigrateTo_16(SchemaMigration):
         for ugid, admin in cu.fetchall():
             cu.execute("update UserGroups set admin = ? where userGroupId = ?",
                        (admin, ugid))
-        fields = ",".join(["userGroupId", "labelId", "itemId", "canWrite",
-                           "canRemove", "capId"])
+        fields = ",".join(["userGroupId", "labelId", "itemId", "canWrite", "canRemove"])
         cu.execute("insert into Permissions(%s) "
                    "select distinct %s from OldPermissions " %(fields, fields))
         cu.execute("drop table OldPermissions")
         self.db.loadSchema()
-        return True
-    def migrate2(self):
+
         # need to rebuild flavormap
         logMe(2, "Recreating the FlavorMap table...")
         cu = self.db.cursor()
@@ -558,11 +555,13 @@ class MigrateTo_16(SchemaMigration):
             flavTable.createFlavorMap(flavorId, flavor, cu)
         return True
     # populate the UserGroupInstances map
-    def migrate3(self):
+    def migrate1(self):
         cu = self.db.cursor()
         self.db.loadSchema()
         if "Latest" in self.db.tables:
             cu.execute("drop table Latest")
+        if "Caps" in self.db.tables:
+            cu.execute("drop table Caps")
         schema.createAccessMaps(self.db)
         schema.createLatest(self.db, withIndexes=False)
         if not createCheckTroveCache(self.db):

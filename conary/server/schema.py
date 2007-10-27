@@ -401,10 +401,6 @@ def createUsers(db):
     db.createIndex("UserGroupMembers", "UserGroupMembersUserIdx",
                    "userId")
 
-    if idtable.createIdTable(db, "Caps", "capId", "capName"):
-        cu.execute("INSERT INTO Caps (capId, capName) VALUES (0, 'UNCAPPED')")
-        commit = True
-
     if "Permissions" not in db.tables:
         assert("Items" in db.tables)
         assert("Labels" in db.tables)
@@ -417,7 +413,6 @@ def createUsers(db):
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
             canWrite        INTEGER NOT NULL DEFAULT 0,
-            capId           INTEGER NOT NULL DEFAULT 0,
             canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
@@ -428,10 +423,7 @@ def createUsers(db):
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Permissions_capId_fk
-                FOREIGN KEY (capId) REFERENCES Caps(capId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
+                ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Permissions"] = []
         commit = True
@@ -440,7 +432,6 @@ def createUsers(db):
                    "userGroupId, labelId, itemId", unique = True)
     db.createIndex("Permissions", "PermissionsLabelId_fk", "labelId, userGroupId")
     db.createIndex("Permissions", "PermissionsItemId_fk", "itemId, userGroupId")
-    db.createIndex("Permissions", "PermissionsCapId_fk", "capId")
     if createTrigger(db, "Permissions"):
         commit = True
 
