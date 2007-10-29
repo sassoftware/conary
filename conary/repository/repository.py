@@ -480,6 +480,8 @@ class ChangeSetJob:
 	    troveInfo = self.addTrove(
                     (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
                     hidden = hidden)
+
+            checkFilesList = []
  
             for (pathId, path, fileId, newVersion) in csTrove.getNewFileList():
                 if (fileHostFilter
@@ -498,14 +500,8 @@ class ChangeSetJob:
                             # diff returned nothing
                             raise KeyError
 
-                        try:
-                            fileObj = repos.getFileVersion(pathId,
-                                fileId, newVersion, withContents=False)
-                        except errors.FileStreamMissing:
-                            # Missing from the repo; raise exception
-                            raise errors.IntegrityError(
-                                "Incomplete changeset specified: missing pathId %s fileId %s" % (
-                                sha1helper.md5ToString(pathId), sha1helper.sha1ToString(fileId)))
+                        checkFilesList.append((pathId, fileId, newVersion))
+                        fileObj = None
                     else:
                         fileObj = files.ThawFile(fileStream, pathId)
                         if fileObj and fileObj.fileId() != fileId:
@@ -519,6 +515,18 @@ class ChangeSetJob:
                                     newVersion, fileStream = fileStream)
 
                 _handleContents(pathId, fileStream, newVersion)
+
+            try:
+                # we need to actualize this, not just get a generator
+                list(repos.getFileVersions(checkFilesList))
+            except errors.FileStreamMissing, e:
+                info = [ x for x in checkFilesList if x[1] == e.fileId ]
+                (pathId, fileId) = info[0][0:2]
+                # Missing from the repo; raise exception
+                raise errors.IntegrityError(
+                    "Incomplete changeset specified: missing pathId %s "
+                    "fileId %s" % (sha1helper.md5ToString(pathId),
+                                   sha1helper.sha1ToString(fileId)))
 
             for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
                 # handle files which haven't changed; we know which those
