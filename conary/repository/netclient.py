@@ -2663,4 +2663,6 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                          rateLimit = rateLimit, sizeLimit = size)
 
     resp = c.getresponse()
+    if resp.status != 200:
+        opener.handleProxyErrors(resp.status)
     return resp.status, resp.reason
