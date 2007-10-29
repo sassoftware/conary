@@ -730,7 +730,7 @@ def emitEntitlement(serverName, className = None, key = None, timeout = None,
 """ % (serverName, classInfo, key)
 
     if timeout is not None or retryOnTimeout is not None:
-        s += "<timeout "
+        s += "    <timeout "
         if timeout is not None:
             s += 'val="%d" ' % timeout
         if retryOnTimeout:
