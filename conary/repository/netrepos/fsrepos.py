@@ -165,7 +165,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             fileDict = self.troveStore.getFiles(fileList)
             for x in fileList:
                 # (pathId, fileId) lookup
-                fileObj = fileDict[x[0:2]]
+                try:
+                    fileObj = fileDict[x[0:2]]
+                except KeyError:
+                    raise errors.FileStreamMissing(x[1])
 
                 if withContents:
                     if file.hasContents:

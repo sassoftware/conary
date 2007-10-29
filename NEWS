@@ -36,6 +36,9 @@ Changes in 2.0.0:
     * getPackageBranchPathIds method no longer requires an acl for the
       branch; it returns the pathIds and fileIds for troves the user is
       allowed to see (CNY-2038)
+    * Reworked commit path to check for files which don't have contents
+      available (during a promote or shadow, for example) with one query
+      (CNY-2053)
 
 o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
