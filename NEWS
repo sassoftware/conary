@@ -4,6 +4,9 @@ Changes in @NEW@:
       (CNY-1987)
     * The OpenPGP implementation is capable of generating trust
       signatures. (CNY-1990)
+    * Fixed bug which could cause troves which contain *identical* files
+      to become corruped in a system database (this bug did not affect
+      repositories) (CNY-2191)
 
   o Build Changes:
     * MakeDirs now handles trailing '/' characters on directory names.
