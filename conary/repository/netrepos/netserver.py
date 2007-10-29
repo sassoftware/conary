@@ -2424,7 +2424,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Instances.instanceId = ugi.instanceId
         JOIN UserGroups ON
             ugi.userGroupId = UserGroups.userGroupId AND
-            UserGroup.canMirror = 1
+            UserGroups.canMirror = 1
         JOIN Items ON Instances.itemId = Items.itemId
         JOIN Versions ON Instances.versionId = Versions.versionId
         JOIN Flavors ON Instances.flavorId = flavors.flavorId
