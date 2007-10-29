@@ -3,6 +3,9 @@ Changes in @NEW@:
     * A bug that caused internal server errors when retrieving
       changeset that contained compressed file data over 4 GiB in size
       has been fixed. (CNY-2170, CNY-2173)
+    * When talking to a repository, Conary proxies will now automatically
+      switch the protocol to HTTPS whenever authentication information
+      is injected on behalf of the client. (CNY-2184)
 
 Changes in 1.1.31.10:
   o Client Changes:
