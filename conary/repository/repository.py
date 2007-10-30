@@ -569,8 +569,15 @@ class ChangeSetJob:
                     fileStream = cs.getFileChange(oldFileId, fileId)
 
                     if fileStream and fileStream[0] == "\x01":
-                        filesNeeded.append((i, (pathId, oldFileId, oldVersion)))
-                        continue
+                        if len(fileStream) != 2:
+                            # This is awful, but this is how we say a file
+                            # stream didn't change. Omitting it or at least ''
+                            # would be nicer, but would break clients.
+                            filesNeeded.append((i, (pathId, oldFileId,
+                                                    oldVersion)))
+                            continue
+
+                        fileObj = None
                     elif fileStream:
                         fileObj = files.ThawFile(fileStream, pathId)
                     else:
