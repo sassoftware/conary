@@ -56,7 +56,7 @@ def displayBranchJob(cs, shadow=False):
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
            sourceOnly = False, binaryOnly = False, info = False,
-           forceBinary = False, ignoreConflicts = False):
+           forceBinary = False, ignoreConflicts = False, targetFile = None):
     branchType = _getBranchType(binaryOnly, sourceOnly)
 
     client = conaryclient.ConaryClient(cfg)
@@ -119,4 +119,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     signAbsoluteChangeset(cs, sigKey)
 
     if not info:
-        client.repos.commitChangeSet(cs)
+        if targetFile:
+            cs.writeToFile(targetFile)
+        else:
+            client.repos.commitChangeSet(cs)
