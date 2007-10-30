@@ -578,6 +578,7 @@ class ChangeSetJob:
                             continue
 
                         fileObj = None
+                        fileStream = None
                     elif fileStream:
                         fileObj = files.ThawFile(fileStream, pathId)
                     else:
