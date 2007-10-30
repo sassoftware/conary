@@ -71,12 +71,16 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
     result = repos.findTroves(cfg.buildLabel, troveSpecs, cfg.buildFlavor)
     troveList = [ x for x in itertools.chain(*result.itervalues())]
 
+    sigKey = selectSignatureKey(cfg, newLabel)
+
     if makeShadow:
-        dups, cs = client.createShadowChangeSet(newLabel, troveList, 
-                                                branchType=branchType)
+        dups, cs = client.createShadowChangeSet(newLabel, troveList,
+                                                branchType=branchType,
+                                                sigKeyId = sigKey)
     else:
-        dups, cs = client.createBranchChangeSet(newLabel, troveList, 
-                                                branchType=branchType)
+        dups, cs = client.createBranchChangeSet(newLabel, troveList,
+                                                branchType=branchType,
+                                                sigKeyId = sigKey)
 
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())
@@ -114,9 +118,6 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
         print 'Creating binary %s is only allowed in interactive mode. ' \
               'Rerun cvc\nwith --interactive.' % branchOps
         return 1
-
-    sigKey = selectSignatureKey(cfg, newLabel)
-    signAbsoluteChangeset(cs, sigKey)
 
     if not info:
         if targetFile:
