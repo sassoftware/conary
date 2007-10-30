@@ -36,7 +36,7 @@ class Items(idtable.IdTable):
         cu = self.db.cursor()
         if val: val = 1
         else:   val = 0
-        # we attempt to avoid doinf busywork here in order to reduce
+        # we attempt to avoid doing busywork here in order to reduce
         # lock contention on the items table during multiple commits       
 	cu.execute("UPDATE Items SET hasTrove = ? "
                    "WHERE itemId = ? AND hasTrove != ?",

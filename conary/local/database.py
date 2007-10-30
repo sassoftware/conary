@@ -693,9 +693,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version,
                         fileStream = fileStream, isPresent = isPresent)
 
-    def addTrove(self, trove, pin = False):
+    def addTrove(self, trove, pin = False, oldTroveSpec = None):
         self._updateTransactionCounter = True
-	return self.db.addTrove(trove, pin = pin)
+	return self.db.addTrove(trove, pin = pin, oldTroveSpec = oldTroveSpec)
 
     def addTroveDone(self, troveInfo):
         self._updateTransactionCounter = True

@@ -323,10 +323,13 @@ def commit(repos, cfg, message, callback=None, test=False):
     # turn off loadInstalled for committing - it ties you too closely
     # to actually being able to build what you are developing locally - often
     # not the case.
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                     cfg=cfg, repos=repos,
-                                     branch=state.getBranch(),
-                                     ignoreInstalled=True)
+    try:
+        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                         cfg=cfg, repos=repos,
+                                         branch=state.getBranch(),
+                                         ignoreInstalled=True)
+    finally:
+        use.allowUnknownFlags(False)
 
     srcMap = {}
     cwd = os.getcwd()

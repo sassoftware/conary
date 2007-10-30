@@ -124,7 +124,9 @@ class ProxyCallFactory:
                      protocolString, headers, cfg, targetServerName,
                      remoteIp, isSecure, baseUrl):
         entitlementList = authToken[2][:]
-        entitlementList += cfg.entitlement.find(targetServerName)
+        injEntList = cfg.entitlement.find(targetServerName)
+        if injEntList:
+            entitlementList += injEntList
 
         userOverride = cfg.user.find(targetServerName)
         if userOverride:
@@ -144,7 +146,10 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
-        transporter = transport.Transport(https = url.startswith('https:'),
+        # If the proxy injected entitlements or user information, switch to
+        # SSL
+        withSSL = url.startswith('https') or bool(injEntList) or bool(userOverride)
+        transporter = transport.Transport(https = withSSL,
                                           proxies = proxies)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)

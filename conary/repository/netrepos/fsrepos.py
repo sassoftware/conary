@@ -122,7 +122,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)
 
-    def addTrove(self, pkg, hidden = False):
+    def addTrove(self, pkg, hidden = False, oldTroveSpec = None):
 	return self.troveStore.addTrove(pkg, hidden = hidden)
 
     def addTroveDone(self, pkg, mirror=False):
