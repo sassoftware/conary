@@ -2,6 +2,11 @@ Changes in 2.0.0:
   o Optimizations:
     * Reworked commit path to pull all modified streams from the repository
       or database with one query (CNY-2053)
+    * Unchanged stream sets now return None on diff
+    * Unchanged file streams are now 2-byte, backwards compatible, sequences
+      instead of more complex representations of "nothing changed"
+    * Commit code (both client and server) recognize unchanged files and
+      don't merge stream sets for them.
 
   o Client Changes:
     * Added getTroveLatestByLabel as a client-side call
