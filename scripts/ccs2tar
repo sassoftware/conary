@@ -63,6 +63,10 @@ del troveList
 
 tf = tarfile.TarFile("", "w", sys.stdout)
 
+delayedContents = {}
+linkGroups = {}
+inodeCount = 0
+
 for pathId, path, fileId in fileList:
     stream = cs.getFileChange(None, fileId)
     f = files.ThawFile(stream, pathId)
@@ -83,7 +87,16 @@ for pathId, path, fileId in fileList:
     if isinstance(f, files.RegularFile):
         tarInfo.size = f.contents.size()
         tarInfo.type = tarfile.REGTYPE
-        fObj = cs.getFileContents(pathId, fileId)[1].get()
+        contentsType, contents = cs.getFileContents(pathId, fileId)
+        fObj = contents.get()
+        if contentsType == changeset.ChangedFileTypes.ptr:
+            ptr = fObj.read()
+            delayedContents.setdefault(ptr, []).append((tarInfo, f))
+            tarInfo = None
+        else:
+            if f.linkGroup():
+                linkGroups[f.linkGroup()] = tarInfo
+
     elif isinstance(f, files.Directory):
         tarInfo.type = tarfile.DIRTYPE
     elif isinstance(f, files.SymbolicLink):
@@ -94,5 +107,21 @@ for pathId, path, fileId in fileList:
                     stream[0]
         sys.exit(0)
 
+    if not tarInfo:
+        continue
+
     tf.addfile(tarInfo, fObj)
 
+    for tarInfo, delayedF in delayedContents.get(pathId + fileId, []):
+        if delayedF.linkGroup() and delayedF.linkGroup() == f.linkGroup():
+            tarInfo.linkname = path
+            tarInfo.type = tarfile.LNKTYPE
+            tf.addfile(tarInfo)
+        else:
+            fObj.seek(0)
+            tf.addfile(tarInfo, fObj)
+            if f.linkGroup():
+                linkGroups[f.linkGroup()] = tarInfo
+
+tf.close()
+sys.stdout.write('\0' * 1024)

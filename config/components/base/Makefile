@@ -13,6 +13,7 @@
 #
 
 filter_files =	\
+	cil.py \
 	data.py \
 	develdocs.py \
 	devellib.py \
@@ -20,11 +21,13 @@ filter_files =	\
 	doc.py \
 	emacs.py \
 	gnomehelpmenu.py \
+	java.py \
 	late.py \
 	lib.py \
 	locale.py \
 	perl.py \
 	python.py \
+	ruby.py \
 	supdoc.py
 
 dist_files = Makefile $(filter_files)
