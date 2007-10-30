@@ -517,9 +517,9 @@ class Label(AbstractLabel):
 		(self.namespace, self.branch) = rest.split(":")
 
 	if not self.namespace:
-	    raise ParseError("namespace may not be empty: %s" % value)
+	    raise ParseError("namespace may not be empty")
 	if not self.branch:
-	    raise ParseError("branch tag not be empty: %s" % value)
+	    raise ParseError("branch tag may not be empty")
 
 class StaticLabel(Label):
 
@@ -587,8 +587,13 @@ class VersionSequence(AbstractVersion):
     def __cmp__(self, other):
         if self.__class__ != other.__class__:
             return NotImplemented
-	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
-	return cmp(self.versions[-1].timeStamp, other.versions[-1].timeStamp)
+        vthis = self.versions[-1]
+        vother = other.versions[-1]
+        if hasattr(vthis, 'timeStamp') and hasattr(vother, 'timeStamp'):
+            return cmp(vthis.timeStamp, vother.timeStamp)
+        if vthis.__class__ != vother.__class__:
+            return NotImplemented
+        return cmp(vthis, vother)
 
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
