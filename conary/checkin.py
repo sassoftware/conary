@@ -309,9 +309,12 @@ def commit(repos, cfg, message, callback=None, test=False):
             return
 
     use.allowUnknownFlags(True)
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                     cfg=cfg, repos=repos,
-                                     branch=state.getBranch())
+    try:
+        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                         cfg=cfg, repos=repos,
+                                         branch=state.getBranch())
+    finally:
+        use.allowUnknownFlags(False)
 
     srcMap = {}
     cwd = os.getcwd()
