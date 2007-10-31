@@ -1245,6 +1245,9 @@ class Trove(streams.StreamSet):
     def hasFiles(self):
         return len(self.idMap) != 0
 
+    def fileCount(self):
+        return len(self.idMap)
+
     def addTrove(self, name, version, flavor, presentOkay = False,
                  byDefault = True, weakRef = False):
 	"""
