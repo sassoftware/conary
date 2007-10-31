@@ -191,8 +191,6 @@ def _finishClone(client, cfg, cs, callback, info=False, test=False,
         if not okay:
             return
 
-    signAbsoluteChangesetByConfig(cs, cfg)
-
     if targetFile:
         cs.writeToFile(targetFile)
     elif not test:

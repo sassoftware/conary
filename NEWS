@@ -21,6 +21,13 @@ Changes in 2.0.0:
       use only absolute changesets to mirror content (CNY-1755)
     * 'cvc shadow' now commits relative changesets when the shadow is
       made to the same repository as the original trove
+    * Reworked promote changesets to be relative to either the source of
+      the promote (if promoting within a server) or to the current version
+      on the target (CNY-2202)
+    * Promote no longer recompresses non-config files during changeset
+      assembly (CNY-2202)
+    * Promote now gets file contents and streams from changesets when a
+      lot of them are needed from the same trove (CNY-2022)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
