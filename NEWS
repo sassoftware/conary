@@ -1,3 +1,5 @@
+Changes in @NEW@:
+
 Changes in 1.2.5:
   o Client Changes:
     * The OpenPGP implementation now merges PGP keys properly.
