@@ -1440,10 +1440,7 @@ class addSvnSnapshot(_RevisionControl):
 
     def getFilename(self):
         urlBits = self.url.split('//', 1)
-        if urlBits[0] == 'file:':
-            dirPath = urlBits[1].replace('/', '_')
-        else:
-            dirPath = urlBits[0].replace('/', '_')
+        dirPath = urlBits[1].replace('/', '_')
 
         # we need to preserve backwards compatibility with conarys (conaries?)
         # prior to 1.2.3, which do not have a revision tag. Without this bit,

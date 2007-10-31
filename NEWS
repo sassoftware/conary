@@ -91,6 +91,8 @@ Changes in @NEW@:
     * When talking to a repository, Conary proxies will now automatically
       switch the protocol to HTTPS whenever authentication information
       is injected on behalf of the client. (CNY-2184)
+    * addSvnSnapshot no longer generates conflicts in the paths for
+      temporary checkouts. (CNY-2196)
 
 Changes in 1.2.4:
   o Bug Fixes:
