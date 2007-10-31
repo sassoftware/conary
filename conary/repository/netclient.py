@@ -2093,7 +2093,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromFileId(fileId)))
 
     def getFileContents(self, fileList, tmpFile = None, lookInLocal = False,
-                        callback = None):
+                        callback = None, compressed = False):
         contents = [ None ] * len(fileList)
 
         if self.localRep and lookInLocal:
@@ -2175,9 +2175,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 totalSize -= size
                 start += size
 
-                gzfile = gzip.GzipFile(fileobj = nestedF)
-
-                contents[i] = filecontents.FromGzFile(gzfile)
+                if compressed:
+                    contents[i] = filecontents.FromFile(nestedF)
+                else:
+                    gzfile = gzip.GzipFile(fileobj = nestedF)
+                    contents[i] = filecontents.FromGzFile(gzfile)
 
             assert(totalSize == 0)
 
