@@ -308,7 +308,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                 r = None
                 for klass, marshall in errors.simpleExceptions:
                     if isinstance(e, klass):
-                        r = (True, (marshall, str(e), {}) )
+                        r = (True, (marshall, (str(e),), {}) )
 
                 if r is None:
                     # this exception is not marshalled back to the client.
