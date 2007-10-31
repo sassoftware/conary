@@ -1,3 +1,56 @@
+Changes in 2.0.0:
+  o Optimizations:
+    * Reworked commit path to pull all modified streams from the repository
+      or database with one query (CNY-2053)
+    * Unchanged stream sets now return None on diff
+    * Unchanged file streams are now 2-byte, backwards compatible, sequences
+      instead of more complex representations of "nothing changed"
+    * Commit code (both client and server) recognize unchanged files and
+      don't merge stream sets for them.
+
+  o Client Changes:
+    * Added getTroveLatestByLabel as a client-side call
+    * Most repository exceptions are demarshalled using logic in the
+      exception class itself rather than in a large if/elif block (CNY-747)
+    * troveNames and troveNamesByServer methods now accept a troveTypes
+      argument and return present troves only by default (CNY-1838)
+    * the mirror client supports a --fast-sync flag which will only
+      scan for new troves in the source and skip the time-expensive
+      scans for changed trove info records (CNY-1756)
+    * the mirror client supports a --absolute flag which will make it
+      use only absolute changesets to mirror content (CNY-1755)
+    * 'cvc shadow' now commits relative changesets when the shadow is
+      made to the same repository as the original trove
+
+  o Server Changes:
+    * Fixed scoring for target flavor sets (CNY-1539)
+    * Setting/resetting the admin field permission is handled now by the
+      setUserGroupIsAdmin() call instead of addAcl/editAcl (CNY-1782)
+    * Removed (unimplemented) concept of caps for permissions
+    * Added @requireClientProtocol decorator for server methods
+    * Renamed usergroups to roles in the repository web user interface
+      (CNY-1973)
+    * Reworked server exceptions to have marshalling logic in the exception
+      class instead of in a large if/elif block (CNY-747)
+    * Call log now tracks cache misses (CNY-1843)
+    * Repository no longer passes anonymous-hint to proxy layer (it has
+      been False since 1.1.29)
+    * Server exceptions are marshalled in the proxy layer now instead of
+      in both the proxy and server layers
+    * When the repository database is locked, RepositoryLocked exceptions
+      are now returned for all code paths (CNY-1596)
+    * troveNames method now filter by troveTypes argument (CNY-1838)
+    * getPackageBranchPathIds method no longer requires an acl for the
+      branch; it returns the pathIds and fileIds for troves the user is
+      allowed to see (CNY-2038)
+    * Reworked commit path to check for files which don't have contents
+      available (during a promote or shadow, for example) with one query
+      (CNY-2053)
+
+o Protocol Changes:
+    * Protocol allows passing keyword arguments for exceptions (CNY-747)
+    * No longer include useAnonymous flag in return value
+
 Changes in @NEW@:
   o Client Changes:
     * The OpenPGP implementation now merges PGP keys properly.

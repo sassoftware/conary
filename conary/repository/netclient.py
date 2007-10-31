@@ -51,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36,51 + 1)
+CLIENT_VERSIONS = range(36, 60 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -110,35 +110,48 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         newArgs = ( clientVersion, ) + argList
 
         try:
-            usedAnonymous, isException, result = self.__send(self.__name,
-                                                             newArgs)
+            rc = self.__send(self.__name, newArgs)
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission(e.url.split("/")[2])
             raise
+
+        if clientVersion < 60:
+            usedAnonymous, isException, result = rc
+        else:
+            usedAnonymous = False
+            isException, result = rc
+
         if usedAnonymous:
             self.__anonymousCallback()
 
-        if isException:
-            if retryOnEntitlementTimeout and result[0] == 'EntitlementTimeout':
-                entList = self._transport.getEntitlements()
-                exception = errors.EntitlementTimeout(result[1])
-
-                singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
-                                                      self.__serverName)
-                # remove entitlement(s) which timed out
-                newEntList = [ x for x in entList if x[1] not in
-                                    exception.getEntitlements() ]
-                newEntList.insert(0, singleEnt[1:])
-
-                # try again with the new entitlement
-                self._transport.setEntitlements(newEntList)
-                return self.__doCall(clientVersion, argList,
-                                     retryOnEntitlementTimeout = False)
-
-            self.handleError(result)
-        else:
+        if not isException:
             return result
+
+        try:
+            self.handleError(clientVersion, result)
+        except errors.EntitlementTimeout:
+            if not retryOnEntitlementTimeout:
+                raise
+
+            entList = self._transport.getEntitlements()
+            exception = errors.EntitlementTimeout(result[1])
+
+            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
+                                                  self.__serverName)
+            # remove entitlement(s) which timed out
+            newEntList = [ x for x in entList if x[1] not in
+                                exception.getEntitlements() ]
+            newEntList.insert(0, singleEnt[1:])
+
+            # try again with the new entitlement
+            self._transport.setEntitlements(newEntList)
+            return self.__doCall(clientVersion, argList,
+                                 retryOnEntitlementTimeout = False)
+        else:
+            # this can't happen as handleError should always result in
+            # an exception
+            assert(0)
 
     def doCall(self, clientVersion, *args):
         try:
@@ -176,62 +189,32 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             pt = 'Conary'
         err.url = "%s (via %s proxy %s)" % (err.url, pt, proxyHost)
 
-    def handleError(self, result):
-	exceptionName = result[0]
-	exceptionArgs = result[1:]
+    def handleError(self, clientVersion, result):
+        if clientVersion < 60:
+            exceptionName = result[0]
+            exceptionArgs = result[1:]
+            exceptionKwArgs = {}
+        else:
+            exceptionName = result[0]
+            exceptionArgs = result[1]
+            exceptionKwArgs = result[2]
 
-	if exceptionName == "TroveMissing":
-	    (name, version) = exceptionArgs
-	    if not name: name = None
-	    if not version:
-		version = None
-	    else:
-		version = shims.toVersion(version)
-	    raise errors.TroveMissing(name, version)
-        elif exceptionName == "MethodNotSupported":
-	    raise errors.MethodNotSupported(exceptionArgs[0])
-        elif exceptionName == "IntegrityError":
-	    raise errors.IntegrityError(exceptionArgs[0])
-        elif exceptionName == "TroveIntegrityError":
-            if len(exceptionArgs) > 1:
-                # old repositories give TIE w/ no
-                # trove information or with a string error message.
-                # exceptionArgs[0] is that message if exceptionArgs[1]
-                # is not set or is empty.
-                raise errors.TroveIntegrityError(error=exceptionArgs[0], 
-                                            *self.toTroveTup(exceptionArgs[1]))
-            else:
-                raise errors.TroveIntegrityError(error=exceptionArgs[0])
-        elif exceptionName == "TroveSchemaError":
-            # value 0 is the full message, for older clients that don't
-            # know about this exception
-            n, v, f = self.toTroveTup(exceptionArgs[1])
-            raise errors.TroveSchemaError(n, v, f,
-                                          exceptionArgs[2], exceptionArgs[3])
-        elif exceptionName == errors.TroveChecksumMissing.__name__:
-            raise errors.TroveChecksumMissing(*self.toTroveTup(exceptionArgs[1]))
-        elif exceptionName == errors.RepositoryMismatch.__name__:
-            raise errors.RepositoryMismatch(*exceptionArgs)
-        elif exceptionName == errors.EntitlementTimeout.__name__:
-            raise errors.EntitlementTimeout(*exceptionArgs)
-        elif exceptionName == 'FileContentsNotFound':
-            raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
-                                               self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileStreamNotFound':
-            raise errors.FileStreamNotFound((self.toFileId(exceptionArgs[0]),
-                                             self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileHasNoContents':
-            raise errors.FileHasNoContents((self.toFileId(exceptionArgs[0]),
-                                            self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileStreamMissing':
-            raise errors.FileStreamMissing((self.toFileId(exceptionArgs[0])))
-        elif exceptionName == 'RepositoryLocked':
-            raise errors.RepositoryLocked
-        elif exceptionName == 'RepositoryError':
-            raise errors.RepositoryError(exceptionArgs[0])
-        elif exceptionName == "InvalidSourceNameError":
-            raise errors.InvalidSourceNameError(*exceptionArgs)
-	else:
+        if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
+            # old repositories give TIE w/ no trove information or with a
+            # string error message. exceptionArgs[0] is that message if
+            # exceptionArgs[1] is not set or is empty.
+            raise errors.TroveIntegrityError(error=exceptionArgs[0], 
+                                        *self.toTroveTup(exceptionArgs[1]))
+        elif not hasattr(errors, exceptionName):
+            raise errors.UnknownException(exceptionName, exceptionArgs)
+        else:
+            exceptionClass = getattr(errors, exceptionName)
+
+            if hasattr(exceptionClass, 'demarshall'):
+                args, kwArgs = exceptionClass.demarshall(self, exceptionArgs,
+                                                         exceptionKwArgs)
+                raise exceptionClass(*args, **kwArgs)
+
             for klass, marshall in errors.simpleExceptions:
                 if exceptionName == marshall:
                     raise klass(exceptionArgs[0])
@@ -736,11 +719,42 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
         self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
 
+    def setUserGroupIsAdmin(self, reposLabel, userGroup, admin):
+        self.c[reposLabel].setUserGroupIsAdmin(userGroup, admin)
+
+    def addTroveAccess(self, role, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].trailingLabel().getHost(), [])
+            l.append( (tup[0], self.fromVersion(tup[1]),
+                       self.fromFlavor(tup[2])) )
+
+        for serverName, troveList in byServer.iteritems():
+            self.c[serverName].addTroveAccess(role, troveList)
+
+    def deleteTroveAccess(self, role, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].trailingLabel().getHost(), [])
+            l.append( (tup[0], self.fromVersion(tup[1]),
+                       self.fromFlavor(tup[2])) )
+
+        for serverName, troveList in byServer.iteritems():
+            self.c[serverName].deleteTroveAccess(role, troveList)
+
+    def listTroveAccess(self, serverName, role):
+        return [ ( x[0], self.toVersion(x[1]), self.toFlavor(x[2]) ) for x in
+                            self.c[serverName].listTroveAccess(role) ]
+
     def listAcls(self, reposLabel, userGroup):
         return self.c[reposLabel].listAcls(userGroup)
 
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
-               capped = False, admin = False, remove = False):
+               remove = False):
+        if self.c[reposLabel].getProtocolVersion() < 60:
+            raise errors.InvalidServerVersion(
+                    "addAcl only works on Conary 2.0 and later")
+
         if not label:
             label = "ALL"
         elif type(label) == str:
@@ -751,20 +765,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        if remove and self.c[reposLabel].getProtocolVersion() < 38:
-            raise InvalidServerVersion, "Setting canRemove for an acl " \
-                    "requires a repository running Conary 1.1 or later."
-        elif remove:
-            self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                      capped, admin, remove)
-        else:
-            self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                      capped, admin)
+        self.c[reposLabel].addAcl(userGroup, trovePattern, label,
+                                  write = write, remove = remove)
+
         return True
 
     def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
-                trovePattern, label, write = False, capped = False,
-                admin = False, canRemove = False):
+                trovePattern, label, write = False, canRemove = False):
+        if self.c[reposLabel].getProtocolVersion() < 60:
+            raise errors.InvalidServerVersion(
+                    "editAcl only works on Conary 2.0 and later")
+
         if not label:
             label = "ALL"
         elif type(label) == str:
@@ -785,16 +796,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
-        if canRemove and self.c[reposLabel].getProtocolVersion() < 38:
-            raise InvalidServerVersion, "Setting canRemove for an acl " \
-                    "requires a repository running Conary 1.1 or later."
-        elif canRemove:
-            self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                       trovePattern, label, write, capped, admin,
-                                       canRemove)
-        else:
-            self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                       trovePattern, label, write, capped, admin)
+        self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
+                                   trovePattern, label, write = write,
+                                   canRemove = canRemove)
 
         return True
 
@@ -854,11 +858,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def listAccessGroups(self, serverName):
         return self.c[serverName].listAccessGroups()
 
-    def troveNames(self, label):
-	return self.c[label].troveNames(self.fromLabel(label))
+    def troveNames(self, label, troveTypes = TROVE_QUERY_PRESENT):
+        if self.c[label].getProtocolVersion() < 60:
+            return self.c[label].troveNames(self.fromLabel(label))
 
-    def troveNamesOnServer(self, server):
-        return self.c[server].troveNames("")
+        return self.c[label].troveNames(self.fromLabel(label),
+                                        troveTypes = troveTypes)
+
+    def troveNamesOnServer(self, server, troveTypes = TROVE_QUERY_PRESENT):
+        if self.c[server].getProtocolVersion() < 60:
+            return self.c[server].troveNames("")
+
+        return self.c[server].troveNames("", troveTypes = troveTypes)
 
     def getTroveLeavesByPath(self, pathList, label):
         l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), 
