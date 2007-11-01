@@ -1610,8 +1610,12 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     # although the recipe we are cooking from may not be in any
     # repository
     if repos and buildLabel:
-        versionDict = repos.getTroveLeavesByLabel(
-                                    { srcName : { buildLabel : None } })
+        try:
+            versionDict = repos.getTroveLeavesByLabel(
+                                        { srcName : { buildLabel : None } })
+        except errors.OpenError:
+            repos = None
+            versionDict = {}
     else:
         versionDict = {}
 
@@ -2033,9 +2037,23 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             # stdin might not even have an isatty method
             pass
 
-def _callSetup(cfg, recipeObj):
+def _callSetup(cfg, recipeObj, recordCalls=True):
     try:
-        return recipeObj.setup()
+        rv = recipeObj.recordCalls(recipeObj.setup)
+        functionNames = []
+        if recordCalls:
+            for (depth, className, fn) in recipeObj.methodsCalled:
+                methodName = className + '.' + fn.__name__
+                line = '  ' * depth + methodName
+                functionNames.append(line)
+            log.info('Methods called:\n%s' % '\n'.join(functionNames))
+            unusedMethods = []
+            for (className, fn) in recipeObj.unusedMethods:
+                methodName = className + '.' + fn.__name__
+                line = '  ' + methodName
+                unusedMethods.append(line)
+            if unusedMethods:
+                log.info('Unused methods:\n%s' % '\n'.join(unusedMethods))
     except Exception, err:
         if cfg.debugRecipeExceptions:
             traceback.print_exception(*sys.exc_info())
