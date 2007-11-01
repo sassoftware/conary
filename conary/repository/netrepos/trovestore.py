@@ -208,12 +208,16 @@ class TroveStore:
 	cu = self.db.cursor()
         schema.resetTable(cu, 'tmpNewFiles')
         schema.resetTable(cu, 'tmpNewRedirects')
-	return (cu, trv, hidden)
+	return (cu, trv, hidden, [])
 
     def addTroveDone(self, troveInfo, mirror=False):
-	(cu, trv, hidden) = troveInfo
+        (cu, trv, hidden, newFilesInsertList) = troveInfo
 
         self.log(3, trv)
+
+        self.db.bulkload("tmpNewFiles", newFilesInsertList,
+                         [ "pathId", "versionId", "fileId", "stream",
+                         "path", "sha1" ])
 
 	troveVersion = trv.getVersion()
 	troveItemId = self.getItemId(trv.getName())
@@ -863,6 +867,8 @@ class TroveStore:
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None):
 	cu = troveInfo[0]
+        newFilesInsertList = troveInfo[3]
+
 	versionId = self.getVersionId(fileVersion)
         # if we have seen this fileId before, ignore the new stream data
         if fileId in self.seenFileId:
@@ -879,18 +885,25 @@ class TroveStore:
                 cont = files.frozenFileContentInfo(fileStream)
                 sha1 = cont.sha1()
             self.seenFileId.add(fileId)
-            cu.execute("""INSERT INTO tmpNewFiles
-                          (pathId, versionId, fileId, stream, path, sha1)
-                          VALUES(?, ?, ?, ?, ?, ?)""",
-                       (cu.binary(pathId), versionId, cu.binary(fileId), 
-                        cu.binary(fileStream), path, cu.binary(sha1)),
-                       start_transaction=False)
+            newFilesInsertList.append((cu.binary(pathId), versionId,
+                                       cu.binary(fileId), cu.binary(fileStream),
+                                       path, cu.binary(sha1)))
+
+            #cu.execute("""INSERT INTO tmpNewFiles
+            #              (pathId, versionId, fileId, stream, path, sha1)
+            #              VALUES(?, ?, ?, ?, ?, ?)""",
+            #           (cu.binary(pathId), versionId, cu.binary(fileId), 
+            #            cu.binary(fileStream), path, cu.binary(sha1)),
+            #           start_transaction=False)
 	else:
-            cu.execute("""INSERT INTO tmpNewFiles
-                          (pathId, versionId, fileId, stream, path, sha1)
-                          VALUES(?, ?, ?, NULL, ?, NULL)""",
-		       (cu.binary(pathId), versionId, cu.binary(fileId), path),
-                       start_transaction=False)
+            newFilesInsertList.append((cu.binary(pathId), versionId,
+                                       cu.binary(fileId), None,
+                                       path, None))
+            #cu.execute("""INSERT INTO tmpNewFiles
+            #              (pathId, versionId, fileId, stream, path, sha1)
+            #              VALUES(?, ?, ?, NULL, ?, NULL)""",
+	#	       (cu.binary(pathId), versionId, cu.binary(fileId), path),
+            #           start_transaction=False)
 
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()
@@ -1271,12 +1284,15 @@ class FileRetriever:
 
     def get(self, l):
         lookup = range(len(l))
+
+        insertL = []
         for itemId, tup in enumerate(l):
             (pathId, fileId) = tup[:2]
-            self.cu.execute("INSERT INTO tmpFileId(itemId, fileId) VALUES(?, ?)",
-                            (itemId, self.cu.binary(fileId)),
-                            start_transaction = False)
+            insertL.append((itemId, self.cu.binary(fileId)))
             lookup[itemId] = (pathId, fileId)
+
+        self.db.bulkload("tmpFileId", insertL, [ "itemId", "fileId" ])
+
         self.db.analyze("tmpFileId")
         self.cu.execute("SELECT itemId, stream FROM tmpFileId "
                         "JOIN FileStreams using (fileId) ")
