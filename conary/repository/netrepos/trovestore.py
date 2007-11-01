@@ -387,6 +387,7 @@ class TroveStore:
         # iterate over both strong and weak troves, and set weakFlag to
         # indicate which kind we're looking at when
         schema.resetTable(cu, 'tmpTroves')
+        insertList = []
         for ((name, version, flavor), weakFlag) in itertools.chain(
                 itertools.izip(trv.iterTroveList(strongRefs = True,
                                                    weakRefs   = False),
@@ -403,11 +404,14 @@ class TroveStore:
             # version/flavor of the package
             assert(not isPackage or version == trv.getVersion())
             assert(not isPackage or flavor == trv.getFlavor())
-            cu.execute("""
-            INSERT INTO tmpTroves (item, version, frozenVersion, flavor, flags)
-            VALUES (?, ?, ?, ?, ?)
-            """, (name, str(version), version.freeze(), flavor.freeze(), flags),
-                       start_transaction=False)
+            insertList.append((name, str(version), version.freeze(),
+                               flavor.freeze(), flags))
+
+        self.db.bulkload("tmpTroves", insertList,
+                         [ "item", "version", "frozenVersion", "flavor",
+                           "flags" ])
+
+
         self.db.analyze("tmpTroves")
         
         # need to use self.items.addId to keep the CheckTroveCache in
@@ -1291,7 +1295,8 @@ class FileRetriever:
             insertL.append((itemId, self.cu.binary(fileId)))
             lookup[itemId] = (pathId, fileId)
 
-        self.db.bulkload("tmpFileId", insertL, [ "itemId", "fileId" ])
+        self.db.bulkload("tmpFileId", insertL, [ "itemId", "fileId" ],
+                         start_transaction = False)
 
         self.db.analyze("tmpFileId")
         self.cu.execute("SELECT itemId, stream FROM tmpFileId "

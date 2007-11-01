@@ -152,7 +152,8 @@ class DependencyWorkTables:
 
         self.db.bulkload("DepCheck", toInsert,
                          [ "troveId", "depNum", "flagCount", "isProvides",
-                           "class", "name", "flag" ])
+                           "class", "name", "flag" ],
+                         start_transaction = False)
 
     def merge(self, intoDatabase = False, skipProvides = False):
         if intoDatabase:
