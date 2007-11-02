@@ -135,15 +135,9 @@ class _ShimMethod(netclient._Method):
 
     def __call__(self, *args, **kwargs):
         args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
-        usedAnonymous, isException, result = self._server.callWrapper(
-            self._protocol, self._port,
-            self._name, self._authToken, args, kwargs)
-
-        if not isException:
-            return result
-        else:
-            self.handleError(result)
-
+        return self._server.callWrapper(self._protocol, self._port,
+                                          self._name, self._authToken, args,
+                                          kwargs)
 
 class ShimServerProxy(netclient.ServerProxy):
     def __init__(self, server, protocol, port, authToken):

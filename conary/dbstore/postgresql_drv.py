@@ -345,3 +345,6 @@ class Database(BaseDatabase):
         assert (isinstance(table, str))
         cu.execute("ANALYZE %s" %table)
         
+    # faster data load for large tables. by default we redirect to executemany()
+    def bulkload(self, tableName, rows, columnNames, start_transaction = True):
+        return self.dbh.bulkload(tableName, rows, columnNames)

@@ -12,7 +12,21 @@
 # full details.
 #
 
+import re
+
 from conary.dbstore import idtable
+
+_cacheRe = {}
+def checkTrove(pattern, trove):
+    global _cacheRe
+    if pattern == 'ALL' or trove is None:
+        return True
+    regExp = _cacheRe.get(pattern, None)
+    if regExp is None:
+        regExp = _cacheRe[pattern] = re.compile(pattern + '$')
+    if regExp.match(trove):
+        return True
+    return False
 
 class Items(idtable.IdTable):
     def __init__(self, db):
@@ -42,3 +56,42 @@ class Items(idtable.IdTable):
 		 LEFT OUTER JOIN instances ON items.itemId = instances.itemId
 		 WHERE instances.itemId is NULL)
 	""")
+
+    # need to keep the CheckTroveCache in sync when adding or removing ids
+    def addId(self, item):
+        itemId = idtable.IdTable.addId(self, item)
+        cu = self.db.cursor()
+        cu.execute("select distinct Items.item, Items.itemId "
+                   "from Permissions join Items using(itemId) ")
+        for (pattern, patternId) in cu.fetchall():
+            if checkTrove(pattern, item):
+                cu.execute("""
+                insert into CheckTroveCache(itemId, patternId)
+                values (?,?) """, (itemId, patternId))
+        return itemId
+    def delId(self, theId):
+        cu = self.db.cursor()
+        cu.execute("delete from CheckTroveCache where itemId = ?", theId)
+        return idtable.IdTable.delId(self, theId)
+
+    # XXX: __setitem__ and __delitem__ aren't currently used, but if
+    # we do, they'll have to handle the CheckTrovesCache as well
+    def addPattern(self, pattern):
+        cu = self.db.cursor()
+        itemId = self.get(pattern, None)
+        if itemId is None:
+            itemId = idtable.IdTable.addId(self, pattern)
+        # need to update CheckTroveCache for this pattern
+        cu.execute("select count(*) from CheckTroveCache where patternId = ?",
+                   itemId)
+        pCount = cu.fetchall()[0][0]
+        if pCount > 0: # this pattern is already being tracked
+            return itemId
+        cu.execute("select Troves.itemId, Troves.item from Items as Troves")
+        for (tid, t) in cu.fetchall():
+            if checkTrove(pattern, t):
+                cu.execute("insert into CheckTroveCache(itemId, patternId) "
+                           "values (?,?)", (tid, itemId))
+        return itemId
+    
+            
