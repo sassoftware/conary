@@ -5,6 +5,10 @@ Changes in @NEW@:
         easier to see if a function from a superclass has been left out.
         (CNY-2193)
 
+  o Bug Fixes:
+      * Use of macros in the r.Link() build action worked only in
+        limited cases. (CNY-2209)
+
 Changes in 1.2.5:
   o Client Changes:
     * The OpenPGP implementation now merges PGP keys properly.
