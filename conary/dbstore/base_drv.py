@@ -461,3 +461,13 @@ class BaseDatabase:
 
     def use(self, dbName):
         pass
+
+    # faster data load for large tables. by default we redirect to executemany()
+    def bulkload(self, tableName, rows, columnNames, start_transaction = True):
+        cu = self.cursor()
+        cols = ",".join(columnNames)
+        values = ",".join("?" for x in range(len(columnNames)))
+        return cu.executemany("insert into %s (%s) values (%s)" % (
+            tableName, cols, values), rows,
+                              start_transaction = start_transaction)
+        

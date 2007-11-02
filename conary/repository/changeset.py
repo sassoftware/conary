@@ -250,7 +250,11 @@ class ChangeSet(streams.StreamSet):
                 raise ChangeSetKeyConflictError(key)
 
 	if cfgFile:
-            assert(not compressed)
+            if compressed:
+                s = gzip.GzipFile(None, "r", fileobj = contents.get()).read()
+                contents = filecontents.FromString(s)
+                compressed = False
+
 	    self.configCache[key] = (contType, contents, compressed)
 	else:
 	    self.fileContents[key] = (contType, contents, compressed)
@@ -882,14 +886,21 @@ class ReadOnlyChangeSet(ChangeSet):
 	if self.configCache.has_key(pathId):
             assert(not compressed)
             name = pathId
-	    (tag, contents, compressed) = self.configCache[pathId]
+	    (tag, contents, alreadyCompressed) = self.configCache[pathId]
             cont = contents
 	elif self.configCache.has_key(key):
-            assert(not compressed)
             name = key
-	    (tag, contents, compressed) = self.configCache[key]
+	    (tag, contents, alreadyCompressed) = self.configCache[key]
 
             cont = contents
+
+            if compressed:
+                f = util.BoundedStringIO()
+                compressor = gzip.GzipFile(None, "w", fileobj = f)
+                util.copyfileobj(cont.get(), compressor)
+                compressor.close()
+                f.seek(0)
+                cont = filecontents.FromFile(f)
 	else:
             self.filesRead = True
 
