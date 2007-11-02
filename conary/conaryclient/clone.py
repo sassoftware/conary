@@ -161,13 +161,13 @@ class ClientClone:
             callback.done()
             return True, cs
 
-        finalCs = self._buildChangeSet(troveCache, newTroveList)
+        finalCs = self._buildChangeSet(troveCache, newTroveList, callback)
 
         callback.prefix = ''
         callback.done()
         return True, finalCs
 
-    def _buildChangeSet(self, troveCache, finalTroveList):
+    def _buildChangeSet(self, troveCache, finalTroveList, callback):
         def _sameHost(v1, v2):
             return v1.trailingLabel().getHost() == v2.trailingLabel().getHost()
 
@@ -236,8 +236,8 @@ class ClientClone:
 
         # make sure we write out the final changeset
         lastTrove = finalTroveList[-1][1]
-        for oldTroveInfo, (fromVersion, finalTrove) in \
-                    itertools.izip(oldTrovesNeeded, finalTroveList):
+        for current, (oldTroveInfo, (fromVersion, finalTrove)) in \
+                    enumerate(itertools.izip(oldTrovesNeeded, finalTroveList)):
             if oldTroveInfo is not None:
                 oldTrove = oldTroves.pop(0)
                 assert(_sameHost(oldTrove.getVersion(),
@@ -300,8 +300,11 @@ class ClientClone:
             if finalTrove != lastTrove and fileCount < MAX_CLONE_FILES:
                 continue
 
+            callback.buildingChangeset(current + 1, len(finalTroveList))
+
             fileChangeSet = self.repos.createChangeSet(jobList,
-                                    withFiles = True, withFileContents = True)
+                                    withFiles = True, withFileContents = True,
+                                    recurse = False, callback = callback)
             jobFilesNeeded.sort()
             # walk the filesNeeded for the files we're getting from changesets
             for (pathId, newFileId, oldFileId, fromFileVersion) in \
@@ -344,7 +347,8 @@ class ClientClone:
 
             allContents = self.repos.getFileContents(
                                 [ x[1] for x in contentsNeeded ],
-                                compressed = True)
+                                compressed = True,
+                                callback = callback)
             for (contents, ((pathId, isCfg), (newFileId, fromFileVersion))) in \
                                 itertools.izip(allContents, contentsNeeded):
                 cs.addFileContents(pathId, newFileId,
