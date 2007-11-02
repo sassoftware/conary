@@ -375,7 +375,7 @@ def commit(repos, cfg, message, callback=None, test=False):
         log.setVerbosity(log.INFO)
         if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
             if hasattr(recipeObj, 'setup'):
-                cook._callSetup(cfg, recipeObj)
+                cook._callSetup(cfg, recipeObj, recordCalls=False)
             else:
                 log.error('you need a setup method for your recipe')
 
@@ -2017,7 +2017,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     log.setVerbosity(log.INFO)
     if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
         if hasattr(recipeObj, 'setup'):
-            cook._callSetup(cfg, recipeObj)
+            cook._callSetup(cfg, recipeObj, recordCalls=False)
         else:
             raise errors.CvcError('Recipe requires setup() method')
 

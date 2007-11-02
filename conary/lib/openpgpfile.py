@@ -249,6 +249,9 @@ class ShortReadError(InvalidBodyError):
 class MergeError(PGPError):
     pass
 
+class SignatureError(PGPError):
+    pass
+
 def getKeyId(keyRing):
     pkt = newPacketFromStream(keyRing, start = -1)
     assert pkt is not None
@@ -1204,7 +1207,7 @@ class PGP_BaseKeySig(PGP_BasePacket):
 class PGP_Signature(PGP_BaseKeySig):
     __slots__ = ['version', 'sigType', 'pubKeyAlg', 'hashAlg', 'hashSig',
                  'mpiFile', 'signerKeyId', 'hashedFile', 'unhashedFile',
-                 '_parsed', '_sigDigest', '_parentPacket',
+                 'creation', '_parsed', '_sigDigest', '_parentPacket',
                  '_hashedSubPackets', '_unhashedSubPackets']
     tag = PKT_SIG
 
@@ -1214,6 +1217,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self.version = self.sigType = self.pubKeyAlg = self.hashAlg = None
         self.hashSig = self.mpiFile = self.signerKeyId = None
         self.hashedFile = self.unhashedFile = None
+        self.creation = None
         self._parsed = False
         self._sigDigest = None
         self._hashedSubPackets = None
@@ -1262,7 +1266,7 @@ class PGP_Signature(PGP_BaseKeySig):
             raise PGPError('Expected 5 octets of length of hashed material, '
                            'got %d' % hLen)
 
-        creation = self.readBin(4)
+        self.creation = self.readBin(4)
         self.signerKeyId = self.readBin(8)
         pkAlg, hashAlg = self.readBin(2)
         hashSig = self.readExact(2)
@@ -1333,6 +1337,31 @@ class PGP_Signature(PGP_BaseKeySig):
         self.mpiFile.seek(0)
         self._copyStream(self.mpiFile, stream)
         return stream
+
+    def getCreation(self):
+        """Return the signature creation timestamp, or 0 if no creation time
+        is available"""
+        if self.creation is not None:
+            return self.creation
+        pkts = [ x[1] for x in self.decodeHashedSubpackets()
+                 if x[0] == SIG_SUBPKT_CREATION ]
+        if not pkts:
+            self.creation = 0
+            return self.creation
+
+        pkts[0].seek(0, SEEK_SET)
+        self.creation = int4FromBytes(*self._readBin(pkts[0], 4))
+        return self.creation
+
+    def getExpiration(self):
+        """Return the expiration offset, or None if the signature does not
+        expire"""
+        pkts = [ x[1] for x in self.decodeHashedSubpackets()
+                 if x[0] == SIG_SUBPKT_SIG_EXPIRE ]
+        if not pkts:
+            return None
+        pkts[0].seek(0, SEEK_SET)
+        return int4FromBytes(*self._readBin(pkts[0], 4))
 
     def rewriteBody(self):
         """Re-writes the body after the signature has been modified"""
@@ -1713,6 +1742,43 @@ class PGP_UserID(PGP_BasePacket):
         self.signatures = finalsigs
         return True
 
+    def getExpiration(self):
+        """Return the key expiration offset, or None if the key does not
+        expire.
+        If the key is revoked, -1 is returned"""
+        # Iterate over all self signatures
+        key = self.getParentPacket()
+        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyId()) ]
+        if not selfSigs:
+            raise PGPError("User packet with no self signature")
+        revocs = []
+        certs = []
+        for sig in selfSigs:
+            sig.parse()
+            if sig.sigType == SIG_TYPE_CERT_REVOC:
+                revocs.append(sig)
+            elif sig.sigType in SIG_CERTS:
+                certs.append(sig)
+        # If we have a revocation, return a negative
+        if revocs:
+            return -1
+
+        # Sort signatures by creation time, and reverse them
+        certs.sort(key = lambda x: x.getCreation(), reverse = True)
+
+        # Walk the signatures, grab the first one that has a key expiration in
+        # it
+        for sig in certs:
+            exps = [ x[1] for x in sig.decodeHashedSubpackets()
+                     if x[0] == SIG_SUBPKT_KEY_EXPIRE ]
+            if not exps:
+                continue
+            expstr = exps[0]
+            expstr.seek(0, SEEK_SET)
+            return int4FromBytes(*self._readBin(expstr, 4))
+        # No expiration
+        return None
+
 PacketTypeDispatcher.addPacketType(PGP_UserID)
 
 class PGP_UserAttribute(PGP_UserID):
@@ -1849,6 +1915,10 @@ class PGP_Key(PGP_BaseKeySig):
         self._keyId = m.hexdigest().upper()
         return self._keyId
 
+    def getCreatedTimestamp(self):
+        self.parse()
+        return self.createdTimestamp
+
     def getEndOfLife(self):
         """Parse self signatures to find timestamp(s) of key expiration.
         Also seek out any revocation timestamps.
@@ -1959,6 +2029,7 @@ class PGP_Key(PGP_BaseKeySig):
             for spktType, dataf in pkt.decodeHashedSubpackets():
                 if spktType == SIG_SUBPKT_KEY_FLAGS:
                     # RFC 2440, sect. 5.2.3.20
+                    dataf.seek(0, SEEK_SET)
                     foct, = self._readBin(dataf, 1)
                     if foct & 0x02:
                         return True
@@ -2392,7 +2463,11 @@ class PGP_SecretAnyKey(PGP_Key):
     def sign(self, packet, passwordCallback, sigType = None, creation = None,
              expiration = None, trustLevel = None, trustAmount = None,
              trustRegex = None, **kwargs):
-        """Sign packet (user packet only)"""
+        """Sign packet (user packet only).
+        If expiration is None, the signature will expire when the key expire,
+        if the key expires, otherwise it does not expire either.
+        To produce a signature that does not expire, regardless of the key's
+        expiration, use -1 for the expiration"""
 
         # We can only sign user IDs for now
         assert(isinstance(packet, PGP_UserID))
@@ -2405,6 +2480,22 @@ class PGP_SecretAnyKey(PGP_Key):
         if (trustLevel is None) ^ (trustAmount is None):
             raise Exception("both trustLevel and trustAmount should be "
                             "specified")
+
+        if expiration is None:
+            keyExpiration = packet.getExpiration()
+            if keyExpiration is None:
+                # Key does not expire
+                expiration = -1
+            elif keyExpiration < 0:
+                # Key is revoked
+                raise SignatureError("Signing a revoked key")
+            else:
+                expiration = (parentPacket.getCreatedTimestamp() +
+                              keyExpiration - creation)
+
+        # We may have to change this default
+        if sigType is None:
+            sigType = SIG_TYPE_CERT_0
 
         # Fetch the crypto key
         cryptoKey = self.makePgpKey(passPhrase = passwordCallback())
@@ -2419,9 +2510,6 @@ class PGP_SecretAnyKey(PGP_Key):
 
         hashAlg = 2 # sha
 
-        # We may have to change this default
-        sigType = SIG_TYPE_CERT_0
-
         # Create signature packet
         sigp = PGP_Signature(util.ExtendedStringIO())
         # Link it to this user packet (which should be linked to a key)
@@ -2435,7 +2523,8 @@ class PGP_SecretAnyKey(PGP_Key):
         sigp.initSubPackets()
 
         sigp.addCreation(creation)
-        if expiration is not None:
+
+        if expiration >= 0:
             sigp.addExpiration(expiration)
         if trustLevel:
             sigp.addTrust(trustLevel, trustAmount, trustRegex)

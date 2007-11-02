@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import inspect
 
 from conary import files
 from conary.errors import ParseError
@@ -79,10 +80,61 @@ class Recipe(object):
         self.srcdirs = srcdirs
         self.sourcePathMap = {}
         self.pathConflicts = {}
+        self._recordMethodCalls = False
+        self.methodsCalled = []
+        self.unusedMethods = set()
+        self.methodDepth = 0
+
+        superClasses = self.__class__.__mro__
+
+        for itemName in dir(self):
+            if itemName[0] == '_':
+                continue
+            item = getattr(self, itemName)
+            if inspect.ismethod(item):
+                if item.im_class == type:
+                    # classmethod
+                    continue
+                className = self.__class__.__name__
+                for class_ in superClasses:
+                    classItem = getattr(class_, itemName, None)
+                    if classItem is None:
+                        continue
+                    if classItem.im_func == item.im_func:
+                        className = class_.__name__
+                if className in ['Recipe', 'AbstractPackageRecipe',
+                                 'GroupRecipe', 'RedirectRecipe', 
+                                 'DerivedPackageRecipe', 'FilesetRecipe',
+                                 '_BaseGroupRecipe']:
+                    continue
+                setattr(self, itemName, self._wrapMethod(className, item))
+                self.unusedMethods.add((className, item))
 
     @classmethod
     def getType(class_):
         return class_._recipeType
+
+    def _wrapMethod(self, className, method):
+        def _callWrapper(*args, **kw):
+            return self._recordMethod(className, method, *args, **kw)
+        return _callWrapper
+
+    def _recordMethod(self, className, method, *args, **kw):
+        if self._recordMethodCalls:
+            self.methodDepth += 1
+            self.methodsCalled.append((self.methodDepth, className, method))
+        rv = method(*args, **kw)
+        if self._recordMethodCalls:
+            self.unusedMethods.discard((className, method))
+            self.methodDepth -= 1
+        return rv
+
+    def recordCalls(self, method, *args, **kw):
+        self._recordMethodCalls = True
+        try:
+            return method(*args, **kw)
+        finally:
+            self._recordMethodCalls = False
 
     @classmethod
     def getLoadedTroves(class_):
