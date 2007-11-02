@@ -1028,31 +1028,31 @@ class TroveStore:
 
         # Look for path/pathId combinarions we don't need anymore
         cu.execute("""
-        SELECT FilePaths.filePathId
-        FROM FilePaths
-        JOIN TroveFiles AS Candidates ON
-            FilePaths.filePathId = Candidates.filePathId
-            AND ( SELECT COUNT(filePathId)
-                    FROM TroveFiles as Used
-                   WHERE Used.filePathId = Candidates.filePathId
-                     AND Used.instanceId != Candidates.instanceId ) = 0
-        WHERE Candidates.instanceId = ?
-        """, instanceId)
+        select FilePaths.filePathId
+        from FilePaths
+        join TroveFiles as TF using(filePathId)
+        where TF.instanceId = ?
+          and not exists (
+              select instanceId from TroveFiles as Others
+              where Others.filePathId = TF.filePathId
+                and Others.instanceId != ? )
+        """, (instanceId, instanceId))
+        
         filePathIdsToRemove = [ x[0] for x in cu ]
 
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
-        SELECT FileStreams.streamId, FileStreams.sha1
-        FROM FileStreams
-        JOIN TroveFiles AS Candidates ON
-            FileStreams.streamId = Candidates.streamId
-            AND ( SELECT COUNT(streamId)
-                    FROM TroveFiles as Used
-                   WHERE Used.streamId = Candidates.streamId
-                     AND Used.instanceId != Candidates.instanceId ) = 0
-        WHERE Candidates.instanceId = ?
-        """, instanceId)
+        select FileStreams.streamId, FileStreams.sha1
+        from FileStreams
+        join TroveFiles as TF using(streamId)
+        where TF.instanceId = ?
+          and not exists (
+              select instanceId from TroveFiles as Others
+              where Others.streamId = TF.streamId
+                and Others.instanceId != ? )
+        """, (instanceId, instanceId))
+
         r = cu.fetchall()
         # if sha1 is None, the file has no contents
         candidateSha1sToRemove = [ x[1] for x in r if x[1] is not None ]
