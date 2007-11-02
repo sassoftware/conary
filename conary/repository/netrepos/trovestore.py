@@ -375,13 +375,25 @@ class TroveStore:
         WHERE FS.fileId IS NULL
         """)
 
+        # create the paths
+        cu.execute("""
+        INSERT INTO TroveFilePaths (pathId, path)
+        SELECT NF.pathId, NF.path
+        FROM tmpNewFiles AS NF
+        LEFT JOIN TroveFilePaths AS TFP USING (pathId, path)
+        WHERE TFP.pathID IS NULL
+        """)
+
         # create the TroveFiles links for this trove's files.
         cu.execute("""
         INSERT INTO TroveFiles
-            (instanceId, streamId, versionId, pathId, path)
-        SELECT %d, FS.streamId, NF.versionId, NF.pathId, NF.path
+            (instanceId, streamId, versionId, filePathId)
+        SELECT %d, FS.streamId, NF.versionId, TFP.filePathId
         FROM tmpNewFiles as NF
         JOIN FileStreams as FS USING(fileId)
+        JOIN TroveFilePaths as TFP ON
+            NF.path = TFP.path AND
+            NF.pathId = TFP.pathId
         """ % (troveInstanceId,))
 
         # iterate over both strong and weak troves, and set weakFlag to
@@ -690,23 +702,29 @@ class TroveStore:
         troveFilesCursor = self.db.cursor()
 	if withFileStreams:
             troveFilesCursor.execute("""
-            SELECT tmpInstanceId.idx, TroveFiles.pathId, TroveFiles.path,
-                   Versions.version, FileStreams.fileId, FileStreams.stream
+            SELECT tmpInstanceId.idx, TroveFilePaths.pathId,
+                   TroveFilePaths.path, Versions.version, FileStreams.fileId,
+                   FileStreams.stream
             FROM tmpInstanceId
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
+            JOIN TroveFilePaths ON
+                TroveFiles.filePathId = TroveFilePaths.filePathId
             ORDER BY tmpInstanceId.idx
             """)
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
         elif withFiles:
             troveFilesCursor.execute("""
-            SELECT tmpInstanceId.idx, TroveFiles.pathId, TroveFiles.path,
-                   Versions.version, FileStreams.fileId, NULL
+            SELECT tmpInstanceId.idx, TroveFilePaths.pathId,
+                   TroveFilePaths.path, Versions.version, FileStreams.fileId,
+                   NULL
             FROM tmpInstanceId
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
+            JOIN TroveFilePaths ON
+                TroveFiles.filePathId = TroveFilePaths.filePathId
             ORDER BY tmpInstanceId.idx
             """)
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
@@ -848,6 +866,8 @@ class TroveStore:
 	cu.execute("""SELECT pathId, path, fileId, versionId, stream
         FROM TroveFiles
         JOIN FileStreams USING (streamId)
+        JOIN TroveFilePaths AS TFP ON
+            TroveFiles.filePathId = TFP.filePathId
         WHERE instanceId = ?
         %s""" %sort, troveInstanceId)
 
@@ -1007,6 +1027,20 @@ class TroveStore:
         # Remove from TroveInfo
         cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
 
+        # Look for path/pathId combinarions we don't need anymore
+        cu.execute("""
+        SELECT TroveFilePaths.filePathId
+        FROM TroveFilePaths
+        JOIN TroveFiles AS Candidates ON
+            TroveFilePaths.filePathId = Candidates.filePathId
+            AND ( SELECT COUNT(filePathId)
+                    FROM TroveFiles as Used
+                   WHERE Used.filePathId = Candidates.filePathId
+                     AND Used.instanceId != Candidates.instanceId ) = 0
+        WHERE Candidates.instanceId = ?
+        """, instanceId)
+        filePathIdsToRemove = [ x[0] for x in cu ]
+
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
@@ -1029,6 +1063,10 @@ class TroveStore:
         if streamIdsToRemove:
             cu.execute("DELETE FROM FileStreams WHERE streamId IN (%s)"
                        % ",".join([ "%d" % x for x in streamIdsToRemove ]))
+
+        if filePathIdsToRemove:
+            cu.execute("DELETE FROM TroveFilePaths WHERE filePathId IN (%s)"
+                       % ",".join([ "%d" % x for x in filePathIdsToRemove ]))
 
         # we need to double check filesToRemove against other streams which
         # may need the same sha1
