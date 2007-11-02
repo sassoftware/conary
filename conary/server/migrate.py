@@ -401,7 +401,7 @@ class MigrateTo_15(SchemaMigration):
         return True
     # conary 1.1.22 went out with a busted definition of LabelMap - we need to fix it
     def migrate4(self):
-        return updateLabelMap(self.db)
+        return True
     # 15.5
     def migrate5(self):
         self.db.loadSchema()
@@ -498,29 +498,22 @@ def createCheckTroveCache(db):
     logMe(2, "done with CheckTroveCache")
     return True
         
-# looks like this LabelMap has to be recreated multiple times by
-# different stages of migraton :-(
-def updateLabelMap(db):
-    cu = db.cursor()
-    logMe(2, "updating LabelMap")
-    cu.execute("create table OldLabelMap as select * from LabelMap")
-    cu.execute("drop table LabelMap")
-    db.loadSchema()
-    schema.createLabelMap(db)
-    cu.execute("insert into LabelMap (itemId, labelId, branchId) "
-               "select itemId, labelId, branchId from OldLabelMap ")
-    cu.execute("drop table OldLabelMap")
-    db.loadSchema()
-    return True
-    
 class MigrateTo_16(SchemaMigration):
-    Version = (16,1)
+    Version = (16,0)
     # migrate to 16.0
     def migrate(self):
         cu = self.db.cursor()
         self.db.loadSchema()
-        # create a primary key for labelmap
-        updateLabelMap(self.db)
+
+        self._buildPermissions(cu)
+        self._buildTroveFiles(cu)
+        self._buildUserGroupInstances(cu)
+        self._buildLabelMap(cu)
+        self._buildFlavorMap(cu)
+
+        return True
+
+    def _buildPermissions(self, cu):
         # move the admin field from Permissions into UserGroups
         logMe(2, "Relocating the admin field from Permissions to UserGroups...")
         if "OldPermissions" in self.db.tables:
@@ -541,10 +534,11 @@ class MigrateTo_16(SchemaMigration):
                    "select distinct %s from OldPermissions " %(fields, fields))
         cu.execute("drop table OldPermissions")
         self.db.loadSchema()
-
+        return True
+        
+    def _buildFlavorMap(self, cu):
         # need to rebuild flavormap
         logMe(2, "Recreating the FlavorMap table...")
-        cu = self.db.cursor()
         cu.execute("drop table FlavorMap")
         self.db.loadSchema()
         schema.createFlavors(self.db)
@@ -554,9 +548,46 @@ class MigrateTo_16(SchemaMigration):
             flavor = deps.ThawFlavor(flavorStr)
             flavTable.createFlavorMap(flavorId, flavor, cu)
         return True
+    
+    def _buildTroveFiles(self, cu):
+        # need to rebuild the TroveFiles and FilesPath tables
+        logMe(2, "updating the TroveFiles table...")
+        self.db.loadSchema()
+        schema.createTroves(self.db, createIndex = False)
+        # create entries for the FilePaths table
+        cu.execute("""
+        insert into FilePaths (pathId, path)
+        select distinct pathId, path from TroveFiles """)
+        self.db.analyze("FilePaths")
+        # prepare for the new format of TroveFiles
+        cu.execute("""
+        create table newTroveFiles as 
+        select instanceId, streamId, versionId, filePathId
+        from TroveFiles join FilePaths using(path, pathId) """)
+        cu.execute("drop table TroveFiles")
+        self.db.loadSchema()
+        schema.createTroves(self.db)
+        cu.execute("""
+        insert into TroveFiles (instanceId, streamId, versionId, filePathId)
+        select instanceId, streamId, versionId, filePathId from newTroveFiles
+        """)
+        cu.execute("drop table newTroveFiles")
+        return True
+    
+    def _buildLabelMap(self, cu):
+        logMe(2, "updating LabelMap")
+        cu.execute("create table OldLabelMap as select * from LabelMap")
+        cu.execute("drop table LabelMap")
+        self.db.loadSchema()
+        schema.createLabelMap(self.db)
+        cu.execute("insert into LabelMap (itemId, labelId, branchId) "
+                   "select itemId, labelId, branchId from OldLabelMap ")
+        cu.execute("drop table OldLabelMap")
+        self.db.loadSchema()
+        return True
+    
     # populate the UserGroupInstances map
-    def migrate1(self):
-        cu = self.db.cursor()
+    def _buildUserGroupInstances(self, cu):
         self.db.loadSchema()
         if "Latest" in self.db.tables:
             cu.execute("drop table Latest")

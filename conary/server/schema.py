@@ -563,7 +563,7 @@ def createPGPKeys(db):
         db.commit()
         db.loadSchema()
 
-def createTroves(db):
+def createTroves(db, createIndex = True):
     cu = db.cursor()
     commit = False
     if 'FileStreams' not in db.tables:
@@ -577,10 +577,8 @@ def createTroves(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
-    db.createIndex("FileStreams", "FileStreamsIdx",
-                   "fileId", unique = True)
-    db.createIndex("FileStreams", "FileStreamsSha1Idx",
-                   "sha1", unique = False)
+    db.createIndex("FileStreams", "FileStreamsIdx", "fileId", unique = True)
+    db.createIndex("FileStreams", "FileStreamsSha1Idx", "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
         commit = True
 
@@ -621,11 +619,11 @@ def createTroves(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveFiles"] = []
         commit = True
-    # FIXME: rename the next two indexes. One day...
-    db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
-    db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
-    db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
-    db.createIndex("TroveFiles", "TroveFilesFilePathId_fk", "filePathId")
+    if createIndex:
+        db.createIndex("TroveFiles", "TroveFilesInstanceId_fk", "instanceId")
+        db.createIndex("TroveFiles", "TroveFilesStreamId_fk", "streamId")
+        db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
+        db.createIndex("TroveFiles", "TroveFilesFilePathId_fk", "filePathId")
     if createTrigger(db, "TroveFiles"):
         commit = True
 
