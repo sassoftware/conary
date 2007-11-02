@@ -1938,11 +1938,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            start_transaction=False)
             self.db.analyze("tmpFilePrefixes")
             prefixQuery = """JOIN tmpFilePrefixes ON
-            TroveFilePaths.path LIKE tmpFilePrefixes.prefix """
+            FilePaths.path LIKE tmpFilePrefixes.prefix """
 
         query = """
         SELECT DISTINCT
-            TroveFilePaths.pathId, TroveFilePaths.path, Versions.version,
+            FilePaths.pathId, FilePaths.path, Versions.version,
             FileStreams.fileId, Nodes.finalTimestamp
         FROM Instances
         JOIN Nodes ON
@@ -1959,8 +1959,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             TroveFiles.versionId = Versions.versionId
         JOIN FileStreams ON
             TroveFiles.streamId = FileStreams.streamId
-        JOIN TroveFilePaths ON
-            TroveFiles.filePathId = TroveFilePaths.filePathId
+        JOIN FilePaths ON
+            TroveFiles.filePathId = FilePaths.filePathId
         %s
         WHERE
             Items.item = ? AND
@@ -2054,7 +2054,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         SELECT tmpPath.row, Items.item, Versions.version, Flavors.flavor,
             Nodes.timeStamps
         FROM tmpPath
-        JOIN TroveFilePaths using(path)
+        JOIN FilePaths using(path)
         JOIN TroveFiles using(filePathId)
         JOIN Instances using(instanceId)
         JOIN Nodes on

@@ -1,5 +1,4 @@
-#
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -585,19 +584,18 @@ def createTroves(db):
     if createTrigger(db, "FileStreams"):
         commit = True
 
-    if "TroveFilePaths" not in db.tables:
+    if "FilePaths" not in db.tables:
         cu.execute("""
-        CREATE TABLE TroveFilePaths(
+        CREATE TABLE FilePaths(
             filePathId      %(PRIMARYKEY)s,
             pathId          %(BINARY16)s,
             path            %(PATHTYPE)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tables["TroveFilePaths"] = []
+        db.tables["FilePaths"] = []
         commit = True
-    db.createIndex("TroveFilePaths", "TroveFilesFilePathIdIdx", "filePathId")
-    db.createIndex("TroveFilePaths", "TroveFilesPathIdx", "path")
-    if createTrigger(db, "TroveFilePaths"):
+    db.createIndex("FilePaths", "FilesPathIdx", "path")
+    if createTrigger(db, "FilePaths"):
         commit = True
 
     if "TroveFiles" not in db.tables:
@@ -618,7 +616,7 @@ def createTroves(db):
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT TroveFiles_filePathId_fk
-                FOREIGN KEY (filePathId) REFERENCES TroveFilePaths(filePathId)
+                FOREIGN KEY (filePathId) REFERENCES FilePaths(filePathId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveFiles"] = []
@@ -627,7 +625,7 @@ def createTroves(db):
     db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
     db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
     db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
-    db.createIndex("TroveFiles", "TroveFilesFilesPathId_fk", "filePathId")
+    db.createIndex("TroveFiles", "TroveFilesFilePathId_fk", "filePathId")
     if createTrigger(db, "TroveFiles"):
         commit = True
 
