@@ -502,9 +502,12 @@ class UserGroupInstances(UserGroupTable):
         where, args = self.getWhereArgs("where", userGroupId = userGroupId)
         cu.execute("delete from UserGroupInstancesCache %s" % (where,), args)
         # first, rebuild the flattened tables
+        logMe(3, "rebuilding UserGroupAllTroves", "userGroupId=%s"%userGroupId)
         self.ugt.rebuild(cu, userGroupId = userGroupId)
+        logMe(3, "rebuilding UserGroupAllPermissions", "userGroupId=%s"%userGroupId)
         self.ugp.rebuild(cu, userGroupId = userGroupId)
-        # and now sum it up. The union keeps the values distinct
+        # and now sum it up
+        logMe(3, "updating UserGroupInstancesCache from UserGroupAllPermissions")
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
         select userGroupId, instanceId, case when sum(canWrite) = 0 then 0 else 1 end
@@ -512,6 +515,7 @@ class UserGroupInstances(UserGroupTable):
         group by userGroupId, instanceId
         """ % (where,), args)
         cond, args = self.getWhereArgs("and", userGroupId = userGroupId)
+        logMe(3, "updating UserGroupInstancesCache from UserGroupAllTroves")
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
         select distinct userGroupId, instanceId, 0 as canWrite
@@ -523,6 +527,7 @@ class UserGroupInstances(UserGroupTable):
         %s """ % (cond,), args)
         self.db.analyze("UserGroupInstancesCache")
         # need to rebuild the latest as well
+        logMe(3, "rebuilding the LatestCache rows", "userGroupId=%s"%userGroupId)
         if userGroupId is not None:
             self.latest.updateUserGroupId(cu, userGroupId)
         else: # this is a full rebuild
