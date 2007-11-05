@@ -1801,8 +1801,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                          pathId, newFileId, newFileVersion))
                     continue
 
-		(filecs, hash) = changeset.fileChangeSet(pathId, oldFileObj, 
-                                                         newFileObj)
+                if mirrorMode:
+                    (filecs, hash) = changeset.fileChangeSet(pathId,
+                                                             None, 
+                                                             newFileObj)
+                else:
+                    (filecs, hash) = changeset.fileChangeSet(pathId,
+                                                             oldFileObj, 
+                                                             newFileObj)
 
 		internalCs.addFile(oldFileId, newFileId, filecs)
 
@@ -1816,7 +1822,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     fetchItems = []
                     needItems = []
 
-                    if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
+                    if (not mirrorMode and 
+                                    changeset.fileContentsUseDiff(oldFileObj,
+                                                                  newFileObj)):
                         fetchItems.append( (oldFileId, oldFileVersion, 
                                             oldFileObj) ) 
                         needItems.append( (pathId, None, oldFileObj) ) 
