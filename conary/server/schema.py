@@ -586,8 +586,8 @@ def createTroves(db, createIndex = True):
         cu.execute("""
         CREATE TABLE FilePaths(
             filePathId      %(PRIMARYKEY)s,
-            pathId          %(BINARY16)s,
             path            %(PATHTYPE)s,
+            pathId          %(BINARY16)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FilePaths"] = []
@@ -624,8 +624,8 @@ def createTroves(db, createIndex = True):
         db.createIndex("TroveFiles", "TroveFilesStreamId_fk", "streamId")
         db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
         db.createIndex("TroveFiles", "TroveFilesFilePathId_fk", "filePathId")
-    if createTrigger(db, "TroveFiles"):
-        commit = True
+        if createTrigger(db, "TroveFiles"):
+            commit = True
 
     if "TroveTroves" not in db.tables:
         cu.execute("""
