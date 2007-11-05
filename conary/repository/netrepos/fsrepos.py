@@ -418,9 +418,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		#newFile = idIdx[(pathId, newFileId)]
 		newFile = files.ThawFile(streams[newFileId], pathId)
 
-		(filecs, contentsHash) = changeset.fileChangeSet(pathId,
-                                                                 oldFile,
-                                                                 newFile)
+                if mirrorMode:
+                    (filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                     None,
+                                                                     newFile)
+                else:
+                    (filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                     oldFile,
+                                                                     newFile)
 
 		cs.addFile(oldFileId, newFileId, filecs)
 
