@@ -9,6 +9,10 @@ Changes in @NEW@:
       * Use of macros in the r.Link() build action worked only in
         limited cases. (CNY-2209)
 
+  o Client Changes:
+    * Mirror mode now includes for file streams instead of differential
+      streams (CNY-2210)
+
 Changes in 1.2.5:
   o Client Changes:
     * The OpenPGP implementation now merges PGP keys properly.
