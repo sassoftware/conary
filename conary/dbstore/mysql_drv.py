@@ -471,3 +471,20 @@ class Database(BaseDatabase):
         self.loadSchema()
         for table in self.tables:
             cu.execute("ANALYZE TABLE %s" % table)
+
+    # the SQL language experts at MySQL decided that to add a FK one should use
+    # ALTER TABLE foo ADD CONSTRAINT foo_fk FOREIGN KEY ...
+    # but to drop it the syntax isn't reciprocal:
+    # ALTER TABLE foo DROP FOREIGN KEY foo_fk
+    # this is when everybody esle is using
+    # ALTER TABLE foo DROP CONSTRAINT foo_fk
+    def dropForeignKey(self, table, column = None, name = None):
+        assert (table in self.tables)
+        if name is None:
+            assert (column is not None), "column name required to build FK name"
+            # by convention, foreign keys are named <table>_<column>_fk
+            name = "%s_%s_fk" % (table, column)
+        cu = self.cursor()
+        cu.execute("ALTER TABLE %s DROP FOREIGN KEY %s" % (table, name))
+        return True
+

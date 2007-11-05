@@ -475,7 +475,6 @@ class MigrateTo_15(SchemaMigration):
 # populate the CheckTroveCache table
 def createCheckTroveCache(db):
     db.loadSchema()
-    logMe(2, "creating the CheckTroveCache table...")
     assert("CheckTroveCache" in db.tables)
     cu = db.cursor()
     cu.execute("delete from CheckTroveCache")
@@ -495,7 +494,6 @@ def createCheckTroveCache(db):
         cu2.execute("insert into CheckTroveCache (patternId, itemId) values (?,?)",
                     (patternId, itemId))
     db.analyze("CheckTroveCache")
-    logMe(2, "done with CheckTroveCache")
     return True
         
 class MigrateTo_16(SchemaMigration):
@@ -505,7 +503,7 @@ class MigrateTo_16(SchemaMigration):
         cu = self.db.cursor()
         self.db.loadSchema()
 
-        self._buildPermissions(cu)
+        self._buildPermissions(cu) 
         self._buildTroveFiles(cu)
         self._buildUserGroupInstances(cu)
         self._buildLabelMap(cu)
@@ -551,7 +549,7 @@ class MigrateTo_16(SchemaMigration):
     
     def _buildTroveFiles(self, cu):
         # need to rebuild the TroveFiles and FilesPath tables
-        logMe(2, "updating the TroveFiles table...")
+        logMe(2, "creating the FilePaths table...")
         self.db.loadSchema()
         schema.createTroves(self.db, createIndex = False)
         # create entries for the FilePaths table
@@ -560,20 +558,33 @@ class MigrateTo_16(SchemaMigration):
         select distinct pathId, path from TroveFiles """)
         self.db.analyze("FilePaths")
         # prepare for the new format of TroveFiles
+        logMe(2, "creating the new TroveFiles table...")
+        # attempt to keep the relative ordering of the stuff we had in the
+        # old TroveFiles
         cu.execute("""
         create table newTroveFiles as 
         select instanceId, streamId, versionId, filePathId
-        from TroveFiles join FilePaths using(path, pathId) """)
+        from TroveFiles join FilePaths using(path, pathId)
+        order by instanceId, streamId, versionId
+        """)
+        cu.execute("alter table newTroveFiles add column "
+                   "changed NUMERIC(14,0) NOT NULL DEFAULT 0 ")
         cu.execute("drop table TroveFiles")
+        cu.execute("alter table newTroveFiles rename to TroveFiles")
+        self.db.loadSchema()
+        logMe(3, "updating the TroveFiles table")
+        self.db.addForeignKey("TroveFiles", "instanceId", "Instances", "instanceId")
+        self.db.addForeignKey("TroveFiles", "streamId", "FileStreams", "streamId")
+        self.db.addForeignKey("TroveFiles", "versionId", "Versions", "versionId")
+        self.db.addForeignKey("TroveFiles", "filePathId", "FilePaths", "filePathId")
+        logMe(3, "checking results and analyzing TroveFiles...")
+        # create the indexes required
         self.db.loadSchema()
         schema.createTroves(self.db)
-        cu.execute("""
-        insert into TroveFiles (instanceId, streamId, versionId, filePathId)
-        select instanceId, streamId, versionId, filePathId from newTroveFiles
-        """)
-        cu.execute("drop table newTroveFiles")
+        #cu.execute("drop table newTroveFiles")
+        self.db.analyze("TroveFiles")
         return True
-    
+
     def _buildLabelMap(self, cu):
         logMe(2, "updating LabelMap")
         cu.execute("create table OldLabelMap as select * from LabelMap")
@@ -595,6 +606,7 @@ class MigrateTo_16(SchemaMigration):
             cu.execute("drop table Caps")
         schema.createAccessMaps(self.db)
         schema.createLatest(self.db, withIndexes=False)
+        logMe(2, "creating the CheckTroveCache table...")
         if not createCheckTroveCache(self.db):
             return False
         logMe(2, "creating UserGroupInstancesCache table")
