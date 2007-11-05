@@ -471,3 +471,33 @@ class BaseDatabase:
             tableName, cols, values), rows,
                               start_transaction = start_transaction)
         
+    # foreign key constraint management
+    def addForeignKey(self, table, column, refTable, refColumn,
+                      cascade = False, name = None):
+        onDelete = "RESTRICT"
+        if cascade:
+            onDelete = "CASCADE"
+        # we always cascade on updates...
+        onUpdate = "CASCADE"
+        if name is None:
+            # by convention, foreign keys are named <table>_<column>_fk
+            name = "%s_%s_fk" % (table, column)
+        assert (table in self.tables)
+        assert (refTable in self.tables)
+        cu = self.cursor()
+        cu.execute("""
+        ALTER TABLE %s ADD CONSTRAINT %s
+            FOREIGN KEY (%s) REFERENCES %s(%s)
+            ON UPDATE %s ON DELETE %s """ %(
+            table, name, column, refTable, refColumn,
+            onUpdate, onDelete))
+        return True
+    def dropForeignKey(self, table, column = None, name = None):
+        assert (table in self.tables)
+        if name is None:
+            assert (column is not None), "column name required to build FK name"
+            # by convention, foreign keys are named <table>_<column>_fk
+            name = "%s_%s_fk" % (table, column)
+        cu = self.cursor()
+        cu.execute("ALTER TABLE %s DROP CONSTRAINT %s" % (table, name))
+        return True
