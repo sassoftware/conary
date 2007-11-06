@@ -306,7 +306,7 @@ class CloneCallback(ChangesetCallback):
     def rewriteTrove(self, current=0, total=0):
         pass
 
-    def rewritingFileVersions(self, current=0, total=0):
+    def buildingChangeset(self, current=0, total=0):
         pass
 
     def requestingFiles(self, number):
