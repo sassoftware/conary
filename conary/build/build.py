@@ -2126,9 +2126,9 @@ class Replace(BuildAction):
     Lines may consist of a tuple *(begin, end)* or a single integer *line* or a
     regular expression of lines to match.  Lines are indexed starting with 1.
 
-    Remember that python will interpret C{\1}-C{\7} as octal characters.
-    You must either escape the backslash: C{\\1} or make the string raw by
-    prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
+    Remember that python will interpret C{\\1}-C{\\7} as octal characters.
+    You must either escape the backslash: C{\\\\1} or make the string raw by
+    prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\\1bc'))}
 
     KEYWORDS
     ========
