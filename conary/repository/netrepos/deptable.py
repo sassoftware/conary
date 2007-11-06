@@ -168,7 +168,16 @@ class DependencyTables:
         cu.execute(query, args)
 
         ret = {}
-        for (depId, depNum, troveName, flavorStr, versionStr, timeStamps) in cu:
+        # sqlite version 3.2.2 have trouble sorting correctly the
+        # results from the previous query. If we're running on sqlite,
+        # we take the hit here and resort the results in Python...
+        if self.db.driver == "sqlite":
+            # order by idx, depNum, finalTimestamp desc
+            retList = sorted(cu, lambda a: (a[0], a[1], -a[6]))
+        else:
+            retList = cu
+            
+        for (depId, depNum, troveName, flavorStr, versionStr, timeStamps, ft) in retList:
             retd = ret.setdefault(depId, [{} for x in xrange(depNums[depId])])
             # remember the first version of each (n,f) tuple for each query
             retd[depNum].setdefault((troveName, flavorStr), (versionStr, timeStamps))
