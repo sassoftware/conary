@@ -102,6 +102,14 @@ class DependencyTables:
         depSetList = requires.keys()
         depNums = self._setupDepSets(cu, depSetList)
 
+        # some versions of sqlite (notably, 3.2.2 on which conary is
+        # developed) will refuse to order the following query
+        # correctly. This is a kludge/hack/workaround to make it
+        # return the correct answers.
+        groupBy = ""
+        if self.db.driver == "sqlite":
+            # group by all the selected items to force the sort order
+            groupBy = "group by 1,2,3,4,5,6"
         # 1. look up inmstances whose provides fully satisfy all the
         #    flags of every depName within a depSet (flagCount check)
         # 2. out of those instances, only consider the ones that fully
@@ -109,8 +117,9 @@ class DependencyTables:
         #    check)
         # 3. filter only the instanceIds the user has access to
         query = """
-        select tmpDepNum.idx, tmpDepNum.depNum,
-            item, flavor, version, Nodes.timeStamps
+        select distinct
+            tmpDepNum.idx, tmpDepNum.depNum, item, flavor, version,
+            Nodes.timeStamps
         from tmpDepNum
         join ( 
             select 
@@ -159,8 +168,9 @@ class DependencyTables:
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
         where %s
+        %s
         order by idx, depNum, Nodes.finalTimestamp desc """ % (
-            " and ".join(where), )
+            " and ".join(where), groupBy)
         cu.execute(query, args)
 
         ret = {}
