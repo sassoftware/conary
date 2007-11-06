@@ -1835,10 +1835,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                     fileJob.extend([ needItems ])
 
-            contentList = self.getFileContents(contentsNeeded, 
+            contentList = self.getFileContents(contentsNeeded,
                                                tmpFile = outFile,
                                                lookInLocal = True,
-                                               callback = callback)
+                                               callback = callback,
+                                               compressed = True)
 
             i = 0
             for item in fileJob:
@@ -1848,20 +1849,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 if len(item) == 1:
                     internalCs.addFileContents(pathId, fileId,
-                                   changeset.ChangedFileTypes.file, 
-                                   contents, 
-                                   fileObj.flags.isConfig())
+                                   changeset.ChangedFileTypes.file,
+                                   contents,
+                                   fileObj.flags.isConfig(),
+                                   compressed = True)
                 else:
+                    # Don't bother with diffs. Clients can reconstruct them for
+                    # installs and they're just a pain to assemble here anyway.
                     fileId = item[1][1]
                     newFileObj = item[1][2]
                     newContents = contentList[i]
                     i += 1
 
-                    (contType, cont) = changeset.fileContentsDiff(fileObj,
-                                            contents, newFileObj, newContents,
+                    (contType, cont) = changeset.fileContentsDiff(None,
+                                            None, newFileObj, newContents,
                                             mirrorMode = mirrorMode)
                     internalCs.addFileContents(pathId, fileId, contType,
-                                               cont, True)
+                                               cont, True,
+                                               compressed = True)
 
         if not cs and internalCs:
             cs = internalCs
@@ -2113,6 +2118,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # retrieve the contents from the database now so that
                     # the changeset can be shared between threads
                     c = self.localRep.getFileContents([item])[0].get().read()
+                    if compressed:
+                        f = util.BoundedStringIO()
+                        compressor = gzip.GzipFile(None, "w", fileobj = f)
+                        compressor.write(c)
+                        compressor.close()
+                        f.seek(0)
+                        c = f.read()
+
                     contents[i] = filecontents.FromString(c)
 
         byServer = {}
