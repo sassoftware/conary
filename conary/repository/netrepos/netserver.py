@@ -1998,10 +1998,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return results
         schema.resetTable(cu, "tmpNVF")
-        for i, item in enumerate(troveList):
-            cu.execute("INSERT INTO tmpNVF (idx, name, version, flavor) "
-                       "VALUES (?, ?, ?, ?)", (i, item[0], item[1], item[2]),
-                       start_transaction=False)
+        def _iterTroveList(troveList):
+            for i, item in enumerate(troveList):
+                yield (i, item[0], item[1], item[2])
+        self.db.bulkload("tmpNVF", _iterTroveList(troveList),
+                         ["idx", "name", "version", "flavor"],
+                         start_transaction=False)
         self.db.analyze("tmpNVF")
         if hidden:
             hiddenClause = ("OR (Instances.isPresent = %d AND ugi.canWrite = 1)"
