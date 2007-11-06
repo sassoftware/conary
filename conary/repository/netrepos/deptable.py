@@ -167,7 +167,6 @@ class DependencyTables:
             " and ".join(where))
         cu.execute(query, args)
 
-        ret = {}
         # sqlite version 3.2.2 have trouble sorting correctly the
         # results from the previous query. If we're running on sqlite,
         # we take the hit here and resort the results in Python...
@@ -177,15 +176,22 @@ class DependencyTables:
         else:
             retList = cu
             
+        ret = {}
         for (depId, depNum, troveName, flavorStr, versionStr, timeStamps, ft) in retList:
             retd = ret.setdefault(depId, [{} for x in xrange(depNums[depId])])
             # remember the first version of each (n,f) tuple for each query
             retd[depNum].setdefault((troveName, flavorStr), (versionStr, timeStamps))
-        result = {}
+        ret2 = {}
         for depId, depDictList in ret.iteritems():
             key = requires[depSetList[depId]]
-            retList = result.setdefault(key, [ [] for x in xrange(len(depDictList)) ])
+            retList = ret2.setdefault(key, [ [] for x in xrange(len(depDictList)) ])
             for i, depDict in enumerate(depDictList):
                 retList[i] = [ (trv[0], versions.strToFrozen(ver[0], ver[1].split(":")),
                                 trv[1]) for trv, ver in depDict.iteritems() ]
+        # fill in the result dictionary for the values we have not resolved deps for
+        result = {}
+        for depId, depSet in enumerate(depSetList):
+            result.setdefault(requires[depSet],
+                              [ [] for x in xrange(depNums[depId])])
+        result.update(ret2)
         return result
