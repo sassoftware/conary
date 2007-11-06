@@ -107,9 +107,9 @@ class DependencyTables:
         # correctly. This is a kludge/hack/workaround to make it
         # return the correct answers.
         groupBy = ""
-        if self.db.driver == "sqlite":
-            # group by all the selected items to force the sort order
-            groupBy = "group by 1,2,3,4,5,6"
+        #if self.db.driver == "sqlite":
+        #    # group by all the selected items to force the sort order
+        #    groupBy = "group by 1,2,3,4,5,6"
         # 1. look up inmstances whose provides fully satisfy all the
         #    flags of every depName within a depSet (flagCount check)
         # 2. out of those instances, only consider the ones that fully
@@ -118,8 +118,8 @@ class DependencyTables:
         # 3. filter only the instanceIds the user has access to
         query = """
         select distinct
-            tmpDepNum.idx, tmpDepNum.depNum, item, flavor, version,
-            Nodes.timeStamps
+            tmpDepNum.idx as idx, tmpDepNum.depNum as depNum,
+            item, flavor, version, Nodes.timeStamps as timeStamps
         from tmpDepNum
         join ( 
             select 
