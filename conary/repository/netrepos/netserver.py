@@ -2829,13 +2829,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             schema.resetTable(cu, "tmpNVF")
         else: # we got no permissions, shortcircuit all of them as missing
             return ret
-        for (n, v, f), (i, perm) in itertools.izip(troveList, enumerate(permList)):
-            # if we don't have permissions for this one, don't bother looking it up
-            if not perm:
-                continue
-            ret[i] = (-1,'') # next best thing is trive missing
-            cu.execute("insert into tmpNVF(idx,name,version,flavor) values (?,?,?,?)",
-                       (i, n, v, f), start_transaction=False)
+        def _iterTroveList(troveList, permList):
+            for (n, v, f), (i, perm) in itertools.izip(troveList, enumerate(permList)):
+                # if we don't have permissions for this one, don't bother looking it up
+                if not perm:
+                    continue
+                yield (i, n, v, f)
+        self.db.bulkload("tmpNVF", _iterTroveList(troveList, permList),
+                         ["idx", "name", "version", "flavor"],
+                         start_transaction = False)
         self.db.analyze("tmpNVF")
         # get the data doing a full scan of tmpNVF
         cu.execute("""
