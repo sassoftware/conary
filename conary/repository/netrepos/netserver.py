@@ -1000,7 +1000,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 'and Instances.troveType != %d' % trove.TROVE_TYPE_REMOVED
         elif troveTypes == TROVE_QUERY_NORMAL:
             troveTypeClause = \
-                'and Instances.troveType == %d' % trove.TROVE_TYPE_NORMAL
+                'and Instances.troveType = %d' % trove.TROVE_TYPE_NORMAL
         else:
             troveTypeClause = ''
 

@@ -322,7 +322,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
                     # fall-through to debug this exception - this code should
                     # not run on production servers
-                    import traceback
+                    import traceback, sys
                     from conary.lib import debugger
                     excInfo = sys.exc_info()
                     lines = traceback.format_exception(*excInfo)
