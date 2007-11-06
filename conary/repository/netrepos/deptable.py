@@ -118,7 +118,7 @@ class DependencyTables:
         # 3. filter only the instanceIds the user has access to
         query = """
         select distinct
-            tmpDepNum.idx, tmpDepNum.depNum, item, flavor, version,
+            tmpDepNum.idx, tmpDepNum.depNum, Items.item, flavor, version,
             Nodes.timeStamps
         from tmpDepNum
         join ( 
@@ -132,7 +132,8 @@ class DependencyTables:
             join Provides using(depId)
             group by tmpDeps.idx, tmpDeps.depNum, Provides.instanceId
         ) as DepSelect using(idx, depNum, flagCount)
-        join Instances using(instanceId)
+        join Instances on
+            Instances.instanceId = DepSelect.instanceId
         join Nodes using(itemId, versionId) """    
 
         where = ["ugi.userGroupId in (%s)" % (
@@ -142,7 +143,8 @@ class DependencyTables:
             self._setupTroveList(cu, troveList)
             query += """
             join tmpInstances as ti on ti.instanceId = Instances.instanceId
-            join UserGroupInstancesCache as ugi using(instanceId) """
+            join UserGroupInstancesCache as ugi on
+                ugi.instanceId = ti.instanceId """
         else:
             if leavesOnly:
                 query += """
@@ -169,7 +171,7 @@ class DependencyTables:
         join Flavors on Instances.flavorId = Flavors.flavorId
         where %s
         %s
-        order by idx, depNum, Nodes.finalTimestamp desc """ % (
+        order by 1, 2, 6 desc """ % (
             " and ".join(where), groupBy)
         cu.execute(query, args)
 
