@@ -173,7 +173,7 @@ class DependencyTables:
         # we take the hit here and resort the results in Python...
         if self.db.driver == "sqlite":
             # order by idx, depNum, finalTimestamp desc
-            retList = sorted(cu, lambda a: (a[0], a[1], -a[6]))
+            retList = sorted(cu, key = lambda a: (a[0], a[1], -a[6]))
         else:
             retList = cu
             
