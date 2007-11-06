@@ -1827,10 +1827,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # None in streams means the stream wasn't found.
         streams = [ None ] * (i+1)
 
-        # use the list of uniquified fileIds to look up streams in the repo
-        for i, fileId in enumerate(uniqIdList):
-            cu.execute("INSERT INTO tmpFileId (itemId, fileId) VALUES (?, ?)",
-                       (i, cu.binary(fileId)), start_transaction=False)
+        # use the list of uniqified fileIds to look up streams in the repo
+        def _iterIdList(uniqIdList):
+            for i, fileId in enumerate(uniqIdList):
+                #cu.execute("INSERT INTO tmpFileId (itemId, fileId) VALUES (?, ?)",
+                #           (i, cu.binary(fileId)), start_transaction=False)
+                yield ((i, cu.binary(fileId)))
+        self.db.bulkload("tmpFileId", _iterIdList(uniqIdList),
+                         ["itemId", "fileId"], start_transaction=False)
         self.db.analyze("tmpFileId")
         q = """
         SELECT DISTINCT
