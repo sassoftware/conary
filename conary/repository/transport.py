@@ -464,6 +464,8 @@ class Transport(xmlrpclib.Transport):
         self.responseProtocol = None
         self.usedProxy = False
         self.entitlement = None
+        self.proxyHost = None
+        self.proxyProtocol = None
 
     def setEntitlements(self, entitlementList):
         self.entitlements = entitlementList
@@ -478,9 +480,6 @@ class Transport(xmlrpclib.Transport):
             self.entitlement = " ".join(l)
         else:
             self.entitlement = None
-
-        self.proxyHost = None
-        self.proxyProtocol = None
 
     def getEntitlements(self):
         return self.entitlements
