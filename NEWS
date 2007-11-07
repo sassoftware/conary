@@ -1,17 +1,17 @@
-Changes in @NEW@:
+Changes in 1.2.6:
   o Build Changes:
-      * When cooking packages or groups, conary now displays the methods that
-        are called.  It also displays the methods that are unused, making it
-        easier to see if a function from a superclass has been left out.
-        (CNY-2193)
+    * When cooking packages or groups, conary now displays the methods
+      that are called. It also displays the methods that are unused,
+      making it easier to see if a function from a superclass has been
+      left out. (CNY-2193)
 
   o Bug Fixes:
-      * Use of macros in the r.Link() build action worked only in
-        limited cases. (CNY-2209)
+    * Use of macros in the r.Link() build action worked only in limited
+      cases. (CNY-2209)
 
   o Client Changes:
-    * Mirror mode now includes for file streams instead of differential
-      streams (CNY-2210)
+    * Mirror mode now includes full file streams in changesets, instead
+      of differential streams. (CNY-2210)
 
 Changes in 1.2.5:
   o Client Changes:
