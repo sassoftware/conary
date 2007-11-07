@@ -821,6 +821,13 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             target.setMirrorMark(bundlesMark)
     # mirroring removed troves requires one by one processing
     for target in targets:
-        updateCount += mirrorRemoved(sourceRepos, target.repo, removedSet,
+        copySet = removedSet.copy()
+        updateCount += mirrorRemoved(sourceRepos, target.repo, copySet,
                                      test=test, callback=callback)
+    # if this was a noop because the removed troves were already mirrored
+    # we need to keep going
+    if updateCount == 0 and len(removedSet):
+        for target in targets:
+            target.setMirrorMark(crtMaxMark)
+        return -1
     return updateCount
