@@ -1827,10 +1827,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # None in streams means the stream wasn't found.
         streams = [ None ] * (i+1)
 
-        # use the list of uniquified fileIds to look up streams in the repo
-        for i, fileId in enumerate(uniqIdList):
-            cu.execute("INSERT INTO tmpFileId (itemId, fileId) VALUES (?, ?)",
-                       (i, cu.binary(fileId)), start_transaction=False)
+        # use the list of uniqified fileIds to look up streams in the repo
+        def _iterIdList(uniqIdList):
+            for i, fileId in enumerate(uniqIdList):
+                #cu.execute("INSERT INTO tmpFileId (itemId, fileId) VALUES (?, ?)",
+                #           (i, cu.binary(fileId)), start_transaction=False)
+                yield ((i, cu.binary(fileId)))
+        self.db.bulkload("tmpFileId", _iterIdList(uniqIdList),
+                         ["itemId", "fileId"], start_transaction=False)
         self.db.analyze("tmpFileId")
         q = """
         SELECT DISTINCT
@@ -1998,10 +2002,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not userGroupIds:
             return results
         schema.resetTable(cu, "tmpNVF")
-        for i, item in enumerate(troveList):
-            cu.execute("INSERT INTO tmpNVF (idx, name, version, flavor) "
-                       "VALUES (?, ?, ?, ?)", (i, item[0], item[1], item[2]),
-                       start_transaction=False)
+        def _iterTroveList(troveList):
+            for i, item in enumerate(troveList):
+                yield (i, item[0], item[1], item[2])
+        self.db.bulkload("tmpNVF", _iterTroveList(troveList),
+                         ["idx", "name", "version", "flavor"],
+                         start_transaction=False)
         self.db.analyze("tmpNVF")
         if hidden:
             hiddenClause = ("OR (Instances.isPresent = %d AND ugi.canWrite = 1)"
@@ -2827,13 +2833,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             schema.resetTable(cu, "tmpNVF")
         else: # we got no permissions, shortcircuit all of them as missing
             return ret
-        for (n, v, f), (i, perm) in itertools.izip(troveList, enumerate(permList)):
-            # if we don't have permissions for this one, don't bother looking it up
-            if not perm:
-                continue
-            ret[i] = (-1,'') # next best thing is trive missing
-            cu.execute("insert into tmpNVF(idx,name,version,flavor) values (?,?,?,?)",
-                       (i, n, v, f), start_transaction=False)
+        def _iterTroveList(troveList, permList):
+            for (n, v, f), (i, perm) in itertools.izip(troveList, enumerate(permList)):
+                # if we don't have permissions for this one, don't bother looking it up
+                if not perm:
+                    continue
+                yield (i, n, v, f)
+        self.db.bulkload("tmpNVF", _iterTroveList(troveList, permList),
+                         ["idx", "name", "version", "flavor"],
+                         start_transaction = False)
         self.db.analyze("tmpNVF")
         # get the data doing a full scan of tmpNVF
         cu.execute("""

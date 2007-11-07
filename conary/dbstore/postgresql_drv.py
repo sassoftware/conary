@@ -347,4 +347,9 @@ class Database(BaseDatabase):
         
     # faster data load for large tables. by default we redirect to executemany()
     def bulkload(self, tableName, rows, columnNames, start_transaction = True):
+        # first, make sure we do this in a transaction so we can roll it back
+        if self.dbh.transaction not in [ pgsql.TRANS_INERROR, pgsql.TRANS_INTRANS,
+                                         pgsql.TRANS_ACTIVE ]:
+            self.dbh.execute(self.basic_transaction)
+        # now it's safe to do the bulkload
         return self.dbh.bulkload(tableName, rows, columnNames)
