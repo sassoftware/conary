@@ -617,6 +617,8 @@ class TroveFormatter(TroveTupFormatter):
                 # on failed getTrove calls 
             except errors.TroveMissing:
                 pass
+            except errors.InsufficientPermission:
+                pass
 
         elif n.endswith(':source'):
             sourceTrove = trove
@@ -674,6 +676,7 @@ class TroveFormatter(TroveTupFormatter):
                                 ("TroveVer  : %s" %
                                             trove.troveInfo.troveVersion()))
             yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
+            yield "%-30s" % (("Conary version : %s" % trove.troveInfo.conaryVersion()))
 
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):
@@ -692,13 +695,17 @@ class TroveFormatter(TroveTupFormatter):
                 if not flags & TROVE_STRONGREF:
                     fmtFlags.append('Weak')
                 if trove and trove.isRedirect():
+                    redirectFlags = []
                     for rName, rBranch, rFlavor in trove.iterRedirects():
                         if rFlavor is None:
                             flag = 'Redirect -> %s=%s' % (rName, rBranch)
                         else:
                             flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch, 
                                                               rFlavor)
-                        fmtFlags.append(flag)
+                        redirectFlags.append(flag)
+                    if not redirectFlags:
+                        redirectFlags.append('Redirect -> Nothing')
+                    fmtFlags.extend(redirectFlags)
                 if trove and trove.isRemoved():
                     fmtFlags.append('Removed')
                 if fmtFlags:
@@ -719,7 +726,8 @@ class TroveFormatter(TroveTupFormatter):
             for line in self.formatDigSigs(trove, indent):
                 yield line
         if dcfg.printBuildReqs():
-            for buildReq in sorted(trove.getBuildRequirements()):
+            for buildReq in sorted(trove.getBuildRequirements(),
+                                   key=lambda x:x[0]):
                 yield '  ' * (indent) + self.formatNVF(*buildReq)
         elif dcfg.printDeps():
             for line in self.formatDeps(trove.getProvides(), 

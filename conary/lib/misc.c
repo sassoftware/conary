@@ -188,7 +188,7 @@ static PyObject * exists(PyObject *self, PyObject *args) {
         return NULL;
 
     if (lstat(fn, &sb)) {
-        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG) {
+        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG || errno == EACCES) {
             Py_INCREF(Py_False);
             return Py_False;
         }

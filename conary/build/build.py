@@ -1998,6 +1998,7 @@ class Link(_FileAction):
     def do(self, macros):
 	d = macros['destdir']
         self.existingpath = self.existingpath % macros
+        self.basedir = self.basedir % macros
         if self.existingpath and self.existingpath[0] != '/':
             self.init_error(TypeError,
                 'hardlink %s must be located in destdir' %self.existingpath)
@@ -2005,6 +2006,7 @@ class Link(_FileAction):
 	if not os.path.exists(e):
 	    raise TypeError, 'hardlink target %s does not exist' %self.existingpath
 	for name in self.newnames:
+            name = name % macros
 	    newpath = util.joinPaths(self.basedir, name)
 	    n = util.joinPaths(d, newpath)
 	    self.setComponents(d, n)
@@ -2571,6 +2573,8 @@ class MakeDirs(_FileAction):
         for path in action._expandPaths(self.paths, macros, braceGlob=False):
             dirs = util.braceExpand(path)
             for d in dirs:
+                if d.endswith('/'):
+                    d = d[:-1]
                 log.info('creating directory %s', d)
 		self.setComponents(macros.destdir, d.replace('%', '%%'))
                 util.mkdirChain(d)

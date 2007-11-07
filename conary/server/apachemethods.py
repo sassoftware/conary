@@ -17,7 +17,6 @@ from mod_python.util import FieldStorage
 import os
 import sys
 import time
-import xmlrpclib
 import zlib
 
 from conary.lib import log, util
@@ -46,8 +45,9 @@ def post(port, isSecure, repos, req):
     if req.headers_in['Content-Type'] == "text/xml":
         # handle XML-RPC requests
         encoding = req.headers_in.get('Content-Encoding', None)
+        sio = util.BoundedStringIO()
         try:
-            data = req.read()
+            util.copyStream(req, sio)
         except IOError, e:
             # if we got a read timeout, marshal an exception back
             # to the client
@@ -64,10 +64,12 @@ def post(port, isSecure, repos, req):
         else:
             # otherwise, we've read the data, let's process it
             if encoding == 'deflate':
-                data = zlib.decompress(data)
+                sio.seek(0)
+                sio = util.decompressStream(sio)
 
             startTime = time.time()
-            (params, method) = xmlrpclib.loads(data)
+            sio.seek(0)
+            (params, method) = util.xmlrpcLoad(sio)
             repos.log(3, "decoding=%s" % method, authToken[0],
                       "%.3f" % (time.time()-startTime))
             # req.connection.local_addr[0] is the IP address the server
@@ -97,17 +99,21 @@ def post(port, isSecure, repos, req):
         usedAnonymous = result[0]
         result = result[1:]
 
-        resp = xmlrpclib.dumps((result,), methodresponse=1)
+        sio = util.BoundedStringIO()
+        util.xmlrpcDump((result,), stream=sio, methodresponse=1)
+        respLen = sio.tell()
         repos.log(1, method, "time=%.3f size=%d" % (time.time()-startTime,
-                                                    len(resp)))
+                                                    respLen))
 
         req.content_type = "text/xml"
         # check to see if the client will accept a compressed response
         encoding = req.headers_in.get('Accept-encoding', '')
-        if len(resp) > 200 and 'deflate' in encoding:
+        if respLen > 200 and 'deflate' in encoding:
             req.headers_out['Content-encoding'] = 'deflate'
-            resp = zlib.compress(resp, 5)
-        req.headers_out['Content-length'] = '%d' % len(resp)
+            sio.seek(0)
+            sio = util.compressStream(sio, 5)
+            respLen = sio.tell()
+        req.headers_out['Content-length'] = '%d' % respLen
         if usedAnonymous:
             req.headers_out["X-Conary-UsedAnonymous"] = "1"
         if extraInfo:
@@ -123,7 +129,8 @@ def post(port, isSecure, repos, req):
             via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
             req.headers_out['Via'] = via
 
-        req.write(resp)
+        sio.seek(0)
+        util.copyStream(sio, req)
         return apache.OK
     else:
         # Handle HTTP (web browser) requests
@@ -179,11 +186,6 @@ def get(port, isSecure, repos, req):
         if not req.args:
             # the client asked for a changeset, but there is no
             # ?tmpXXXXXX.cf after /conary/changeset (CNY-1142)
-            import sys
-            print >> sys.stderr, "sys.modules", str(sys.modules)
-            sys.stderr.flush()
-            from conary.server.apachehooks import logAndEmail
-            logAndEmail(req, repos.cfg, 'Bad GET request to /changeset', '')
             return apache.HTTP_BAD_REQUEST
         if '/' in req.args:
             return apache.HTTP_FORBIDDEN

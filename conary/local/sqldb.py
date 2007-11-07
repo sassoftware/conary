@@ -404,9 +404,6 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
-        if not readOnly:
-            self.db.analyze()
-
         self.needsCleanup = False
         self.addVersionCache = {}
         self.flavorsNeeded = {}
@@ -589,13 +586,41 @@ order by
 
 	return theId
 
-    def addTrove(self, trove, pin = False):
+    def _findTroveInstanceId(self, cu, name, version, flavor):
+        if flavor.isEmpty():
+            flavorStr = "IS NULL"
+        else:
+            flavorStr = "= '%s'" % flavor.freeze()
+
+        cu.execute("""
+        SELECT instanceId
+        FROM Instances
+        JOIN Versions USING (versionId)
+        JOIN Flavors ON (Instances.flavorId = Flavors.flavorId)
+        WHERE Instances.troveName = ?
+        AND Versions.version = ?
+        AND Flavors.flavor %s
+        """ % flavorStr, name, str(version))
+
+        rows = list(cu)
+
+        if not len(rows):
+            raise errors.TroveNotFound
+
+        return rows[0][0]
+
+    def addTrove(self, trove, pin = False, oldTroveSpec = None):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()
 	troveVersion = trove.getVersion()
 	troveVersionId = self.getVersionId(troveVersion, {})
 	self.addVersionCache[troveVersion] = troveVersionId
+
+        if oldTroveSpec is not None:
+            oldTroveId = self._findTroveInstanceId(cu, *oldTroveSpec)
+        else:
+            oldTroveId = None
 
 	troveFlavor = trove.getFlavor()
         if not troveFlavor.isEmpty():
@@ -752,7 +777,7 @@ order by
                                       stream, isPresent)
                         VALUES (?, ?, ?, ?, ?, ?)""")
 
-	return (cu, troveInstanceId, stmt)
+	return (cu, troveInstanceId, stmt, oldTroveId)
 
     def _sanitizeTroveCollection(self, cu, instanceId, nameHint = None):
         # examine the list of present, missing, and not inPristine troves
@@ -855,7 +880,7 @@ order by
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None, isPresent = True):
-	(cu, troveInstanceId, addFileStmt) = troveInfo
+	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
 	if fileObj or fileStream:
@@ -874,13 +899,13 @@ order by
                 cu.executemany("INSERT INTO NewFileTags VALUES (?, ?)",
                                itertools.izip(itertools.repeat(pathId), tags))
 	else:
-	    cu.execute("""
-		UPDATE DBTroveFiles SET instanceId=?, isPresent=? WHERE
-		    fileId=? AND pathId=? AND versionId=?""",
-                    troveInstanceId, isPresent, fileId, pathId, versionId)
+            cu.execute("""
+                UPDATE DBTroveFiles SET instanceId=?, isPresent=?, path = ?
+                    WHERE pathId=? AND instanceId=?""",
+                    troveInstanceId, isPresent, path, pathId, oldInstanceId)
 
     def addTroveDone(self, troveInfo):
-	(cu, troveInstanceId, addFileStmt) = troveInfo
+	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 
         cu.execute("""
             INSERT INTO DBTroveFiles (pathId, versionId, path, fileId,
@@ -1022,11 +1047,17 @@ order by
         cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
                        ((x[0], x[1][1]) for x in enumerate(l)),
                        start_transaction = False)
-	cu.execute("""
-	    SELECT DISTINCT row, stream FROM getFilesTbl
-                JOIN DBTroveFiles ON
-		    getFilesTbl.fileId = DBTroveFiles.fileId
-	""")
+
+        # there may be duplicate fileId entries in getFilesTbl
+        # and DBTrovefiles.  To avoid searching through potentially
+        # millions of rows, we perform some more complicated sql.
+        cu.execute("""
+                SELECT row, (SELECT stream
+                              FROM DBTroveFiles AS dbt 
+                              WHERE dbt.fileId = gft.fileId LIMIT 1) AS stream
+                    FROM getfilesTbl AS gft
+                    WHERE stream IS NOT NULL
+        """)
 
         l2 = [ None ] * len(l)
 
@@ -1229,14 +1260,14 @@ order by
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT DBTroveFiles.versionId FROM DBTroveFiles
                         WHERE
-                            DBTroveFiles.instanceId = ?""")
+                            DBTroveFiles.instanceId = ?""", troveInstanceId)
         cu.execute("""
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT Instances.versionId FROM
                         TroveTroves JOIN Instances ON
-                            TroveTroves.instanceId = Instances.instanceId
+                            TroveTroves.includedId = Instances.instanceId
                         WHERE
-                            TroveTroves.instanceId = ?""")
+                            TroveTroves.instanceId = ?""", troveInstanceId)
 
         wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ]
 

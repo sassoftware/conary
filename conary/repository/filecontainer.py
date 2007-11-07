@@ -207,7 +207,6 @@ class FileContainer:
                                   LARGE_SUBFILE_MAGIC,
                                   total >> 32, total & 0xFFFFFFFF,
                                   name, tag)
-
             dumpString(hdr)
 
 	assert(not self.mutable)

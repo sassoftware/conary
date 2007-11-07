@@ -30,6 +30,8 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+from conary.lib import util
+
 class InfoURL(urllib.addinfourl):
     def __init__(self, fp, headers, url, protocolVersion):
         urllib.addinfourl.__init__(self, fp, headers, url)
@@ -345,12 +347,28 @@ class URLOpener(urllib.FancyURLopener):
             if encoding == 'deflate':
                 # disable until performace is better
                 #fp = DecompressFileObj(fp)
-                fp = StringIO(zlib.decompress(fp.read()))
+                fp = util.decompressStream(fp)
+                fp.seek(0)
 
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
             return InfoURL(fp, headers, selector, protocolVersion)
         else:
+            self.handleProxyErrors(errcode)
             return self.http_error(selector, fp, errcode, errmsg, headers, data)
+
+    def handleProxyErrors(self, errcode):
+        if not self.proxyHost or not self.proxyProtocol.startswith('http'):
+            return
+        e = None
+        if errcode == 503:
+            # Service unavailable, make it a socket error
+            e = socket.error(111, "Repository service unavailable")
+        elif errcode == 502:
+            # Bad gateway (server responded with some broken answer)
+            e = socket.error(111, "Bad Gateway (repository error reported by proxy)")
+        if e:
+            self._processSocketError(e)
+            raise e
 
     def _processSocketError(self, error):
         if not self.proxyHost:
@@ -369,18 +387,26 @@ class URLOpener(urllib.FancyURLopener):
             check = self.abortCheck
         else:
             check = lambda: False
-        sourceFd = h.sock.fileno()
+
+        pollObj = select.poll()
+        pollObj.register(h.sock.fileno(), select.POLLIN)
+
+        lastTimeout = time.time()
         while True:
             if check():
                 raise AbortError
             # wait 5 seconds for a response
-            l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
-            if not l1:
+            l = pollObj.poll(5000)
+
+            if not l:
                 # still no response from the server.  send a space to
                 # keep the connection alive - in case the server is
                 # behind a load balancer/firewall with short
                 # connection timeouts.
-                h.send(' ')
+                now = time.time()
+                if now - lastTimeout > 14.9:
+                    h.send(' ')
+                    lastTimeout = now
             else:
                 # ready to read response
                 break
@@ -422,6 +448,9 @@ class Transport(xmlrpclib.Transport):
 
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
+    # make this a class variable so that across all attempts to transport we'll only
+    # spew messages once per host.
+    failedHosts = set()
 
     def __init__(self, https = False, proxies = None, serverName = None,
                  extraHeaders = None):
@@ -515,7 +544,8 @@ class Transport(xmlrpclib.Transport):
                 break
             except IOError, e:
                 tries += 1
-                if tries >= 5:
+                if tries >= 5 or host in self.failedHosts:
+                    self.failedHosts.add(host)
                     raise
                 if e.args[0] == 'socket error':
                     e = e.args[1]
@@ -536,6 +566,9 @@ class Transport(xmlrpclib.Transport):
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
 	return rc
+
+    def getparser(self):
+        return util.xmlrpcGetParser()
 
 class AbortError(Exception): pass
 
