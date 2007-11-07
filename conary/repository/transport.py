@@ -357,8 +357,6 @@ class URLOpener(urllib.FancyURLopener):
             return self.http_error(selector, fp, errcode, errmsg, headers, data)
 
     def handleProxyErrors(self, errcode):
-        if not self.proxyHost or not self.proxyProtocol.startswith('http'):
-            return
         e = None
         if errcode == 503:
             # Service unavailable, make it a socket error
@@ -464,6 +462,8 @@ class Transport(xmlrpclib.Transport):
         self.responseProtocol = None
         self.usedProxy = False
         self.entitlement = None
+        self.proxyHost = None
+        self.proxyProtocol = None
 
     def setEntitlements(self, entitlementList):
         self.entitlements = entitlementList
@@ -478,9 +478,6 @@ class Transport(xmlrpclib.Transport):
             self.entitlement = " ".join(l)
         else:
             self.entitlement = None
-
-        self.proxyHost = None
-        self.proxyProtocol = None
 
     def getEntitlements(self):
         return self.entitlements

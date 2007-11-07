@@ -150,7 +150,8 @@ class ProxyCallFactory:
         # SSL
         withSSL = url.startswith('https') or bool(injEntList) or bool(userOverride)
         transporter = transport.Transport(https = withSSL,
-                                          proxies = proxies)
+                                          proxies = proxies,
+                                          serverName = targetServerName)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
 

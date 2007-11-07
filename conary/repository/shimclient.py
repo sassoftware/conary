@@ -145,8 +145,6 @@ class ShimServerProxy(netclient.ServerProxy):
         self._server = server
         self._protocol = protocol
         self._port = port
-        if len(self._authToken) == 3:
-            import epdb;epdb.st()
 
     def setAbortCheck(self, *args):
         pass
