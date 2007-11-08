@@ -670,10 +670,11 @@ class ClientClone:
         if needsNewVersions:
             leafVersion = leafMap.getLeafVersion(troveName, targetBranch, 
                                                  troveFlavor)
-            if leafVersion:
-                # FIXME: parallelize this
+            if leafVersion and troveCache.hasTrove(troveName, leafVersion,
+                                                   troveFlavor):
                 oldTrv = troveCache.getTrove((troveName, leafVersion,
-                                              troveFlavor), withFiles = True)
+                                              troveFlavor),
+                                              withFiles = True)
                 # pathId, fileId -> fileVersion map
                 fileMap = dict(((x[0], x[2]), x[3]) for x in
                                         oldTrv.iterFileList())
@@ -831,13 +832,20 @@ class CloneOptions(object):
 
 class TroveCache(object):
     def __init__(self, repos, callback):
+        self._hasTroves = {}
         self.troves = {True : {}, False : {}}
         self.repos = repos
         self.callback = callback
 
+    def hasTrove(self, name, version, flavor):
+        return self.hasTroves([(name, version, flavor)])[name, version, flavor]
+
     def hasTroves(self, troveTups):
-        # FIXME: cache this.
-        return self.repos.hasTroves(troveTups)
+        needed = [ x for x in troveTups if x not in self._hasTroves ]
+        if needed:
+            self._hasTroves.update(self.repos.hasTroves(needed))
+        return dict((x, self._hasTroves[x]) for x in troveTups)
+
 
     def getTroves(self, troveTups, withFiles=True):
         theDict = self.troves[withFiles]

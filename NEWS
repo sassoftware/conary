@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Fixed a traceback that would occur where a component doesn't exist even
+      though its containing package does.  (CNY-2213)
+
 Changes in 1.2.6:
   o Build Changes:
     * When cooking packages or groups, conary now displays the methods
