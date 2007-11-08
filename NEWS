@@ -1,7 +1,10 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * Fixed a traceback that would occur where a component doesn't exist even
-      though its containing package does.  (CNY-2213)
+  o Build Changes:
+    * Fixed a traceback that would occur where a component doesn't exist
+      even though its containing package does.  (CNY-2213)
+    * The cvc command now prints out the most recent log message from
+      the underlying source code control system when creating new
+      snapshot archives. (CNY-1778)
 
 Changes in 1.2.6:
   o Build Changes:
