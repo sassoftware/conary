@@ -38,7 +38,7 @@
                 <td><a href="editPermForm?role=${role};label=${row[0]};trove=${row[1]};writeperm=${row[2]};remove=${row[3]}" title="Edit Permission">E</a></td>
             </tr>
             <tr py:if="not rows">
-                <td>Group has no permissions.</td>
+                <td>Role has no permissions.</td>
             </tr>
         </tbody>
     </table>
@@ -83,7 +83,7 @@
                         <td py:if="netAuth.groupCanMirror(group)" py:content="'yes'"/>
                         <td py:if="not netAuth.groupCanMirror(group)" py:content="'no'"/>
                         <td py:if="rows" py:content="permTable(group, rows)"/>
-                        <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
+                        <td py:if="not rows" style="font-size: 80%;">Role has no permissions</td>
                         <td style="text-align: right;"><a href="addPermForm?roleName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?roleName=${group}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?roleName=${group}">Edit&nbsp;Role</a></td>
                     </tr>
                 </tbody>
