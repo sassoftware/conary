@@ -5,6 +5,8 @@ Changes in @NEW@:
     * The cvc command now prints out the most recent log message from
       the underlying source code control system when creating new
       snapshot archives. (CNY-1778)
+    * Conary now has support for cmake, using the "r.CMake" class recipe.
+      (CNY-1321)
 
 Changes in 1.2.6:
   o Build Changes:
