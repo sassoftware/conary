@@ -1398,21 +1398,27 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
     trovesToGet = list(itertools.chain(*[ x.iterTroveList(strongRefs=True)
                                        for x in latestTroves ]))
     # get components
-    latestTroves = repos.getTroves(trovesToGet, withFiles=True)
-    d = {}
-    for trv in sorted(latestTroves):
-        for pathId, path, fileId, fileVersion in trv.iterFileList():
-            if path in fileIdsPathMap:
-                newFileId = fileIdsPathMap[path]
-                if path in d and newFileId != fileId:
-                    # if the fileId already exists and we're not
-                    # a perfect match, don't override what already exists
-                    # there.
-                    continue
-                d[path] = pathId, fileVersion, fileId
-    for path in d:
-        fileIdsPathMap.pop(path)
-    ident.merge(d)
+    try:
+        latestTroves = repos.getTroves(trovesToGet, withFiles=True)
+        d = {}
+        for trv in sorted(latestTroves):
+            for pathId, path, fileId, fileVersion in trv.iterFileList():
+                if path in fileIdsPathMap:
+                    newFileId = fileIdsPathMap[path]
+                    if path in d and newFileId != fileId:
+                        # if the fileId already exists and we're not
+                        # a perfect match, don't override what already exists
+                        # there.
+                        continue
+                    d[path] = pathId, fileVersion, fileId
+        for path in d:
+            fileIdsPathMap.pop(path)
+        ident.merge(d)
+    except errors.TroveMissing:
+        # a component is missing from the repository.  The repos can
+        # likely do a better job by falling back to getPackageBranchPathIds
+        # (CNY-2250)
+        pass
 
     # Any path in fileIdsPathMap beyond this point is a file that did not
     # exist in the latest version(s) of this package, so fall back to
