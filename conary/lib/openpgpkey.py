@@ -21,6 +21,7 @@ from time import time
 
 from conary import callbacks
 from conary.lib.util import log
+from conary.lib import graph
 
 from Crypto.PublicKey import DSA
 from openpgpfile import BadPassPhrase
@@ -447,4 +448,84 @@ def getKeyCache():
 def setKeyCache(keyCache):
     global _keyCache
     _keyCache = keyCache
+
+class Trust(object):
+    depthLimit = 10
+    marginals = 3
+
+    def __init__(self, topLevelKeys, keyCache):
+        self.topLevelKeys = topLevelKeys
+        self.keyCache = keyCache
+        self._graph = None
+        self._trust = {}
+
+    def computeTrust(self, keyId):
+        self._graph = graph.DirectedGraph()
+        g = self._graph
+
+        g.addNode(keyId)
+        starts, finishes, trees, pred, depth = g.doBFS(
+            start = keyId,
+            getChildrenCallback = self.getChildrenCallback,
+            depthLimit = self.depthLimit)
+
+        # Start walking the tree in reverse order, validating the trust of
+        # each signature
+        gt = g.transpose()
+        self._graph = gt
+
+        # Top-level keys are fully trusted
+        toplevel = [ x for x in self.topLevelKeys if x in g ]
+        self._trust = dict((x, (self.depthLimit, 120, 120))
+                            for x in toplevel)
+
+        tstart, tfinishes, ttrees, tpred, tdepth = gt.doBFS(start = toplevel,
+            getChildrenCallback = self.trustComputationCallback)
+        tdepth = dict((g.get(x), y) for x, y in tdepth.items())
+        return self._trust, tdepth
+
+    def getChildrenCallback(self, nodeIdx):
+        nodeId = self._graph.get(nodeIdx)
+        try:
+            node = self.keyCache.getPublicKey(nodeId)
+        except KeyNotFound:
+            return []
+
+        for sig in node.signatures:
+            if sig.verifies():
+                self._graph.addEdge(nodeId, sig.getSigId())
+        return self._graph.edges[nodeIdx]
+
+    def trustComputationCallback(self, nodeIdx):
+        gt = self._graph
+        trust = self._trust
+        classicTrust = int(120 / self.marginals)
+        if 120 % self.marginals:
+            classicTrust += 1
+
+        nodeId = gt.get(nodeIdx)
+        nodeSigLevel, nodeSigTrust, nodeTrust = trust[nodeId]
+        for snIdx in gt.edges[nodeIdx]:
+            node = gt.get(snIdx)
+            ntlev, ntamt, tramt = trust.setdefault(node,
+                    (nodeSigLevel - 1, 120, 0))
+            # Get the signature
+            n = self.keyCache.getPublicKey(node)
+            sig = [ x for x in n.signatures if x.getSigId() == nodeId ]
+            assert(sig)
+            sig = sig[0]
+
+            if sig.trustLevel is not None:
+                ntlev = min(ntlev, sig.trustLevel)
+            # If no trust amount is present, use the standard trust model
+            # (self.marginals needed to introduce a trusted - limited to one
+            # level of intermediate trusted keys only)
+            amt = ((sig.trustAmount is None) and classicTrust) or sig.trustAmount
+            ntamt = min(ntamt, amt)
+            # Child node trust cannot exceed the parent's trust
+            tramt = min(tramt + nodeSigTrust, nodeTrust)
+
+            trust[node] = (ntlev, ntamt, tramt)
+
+        return gt.edges[nodeIdx]
 
