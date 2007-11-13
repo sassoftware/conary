@@ -65,23 +65,27 @@ class DependencyTables:
         depNums = []
         for i, depSet in enumerate(depSetList):
             depNum = 0
-            for classId, depClass in depSet.getDepClasses().iteritems():
-                for dep in depClass.getDeps():
-                    for (depName, flags) in zip(dep.getName(), dep.getFlags()):
-                        cu.execute("""
-                        insert into tmpDeps(idx, depNum, class, name, flag)
-                        values (?, ?, ?, ?, ?)""",
-                                   (i, depNum, classId, depName, NO_FLAG_MAGIC))
-                        if flags:
-                            for flag, sense in flags:
-                                # assert sense is required
-                                cu.execute("""
-                                insert into tmpDeps(idx, depNum, class, name, flag)
-                                values (?, ?, ?, ?, ?)""",
-                                           (i, depNum, classId, depName, flag))
-                    cu.execute("""insert into tmpDepNum(idx, depNum, flagCount)
-                    values (?, ?, ?)""", (i, depNum, len(flags)+1))
-                    depNum += 1
+            for depClass, dep in depSet.iterDeps(sort=True):
+                # need to get these in sorted order as the depNums
+                # we get here are important...
+                classId = depClass.tag
+                depName = dep.getName()
+                flags = dep.getFlags()
+                for (depName, flags) in zip(dep.getName(), dep.getFlags()):
+                    cu.execute("""
+                    insert into tmpDeps(idx, depNum, class, name, flag)
+                    values (?, ?, ?, ?, ?)""",
+                               (i, depNum, classId, depName, NO_FLAG_MAGIC))
+                    if flags:
+                        for flag, sense in flags:
+                            # assert sense is required
+                            cu.execute("""
+                            insert into tmpDeps(idx, depNum, class, name, flag)
+                            values (?, ?, ?, ?, ?)""",
+                                       (i, depNum, classId, depName, flag))
+                cu.execute("""insert into tmpDepNum(idx, depNum, flagCount)
+                values (?, ?, ?)""", (i, depNum, len(flags)+1))
+                depNum += 1
             depNums.append(depNum)
         self.db.analyze("tmpDeps")
         self.db.analyze("tmpDepNum")
