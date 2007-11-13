@@ -12,12 +12,15 @@
 #
 
 import base64
+import errno
+import fcntl
 import itertools
 import md5
 import os
 import sha
 import struct
 import sys
+import tempfile
 import time
 
 try:
@@ -450,6 +453,56 @@ def getKeyEndOfLife(keyId, keyFile=''):
         raise KeyNotFound(keyId, "Couldn't open keyring")
 
     return _getKeyEndOfLife(keyId, keyRing)
+
+def addKeys(keys, stream):
+    """Add keys to the stream"""
+    keysDict = {}
+    for k in keys:
+        keyId = k.getKeyId()
+        if keyId in keysDict:
+            keysDict[keyId].merge(k)
+        else:
+            keysDict[keyId] = k
+
+    # Lock the stream
+    fd = stream.fileno()
+    try:
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_EX)
+        except IOError, e:
+            if e.errno == errno.EBADF:
+                # The file was open in read-only mode
+                raise PGPError("Please pass in a file descriptor open in "
+                               "write mode")
+            raise
+        tempfd, tempf = tempfile.mkstemp()
+        # XXX This is disgusting. Ideally we should be able to fdopen directly
+        # into an ExtendedFile.
+        tempf = util.ExtendedFile(tempf, mode = "w+", buffering = False)
+        os.close(tempfd)
+
+        msg = PGP_Message(stream, start = 0)
+        for ikey in msg.iterMainKeys():
+            iKeyId = ikey.getKeyId()
+            if iKeyId in keysDict:
+                ikey.merge(keysDict[iKeyId])
+                del keysDict[iKeyId]
+            ikey.writeAll(tempf)
+        # Add the rest of the keys
+        for key in keys:
+            keyId = key.getKeyId()
+            if keyId not in keysDict:
+                continue
+            key.writeAll(tempf)
+            del keysDict[keyId]
+        # Now copy the keyring back
+        tempf.seek(0, SEEK_SET)
+        stream.seek(0, SEEK_SET)
+        stream.truncate()
+        PGP_BasePacket._copyStream(tempf, stream)
+        stream.flush()
+    finally:
+        fcntl.lockf(fd, fcntl.LOCK_UN)
 
 def _getKeyEndOfLife(keyId, stream):
     msg = PGP_Message(stream, start = 0)
