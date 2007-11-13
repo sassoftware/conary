@@ -457,6 +457,14 @@ class Trust(object):
         self.topLevelKeys = topLevelKeys
         self.keyCache = keyCache
         self._graph = None
+        # self._trust is a dictionary, keyed on the node index, and with 3
+        # values: (node trust level, node trust amount, actual trust)
+        # The first two are just caches of the values in a trust signature,
+        # and only affect the values for this node's children (i.e. they
+        # determine the amount of trust this node transmits to the nodes it
+        # signed). If the cumulated actual trust for this node does not exceed
+        # 120, this node is considered untrusted, and it will be ignored
+        # completely in determining trust for other keys.
         self._trust = {}
 
     def computeTrust(self, keyId):
@@ -504,7 +512,13 @@ class Trust(object):
             classicTrust += 1
 
         nodeId = gt.get(nodeIdx)
+        if nodeId not in trust:
+            return []
         nodeSigLevel, nodeSigTrust, nodeTrust = trust[nodeId]
+        if nodeSigLevel == 0 or nodeTrust < 120:
+            # This node is not trusted, don't propagate its trust to children
+            return []
+
         for snIdx in gt.edges[nodeIdx]:
             node = gt.get(snIdx)
             ntlev, ntamt, tramt = trust.setdefault(node,
@@ -518,8 +532,9 @@ class Trust(object):
             if sig.trustLevel is not None:
                 ntlev = min(ntlev, sig.trustLevel)
             # If no trust amount is present, use the standard trust model
-            # (self.marginals needed to introduce a trusted - limited to one
-            # level of intermediate trusted keys only)
+            # (self.marginals keys needed to introduce a trusted key.
+            # Note this is limited to one level of intermediate trusted keys
+            # only)
             amt = ((sig.trustAmount is None) and classicTrust) or sig.trustAmount
             ntamt = min(ntamt, amt)
             # Child node trust cannot exceed the parent's trust
