@@ -1641,14 +1641,14 @@ class PGP_Signature(PGP_BaseKeySig):
         sigDigest = hashObj.digest()
         return sigDigest
 
-    def _finalizeSignature(self, mainKey):
+    def _finalizeSignature(self, mainKey, keyId):
         """Compute the signature digest and pad it properly"""
 
         # Compute the signature digest
         sigString = self.getSignatureHash()
         # Validate it against the short digest
         if sigString[:2] != self.hashSig:
-            raise BadSelfSignature(None)
+            raise BadSelfSignature(keyId)
 
         # if this is an RSA signature, it needs to properly padded
         # RFC 2440 5.2.2 and RFC 2313 10.1.2
@@ -1665,7 +1665,7 @@ class PGP_Signature(PGP_BaseKeySig):
         """Compute the signature digest, pad it properly and verify the
         self signature"""
 
-        sigString = self._finalizeSignature(mainKey)
+        sigString = self._finalizeSignature(mainKey, keyId)
 
         digSig = self.parseMPIs()
         if not mainKey.verify(sigString, digSig):
@@ -2407,12 +2407,16 @@ class PGP_SecretAnyKey(PGP_Key):
                         ENCRYPTION_TYPE_S2K_SPECIFIED]:
             self.symmEncAlg, self.s2kType, self.hashAlg = self.readBin(3)
             if self.s2kType:
-                if self.s2kType not in (0x01, 0x03):
-                    raise IncompatibleKey('Unknown string-to-key type %s' %
-                                          self.s2kType)
-                self.salt = self.readExact(8)
-                if self.s2kType == 0x03:
-                    self.count, = self.readBin(1)
+                if 100 <= self.s2kType <= 110:
+                    # Private/Experimental s2k
+                    pass
+                else:
+                    if self.s2kType not in (0x01, 0x03):
+                        raise IncompatibleKey('Unknown string-to-key type %s' %
+                                              self.s2kType)
+                    self.salt = self.readExact(8)
+                    if self.s2kType == 0x03:
+                        self.count, = self.readBin(1)
         # The MPIs are most likely encrypted, we'll just have to trust that
         # there are enough of them for now.
         dataLen = self._bodyStream.size - self._bodyStream.tell()
@@ -2590,7 +2594,7 @@ class PGP_SecretAnyKey(PGP_Key):
         sighash = sigp.getSignatureHash()
         sigp.setShortSigHash(sighash[:2])
 
-        sigString = sigp._finalizeSignature(cryptoKey)
+        sigString = sigp._finalizeSignature(cryptoKey, None)
 
         # Pick a random number that is relatively prime with the crypto key's
         # q
@@ -2708,7 +2712,7 @@ class PGP_SubKey(PGP_Key):
                 continue
             self.adoptSignature(sig)
             # Verify the signature with the subkey's public key
-            sig.verify(self.makePgpKey(), keyId)
+            sig.verify(self.toPublicKey().makePgpKey(), keyId)
 
     def iterSubKeys(self):
         # Nothing to iterate over, subkeys don't have subkeys
