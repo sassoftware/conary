@@ -32,11 +32,16 @@ class CallLogEntry:
             (self.serverName, self.timeStamp, self.remoteIp,
              (self.user, self.entitlements),
              self.methodName, self.args, self.exceptionStr) = info[1:]
+        elif (self.revision == 4):
+            (self.serverName, self.timeStamp, self.remoteIp,
+             (self.user, self.entitlements),
+             self.methodName, self.args, self.kwArgs,
+             self.exceptionStr) = info[1:]
         else:
             assert(0)
 
 class CallLogger:
-    logFormatRevision = 3
+    logFormatRevision = 4
 
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
@@ -71,7 +76,8 @@ class CallLogger:
         sb = os.stat(self.path)
         self.inode = (sb.st_dev, sb.st_ino)
 
-    def log(self, remoteIp, authToken, methodName, args, exception = None):
+    def log(self, remoteIp, authToken, methodName, args, kwArgs = {},
+            exception = None):
         # lazy re-open the log file in case it was rotated from underneath us
         self.reopen()
         if exception:
@@ -80,12 +86,15 @@ class CallLogger:
         (user, entitlements) = authToken[0], authToken[2]
         logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
                                 time.time(), remoteIp, (user, entitlements),
-                                methodName, args, exception))
+                                methodName, args, kwArgs, exception))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
 
     def __iter__(self):
         fd = os.open(self.path, os.O_RDONLY)
         size = os.fstat(fd).st_size
+        if not size:
+            return
+
         map = mmap.mmap(fd, size, access = mmap.ACCESS_READ)
         i = 0
         while i < size:
