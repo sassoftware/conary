@@ -277,7 +277,7 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
     for spec in checkoutSpecs:
         spec.conaryState.write(spec.targetDir + "/CONARY")
 
-def commit(repos, cfg, message, callback=None, test=False):
+def commit(repos, cfg, message, callback=None, test=False, force=False):
     if not callback:
         callback = CheckinCallback()
 
@@ -574,7 +574,7 @@ def commit(repos, cfg, message, callback=None, test=False):
         print
         print '\t%s=%s' % (troveName, newVersion.asString())
         print
-    if conflicts:
+    if not force and conflicts:
         print 'WARNING: performing this commit will switch the active branch:'
         print
         print 'New version %s=%s' % (troveName, newVersion)
