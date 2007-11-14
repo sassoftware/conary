@@ -397,6 +397,9 @@ def _getPrivateKey(keyId, stream, passPhrase):
         pkt = msg.iterByKeyId(keyId).next()
     except StopIteration:
         raise KeyNotFound(keyId)
+    return getCryptoKey(pkt, passPhrase)
+
+def getCryptoKey(pkt, passPhrase):
     try:
         pkt.verifySelfSignatures()
     except BadSelfSignature:
