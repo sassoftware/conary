@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.7:
   o Build Changes:
     * The cvc command now prints out the most recent log message from
       the underlying source code control system when creating new
