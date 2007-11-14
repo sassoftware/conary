@@ -109,8 +109,7 @@ class FlavorPreferences:
     @staticmethod
     def getFlavorPreferences(arch):
         return [ deps.parseFlavor(x)
-            for x in FlavorPreferences.getStringFlavorPreferences(arch)
-        ]
+            for x in FlavorPreferences.getStringFlavorPreferences(arch) ]
 
 def getFlavorPreferences(arch = currentArch):
     return FlavorPreferences.getFlavorPreferences(arch)
@@ -123,6 +122,12 @@ class IncompatibleInstructionSets(Exception):
 
     def __str__(self):
         return "Incompatible architectures: %s: %s" % (self.is1, self.is2)
+
+def getFlavorPreferencesFromFlavor(depSet):
+    arch = getMajorArch(depSet.iterDepsByClass(deps.InstructionSetDependency))
+    if arch is None:
+        return None
+    return getFlavorPreferences([[arch]])
 
 def getMajorArch(depList):
     """Return the major architecture from an instruction set dependency

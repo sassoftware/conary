@@ -17,6 +17,7 @@ import itertools
 from conary import errors as conaryerrors
 from conary import files
 from conary import trove
+from conary.deps import arch
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
 
@@ -48,6 +49,10 @@ class AbstractTroveSource:
         if not preferenceList:
             preferenceList = []
         self._flavorPreferences = preferenceList
+
+    def setFlavorPreferencesByFlavor(self, flavor):
+        self.setFlavorPreferenceList(
+                                arch.getFlavorPreferencesFromFlavor(flavor))
 
     def getFlavorPreferenceList(self):
         return self._flavorPreferences
@@ -516,10 +521,7 @@ class SearchableTroveSource(AbstractTroveSource):
                     fSet = results.setdefault(version, set())
                     fSet.update(flavorList)
             return results
-        if flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
-            flavorPreferenceList = []
-        else:
-            flavorPreferenceList = self._flavorPreferences
+        flavorPreferenceList = self._flavorPreferences
 
         results = {}
         for flavorQuery in flavorQueryList:
@@ -528,12 +530,28 @@ class SearchableTroveSource(AbstractTroveSource):
             queryResults = {}
             # lower preference score is better, means you've got a
             # flavor that matches a flavor preference earlier in the list.
-            currentPreferenceScore = len(flavorPreferenceList) + 1
 
             if isinstance(flavorQuery, (tuple, list)):
                 flavorQuery, primaryFlavorQuery = flavorQuery
             else:
                 primaryFlavorQuery = None
+
+            if flavorQuery is not None:
+                # if the user specifies something like [is:x86 x86_64]
+                # in their query, that should trigger an override of their
+                # default flavor preferences to match those in deps/arch.py.
+                newPreferenceList = arch.getFlavorPreferencesFromFlavor(
+                                                                    flavorQuery)
+                if newPreferenceList:
+                    # of course, if they just specified [ssl] then we don't
+                    # match a preference list and so we don't override
+                    # the current one.
+                    flavorPreferenceList = newPreferenceList
+            if flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
+                flavorPreferenceList = []
+
+            currentPreferenceScore = len(flavorPreferenceList) + 1
+
             for version, flavorList in versionFlavorList:
                 if primaryFlavorQuery is not None:
                     self._calculateFlavorScores(_CHECK_TROVE_STRONG_FLAVOR,
