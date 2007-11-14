@@ -1264,7 +1264,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for singleJob in jobList:
             totalSize = 0
             if singleJob[2][0] is not None:
-                totalSize += sizeList.pop(0)
+                totalSize += int(sizeList.pop(0))
 
             jobSizes.append(totalSize)
 
@@ -1790,8 +1790,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                          pathId, newFileId, newFileVersion))
                     continue
 
-		(filecs, hash) = changeset.fileChangeSet(pathId, oldFileObj, 
-                                                         newFileObj)
+                if mirrorMode:
+                    (filecs, hash) = changeset.fileChangeSet(pathId,
+                                                             None, 
+                                                             newFileObj)
+                else:
+                    (filecs, hash) = changeset.fileChangeSet(pathId,
+                                                             oldFileObj, 
+                                                             newFileObj)
 
 		internalCs.addFile(oldFileId, newFileId, filecs)
 
@@ -1805,7 +1811,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     fetchItems = []
                     needItems = []
 
-                    if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
+                    if (not mirrorMode and 
+                                    changeset.fileContentsUseDiff(oldFileObj,
+                                                                  newFileObj)):
                         fetchItems.append( (oldFileId, oldFileVersion, 
                                             oldFileObj) ) 
                         needItems.append( (pathId, None, oldFileObj) ) 
@@ -2663,4 +2671,6 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                          rateLimit = rateLimit, sizeLimit = size)
 
     resp = c.getresponse()
+    if resp.status != 200:
+        opener.handleProxyErrors(resp.status)
     return resp.status, resp.reason

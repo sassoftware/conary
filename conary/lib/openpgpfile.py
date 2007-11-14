@@ -1,4 +1,4 @@
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,11 +12,16 @@
 #
 
 import base64
+import errno
+import fcntl
+import itertools
+import md5
 import os
 import sha
-import md5
 import struct
 import sys
+import tempfile
+import time
 
 try:
     from Crypto.Hash import RIPEMD
@@ -80,6 +85,8 @@ PKT_ALL_KEYS = PKT_ALL_SECRET + PKT_ALL_PUBLIC
 PKT_MAIN_KEYS = (PKT_SECRET_KEY, PKT_PUBLIC_KEY)
 PKT_SUB_KEYS = (PKT_SECRET_SUBKEY, PKT_PUBLIC_SUBKEY)
 
+PKT_ALL_USER = set([PKT_USERID, PKT_USER_ATTRIBUTE])
+
 # 5.2.1 Signature Types
 SIG_TYPE_BINARY_DOC    = 0x00
 SIG_TYPE_TEXT_DOC      = 0x01
@@ -89,11 +96,13 @@ SIG_TYPE_CERT_1        = 0x11
 SIG_TYPE_CERT_2        = 0x12
 SIG_TYPE_CERT_3        = 0x13
 SIG_TYPE_SUBKEY_BIND   = 0x18
+SIG_TYPE_PRKEY_BIND    = 0x19
 SIG_TYPE_DIRECT_KEY    = 0x1F
 SIG_TYPE_KEY_REVOC     = 0x20
 SIG_TYPE_SUBKEY_REVOC  = 0x28
 SIG_TYPE_CERT_REVOC    = 0x30
 SIG_TYPE_TIMESTAMP     = 0x40
+SIG_TYPE_THIRD_PARTY_CONFIRM    = 0x50
 
 SIG_CERTS = (SIG_TYPE_CERT_0, SIG_TYPE_CERT_1,
              SIG_TYPE_CERT_2, SIG_TYPE_CERT_3, )
@@ -121,6 +130,9 @@ SIG_SUBPKT_POLICY_URL     = 26
 SIG_SUBPKT_KEY_FLAGS      = 27
 SIG_SUBPKT_SIGNERS_UID    = 28
 SIG_SUBPKT_REVOC_REASON   = 29
+SIG_SUBPKT_FEATURES       = 30
+SIG_SUBPKT_SIG_TARGET     = 31
+SIG_SUBPKT_EMBEDDED_SIG   = 32
 SIG_SUBPKT_INTERNAL_0     = 100
 SIG_SUBPKT_INTERNAL_1     = 101
 SIG_SUBPKT_INTERNAL_2     = 102
@@ -237,6 +249,12 @@ class ShortReadError(InvalidBodyError):
         self.expected = expected
         self.actual = actual
 
+class MergeError(PGPError):
+    pass
+
+class SignatureError(PGPError):
+    pass
+
 def getKeyId(keyRing):
     pkt = newPacketFromStream(keyRing, start = -1)
     assert pkt is not None
@@ -286,6 +304,11 @@ def binSeqToString(sequence):
     """sequence is a sequence of unsigned chars.
     Return the string with a corresponding char for each item"""
     return "".join([ chr(x) for x in sequence ])
+
+def stringToAscii(sequence):
+    """sequence is a sequence of characters.
+    Return the string with the hex representation for each character"""
+    return "".join("%02x" % ord(c) for c in sequence).upper()
 
 def simpleS2K(passPhrase, hash, keySize):
     # RFC 2440 3.6.1.1.
@@ -431,6 +454,56 @@ def getKeyEndOfLife(keyId, keyFile=''):
 
     return _getKeyEndOfLife(keyId, keyRing)
 
+def addKeys(keys, stream):
+    """Add keys to the stream"""
+    keysDict = {}
+    for k in keys:
+        keyId = k.getKeyId()
+        if keyId in keysDict:
+            keysDict[keyId].merge(k)
+        else:
+            keysDict[keyId] = k
+
+    # Lock the stream
+    fd = stream.fileno()
+    try:
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_EX)
+        except IOError, e:
+            if e.errno == errno.EBADF:
+                # The file was open in read-only mode
+                raise PGPError("Please pass in a file descriptor open in "
+                               "write mode")
+            raise
+        tempfd, tempf = tempfile.mkstemp()
+        # XXX This is disgusting. Ideally we should be able to fdopen directly
+        # into an ExtendedFile.
+        tempf = util.ExtendedFile(tempf, mode = "w+", buffering = False)
+        os.close(tempfd)
+
+        msg = PGP_Message(stream, start = 0)
+        for ikey in msg.iterMainKeys():
+            iKeyId = ikey.getKeyId()
+            if iKeyId in keysDict:
+                ikey.merge(keysDict[iKeyId])
+                del keysDict[iKeyId]
+            ikey.writeAll(tempf)
+        # Add the rest of the keys
+        for key in keys:
+            keyId = key.getKeyId()
+            if keyId not in keysDict:
+                continue
+            key.writeAll(tempf)
+            del keysDict[keyId]
+        # Now copy the keyring back
+        tempf.seek(0, SEEK_SET)
+        stream.seek(0, SEEK_SET)
+        stream.truncate()
+        PGP_BasePacket._copyStream(tempf, stream)
+        stream.flush()
+    finally:
+        fcntl.lockf(fd, fcntl.LOCK_UN)
+
 def _getKeyEndOfLife(keyId, stream):
     msg = PGP_Message(stream, start = 0)
     try:
@@ -444,7 +517,7 @@ def verifyRFC2440Checksum(data):
     if len(data) < 2:
         return 0
     checksum = [ ord(x) for x in data[-2:] ]
-    checksum = int2bytes(*checksum)
+    checksum = int2FromBytes(*checksum)
     runningCount=0
     for i in range(len(data) - 2):
         runningCount += ord(data[i])
@@ -492,6 +565,49 @@ def parseAsciiArmorKey(asciiData):
 
     keyData = base64.b64decode(buf)
     return keyData
+
+class CRC24(object):
+    __slots__ = [ '_crc' ]
+    CRC24_INIT = 0xb704ce
+    CRC24_POLY = 0x1864cfb
+
+    def __init__(self, data=''):
+        self._crc = self.CRC24_INIT
+        self.update(data)
+
+    def update(self, data):
+        crc = self._crc
+        for ch in data:
+            crc ^= (ord(ch) << 16)
+            for i in range(8):
+                crc <<= 1
+                if crc & 0x1000000:
+                    crc ^= self.CRC24_POLY
+        self._crc = crc
+
+    def digest(self):
+        r = self._crc & 0xffffff
+        return chr((r >> 16) & 0xff) + chr((r >> 8) & 0xff) + chr(r & 0xff)
+
+    def base64digest(self):
+        return base64.b64encode(self.digest())
+
+def _crc24(stream):
+    if isinstance(stream, str):
+        stream = StringIO(stream)
+    crc = CRC24()
+    while 1:
+        buf = stream.read(8192)
+        if not buf:
+            break
+        crc.update(buf)
+    return crc
+
+def crc24(stream):
+    return _crc24(stream).digest()
+
+def crc24base64(stream):
+    return _crc24(stream).base64digest()
 
 # this function will enforce the following rules
 # rule 1: cannot switch main keys
@@ -758,7 +874,7 @@ class PGP_PacketFromStream(object):
             self._f.seek(2)
 
             rest = PGP_BasePacket._readBin(self._f, 4)
-            self.bodyLength = int4bytes(*rest)
+            self.bodyLength = int4FromBytes(*rest)
             return
         # 4.2.2.4. Partial Body Lengths
         partialBodyLength = 1 << (body1 & 0x1F)
@@ -766,10 +882,13 @@ class PGP_PacketFromStream(object):
 
 class PGP_BasePacket(object):
     __slots__ = ['_bodyStream', 'headerLength', 'bodyLength',
-                 '_newStyle', '_nextStream', '_nextStreamPos' ]
+                 '_newStyle', '_nextStream', '_nextStreamPos',
+                 '_parentPacket', ]
 
     tag = None
     BUFFER_SIZE = 16384
+
+    _parentPacketTypes = set()
 
     def __init__(self, bodyStream, newStyle = False, minHeaderLen = 2):
         assert hasattr(bodyStream, 'pread')
@@ -780,13 +899,31 @@ class PGP_BasePacket(object):
         # Keep a reference to the next stream we link to
         self._nextStream = None
         self._nextStreamPos = 0
-        self.validate()
+        self._parentPacket = None
+        self.setUp()
+        self.initialize()
 
     def setNextStream(self, stream, pos):
         if stream:
             assert hasattr(stream, 'pread')
         self._nextStream = stream
         self._nextStreamPos = pos
+
+    def setParentPacket(self, pkt, clone = True):
+        """Add a parent packet to this packet"""
+        if pkt is None:
+            self._parentPacket = None
+            return
+
+        assert pkt.tag in self._parentPacketTypes
+        if clone:
+            self._parentPacket = pkt.clone()
+        else:
+            self._parentPacket = pkt
+
+    def getParentPacket(self):
+        return self._parentPacket
+
 
     def clone(self):
         """Produce another packet identical with this one"""
@@ -797,10 +934,17 @@ class PGP_BasePacket(object):
         newPkt = newPacket(self.tag, newBodyStream,
                     newStyle = self._newStyle, minHeaderLen = self.headerLength)
         newPkt.setNextStream(self._nextStream, self._nextStreamPos)
+        newPkt.setParentPacket(self.getParentPacket(), clone = False)
         return newPkt
 
-    def validate(self):
-        """To be overridden by various subclasses"""
+    def setUp(self):
+        """setUp is executed at object creation time."""
+        pass
+
+    def initialize(self):
+        """initialize is executed at object creation time, after setUp(),
+        and generally everywhere the state has to be reset.
+        To be overridden by various subclasses"""
         pass
 
     def _getHeaderLength(self, minHeaderLen = 2):
@@ -852,16 +996,14 @@ class PGP_BasePacket(object):
             # 5-byte body length length, first byte is 255
             stream.write(chr(255))
             blen = self.bodyLength & 0xffffffff
-            for i in range(1, 5):
-                stream.write(chr((blen >> ((4 - i) << 3)) & 0xff))
+            self._writeBin(stream, len4ToBytes(blen))
             return
         if self.headerLength == 3:
             # 2-byte body length length
             if not (192 <= self.bodyLength < 8384):
                 raise InvalidPacketError("Invalid body length %s for "
                     "header length %s" % (self.bodyLength, self.headerLength))
-            stream.write(chr(((self.bodyLength - 192) >> 8) + 192))
-            stream.write(chr((self.bodyLength - 192) & 0xff))
+            self._writeBin(stream, len2ToBytes(self.bodyLength))
             return 
         if self.headerLength == 2:
             # 1-byte body length length
@@ -900,7 +1042,6 @@ class PGP_BasePacket(object):
 
     def writeBody(self, stream):
         self.resetBody()
-        self._bodyStream.seek(0)
         self._copyStream(self._bodyStream, stream)
 
     def write(self, stream):
@@ -918,7 +1059,7 @@ class PGP_BasePacket(object):
 
     def readBody(self, bytes = -1):
         """Read bytes from stream"""
-        return self._bodyStream.read(bytes = bytes)
+        return self._bodyStream.read(bytes)
 
     def seek(self, pos, whence = SEEK_SET):
         return self._bodyStream.seek(pos, whence)
@@ -972,9 +1113,21 @@ class PGP_BasePacket(object):
 
     @staticmethod
     def checkStreamLength(stream, length):
-        """Checks that the stream has exactly the length specified"""
+        """Checks that the stream has exactly the length specified extra
+        bytes from the current position"""
         pos = stream.tell()
         stream.seek(0, SEEK_END)
+        if length != stream.tell() - pos:
+            raise ShortReadError(length, stream.tell() - pos)
+        # SeekableNestedFiles will happily pass the previous test, so be more
+        # devious: seek to the (end - 1), try to read one byte
+        # Determining the actual length is hard, but worth it
+        i = stream.tell() - 1
+        while i > pos:
+            stream.seek(i, SEEK_SET)
+            if len(stream.read(1)) == 1:
+                break
+            i -= 1
         if length != stream.tell() - pos:
             raise ShortReadError(length, stream.tell() - pos)
         # Rewind
@@ -1057,26 +1210,46 @@ class PGP_BaseKeySig(PGP_BasePacket):
         numMPI = self._getMPICount(algType)
         return self._readCountMPIs(stream, numMPI, discard = discard)
 
-    def _readCountMPIs(self, stream, count, discard = True):
-        """Read count MPs from the current position in stream.
+    @staticmethod
+    def _readCountMPIs(stream, count, discard = True):
+        """Read count MPIs from the current position in stream.
         @raise UnsupportedEncryptionAlgorithm
         """
 
         ret = []
         for i in range(count):
-            buf = self._readBin(stream, 2)
-            mLen = (int2bytes(*buf) + 7) // 8
+            buf = PGP_BaseKeySig._readBin(stream, 2)
+            mLen = (int2FromBytes(*buf) + 7) // 8
             if discard:
                 # Skip the MPI len
-                self._readExact(stream, mLen)
+                PGP_BaseKeySig._readExact(stream, mLen)
                 ret.append(None)
             else:
-                data = self._readBin(stream, mLen)
+                data = PGP_BaseKeySig._readBin(stream, mLen)
                 r = 0L
                 for i in data:
                     r = r * 256 + i
                 ret.append(r)
         return ret
+
+    @staticmethod
+    def _writeMPI(stream, mpi):
+        bytes = []
+        while mpi != 0:
+            bytes.append(mpi & 0xFF)
+            mpi >>= 8
+
+        # Compute length in bits
+        if not bytes:
+            # Zero length
+            bitlen = 0
+        else:
+            # The only variable part can be the one in the most significant
+            # octet, which is the last
+            bitlen = 8 * (len(bytes) - 1) + num_bitLen(bytes[-1])
+        PGP_BaseKeySig._writeBin(stream, int2ToBytes(bitlen))
+        PGP_BaseKeySig._writeBin(stream, reversed(bytes))
+
 
     def skipMPIs(self, stream, algType):
         self._readMPIs(stream, algType, discard = True)
@@ -1087,19 +1260,31 @@ class PGP_BaseKeySig(PGP_BasePacket):
 class PGP_Signature(PGP_BaseKeySig):
     __slots__ = ['version', 'sigType', 'pubKeyAlg', 'hashAlg', 'hashSig',
                  'mpiFile', 'signerKeyId', 'hashedFile', 'unhashedFile',
-                 '_parsed']
+                 'creation', '_parsed', '_sigDigest', '_parentPacket',
+                 '_hashedSubPackets', '_unhashedSubPackets']
     tag = PKT_SIG
 
-    def validate(self):
+    _parentPacketTypes = set(PKT_ALL_KEYS).union(PKT_ALL_USER)
+
+    def initialize(self):
         self.version = self.sigType = self.pubKeyAlg = self.hashAlg = None
         self.hashSig = self.mpiFile = self.signerKeyId = None
         self.hashedFile = self.unhashedFile = None
+        self.creation = None
         self._parsed = False
+        self._sigDigest = None
+        self._hashedSubPackets = None
+        self._unhashedSubPackets = None
 
-    def parse(self):
+    def parse(self, force = False):
         """Parse the signature body and initializes the internal data
         structures for other operations"""
+        if self._parsed and not force:
+            return
         self.resetBody()
+        # Reset all internal state
+        self.initialize()
+
         sigVersion, = self.readBin(1)
         if sigVersion not in [3, 4]:
             raise InvalidBodyError("Invalid signature version %s" % sigVersion)
@@ -1123,8 +1308,7 @@ class PGP_Signature(PGP_BaseKeySig):
         return numMPI
 
     def parseMPIs(self):
-        if not self._parsed:
-            self.parse()
+        self.parse()
         assert hasattr(self, 'mpiFile') and self.mpiFile is not None
         self.mpiFile.seek(0)
         return self.readMPIs(self.mpiFile, self.pubKeyAlg)
@@ -1135,14 +1319,15 @@ class PGP_Signature(PGP_BaseKeySig):
             raise PGPError('Expected 5 octets of length of hashed material, '
                            'got %d' % hLen)
 
-        creation = self.readBin(4)
+        self.creation = self.readBin(4)
         self.signerKeyId = self.readBin(8)
-        pkAlg, hashAlg, sig0, sig1 = self.readBin(4)
+        pkAlg, hashAlg = self.readBin(2)
+        hashSig = self.readExact(2)
 
         self.sigType = sigType
         self.pubKeyAlg = pkAlg
         self.hashAlg = hashAlg
-        self.hashSig = (sig0, sig1)
+        self.hashSig = hashSig
 
     def _readSigV4(self):
         sigType, pkAlg, hashAlg = self.readBin(3)
@@ -1163,7 +1348,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self.seek(uSubPktLen, SEEK_CUR)
 
         # Two-octet field holding left 16 bits of signed hash value.
-        hashSig = self.readBin(2)
+        hashSig = self.readExact(2)
 
         # MPI data
         mpiFile = util.SeekableNestedFile(self._bodyStream,
@@ -1177,20 +1362,90 @@ class PGP_Signature(PGP_BaseKeySig):
         self.hashedFile = hSubpktsFile
         self.unhashedFile = uSubpktsFile
 
+    def _writeSigV4(self):
+        self.parse()
+
+        stream = util.ExtendedStringIO()
+        self.hashedFile.seek(0, SEEK_END)
+
+        self.unhashedFile.seek(0, SEEK_END)
+        unhashedLen = self.unhashedFile.tell()
+
+        self._writeBin(stream, [4, self.sigType, self.pubKeyAlg, self.hashAlg])
+
+        for sstream in [ self.hashedFile, self.unhashedFile ]:
+            # Determine length
+            sstream.seek(0, SEEK_END)
+            slen = sstream.tell()
+            # subpackets data length
+            self._writeBin(stream, int2ToBytes(slen))
+            # And the stream itself
+            sstream.seek(0)
+            self._copyStream(sstream, stream)
+
+        # 2-octet hash sig
+        stream.write(self.hashSig)
+
+        # MPI file
+        self.mpiFile.seek(0)
+        self._copyStream(self.mpiFile, stream)
+        return stream
+
+    def getCreation(self):
+        """Return the signature creation timestamp, or 0 if no creation time
+        is available"""
+        if self.creation is not None:
+            return self.creation
+        pkts = [ x[1] for x in self.decodeHashedSubpackets()
+                 if x[0] == SIG_SUBPKT_CREATION ]
+        if not pkts:
+            self.creation = 0
+            return self.creation
+
+        pkts[0].seek(0, SEEK_SET)
+        self.creation = int4FromBytes(*self._readBin(pkts[0], 4))
+        return self.creation
+
+    def getExpiration(self):
+        """Return the expiration offset, or None if the signature does not
+        expire"""
+        pkts = [ x[1] for x in self.decodeHashedSubpackets()
+                 if x[0] == SIG_SUBPKT_SIG_EXPIRE ]
+        if not pkts:
+            return None
+        pkts[0].seek(0, SEEK_SET)
+        return int4FromBytes(*self._readBin(pkts[0], 4))
+
+    def rewriteBody(self):
+        """Re-writes the body after the signature has been modified"""
+        if not (isinstance(self.unhashedFile, util.ExtendedStringIO) or
+                isinstance(self.hashedFile, util.ExtendedStringIO)):
+            # Not changed
+            return
+
+        # Re-write ourselves
+        bodyStream = self._writeSigV4()
+        ns, nsp = self._nextStream, self._nextStreamPos
+        parentPkt = self._parentPacket
+        self.__init__(bodyStream, newStyle = self._newStyle)
+        self.setNextStream(ns, nsp)
+        self.setParentPacket(parentPkt)
+        self.initialize()
+
     def getSigId(self):
         """Get the key ID of the issuer for this signature.
         Return None if the packet did not contain an issuer key ID"""
-        if not self._parsed:
-            self.parse()
+        self.parse()
         if self.version == 3:
             assert self.signerKeyId is not None
             return binSeqToString(self.signerKeyId)
         # Version 3 packets should have already set signerKeyId
         assert self.version == 4
-        for spktType, dataf in self.decodeSigSubpackets(self.unhashedFile):
+        for spktType, dataf in self.decodeUnhashedSubpackets():
             if spktType != SIG_SUBPKT_ISSUER_KEYID:
                 continue
             # Verify it only contains 8 bytes
+            dataf.seek(0, SEEK_SET)
             try:
                 self.checkStreamLength(dataf, 8)
             except ShortReadError, e:
@@ -1199,52 +1454,162 @@ class PGP_Signature(PGP_BaseKeySig):
             self.signerKeyId = self._readBin(dataf, 8)
             return binSeqToString(self.signerKeyId)
 
-    def decodeSigSubpackets(self, fobj):
+    def decodeHashedSubpackets(self):
+        self.parse()
+        if self._hashedSubPackets is None:
+            self._hashedSubPackets = list(self._decodeSigSubpackets(self.hashedFile))
+        return self._hashedSubPackets
+
+    def decodeUnhashedSubpackets(self):
+        self.parse()
+        if self._unhashedSubPackets is None:
+            self._unhashedSubPackets = list(self._decodeSigSubpackets(self.unhashedFile))
+        return self._unhashedSubPackets
+
+    @staticmethod
+    def _decodeSigSubpackets(fobj):
+        fobj.seek(0, SEEK_END)
+        ocount = fobj.tell()
         fobj.seek(0)
-        while fobj.size != fobj.tell():
-            yield self._getNextSubpacket(fobj)
+        while fobj.tell() < ocount:
+            yield PGP_Signature._getNextSubpacket(fobj)
 
-    def _getNextSubpacket(self, fobj):
-        len0, = self._readBin(fobj, 1)
+    @staticmethod
+    def _getNextSubpacket(fobj):
+        len0, = PGP_BaseKeySig._readBin(fobj, 1)
 
-        # Sect 5.2.3.1 of RFC2440 implies there should be a 2-octet scalar
-        # count of the length of the set of subpackets, but I can't seem to
-        # find it here.
-
-        if len0 & 0xC0 == 0:
+        if len0 < 0xC0:
             pktlenlen = 1
             pktlen = len0
         elif len0 == 0xFF:
             pktlenlen = 5
-            data = self._readBin(fobj, 4)
+            data = PGP_BaseKeySig._readBin(fobj, 4)
             pktlen = len4bytes(*data)
         else:
             pktlenlen = 2
-            len1, = self._readBin(fobj, 1)
+            len1, = PGP_BaseKeySig._readBin(fobj, 1)
             pktlen = len2bytes(len0, len1)
 
-        spktType, = self._readBin(fobj, 1)
+        spktType, = PGP_BaseKeySig._readBin(fobj, 1)
 
         # The packet length includes the subpacket type
         dataf = util.SeekableNestedFile(fobj, pktlen - 1)
         # Do we have enough data?
-        dataf.seek(0, SEEK_END)
-        if dataf.tell() != pktlen - 1:
-            raise ShortReadError(pktlen + pktlenlen, dataf.tell())
+        try:
+            PGP_Signature.checkStreamLength(dataf, pktlen - 1)
+        except ShortReadError, e:
+            raise ShortReadError(pktlen + pktlenlen, e.actual + pktlenlen + 1)
         dataf.seek(0, SEEK_SET)
 
         # Skip the data
         fobj.seek(pktlen - 1, SEEK_CUR)
         return spktType, dataf
 
-    def _finalizeSelfSig(self, dataFile, mainKey):
-        """Append more data to dataFile and compute the self signature"""
-        if not self._parsed:
-            self.parse()
+    def _writeSigPacketsToStream(self):
+        self.parse()
+        sio = util.ExtendedStringIO()
+        parentPacket = self.getParentPacket()
+        # XXX we could probably rewrite this if/then/else
+        if isinstance(parentPacket, PGP_MainKey):
+            parentPacket.toPublicKey(minHeaderLen = 3).write(sio)
+        elif isinstance(parentPacket, (PGP_SubKey, PGP_UserID)):
+            pkpkt = parentPacket.getParentPacket().toPublicKey(minHeaderLen = 3)
+            pkpkt.write(sio)
+            if isinstance(parentPacket, PGP_UserID):
+                parentPacket.writeHash(sio)
+            else:
+                parentPacket.toPublicKey(minHeaderLen = 3).write(sio)
+        else:
+            raise InvalidPacketError("Unexpected parent", self._parentPacket)
+        return sio
+
+    def resetSignatureHash(self):
+        self._sigDigest = None
+
+    def getSignatureHash(self):
+        """Compute the signature digest"""
+        if self._sigDigest is not None:
+            return self._sigDigest
+
+        sio = self._writeSigPacketsToStream()
+
+        self._sigDigest = self._computeSignatureHash(sio)
+        return self._sigDigest
+
+    def getShortSigHash(self):
+        """Return the 16-leftmost bits for the signature hash"""
+        self.parse()
+        return self.hashSig
+
+    def setShortSigHash(self, val):
+        """Set the 16-leftmost bits"""
+        assert(len(val) == 2)
+        self.hashSig = val
+
+    def merge(self, other):
+        """Merge this signature with the other signature.
+        Returns True if it modified the current packet"""
+        assert self.tag == other.tag
+        # The signed part of the signature is immutable, there is no way we
+        # can merge it. The only things we might be able to merge are the
+        # unhashed signature subpackets
+        # However, gpg does not do that, so we will not do that either
+        if self.hashSig != other.hashSig:
+            raise MergeError("Signature packets with different hash")
+        if self.getSignatureHash() != other.getSignatureHash():
+            raise MergeError("Signature packets with different hash")
+        # Not much more to do here
+        return False
+
+    def _prepareSubpackets(self):
+        # XXX this is most likely going to change
+        if self._unhashedSubPackets is not None:
+            stream = util.ExtendedStringIO()
+            for spktType, spktStream in self._unhashedSubPackets:
+                self._writeSubpacket(stream, spktType, spktStream)
+            self.unhashedFile = stream
+        if self._hashedSubPackets is not None:
+            stream = util.ExtendedStringIO()
+            for spktType, spktStream in self._hashedSubPackets:
+                self._writeSubpacket(stream, spktType, spktStream)
+            self.hashedFile = stream
+        self._parsed = True
+
+    @staticmethod
+    def _writeSubpacket(stream, spktType, spktStream):
+        """Write the subpacket into the stream"""
+        # First, determine the subpacket length
+        spktStream.seek(0, SEEK_END)
+        spktLen = spktStream.tell()
+        spktStream.seek(0, SEEK_SET)
+
+        # The subpacket length includes the type octet
+        spktLen += 1
+
+        header = []
+        if spktLen < 192:
+            # 1-octet length
+            header.append(spktLen)
+        elif spktLen < 16320:
+            # 2-octet length
+            header.extend(len2ToBytes(spktLen))
+        else:
+            # 5-octet length
+            header.append(255)
+            header.extend(len4ToBytes(spktLen))
+        for d in header:
+            stream.write(chr(d))
+        # Type
+        stream.write(chr(spktType))
+        PGP_Signature._copyStream(spktStream, stream)
+
+    def _computeSignatureHash(self, dataFile):
+        """Compute the signature digest for this signature, using the
+        key serialized in dataFile"""
+        self.parse()
         if self.version != 4:
             raise InvalidKey("Self signature is not a V4 signature")
         dataFile.seek(0, SEEK_END)
-        digSig = self.parseMPIs()
 
         # (re)compute the hashed packet subpacket data length
         self.hashedFile.seek(0, SEEK_END)
@@ -1255,7 +1620,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self._writeBin(dataFile, [ self.version, self.sigType, self.pubKeyAlg,
                                    self.hashAlg ])
         # Write hashed data length
-        self._writeBin(dataFile, [ hSubPktLen // 256, hSubPktLen % 256 ])
+        self._writeBin(dataFile, int2ToBytes(hSubPktLen))
         # Write the hashed data
         self._copyStream(self.hashedFile, dataFile)
 
@@ -1273,7 +1638,18 @@ class PGP_Signature(PGP_BaseKeySig):
         # Rewind dataFile, we need to hash it
         dataFile.seek(0, SEEK_SET)
         self._updateHash(hashObj, dataFile)
-        sigString = hashObj.digest()
+        sigDigest = hashObj.digest()
+        return sigDigest
+
+    def _finalizeSignature(self, mainKey, keyId):
+        """Compute the signature digest and pad it properly"""
+
+        # Compute the signature digest
+        sigString = self.getSignatureHash()
+        # Validate it against the short digest
+        if sigString[:2] != self.hashSig:
+            raise BadSelfSignature(keyId)
+
         # if this is an RSA signature, it needs to properly padded
         # RFC 2440 5.2.2 and RFC 2313 10.1.2
 
@@ -1283,23 +1659,77 @@ class PGP_Signature(PGP_BaseKeySig):
             padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[self.hashAlg]))) // 2 -1
             sigString = chr(1) + chr(0xFF) * padLen + hashPads[self.hashAlg] + sigString
 
-        if not mainKey.verify(sigString, digSig):
-            raise BadSelfSignature(None)
+        return sigString
 
+    def verify(self, mainKey, keyId):
+        """Compute the signature digest, pad it properly and verify the
+        self signature"""
+
+        sigString = self._finalizeSignature(mainKey, keyId)
+
+        digSig = self.parseMPIs()
+        if not mainKey.verify(sigString, digSig):
+            raise BadSelfSignature(keyId)
+
+    def initSubPackets(self):
+        self._hashedSubPackets = []
+        self._unhashedSubPackets = []
+
+    # Handling signature generation
+    def addTrust(self, level, amount, regexLimit = None):
+        """Mark this signature packet as being a trust signature"""
+        stream = util.ExtendedStringIO()
+        stream.write(chr(level))
+        stream.write(chr(amount))
+        self._hashedSubPackets.append((SIG_SUBPKT_TRUST, stream))
+        if regexLimit:
+            stream = util.ExtendedStringIO()
+            stream.write(regexLimit)
+            stream.write('\x00')
+            # Mark this packet as critical
+            self._hashedSubPackets.append((0x80 | SIG_SUBPKT_REGEX, stream))
+
+    def addIssuerKeyId(self, keyId):
+        stream = util.ExtendedStringIO()
+        stream.write(fingerprintToInternalKeyId(keyId))
+
+        # The key ID is part of the unhashed data
+        self._unhashedSubPackets.append((SIG_SUBPKT_ISSUER_KEYID, stream))
+
+    def addCreation(self, timestamp = None):
+        """Add a creation timestamp sub-packet"""
+        if timestamp is None:
+            timestamp = time.time()
+        self._hashedSubPackets.append((SIG_SUBPKT_CREATION,
+                                       self._addInt4(timestamp)))
+
+    def addExpiration(self, seconds):
+        """Add an expiration sub-packet"""
+        self._hashedSubPackets.append((SIG_SUBPKT_SIG_EXPIRE,
+                                       self._addInt4(seconds)))
+
+    def _addInt4(self, int4):
+        int4 = int(int4)
+        stream = util.ExtendedStringIO()
+        self._writeBin(stream, int4ToBytes(int4))
+        return stream
 
 PacketTypeDispatcher.addPacketType(PGP_Signature)
 
 class PGP_UserID(PGP_BasePacket):
-    __slots__ = ['id', 'signatures']
+    __slots__ = ['id', 'signatures', '_parentPacket']
     tag = PKT_USERID
+
+    _parentPacketTypes = set(PKT_MAIN_KEYS)
 
     # Constant used for signing. See #5.2.4
     signingConstant = 0xB4
-    def validate(self):
+    def initialize(self):
         self.resetBody()
         self.parseBody()
         # Signatures for this user ID
         self.signatures = None
+        self._parentPacket = None
 
     def parseBody(self):
         # A user ID's data is just the user ID
@@ -1314,13 +1744,26 @@ class PGP_UserID(PGP_BasePacket):
             self.signatures = []
         for sig in signatures:
             assert isinstance(sig, PGP_Signature)
+            # No circular reference here, setParentPacket does a clone
+            sig.setParentPacket(self)
             self.signatures.append(sig)
+
+    def adoptSignature(self, sig):
+        """Adopt the signature, if it's not ours already"""
+        pp = sig.getParentPacket()
+        if isinstance(pp, self.__class__) and self.id == pp.id:
+            return
+
+        sig.resetSignatureHash()
+        sig.setParentPacket(self)
 
     def iterSignatures(self):
         """Iterate over this user's UserID"""
         if self.signatures is not None:
             return iter(self.signatures)
         raise PGPError("Key packet not parsed")
+
+    iterSubPackets = iterSignatures
 
     def iterKeySignatures(self, keyId):
         intKeyId = fingerprintToInternalKeyId(keyId)
@@ -1337,6 +1780,58 @@ class PGP_UserID(PGP_BasePacket):
         stream.write(struct.pack("!I", self.bodyLength))
         self.writeBody(stream)
 
+    def merge(self, other):
+        """Merges this UserID packet to the other one.
+        Returns True if it changed the current packet"""
+        assert self.tag == other.tag
+
+        if self.id != other.id:
+            raise MergeError("User packets with different identifier")
+
+        finalsigs = _mergeSignatures(self.iterSignatures(),
+                                     other.iterSignatures())
+        if self.signatures == finalsigs:
+            return False
+        self.signatures = finalsigs
+        return True
+
+    def getExpiration(self):
+        """Return the key expiration offset, or None if the key does not
+        expire.
+        If the key is revoked, -1 is returned"""
+        # Iterate over all self signatures
+        key = self.getParentPacket()
+        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyId()) ]
+        if not selfSigs:
+            raise PGPError("User packet with no self signature")
+        revocs = []
+        certs = []
+        for sig in selfSigs:
+            sig.parse()
+            if sig.sigType == SIG_TYPE_CERT_REVOC:
+                revocs.append(sig)
+            elif sig.sigType in SIG_CERTS:
+                certs.append(sig)
+        # If we have a revocation, return a negative
+        if revocs:
+            return -1
+
+        # Sort signatures by creation time, and reverse them
+        certs.sort(key = lambda x: x.getCreation(), reverse = True)
+
+        # Walk the signatures, grab the first one that has a key expiration in
+        # it
+        for sig in certs:
+            exps = [ x[1] for x in sig.decodeHashedSubpackets()
+                     if x[0] == SIG_SUBPKT_KEY_EXPIRE ]
+            if not exps:
+                continue
+            expstr = exps[0]
+            expstr.seek(0, SEEK_SET)
+            return int4FromBytes(*self._readBin(expstr, 4))
+        # No expiration
+        return None
+
 PacketTypeDispatcher.addPacketType(PGP_UserID)
 
 class PGP_UserAttribute(PGP_UserID):
@@ -1346,7 +1841,11 @@ class PGP_UserAttribute(PGP_UserID):
     signingConstant = 0xD1
 
     def parseBody(self):
-        self.id = '[image]'
+        # Digest the packet
+        m = sha.new()
+        self._updateHash(m, self.getBodyStream())
+
+        self.id = '[image, digest = %s]' % m.hexdigest().upper()
 
 PacketTypeDispatcher.addPacketType(PGP_UserAttribute)
 
@@ -1356,7 +1855,7 @@ class PGP_Key(PGP_BaseKeySig):
     # Base class for public/secret keys/subkeys
     tag = None
 
-    def validate(self):
+    def initialize(self):
         self.version = self.createdTimestamp = self.pubKeyAlg = None
         self.mpiFile = self.mpiLen = None
         self.daysValid = None
@@ -1364,10 +1863,15 @@ class PGP_Key(PGP_BaseKeySig):
         self._keyId = None
         self._parsed = False
 
-    def parse(self):
+    def parse(self, force = False):
         """Parse the signature body and initializes the internal data
         structures for other operations"""
+        if self._parsed and not force:
+            return
+
         self.resetBody()
+        # Reset all internal state
+        self.initialize()
         keyVersion, = self.readBin(1)
         if keyVersion not in [3, 4]:
             raise InvalidBodyError("Invalid key version %s" % keyVersion)
@@ -1386,7 +1890,7 @@ class PGP_Key(PGP_BaseKeySig):
 
         ## daysValid
         data = self.readBin(2)
-        self.daysValid = int2bytes(*data)
+        self.daysValid = int2FromBytes(*data)
 
         ## Public key algorithm
         self.pubKeyAlg, = self.readBin(1)
@@ -1425,7 +1929,7 @@ class PGP_Key(PGP_BaseKeySig):
             self._readCountMPIs(self.mpiFile, 1, discard = True)
             pos = self.mpiFile.tell()
             octets = self.mpiFile.pread(8, pos - 8)
-            self._keyId = "".join("%02x" % ord(x) for x in octets).upper()
+            self._keyId = stringToAscii(octets)
             return self._keyId
 
         # Convert to public key
@@ -1464,6 +1968,10 @@ class PGP_Key(PGP_BaseKeySig):
         self._keyId = m.hexdigest().upper()
         return self._keyId
 
+    def getCreatedTimestamp(self):
+        self.parse()
+        return self.createdTimestamp
+
     def getEndOfLife(self):
         """Parse self signatures to find timestamp(s) of key expiration.
         Also seek out any revocation timestamps.
@@ -1484,7 +1992,7 @@ class PGP_Key(PGP_BaseKeySig):
         for pkt in self.iterAllSelfSignatures():
             if pkt.sigType in SIG_CERTS:
                 eTimestamp = cTimestamp = 0
-                for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                for spktType, dataf in pkt.decodeHashedSubpackets():
                     if spktType == SIG_SUBPKT_KEY_EXPIRE:
                         eTimestamp = self.readTimestamp(dataf)
                     elif spktType == SIG_SUBPKT_CREATION:
@@ -1498,7 +2006,7 @@ class PGP_Key(PGP_BaseKeySig):
             elif pkt.sigType in SIG_KEY_REVOCS:
                 # parse this revocation to look for the creation timestamp
                 # we're ultimately looking for the most stringent revocation
-                for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+                for spktType, dataf in pkt.decodeHashedSubpackets():
                     if spktType == SIG_SUBPKT_CREATION:
                         ts = self.readTimestamp(dataf)
                         if revocTimestamp:
@@ -1526,8 +2034,7 @@ class PGP_Key(PGP_BaseKeySig):
 
     def _iterSelfSignatures(self, keyId):
         """Iterate over all the self-signatures"""
-        if self._parsed is False:
-            self.parse()
+        self.parse()
 
         intKeyId = fingerprintToInternalKeyId(keyId)
         # Look for a self signature
@@ -1555,8 +2062,7 @@ class PGP_Key(PGP_BaseKeySig):
         # first search for the public key algortihm octet. if the key is really
         # old, this might be the only hint that it's legal to use this key to
         # make digital signatures.
-        if self._parsed is False:
-            self.parse()
+        self.parse()
 
         if self.pubKeyAlg in (PK_ALGO_RSA_SIGN_ONLY, PK_ALGO_DSA):
             # the public key algorithm octet satisfies this test. no more
@@ -1573,9 +2079,10 @@ class PGP_Key(PGP_BaseKeySig):
         # Look for a self signature
         for pkt in self.iterAllSelfSignatures():
             # We know it's a ver4 packet, otherwise getSigId would have failed
-            for spktType, dataf in pkt.decodeSigSubpackets(pkt.hashedFile):
+            for spktType, dataf in pkt.decodeHashedSubpackets():
                 if spktType == SIG_SUBPKT_KEY_FLAGS:
                     # RFC 2440, sect. 5.2.3.20
+                    dataf.seek(0, SEEK_SET)
                     foct, = self._readBin(dataf, 1)
                     if foct & 0x02:
                         return True
@@ -1584,8 +2091,7 @@ class PGP_Key(PGP_BaseKeySig):
 
     def getPublicKeyTuple(self):
         """Return the key material"""
-        if not self._parsed:
-            self.parse()
+        self.parse()
         self.mpiFile.seek(0, SEEK_SET)
         return self.readMPIs(self.mpiFile, self.pubKeyAlg)
 
@@ -1600,14 +2106,22 @@ class PGP_Key(PGP_BaseKeySig):
             return DSA.construct((y, g, p, q))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+    def adoptSignature(self, sig):
+        """Adopt the signature, if it's not ours already"""
+        pp = sig.getParentPacket()
+        if isinstance(pp, self.__class__) and pp.getKeyId() == self.getKeyId():
+            return
+
+        sig.resetSignatureHash()
+        sig.setParentPacket(self)
+
 class PGP_MainKey(PGP_Key):
     def initSubPackets(self):
         if hasattr(self, "subkeys"):
             # Already processed
             return
 
-        if not self._parsed:
-            self.parse()
+        self.parse()
 
         self.revsigs = []
         self.uids = []
@@ -1618,6 +2132,7 @@ class PGP_MainKey(PGP_Key):
         # Start reading signatures until we hit a UserID or another key
         limit = set(PKT_SUB_KEYS)
         limit.add(PKT_USERID)
+        limit.add(PKT_USER_ATTRIBUTE)
         i = 0
         for pkt in subpkts:
             if pkt.tag in limit:
@@ -1628,7 +2143,9 @@ class PGP_MainKey(PGP_Key):
                 continue
             pkt.parse()
             if pkt.sigType in (SIG_TYPE_KEY_REVOC, SIG_TYPE_DIRECT_KEY):
-                # Key revocation, or direct key signature
+                # Key revocation
+                # No circular reference here, setParentPacket does a clone
+                pkt.setParentPacket(self)
                 self.revsigs.append(pkt)
                 continue
             # According to sect. 10.1, there should not be other signatures
@@ -1647,6 +2164,8 @@ class PGP_MainKey(PGP_Key):
             # Certification revocations live together with regular signatures
             # or so is the RFC saying
             if isinstance(pkt, PGP_UserID):
+                # No circular reference here, setParentPacket does a clone
+                pkt.setParentPacket(self)
                 self.uids.append(pkt)
                 continue
             if isinstance(pkt, PGP_Signature):
@@ -1662,12 +2181,10 @@ class PGP_MainKey(PGP_Key):
         # Read until the end
         # We don't want to point back to ourselves, or we'll create a
         # circular loop.
-        newMainKey = self.clone()
-        # Don't call initSubPackets on newMainKey here, or you end up with an
-        # infinite loop.
         for pkt in subpkts[uidLimit:]:
             if isinstance(pkt, PGP_SubKey):
-                pkt.mainKey = newMainKey
+                # No circular reference here, setParentPacket does a clone
+                pkt.setParentPacket(self)
                 self.subkeys.append(pkt)
                 continue
             if isinstance(pkt, PGP_Signature):
@@ -1676,10 +2193,10 @@ class PGP_MainKey(PGP_Key):
                 subkey = self.subkeys[-1]
                 pkt.parse()
                 if pkt.sigType == SIG_TYPE_SUBKEY_REVOC:
-                    subkey.bindingSigRevoc = pkt
+                    subkey.setRevocationSig(pkt)
                     continue
                 if pkt.sigType == SIG_TYPE_SUBKEY_BIND:
-                    subkey.bindingSig = pkt
+                    subkey.setBindingSig(pkt)
                     continue
                 # There should not be any other type of signature here
                 assert False, "Unexpected signature type %s" % pkt.sigType
@@ -1724,25 +2241,15 @@ class PGP_MainKey(PGP_Key):
         keyId = pkpkt.getKeyId()
         pgpKey = pkpkt.makePgpKey()
         for sig in self.iterSelfSignatures():
-            sio = util.ExtendedStringIO()
-            pkpkt.write(sio)
-            try:
-                sig._finalizeSelfSig(sio, pgpKey)
-            except BadSelfSignature:
-                raise BadSelfSignature(keyId), None, sys.exc_traceback
+            self.adoptSignature(sig)
+            sig.verify(pgpKey, keyId)
         for uid in self.iterUserIds():
+            verified = False
             for sig in uid.iterKeySignatures(keyId):
-                sio = util.ExtendedStringIO()
-                pkpkt.write(sio)
-                uid.writeHash(sio)
-                try:
-                    sig._finalizeSelfSig(sio, pgpKey)
-                except BadSelfSignature:
-                    raise BadSelfSignature(keyId), None, sys.exc_traceback
-                # Only verify the first sig on the user ID.
-                # XXX Why? No idea yet
-                break
-            else: # for
+                uid.adoptSignature(sig)
+                sig.verify(pgpKey, keyId)
+                verified = True
+            if not verified:
                 # No signature. Not good, according to our standards
                 raise BadSelfSignature(keyId)
 
@@ -1774,8 +2281,8 @@ class PGP_MainKey(PGP_Key):
             # Missing uid
             return False
 
-        thisRevSigs = self._hashSet(x.getBodyStream() for x in self.revsigs)
-        otherRevSigs = self._hashSet(x.getBodyStream() for x in key.revsigs)
+        thisRevSigs = set(x.getSignatureHash() for x in self.revsigs)
+        otherRevSigs = set(x.getSignatureHash() for x in key.revsigs)
         if not thisRevSigs.issuperset(otherRevSigs):
             # Missing revocation signature
             return False
@@ -1787,6 +2294,76 @@ class PGP_MainKey(PGP_Key):
 
     def getUserIds(self):
         return [ pkt.id for pkt in self.iterUserIds() ]
+
+    def merge(self, other):
+        """Merge this key with the other key
+        Return True if the key was modified"""
+        assert self.tag == other.tag
+
+        if self.getKeyId() != other.getKeyId():
+            raise MergeError("Merging keys with a different ID")
+
+        # Both keys must verify their self-signing signatures
+        self.verifySelfSignatures()
+        other.verifySelfSignatures()
+
+        # Merge revocations / direct keys
+        finalsigs = _mergeSignatures(self.iterSignatures(),
+                                     other.iterSignatures())
+        changed = False
+        if self.revsigs != finalsigs:
+            changed = True
+            self.revsigs = finalsigs
+
+        # Now merge user ids
+        changed = self._mergeUserIds(other) or changed
+
+        # And merge subkeys
+        changed = self._mergeSubkeys(other) or changed
+        return changed
+
+    def _mergeUserIds(self, other):
+        luids = {}
+        # Preserve order
+        finaluids = []
+        changed = False
+        for uid in itertools.chain(self.iterUserIds(), other.iterUserIds()):
+            luidlist = luids.setdefault(uid.id, [])
+            # We may have UserID and UserAttribute packets that can collide
+            # (though it's very unlikely)
+            for luid in luidlist:
+                if uid.tag == luid.tag:
+                    changed = luid.merge(uid) or changed
+                    break
+            else: # for
+                luidlist.append(uid)
+                finaluids.append(uid)
+        if self.uids == finaluids and not changed:
+            return False
+        self.uids = finaluids
+        return True
+
+    def _mergeSubkeys(self, other):
+        # Subkeys can only have one revocation (revoking a subkey effectively
+        # invalidates the key)
+        lkids = {}
+        # Preserve order
+        finalkeys = []
+        changed = False
+        for skey in itertools.chain(self.iterSubKeys(), other.iterSubKeys()):
+            # Verify self signatures
+            skey.verifySelfSignatures()
+
+            keyId = skey.getKeyId()
+            if keyId not in lkids:
+                lkids[keyId] = skey
+                finalkeys.append(skey)
+                continue
+            changed = lkids[keyId].merge(skey) or changed
+        if self.subkeys == finalkeys and not changed:
+            return False
+        self.subkeys = finalkeys
+        return True
 
 class PGP_PublicAnyKey(PGP_Key):
     pubTag = None
@@ -1811,14 +2388,14 @@ class PGP_SecretAnyKey(PGP_Key):
                  (AES, 128), (AES, 192), (AES, 256), ]
     _legalCiphers = set([ 2, 3, 4, 7, 8, 9 ])
 
-    def validate(self):
-        PGP_Key.validate(self)
+    def initialize(self):
+        PGP_Key.initialize(self)
         self.s2k = self.symmEncAlg = self.s2kType = None
         self.hashAlg = self.salt = self.count = None
         self.initialVector = self.encMpiFile = None
 
-    def parse(self):
-        PGP_Key.parse(self)
+    def parse(self, force = False):
+        PGP_Key.parse(self, force = force)
 
         # Seek to the end of the MPI file, just to be safe (we should be there
         # already)
@@ -1830,12 +2407,16 @@ class PGP_SecretAnyKey(PGP_Key):
                         ENCRYPTION_TYPE_S2K_SPECIFIED]:
             self.symmEncAlg, self.s2kType, self.hashAlg = self.readBin(3)
             if self.s2kType:
-                if self.s2kType not in (0x01, 0x03):
-                    raise IncompatibleKey('Unknown string-to-key type %s' %
-                                          self.s2kType)
-                self.salt = self.readExact(8)
-                if self.s2kType == 0x03:
-                    self.count, = self.readBin(1)
+                if 100 <= self.s2kType <= 110:
+                    # Private/Experimental s2k
+                    pass
+                else:
+                    if self.s2kType not in (0x01, 0x03):
+                        raise IncompatibleKey('Unknown string-to-key type %s' %
+                                              self.s2kType)
+                    self.salt = self.readExact(8)
+                    if self.s2kType == 0x03:
+                        self.count, = self.readBin(1)
         # The MPIs are most likely encrypted, we'll just have to trust that
         # there are enough of them for now.
         dataLen = self._bodyStream.size - self._bodyStream.tell()
@@ -1851,8 +2432,7 @@ class PGP_SecretAnyKey(PGP_Key):
         raise PGPError("Unsupported public key algorithm %s" % self.pubKeyAlg)
 
     def toPublicKey(self, minHeaderLen = 2):
-        if not self._parsed:
-            self.parse()
+        self.parse()
 
         # Create a nested file starting at the beginning of the body's and
         # with the length equal to the position in the body up to the MPIs
@@ -1862,8 +2442,7 @@ class PGP_SecretAnyKey(PGP_Key):
         return pkt
 
     def decrypt(self, passPhrase):
-        if not self._parsed:
-            self.parse()
+        self.parse()
         self.encMpiFile.seek(0, SEEK_SET)
 
         if self.s2k == ENCRYPTION_TYPE_UNENCRYPTED:
@@ -1938,6 +2517,102 @@ class PGP_SecretAnyKey(PGP_Key):
             return DSA.construct((y, g, p, q, x))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+    def sign(self, packet, passwordCallback, sigType = None, creation = None,
+             expiration = None, trustLevel = None, trustAmount = None,
+             trustRegex = None, **kwargs):
+        """Sign packet (user packet only).
+        If expiration is None, the signature will expire when the key expire,
+        if the key expires, otherwise it does not expire either.
+        To produce a signature that does not expire, regardless of the key's
+        expiration, use -1 for the expiration"""
+
+        # We can only sign user IDs for now
+        assert(isinstance(packet, PGP_UserID))
+        # We need a key linked to this user
+        parentPacket = packet.getParentPacket()
+        assert(isinstance(parentPacket, PGP_MainKey))
+
+        if creation is None:
+            creation = time.time()
+        if (trustLevel is None) ^ (trustAmount is None):
+            raise Exception("both trustLevel and trustAmount should be "
+                            "specified")
+
+        if expiration is None:
+            keyExpiration = packet.getExpiration()
+            if keyExpiration is None:
+                # Key does not expire
+                expiration = -1
+            elif keyExpiration < 0:
+                # Key is revoked
+                raise SignatureError("Signing a revoked key")
+            else:
+                expiration = (parentPacket.getCreatedTimestamp() +
+                              keyExpiration - creation)
+
+        # We may have to change this default
+        if sigType is None:
+            sigType = SIG_TYPE_CERT_0
+
+        # Fetch the crypto key
+        cryptoKey = self.makePgpKey(passPhrase = passwordCallback())
+
+        if isinstance(cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
+            pkAlg = PK_ALGO_DSA
+        elif isinstance(cryptoKey, (RSA.RSAobj_c, RSA.RSAobj)):
+            pkAlg = PK_ALGO_RSA
+        else:
+            # Maybe we need a different exception?
+            raise UnsupportedEncryptionAlgorithm(cryptoKey.__class__.__name__)
+
+        hashAlg = 2 # sha
+
+        # Create signature packet
+        sigp = PGP_Signature(util.ExtendedStringIO())
+        # Link it to this user packet (which should be linked to a key)
+        sigp.setParentPacket(packet)
+
+        sigp.version = 4
+        sigp.sigType = sigType
+        sigp.pubKeyAlg = pkAlg
+        sigp.hashAlg = hashAlg
+
+        sigp.initSubPackets()
+
+        sigp.addCreation(creation)
+
+        if expiration >= 0:
+            sigp.addExpiration(expiration)
+        if trustLevel:
+            sigp.addTrust(trustLevel, trustAmount, trustRegex)
+        sigp.addIssuerKeyId(self.getKeyId())
+
+        # Prepare the subpacket streams
+        sigp._prepareSubpackets()
+
+        # Add the short sig hash (we can compute the real sig hash now)
+        sighash = sigp.getSignatureHash()
+        sigp.setShortSigHash(sighash[:2])
+
+        sigString = sigp._finalizeSignature(cryptoKey, None)
+
+        # Pick a random number that is relatively prime with the crypto key's
+        # q
+        relprime = num_getRelPrime(cryptoKey.q)
+
+        mpis = cryptoKey.sign(sigString, relprime)
+
+        # Write MPIs
+        stream = util.ExtendedStringIO()
+        sigp.mpiFile = stream
+
+        for mpi in mpis:
+            PGP_Signature._writeMPI(stream, mpi)
+
+        sigp.rewriteBody()
+        packet.signatures.append(sigp)
+        return sigp
+
 class PGP_SecretKey(PGP_SecretAnyKey, PGP_MainKey):
     tag = PKT_SECRET_KEY
     pubTag = PKT_PUBLIC_KEY
@@ -1946,18 +2621,30 @@ class PGP_SubKey(PGP_Key):
     # Subkeys are promoted to main keys when converted to public keys
     pubTag = PKT_PUBLIC_KEY
 
-    def validate(self):
-        PGP_Key.validate(self)
-        self.mainKey = None
+    _parentPacketTypes = set(PKT_MAIN_KEYS)
+
+    def setUp(self):
         self.bindingSig = None
-        self.bindingSigRevoc = None
+        self.revocationSig = None
+
+    def setBindingSig(self, sig):
+        self.bindingSig = sig
+        # No circular reference here
+        self.bindingSig.setParentPacket(self)
+        sig.resetSignatureHash()
+
+    def setRevocationSig(self, sig):
+        self.revocationSig = sig
+        # No circular reference here
+        self.revocationSig.setParentPacket(self)
+        sig.resetSignatureHash()
 
     def iterSubPackets(self):
         # Stop at another key
         if self.bindingSig:
             yield self.bindingSig
-        if self.bindingSigRevoc:
-            yield self.bindingSigRevoc
+        if self.revocationSig:
+            yield self.revocationSig
 
     def iterUserIds(self):
         # Subkeys don't have user ids
@@ -1972,11 +2659,11 @@ class PGP_SubKey(PGP_Key):
 
     def getMainKey(self):
         """Return the main key for this subkey"""
-        return self.mainKey
+        return self.getParentPacket()
 
     def verifySelfSignatures(self):
-        # seek the main key associated with this subkey
-        mainKey = self.getMainKey()
+        # Get the main key associated with this subkey
+        mainKey = self.getParentPacket()
         # since this is a subkey, let's go ahead and make sure the
         # main key is valid before we continue
         mainpkpkt, mainPgpKey = mainKey.verifySelfSignatures()
@@ -1984,23 +2671,48 @@ class PGP_SubKey(PGP_Key):
         # Convert this subkey to a public key
         pkpkt = self.toPublicKey(minHeaderLen = 3)
 
-        # Only verify direct signatures
         keyId = pkpkt.getKeyId()
+
+        # We should have a binding signature or a revocation
+        if self.bindingSig is None and self.revocationSig is None:
+            raise BadSelfSignature(keyId)
+
+        # Only verify direct signatures
+        verified = False
         for sig in self.iterSelfSignatures():
-            # There should be exactly one signature, according to
-            # RFC 2440 11.1
-            sio = util.ExtendedStringIO()
-            mainpkpkt.write(sio)
-            pkpkt.write(sio)
-            try:
-                sig._finalizeSelfSig(sio, mainPgpKey)
-            except BadSelfSignature:
-                raise BadSelfSignature(keyId)
-            # Stop after the first sig
-            break
-        else: # for
+            # We verify both the key binding and the revocation, if available
+            # Also make sure we're verifying the right key
+            self.adoptSignature(sig)
+            sig.verify(mainPgpKey, keyId)
+            verified = True
+        if not verified:
             # No signatures on the subkey
             raise BadSelfSignature(keyId)
+
+        if self.bindingSig is None:
+            # No binding sig to further check (must have been revoked)
+            return
+
+        # Iterate over the unhashed packets of the binding signature, there
+        # may be a SIG_TYPE_PRKEY_BIND (0x19) embedded signature. See #12.1
+        # (Enhanced Key Formats) from the draft spec for details
+        embeddedSigs = [ x[1]
+                         for x in self.bindingSig.decodeUnhashedSubpackets()
+                         if x[0] == SIG_SUBPKT_EMBEDDED_SIG ]
+        if not embeddedSigs:
+            return
+        for sigStream in embeddedSigs:
+            sig = PGP_Signature(bodyStream = sigStream)
+            sig.parse()
+            if sig.sigType != SIG_TYPE_PRKEY_BIND:
+                # Non-signing keys can have this packet missing
+                continue
+            intKeyId = fingerprintToInternalKeyId(keyId)
+            if sig.getSigId() != intKeyId:
+                continue
+            self.adoptSignature(sig)
+            # Verify the signature with the subkey's public key
+            sig.verify(self.toPublicKey().makePgpKey(), keyId)
 
     def iterSubKeys(self):
         # Nothing to iterate over, subkeys don't have subkeys
@@ -2010,6 +2722,65 @@ class PGP_SubKey(PGP_Key):
         for pkt in self.iterSubPackets():
             yield pkt
 
+    def merge(self, other):
+        """Merge this subkey with the other key"""
+        assert self.tag == other.tag
+        # Subkeys MUST have a key binding signature (unless it's been revoked,
+        # in which case only the revocation 
+        # They MAY also have an optional revocation.
+        # Revoking a subkey effectively terminates that key. Reconciling
+        # revocation signatures is therefore not a big issue - probably
+        # keeping one of the revocations would be enough -- misa
+        if other.revocationSig is not None:
+            # The other key is revoked.
+            if self.bindingSig is None:
+                if self.revocationSig.getShortSigHash() == \
+                        other.revocationSig.getShortSigHash():
+                    # Same key
+                    return False
+                # Our key verifies, so it must have a revocation (since it
+                # doesn't have a key binding sig)
+                assert(self.revocationSig is not None)
+
+                # we already have a revocation, keep ours
+                return False
+
+            # Prefer our own revocation
+            changed = False
+            if self.revocationSig is None:
+                self.revocationSig = other.revocationSig
+                changed = True
+            if changed:
+                # While we are at it, drop the binding key too, it's not
+                # needed
+                self.bindingSig = None
+                # We modified the key
+                return True
+            return False
+
+        # We verified the other key before we tried to merge, so this should
+        # not be possible
+        assert(other.bindingSig is not None)
+
+        if self.revocationSig is not None:
+            if self.bindingSig is not None:
+                # Drop the binding signature
+                self.bindingSig = None
+                return True
+            # This key is revoked, nothing else to do
+            return False
+
+        # self.revocationSig is None, we verified the key, so we must have a
+        # binding sig.
+        assert(self.bindingSig is not None)
+
+        if self.bindingSig.getSignatureHash() != other.bindingSig.getSignatureHash():
+            # This is very unlikely, since the binding signature is produced
+            # at the time the subkey is created, there should be only one
+            raise MergeError("Different binding signatures")
+
+        # Same binding sig, and no revocation
+        return False
 
 class PGP_PublicSubKey(PGP_SubKey, PGP_PublicAnyKey):
     __slots__ = []
@@ -2059,6 +2830,24 @@ def newKeyFromStream(stream):
     return pkt
 
 
+def _mergeSignatures(*sources):
+    # Merge all signatures from the specified sources
+    lsigs = {}
+    # Preserve order
+    finalsigs = []
+    for sig in itertools.chain(*sources):
+        lsiglist = lsigs.setdefault(sig.getShortSigHash(), [])
+        # Do we already have this sig?
+        for lsig in lsiglist:
+            if sig.getSignatureHash() == lsig.getSignatureHash():
+                lsig.merge(sig)
+                break
+        else: # for
+            # This signature was not found; add it
+            lsiglist.append(sig)
+            finalsigs.append(sig)
+    return finalsigs
+
 def len2bytes(v1, v2):
     """Return the packet body length when represented on 2 bytes"""
     return ((v1 - 192) << 8) + v2 + 192
@@ -2067,8 +2856,48 @@ def len4bytes(v1, v2, v3, v4):
     """Return the packet body length when represented on 4 bytes"""
     return (v1 << 24) | (v2 << 16) | (v3 << 8) | v4
 
-def int2bytes(v1, v2):
+def len2ToBytes(v):
+    return (((v - 192) >> 8) & 0xFF) + 192, (v - 192) & 0xFF
+
+def len4ToBytes(v):
+    return int4ToBytes(v)
+
+def int2FromBytes(v1, v2):
     return (v1 << 8) + v2
 
-def int4bytes(v1, v2, v3, v4):
+def int4FromBytes(v1, v2, v3, v4):
     return len4bytes(v1, v2, v3, v4)
+
+def int2ToBytes(v):
+    return (v >> 8) & 0xFF, v & 0xFF
+
+def int4ToBytes(v):
+    b0, b1 = (v >> 24) & 0xFF, (v >> 16) & 0xFF
+    b2, b3 = (v >> 8) & 0xFF, v & 0xFF
+    return b0, b1, b2, b3
+
+def num_gcd(a, b):
+    while b:
+        a, b = b, a % b
+    return a
+
+def num_bitLen(a):
+    r=0
+    while a:
+        a, r = a/2, r+1
+    return r
+
+def num_getRelPrime(q):
+    # Use os module to ensure reads are unbuffered so as not to
+    # artifically deflate entropy
+    randFD = os.open('/dev/urandom', os.O_RDONLY)
+    b = num_bitLen(q)/8 + 1
+    r = 0L
+    while r < 2:
+        for i in range(b):
+            r = r*256 + ord(os.read(randFD, 1))
+            r %= q
+        while num_gcd(r, q-1) != 1:
+            r = (r+1) % q
+    os.close(randFD)
+    return r

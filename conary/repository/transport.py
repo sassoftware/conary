@@ -353,7 +353,20 @@ class URLOpener(urllib.FancyURLopener):
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
             return InfoURL(fp, headers, selector, protocolVersion)
         else:
+            self.handleProxyErrors(errcode)
             return self.http_error(selector, fp, errcode, errmsg, headers, data)
+
+    def handleProxyErrors(self, errcode):
+        e = None
+        if errcode == 503:
+            # Service unavailable, make it a socket error
+            e = socket.error(111, "Repository service unavailable")
+        elif errcode == 502:
+            # Bad gateway (server responded with some broken answer)
+            e = socket.error(111, "Bad Gateway (repository error reported by proxy)")
+        if e:
+            self._processSocketError(e)
+            raise e
 
     def _processSocketError(self, error):
         if not self.proxyHost:
@@ -449,6 +462,8 @@ class Transport(xmlrpclib.Transport):
         self.responseProtocol = None
         self.usedProxy = False
         self.entitlement = None
+        self.proxyHost = None
+        self.proxyProtocol = None
 
     def setEntitlements(self, entitlementList):
         self.entitlements = entitlementList
@@ -463,9 +478,6 @@ class Transport(xmlrpclib.Transport):
             self.entitlement = " ".join(l)
         else:
             self.entitlement = None
-
-        self.proxyHost = None
-        self.proxyProtocol = None
 
     def getEntitlements(self):
         return self.entitlements

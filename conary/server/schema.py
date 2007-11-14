@@ -944,7 +944,7 @@ def checkVersion(db):
     return version
 
 # run through the schema creation and migration (if required)
-def loadSchema(db, migrate=False):
+def loadSchema(db, doMigrate=False):
     global VERSION
     try:
         version =  checkVersion(db)
@@ -971,7 +971,7 @@ def loadSchema(db, migrate=False):
         this code base. You need to update conary code to a version
         that undersand repo schema %s""" % version, version)
     # now we need to perform a schema migration
-    if version.major < VERSION.major and not migrate:
+    if version.major < VERSION.major and not doMigrate:
         raise sqlerrors.SchemaVersionError("""
         Repository schema needs to have a major schema update performed.
         Please run server.py with --migrate option to perform this upgrade.
@@ -984,7 +984,7 @@ def loadSchema(db, migrate=False):
         supported. Contact rPath for help converting your repository to
         a supported version.""", version)
     # compatible schema versions have the same major
-    if version.major == VERSION.major and not migrate:
+    if version.major == VERSION.major and not doMigrate:
         return version
     # if we reach here, a schema migration is needed/requested
     version = migrate.migrateSchema(db)

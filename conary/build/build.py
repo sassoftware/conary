@@ -448,6 +448,8 @@ class Configure(BuildCommand):
                 'local': False,
                }
 
+    _configLog = "config.log"
+
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword configureName: The name of the configure command. Normally,
@@ -465,6 +467,12 @@ class Configure(BuildCommand):
         """
         BuildCommand.__init__(self, recipe, *args, **keywords)
 
+    def _setupMacros(self, macros):
+        if self.objDir:
+            macros.configure = '../%s' % self.configureName
+        else:
+            macros.configure = './%s' % self.configureName
+
     def do(self, macros):
         macros = macros.copy(False)
         if self.local:
@@ -478,14 +486,14 @@ class Configure(BuildCommand):
             return
 
         if self.objDir:
-	    objDir = self.objDir %macros
+            objDir = self.objDir %macros
             macros.mkObjdir = 'mkdir -p \'%s\'; cd \'%s\';' %(objDir, objDir)
             macros.cdObjdir = 'cd \'%s\';' %objDir
-	    macros.configure = '../%s' % self.configureName
         else:
             macros.mkObjdir = ''
             macros.cdObjdir = ''
-            macros.configure = './%s' % self.configureName
+
+        self._setupMacros(macros)
 
         if self.local:
             oldPath = os.environ['PATH']
@@ -508,14 +516,143 @@ class Configure(BuildCommand):
                     # inspecting the build directory
                     # Each file line will have the filename prepended
                     # The "|| :" makes it OK if there is no config.log
-                    util.execute('cd \'%(actionDir)s\'; %(cdObjdir)s'
-                                 'find . -name config.log | xargs grep -H . || :'
+                    util.execute(('cd \'%(actionDir)s\'; %(cdObjdir)s'
+                                  'find . -name ' + self._configLog + 
+                                  ' | xargs grep -H . || :')
                                  %macros)
                 raise
         finally:
             if self.local:
                 os.environ['PATH'] = oldPath
                 os.environ['CONFIG_SITE'] = oldSite
+
+class CMake(Configure):
+    """
+    NAME
+    ====
+
+    B{C{r.CMake()}} - Runs cmake configure script
+
+    SYNOPSIS
+    ========
+
+    C{r.CMake(I{extra args}, [I{objDir},] [I{preCMake},] [I{skipMissingDir},] [I{dir}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.CMake()} class is called from within a Conary recipe to run an
+    cmake configure script, giving it the default paths as defined by the
+    macro set: C{r.CMake(extra args)}.
+
+    KEYWORDS
+    ========
+
+    The C{r.CMake()} class accepts the following keywords, with default
+    values shown in parentheses when applicable:
+
+    B{objDir} : (None) Make an object directory before running C{cmake}.
+    This is used for out of source build (srcdir != objdir). It can contain
+    macro references.
+
+    B{preCMake} : (None) Extra shell script which is inserted in front of
+    the C{cmake} command.
+
+    B{skipMissingDir} : (False) Raise an error if C{dir} does not exist,
+    (by default) and if set to C{True} skip the action when C{dir} does not
+    exist.
+
+    B{dir} : (None) Directory in which to run C{cmake}
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
+    EXAMPLES
+    ========
+
+    C{r.CMake('-DUSE_KDE3=NO')}
+
+    Demonstrates calling C{r.CMake()} and specifying C{NO} value for
+    C{USE_KDE3} variable.
+    """
+    # note that template is NOT a tuple, () is used merely to group strings
+    # to avoid trailing \ characters on every line
+    template = (
+        'cd %%(actionDir)s; '
+        '%%(mkObjdir)s '
+        ' CC=%%(cc)s CXX=%%(cxx)s'
+        ' %(preCMake)s cmake'
+        ' -DCMAKE_C_FLAGS:STRING="%%(cflags)s"'
+        ' -DCMAKE_CXX_FLAGS:STRING="%%(cflags)s %%(cxxflags)s"'
+        ' -DCMAKE_EXE_LINKER_FLAGS:STRING="%%(ldflags)s"'
+        ' -DCMAKE_MODULE_LINKER_FLAGS:STRING="%%(ldflags)s"'
+        ' -DCMAKE_SHARED_LINKER_FLAGS:STRING="%%(ldflags)s"'
+        ' -DCMAKE_INSTALL_PREFIX:PATH="%%(prefix)s"'
+        ' %(args)s'
+        ' %%(actionDir)s')
+    keywords = {
+        'preCMake': '',
+        'objDir': '',
+        'dir': '',
+        'subDir': '',
+        'skipMissingDir': False,
+        'skipMissingSubDir': False }
+
+    _configLog = 'CMakeCache.txt'
+
+    def __init__(self, recipe, *args, **keywords):
+        """
+        @keyword objDir: Make an object directory before running C{cmake}.
+            This is useful for applications which do not support running
+            cmake from the same directory as the sources
+            (srcdir != objdir). It can contain macro references.
+        @keyword preCMake: Extra shell script which is inserted in front
+            of the C{cmake} command.
+        @keyword skipMissingDir: Raise an error if C{dir} does not
+            exist, (by default) and if set to C{True} skip the action when
+            C{dir} does not exist.
+        @keyword dir: Directory in which to run C{cmake}
+        """
+        BuildCommand.__init__(self, recipe, *args, **keywords)
+
+    def _setupMacros(self, macros):
+        pass
+
+    def do(self, macros):
+        macros = macros.copy()
+        macros.actionDir = action._expandOnePath(self.dir, macros,
+             macros.builddir, error=not self.skipMissingDir)
+        if not os.path.exists(macros.actionDir):
+            assert(self.skipMissingDir)
+            return
+
+        macros.cdObjdir = ''
+        macros.mkObjdir = ''
+        if self.objDir:
+            objDir = self.objDir %macros
+            macros.cdObjdir = 'cd %s;' %objDir
+            macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
+
+        try:
+            util.execute(self.command %macros)
+        except RuntimeError, info:
+            if not self.recipe.isatty():
+                # When conary is being scripted, logs might be
+                # redirected to a file, and it might be easier to
+                # see config.log output in that logfile than by
+                # inspecting the build directory
+                # Each file line will have the filename prepended
+                # The "|| :" makes it OK if there is no config.log
+                util.execute('cd %(actionDir)s; %(cdObjdir)s'
+                             'find . -name CMakeCache.txt | xargs grep -H . || :'
+                             %macros)
+            raise
+
 
 class ManualConfigure(Configure):
     """
@@ -1998,6 +2135,7 @@ class Link(_FileAction):
     def do(self, macros):
 	d = macros['destdir']
         self.existingpath = self.existingpath % macros
+        self.basedir = self.basedir % macros
         if self.existingpath and self.existingpath[0] != '/':
             self.init_error(TypeError,
                 'hardlink %s must be located in destdir' %self.existingpath)
@@ -2005,6 +2143,7 @@ class Link(_FileAction):
 	if not os.path.exists(e):
 	    raise TypeError, 'hardlink target %s does not exist' %self.existingpath
 	for name in self.newnames:
+            name = name % macros
 	    newpath = util.joinPaths(self.basedir, name)
 	    n = util.joinPaths(d, newpath)
 	    self.setComponents(d, n)
@@ -2124,9 +2263,9 @@ class Replace(BuildAction):
     Lines may consist of a tuple *(begin, end)* or a single integer *line* or a
     regular expression of lines to match.  Lines are indexed starting with 1.
 
-    Remember that python will interpret C{\1}-C{\7} as octal characters.
-    You must either escape the backslash: C{\\1} or make the string raw by
-    prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
+    Remember that python will interpret C{\\1}-C{\\7} as octal characters.
+    You must either escape the backslash: C{\\\\1} or make the string raw by
+    prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\\1bc'))}
 
     KEYWORDS
     ========
@@ -2571,6 +2710,8 @@ class MakeDirs(_FileAction):
         for path in action._expandPaths(self.paths, macros, braceGlob=False):
             dirs = util.braceExpand(path)
             for d in dirs:
+                if d.endswith('/'):
+                    d = d[:-1]
                 log.info('creating directory %s', d)
 		self.setComponents(macros.destdir, d.replace('%', '%%'))
                 util.mkdirChain(d)

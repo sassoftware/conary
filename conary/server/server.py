@@ -339,19 +339,23 @@ class HttpRequests(SimpleHTTPRequestHandler):
             return
 
         out = open(path, "w")
-        if chunked:
-            while 1:
-                chunk = self.rfile.readline()
-                chunkSize = int(chunk, 16)
-                # chunksize of 0 means we're done
-                if chunkSize == 0:
-                    break
-                util.copyfileobj(self.rfile, out, sizeLimit=chunkSize)
-                # read the \r\n after the chunk we just copied
-                self.rfile.readline()
-        else:
-            util.copyfileobj(self.rfile, out, sizeLimit=contentLength)
+        try:
+            if chunked:
+                while 1:
+                    chunk = self.rfile.readline()
+                    chunkSize = int(chunk, 16)
+                    # chunksize of 0 means we're done
+                    if chunkSize == 0:
+                        break
+                    util.copyfileobj(self.rfile, out, sizeLimit=chunkSize)
+                    # read the \r\n after the chunk we just copied
+                    self.rfile.readline()
+            else:
+                util.copyfileobj(self.rfile, out, sizeLimit=contentLength)
+        finally:
+            out.close()
         self.send_response(200)
+        self.end_headers()
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     publicCalls = set(tuple(NetworkRepositoryServer.publicCalls) + ('reset',))

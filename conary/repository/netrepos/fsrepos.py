@@ -122,7 +122,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)
 
-    def addTrove(self, pkg, hidden = False):
+    def addTrove(self, pkg, hidden = False, oldTroveSpec = None):
 	return self.troveStore.addTrove(pkg, hidden = hidden)
 
     def addTroveDone(self, pkg, mirror=False):
@@ -388,9 +388,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		#newFile = idIdx[(pathId, newFileId)]
 		newFile = files.ThawFile(streams[newFileId], pathId)
 
-		(filecs, contentsHash) = changeset.fileChangeSet(pathId,
-                                                                 oldFile,
-                                                                 newFile)
+                if mirrorMode:
+                    (filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                     None,
+                                                                     newFile)
+                else:
+                    (filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                     oldFile,
+                                                                     newFile)
 
 		cs.addFile(oldFileId, newFileId, filecs)
 

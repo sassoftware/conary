@@ -114,7 +114,9 @@ class ProxyCallFactory:
                      protocolString, headers, cfg, targetServerName,
                      remoteIp, isSecure, baseUrl):
         entitlementList = authToken[2][:]
-        entitlementList += cfg.entitlement.find(targetServerName)
+        injEntList = cfg.entitlement.find(targetServerName)
+        if injEntList:
+            entitlementList += injEntList
 
         userOverride = cfg.user.find(targetServerName)
         if userOverride:
@@ -134,8 +136,12 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
-        transporter = transport.Transport(https = url.startswith('https:'),
-                                          proxies = proxies)
+        # If the proxy injected entitlements or user information, switch to
+        # SSL
+        withSSL = url.startswith('https') or bool(injEntList) or bool(userOverride)
+        transporter = transport.Transport(https = withSSL,
+                                          proxies = proxies,
+                                          serverName = targetServerName)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
 
@@ -761,7 +767,7 @@ class ChangesetFilter(BaseProxy):
 
         # clientVersion >= 50
         return False, (url, (
-                [ (x.size, x.trovesNeeded, x.filesNeeded, x.removedTroves)
+                [ (str(x.size), x.trovesNeeded, x.filesNeeded, x.removedTroves)
                     for x in changeSetList ] ) )
 
 class SimpleRepositoryFilter(ChangesetFilter):

@@ -1149,12 +1149,18 @@ class _RevisionControl(addArchive):
         else:
             self.updateArchive(repositoryDir)
 
+        self.showInfo(repositoryDir)
+
         path = lookaside.createCacheName(self.recipe.cfg, fullPath,
                                          self.recipe.name)
 
         self.createSnapshot(repositoryDir, path)
 
         return path
+
+    def showInfo(self, lookasideDir):
+        # To be implemented in sub-classes
+        pass
 
     def doDownload(self):
         return self.fetch()
@@ -1221,6 +1227,10 @@ class addGitSnapshot(_RevisionControl):
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
         util.execute("cd '%s' && git pull -q %s" % (lookasideDir, self.url))
+
+    def showInfo(self, lookasideDir):
+        log.info('Most recent repository commit message:')
+        util.execute("cd '%s' && git log -1" % lookasideDir)
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
@@ -1298,6 +1308,10 @@ class addMercurialSnapshot(_RevisionControl):
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
         util.execute("cd '%s' && hg -q pull %s" % (lookasideDir, self.url))
+
+    def showInfo(self, lookasideDir):
+        log.info('Most recent repository commit message:')
+        util.execute("cd '%s' && hg log --limit 1" % lookasideDir)
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
@@ -1440,10 +1454,7 @@ class addSvnSnapshot(_RevisionControl):
 
     def getFilename(self):
         urlBits = self.url.split('//', 1)
-        if urlBits[0] == 'file:':
-            dirPath = urlBits[1].replace('/', '_')
-        else:
-            dirPath = urlBits[0].replace('/', '_')
+        dirPath = urlBits[1].replace('/', '_')
 
         # we need to preserve backwards compatibility with conarys (conaries?)
         # prior to 1.2.3, which do not have a revision tag. Without this bit,
@@ -1468,6 +1479,10 @@ class addSvnSnapshot(_RevisionControl):
                   % (self.project,self.revision))
         util.execute('cd \'%s\' && svn --quiet update --revision \'%s\'' 
                       % ( lookasideDir, self.revision ))
+
+    def showInfo(self, lookasideDir):
+        log.info('Most recent repository commit message:')
+        util.execute("svn log --limit 1 '%s'" % lookasideDir)
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s, revision %s' 
@@ -1543,6 +1558,10 @@ class addBzrSnapshot(_RevisionControl):
         log.info('Updating repository %s', self.url)
         util.execute("cd '%s' && bzr pull %s --overwrite %s && bzr update" % \
                 (lookasideDir, self.url, self.tagArg))
+
+    def showInfo(self, lookasideDir):
+        log.info('Most recent repository commit message:')
+        util.execute("bzr log -r -1 --long '%s'" % lookasideDir)
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s %s', self.url,

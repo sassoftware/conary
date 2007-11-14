@@ -277,7 +277,7 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
     for spec in checkoutSpecs:
         spec.conaryState.write(spec.targetDir + "/CONARY")
 
-def commit(repos, cfg, message, callback=None, test=False):
+def commit(repos, cfg, message, callback=None, test=False, force=False):
     if not callback:
         callback = CheckinCallback()
 
@@ -323,10 +323,13 @@ def commit(repos, cfg, message, callback=None, test=False):
     # turn off loadInstalled for committing - it ties you too closely
     # to actually being able to build what you are developing locally - often
     # not the case.
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                     cfg=cfg, repos=repos,
-                                     branch=state.getBranch(),
-                                     ignoreInstalled=True)
+    try:
+        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
+                                         cfg=cfg, repos=repos,
+                                         branch=state.getBranch(),
+                                         ignoreInstalled=True)
+    finally:
+        use.allowUnknownFlags(False)
 
     srcMap = {}
     cwd = os.getcwd()
@@ -372,7 +375,7 @@ def commit(repos, cfg, message, callback=None, test=False):
         log.setVerbosity(log.INFO)
         if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
             if hasattr(recipeObj, 'setup'):
-                cook._callSetup(cfg, recipeObj)
+                cook._callSetup(cfg, recipeObj, recordCalls=False)
             else:
                 log.error('you need a setup method for your recipe')
 
@@ -571,7 +574,7 @@ def commit(repos, cfg, message, callback=None, test=False):
         print
         print '\t%s=%s' % (troveName, newVersion.asString())
         print
-    if conflicts:
+    if not force and conflicts:
         print 'WARNING: performing this commit will switch the active branch:'
         print
         print 'New version %s=%s' % (troveName, newVersion)
@@ -2014,7 +2017,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     log.setVerbosity(log.INFO)
     if not 'abstractBaseClass' in recipeObj.__class__.__dict__ or not recipeObj.abstractBaseClass:
         if hasattr(recipeObj, 'setup'):
-            cook._callSetup(cfg, recipeObj)
+            cook._callSetup(cfg, recipeObj, recordCalls=False)
         else:
             raise errors.CvcError('Recipe requires setup() method')
 
