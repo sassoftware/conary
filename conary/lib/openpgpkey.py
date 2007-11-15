@@ -25,6 +25,7 @@ from conary.lib import graph
 
 from Crypto.PublicKey import DSA
 from openpgpfile import BadPassPhrase
+from openpgpfile import PGP_Signature
 from openpgpfile import getKeyTrust
 from openpgpfile import KeyNotFound
 from openpgpfile import num_getRelPrime
@@ -70,11 +71,12 @@ class OpenPGPKey(object):
             if sigKeyId in sigs:
                 continue
             trustLevel, trustAmount, trustRegex = sig.getTrust()
-            # XXX Using the short sig hash only may not be sufficient - in the
-            # future we may have to use getSignatureHash() to avoid collisions
             sigs[sigKeyId] = OpenPGPKeySignature(
-                    sigId = sig.getShortSigHash(),
+                    sigId = sig.getSignatureHash(),
                     signer = sigKeyId,
+                    signature = sig.parseMPIs(),
+                    pubKeyAlg = sig.pubKeyAlg,
+                    hashAlg = sig.hashAlg,
                     creation = sig.getCreation(),
                     expiration = sig.getExpiration(),
                     trustLevel = trustLevel,
@@ -130,24 +132,34 @@ class OpenPGPKey(object):
             return -1
 
 class OpenPGPKeySignature(object):
-    __slots__ = ['signer', 'creation', 'expiration', 'revocation',
-                 'trustLevel', 'trustAmount']
+    __slots__ = ['sigId', 'signer', 'creation', 'expiration', 'revocation',
+                 'trustLevel', 'trustAmount', 'pubKeyAlg', 'hashAlg',
+                 'signature', '_verifies']
     """A key signature on a key"""
     def __init__(self, **kwargs):
-        self.sigid = kwargs.pop('sigid')
+        self.sigId = kwargs.pop('sigId')
         self.signer = kwargs.pop('signer')
         self.creation = kwargs.pop('creation')
+        self.pubKeyAlg = kwargs.pop('pubKeyAlg')
+        self.hashAlg = kwargs.pop('hashAlg')
+        self.signature = kwargs.pop('signature')
         self.expiration = kwargs.pop('expiration', None)
         self.revocation = kwargs.pop('revocation', None)
         self.trustLevel = kwargs.pop('trustLevel', None)
         self.trustAmount = kwargs.pop('trustAmount', None)
+        self._verifies = None
 
     def getSignerKeyId(self):
         return self.signer
 
-    def verifies(self):
-        # XXX
-        return True
+    def verifies(self, keyRetrievalCallback):
+        if self._verifies is not None:
+            return self._verifies
+        # We need to get the signer's crypto alg
+        sigKey = keyRetrievalCallback(self.signer)
+        self._verifies = PGP_Signature.verifySignature(self.sigId,
+                sigKey.cryptoKey, self.signature, self.pubKeyAlg, self.hashAlg)
+        return self._verifies
 
 class _KeyNotFound(KeyNotFound):
     errorIsUncatchable = True
@@ -564,7 +576,7 @@ class Trust(object):
             assert(sig)
             sig = sig[0]
 
-            if not sig.verifies():
+            if not sig.verifies(self.keyCache.getPublicKey):
                 continue
 
             if sig.trustLevel is not None:

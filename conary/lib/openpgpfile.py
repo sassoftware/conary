@@ -1654,8 +1654,20 @@ class PGP_Signature(PGP_BaseKeySig):
         sigDigest = hashObj.digest()
         return sigDigest
 
-    def _finalizeSignature(self, mainKey, keyId):
-        """Compute the signature digest and pad it properly"""
+    @staticmethod
+    def finalizeSignature(sigString, cryptoKey, pubKeyAlg, hashAlg):
+        # if this is an RSA signature, it needs to properly padded
+        # RFC 2440 5.2.2 and RFC 2313 10.1.2
+        if pubKeyAlg in PK_ALGO_ALL_RSA:
+            # hashPads from RFC2440 section 5.2.2
+            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
+            padLen = (len(hex(cryptoKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) // 2 -1
+            sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
+
+        return sigString
+
+    def verify(self, cryptoKey, keyId):
+        """Verify the signature as generated with cryptoKey"""
 
         # Compute the signature digest
         sigString = self.getSignatureHash()
@@ -1663,26 +1675,17 @@ class PGP_Signature(PGP_BaseKeySig):
         if sigString[:2] != self.hashSig:
             raise BadSelfSignature(keyId)
 
-        # if this is an RSA signature, it needs to properly padded
-        # RFC 2440 5.2.2 and RFC 2313 10.1.2
-
-        if self.pubKeyAlg in PK_ALGO_ALL_RSA:
-            # hashPads from RFC2440 section 5.2.2
-            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
-            padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[self.hashAlg]))) // 2 -1
-            sigString = chr(1) + chr(0xFF) * padLen + hashPads[self.hashAlg] + sigString
-
-        return sigString
-
-    def verify(self, mainKey, keyId):
-        """Compute the signature digest, pad it properly and verify the
-        self signature"""
-
-        sigString = self._finalizeSignature(mainKey, keyId)
-
         digSig = self.parseMPIs()
-        if not mainKey.verify(sigString, digSig):
+        if not self.verifySignature(sigString, cryptoKey, digSig,
+                                    self.pubKeyAlg, self.hashAlg):
             raise BadSelfSignature(keyId)
+
+    @staticmethod
+    def verifySignature(sigString, cryptoKey, signature, pubKeyAlg, hashAlg):
+        """Verify the signature on sigString generated with cryptoKey"""
+        sigString = PGP_Signature.finalizeSignature(sigString, cryptoKey,
+                                                    pubKeyAlg, hashAlg)
+        return cryptoKey.verify(sigString, signature)
 
     def initSubPackets(self):
         self._hashedSubPackets = []
@@ -2602,7 +2605,7 @@ class PGP_SecretAnyKey(PGP_Key):
             # Pick a random number that is relatively prime with the crypto
             # key's q
             relprime = cryptoKey.q + 1
-            while replprime > self.cryptoKey.q:
+            while relprime > cryptoKey.q:
                 relprime = num_getRelPrime(cryptoKey.q)
         elif isinstance(cryptoKey, (RSA.RSAobj_c, RSA.RSAobj)):
             pkAlg = PK_ALGO_RSA
@@ -2641,7 +2644,8 @@ class PGP_SecretAnyKey(PGP_Key):
         sighash = sigp.getSignatureHash()
         sigp.setShortSigHash(sighash[:2])
 
-        sigString = sigp._finalizeSignature(cryptoKey, None)
+        sigString = sigp.finalizeSignature(sighash, cryptoKey, sigp.pubKeyAlg,
+                                           sigp.hashAlg)
 
         mpis = cryptoKey.sign(sigString, relprime)
 
