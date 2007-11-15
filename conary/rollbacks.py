@@ -18,7 +18,7 @@ from conary.lib import log, util
 from conary.local import database
 
 def listRollbacks(db, cfg):
-    return formatRollbacks(cfg, db.iterRollbacksList(), stream=sys.stdout)
+    return formatRollbacks(cfg, db.getRollbackStack().iter(), stream=sys.stdout)
 
 def versionFormat(cfg, version, defaultLabel = None):
     """Format the version according to the options in the cfg object"""
@@ -164,8 +164,8 @@ def applyRollback(client, rollbackSpec, **kwargs):
                     transactionCounter = transactionCounter)
     defaults.update(kwargs)
 
-    client.db.readRollbackStatus()
-    rollbackList = client.db.getRollbackList()
+    rollbackStack = client.db.getRollbackStack()
+    rollbackList = rollbackStack.getList()
 
     if rollbackSpec.startswith('r.'):
         try:
