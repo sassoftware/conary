@@ -221,13 +221,13 @@ class RollbackStack:
                 os.mkdir(self.dir, 0700)
             except OSError, e:
                 if e.errno == errno.ENOTDIR:
-                    # when making a directory, the partent
-                    # wat not a directory
+                    # when making a directory, the parent
+                    # was not a directory
                     d = os.path.dirname(e.filename)
-                    raise OpenError(top, '%s is not a directory' %d)
+                    raise OpenError(self.dir, '%s is not a directory' %d)
                 elif e.errno == errno.EACCES:
                     d = os.path.dirname(e.filename)
-                    raise OpenError(top, 'cannot create directory %s' %d)
+                    raise OpenError(self.dir, 'cannot create directory %s' %d)
                 else:
                     raise
 
@@ -1711,6 +1711,7 @@ class Database(SqlDbRepository):
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:')
         else:
+            SqlDbRepository.__init__(self, root + path)
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
@@ -1723,9 +1724,10 @@ class Database(SqlDbRepository):
             self.lockFileObj = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
-            self.rollbackStack = RollbackStack(self.rollbackCache)
-
-            SqlDbRepository.__init__(self, root + path)
+            try:
+                self.rollbackStack = RollbackStack(self.rollbackCache)
+            except OpenError, e:
+                raise OpenError(top, e.msg)
 
 class DatabaseCacheWrapper:
 
