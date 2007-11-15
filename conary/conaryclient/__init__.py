@@ -123,6 +123,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def setRepos(self, repos):
         self.repos = repos
 
+    def getDatabase(self):
+        return self.db
+
     def disconnectRepos(self):
         self.repos = None
 
