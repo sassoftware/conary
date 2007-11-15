@@ -209,7 +209,25 @@ class DirectedGraph:
         g.edges = self.getReversedEdges()
         return g
 
-    def doDFS(self, start=None, nodeSort=None, finishCallback=None):
+    def doDFS(self, start=None, nodeSort=None, finishCallback=None,
+              depthLimit = None):
+        # DFS doesn't need the predecessor data structure (although the tree
+        # data structure could be derived from it)
+        starts, finishes, trees, pred, depth = self._walk(start=start,
+                nodeSort=nodeSort, finishCallback=finishCallback,
+                depthLimit = depthLimit, dfs = True)
+        return starts, finishes, trees
+
+    def doBFS(self, start=None, nodeSort=None, finishCallback=None,
+              depthLimit = None, getChildrenCallback = None):
+        return self._walk(start=start, nodeSort=nodeSort,
+                finishCallback=finishCallback,
+                getChildrenCallback = getChildrenCallback,
+                depthLimit = depthLimit, dfs = False)
+
+    def _walk(self, start=None, nodeSort=None, finishCallback=None,
+                    getChildrenCallback = None, depthLimit = None,
+                    dfs=True):
         nodeData = self.data
 
         nodeIds = [ x[0] for x in nodeData.sort(nodeSort) ]
@@ -217,26 +235,47 @@ class DirectedGraph:
         trees = {}
         starts = {}
         finishes = {}
+        pred = {}
+        depth = {}
         timeCount = 0
         parent = None
-        nodeStack = []
+        if dfs:
+            nodeStruct = Stack()
+        else:
+            nodeStruct = Queue()
 
         if start is not None:
-            startId = nodeData.getIndex(start)
-            nodeIds.remove(startId)
-            nodeIds.insert(0, startId)
+            if not isinstance(start, list):
+                start = [start]
+            if dfs:
+                start.reverse()
+            for s in start:
+                startId = nodeData.getIndex(s)
+                nodeIds.remove(startId)
+                nodeIds.insert(0, startId)
+
+        if getChildrenCallback is None:
+            getChildrenCallback = self.edges.__getitem__
+
+        # Only have to reverse the order of the nodes for DFS
+        reverse = bool(dfs)
 
         while nodeIds:
-            if not nodeStack:
+            if not nodeStruct:
+                # with BFS we really don't want to explore the whole graph,
+                # expecially if we do depth limiting searches
+                if not dfs and depthLimit is not None and trees:
+                    break
                 nodeId = nodeIds.pop(0)
                 if nodeId in starts:
                     continue
-                nodeStack = [(nodeId, False)]
+                nodeStruct.clear().push((nodeId, None, False))
                 parent = nodeId
                 trees[nodeId] = []
+                depth[nodeId] = 0
 
-            while nodeStack:
-                nodeId, finish = nodeStack.pop()
+            while nodeStruct:
+                nodeId, predNode, finish = nodeStruct.pop()
                 if finish:
                     finishes[nodeId] = timeCount
                     if finishCallback:
@@ -246,20 +285,36 @@ class DirectedGraph:
                 elif nodeId in starts:
                     continue
 
+                if predNode is not None:
+                    predDepth = depth[predNode]
+                    if depthLimit is not None and predDepth == depthLimit:
+                        # This child node is beyond the depth limit
+                        continue
+
+                    pred[nodeId] = predNode
+                    depth[nodeId] = depth[predNode] + 1
                 starts[nodeId] = timeCount
                 timeCount += 1
 
                 trees[parent].append(nodeId)
 
-                nodeStack.append((nodeId, True))
+                # Both in DFS and in BFS, the parent node has to be finalized
+                # after all its children. Because in DFS we put the items in a
+                # queue, we have to do it after we add the children.
+                if dfs:
+                    nodeStruct.push((nodeId, None, True))
+
                 childNodes = [x[0] for x in nodeData.sortSubset(
-                                            self.edges[nodeId], nodeSort,
-                                            reverse=True)]
+                                            getChildrenCallback(nodeId),
+                                            nodeSort, reverse=reverse)]
                 for childNodeId in childNodes:
                     if childNodeId not in starts:
-                        nodeStack.append((childNodeId, False))
+                        nodeStruct.push((childNodeId, nodeId, False))
 
-        return starts, finishes, trees
+                if not dfs:
+                    nodeStruct.push((nodeId, None, True))
+
+        return starts, finishes, trees, pred, depth
 
     def getTotalOrdering(self, nodeSort=None):
         """
@@ -386,3 +441,36 @@ class DirectedGraph:
                     out.write(' [label="%s"]' % (labelStr,))
                 out.write('\n')
         out.write('}\n')
+
+class Stack(object):
+    """A representation of a stack"""
+    __slots__ = [ 'data' ]
+
+    def __init__(self):
+        self.data = []
+
+    def push(self, obj):
+        self.data.append(obj)
+
+    def pop(self):
+        return self.data.pop()
+
+    def clear(self):
+        del self.data[:]
+        return self
+
+    def __nonzero__(self):
+        return bool(self.data)
+
+    def __repr__(self):
+        return "<%s object at %0x: %s>" % (self.__class__.__name__,
+                id(self), self.data)
+
+class Queue(Stack):
+    """A representation of a queue"""
+    __slots__ = [ 'data' ]
+
+    def pop(self):
+        obj = self.data[0]
+        del self.data[0]
+        return obj

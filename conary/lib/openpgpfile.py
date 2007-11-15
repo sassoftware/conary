@@ -260,6 +260,10 @@ def getKeyId(keyRing):
     assert pkt is not None
     return pkt.getKeyId()
 
+def getKeyFromString(keyId, data):
+    msg = PGP_Message(util.ExtendedStringIO(data))
+    return msg.getKeyByKeyId(keyId)
+
 def seekKeyById(keyId, keyRing):
     if isinstance(keyRing, str):
         try:
@@ -276,20 +280,14 @@ def seekKeyById(keyId, keyRing):
 def readKeyData(stream, keyId):
     """Read the key from the keyring and export it"""
     msg = PGP_Message(stream, start = 0)
-    try:
-        pkt = msg.iterByKeyId(keyId).next()
-    except StopIteration:
-        raise KeyNotFound(keyId)
+    pkt = msg.getKeyByKeyId(keyId)
     sio = StringIO()
     pkt.writeAll(sio)
     return sio.getvalue()
 
 def verifySelfSignatures(keyId, stream):
     msg = PGP_Message(stream, start = 0)
-    try:
-        pkt = msg.iterByKeyId(keyId).next()
-    except StopIteration:
-        raise KeyNotFound(keyId)
+    pkt = msg.getKeyByKeyId(keyId)
 
     return pkt.verifySelfSignatures()
 
@@ -372,12 +370,8 @@ def getPublicKey(keyId, keyFile=''):
 
 def _getPublicKey(keyId, stream):
     msg = PGP_Message(stream, start = 0)
-    try:
-        pkt = msg.iterByKeyId(keyId).next()
-    except StopIteration:
-        raise KeyNotFound(keyId)
-    pkt.verifySelfSignatures()
-    return pkt.toPublicKey().makePgpKey()
+    pkt = msg.getKeyByKeyId(keyId)
+    return pkt.getCryptoKey()
 
 def getPrivateKey(keyId, passPhrase='', keyFile=''):
     if keyFile == '':
@@ -393,15 +387,8 @@ def getPrivateKey(keyId, passPhrase='', keyFile=''):
 
 def _getPrivateKey(keyId, stream, passPhrase):
     msg = PGP_Message(stream, start = 0)
-    try:
-        pkt = msg.iterByKeyId(keyId).next()
-    except StopIteration:
-        raise KeyNotFound(keyId)
-    try:
-        pkt.verifySelfSignatures()
-    except BadSelfSignature:
-        sys.stderr.write("Warning: self-signature on private key does not verify\n")
-    return pkt.makePgpKey(passPhrase)
+    pkt = msg.getKeyByKeyId(keyId)
+    return pkt.getCryptoKey(passPhrase)
 
 def getPublicKeyFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
@@ -435,11 +422,8 @@ def getFingerprint(keyId, keyFile=''):
         raise KeyNotFound(keyId, "Couldn't open keyring")
     keyRing.seek(0, SEEK_SET)
     msg = PGP_Message(keyRing)
-    try:
-        pkt = msg.iterByKeyId(keyId).next()
-    except StopIteration:
-        raise KeyNotFound(keyId)
-    return pkt.getKeyId()
+    pkt = msg.getKeyByKeyId(keyId)
+    return pkt.getKeyFingerprint()
 
 def getKeyEndOfLife(keyId, keyFile=''):
     if keyFile == '':
@@ -458,7 +442,7 @@ def addKeys(keys, stream):
     """Add keys to the stream"""
     keysDict = {}
     for k in keys:
-        keyId = k.getKeyId()
+        keyId = k.getKeyFingerprint()
         if keyId in keysDict:
             keysDict[keyId].merge(k)
         else:
@@ -483,14 +467,14 @@ def addKeys(keys, stream):
 
         msg = PGP_Message(stream, start = 0)
         for ikey in msg.iterMainKeys():
-            iKeyId = ikey.getKeyId()
+            iKeyId = ikey.getKeyFingerprint()
             if iKeyId in keysDict:
                 ikey.merge(keysDict[iKeyId])
                 del keysDict[iKeyId]
             ikey.writeAll(tempf)
         # Add the rest of the keys
         for key in keys:
-            keyId = key.getKeyId()
+            keyId = key.getKeyFingerprint()
             if keyId not in keysDict:
                 continue
             key.writeAll(tempf)
@@ -506,10 +490,7 @@ def addKeys(keys, stream):
 
 def _getKeyEndOfLife(keyId, stream):
     msg = PGP_Message(stream, start = 0)
-    try:
-        pkt = msg.iterByKeyId(keyId).next()
-    except StopIteration:
-        raise KeyNotFound(keyId, "Key not found")
+    pkt = msg.getKeyByKeyId(keyId)
     return pkt.getEndOfLife()
 
 def verifyRFC2440Checksum(data):
@@ -543,7 +524,7 @@ def countKeys(keyRing):
 def getFingerprints(keyRing):
     # returns the fingerprints for all keys in a key ring file
     msg = PGP_Message(keyRing)
-    return [ x.getKeyId() for x in msg.iterKeys() ]
+    return [ x.getKeyFingerprint() for x in msg.iterKeys() ]
 
 def parseAsciiArmorKey(asciiData):
     data = StringIO(asciiData)
@@ -746,19 +727,27 @@ class PGP_Message(object):
     def iterByKeyId(self, keyId):
         """Iterate over the keys with this key ID"""
         for pkt in self.iterKeys():
-            if keyId.upper() in pkt.getKeyId():
+            if pkt.getKeyFingerprint().endswith(keyId.upper()):
                 yield pkt
+            if pkt.version == 3 and pkt.getKeyId().endswith(keyId.upper()):
+                yield pkt
+
+    def getKeyByKeyId(self, keyId):
+        try:
+            return self.iterByKeyId(keyId).next()
+        except StopIteration:
+            raise KeyNotFound(keyId)
 
     def seekParentKey(self, keyId):
         """Get a parent key with this keyId or with a subkey with this
         keyId"""
         for pkt in self.iterKeys():
             if isinstance(pkt, PGP_MainKey):
-                if keyId.upper() in pkt.getKeyId():
+                if pkt.getKeyFingerprint().endswith(keyId.upper()):
                     # This is a main key and it has the keyId we need
                     return pkt
             elif isinstance(pkt, PGP_SubKey):
-                if keyId.upper() in pkt.getKeyId():
+                if pkt.getKeyFingerprint().endswith(keyId.upper()):
                     # This is a subkey, return the main key
                     return pkt.getMainKey()
 
@@ -1416,6 +1405,29 @@ class PGP_Signature(PGP_BaseKeySig):
         pkts[0].seek(0, SEEK_SET)
         return int4FromBytes(*self._readBin(pkts[0], 4))
 
+    def getTrust(self):
+        """Return the trust level, the trust amount and the trust regex for
+        this signature"""
+        spktTypes = set([SIG_SUBPKT_TRUST, 0x80 | SIG_SUBPKT_TRUST])
+        pkts = [ x[1] for x in self.decodeHashedSubpackets()
+                   if x[0] in spktTypes ]
+        if not pkts:
+            return None, None, None
+        pkts[0].seek(0)
+        tlevel, tamt = self._readBin(pkts[0], 2)
+
+        # Look for a trust regex
+        # critical packets are ANDed with 0x80
+        spktTypes = set([SIG_SUBPKT_REGEX, 0x80 | SIG_SUBPKT_REGEX])
+        pkts = [ x[1] for x in self.decodeHashedSubpackets()
+                   if x[0] in spktTypes ]
+        if not pkts:
+            return tlevel, tamt, None
+        pkts[0].seek(0)
+        # Trust packet is NULL-terminated
+        tregex = pkts[0].read()[:-1]
+        return tlevel, tamt, tregex
+
     def rewriteBody(self):
         """Re-writes the body after the signature has been modified"""
         if not (isinstance(self.unhashedFile, util.ExtendedStringIO) or
@@ -1453,6 +1465,9 @@ class PGP_Signature(PGP_BaseKeySig):
                     (e.expected, e.actual))
             self.signerKeyId = self._readBin(dataf, 8)
             return binSeqToString(self.signerKeyId)
+
+    def getSignerKeyId(self):
+        return stringToAscii(self.getSigId())
 
     def decodeHashedSubpackets(self):
         self.parse()
@@ -1641,8 +1656,20 @@ class PGP_Signature(PGP_BaseKeySig):
         sigDigest = hashObj.digest()
         return sigDigest
 
-    def _finalizeSignature(self, mainKey, keyId):
-        """Compute the signature digest and pad it properly"""
+    @staticmethod
+    def finalizeSignature(sigString, cryptoKey, pubKeyAlg, hashAlg):
+        # if this is an RSA signature, it needs to properly padded
+        # RFC 2440 5.2.2 and RFC 2313 10.1.2
+        if pubKeyAlg in PK_ALGO_ALL_RSA:
+            # hashPads from RFC2440 section 5.2.2
+            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
+            padLen = (len(hex(cryptoKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) // 2 -1
+            sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
+
+        return sigString
+
+    def verify(self, cryptoKey, keyId):
+        """Verify the signature as generated with cryptoKey"""
 
         # Compute the signature digest
         sigString = self.getSignatureHash()
@@ -1650,26 +1677,17 @@ class PGP_Signature(PGP_BaseKeySig):
         if sigString[:2] != self.hashSig:
             raise BadSelfSignature(keyId)
 
-        # if this is an RSA signature, it needs to properly padded
-        # RFC 2440 5.2.2 and RFC 2313 10.1.2
-
-        if self.pubKeyAlg in PK_ALGO_ALL_RSA:
-            # hashPads from RFC2440 section 5.2.2
-            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
-            padLen = (len(hex(mainKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[self.hashAlg]))) // 2 -1
-            sigString = chr(1) + chr(0xFF) * padLen + hashPads[self.hashAlg] + sigString
-
-        return sigString
-
-    def verify(self, mainKey, keyId):
-        """Compute the signature digest, pad it properly and verify the
-        self signature"""
-
-        sigString = self._finalizeSignature(mainKey, keyId)
-
         digSig = self.parseMPIs()
-        if not mainKey.verify(sigString, digSig):
+        if not self.verifySignature(sigString, cryptoKey, digSig,
+                                    self.pubKeyAlg, self.hashAlg):
             raise BadSelfSignature(keyId)
+
+    @staticmethod
+    def verifySignature(sigString, cryptoKey, signature, pubKeyAlg, hashAlg):
+        """Verify the signature on sigString generated with cryptoKey"""
+        sigString = PGP_Signature.finalizeSignature(sigString, cryptoKey,
+                                                    pubKeyAlg, hashAlg)
+        return cryptoKey.verify(sigString, signature)
 
     def initSubPackets(self):
         self._hashedSubPackets = []
@@ -1773,6 +1791,13 @@ class PGP_UserID(PGP_BasePacket):
                 continue
             yield pkt
 
+    def iterCertifications(self):
+        for pkt in self.iterSignatures():
+            pkt.parse()
+            if pkt.sigType not in SIG_CERTS:
+                continue
+            yield pkt
+
     def writeHash(self, stream):
         """Write a UserID packet in a stream, in order to be hashed.
         Described in RFC 2440 5.2.4 computing signatures."""
@@ -1801,7 +1826,7 @@ class PGP_UserID(PGP_BasePacket):
         If the key is revoked, -1 is returned"""
         # Iterate over all self signatures
         key = self.getParentPacket()
-        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyId()) ]
+        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyFingerprint()) ]
         if not selfSigs:
             raise PGPError("User packet with no self signature")
         revocs = []
@@ -1919,18 +1944,34 @@ class PGP_Key(PGP_BaseKeySig):
         self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
             start = mpiStart)
 
-    def getKeyId(self):
+    def getKeyFingerprint(self):
         if self._keyId is not None:
+            if self.version == 3:
+                return self._keyId[0]
             return self._keyId
 
         if self.version == 3:
+            # See section "Key IDs and Fingerprints" for a description of how
+            # v3 fingerprints and key IDs are different
+
             # Key ID is low 64 bits of the modulus
             self.mpiFile.seek(0)
             self._readCountMPIs(self.mpiFile, 1, discard = True)
-            pos = self.mpiFile.tell()
-            octets = self.mpiFile.pread(8, pos - 8)
-            self._keyId = stringToAscii(octets)
-            return self._keyId
+            end1 = self.mpiFile.tell()
+            octets = self.mpiFile.pread(8, end1 - 8)
+
+            # The fingerprint of a V3 key is formed by hashing the body (but
+            # not the two-octet length) of the MPIs that form the key material
+            # (public modulus n, followed by exponent e) with MD5.
+            self._readCountMPIs(self.mpiFile, 1, discard = True)
+            end2 = self.mpiFile.tell()
+            fpr = md5.new()
+            # Skip the 2-octet length 
+            fpr.update(self.mpiFile.pread(end1 - 2, 2))
+            fpr.update(self.mpiFile.pread((end2 - end1) - 2, end1 + 2))
+            fpr = fpr.hexdigest().upper()
+            self._keyId = fpr, stringToAscii(octets)
+            return fpr
 
         # Convert to public key
 
@@ -1967,6 +2008,12 @@ class PGP_Key(PGP_BaseKeySig):
 
         self._keyId = m.hexdigest().upper()
         return self._keyId
+
+    def getKeyId(self):
+        if self.version == 3:
+            self.getKeyFingerprint()
+            return self._keyId[1]
+        return self.getKeyFingerprint()[-16:]
 
     def getCreatedTimestamp(self):
         self.parse()
@@ -2030,7 +2077,7 @@ class PGP_Key(PGP_BaseKeySig):
         return (revocTimestamp != 0) and (not parentRevoked), ts
 
     def iterSelfSignatures(self):
-        return self._iterSelfSignatures(self.getKeyId())
+        return self._iterSelfSignatures(self.getKeyFingerprint())
 
     def _iterSelfSignatures(self, keyId):
         """Iterate over all the self-signatures"""
@@ -2045,7 +2092,7 @@ class PGP_Key(PGP_BaseKeySig):
 
     def iterAllSelfSignatures(self):
         """Iterate over direct signatures and UserId signatures"""
-        return self._iterAllSelfSignatures(self.getKeyId())
+        return self._iterAllSelfSignatures(self.getKeyFingerprint())
 
     def _iterAllSelfSignatures(self, keyId):
         for pkt in self.iterSelfSignatures():
@@ -2069,7 +2116,7 @@ class PGP_Key(PGP_BaseKeySig):
             # checks required.
             return True
 
-        keyId = self.getKeyId()
+        keyId = self.getKeyFingerprint()
 
         # If it's a subkey, look for the master key
         if self.tag in PKT_SUB_KEYS:
@@ -2106,10 +2153,16 @@ class PGP_Key(PGP_BaseKeySig):
             return DSA.construct((y, g, p, q))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+    def getCryptoKey(self, passPhrase = None):
+        assert passPhrase is None
+        self.verifySelfSignatures()
+        return self.makePgpKey()
+
     def adoptSignature(self, sig):
         """Adopt the signature, if it's not ours already"""
         pp = sig.getParentPacket()
-        if isinstance(pp, self.__class__) and pp.getKeyId() == self.getKeyId():
+        if isinstance(pp, self.__class__) and \
+                pp.getKeyFingerprint() == self.getKeyFingerprint():
             return
 
         sig.resetSignatureHash()
@@ -2219,8 +2272,15 @@ class PGP_MainKey(PGP_Key):
                 yield pkt
 
     def iterSignatures(self):
+        """Iterate over all signature packets"""
         self.initSubPackets()
         return iter(self.revsigs)
+
+    def iterCertifications(self):
+        """Iterate over all certification signatures (on user IDs)"""
+        for uid in self.iterUserIds():
+            for sig in uid.iterCertifications():
+                yield sig
 
     def iterSubKeys(self):
         self.initSubPackets()
@@ -2238,7 +2298,7 @@ class PGP_MainKey(PGP_Key):
             raise InvalidKey("Version 3 keys not supported")
         # Convert to a public key (even if it's already a public key)
         pkpkt = self.toPublicKey(minHeaderLen = 3)
-        keyId = pkpkt.getKeyId()
+        keyId = pkpkt.getKeyFingerprint()
         pgpKey = pkpkt.makePgpKey()
         for sig in self.iterSelfSignatures():
             self.adoptSignature(sig)
@@ -2266,11 +2326,11 @@ class PGP_MainKey(PGP_Key):
         """
         if self.tag != key.tag:
             raise IncompatibleKey("Attempting to compare different key types")
-        if self.getKeyId() != key.getKeyId():
+        if self.getKeyFingerprint() != key.getKeyFingerprint():
             raise IncompatibleKey("Attempting to compare different keys")
 
-        thisSubkeyIds = dict((x.getKeyId(), x) for x in self.iterSubKeys())
-        otherSubkeyIds = dict((x.getKeyId(), x) for x in key.iterSubKeys())
+        thisSubkeyIds = dict((x.getKeyFingerprint(), x) for x in self.iterSubKeys())
+        otherSubkeyIds = dict((x.getKeyFingerprint(), x) for x in key.iterSubKeys())
         if not set(thisSubkeyIds).issuperset(otherSubkeyIds):
             # Missing subkey
             return False
@@ -2300,7 +2360,7 @@ class PGP_MainKey(PGP_Key):
         Return True if the key was modified"""
         assert self.tag == other.tag
 
-        if self.getKeyId() != other.getKeyId():
+        if self.getKeyFingerprint() != other.getKeyFingerprint():
             raise MergeError("Merging keys with a different ID")
 
         # Both keys must verify their self-signing signatures
@@ -2354,7 +2414,7 @@ class PGP_MainKey(PGP_Key):
             # Verify self signatures
             skey.verifySelfSignatures()
 
-            keyId = skey.getKeyId()
+            keyId = skey.getKeyFingerprint()
             if keyId not in lkids:
                 lkids[keyId] = skey
                 finalkeys.append(skey)
@@ -2517,6 +2577,14 @@ class PGP_SecretAnyKey(PGP_Key):
             return DSA.construct((y, g, p, q, x))
         raise MalformedKeyRing("Can't use El-Gamal keys in current version")
 
+    def getCryptoKey(self, passPhrase):
+        try:
+            self.verifySelfSignatures()
+        except BadSelfSignature:
+            # XXX Make this a callback
+            sys.stderr.write("Warning: self-signature on private key does not verify\n")
+        return self.makePgpKey(passPhrase)
+
     def sign(self, packet, passwordCallback, sigType = None, creation = None,
              expiration = None, trustLevel = None, trustAmount = None,
              trustRegex = None, **kwargs):
@@ -2559,8 +2627,15 @@ class PGP_SecretAnyKey(PGP_Key):
 
         if isinstance(cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
             pkAlg = PK_ALGO_DSA
+            # Pick a random number that is relatively prime with the crypto
+            # key's q
+            relprime = cryptoKey.q + 1
+            while relprime > cryptoKey.q:
+                relprime = num_getRelPrime(cryptoKey.q)
         elif isinstance(cryptoKey, (RSA.RSAobj_c, RSA.RSAobj)):
             pkAlg = PK_ALGO_RSA
+            # RSA doesn't need a prime for signing
+            relprime = 0
         else:
             # Maybe we need a different exception?
             raise UnsupportedEncryptionAlgorithm(cryptoKey.__class__.__name__)
@@ -2585,7 +2660,7 @@ class PGP_SecretAnyKey(PGP_Key):
             sigp.addExpiration(expiration)
         if trustLevel:
             sigp.addTrust(trustLevel, trustAmount, trustRegex)
-        sigp.addIssuerKeyId(self.getKeyId())
+        sigp.addIssuerKeyId(self.getKeyFingerprint())
 
         # Prepare the subpacket streams
         sigp._prepareSubpackets()
@@ -2594,11 +2669,8 @@ class PGP_SecretAnyKey(PGP_Key):
         sighash = sigp.getSignatureHash()
         sigp.setShortSigHash(sighash[:2])
 
-        sigString = sigp._finalizeSignature(cryptoKey, None)
-
-        # Pick a random number that is relatively prime with the crypto key's
-        # q
-        relprime = num_getRelPrime(cryptoKey.q)
+        sigString = sigp.finalizeSignature(sighash, cryptoKey, sigp.pubKeyAlg,
+                                           sigp.hashAlg)
 
         mpis = cryptoKey.sign(sigString, relprime)
 
@@ -2646,16 +2718,19 @@ class PGP_SubKey(PGP_Key):
         if self.revocationSig:
             yield self.revocationSig
 
+    def iterCertifications(self):
+        return []
+
     def iterUserIds(self):
         # Subkeys don't have user ids
         return []
 
     def iterSelfSignatures(self):
-        return self._iterSelfSignatures(self.getMainKey().getKeyId())
+        return self._iterSelfSignatures(self.getMainKey().getKeyFingerprint())
 
     def iterAllSelfSignatures(self):
         """Iterate over direct signatures and UserId signatures"""
-        return self._iterAllSelfSignatures(self.getMainKey().getKeyId())
+        return self._iterAllSelfSignatures(self.getMainKey().getKeyFingerprint())
 
     def getMainKey(self):
         """Return the main key for this subkey"""
@@ -2671,7 +2746,7 @@ class PGP_SubKey(PGP_Key):
         # Convert this subkey to a public key
         pkpkt = self.toPublicKey(minHeaderLen = 3)
 
-        keyId = pkpkt.getKeyId()
+        keyId = pkpkt.getKeyFingerprint()
 
         # We should have a binding signature or a revocation
         if self.bindingSig is None and self.revocationSig is None:
