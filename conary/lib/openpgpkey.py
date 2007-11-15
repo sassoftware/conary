@@ -26,7 +26,6 @@ from conary.lib import graph
 from Crypto.PublicKey import DSA
 from openpgpfile import BadPassPhrase
 from openpgpfile import getKeyTrust
-from openpgpfile import getCryptoKey
 from openpgpfile import KeyNotFound
 from openpgpfile import num_getRelPrime
 from openpgpfile import seekKeyById
@@ -36,27 +35,52 @@ from openpgpfile import SEEK_SET, SEEK_END
 #OpenPGPKey structure:
 #-----#
 
-class OpenPGPKey:
-    def __init__(self, fingerprint, cryptoKey, revoked, timestamp, key, trustLevel=255):
+class OpenPGPKey(object):
+    __slots__ = ['fingerprint', 'cryptoKey', 'revoked', 'timestamp',
+                 'trustLevel', 'signatures']
+    def __init__(self, key, cryptoKey, trustLevel=255):
         """
         instantiates a OpenPGPKey object
 
-        @param fingerprint: string key fingerprint of this key
-        @type fingerprint: str
+        @param key: A PGP key
+        @type fingerprint: instance of openpgpfile.PGP_Key
         @param cyptoKey: DSA or RSA key object
         @type cryptoKey: instance
-        @param revoked: is this key revoked
-        @type revoked: bool
         @param trustLevel: the trust level of this key, as stored locally
         @type trustLevel: int
         """
 
-        self.fingerprint = fingerprint
+        self.fingerprint = key.getKeyId()
         self.cryptoKey = cryptoKey
-        self.revoked = revoked
-        self.timestamp = timestamp
+        self.revoked, self.timestamp = key.getEndOfLife()
         self.trustLevel = trustLevel
-        self._key = key
+        self.signatures = []
+        self._initSignatures(key)
+
+    def _initSignatures(self, key):
+        # Iterate over this packet's signatures
+        sigs = {}
+        keyId = key.getKeyId()
+        for sig in key.iterCertifications():
+            # Ignore self signatures
+            sigKeyId = sig.getSignerKeyId()
+            if sigKeyId == keyId:
+                continue
+            # XXX We should deal with conflict here
+            if sigKeyId in sigs:
+                continue
+            trustLevel, trustAmount, trustRegex = sig.getTrust()
+            # XXX Using the short sig hash only may not be sufficient - in the
+            # future we may have to use getSignatureHash() to avoid collisions
+            sigs[sigKeyId] = OpenPGPKeySignature(
+                    sigId = sig.getShortSigHash(),
+                    signer = sigKeyId,
+                    creation = sig.getCreation(),
+                    expiration = sig.getExpiration(),
+                    trustLevel = trustLevel,
+                    trustAmount = trustAmount,
+                    trustRegex = trustRegex)
+        self.signatures = sorted(sigs.values(), key = lambda x: x.signer)
 
     def getTrustLevel(self):
         return self.trustLevel
@@ -104,6 +128,26 @@ class OpenPGPKey:
             return self.trustLevel
         else:
             return -1
+
+class OpenPGPKeySignature(object):
+    __slots__ = ['signer', 'creation', 'expiration', 'revocation',
+                 'trustLevel', 'trustAmount']
+    """A key signature on a key"""
+    def __init__(self, **kwargs):
+        self.sigid = kwargs.pop('sigid')
+        self.signer = kwargs.pop('signer')
+        self.creation = kwargs.pop('creation')
+        self.expiration = kwargs.pop('expiration', None)
+        self.revocation = kwargs.pop('revocation', None)
+        self.trustLevel = kwargs.pop('trustLevel', None)
+        self.trustAmount = kwargs.pop('trustAmount', None)
+
+    def getSignerKeyId(self):
+        return self.signer
+
+    def verifies(self):
+        # XXX
+        return True
 
 class _KeyNotFound(KeyNotFound):
     errorIsUncatchable = True
@@ -191,13 +235,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                 key = seekKeyById(keyId, publicPath)
                 if not key:
                     continue
-                fingerprint = key.getKeyId()
-                revoked, timestamp = key.getEndOfLife()
-                cryptoKey = key.makePgpKey()
-                trustLevel = getKeyTrust(trustDbPath, fingerprint)
-                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                    revoked, timestamp,
-                                                    key,
+                trustLevel = getKeyTrust(trustDbPath, key.getKeyId())
+                self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
                                                     trustLevel)
                 return self.publicDict[keyId]
             except (KeyNotFound, IOError):
@@ -214,23 +253,19 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
         # translate the keyId to a full fingerprint for consistency
         key = seekKeyById(keyId, self.privatePath)
-        fingerprint = key.getKeyId()
-        revoked, timestamp = key.getEndOfLife()
 
         # if we were supplied a password, use it.  The caller will need
         # to deal with handling BadPassPhrase exceptions
         if passphrase is not None:
-            cryptoKey = getCryptoKey(key, passphrase)
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                 revoked, timestamp, key)
+            cryptoKey = key.getCryptoKey(passphrase)
+            self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
             return self.privateDict[keyId]
 
         # next, see if the key has no passphrase (WHY???)
         # if it's readable, there's no need to prompt the user
         try:
-            cryptoKey = getCryptoKey(key, '')
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                 revoked, timestamp, key)
+            cryptoKey = key.getCryptoKey('')
+            self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
             return self.privateDict[keyId]
         except BadPassPhrase:
             pass
@@ -243,9 +278,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             # FIXME: make this a callback
             passPhrase = getpass.getpass("Passphrase: ")
             try:
-                cryptoKey = getCryptoKey(key, '')
-                self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                    revoked, timestamp, key)
+                cryptoKey = key.getCryptoKey('')
+                self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
                 return self.privateDict[keyId]
             except BadPassPhrase:
                 print "Bad passphrase. Please try again."
@@ -502,8 +536,7 @@ class Trust(object):
             return []
 
         for sig in node.signatures:
-            if sig.verifies():
-                self._graph.addEdge(nodeId, sig.getSigId())
+            self._graph.addEdge(nodeId, sig.getSignerKeyId())
         return self._graph.edges[nodeIdx]
 
     def trustComputationCallback(self, nodeIdx):
@@ -527,9 +560,12 @@ class Trust(object):
                     (nodeSigLevel - 1, 120, 0))
             # Get the signature
             n = self.keyCache.getPublicKey(node)
-            sig = [ x for x in n.signatures if x.getSigId() == nodeId ]
+            sig = [ x for x in n.signatures if x.getSignerKeyId() == nodeId ]
             assert(sig)
             sig = sig[0]
+
+            if not sig.verifies():
+                continue
 
             if sig.trustLevel is not None:
                 ntlev = min(ntlev, sig.trustLevel)

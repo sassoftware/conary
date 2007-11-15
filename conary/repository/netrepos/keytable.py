@@ -187,14 +187,12 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
         fingerprint = self.keyTable.getFingerprint(keyId)
         keyData = self.keyTable.getPGPKeyData(keyId)
 
-        # instantiate the crypto key object from the raw key data
-        cryptoKey = openpgpfile.getPublicKeyFromString(keyId, keyData)
-
-        # get end of life data
-        revoked, timestamp = openpgpfile.getKeyEndOfLifeFromString(keyId, keyData)
+        # instantiate the key object from the raw key data
+        key = openpgpfile.getKeyFromString(keyData)
 
         # populate the cache
         # note keys in the repository are always considered fully trusted
-        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp, openpgpfile.TRUST_FULL)
+        self.publicDict[keyId] = openpgpkey.OpenPGPKey(key, key.getCryptoKey(),
+                                                       openpgpfile.TRUST_FULL)
         return self.publicDict[keyId]
 
