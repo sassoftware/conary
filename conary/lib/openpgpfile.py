@@ -729,6 +729,8 @@ class PGP_Message(object):
         for pkt in self.iterKeys():
             if pkt.getKeyFingerprint().endswith(keyId.upper()):
                 yield pkt
+            if pkt.version == 3 and pkt.getKeyId().endswith(keyId.upper()):
+                yield pkt
 
     def getKeyByKeyId(self, keyId):
         try:
