@@ -158,9 +158,13 @@ class RollbackStack:
         dir = self.dir + "/" + "%d" % num
         return Rollback(dir, load = True)
 
+    def removeFirst(self):
+        name = 'r.%d' % self.first
+        self._remove(name)
+
     def removeLast(self):
         name = 'r.%d' % self.last
-        self.remove(name)
+        self._remove(name)
 
     def getList(self):
         self._ensureReadableRollbackStack()
@@ -171,9 +175,10 @@ class RollbackStack:
         return list
 
     # name looks like "r.%d"
-    def remove(self, name):
+    def _remove(self, name):
         rollback = int(name[2:])
-        assert(rollback == self.last)
+        assert(rollback == self.first or rollback == self.last)
+
         try:
             shutil.rmtree(self.dir + "/%d" % rollback)
         except OSError, e:
@@ -181,10 +186,18 @@ class RollbackStack:
                 pass
         if rollback == self.last:
             self.last -= 1
-            self.writeStatus()
+        elif rollback == self.first:
+            self.first += 1
+        else:
+            assert(0)
+
+        self.writeStatus()
 
     def invalidate(self):
-        """Invalidate the rollback stack."""
+        """
+        Invalidate the rollback stack. It doesn't remove the rollbacks
+        though.
+        """
         # Works nicely for the very beginning
         # (when rollbackStack.first, rollbackStack.last) = (0, -1)
         self.first = self.last + 1
@@ -1443,7 +1456,7 @@ class Database(SqlDbRepository):
         try:
             _doRemove(self, rb, pathList)
         except Exception, e:
-            self.rollbackStack.remove("r." + rb.dir.split("/")[-1])
+            self.rollbackStack.removeLast()
             raise
 
         self._updateTransactionCounter = True
@@ -1611,7 +1624,7 @@ class Database(SqlDbRepository):
 
                 (reposCs, localCs) = rb.getLast()
 
-            self.rollbackStack.remove(name)
+            self.rollbackStack.removeLast()
 
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
