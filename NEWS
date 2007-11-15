@@ -29,6 +29,8 @@ Changes in 2.0.0:
       assembly (CNY-2202)
     * Promote now gets file contents and streams from changesets when a
       lot of them are needed from the same trove (CNY-2022)
+    * Split rollback stack code into a separate class (CNY-2061)
+    * Added rmrollback command to remove old rollbacks (CNY-2061)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)

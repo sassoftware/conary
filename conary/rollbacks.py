@@ -204,3 +204,38 @@ def applyRollback(client, rollbackSpec, **kwargs):
     log.syslog.commandComplete()
 
     return 0
+
+def removeRollbacks(db, rollbackSpec):
+    rollbackStack = db.getRollbackStack()
+    rollbackList = rollbackStack.getList()
+
+    if rollbackSpec.startswith('r.'):
+        try:
+            i = rollbackList.index(rollbackSpec)
+        except:
+            log.error("rollback '%s' not present" % rollbackSpec)
+            return 1
+
+        rollbacks = rollbackList[:i + 1]
+    else:
+        try:
+            rollbackCount = int(rollbackSpec)
+        except:
+            log.error("integer rollback count expected instead of '%s'" %
+                    rollbackSpec)
+            return 1
+
+        if rollbackCount < 1:
+            log.error("rollback count must be positive")
+            return 1
+        elif rollbackCount > len(rollbackList):
+            log.error("rollback count higher then number of rollbacks "
+                      "available")
+            return 1
+
+        rollbacks = rollbackList[:rollbackCount]
+
+    for rb in rollbacks:
+        rollbackStack.remove(rb)
+
+    return 0

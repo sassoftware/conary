@@ -160,11 +160,11 @@ class RollbackStack:
 
     def removeFirst(self):
         name = 'r.%d' % self.first
-        self._remove(name)
+        self.remove(name)
 
     def removeLast(self):
         name = 'r.%d' % self.last
-        self._remove(name)
+        self.remove(name)
 
     def getList(self):
         self._ensureReadableRollbackStack()
@@ -175,7 +175,7 @@ class RollbackStack:
         return list
 
     # name looks like "r.%d"
-    def _remove(self, name):
+    def remove(self, name):
         rollback = int(name[2:])
         assert(rollback == self.first or rollback == self.last)
 
