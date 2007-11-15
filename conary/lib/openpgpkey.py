@@ -251,7 +251,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                 key = seekKeyById(keyId, publicPath)
                 if not key:
                     continue
-                trustLevel = getKeyTrust(trustDbPath, key.getKeyId())
+                trustLevel = getKeyTrust(trustDbPath, key.getKeyFingerprint())
                 self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
                                                     trustLevel)
                 return self.publicDict[keyId]

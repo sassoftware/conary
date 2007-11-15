@@ -60,7 +60,7 @@ class OpenPGPKeyTable:
 
         inKey.verifySelfSignatures()
 
-        mainFingerprint = inKey.getKeyId()
+        mainFingerprint = inKey.getKeyFingerprint()
 
         # if key already exists we need to ensure it's safe to overwrite
         # the old one, and then just do it.
@@ -85,7 +85,7 @@ class OpenPGPKeyTable:
             keyId = cu.lastrowid
 
         keyFingerprints = [ mainFingerprint ]
-        keyFingerprints.extend(x.getKeyId() for x in inKey.iterSubKeys())
+        keyFingerprints.extend(x.getKeyFingerprint() for x in inKey.iterSubKeys())
 
         for fingerprint in keyFingerprints:
             cu.execute("SELECT COUNT(*) FROM PGPFingerprints "
@@ -188,7 +188,7 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
         keyData = self.keyTable.getPGPKeyData(keyId)
 
         # instantiate the key object from the raw key data
-        key = openpgpfile.getKeyFromString(keyData)
+        key = openpgpfile.getKeyFromString(keyId, keyData)
 
         # populate the cache
         # note keys in the repository are always considered fully trusted
