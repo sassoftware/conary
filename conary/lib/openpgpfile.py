@@ -2599,8 +2599,15 @@ class PGP_SecretAnyKey(PGP_Key):
 
         if isinstance(cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
             pkAlg = PK_ALGO_DSA
+            # Pick a random number that is relatively prime with the crypto
+            # key's q
+            relprime = cryptoKey.q + 1
+            while replprime > self.cryptoKey.q:
+                relprime = num_getRelPrime(cryptoKey.q)
         elif isinstance(cryptoKey, (RSA.RSAobj_c, RSA.RSAobj)):
             pkAlg = PK_ALGO_RSA
+            # RSA doesn't need a prime for signing
+            relprime = 0
         else:
             # Maybe we need a different exception?
             raise UnsupportedEncryptionAlgorithm(cryptoKey.__class__.__name__)
@@ -2635,10 +2642,6 @@ class PGP_SecretAnyKey(PGP_Key):
         sigp.setShortSigHash(sighash[:2])
 
         sigString = sigp._finalizeSignature(cryptoKey, None)
-
-        # Pick a random number that is relatively prime with the crypto key's
-        # q
-        relprime = num_getRelPrime(cryptoKey.q)
 
         mpis = cryptoKey.sign(sigString, relprime)
 
