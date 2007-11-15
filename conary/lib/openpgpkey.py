@@ -65,7 +65,7 @@ class OpenPGPKey(object):
         for sig in key.iterCertifications():
             # Ignore self signatures
             sigKeyId = sig.getSignerKeyId()
-            if sigKeyId == keyId:
+            if sigKeyId == keyId[-16:]:
                 continue
             # XXX We should deal with conflict here
             if sigKeyId in sigs:
@@ -83,6 +83,7 @@ class OpenPGPKey(object):
                     trustAmount = trustAmount,
                     trustRegex = trustRegex)
         self.signatures = sorted(sigs.values(), key = lambda x: x.signer)
+        print "FFF", self.fingerprint, [x.getSignerKeyId() for x in self.signatures]
 
     def getTrustLevel(self):
         return self.trustLevel
