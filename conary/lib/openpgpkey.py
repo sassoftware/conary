@@ -38,7 +38,7 @@ from openpgpfile import SEEK_SET, SEEK_END
 
 class OpenPGPKey(object):
     __slots__ = ['fingerprint', 'cryptoKey', 'revoked', 'timestamp',
-                 'trustLevel', 'signatures']
+                 'trustLevel', 'signatures', 'id']
     def __init__(self, key, cryptoKey, trustLevel=255):
         """
         instantiates a OpenPGPKey object
@@ -51,7 +51,8 @@ class OpenPGPKey(object):
         @type trustLevel: int
         """
 
-        self.fingerprint = key.getKeyId()
+        self.id = key.getKeyId()
+        self.fingerprint = key.getKeyFingerprint()
         self.cryptoKey = cryptoKey
         self.revoked, self.timestamp = key.getEndOfLife()
         self.trustLevel = trustLevel
@@ -83,13 +84,15 @@ class OpenPGPKey(object):
                     trustAmount = trustAmount,
                     trustRegex = trustRegex)
         self.signatures = sorted(sigs.values(), key = lambda x: x.signer)
-        print "FFF", self.fingerprint, [x.getSignerKeyId() for x in self.signatures]
 
     def getTrustLevel(self):
         return self.trustLevel
 
     def isRevoked(self):
         return self.revoked
+
+    def getKeyId(self):
+        return self.id
 
     def getFingerprint(self):
         return self.fingerprint
@@ -515,11 +518,31 @@ class Trust(object):
         # 120, this node is considered untrusted, and it will be ignored
         # completely in determining trust for other keys.
         self._trust = {}
+        self._depth = {}
+        # Requesting keys by the short name will populate _idMap
+        self._idMap = {}
+
+    def _getKey(self, keyId):
+        try:
+            key = self.keyCache.getPublicKey(keyId)
+            realKeyId = key.getKeyId()
+            if key != realKeyId:
+                self._idMap[keyId] = realKeyId
+            return key
+        except KeyNotFound:
+            return None
 
     def computeTrust(self, keyId):
         self._graph = graph.DirectedGraph()
         g = self._graph
+        self._trust.clear()
+        self._depth.clear()
 
+        # Normalize the key
+        key = self._getKey(keyId)
+        if key is None:
+            return {}, {}
+        keyId = key.getKeyId()
         g.addNode(keyId)
         starts, finishes, trees, pred, depth = g.doBFS(
             start = keyId,
@@ -531,15 +554,26 @@ class Trust(object):
         gt = g.transpose()
         self._graph = gt
 
+        topLevelKeyIds = [ self._getKey(x) for x in self.topLevelKeys ]
+        topLevelKeyIds = [ x.getKeyId() for x in topLevelKeyIds if x is not None ]
         # Top-level keys are fully trusted
-        toplevel = [ x for x in self.topLevelKeys if x in g ]
+        topLevelKeyIds = [ x for x in topLevelKeyIds if x in g ]
         self._trust = dict((x, (self.depthLimit, 120, 120))
-                            for x in toplevel)
+                            for x in topLevelKeyIds)
 
-        tstart, tfinishes, ttrees, tpred, tdepth = gt.doBFS(start = toplevel,
+        tstart, tfinishes, ttrees, tpred, tdepth = gt.doBFS(
+            start = topLevelKeyIds,
             getChildrenCallback = self.trustComputationCallback)
-        tdepth = dict((g.get(x), y) for x, y in tdepth.items())
-        return self._trust, tdepth
+        self._depth = dict((g.get(x), y) for x, y in tdepth.items())
+        return self._trust, self._depth
+
+    def getTrust(self, keyId):
+        keyId = self._idMap.get(keyId, keyId)
+        return self._trust.get(keyId, None)
+
+    def getDepth(self, keyId):
+        keyId = self._idMap.get(keyId, keyId)
+        return self._depth.get(keyId, None)
 
     def getChildrenCallback(self, nodeIdx):
         nodeId = self._graph.get(nodeIdx)
