@@ -31,6 +31,7 @@ Changes in 2.0.0:
       lot of them are needed from the same trove (CNY-2022)
     * Split rollback stack code into a separate class (CNY-2061)
     * Added rmrollback command to remove old rollbacks (CNY-2061)
+    * Rollback objects now have isLocal() method (CNY-2077)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
