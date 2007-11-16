@@ -54,10 +54,20 @@ class Rollback:
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 
-    def _getChangeSets(self, item):
-        repos = changeset.ChangeSetFromFile(self.reposName % (self.dir, item))
-        local = changeset.ChangeSetFromFile(self.localName % (self.dir, item))
-        return (repos, local)
+    def _getChangeSets(self, item, repos = True, local = True):
+        if repos:
+            reposCs = changeset.ChangeSetFromFile(
+                                        self.reposName % (self.dir, item))
+        else:
+            reposCs = False
+
+        if local:
+            localCs = changeset.ChangeSetFromFile(
+                                        self.localName % (self.dir, item))
+        else:
+            localCs = False
+
+        return (reposCs, localCs)
 
     def getLast(self):
         if not self.count:
@@ -67,6 +77,20 @@ class Rollback:
     def getLocalChangeset(self, i):
         local = changeset.ChangeSetFromFile(self.localName % (self.dir, i))
         return local
+
+    def isLocal(self):
+        """
+        Return True if every element of the rollback is locally available,
+        False otherwise.
+        """
+        for i in range(self.count):
+            (reposCs, localCs) = self._getChangeSets(i, repos = True,
+                                                     local = False)
+            for trvCs in reposCs.iterNewTroveList():
+                if trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
+                    return False
+
+        return True
 
     def removeLast(self):
         if self.count == 0:
