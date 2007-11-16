@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Internal Changes:
+    * The Conary library now has a parallel implementation to gpg
+      for the trust algorithm. (CNY-1988)
+
 Changes in 1.2.7:
   o Build Changes:
     * The cvc command now prints out the most recent log message from
