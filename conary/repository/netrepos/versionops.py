@@ -307,11 +307,8 @@ class SqlVersioning:
                 self.versionTable.addId(version)
             except sqlerrors.ColumnNotUnique:
                 import sys
-                print >> sys.stderr, 'ERROR: tried to add', version.asString(), 'to version table'
-                versionId = self.versionTable.get(version, None)
-                print >> sys.stderr, 'ERROR: the version id now seems to be', versionId
-                sys.stderr.flush()
-                assert(versionId != None)
+                print >> sys.stderr, 'ERROR: tried to add', version.asString(), 'to version table but it seems to already be there', versionId
+                raise
 	    versionId = self.versionTable.get(version, None)
 
 	if self.nodes.hasRow(itemId, versionId):
