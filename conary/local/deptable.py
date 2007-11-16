@@ -29,7 +29,8 @@ DEP_REASON_COLLECTION = 5
 NO_FLAG_MAGIC = '-*none*-'
 
 class DependencyWorkTables:
-    def __init__(self, cu, removeTables = False):
+    def __init__(self, db, cu, removeTables = False):
+        self.db = db
         self.cu = cu
 
         schema.resetTable(self.cu, "DepCheck")
@@ -121,33 +122,38 @@ class DependencyWorkTables:
             allDeps += [ (1,  x) for x in
                             sorted(provides.getDepClasses().iteritems()) ]
 
-        populateStmt = self.cu.compile("""
-        INSERT INTO DepCheck
-        (troveId, depNum, flagCount, isProvides, class, name, flag)
-        VALUES(?, ?, ?, ?, ?, ?, ?)
-        """)
+        #populateStmt = self.cu.compile("""
+        #INSERT INTO DepCheck
+        #(troveId, depNum, flagCount, isProvides, class, name, flag)
+        #VALUES(?, ?, ?, ?, ?, ?, ?)
+        #""")
 
+        toInsert = []
         for (isProvides, (classId, depClass)) in allDeps:
             # getDeps() returns sorted deps
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
-                    self.cu.execstmt(populateStmt,
-                                   troveNum, multiplier * len(depList),
-                                    1 + len(flags), isProvides, classId,
-                                    depName, NO_FLAG_MAGIC)
+                    toInsert.append((troveNum, multiplier * len(depList),
+                                     1 + len(flags), isProvides, classId,
+                                     depName, NO_FLAG_MAGIC))
                     if flags:
                         for (flag, sense) in flags:
                             # conary 0.12.0 had mangled flags; this check
                             # prevents them from making it into any repository
                             assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
-                            self.cu.execstmt(populateStmt,
-                                        troveNum, multiplier * len(depList),
-                                        1 + len(flags), isProvides, classId,
-                                        depName, flag)
+                            toInsert.append((troveNum,
+                                             multiplier * len(depList),
+                                             1 + len(flags), isProvides,
+                                             classId, depName, flag))
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
+
+        self.db.bulkload("DepCheck", toInsert,
+                         [ "troveId", "depNum", "flagCount", "isProvides",
+                           "class", "name", "flag" ],
+                         start_transaction = False)
 
     def merge(self, intoDatabase = False, skipProvides = False):
         if intoDatabase:
@@ -845,7 +851,7 @@ class DependencyChecker:
         # troves being removed. since those dependencies will be broken
         # after this operation, we don't need to order on them (it's likely
         # they are filled by some other trove being added, and the edge
-        # in newNewEdges will make that work out
+        # in newNewEdges will make that work out)
         del newOldEdges
 
         # Now build up a unified node list. The different kinds of edges
@@ -1047,7 +1053,8 @@ class DependencyChecker:
         self.db = db
         self.cu = self.db.cursor()
         self.troveSource = troveSource
-        self.workTables = DependencyWorkTables(self.cu, removeTables = True)
+        self.workTables = DependencyWorkTables(self.db, self.cu,
+                                               removeTables = True)
 
         # this begins a transaction. we do this explicitly to keep from
         # grabbing any exclusive locks (when the python binding autostarts
@@ -1092,7 +1099,7 @@ class DependencyTables:
         self._add(cu, troveId, trove.getProvides(), trove.getRequires())
 
     def _add(self, cu, troveId, provides, requires):
-        workTables = DependencyWorkTables(cu)
+        workTables = DependencyWorkTables(self.db, cu)
 
         workTables._populateTmpTable([], troveId, requires, provides)
         workTables.merge(intoDatabase = True)
@@ -1138,18 +1145,19 @@ class DependencyTables:
             LabelMap.branchId = Nodes.branchId
         JOIN Labels ON Labels.labelId = LabelMap.labelId """
         restrictWhere = """ WHERE Labels.label = '%s' """ % label
-        # FIXME: avoid sprintf() here
         if leavesOnly:
             # this call only makes sense from the server.
             # limit the import to server-side only to avoid extra deps.
-            from conary.repository.netrepos import versionops
+            from conary.repository import trovesource
+            raise RuntimeError("make sure we process usergroupid here!")
             restrictJoin += """
-                JOIN Latest ON (Instances.itemId = Latest.itemId
-                                AND Nodes.branchId = Latest.branchId
-                                AND Instances.flavorId = Latest.flavorId
-                                AND Instances.versionId = Latest.versionId
-                                AND Latest.latestType = %s)
-            """ % versionops.LATEST_TYPE_NORMAL
+            JOIN LatestCache ON
+                Instances.itemId = LatestCache.itemId AND
+                Nodes.branchId = LatestCache.branchId AND
+                Instances.flavorId = LatestCache.flavorId AND
+                Instances.versionId = LatestCache.versionId AND
+                LatestCache.latestType = %d """ % (
+                trovesource.QUERY_TYPE_NORMAL,)
 
         return restrictJoin, restrictWhere
 
@@ -1168,7 +1176,7 @@ class DependencyTables:
                  restrictBy=None):
 
         cu = self.db.cursor()
-        workTables = DependencyWorkTables(cu)
+        workTables = DependencyWorkTables(self.db, cu)
 
 	cu.execute("BEGIN")
 
@@ -1322,7 +1330,7 @@ class DependencyTables:
 
         cu = self.db.cursor()
 
-        workTables = DependencyWorkTables(cu)
+        workTables = DependencyWorkTables(self.db, cu)
 
 	cu.execute("BEGIN")
 
