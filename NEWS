@@ -3,6 +3,10 @@ Changes in @NEW@:
     * The Conary library now has a parallel implementation to gpg
       for the trust algorithm. (CNY-1988)
 
+  o Bug Fixes:
+    * A problem occurring when updating troves with sharing a large
+      number of identical files has been fixed. (CNY-2273)
+
 Changes in 1.2.7:
   o Build Changes:
     * The cvc command now prints out the most recent log message from

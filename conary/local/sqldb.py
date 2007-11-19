@@ -128,12 +128,20 @@ class DBTroveFiles:
 		   "AND instanceId=?", (path, instanceId))
 
     def _updatePathIdsPresent(self, instanceId, pathIdList, isPresent):
-        pathIdListPattern = ",".join(( '?' ) * len(pathIdList))
+        # Max number of bound params
+        chunkSize = 990
+        plen = len(pathIdList)
         cu = self.db.cursor()
-
-        cu.execute("UPDATE DBTroveFiles SET isPresent=%d WHERE "
-                   "instanceId=%d AND pathId in (%s)" % (isPresent, 
-                   instanceId, pathIdListPattern), pathIdList)
+        i = 0
+        while i < plen:
+            clen = min(chunkSize, plen - i)
+            bvals = [ isPresent, instanceId ] + pathIdList[i : i + clen]
+            bparams = ','.join('?' * clen)
+            cu.execute("UPDATE DBTroveFiles "
+                       "SET isPresent=? "
+                       "WHERE instanceId=? AND pathId in (%s)" % bparams,
+                       bvals)
+            i += clen
 
     def removePathIds(self, instanceId, pathIdList):
         self._updatePathIdsPresent(instanceId, pathIdList, isPresent = 0)
