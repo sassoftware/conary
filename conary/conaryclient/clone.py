@@ -210,7 +210,7 @@ class ClientClone:
                     # keep oldTrovesNeeded parallel to finalTroveList
                     oldTrovesNeeded.append(None)
                 else:
-                    oldTrovesNeeded.append((name, matchVersion, flavor))
+                    oldTrovesNeeded.append((name, match, flavor))
 
         oldTroves = troveCache.getTroves(
             [ x for x in oldTrovesNeeded if x is not None ], withFiles=True)
