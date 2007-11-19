@@ -123,6 +123,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def setRepos(self, repos):
         self.repos = repos
 
+    def getDatabase(self):
+        return self.db
+
     def disconnectRepos(self):
         self.repos = None
 
@@ -351,7 +354,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         Iterate over rollback list.
         Yield (rollbackName, rollback)
         """
-        return self.db.iterRollbacksList()
+        return self.db.getRollbackStack().iter()
 
     def getSearchSource(self, flavor=0, troveSource=None):
         # a flavor of None is common in some cases so we use 0
