@@ -6,6 +6,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * A problem occurring when updating troves with sharing a large
       number of identical files has been fixed. (CNY-2273)
+    * A regression from Conary 1.2.7 in the way passphrases are passed
+      to the PGP library has been fixed. (CNY-2279)
 
 Changes in 1.2.7:
   o Build Changes:

@@ -294,7 +294,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             # FIXME: make this a callback
             passPhrase = getpass.getpass("Passphrase: ")
             try:
-                cryptoKey = key.getCryptoKey('')
+                cryptoKey = key.getCryptoKey(passPhrase)
                 self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
                 return self.privateDict[keyId]
             except BadPassPhrase:
