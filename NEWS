@@ -32,6 +32,9 @@ Changes in 2.0.0:
     * Split rollback stack code into a separate class (CNY-2061)
     * Added rmrollback command to remove old rollbacks (CNY-2061)
     * Rollback objects now have isLocal() method (CNY-2077)
+    * cvc promote now uses the labels and branches specified in the
+      "from" section of any promote as the place to search for packages
+      (CNY-2235).
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
