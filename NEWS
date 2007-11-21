@@ -9,6 +9,11 @@ Changes in @NEW@:
     * A regression from Conary 1.2.7 in the way passphrases are passed
       to the PGP library has been fixed. (CNY-2279)
 
+  o Client Changes:
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+
 Changes in 1.2.7:
   o Build Changes:
     * The cvc command now prints out the most recent log message from

@@ -27,6 +27,7 @@ from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
+from conary.conaryclient import cmdline
 from conary.conaryclient.clone import ClientClone
 from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
@@ -388,3 +389,30 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         # Close the log files too
         log.syslog.close()
+
+def getClient(context=None, environ=None, searchCurrentDir=False, cfg=None):
+    """
+        Returns a ConaryClient object that has the context set as it would
+        be if the conary command line were used.
+
+        This means it checks for the explicit "context" variable passed in
+        manually.  It follows by checking the eviron dict
+        (defaults to os.environ) for the CONARY_CONTEXT variable.  It then
+        falls back to the CONARY file and looks for a context set there.  
+        Finally, if these checks fail to find a context, it will look at the
+        context specified in the cfg variable.
+
+        @param context: a context override string or None
+        @param environ: a dict representing the current environment or None to
+            use os.environ
+        @param searchCurrentDir: if True, look in the current directory for
+            a CONARY file and set the context from there if needed.  Otherwise,
+            do not look for a CONARY file.  (Default False)
+        @param cfg: ConaryConfiguration to use.  If None, read the
+            configuration as conary would, from /etc/conaryrc, ~/.conaryrc,
+            and ./conaryrc.
+    """
+    if cfg is None:
+        cfg = conarycfg.ConaryConfiguration(True)
+    cmdline.setContext(cfg, context, environ, searchCurrentDir)
+    return ConaryClient(cfg)
