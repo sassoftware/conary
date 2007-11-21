@@ -18,7 +18,7 @@ from conary import conarycfg
 from conary import errors
 from conary import state
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, cfgtypes
 from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
@@ -217,7 +217,7 @@ def setContext(cfg, context=None, environ=None, searchCurrentDir=False):
             where = 'specified in the CONARY_CONTEXT environment variable'
     if context:
         if not cfg.getContext(context):
-            raise RuntimeError('context "%s" (%s) does not exist' % (context, where))
+            raise cfgtypes.CfgError('context "%s" (%s) does not exist' % (context, where))
         cfg.setContext(context)
     return cfg
 
