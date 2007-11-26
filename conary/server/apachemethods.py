@@ -154,19 +154,20 @@ def sendfile(req, size, path):
         # otherwise we can use the handy sendfile method
         req.sendfile(path)
 
+def _writeNestedFile(req, name, tag, size, f, sizeCb):
+    if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
+        # this is a reference to a compressed file in the contents store
+        path = f.read()
+        size = os.stat(path).st_size
+        tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+        sizeCb(size, tag)
+        sendfile(req, size, path)
+    else:
+        # this is data from the changeset itself
+        sizeCb(size, tag)
+        req.write(f.read())
+
 def get(port, isSecure, repos, req):
-    def _writeNestedFile(req, name, tag, size, f, sizeCb):
-        if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
-            # this is a reference to a compressed file in the contents store
-            path = f.read()
-            size = os.stat(path).st_size
-            tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-            sizeCb(size, tag)
-            sendfile(req, size, path)
-        else:
-            # this is data from the changeset itself
-            sizeCb(size, tag)
-            req.write(f.read())
 
     uri = req.uri
     if uri.endswith('/'):
