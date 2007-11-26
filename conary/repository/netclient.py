@@ -220,6 +220,12 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                     raise klass(exceptionArgs[0])
 	    raise errors.UnknownException(exceptionName, exceptionArgs)
 
+    def __getattr__(self, name):
+        # Don't invoke methods that start with __
+        if name.startswith('__'):
+            raise AttributeError(name)
+        return xmlrpclib._Method.__getattr__(self, name)
+
 class ServerProxy(util.ServerProxy):
 
     def __passwordCallback(self):

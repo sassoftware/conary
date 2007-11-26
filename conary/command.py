@@ -13,6 +13,8 @@
 #
 
 import os, sys, optparse
+
+from conary.conaryclient import cmdline
 from conary.lib import options, log
 from conary import state, versions
 
@@ -81,26 +83,8 @@ class ConaryCommand(options.AbstractCommand):
         options.AbstractCommand.addConfigOptions(self, cfgMap, argDef)
 
     def setContext(self, cfg, argSet):
-        context = cfg.context
-        where = 'specified as the default context in the conary configuration'
-        if os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
-            if conaryState.hasContext():
-                context = conaryState.getContext()
-                where = 'specified in the CONARY state file'
-
-        if 'CONARY_CONTEXT' in os.environ:
-            context = os.environ['CONARY_CONTEXT']
-            where = 'specified in the CONARY_CONTEXT environment variable'
-        if 'context' in argSet:
-            context = argSet.pop('context')
-            where = 'specified on the command line'
-
-        if context:
-            if not cfg.getContext(context):
-                log.error('context "%s" (%s) does not exist', context, where)
-                sys.exit(1)
-            cfg.setContext(context)
+        cmdline.setContext(cfg, argSet.pop('context', None),
+                                 searchCurrentDir=True)
 
     def processConfigOptions(self, cfg, cfgMap, argSet):
         self.setContext(cfg, argSet)
