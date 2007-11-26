@@ -100,9 +100,6 @@ class ProxyCaller:
                          self._transport.responseProtocol)
 
     def __getattr__(self, method):
-        # Don't invoke methods that start with _
-        if method.startswith('_'):
-            raise AttributeError(method)
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, url, proxy, transport):
@@ -173,9 +170,6 @@ class RepositoryCaller:
         return None
 
     def __getattr__(self, method):
-        # Don't invoke methods that start with _
-        if method.startswith('_'):
-            raise AttributeError(method)
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, protocol, port, authToken, repos, remoteIp, rawUrl,
