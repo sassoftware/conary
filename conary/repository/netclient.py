@@ -238,8 +238,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 	    raise errors.UnknownException(exceptionName, exceptionArgs)
 
     def __getattr__(self, name):
-        # Don't invoke methods that start with _
-        if name.startswith('_'):
+        # Don't invoke methods that start with __
+        if name.startswith('__'):
             raise AttributeError(name)
         return xmlrpclib._Method.__getattr__(self, name)
 
