@@ -26,10 +26,6 @@ from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
 from conary.server.apachemethods import get, post, putFile
 
-def writeTraceback(wfile, cfg):
-    kid_error.write(wfile, cfg = cfg, pageTitle = "Error",
-                           error = traceback.format_exc())
-
 def formatRequestInfo(req):
     c = req.connection
     req.add_common_vars()
