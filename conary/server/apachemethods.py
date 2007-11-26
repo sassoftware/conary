@@ -173,7 +173,6 @@ def get(port, isSecure, repos, req):
     if uri.endswith('/'):
         uri = uri[:-1]
     cmd = os.path.basename(uri)
-    fields = FieldStorage(req)
 
     authToken = getAuth(req)
 
