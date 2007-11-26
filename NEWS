@@ -6,8 +6,10 @@ Changes in @NEW@:
   o Bug Fixes:
     * A problem occurring when updating troves with sharing a large
       number of identical files has been fixed. (CNY-2273)
-    * A regression from Conary 1.2.7 in the way passphrases are passed
-      to the PGP library has been fixed. (CNY-2279)
+    * Repository traceback emails are now more verbose. (CNY-2287)
+    * Methods starting with an underscore are considered internal and
+      are no longer passed to the XML-RPC library for marshaling.
+      (CNY-2286)
 
   o Client Changes:
     * A new method, conary.conaryclient.getClient(), has been added to
