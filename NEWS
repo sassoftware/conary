@@ -10,6 +10,7 @@ Changes in 2.0.0:
     * Distributed changeset creation no longer recompresses file contents
 
   o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
     * Added getTroveLatestByLabel as a client-side call
     * Most repository exceptions are demarshalled using logic in the
       exception class itself rather than in a large if/elif block (CNY-747)
