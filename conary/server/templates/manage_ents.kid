@@ -24,8 +24,8 @@
                 <thead>
                     <tr>
                         <td style="width: 25%;">Entitlement Class</td>
-                        <td py:if="isAdmin" py:content="'Permissions Group'"/>
-                        <td py:if="isAdmin" py:content="'Managing Group'"/>
+                        <td py:if="isAdmin" py:content="'Role'"/>
+                        <td py:if="isAdmin" py:content="'Managing Role'"/>
                         <td style="text-align: center;" py:content="'Manage'"/>
                         <td style="text-align: center;" py:if="isAdmin" py:content="'Delete'"/>
                     </tr>

@@ -14,6 +14,7 @@
 
 from conary import trove, versions
 from conary.dbstore import idtable
+from conary.dbstore import sqlerrors
 from conary.repository import trovesource
 from conary.repository.errors import DuplicateBranch, InvalidSourceNameError
 from conary.repository.netrepos import instances, items
@@ -302,7 +303,12 @@ class SqlVersioning:
 
 	versionId = self.versionTable.get(version, None)
 	if versionId == None:
-	    self.versionTable.addId(version)
+            try:
+                self.versionTable.addId(version)
+            except sqlerrors.ColumnNotUnique:
+                import sys
+                print >> sys.stderr, 'ERROR: tried to add', version.asString(), 'to version table but it seems to already be there', versionId
+                raise
 	    versionId = self.versionTable.get(version, None)
 
 	if self.nodes.hasRow(itemId, versionId):

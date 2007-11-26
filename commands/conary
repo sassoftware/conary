@@ -378,6 +378,20 @@ class RollbackCommand(ConaryCommand):
         client.applyRollback(otherArgs[2], **kwargs)
 _register(RollbackCommand)
 
+class RemoveRollbackCommand(ConaryCommand):
+    commands = ['rmrollback', 'rmrb']
+    paramHelp = "<rollback>"
+    help = 'Remove old rollbacks'
+    commandGroup = 'System Modification'
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if argSet or len(otherArgs) != 3: return self.usage()
+        db = openDatabase(cfg.root, cfg.dbPath)
+        rollbacks.removeRollbacks(db, otherArgs[2])
+_register(RemoveRollbackCommand)
 
 class _AbstractQueryCommand(ConaryCommand):
 

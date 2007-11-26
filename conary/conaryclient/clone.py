@@ -210,7 +210,7 @@ class ClientClone:
                     # keep oldTrovesNeeded parallel to finalTroveList
                     oldTrovesNeeded.append(None)
                 else:
-                    oldTrovesNeeded.append((name, matchVersion, flavor))
+                    oldTrovesNeeded.append((name, match, flavor))
 
         oldTroves = troveCache.getTroves(
             [ x for x in oldTrovesNeeded if x is not None ], withFiles=True)
@@ -306,6 +306,10 @@ class ClientClone:
                                     withFiles = True, withFileContents = True,
                                     recurse = False, callback = callback)
             jobFilesNeeded.sort()
+	    # fileId, pathId of the last file we saw. we don't need to
+	    # include the same file contents twice (nor can we get them
+	    # twice from fileChangeSet
+            lastContents = (None, None)
             # walk the filesNeeded for the files we're getting from changesets
             for (pathId, newFileId, oldFileId, fromFileVersion) in \
                                 jobFilesNeeded:
@@ -321,7 +325,8 @@ class ClientClone:
                 # need them anyway. That leaves a changeset with broken
                 # ptr links, but it commits just fine.
 
-                if files.frozenFileHasContents(filecs):
+                if (files.frozenFileHasContents(filecs) and
+			(pathId, newFileId) != lastContents):
                     # this copies the contents from the old changeset to the
                     # new without recompressing
                     (contType, contents) = fileChangeSet.getFileContents(
@@ -331,6 +336,7 @@ class ClientClone:
                                    contType, contents,
                                    files.frozenFileFlags(filecs).isConfig(),
                                    compressed = True)
+		    lastContents = (pathId, newFileId)
 
             # now collect up the random files and handle those
             allFileObjects = self.repos.getFileVersions(

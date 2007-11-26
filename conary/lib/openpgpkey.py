@@ -21,14 +21,12 @@ from time import time
 
 from conary import callbacks
 from conary.lib.util import log
+from conary.lib import graph
 
 from Crypto.PublicKey import DSA
 from openpgpfile import BadPassPhrase
-from openpgpfile import getFingerprint
-from openpgpfile import getKeyEndOfLife
+from openpgpfile import PGP_Signature
 from openpgpfile import getKeyTrust
-from openpgpfile import getPrivateKey
-from openpgpfile import getPublicKey
 from openpgpfile import KeyNotFound
 from openpgpfile import num_getRelPrime
 from openpgpfile import seekKeyById
@@ -38,32 +36,63 @@ from openpgpfile import SEEK_SET, SEEK_END
 #OpenPGPKey structure:
 #-----#
 
-class OpenPGPKey:
-    def __init__(self, fingerprint, cryptoKey, revoked, timestamp, trustLevel=255):
+class OpenPGPKey(object):
+    __slots__ = ['fingerprint', 'cryptoKey', 'revoked', 'timestamp',
+                 'trustLevel', 'signatures', 'id']
+    def __init__(self, key, cryptoKey, trustLevel=255):
         """
         instantiates a OpenPGPKey object
 
-        @param fingerprint: string key fingerprint of this key
-        @type fingerprint: str
+        @param key: A PGP key
+        @type fingerprint: instance of openpgpfile.PGP_Key
         @param cyptoKey: DSA or RSA key object
         @type cryptoKey: instance
-        @param revoked: is this key revoked
-        @type revoked: bool
         @param trustLevel: the trust level of this key, as stored locally
         @type trustLevel: int
         """
 
-        self.fingerprint = fingerprint
+        self.id = key.getKeyId()
+        self.fingerprint = key.getKeyFingerprint()
         self.cryptoKey = cryptoKey
-        self.revoked = revoked
-        self.timestamp = timestamp
+        self.revoked, self.timestamp = key.getEndOfLife()
         self.trustLevel = trustLevel
+        self.signatures = []
+        self._initSignatures(key)
+
+    def _initSignatures(self, key):
+        # Iterate over this packet's signatures
+        sigs = {}
+        keyId = key.getKeyId()
+        for sig in key.iterCertifications():
+            # Ignore self signatures
+            sigKeyId = sig.getSignerKeyId()
+            if sigKeyId == keyId[-16:]:
+                continue
+            # XXX We should deal with conflict here
+            if sigKeyId in sigs:
+                continue
+            trustLevel, trustAmount, trustRegex = sig.getTrust()
+            sigs[sigKeyId] = OpenPGPKeySignature(
+                    sigId = sig.getSignatureHash(),
+                    signer = sigKeyId,
+                    signature = sig.parseMPIs(),
+                    pubKeyAlg = sig.pubKeyAlg,
+                    hashAlg = sig.hashAlg,
+                    creation = sig.getCreation(),
+                    expiration = sig.getExpiration(),
+                    trustLevel = trustLevel,
+                    trustAmount = trustAmount,
+                    trustRegex = trustRegex)
+        self.signatures = sorted(sigs.values(), key = lambda x: x.signer)
 
     def getTrustLevel(self):
         return self.trustLevel
 
     def isRevoked(self):
         return self.revoked
+
+    def getKeyId(self):
+        return self.id
 
     def getFingerprint(self):
         return self.fingerprint
@@ -105,6 +134,36 @@ class OpenPGPKey:
             return self.trustLevel
         else:
             return -1
+
+class OpenPGPKeySignature(object):
+    __slots__ = ['sigId', 'signer', 'creation', 'expiration', 'revocation',
+                 'trustLevel', 'trustAmount', 'pubKeyAlg', 'hashAlg',
+                 'signature', '_verifies']
+    """A key signature on a key"""
+    def __init__(self, **kwargs):
+        self.sigId = kwargs.pop('sigId')
+        self.signer = kwargs.pop('signer')
+        self.creation = kwargs.pop('creation')
+        self.pubKeyAlg = kwargs.pop('pubKeyAlg')
+        self.hashAlg = kwargs.pop('hashAlg')
+        self.signature = kwargs.pop('signature')
+        self.expiration = kwargs.pop('expiration', None)
+        self.revocation = kwargs.pop('revocation', None)
+        self.trustLevel = kwargs.pop('trustLevel', None)
+        self.trustAmount = kwargs.pop('trustAmount', None)
+        self._verifies = None
+
+    def getSignerKeyId(self):
+        return self.signer
+
+    def verifies(self, keyRetrievalCallback):
+        if self._verifies is not None:
+            return self._verifies
+        # We need to get the signer's crypto alg
+        sigKey = keyRetrievalCallback(self.signer)
+        self._verifies = PGP_Signature.verifySignature(self.sigId,
+                sigKey.cryptoKey, self.signature, self.pubKeyAlg, self.hashAlg)
+        return self._verifies
 
 class _KeyNotFound(KeyNotFound):
     errorIsUncatchable = True
@@ -192,12 +251,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                 key = seekKeyById(keyId, publicPath)
                 if not key:
                     continue
-                fingerprint = key.getKeyId()
-                revoked, timestamp = key.getEndOfLife()
-                cryptoKey = key.makePgpKey()
-                trustLevel = getKeyTrust(trustDbPath, fingerprint)
-                self.publicDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                    revoked, timestamp,
+                trustLevel = getKeyTrust(trustDbPath, key.getKeyFingerprint())
+                self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
                                                     trustLevel)
                 return self.publicDict[keyId]
             except (KeyNotFound, IOError):
@@ -213,22 +268,20 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             return self.privateDict[keyId]
 
         # translate the keyId to a full fingerprint for consistency
-        fingerprint = getFingerprint(keyId, self.privatePath)
-        revoked, timestamp = getKeyEndOfLife(keyId, self.privatePath)
+        key = seekKeyById(keyId, self.privatePath)
 
         # if we were supplied a password, use it.  The caller will need
         # to deal with handling BadPassPhrase exceptions
         if passphrase is not None:
-            cryptoKey = getPrivateKey(keyId, passphrase, self.privatePath)
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey,
-                                                 revoked, timestamp)
+            cryptoKey = key.getCryptoKey(passphrase)
+            self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
             return self.privateDict[keyId]
 
         # next, see if the key has no passphrase (WHY???)
         # if it's readable, there's no need to prompt the user
         try:
-            cryptoKey = getPrivateKey(keyId, '', self.privatePath)
-            self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
+            cryptoKey = key.getCryptoKey('')
+            self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
             return self.privateDict[keyId]
         except BadPassPhrase:
             pass
@@ -241,8 +294,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             # FIXME: make this a callback
             passPhrase = getpass.getpass("Passphrase: ")
             try:
-                cryptoKey = getPrivateKey(keyId, passPhrase, self.privatePath)
-                self.privateDict[keyId] = OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp)
+                cryptoKey = key.getCryptoKey(passPhrase)
+                self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
                 return self.privateDict[keyId]
             except BadPassPhrase:
                 print "Bad passphrase. Please try again."
@@ -447,4 +500,132 @@ def getKeyCache():
 def setKeyCache(keyCache):
     global _keyCache
     _keyCache = keyCache
+
+class Trust(object):
+    depthLimit = 10
+    marginals = 3
+
+    def __init__(self, topLevelKeys, keyCache):
+        self.topLevelKeys = topLevelKeys
+        self.keyCache = keyCache
+        self._graph = None
+        # self._trust is a dictionary, keyed on the node index, and with 3
+        # values: (node trust level, node trust amount, actual trust)
+        # The first two are just caches of the values in a trust signature,
+        # and only affect the values for this node's children (i.e. they
+        # determine the amount of trust this node transmits to the nodes it
+        # signed). If the cumulated actual trust for this node does not exceed
+        # 120, this node is considered untrusted, and it will be ignored
+        # completely in determining trust for other keys.
+        self._trust = {}
+        self._depth = {}
+        # Requesting keys by the short name will populate _idMap
+        self._idMap = {}
+
+    def _getKey(self, keyId):
+        try:
+            key = self.keyCache.getPublicKey(keyId)
+            realKeyId = key.getKeyId()
+            if key != realKeyId:
+                self._idMap[keyId] = realKeyId
+            return key
+        except KeyNotFound:
+            return None
+
+    def computeTrust(self, keyId):
+        self._graph = graph.DirectedGraph()
+        g = self._graph
+        self._trust.clear()
+        self._depth.clear()
+
+        # Normalize the key
+        key = self._getKey(keyId)
+        if key is None:
+            return {}, {}
+        keyId = key.getKeyId()
+        g.addNode(keyId)
+        starts, finishes, trees, pred, depth = g.doBFS(
+            start = keyId,
+            getChildrenCallback = self.getChildrenCallback,
+            depthLimit = self.depthLimit)
+
+        # Start walking the tree in reverse order, validating the trust of
+        # each signature
+        gt = g.transpose()
+        self._graph = gt
+
+        topLevelKeyIds = [ self._getKey(x) for x in self.topLevelKeys ]
+        topLevelKeyIds = [ x.getKeyId() for x in topLevelKeyIds if x is not None ]
+        # Top-level keys are fully trusted
+        topLevelKeyIds = [ x for x in topLevelKeyIds if x in g ]
+        self._trust = dict((x, (self.depthLimit, 120, 120))
+                            for x in topLevelKeyIds)
+
+        tstart, tfinishes, ttrees, tpred, tdepth = gt.doBFS(
+            start = topLevelKeyIds,
+            getChildrenCallback = self.trustComputationCallback)
+        self._depth = dict((g.get(x), y) for x, y in tdepth.items())
+        return self._trust, self._depth
+
+    def getTrust(self, keyId):
+        keyId = self._idMap.get(keyId, keyId)
+        return self._trust.get(keyId, None)
+
+    def getDepth(self, keyId):
+        keyId = self._idMap.get(keyId, keyId)
+        return self._depth.get(keyId, None)
+
+    def getChildrenCallback(self, nodeIdx):
+        nodeId = self._graph.get(nodeIdx)
+        try:
+            node = self.keyCache.getPublicKey(nodeId)
+        except KeyNotFound:
+            return []
+
+        for sig in node.signatures:
+            self._graph.addEdge(nodeId, sig.getSignerKeyId())
+        return self._graph.edges[nodeIdx]
+
+    def trustComputationCallback(self, nodeIdx):
+        gt = self._graph
+        trust = self._trust
+        classicTrust = int(120 / self.marginals)
+        if 120 % self.marginals:
+            classicTrust += 1
+
+        nodeId = gt.get(nodeIdx)
+        if nodeId not in trust:
+            return []
+        nodeSigLevel, nodeSigTrust, nodeTrust = trust[nodeId]
+        if nodeSigLevel == 0 or nodeTrust < 120:
+            # This node is not trusted, don't propagate its trust to children
+            return []
+
+        for snIdx in gt.edges[nodeIdx]:
+            node = gt.get(snIdx)
+            ntlev, ntamt, tramt = trust.setdefault(node,
+                    (nodeSigLevel - 1, 120, 0))
+            # Get the signature
+            n = self.keyCache.getPublicKey(node)
+            sig = [ x for x in n.signatures if x.getSignerKeyId() == nodeId ]
+            assert(sig)
+            sig = sig[0]
+
+            if not sig.verifies(self.keyCache.getPublicKey):
+                continue
+
+            if sig.trustLevel is not None:
+                ntlev = min(ntlev, sig.trustLevel)
+            # If no trust amount is present, use the standard trust model
+            # (self.marginals keys needed to introduce a trusted key.
+            # Note this is limited to one level of intermediate trusted keys
+            # only)
+            amt = ((sig.trustAmount is None) and classicTrust) or sig.trustAmount
+            ntamt = min(ntamt, amt)
+            # Child node trust cannot exceed the parent's trust
+            tramt = min(tramt + nodeSigTrust, nodeTrust)
+
+            trust[node] = (ntlev, ntamt, tramt)
+
+        return gt.edges[nodeIdx]
 
