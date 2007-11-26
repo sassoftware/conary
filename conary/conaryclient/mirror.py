@@ -186,7 +186,8 @@ def Main(argv=sys.argv[1:]):
     if options.verbose:
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
-
+    if options.fastSync: # make --fast-sync imply --full-trove-sync
+        options.sync = True
     mainWorkflow(cfg, callback, options.test,
                  sync = options.sync, infoSync = options.infoSync,
                  fastSync = options.fastSync)
