@@ -2055,14 +2055,14 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
         rv = recipeObj.recordCalls(recipeObj.setup)
         functionNames = []
         if recordCalls:
-            for (depth, className, fn) in recipeObj.methodsCalled:
-                methodName = className + '.' + fn.__name__
+            for (depth, className, fnName) in recipeObj.methodsCalled:
+                methodName = className + '.' + fnName
                 line = '  ' * depth + methodName
                 functionNames.append(line)
             log.info('Methods called:\n%s' % '\n'.join(functionNames))
             unusedMethods = []
-            for (className, fn) in recipeObj.unusedMethods:
-                methodName = className + '.' + fn.__name__
+            for (className, fnName) in recipeObj.unusedMethods:
+                methodName = className + '.' + fnName
                 line = '  ' + methodName
                 unusedMethods.append(line)
             if unusedMethods:
