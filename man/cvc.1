@@ -436,6 +436,28 @@ Signs the specified troves in their respective repositories. If
 signatureKeyMap settings specified in config files. The repositories affected 
 must recognize the OpenPGP key(s) that made the trove signature(s) or the 
 respective signatures will be rejected.
+.TP
+.B derive \fInewshadow [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
+Creates a derived package in one step. This is an aggregation function to
+shadow, check out and patch a trove in one step. derive performs a source\-only
+shadow of \fI<trove>:source\fR to \fInewshadow\fR. more than one source trove
+can be passed unless \fB\-\-checkout\-dir\fR or \fB\-\-extract\-dir\fR are
+specified.
+.RS 4
+.TP
+.B \-\-checkout\-dir
+Check the \fI<newshadow>:source\fR component out of the repository
+and put it in directory \fI<checkout\-dir>\fP instead of directory.
+Only one \fI<trove>\fP may be specified if this flag is used.
+\fI<trove>\fP.
+.TP
+.B \-\-extract\-dir
+Check the \fI<trove>\fP package out of the repository and put it in directory
+\fI<extract\-dir>\fP. \fI<Trove>\fP must be a binary trove if this flag is used.
+Only one \fI<trove>\fP may be specified if this flag is used.
+.TP
+.B \-\-info, \-i
+Determine the packages and groups that would be created by the shadow and display that information, without actually shadowing.
 .RE
 .\"
 .\"
