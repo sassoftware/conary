@@ -7,9 +7,9 @@ Changes in @NEW@:
     * A problem occurring when updating troves with sharing a large
       number of identical files has been fixed. (CNY-2273)
     * Repository traceback emails are now more verbose. (CNY-2287)
-    * Methods starting with an underscore are considered internal and
-      are no longer passed to the XML-RPC library for marshaling.
-      (CNY-2286)
+    * Methods starting with two underscore characters are considered
+      internal and are no longer passed to the XML-RPC library for
+      marshaling. (CNY-2286)
 
   o Client Changes:
     * Added cvc derive as a client-side call (CNY-2237)
