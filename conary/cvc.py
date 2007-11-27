@@ -575,20 +575,20 @@ class DeriveCommand(CvcCommand):
     help = 'Aggregation command to shadow, check out and alter a recipe'
     commandGroup = 'Repository Access'
 
-    docs = {'checkout-dir' : 'Derive single trove and check out in directory DIR',
+    docs = {'dir' : 'Derive single trove and check out in directory DIR',
             'extract-dir': 'extract single binary parent trove in dirctory DIR',
             'info': 'Display info on shadow/branch'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
-        argDef["checkout-dir"] = ONE_PARAM
+        argDef["dir"] = ONE_PARAM
         argDef["info"] = '-i', NO_PARAM
         argDef['extract-dir'] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
-        checkoutDir = argSet.pop('checkout-dir', None)
+        checkoutDir = argSet.pop('dir', None)
         extractDir = argSet.pop('extract-dir', None)
         info = prep = False
         if argSet.has_key('info'):
@@ -597,7 +597,7 @@ class DeriveCommand(CvcCommand):
 
         if argSet or (len(args) < 3) or ((checkoutDir or extractDir) and len(args) != 3):
             # no leftover args
-            # usage of --extract-dir or --checkout-dir implies only one trove
+            # usage of --extract-dir or --dir implies only one trove
             return self.usage()
 
         target = args[1]
