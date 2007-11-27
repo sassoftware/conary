@@ -18,14 +18,14 @@
     <head/>
     <body>
         <div id="inner">
-            <h2 py:content="modify and 'Edit Group' or 'Add Group'"></h2>
+            <h2 py:content="modify and 'Edit Role' or 'Add Role'"></h2>
 
-            <form method="post" action="${modify and 'manageGroup' or 'addGroup'}">
+            <form method="post" action="${modify and 'manageRole' or 'addRole'}">
                 <input py:if="modify" type="hidden" name="userGroupName" value="${userGroupName}" />
                 <table class="add-form">
                     <tr>
-                        <td id="header">Group Name:</td>
-                        <td><input type="text" name="newUserGroupName" value="${userGroupName}"/></td>
+                        <td id="header">Role Name:</td>
+                        <td><input type="text" name="newRoleName" value="${userGroupName}"/></td>
                     </tr>
                     <tr>
                         <td id="header">Initial Users:</td>
@@ -41,7 +41,14 @@
                         </td>
                     </tr>
                     <tr>
-                        <td id="header">Group can mirror:</td>
+                        <td id="header">Role is admin:</td>
+                        <td>
+                            <input type="radio" name="isAdmin" value="1" py:attrs="{'checked' : groupIsAdmin and 'checked' or None }"/>Yes
+                            <input type="radio" name="isAdmin" value="0" py:attrs="{'checked' : (not groupIsAdmin) and 'checked' or None }"/>No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td id="header">Role can mirror:</td>
                         <td>
                             <input type="radio" name="canMirror" value="1" py:attrs="{'checked' : canMirror and 'checked' or None }"/>Yes
                             <input type="radio" name="canMirror" value="0" py:attrs="{'checked' : (not canMirror) and 'checked' or None }"/>No
@@ -49,8 +56,8 @@
                     </tr>
                 </table>
                 <p>
-                    <input py:if="not modify" type="submit" value="Add Group" />
-                    <input py:if="modify" type="submit" value="Submit Group Changes" />
+                    <input py:if="not modify" type="submit" value="Add Role" />
+                    <input py:if="modify" type="submit" value="Submit Role Changes" />
                 </p>
             </form>
         </div>

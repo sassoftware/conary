@@ -250,7 +250,11 @@ class ChangeSet(streams.StreamSet):
                 raise ChangeSetKeyConflictError(key)
 
 	if cfgFile:
-            assert(not compressed)
+            if compressed:
+                s = gzip.GzipFile(None, "r", fileobj = contents.get()).read()
+                contents = filecontents.FromString(s)
+                compressed = False
+
 	    self.configCache[key] = (contType, contents, compressed)
 	else:
 	    self.fileContents[key] = (contType, contents, compressed)
@@ -882,14 +886,21 @@ class ReadOnlyChangeSet(ChangeSet):
 	if self.configCache.has_key(pathId):
             assert(not compressed)
             name = pathId
-	    (tag, contents, compressed) = self.configCache[pathId]
+	    (tag, contents, alreadyCompressed) = self.configCache[pathId]
             cont = contents
 	elif self.configCache.has_key(key):
-            assert(not compressed)
             name = key
-	    (tag, contents, compressed) = self.configCache[key]
+	    (tag, contents, alreadyCompressed) = self.configCache[key]
 
             cont = contents
+
+            if compressed:
+                f = util.BoundedStringIO()
+                compressor = gzip.GzipFile(None, "w", fileobj = f)
+                util.copyfileobj(cont.get(), compressor)
+                compressor.close()
+                f.seek(0)
+                cont = filecontents.FromFile(f)
 	else:
             self.filesRead = True
 
@@ -1436,29 +1447,33 @@ class DictAsCsf:
         if self.next >= len(self.items):
             return None
 
-        (name, contType, contObj) = self.items[self.next]
+        (name, contType, contObj, compressed) = self.items[self.next]
         self.next += 1
 
-        f = contObj.get()
-        compressedFile = util.BoundedStringIO(maxMemorySize = self.maxMemSize)
-        bufSize = 16384
+        if compressed:
+            compressedFile = contObj.get()
+        else:
+            f = contObj.get()
+            compressedFile = util.BoundedStringIO(maxMemorySize =
+                                                            self.maxMemSize)
+            bufSize = 16384
 
-        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-        while 1:
-            buf = f.read(bufSize)
-            if not buf:
-                break
-            gzf.write(buf)
-        gzf.close()
+            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+            while 1:
+                buf = f.read(bufSize)
+                if not buf:
+                    break
+                gzf.write(buf)
+            gzf.close()
 
-        compressedFile.seek(0)
+            compressedFile.seek(0)
 
         return (name, contType, compressedFile)
 
     def addConfigs(self, contents):
         # this is like __init__, but it knows things are config files so
         # it tags them with a "1" and puts them at the front
-        l = [ (x[0], "1 " + x[1][0][4:], x[1][1]) 
+        l = [ (x[0], "1 " + x[1][0][4:], x[1][1], x[1][2])
                         for x in contents.iteritems() ]
         l.sort()
         self.items = l + self.items
@@ -1467,10 +1482,10 @@ class DictAsCsf:
         self.next = 0
 
     def __init__(self, contents):
-        # convert the dict (which is a changeSet.fileContents object) to
-        # a (name, contTag, contObj) list, where contTag is the same kind
-        # of tag we use in csf files "[0|1] [file|diff]"
-        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1]) for x in 
+        # convert the dict (which is a changeSet.fileContents object) to a
+        # (name, contTag, contObj, compressed) list, where contTag is the same
+        # kind of tag we use in csf files "[0|1] [file|diff]"
+        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1], x[1][2]) for x in 
                             contents.iteritems() ]
         self.items.sort()
         self.next = 0

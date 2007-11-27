@@ -43,7 +43,7 @@ class RepositoryVersionCache:
         if uri not in self.d:
             # checkVersion protocol is stopped at 50; we don't support kwargs
             # for that call, ever
-            useAnon, parentVersions = caller.checkVersion(50)
+            parentVersions = caller.checkVersion(50)
             self.d[uri] = max(set(parentVersions) & set(netserver.SERVER_VERSIONS))
 
         return self.d[uri]
@@ -88,11 +88,21 @@ class ProxyCaller:
 
             raise
 
-        if rc[1]:
-            # exception occured
-            raise ProxyRepositoryError(rc[2])
+        if args[0] < 60:
+            # strip off useAnonymous flag
+            rc = rc[1:3]
 
-        return (rc[0], rc[2])
+        if rc[0]:
+            # exception occured. this lets us tunnel the error through
+            # without instantiating it (which would be demarshalling the
+            # thing just to remarshall it again)
+            if args[0] < 60:
+                raise ProxyRepositoryError(rc[1][0], rc[1][1:], None)
+            else:
+                # keyword args to exceptions appear
+                raise ProxyRepositoryError(rc[1][0], rc[1][1], rc[1][2])
+
+        return rc[1]
 
     def getExtraInfo(self):
         """Return extra information if available"""
@@ -150,7 +160,7 @@ class ProxyCallFactory:
 
         return ProxyCaller(url, proxy, transporter)
 
-class RepositoryCaller:
+class RepositoryCaller(xmlshims.NetworkConvertors):
 
     def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
@@ -159,11 +169,7 @@ class RepositoryCaller:
                                     rawUrl = self.rawUrl,
                                     isSecure = self.isSecure)
 
-        if rc[1]:
-            # exception occured
-            raise ProxyRepositoryError(rc[2])
-
-        return (rc[0], rc[2])
+        return rc
 
     def getExtraInfo(self):
         """No extra information available for a RepositoryCaller"""
@@ -239,7 +245,11 @@ class BaseProxy(xmlshims.NetworkConvertors):
         request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
-            return (False, True, ("MethodNotSupported", methodname, ""), None)
+            if protocol < 60:
+                return (False, True, ("MethodNotSupported", methodname, ""),
+                        None)
+            else:
+                return (True, ("MethodNotSupported", methodname, ""), None)
 
         self._port = port
         self._protocol = protocol
@@ -261,12 +271,15 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                self.urlBase())
 
         # args[0] is the protocol version
+        protocolVersion = args[0]
         if args[0] < 51:
             kwargs = {}
         else:
             assert(len(args) == 3)
             kwargs = args[2]
             args = [ args[0], ] + args[1]
+
+        extraInfo = None
 
         try:
             if hasattr(self, methodname):
@@ -277,14 +290,56 @@ class BaseProxy(xmlshims.NetworkConvertors):
                     self.callLog.log(remoteIp, authToken, methodname, args,
                                      kwargs)
 
-                anon, r = method(caller, authToken, *args, **kwargs)
-                return (anon, False, r, caller.getExtraInfo())
+                r = method(caller, authToken, *args, **kwargs)
+            else:
+                r = caller.callByName(methodname, *args, **kwargs)
 
-            r = caller.callByName(methodname, *args)
+            r = (False, r)
+            extraInfo = caller.getExtraInfo()
         except ProxyRepositoryError, e:
-            return (False, True, e.args, None)
+            r = (True, (e.name, e.args, e.kwArgs))
+        except Exception, e:
+            if hasattr(e, 'marshall'):
+                marshalled = e.marshall(self)
+                args, kwArgs = marshalled
 
-        return (r[0], False, r[1], caller.getExtraInfo())
+                r = (True,
+                        (e.__class__.__name__, args, kwArgs) )
+            else:
+                r = None
+                for klass, marshall in errors.simpleExceptions:
+                    if isinstance(e, klass):
+                        r = (True, (marshall, (str(e),), {}) )
+
+                if r is None:
+                    # this exception is not marshalled back to the client.
+                    # re-raise it now.  comment the next line out to fall into
+                    # the debugger
+                    raise
+
+                    # uncomment the next line to translate exceptions into
+                    # nicer errors for the client.
+                    #return (True, ("Unknown Exception", str(e)))
+
+                    # fall-through to debug this exception - this code should
+                    # not run on production servers
+                    import traceback, sys
+                    from conary.lib import debugger
+                    excInfo = sys.exc_info()
+                    lines = traceback.format_exception(*excInfo)
+                    print "".join(lines)
+                    if 1 or sys.stdout.isatty() and sys.stdin.isatty():
+                        debugger.post_mortem(excInfo[2])
+                    raise
+
+        if protocolVersion < 60:
+            if r[0] is True:
+                # return (useAnon, isException, (exceptName,) + ordArgs) )
+                return (False, True, (r[1][0],) + r[1][1], extraInfo)
+            else:
+                return (False, False, r[1], extraInfo)
+
+        return r + (extraInfo,)
 
 
     def setBaseUrlOverride(self, rawUrl, headers, isSecure):
@@ -312,12 +367,12 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         # cut off older clients entirely, no negotiation
         if clientVersion < self.SERVER_VERSIONS[0]:
-            raise ProxyRepositoryError(("InvalidClientVersion",
+            raise errors.InvalidClientVersion(
                'Invalid client version %s.  Server accepts client versions %s '
                '- read http://wiki.rpath.com/wiki/Conary:Conversion' %
-               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS))))
+               (clientVersion, ', '.join(str(x) for x in self.SERVER_VERSIONS)))
 
-        useAnon, parentVersions = caller.checkVersion(clientVersion)
+        parentVersions = caller.checkVersion(clientVersion)
 
         if self.SERVER_VERSIONS is not None:
             commonVersions = sorted(list(set(self.SERVER_VERSIONS) &
@@ -325,7 +380,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         else:
             commonVersions = parentVersions
 
-        return useAnon, commonVersions
+        return commonVersions
 
 class ChangeSetInfo(object):
 
@@ -438,8 +493,7 @@ class ChangesetFilter(BaseProxy):
             else:
                 # this really was marked as a removed trove.
                 # raise a TroveMissing exception
-                raise ProxyRepositoryError(("TroveMissing", trvName,
-                    self.fromVersion(trvNewVersion)))
+                raise errors.TroveMissing(trvName, trvNewVersion)
 
         # we need to re-write the munged changeset for an
         # old client
@@ -508,28 +562,25 @@ class ChangesetFilter(BaseProxy):
         # This is important; if it doesn't work out the cache is likely
         # not working.
         if verPath[-1] != wireCsVersion:
-            raise ProxyRepositoryError(('InvalidClientVersion',
+            raise errors.InvalidClientVersion(
                 "Unable to produce changeset version %s "
-                "with upstream server %s" % (neededCsVersion, wireCsVersion)))
+                "with upstream server %s" % (neededCsVersion, wireCsVersion))
 
         fingerprints = [ '' ] * len(chgSetList)
         if self.csCache:
             try:
                 if mirrorMode:
-                    useAnon, fingerprints = caller.getChangeSetFingerprints(49,
+                    fingerprints = caller.getChangeSetFingerprints(49,
                             chgSetList, recurse, withFiles, withFileContents,
                             excludeAutoSource, mirrorMode)
                 else:
-                    useAnon, fingerprints = caller.getChangeSetFingerprints(43,
+                    fingerprints = caller.getChangeSetFingerprints(43,
                             chgSetList, recurse, withFiles, withFileContents,
                             excludeAutoSource)
 
-            except ProxyRepositoryError, e:
+            except errors.MethodNotSupported:
                 # old server; act like no fingerprints were returned
-                if e.args[0] == 'MethodNotSupported':
-                    pass
-                else:
-                    raise
+                pass
 
         changeSetList = [ None ] * len(chgSetList)
 
@@ -554,6 +605,10 @@ class ChangesetFilter(BaseProxy):
             [ x for x in
                     enumerate(itertools.izip(chgSetList, fingerprints))
                     if changeSetList[x[0]] is None ]
+
+        if self.callLog and changeSetsNeeded:
+            self.callLog.log(None, authToken, '__createChangeSets',
+                             changeSetsNeeded)
 
         # This is a loop to make supporting single-request changeset generation
         # easy; we need that not only for old servers we proxy, but for an
@@ -580,19 +635,19 @@ class ChangesetFilter(BaseProxy):
                                      recurse, withFiles, withFileContents,
                                      excludeAutoSource,
                                      neededCsVersion, mirrorMode,
-                                     infoOnly)[1]
+                                     infoOnly)
             elif getCsVersion >= 49:
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
                                      excludeAutoSource,
-                                     wireCsVersion, mirrorMode)[1]
+                                     wireCsVersion, mirrorMode)
             else:
                 # We don't support requesting specific changeset versions
                 rc = caller.getChangeSet(getCsVersion,
                                      [ x[1][0] for x in neededHere ],
                                      recurse, withFiles, withFileContents,
-                                     excludeAutoSource)[1]
+                                     excludeAutoSource)
 
             csInfoList = []
             url = rc[0]
@@ -634,7 +689,7 @@ class ChangesetFilter(BaseProxy):
             try:
                 inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
             except transport.TransportError, e:
-                raise ProxyRepositoryError(("RepositoryError", e.args[0]))
+                raise errors.RepositoryError(e.args[0])
 
             for (jobIdx, (rawJob, fingerprint)), csInfo in \
                             itertools.izip(neededHere, csInfoList):
@@ -754,19 +809,19 @@ class ChangesetFilter(BaseProxy):
             else:
                 for size in allSizes:
                     if size >= 0x80000000:
-                        raise ProxyRepositoryError(('InvalidClientVersion',
+                        raise errors.InvalidClientVersion(
                          'This version of Conary does not support downloading '
                          'changesets larger than 2 GiB.  Please install a new '
-                         'Conary client.'))
+                         'Conary client.')
 
             if clientVersion < 38:
-                return False, (url, allSizes, allTrovesNeeded, allFilesNeeded)
+                return (url, allSizes, allTrovesNeeded, allFilesNeeded)
 
-            return False, (url, allSizes, allTrovesNeeded, allFilesNeeded,
-                          allTrovesRemoved)
+            return (url, allSizes, allTrovesNeeded, allFilesNeeded,
+                    allTrovesRemoved)
 
         # clientVersion >= 50
-        return False, (url, (
+        return (url, (
                 [ (str(x.size), x.trovesNeeded, x.filesNeeded, x.removedTroves)
                     for x in changeSetList ] ) )
 
@@ -787,7 +842,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = [ 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 ]
+    SERVER_VERSIONS = range(42, 60 + 1)
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):
@@ -857,7 +912,7 @@ class ProxyRepositoryServer(ChangesetFilter):
         if neededFiles:
             # now get the contents we don't have cached
             (url, sizes) = caller.getFileContents(
-                    clientVersion, neededFiles, False)[1]
+                    clientVersion, neededFiles, False)
             # insure that the size is an integer -- protocol version
             # 44 returns a string to avoid XML-RPC marshal limits
             sizes = [ int(x) for x in sizes ]
@@ -917,12 +972,11 @@ class ProxyRepositoryServer(ChangesetFilter):
             else:
                 for size in sizeList:
                     if size >= 0x80000000:
-                        raise ProxyRepositoryError(
-                            ('InvalidClientVersion',
+                        raise errors.InvalidClientVersion(
                              'This version of Conary does not support '
                              'downloading file contents larger than 2 '
-                             'GiB.  Please install a new Conary client.'))
-            return False, (url, sizeList)
+                             'GiB.  Please install a new Conary client.')
+            return (url, sizeList)
         finally:
             os.close(fd)
 
@@ -1006,8 +1060,10 @@ def formatViaHeader(localAddr, protocolString):
 
 class ProxyRepositoryError(Exception):
 
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, name, args, kwArgs):
+        self.name = name
+        self.args = tuple(args)
+        self.kwArgs = kwArgs
 
 # ewtroan: for the internal proxy, we support client version 38 but need to talk to a server which is at least version 41
 # ewtroan: for external proxy, we support client version 41 and need a server which is at least 41
