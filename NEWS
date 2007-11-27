@@ -12,6 +12,7 @@ Changes in @NEW@:
       (CNY-2286)
 
   o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
     * A new method, conary.conaryclient.getClient(), has been added to
       allow the creation of a conaryclient with configuration to match
       that would be used with a conary command line client. (CNY-1745)

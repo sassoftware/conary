@@ -19,6 +19,7 @@ Provides the output for the "cvc" subcommands
 import inspect
 import optparse
 import os
+import stat
 import sys
 
 from conary import branch
@@ -32,7 +33,7 @@ from conary import errors, keymgmt
 from conary import state
 from conary import updatecmd
 from conary import versions
-from conary.build import cook, use, signtrove
+from conary.build import cook, use, signtrove, loadrecipe
 from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
@@ -568,7 +569,106 @@ class DescribeCommand(CvcCommand):
         log.setVerbosity(level)
 _register(DescribeCommand)
 
+class DeriveCommand(CvcCommand):
+    commands = ['derive']
+    paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
+    help = 'Aggregation command to shadow, check out and alter a recipe'
+    commandGroup = 'Repository Access'
 
+    docs = {'checkout-dir' : 'Derive single trove and check out in directory DIR',
+            'extract-dir': 'extract single binary parent trove in dirctory DIR',
+            'info': 'Display info on shadow/branch'}
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["checkout-dir"] = ONE_PARAM
+        argDef["info"] = '-i', NO_PARAM
+        argDef['extract-dir'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
+        checkoutDir = argSet.pop('checkout-dir', None)
+        extractDir = argSet.pop('extract-dir', None)
+        info = prep = False
+        if argSet.has_key('info'):
+            del argSet['info']
+            info = True
+
+        if argSet or (len(args) < 3) or ((checkoutDir or extractDir) and len(args) != 3):
+            # no leftover args
+            # usage of --extract-dir or --checkout-dir implies only one trove
+            return self.usage()
+
+        target = args[1]
+        troveSpecs = args[2:]
+
+        # we already know there's exactly one troveSpec
+        if extractDir and ':source' in troveSpecs[0].split('=')[0]:
+            # usage of --extract-dir requires specification of a binary trove
+            return self.usage()
+
+        branch.branch(repos, cfg, target, troveSpecs, makeShadow = True,
+                      sourceOnly = True, binaryOnly = False,
+                      info = info, targetFile = None)
+        if info:
+            return
+
+        targetTroveSpecs = []
+        for trvSpec in troveSpecs:
+            nvf = conaryclient.cmdline.parseTroveSpec(trvSpec)
+            targetTroveSpecs.append("%s=%s" % (nvf[0], target))
+
+        coArgs = [repos, cfg, checkoutDir, targetTroveSpecs, callback]
+        checkin.checkout(*coArgs)
+
+        targetLabel = versions.Label(target)
+        for trvSpec in targetTroveSpecs:
+            nvf = conaryclient.cmdline.parseTroveSpec(trvSpec)
+            recipe = loadrecipe.recipeLoaderFromSourceComponent( \
+                    nvf[0], cfg, repos, labelPath = targetLabel)[0]
+            className, recipe = recipe.allRecipes().items()[0]
+
+            dirName = checkoutDir or nvf[0]
+            cnyState = state.ConaryStateFromFile( \
+                    os.path.join(dirName, "CONARY"), repos)
+            st = cnyState.getSourceState()
+            for (pathId, path, fileId, version) in \
+                    [x for x in st.iterFileList() \
+                    if not x[1].endswith('.recipe')]:
+                st.removeFile(pathId)
+                filename = os.path.join(dirName, path)
+                if util.exists(filename):
+                    sb = os.lstat(filename)
+                    try:
+                        if sb.st_mode & stat.S_IFDIR:
+                            os.rmdir(filename)
+                        else:
+                            os.unlink(filename)
+                    except OSError, e:
+                        log.error("cannot remove %s: %s" % (filename, e.strerror))
+                        return 1
+            cnyState.write(os.path.join(dirName, "CONARY"))
+
+            recipePath = [x for x in [y[1] for y in st.iterFileList()] \
+                    if x.endswith('.recipe')][0]
+            recipeFile = open(os.path.join(dirName, recipePath), 'w')
+
+            recipeFile.write('class %s(DerivedPackageRecipe):\n' % className)
+            recipeFile.write("    name = '%s'\n" % recipe.name)
+            recipeFile.write("    version = '%s'\n" % recipe.version)
+            recipeFile.write('\n')
+            recipeFile.write('    def setup(r):\n')
+            recipeFile.write('        pass\n')
+            recipeFile.write('\n')
+
+        if extractDir:
+            kwargs = {}
+            kwargs['callback'] = callback
+            kwargs['depCheck'] = False
+            cfg.root = os.path.abspath(extractDir)
+            updatecmd.doUpdate(cfg, troveSpecs, **kwargs)
+_register(DeriveCommand)
 
 class DiffCommand(CvcCommand):
     commands = ['diff']
