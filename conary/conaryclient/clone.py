@@ -795,8 +795,26 @@ def _updateVersion(trv, mark, newVersion):
         trv.delTrove(name, oldVersion, flavor, False, 
                                                weakRef = not isStrong)
         if newVersion:
-            trv.addTrove(name, newVersion, flavor, byDefault = byDefault,
-                                                   weakRef = not isStrong)
+            if not trv.hasTrove(name, newVersion, flavor):
+                trv.addTrove(name, newVersion, flavor,
+                             byDefault = byDefault,
+                             weakRef = not isStrong)
+            else:
+                # it's possible that this trove already exists in this group
+                # this could happen if the trove has previously been cloned
+                # and the group contains a reference to the cloned and
+                # uncloned versions.  Afterwards there will just be one 
+                # reference.
+                if not isStrong:
+                    return
+                # delete a weak reference if it exists, there should only
+                # be one reference to this package in this group.
+                trv.delTrove(name, newVersion, flavor, missingOkay = True,
+                                                       weakRef = True)
+                trv.addTrove(name, newVersion, flavor,
+                             byDefault = byDefault,
+                             presentOkay = True,
+                             weakRef = not isStrong)
     else:
         assert(0)
 

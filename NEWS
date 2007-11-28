@@ -10,6 +10,9 @@ Changes in @NEW@:
     * Methods starting with two underscore characters are considered
       internal and are no longer passed to the XML-RPC library for
       marshaling. (CNY-2286)
+    * It is now possible to clone a group that contains references to both
+      a cloned package and the version that the cloned package originated from.
+      (CNY-2302)
 
   o Client Changes:
     * Added the cvc derive command. (CNY-2237)
