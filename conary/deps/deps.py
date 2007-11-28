@@ -1231,9 +1231,11 @@ def getInstructionSetFlavor(flavor):
     newFlavor.addDeps(ISD,
                       [Dependency(x[1].name) for x in flavor.iterDeps() 
                        if x[0] is ISD])
-    newFlavor.addDeps(targetISD, 
-                      [ Dependency(x[1].name) for x in flavor.iterDeps() 
-                        if x[0] is targetISD ])
+    targetDeps = [ Dependency(x[1].name) for x in flavor.iterDeps() 
+                  if x[0] is targetISD ]
+
+    if targetDeps:
+        newFlavor.addDeps(targetISD, targetDeps)
     return newFlavor
 
 def formatFlavor(flavor):
