@@ -13,6 +13,8 @@ Changes in @NEW@:
     * It is now possible to clone a group that contains references to both
       a cloned package and the version that the cloned package originated from.
       (CNY-2302)
+    * A missing taghandler reading its data from stdin will no longer result 
+      in a database locked error (CNY-2257)
 
   o Client Changes:
     * Added the cvc derive command. (CNY-2237)

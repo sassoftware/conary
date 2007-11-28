@@ -2431,31 +2431,36 @@ class TagCommand:
                     # fork a separate process to feed stdin
                     inputPid = os.fork()
                     if inputPid == 0:
-                        os.close(inputPipe[0])
-                        if datasource == 'stdin':
-                            for filename in sorted(hi.tagToFile[tagInfo]):
-                                try:
-                                    os.write(inputPipe[1], filename + "\n")
-                                except OSError, e:
-                                    if e.errno != errno.EPIPE:
-                                        raise
-                                    self.callback.error(str(e))
-                                    break
-                        elif datasource == 'multitag':
-                            for fileName in sorted(hi.fileToTag):
-                                try:
-                                    os.write(inputPipe[1], 
-                                        "%s\n%s\n" %(" ".join(
-                                        sorted([x.tag for x in
-                                                hi.fileToTag[fileName]])),
-                                        fileName))
-                                except OSError, e:
-                                    if e.errno != errno.EPIPE:
-                                        raise
-                                    self.callback.error(str(e))
-                                    break
-                        os._exit(0)
-
+                        try:
+                            os.close(inputPipe[0])
+                            if datasource == 'stdin':
+                                for filename in sorted(hi.tagToFile[tagInfo]):
+                                    try:
+                                        os.write(inputPipe[1], filename + "\n")
+                                    except OSError, e:
+                                        if e.errno != errno.EPIPE:
+                                            raise
+                                        self.callback.error(str(e))
+                                        break
+                            elif datasource == 'multitag':
+                                for fileName in sorted(hi.fileToTag):
+                                    try:
+                                        os.write(inputPipe[1], 
+                                            "%s\n%s\n" %(" ".join(
+                                            sorted([x.tag for x in
+                                                    hi.fileToTag[fileName]])),
+                                            fileName))
+                                    except OSError, e:
+                                        if e.errno != errno.EPIPE:
+                                            raise
+                                        self.callback.error(str(e))
+                                        break
+                            os._exit(0)
+                        except Exception, err:
+                            try:
+                                sys.stderr.write('%s\n' %err)
+                            finally:
+                                os._exit(1)
                 os.close(inputPipe[1])
 
                 stdoutPipe = os.pipe()
