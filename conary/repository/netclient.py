@@ -18,7 +18,7 @@ import httplib
 import itertools
 import os
 import socket
-import sys
+import sys, time
 import urllib
 import xml
 import xmlrpclib
@@ -31,6 +31,7 @@ from conary import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util
+from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
@@ -69,7 +70,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
                  altHostCallback, protocolVersion, transport, serverName,
-                 entitlementDir):
+                 entitlementDir, callLog):
         xmlrpclib._Method.__init__(self, send, name)
         self.__name = name
         self.__host = host
@@ -80,6 +81,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         self.__serverName = serverName
         self.__entitlementDir = entitlementDir
         self._transport = transport
+        self.__callLog = callLog
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -109,6 +111,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                  retryOnEntitlementTimeout = True):
         newArgs = ( clientVersion, ) + argList
 
+        start = time.time()
+
         try:
             rc = self.__send(self.__name, newArgs)
         except xmlrpclib.ProtocolError, e:
@@ -121,6 +125,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         else:
             usedAnonymous = False
             isException, result = rc
+
+        if self.__callLog:
+            self.__callLog.log(self.__host, self._transport.getEntitlements(),
+                               self.__name, rc, newArgs,
+                               latency = time.time() - start)
 
         if usedAnonymous:
             self.__anonymousCallback()
@@ -284,7 +293,7 @@ class ServerProxy(util.ServerProxy):
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.getProtocolVersion(),
                        self.__transport, self.__serverName,
-                       self.__entitlementDir)
+                       self.__entitlementDir, self.__callLog)
 
     def usedProxy(self):
         return self.__transport.usedProxy
@@ -299,7 +308,7 @@ class ServerProxy(util.ServerProxy):
         return self.__protocolVersion
 
     def __init__(self, url, serverName, transporter, pwCallback, usedMap,
-                 entitlementDir):
+                 entitlementDir, callLog):
         try:
             util.ServerProxy.__init__(self, url, transporter)
         except IOError, e:
@@ -312,6 +321,7 @@ class ServerProxy(util.ServerProxy):
         self.__usedMap = usedMap
         self.__protocolVersion = CLIENT_VERSIONS[-1]
         self.__entitlementDir = entitlementDir
+        self.__callLog = callLog
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
@@ -324,6 +334,11 @@ class ServerCache:
         self.entitlements = entitlements
         self.proxies = proxies
         self.entitlementDir = entitlementDir
+        self.callLog = None
+
+        if 'CONARY_CLIENT_LOG' in os.environ:
+            self.callLog = calllog.ClientCallLogger(
+                                os.environ['CONARY_CLIENT_LOG'])
 
     def __getPassword(self, host, user=None):
         if not self.pwPrompt:
@@ -456,7 +471,8 @@ class ServerCache:
         transporter.setEntitlements(entList)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap,
-                             entitlementDir = self.entitlementDir)
+                             entitlementDir = self.entitlementDir,
+                             callLog = self.callLog)
 
         # Avoid poking at __transport
         server._transport = transporter

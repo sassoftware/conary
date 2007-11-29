@@ -18,7 +18,7 @@ from conary import constants, conarycfg, trove
 from conary.lib import sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
-from conary.repository.netrepos import netserver, calllog
+from conary.repository.netrepos import netserver, reposlog
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -227,7 +227,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
             self.log = tracelog.getLog(filename=f, level=l, trace=l>2)
 
         if self.logFile:
-            self.callLog = calllog.CallLogger(self.logFile, [])
+            self.callLog = reposlog.RepositoryCallLogger(self.logFile, [])
         else:
             self.callLog = None
 

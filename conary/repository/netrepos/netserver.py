@@ -32,7 +32,7 @@ from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.trove import DigitalSignature
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
-from conary.repository.netrepos import calllog
+from conary.repository.netrepos import reposlog
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
@@ -137,7 +137,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.log = tracelog.getLog(filename=f, level=l, trace=l>2)
 
         if self.logFile:
-            self.callLog = calllog.CallLogger(self.logFile, self.serverNameList)
+            self.callLog = reposlog.RepositoryCallLogger(self.logFile,
+                                                         self.serverNameList)
 
         if not db:
             self.open()

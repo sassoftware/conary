@@ -15,10 +15,105 @@
 #
 #
 
+import cPickle
 import os
 import socket
+import struct
 import sys
 import time
+
+class ClientDumper:
+    def __init__(self, options):
+        self.options = options
+
+    def dump(self, entry):
+        if entry.entitlement:
+            entitlement = "ENTITLEMENTS=%s" % entry.entitlement
+        else:
+            entitlement = ""
+
+        if (options.showLatency and entry.latency is not None):
+            latency = " runtime=%f" % entry.latency
+        else:
+            latency = ''
+
+        print "%s %s %s %s%s%s" % (
+            entry.url,
+            entry.methodName,
+            entry.args,
+            entry.result,
+            latency,
+            entitlement
+        )
+
+class ReposDumper:
+
+    def __init__(self, options):
+        self.hostnameCache = {}
+        self.options = options
+
+    def dump(self, entry):
+        if not entry.remoteIp:
+            hostname = "(unknown)"
+        elif options.noReverseDNS:
+            hostname = entry.remoteIp
+        else:
+            hostname = self.hostnameCache.get(entry.remoteIp, None)
+            if hostname is None:
+                try:
+                    hostname = socket.gethostbyaddr(entry.remoteIp)[0]
+                except socket.herror:
+                    hostname = entry.remoteIp
+
+                self.hostnameCache[entry.remoteIp] = hostname
+
+        userInfo = []
+
+        if (options.showLatency and entry.revision >= 5 and
+                    entry.latency is not None):
+            latency = " runtime=%f" % entry.latency
+        else:
+            latency = ''
+
+        if entry.user is not None:
+            userInfo.append("user=%s" % entry.user)
+        if entry.revision > 2:
+            userInfo.append("entitlements=[%s]" % 
+                                ",".join(x[1] for x in entry.entitlements))
+        elif entry.entClass is not None:
+            userInfo.append("entclass=%s" % entry.entClass)
+        if hasattr(entry, 'entKey') and entry.entKey is not None:
+            userInfo.append("entkey=%s" % entry.entKey)
+        if hasattr(entry, 'entitlements') and entry.entitlements is not None:
+            userInfo.append("entitlements=%s" % entry.entitlements)
+
+        if userInfo:
+            userStr = " ".join(userInfo) + " "
+        else:
+            userStr = ""
+
+        if options.showParams:
+            params = str(entry.args)
+        else:
+            params = ""
+
+        if entry.exceptionStr is not None:
+            excpt = " EXCEPTION(%s)" % str(entry.exceptionStr)
+        elif options.showExcepts:
+            return
+        else:
+            excpt =""
+
+        print "%s %s %s %s%s%s%s%s" % (
+            hostname,
+            time.strftime("%B %d %H:%M", time.localtime(entry.timeStamp)),
+            entry.serverName,
+            userStr,
+            entry.methodName,
+            params,
+            latency,
+            excpt
+        )
 
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
@@ -33,7 +128,8 @@ sys.path.insert(0, os.path.dirname(fullPath))
 import optparse, tarfile
 
 from conary.lib import util
-from conary.repository.netrepos import calllog
+from conary.repository import calllog
+from conary.repository.netrepos import reposlog
 
 sys.excepthook = util.genExcepthook(debug=True)
 
@@ -56,71 +152,30 @@ if len(args) != 1:
 
 hostnameCache = {}
 
-log = calllog.CallLogger(args[0], None, readOnly = True)
+# read the first bit of the first entry so we can tell if this is a
+# client or repository log
+f = open(args[0])
+length = f.read(4)
+if not length:
+    # nothing to do; this breaks -f, but we don't know what we're following...
+    sys.exit(0)
+
+length = struct.unpack("!I", length)[0]
+entry = f.read(length)
+entryRevision = cPickle.loads(entry)[0]
+clientLog = entryRevision >= calllog.CLIENT_LOG
+
+if clientLog:
+    log = calllog.ClientCallLogger(args[0], readOnly = True)
+    dumper = ClientDumper(options)
+else:
+    log = reposlog.RepositoryCallLogger(args[0], None, readOnly = True)
+    dumper = ReposDumper(options)
+
 if options.follow:
     iterator = log.follow()
 else:
     iterator = iter(log)
 
 for entry in iterator:
-    if not entry.remoteIp:
-        hostname = "(unknown)"
-    elif options.noReverseDNS:
-        hostname = entry.remoteIp
-    else:
-        hostname = hostnameCache.get(entry.remoteIp, None)
-        if hostname is None:
-            try:
-                hostname = socket.gethostbyaddr(entry.remoteIp)[0]
-            except socket.herror:
-                hostname = entry.remoteIp
-
-            hostnameCache[entry.remoteIp] = hostname
-
-    userInfo = []
-
-    if (options.showLatency and entry.revision >= 5 and
-                entry.latency is not None):
-        latency = " runtime=%f" % entry.latency
-    else:
-        latency = ''
-
-    if entry.user is not None:
-        userInfo.append("user=%s" % entry.user)
-    if entry.revision > 2:
-        userInfo.append("entitlements=[%s]" % 
-                            ",".join(x[1] for x in entry.entitlements))
-    elif entry.entClass is not None:
-        userInfo.append("entclass=%s" % entry.entClass)
-    if hasattr(entry, 'entKey') and entry.entKey is not None:
-        userInfo.append("entkey=%s" % entry.entKey)
-    if hasattr(entry, 'entitlements') and entry.entitlements is not None:
-        userInfo.append("entitlements=%s" % entry.entitlements)
-
-    if userInfo:
-        userStr = " ".join(userInfo) + " "
-    else:
-        userStr = ""
-
-    if options.showParams:
-        params = str(entry.args)
-    else:
-        params = ""
-
-    if entry.exceptionStr is not None:
-        excpt = " EXCEPTION(%s)" % str(entry.exceptionStr)
-    elif options.showExcepts:
-        continue
-    else:
-        excpt =""
-
-    print "%s %s %s %s%s%s%s%s" % (
-        hostname,
-        time.strftime("%B %d %H:%M", time.localtime(entry.timeStamp)),
-        entry.serverName,
-        userStr,
-        entry.methodName,
-        params,
-        latency,
-        excpt
-    )
+    dumper.dump(entry)
