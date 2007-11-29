@@ -57,6 +57,8 @@ class Callback(object):
                     ' %s', filename, linenum, msg)
         # log the full traceback if debugging (--debug=all)
         log.debug(''.join(traceback.format_exception(*exc_info)))
+        if not hasattr(self, 'exceptions'):
+            self.exceptions = []
         self.exceptions.append(e)
 
     def __getattribute__(self, name):
