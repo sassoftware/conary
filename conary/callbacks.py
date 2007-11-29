@@ -71,6 +71,8 @@ class Callback(object):
     def cancelOperation(self):
         """Return True if we should cancel the operation as soon as it is
         safely possible"""
+        if not hasattr(self, 'exceptions'):
+            return False
         for exc in self.exceptions:
             if hasattr(exc, 'cancelOperation'):
                 return exc.cancelOperation
