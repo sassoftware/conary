@@ -3210,7 +3210,7 @@ conary erase '%s=%s[%s]'
                 self._applyCs(newCs, uJob, removeHints = removeHints,
                               **kwargs)
                 self.updateCallback.updateDone()
-                if self.updateCallback.cancelUpdate():
+                if self.updateCallback.cancelOperation():
                     break
         finally:
             stopDownloadEvent.set()
