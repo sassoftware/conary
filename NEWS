@@ -22,6 +22,9 @@ Changes in @NEW@:
     * A new method, conary.conaryclient.getClient(), has been added to
       allow the creation of a conaryclient with configuration to match
       that would be used with a conary command line client. (CNY-1745)
+    * Unhandled exceptions that are raised inside a progress callback
+      no longer terminate the update process.  A warning is emitted
+      and the update continues. (CNY-2304)
 
 Changes in 1.2.7:
   o Build Changes:
