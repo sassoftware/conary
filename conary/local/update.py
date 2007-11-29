@@ -743,7 +743,7 @@ class FilesystemJob:
             else:
                 scriptId = "%s postinstall" % troveCs.getName()
 
-            runTroveScript(troveCs.getJob(), script, tagScript, '/tmp',
+            runTroveScript(troveCs.getJob(), script, tagScript, '/',
                            self.root, self.callback, isPre = False,
                            scriptId = scriptId,
                            oldCompatClass = baseCompatClass,

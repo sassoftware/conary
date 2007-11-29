@@ -16,6 +16,9 @@ Changes in @NEW@:
     * When data is provided to a taghandler from stdin, but the
       taghandler is missing or fails to read some or all of the data,
       it will no longer result in a database locked error. (CNY-2257)
+    * Conary no longer exits with an unhandled exception if /tmp does
+      not exist when attempting to run a trove script (e.g., group
+      pre/post scripts). (CNY-2303)
 
   o Client Changes:
     * Added the cvc derive command. (CNY-2237)
