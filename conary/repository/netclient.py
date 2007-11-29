@@ -31,7 +31,7 @@ from conary import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util
-from conary.repository import callog
+from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
