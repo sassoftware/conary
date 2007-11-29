@@ -37,11 +37,16 @@ class CallLogEntry:
              (self.user, self.entitlements),
              self.methodName, self.args, self.kwArgs,
              self.exceptionStr) = info[1:]
+        elif (self.revision == 5):
+            (self.serverName, self.timeStamp, self.remoteIp,
+             (self.user, self.entitlements),
+             self.methodName, self.args, self.kwArgs,
+             self.exceptionStr, self.latency) = info[1:]
         else:
             assert(0)
 
 class CallLogger:
-    logFormatRevision = 4
+    logFormatRevision = 5
 
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
@@ -77,7 +82,7 @@ class CallLogger:
         self.inode = (sb.st_dev, sb.st_ino)
 
     def log(self, remoteIp, authToken, methodName, args, kwArgs = {},
-            exception = None):
+            exception = None, latency = None):
         # lazy re-open the log file in case it was rotated from underneath us
         self.reopen()
         if exception:
@@ -86,7 +91,8 @@ class CallLogger:
         (user, entitlements) = authToken[0], authToken[2]
         logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
                                 time.time(), remoteIp, (user, entitlements),
-                                methodName, args, kwArgs, exception))
+                                methodName, args, kwArgs, exception,
+                                latency))
         os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
 
     def __iter__(self):

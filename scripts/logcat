@@ -46,6 +46,8 @@ parser.add_option("-n", dest = "noReverseDNS", default = False,
                   action = "store_true", help = "skip reverse dns")
 parser.add_option("--params", "-p", dest = "showParams", default = False,
                   action = "store_true", help = "display method parameters")
+parser.add_option("--times", "-t", dest = "showLatency", default = False,
+                  action = "store_true", help = "display method run times")
 (options, args) = parser.parse_args()
 
 if len(args) != 1:
@@ -76,6 +78,13 @@ for entry in iterator:
             hostnameCache[entry.remoteIp] = hostname
 
     userInfo = []
+
+    if (options.showLatency and entry.revision >= 5 and
+                entry.latency is not None):
+        latency = " runtime=%f" % entry.latency
+    else:
+        latency = ''
+
     if entry.user is not None:
         userInfo.append("user=%s" % entry.user)
     if entry.revision > 2:
@@ -105,12 +114,13 @@ for entry in iterator:
     else:
         excpt =""
 
-    print "%s %s %s %s%s%s%s" % (
+    print "%s %s %s %s%s%s%s%s" % (
         hostname,
         time.strftime("%B %d %H:%M", time.localtime(entry.timeStamp)),
         entry.serverName,
         userStr,
         entry.methodName,
         params,
+        latency,
         excpt
     )

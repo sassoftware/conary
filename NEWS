@@ -66,6 +66,7 @@ Changes in 2.0.0:
     * Reworked commit path to check for files which don't have contents
       available (during a promote or shadow, for example) with one query
       (CNY-2053)
+    * Added call latency to repository log (CNY-2305)
 
   o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
