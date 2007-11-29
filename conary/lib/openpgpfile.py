@@ -18,6 +18,7 @@ import itertools
 import md5
 import os
 import sha
+import stat
 import struct
 import sys
 import tempfile
@@ -440,13 +441,24 @@ def getKeyEndOfLife(keyId, keyFile=''):
 
 def addKeys(keys, stream):
     """Add keys to the stream"""
-    keysDict = {}
-    for k in keys:
-        keyId = k.getKeyFingerprint()
-        if keyId in keysDict:
-            keysDict[keyId].merge(k)
+    return addPackets(keys, stream, "getKeyFingerprint", "iterMainKeys")
+
+def addKeyTimestampPackets(pkts, stream):
+    """Add key timestamp packets to the stream"""
+    return addPackets(pkts, stream, "getKeyId", "iterTrustPackets")
+
+def addPackets(pkts, stream, pktIdFunc, streamIterFunc):
+    """Add packets to the stream. Return the packet IDs for the added packets"""
+    # Expand generators
+    pktsDict = {}
+    for k in pkts:
+        pktId = getattr(k, pktIdFunc)()
+        if pktId in pktsDict:
+            pktsDict[pktId].merge(k)
         else:
-            keysDict[keyId] = k
+            pktsDict[pktId] = k
+    if not pktsDict:
+        return []
 
     # Lock the stream
     fd = stream.fileno()
@@ -465,26 +477,32 @@ def addKeys(keys, stream):
         tempf = util.ExtendedFile(tempf, mode = "w+", buffering = False)
         os.close(tempfd)
 
+        pktIds = []
+
         msg = PGP_Message(stream, start = 0)
-        for ikey in msg.iterMainKeys():
-            iKeyId = ikey.getKeyFingerprint()
-            if iKeyId in keysDict:
-                ikey.merge(keysDict[iKeyId])
-                del keysDict[iKeyId]
-            ikey.writeAll(tempf)
-        # Add the rest of the keys
-        for key in keys:
-            keyId = key.getKeyFingerprint()
-            if keyId not in keysDict:
+        for ipkt in getattr(msg, streamIterFunc)():
+            iPktId = getattr(ipkt, pktIdFunc)()
+            if iPktId in pktsDict:
+                ipkt.merge(pktsDict[iPktId])
+                pktIds.append(iPktId)
+                del pktsDict[iPktId]
+            ipkt.writeAll(tempf)
+
+        # Add the rest of the packets
+        for pkt in pkts:
+            pktId = getattr(pkt, pktIdFunc)()
+            if pktId not in pktsDict:
                 continue
-            key.writeAll(tempf)
-            del keysDict[keyId]
+            pkt.writeAll(tempf)
+            del pktsDict[pktId]
+            pktIds.append(pktId)
         # Now copy the keyring back
         tempf.seek(0, SEEK_SET)
         stream.seek(0, SEEK_SET)
         stream.truncate()
         PGP_BasePacket._copyStream(tempf, stream)
         stream.flush()
+        return pktIds
     finally:
         fcntl.lockf(fd, fcntl.LOCK_UN)
 
@@ -705,6 +723,12 @@ class PGP_Message(object):
                 break
             yield pkt
             pkt = pkt.next()
+
+    def iterTrustPackets(self):
+        """Iterate over all trust packets"""
+        for pkt in self.iterPackets():
+            if isinstance(pkt, PGP_Trust):
+                yield pkt
 
     def iterKeys(self):
         """Iterate over all keys"""
@@ -1048,7 +1072,7 @@ class PGP_BasePacket(object):
 
     def readBody(self, bytes = -1):
         """Read bytes from stream"""
-        return self._bodyStream.read(bytes)
+        return self._bodyStream.pread(bytes, 0)
 
     def seek(self, pos, whence = SEEK_SET):
         return self._bodyStream.seek(pos, whence)
@@ -2869,6 +2893,10 @@ class PGP_SecretSubKey(PGP_SubKey, PGP_SecretAnyKey):
 for klass in [PGP_PublicKey, PGP_SecretKey, PGP_PublicSubKey, PGP_SecretSubKey]:
     PacketTypeDispatcher.addPacketType(klass)
 
+class PGP_Trust(PGP_BasePacket):
+    tag = PKT_TRUST
+PacketTypeDispatcher.addPacketType(PGP_Trust)
+
 def newPacket(tag, bodyStream, newStyle = False, minHeaderLen = 2):
     """Create a new Packet"""
     klass = PacketTypeDispatcher.getClass(tag)
@@ -2976,3 +3004,176 @@ def num_getRelPrime(q):
             r = (r+1) % q
     os.close(randFD)
     return r
+
+class KeyTimestampPacket(PGP_Trust):
+    """This packet is associated with a particular (main) key in
+    order to track its "freshness".
+    """
+    __slots__ = ['_trustPacketVersion', '_keyId', '_refreshTimestamp',
+                 '_parsed']
+    def setUp(self):
+        self._trustPacketVersion = 1
+        self._keyId = None
+        self._refreshTimestamp = None
+        self._parsed = False
+
+    def initialize(self):
+        self.setUp()
+
+    def iterSubPackets(self):
+        return []
+
+    def parse(self, force = False):
+        """Parse the body and initializes the internal data
+        structures for other operations"""
+        if self._parsed and not force:
+            return
+        self.resetBody()
+        # Reset all internal state
+        self.initialize()
+
+        # Key ID
+        self._trustPacketVersion = self.readBin(1)[0]
+        if self._trustPacketVersion != 1:
+            raise PGPError("Unknown trust packet version %s" % self._trustPacketVersion)
+        self._keyId = self.readExact(8)
+        self._refreshTimestamp = int4FromBytes(*self.readBin(4))
+
+        self._parsed = True
+
+    def getKeyId(self):
+        self.parse()
+        return stringToAscii(self._keyId)
+
+    def setKeyId(self, keyId):
+        assert(len(keyId) >= 16)
+        self._keyId = fingerprintToInternalKeyId(keyId)
+
+    def getRefreshTimestamp(self):
+        return self._refreshTimestamp
+
+    def setRefreshTimestamp(self, ts):
+        self._refreshTimestamp = ts
+
+    def rewriteBody(self):
+        """Re-writes the body"""
+        # Re-write ourselves
+        bodyStream = self._writeBodyV1()
+        ns, nsp = self._nextStream, self._nextStreamPos
+        parentPkt = self._parentPacket
+        self.__init__(bodyStream, newStyle = self._newStyle)
+        self.setNextStream(ns, nsp)
+        self.setParentPacket(parentPkt)
+        self.initialize()
+
+    def _writeBodyV1(self):
+        stream = util.ExtendedStringIO()
+        stream.write(binSeqToString([self._trustPacketVersion]))
+        stream.write(self._keyId)
+        stream.write(binSeqToString(int4ToBytes(self._refreshTimestamp)))
+        # Write padding
+        stream.write('\0' * 25)
+        stream.seek(0)
+        return stream
+
+    def merge(self, other):
+        assert self.tag == other.tag
+        ns, nsp = self._nextStream, self._nextStreamPos
+        parentPkt = self._parentPacket
+        self.__init__(other.getBodyStream(), newStyle = self._newStyle)
+        self.setNextStream(ns, nsp)
+        self.setParentPacket(parentPkt)
+        self.initialize()
+
+# This is technically not a trust packet in the way GPG understands it.
+PacketTypeDispatcher.addPacketType(KeyTimestampPacket)
+
+class PublicKeyring(object):
+    """A representation of a public keyring."""
+    def __init__(self, keyringPath, tsDbPath):
+        self._keyringPath = keyringPath
+        self._tsDbPath = tsDbPath
+        # Create the files if they don't exist
+        for f in [self._keyringPath, self._tsDbPath]:
+            file(f, "w")
+        self._tsDbTimestamp = None
+        self._cache = {}
+
+        # For debugging purposes only
+        self._timeIncrement = 1
+
+    def addKeys(self, keys, timestamp = None):
+        # Expand generators
+        if hasattr(keys, 'next'):
+            keys = list(keys)
+        for key in keys:
+            assert(isinstance(key, PGP_MainKey))
+        stream = self._openKeyring()
+        keyFingerprints = addKeys(keys, stream)
+        self.updateTimestamps(keyFingerprints, timestamp = timestamp)
+        return keyFingerprints
+
+
+    def updateTimestamps(self, keyIds, timestamp = None):
+        # Expand generators
+        if hasattr(keyIds, 'next'):
+            keyIds = list(keyIds)
+        for keyId in keyIds:
+            assert(len(keyId) >= 16)
+
+        if timestamp is None:
+            timestamp = int(time.time())
+
+        pkts = []
+        for keyId in keyIds:
+            pkt = KeyTimestampPacket(util.ExtendedStringIO())
+            pkt.setKeyId(keyId)
+            pkt.setRefreshTimestamp(timestamp)
+            pkt.rewriteBody()
+            pkts.append(pkt)
+
+        mtime0 = os.stat(self._tsDbPath)[stat.ST_MTIME]
+        addKeyTimestampPackets(pkts, self._openTsDb())
+        mtime1 = os.stat(self._tsDbPath)[stat.ST_MTIME]
+        if mtime0 == mtime1:
+            # Cheat, and set the mtime to be a second larger
+            os.utime(self._tsDbPath, (mtime1, mtime1 + self._timeIncrement))
+        # We know for a fact we've touched the file.
+        # In order to prevent sub-second updates from not being noticed, reset
+        # the mtime.
+        self._tsDbTimestamp = None
+
+    def _openTsDb(self):
+        return util.ExtendedFile(self._tsDbPath, "r+",
+                buffering = False)
+
+    def _openKeyring(self):
+        return util.ExtendedFile(self._keyringPath, "r+",
+                buffering = False)
+
+    def _parseTsDb(self):
+        # Stat the timestamp database
+        mtime = os.stat(self._tsDbPath)[stat.ST_MTIME]
+        if self._tsDbTimestamp == mtime:
+            # Database hasn't changed
+            return
+
+        stream = self._openTsDb()
+        fd = stream.fileno()
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_SH)
+            self._tsDbTimestamp = os.stat(self._tsDbPath)[stat.ST_MTIME]
+            self._cache.clear()
+            for pkt in PGP_Message(stream).iterTrustPackets():
+                pkt.parse()
+                self._cache[pkt.getKeyId()] = pkt.getRefreshTimestamp()
+        finally:
+            fcntl.lockf(fd, fcntl.LOCK_UN)
+
+    def getKeyTimestamp(self, keyId):
+        assert(len(keyId) >= 16)
+
+        self._parseTsDb()
+        # XXX for v3 keys, trimming to the last 8 bytes is not the valid way
+        # to get the key ID. But it's just a cache.
+        return self._cache.get(keyId[-16:], None)
