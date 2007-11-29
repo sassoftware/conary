@@ -505,6 +505,7 @@ class ConaryContext(ConfigSection):
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
+    keepRequired          =  CfgBool
     installLabelPath      =  CfgInstallLabelPath
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPathList, ('/var/log/conary',
