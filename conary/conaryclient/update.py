@@ -2509,8 +2509,6 @@ conary erase '%s=%s[%s]'
                     resolveSource = resolveSource,
                     updateJob = updJob, exactFlavors = exactFlavors)
         except DependencyFailure, e:
-            if e.hasCriticalUpdates() and not applyCriticalOnly:
-                e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
             raise
         except:
             if restartChangeSets:
