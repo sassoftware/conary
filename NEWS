@@ -27,7 +27,7 @@ Changes in 1.2.8:
     * Repository traceback emails are now more verbose. (CNY-2287)
     * Methods starting with two underscore characters are considered
       internal and are no longer passed to the XML-RPC library for
-      marshaling. (CNY-2286)
+      marshaling. (CNY-2289)
     * It is now possible to clone a group that contains references to
       both a cloned package and the version that the cloned package
       originated from. (CNY-2302)
