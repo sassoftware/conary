@@ -3367,7 +3367,7 @@ class EraseDepFailure(DepResolutionFailure):
         for jobSet in self.jobSets:
             for job in jobSet:
                 newInfo = job[0], job[2][0], job[2][1]
-                oldInfo = job[0], job[1][0], job[2][1]
+                oldInfo = job[0], job[1][0], job[1][1]
                 if job[1][0]:
                     packagesByErase[oldInfo] = newInfo
                 if job[2][0]:
