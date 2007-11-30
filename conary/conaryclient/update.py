@@ -3314,9 +3314,7 @@ class DependencyFailure(UpdateError):
     def getJobSets(self):
         return self.jobSets
 
-    def formatNVF(self, troveTup, showVersion=True):
-        if not self.cfg:
-            return '%s=%s' % (troveTup[0], troveTup[1].trailingRevision())
+    def formatVF(self, troveTup, showVersion=True):
         if self.cfg.fullVersions:
             version = troveTup[1]
         elif self.cfg.showLabels:
@@ -3327,15 +3325,20 @@ class DependencyFailure(UpdateError):
         else:
             version = ''
 
-        if version:
-            version = '=%s' % version
-
         if self.cfg.fullFlavors:
             flavor = '[%s]' % troveTup[2]
         else:
             flavor = ''
+        return '%s%s' % (version, flavor)
 
-        return '%s%s%s' % (troveTup[0], version, flavor)
+
+    def formatNVF(self, troveTup, showVersion=True):
+        if not self.cfg:
+            return '%s=%s' % (troveTup[0], troveTup[1].trailingRevision())
+        versionFlavor = self.formatVF(troveTup, showVersion=showVersion)
+        if versionFlavor and versionFlavor[0] != '[':
+            return '%s=%s' % (troveTup[0], versionFlavor)
+        return '%s%s' % (troveTup[0], versionFlavor)
 
 class DepResolutionFailure(DependencyFailure):
     """ Unable to resolve dependencies """
@@ -3359,12 +3362,45 @@ class EraseDepFailure(DepResolutionFailure):
 
     def _initErrorMessage(self):
         res = []
-        res.append("Troves being removed create unresolved dependencies:")
+        packagesByErase = {}
+        packagesByInstall = {}
+        for jobSet in self.jobSets:
+            for job in jobSet:
+                newInfo = job[0], job[2][0], job[2][1]
+                oldInfo = job[0], job[1][0], job[2][1]
+                if job[1][0]:
+                    packagesByErase[oldInfo] = newInfo
+                if job[2][0]:
+                    packagesByInstall[newInfo] = oldInfo
+
+        res.append('The following dependencies would no longer be met after this update:\n')
         for (reqBy, depSet, providedBy) in self.getFailures():
-            res.append("    %s requires %s:\n\t%s" %
-                       (self.formatNVF(reqBy),
-                        ' or '.join(self.formatNVF(x) for x in providedBy),
-                        "\n\t".join(str(depSet).split("\n"))))
+            requiredPackages = []
+            providers = []
+            for oldInfo in providedBy:
+                newInfo = packagesByErase[oldInfo]
+                if not newInfo[1]:
+                    status = 'Erased'
+                else:
+                    status = 'Updated to %s' % self.formatVF(newInfo)
+                providedInfo = '%s (%s)' % (self.formatNVF(oldInfo), status)
+                providers.append(providedInfo)
+            if reqBy in packagesByInstall:
+                oldInfo = packagesByInstall[reqBy]
+                if oldInfo[1]:
+                    reqByInfo = '%s (Updated from %s)' % (
+                                            self.formatNVF(reqBy),
+                                                self.formatVF(oldInfo))
+                else:
+                    reqByInfo = '%s (Newly Installed)' % self.formatNVF(reqBy)
+            else:
+                reqByInfo = '%s (Already Installed)' % self.formatNVF(reqBy)
+
+            res.append("  %s requires:\n"
+                       "    %s\n  which was provided by:\n"
+                       "    %s" % (reqByInfo,
+                                   "\n    ".join(str(depSet).split("\n")),
+                               ' or '.join(providers)))
         return '\n'.join(res)
 
 class NeededTrovesFailure(DependencyFailure):
