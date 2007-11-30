@@ -72,17 +72,36 @@ Changes in 2.0.0:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
     * No longer include useAnonymous flag in return value
 
+Changes in 1.2.8:
+  o Client Changes:
+    * Added the cvc derive command. (CNY-2237)
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+    * Unhandled exceptions that are raised inside a progress callback
+      no longer terminate the update process.  A warning is emitted
+      and the update continues. (CNY-2304)
+
   o Internal Changes:
     * The Conary library now has a parallel implementation to gpg
       for the trust algorithm. (CNY-1988)
 
   o Bug Fixes:
-    * A problem occurring when updating troves with sharing a large
+    * A problem occurring when updating troves sharing a large
       number of identical files has been fixed. (CNY-2273)
     * Repository traceback emails are now more verbose. (CNY-2287)
-    * Methods starting with an underscore are considered internal and
-      are no longer passed to the XML-RPC library for marshaling.
-      (CNY-2286)
+    * Methods starting with two underscore characters are considered
+      internal and are no longer passed to the XML-RPC library for
+      marshaling. (CNY-2286)
+    * It is now possible to clone a group that contains references to
+      both a cloned package and the version that the cloned package
+      originated from. (CNY-2302)
+    * When data from stdin is provided to a taghandler, but the
+      taghandler is missing or fails to read some or all of the data,
+      it will no longer result in a database locked error. (CNY-2257)
+    * Conary no longer exits with an unhandled exception if /tmp does
+      not exist when attempting to run a trove script (e.g., group
+      pre/post scripts). (CNY-2303)
 
   o Client Changes:
     * Added cvc derive as a client-side call (CNY-2237)

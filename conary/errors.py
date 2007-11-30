@@ -162,6 +162,11 @@ class ReexecRequired(ConaryError):
         self.data = data
         ConaryError.__init__(self, msg)
 
+class CancelOperationException(Exception):
+    """Inherit from this class and throw exceptions of this type if you
+    want a callback to stop an update at the end of the job"""
+    cancelOperation = True
+
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 
 def exceptionIsUncatchable(e):

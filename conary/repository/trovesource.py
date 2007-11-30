@@ -122,6 +122,13 @@ class AbstractTroveSource:
                             troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
+    def getLabelsForTroveName(self, name, troveTypes=TROVE_QUERY_PRESENT):
+        """
+            Gets a set of labels on which a particular package is available
+        """
+        versionList = self.getTroveVersionList(name, troveTypes=troveTypes)
+        return set(x.trailingLabel() for x in versionList)
+
     def findTroves(self, labelPath, troves, defaultFlavor=None, 
                    acrossLabels=False, acrossFlavors=False, 
                    affinityDatabase=None, allowMissing=False, 

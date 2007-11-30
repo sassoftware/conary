@@ -57,6 +57,8 @@ class Callback(object):
                     ' %s', filename, linenum, msg)
         # log the full traceback if debugging (--debug=all)
         log.debug(''.join(traceback.format_exception(*exc_info)))
+        if not hasattr(self, 'exceptions'):
+            self.exceptions = []
         self.exceptions.append(e)
 
     def __getattribute__(self, name):
@@ -67,6 +69,16 @@ class Callback(object):
             return item
 
         return exceptionProtection(item, self._exceptionOccured)
+
+    def cancelOperation(self):
+        """Return True if we should cancel the operation as soon as it is
+        safely possible"""
+        if not hasattr(self, 'exceptions'):
+            return False
+        for exc in self.exceptions:
+            if hasattr(exc, 'cancelOperation'):
+                return exc.cancelOperation
+        return False
 
     def __init__(self):
         self.exceptions = []
@@ -231,7 +243,7 @@ class UpdateCallback(ChangesetCallback):
         pass
 
     def checkAbort(self):
-        return (self.abortEvent and self.abortEvent.isSet()) or self.exceptions
+        return (self.abortEvent and self.abortEvent.isSet()) or self.cancelOperation()
 
     def setAbortEvent(self, event = None):
         self.abortEvent = event

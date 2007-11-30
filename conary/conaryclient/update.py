@@ -3131,8 +3131,7 @@ conary erase '%s=%s[%s]'
         # run preinstall scripts
         if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
                                      tagScript = tagScript,
-                                     justDatabase = commitFlags.justDatabase,
-                                     tmpDir = self.cfg.tmpDir):
+                                     justDatabase = commitFlags.justDatabase):
             raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
@@ -3211,7 +3210,7 @@ conary erase '%s=%s[%s]'
                 self._applyCs(newCs, uJob, removeHints = removeHints,
                               **kwargs)
                 self.updateCallback.updateDone()
-                if self.updateCallback.exceptions:
+                if self.updateCallback.cancelOperation():
                     break
         finally:
             stopDownloadEvent.set()
