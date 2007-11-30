@@ -257,7 +257,7 @@ class SignatureError(PGPError):
     pass
 
 def getKeyId(keyRing):
-    pkt = newPacketFromStream(keyRing, start = -1)
+    pkt = PGP_Message.newPacketFromStream(keyRing, start = -1)
     assert pkt is not None
     return pkt.getKeyId()
 
@@ -441,13 +441,15 @@ def getKeyEndOfLife(keyId, keyFile=''):
 
 def addKeys(keys, stream):
     """Add keys to the stream"""
-    return addPackets(keys, stream, "getKeyFingerprint", "iterMainKeys")
+    return addPackets(keys, stream, "getKeyFingerprint",
+        PGP_Message, "iterMainKeys")
 
 def addKeyTimestampPackets(pkts, stream):
     """Add key timestamp packets to the stream"""
-    return addPackets(pkts, stream, "getKeyId", "iterTrustPackets")
+    return addPackets(pkts, stream, "getKeyId",
+        TimestampPacketDatabase, "iterTrustPackets")
 
-def addPackets(pkts, stream, pktIdFunc, streamIterFunc):
+def addPackets(pkts, stream, pktIdFunc, messageFactory, streamIterFunc):
     """Add packets to the stream. Return the packet IDs for the added packets"""
     # Expand generators
     pktsDict = {}
@@ -479,7 +481,7 @@ def addPackets(pkts, stream, pktIdFunc, streamIterFunc):
 
         pktIds = []
 
-        msg = PGP_Message(stream, start = 0)
+        msg = messageFactory(stream, start = 0)
         for ipkt in getattr(msg, streamIterFunc)():
             iPktId = getattr(ipkt, pktIdFunc)()
             if iPktId in pktsDict:
@@ -692,10 +694,22 @@ def getKeyTrust(trustFile, fingerprint):
     return TRUST_UNTRUSTED
 
 
-### New-style
+class PacketTypeDispatcher(object):
+    _registry = {}
+
+    @classmethod
+    def addPacketType(cls, klass):
+        cls._registry[klass.tag] = klass
+
+    @classmethod
+    def getClass(cls, tag):
+        return cls._registry.get(tag, PGP_Packet)
+
 
 class PGP_Message(object):
     __slots__ = ['_f', 'pos']
+    PacketDispatcherClass = PacketTypeDispatcher
+
     def __init__(self, message, start = -1):
         if isinstance(message, str):
             # Assume a path
@@ -713,7 +727,7 @@ class PGP_Message(object):
         self.pos = start
 
     def _getPacket(self):
-        pkt = newPacketFromStream(self._f, start = self.pos)
+        pkt = self.newPacketFromStream(self._f, start = self.pos)
         return pkt
 
     def iterPackets(self):
@@ -775,23 +789,34 @@ class PGP_Message(object):
                     # This is a subkey, return the main key
                     return pkt.getMainKey()
 
-class PacketTypeDispatcher(object):
-    _registry = {}
+    @classmethod
+    def newPacketFromStream(cls, stream, start = -1):
+        if isinstance(stream, file) and not hasattr(stream, "pread"):
+            # Try to reopen as an ExtendedFile
+            f = util.ExtendedFile(stream.name, buffering = False)
+            f.seek(stream.tell())
+            stream = f
+        return PGP_PacketFromStream(cls).read(stream, start = start)
 
-    @staticmethod
-    def addPacketType(klass):
-        PacketTypeDispatcher._registry[klass.tag] = klass
+    @classmethod
+    def newPacket(cls, tag, bodyStream, newStyle = False, minHeaderLen = 2):
+        """Create a new Packet"""
+        typeDispatcher = cls.PacketDispatcherClass
+        klass = typeDispatcher.getClass(tag)
+        pkt = klass(bodyStream, newStyle = newStyle, minHeaderLen = minHeaderLen)
+        if not hasattr(pkt, 'tag'): # No special class for this packet
+            pkt.setTag(tag)
+        pkt._msgClass = cls
+        return pkt
 
-    @staticmethod
-    def getClass(tag):
-        return PacketTypeDispatcher._registry.get(tag, PGP_Packet)
 
 class PGP_PacketFromStream(object):
-    __slots__ = ['_f', 'tag', 'headerLength', 'bodyLength']
-    def __init__(self):
+    __slots__ = ['_f', 'tag', 'headerLength', 'bodyLength', '_msgClass']
+    def __init__(self, msgClass):
         self.tag = None
         self.headerLength = self.bodyLength = 0
         self._f = None
+        self._msgClass = msgClass
 
     def read(self, fileobj, start = -1):
         """Create packet from stream
@@ -824,8 +849,9 @@ class PGP_PacketFromStream(object):
             _bodyStream.seek(0)
         nextStreamPos = self._f.start + self.headerLength + self.bodyLength
 
-        pkt = newPacket(self.tag, _bodyStream, newStyle = newStyle,
-                        minHeaderLen = self.headerLength)
+        pkt = self._msgClass.newPacket(self.tag, _bodyStream,
+                                      newStyle = newStyle,
+                                      minHeaderLen = self.headerLength)
         pkt.setNextStream(fileobj, nextStreamPos)
         return pkt
 
@@ -896,7 +922,7 @@ class PGP_PacketFromStream(object):
 class PGP_BasePacket(object):
     __slots__ = ['_bodyStream', 'headerLength', 'bodyLength',
                  '_newStyle', '_nextStream', '_nextStreamPos',
-                 '_parentPacket', ]
+                 '_parentPacket', '_msgClass']
 
     tag = None
     BUFFER_SIZE = 16384
@@ -944,7 +970,7 @@ class PGP_BasePacket(object):
         newBodyStream = util.SeekableNestedFile(self._bodyStream.file,
             self._bodyStream.size, self._bodyStream.start)
 
-        newPkt = newPacket(self.tag, newBodyStream,
+        newPkt = self._msgClass.newPacket(self.tag, newBodyStream,
                     newStyle = self._newStyle, minHeaderLen = self.headerLength)
         newPkt.setNextStream(self._nextStream, self._nextStreamPos)
         newPkt.setParentPacket(self.getParentPacket(), clone = False)
@@ -1159,7 +1185,8 @@ class PGP_BasePacket(object):
         if self._nextStream is None:
             raise StopIteration()
 
-        newPkt = newPacketFromStream(self._nextStream, self._nextStreamPos)
+        newPkt = self._msgClass.newPacketFromStream(self._nextStream,
+                                                       self._nextStreamPos)
         if newPkt is None:
             raise StopIteration()
 
@@ -2452,8 +2479,8 @@ class PGP_MainKey(PGP_Key):
 class PGP_PublicAnyKey(PGP_Key):
     pubTag = None
     def toPublicKey(self, minHeaderLen = 2):
-        return newPacket(self.pubTag, self._bodyStream,
-                         minHeaderLen = minHeaderLen)
+        return self._msgClass.newPacket(self.pubTag, self._bodyStream,
+                                           minHeaderLen = minHeaderLen)
 
 class PGP_PublicKey(PGP_PublicAnyKey, PGP_MainKey):
     tag = PKT_PUBLIC_KEY
@@ -2522,7 +2549,8 @@ class PGP_SecretAnyKey(PGP_Key):
         # with the length equal to the position in the body up to the MPIs
         io = util.SeekableNestedFile(self._bodyStream,
             self.mpiFile.start + self.mpiLen, start = 0)
-        pkt = newPacket(self.pubTag, io, minHeaderLen = minHeaderLen)
+        pkt = self._msgClass.newPacket(self.pubTag, io,
+                                         minHeaderLen = minHeaderLen)
         return pkt
 
     def decrypt(self, passPhrase):
@@ -2897,22 +2925,6 @@ class PGP_Trust(PGP_BasePacket):
     tag = PKT_TRUST
 PacketTypeDispatcher.addPacketType(PGP_Trust)
 
-def newPacket(tag, bodyStream, newStyle = False, minHeaderLen = 2):
-    """Create a new Packet"""
-    klass = PacketTypeDispatcher.getClass(tag)
-    pkt = klass(bodyStream, newStyle = newStyle, minHeaderLen = minHeaderLen)
-    if not hasattr(pkt, 'tag'): # No special class for this packet
-        pkt.setTag(tag)
-    return pkt
-
-def newPacketFromStream(stream, start = -1):
-    if isinstance(stream, file) and not hasattr(stream, "pread"):
-        # Try to reopen as an ExtendedFile
-        f = util.ExtendedFile(stream.name, buffering = False)
-        f.seek(stream.tell())
-        stream = f
-    return PGP_PacketFromStream().read(stream, start = start)
-
 def newKeyFromString(data):
     """Create a new (main) key from the data
     Returns None if a key was not found"""
@@ -2921,7 +2933,7 @@ def newKeyFromString(data):
 def newKeyFromStream(stream):
     """Create a new (main) key from the stream
     Returns None if a key was not found"""
-    pkt = newPacketFromStream(stream)
+    pkt = PGP_Message.newPacketFromStream(stream)
     if pkt is None:
         return None
     if not isinstance(pkt, PGP_MainKey):
@@ -3005,6 +3017,12 @@ def num_getRelPrime(q):
     os.close(randFD)
     return r
 
+class TimestampPacketDispatcher(PacketTypeDispatcher):
+    _registry = {}
+
+class TimestampPacketDatabase(PGP_Message):
+    PacketDispatcherClass = TimestampPacketDispatcher
+
 class KeyTimestampPacket(PGP_Trust):
     """This packet is associated with a particular (main) key in
     order to track its "freshness".
@@ -3085,8 +3103,7 @@ class KeyTimestampPacket(PGP_Trust):
         self.setParentPacket(parentPkt)
         self.initialize()
 
-# This is technically not a trust packet in the way GPG understands it.
-PacketTypeDispatcher.addPacketType(KeyTimestampPacket)
+TimestampPacketDispatcher.addPacketType(KeyTimestampPacket)
 
 class PublicKeyring(object):
     """A representation of a public keyring."""
@@ -3164,7 +3181,7 @@ class PublicKeyring(object):
             fcntl.lockf(fd, fcntl.LOCK_SH)
             self._tsDbTimestamp = os.stat(self._tsDbPath)[stat.ST_MTIME]
             self._cache.clear()
-            for pkt in PGP_Message(stream).iterTrustPackets():
+            for pkt in TimestampPacketDatabase(stream).iterTrustPackets():
                 pkt.parse()
                 self._cache[pkt.getKeyId()] = pkt.getRefreshTimestamp()
         finally:
