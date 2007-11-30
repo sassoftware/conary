@@ -69,7 +69,7 @@ class TroveStore:
             self.db, self.versionTable, self.branchTable)
 	self.instances = instances.InstanceTable(self.db)
         self.latest = versionops.LatestTable(self.db)
-        self.ugi = accessmap.UserGroupInstances(self.db)
+        self.ri = accessmap.RoleInstances(self.db)
         
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         self.depTables = deptable.DependencyTables(self.db)
@@ -322,7 +322,7 @@ class TroveStore:
 
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depTables.add(cu, trv, troveInstanceId)
-        self.ugi.addInstanceId(troveInstanceId)
+        self.ri.addInstanceId(troveInstanceId)
         self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
         
         # Fold tmpNewFiles into FileStreams
@@ -1113,7 +1113,7 @@ class TroveStore:
         self.db.analyze("tmpRemovals")
 
         # remove access to troves we're about to remove
-        self.ugi.deleteInstanceIds("tmpRemovals")
+        self.ri.deleteInstanceIds("tmpRemovals")
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM TroveRedirects WHERE instanceId=?", instanceId)
         cu.execute("DELETE FROM Instances WHERE instanceId IN "
@@ -1125,7 +1125,7 @@ class TroveStore:
                        trove.TROVE_TYPE_REMOVED, instanceId)
             self.latest.update(cu, itemId, branchId, flavorId)
         else:
-            self.ugi.deleteInstanceId(instanceId)
+            self.ri.deleteInstanceId(instanceId)
             cu.execute("DELETE FROM Instances WHERE instanceId = ?", instanceId)
 
         # look for troves referenced by this one

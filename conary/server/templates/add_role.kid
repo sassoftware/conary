@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <?python
-# Copyright (c) 2005 rpath, Inc.
+# Copyright (c) 2005,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -21,11 +21,11 @@
             <h2 py:content="modify and 'Edit Role' or 'Add Role'"></h2>
 
             <form method="post" action="${modify and 'manageRole' or 'addRole'}">
-                <input py:if="modify" type="hidden" name="userGroupName" value="${userGroupName}" />
+                <input py:if="modify" type="hidden" name="roleName" value="${role}" />
                 <table class="add-form">
                     <tr>
                         <td id="header">Role Name:</td>
-                        <td><input type="text" name="newRoleName" value="${userGroupName}"/></td>
+                        <td><input type="text" name="newRoleName" value="${role}"/></td>
                     </tr>
                     <tr>
                         <td id="header">Initial Users:</td>
@@ -43,8 +43,8 @@
                     <tr>
                         <td id="header">Role is admin:</td>
                         <td>
-                            <input type="radio" name="isAdmin" value="1" py:attrs="{'checked' : groupIsAdmin and 'checked' or None }"/>Yes
-                            <input type="radio" name="isAdmin" value="0" py:attrs="{'checked' : (not groupIsAdmin) and 'checked' or None }"/>No
+                            <input type="radio" name="isAdmin" value="1" py:attrs="{'checked' : isAdmin and 'checked' or None }"/>Yes
+                            <input type="radio" name="isAdmin" value="0" py:attrs="{'checked' : (not isAdmin) and 'checked' or None }"/>No
                         </td>
                     </tr>
                     <tr>

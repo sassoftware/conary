@@ -41,7 +41,6 @@ Changes in 2.0.0:
       option informs conary to prefer x86_64 packages. This change allows
       group building to automatically resolve x86 packages. (CNY-525)
 
-
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
     * Setting/resetting the admin field permission is handled now by the
@@ -71,6 +70,8 @@ Changes in 2.0.0:
   o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
     * No longer include useAnonymous flag in return value
+    * Many repository permission manipulation methods have been
+      renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
 Changes in 1.2.9:
   o Client Changes:

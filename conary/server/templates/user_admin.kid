@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
- Copyright (c) 2005 rpath, Inc.
+ Copyright (c) 2005,2007 rPath, Inc.
 
  This program is distributed under the terms of the Common Public License,
  version 1.0. A copy of this license should have been distributed with this
@@ -52,15 +52,15 @@
                     <tr>
                         <td style="width: 25%;">Username</td>
                         <td>Member Of</td>
-                        <td style="text-align: right;">Options</td>
+                        <td style="text-align: right;">Action</td>
                     </tr>
                 </thead>
                 <tbody>
                     <tr py:for="i, user in enumerate(netAuth.userAuth.getUserList())"
                         class="${i % 2 and 'even' or 'odd'}">
                         <td>${user}</td>
-                        <td><div py:for="group in netAuth.userAuth.getGroupsByUser(user)"
-                                 py:content="group" />
+                        <td><div py:for="role in netAuth.userAuth.getRolesByUser(user)"
+                                 py:content="role" />
                         </td>
                         <td style="text-align: right;"><a href="chPassForm?username=${user}">Change Password</a>&nbsp;|&nbsp;<a href="deleteUser?username=${user}">Delete</a></td>
                     </tr>
@@ -69,22 +69,22 @@
             <p><a href="addUserForm">Add User</a></p>
 
             <h2>Roles</h2>
-            <table class="user-admin" id="groups">
-                <thead><tr><td style="width: 25%;">Role</td><td>Admin</td><td>Mirror</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
+            <table class="user-admin" id="roles">
+                <thead><tr><td style="width: 25%;">Role</td><td>Admin</td><td>Mirror</td><td>Permissions</td><td style="text-align: right;">Action</td></tr></thead>
                 <tbody>
-                    <tr py:for="i, group in enumerate(netAuth.getGroupList())"
+                    <tr py:for="i, role in enumerate(netAuth.getRoleList())"
                         class="${i % 2 and 'even' or 'odd'}">
                     <?python #
-                    rows = list(enumerate(netAuth.iterPermsByGroup(group)))
+                    rows = list(enumerate(netAuth.iterPermsByRole(role)))
                     ?>
-                        <td><b>${group}</b></td>
-                        <td py:if="netAuth.groupIsAdmin(group)" py:content="'yes'"/>
-                        <td py:if="not netAuth.groupIsAdmin(group)" py:content="'no'"/>
-                        <td py:if="netAuth.groupCanMirror(group)" py:content="'yes'"/>
-                        <td py:if="not netAuth.groupCanMirror(group)" py:content="'no'"/>
-                        <td py:if="rows" py:content="permTable(group, rows)"/>
+                        <td><b>${role}</b></td>
+                        <td py:if="netAuth.roleIsAdmin(role)" py:content="'yes'"/>
+                        <td py:if="not netAuth.roleIsAdmin(role)" py:content="'no'"/>
+                        <td py:if="netAuth.roleCanMirror(role)" py:content="'yes'"/>
+                        <td py:if="not netAuth.roleCanMirror(role)" py:content="'no'"/>
+                        <td py:if="rows" py:content="permTable(role, rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Role has no permissions</td>
-                        <td style="text-align: right;"><a href="addPermForm?roleName=${group}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?roleName=${group}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?roleName=${group}">Edit&nbsp;Role</a></td>
+                        <td style="text-align: right;"><a href="addPermForm?roleName=${role}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?roleName=${role}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?roleName=${role}">Edit&nbsp;Role</a></td>
                     </tr>
                 </tbody>
             </table>

@@ -17,17 +17,18 @@ from conary.repository import errors
 from conary.repository.netrepos import instances, versionops
 from conary.lib.tracelog import logMe
 
-# - Entries in the UserGroupTroves table are processed and flattened
-#   into the UserGroupAllTroves table
+# - Entries in the RoleTroves table are processed and flattened
+#   into the RoleAllTroves table
 # - Entries in the Permissions table are processed and flattened into
-#   the UserGroupAllPermissions table
-# - Then, UserGroupAllTroves and UserGroupAllPermissions are summarized
-#   in the UserGroupInstancesCache table
+#   the RoleAllPermissions table
+# - Then, RoleAllTroves and RoleAllPermissions are summarized
+#   in the RoleInstancesCache table
 
-# base class for handling UGAP and UGAT
-class UserGroupTable:
+# base class for handling RAP and GAT
+class RoleTable:
     def __init__(self, db):
         self.db = db
+
     def getWhereArgs(self, cond = "where", **kw):
         where = []
         args = []
@@ -41,9 +42,10 @@ class UserGroupTable:
         else:
             where = ""
         return (where, args)
-    
-# class and methods for handling UserGroupTroves operations
-class UserGroupTroves(UserGroupTable):
+
+
+# class and methods for handling RoleTroves operations
+class RoleTroves(RoleTable):
     # given a list of (n,v,f) tuples, convert them to instanceIds in
     # the tmpInstanceId table
     def _findInstanceIds(self, troveList, checkMissing=True):
@@ -84,16 +86,16 @@ class UserGroupTroves(UserGroupTable):
                 raise errors.TroveMissing(n,v)
         return True
 
-    # update the UserGroupAllTroves table
-    def rebuild(self, cu, ugtId = None, userGroupId = None):
+    # update the RoleAllTroves table
+    def rebuild(self, cu, rtId = None, roleId = None):
         where = []
         args = {}
-        if ugtId is not None:
-            where.append("ugtId = :ugtId")
-            args["ugtId"] = ugtId
-        if userGroupId is not None:
-            where.append("userGroupId = :userGroupId")
-            args["userGroupId"] = userGroupId
+        if rtId is not None:
+            where.append("ugtId = :rtId")
+            args["rtId"] = rtId
+        if roleId is not None:
+            where.append("userGroupId = :roleId")
+            args["roleId"] = roleId
         whereCond = ""
         andCond = ""
         if where:
@@ -109,15 +111,17 @@ class UserGroupTroves(UserGroupTable):
         from UserGroupTroves join TroveTroves using (instanceId)
         where UserGroupTroves.recursive = 1 %s
         """ %(whereCond, andCond), args)
-        if ugtId is None and userGroupId is None:
+        if rtId is None and roleId is None:
             # this was a full rebuild
             self.db.analyze("UserGroupAllTroves")
         return True
     
-    # grant access on a troveList to userGroup
-    def add(self, userGroupId, troveList, recursive=True):
-        """grant access on a troveList to a userGroup. If recursive = True,
-        then access is also granted to all the children of the troves passed
+    # grant access on a troveList to role
+    def add(self, roleId, troveList, recursive=True):
+        """
+        grant access on a troveList to a Role. If recursive = True,
+        then access is also granted to all the children of the troves
+        passed
         """
         self._findInstanceIds(troveList)
         recursive = int(bool(recursive))
@@ -129,27 +133,27 @@ class UserGroupTroves(UserGroupTable):
         from tmpInstanceId
         left join UserGroupTroves as ugt using(instanceId)
         where ugt.userGroupId is NULL or ugt.userGroupId = ?
-        """, userGroupId)
+        """, roleId)
         # record the new permissions
-        ugtList = []
-        for instanceId, ugtId, recflag in cu.fetchall():
-            if ugtId is None: # new instanceId, left join returned a NULL ugt record
+        rtList = []
+        for instanceId, rtId, recflag in cu.fetchall():
+            if rtId is None: # new instanceId, left join returned a NULL rt record
                 cu.execute("insert into UserGroupTroves(userGroupId, instanceId, recursive) "
-                           "values (?,?,?)", (userGroupId, instanceId, recursive))
-                ugtId = cu.lastrowid
+                           "values (?,?,?)", (roleId, instanceId, recursive))
+                rtId = cu.lastrowid
             elif recursive and not recflag:
                 # granting recursive access to something that wasn't recursive before
-                cu.execute("update UserGroupTroves set recursive = ? where ugtId = ?",
-                           (recursive, ugtId))
+                cu.execute("update UserGroupTroves set recursive = ? where rtId = ?",
+                           (recursive, rtId))
             else: # not worth bothering with a rebuild
-                ugtId = None
-            if ugtId: # we have a new (or changed) acl
-                self.rebuild(cu, ugtId, userGroupId)
-                ugtList.append(ugtId)
-        return ugtList
+                rtId = None
+            if rtId: # we have a new (or changed) acl
+                self.rebuild(cu, rtId, roleId)
+                rtList.append(rtId)
+        return rtList
 
     # remove trove access grants
-    def delete(self, userGroupId, troveList):
+    def delete(self, roleId, troveList):
         """remove group access to troves passed in the (n,v,f) troveList"""
         self._findInstanceIds(troveList, checkMissing=False)
         cu = self.db.cursor()
@@ -159,7 +163,7 @@ class UserGroupTroves(UserGroupTable):
         select ugtId from UserGroupTroves
         where userGroupId = ?
         and instanceId in (select instanceId from tmpInstanceId)
-        """, userGroupId, start_transaction=False)
+        """, roleId, start_transaction=False)
         self.db.analyze("tmpId")
         # save what instanceIds will be affected by this delete
         schema.resetTable(cu, "tmpInstances")
@@ -169,7 +173,7 @@ class UserGroupTroves(UserGroupTable):
         from UserGroupAllTroves as ugat
         where ugat.userGroupId = ?
           and ugat.ugtId in (select id from tmpId)
-        """, userGroupId, start_transaction = False)
+        """, roleId, start_transaction = False)
         cu.execute("delete from UserGroupAllTroves where ugtId in (select id from tmpId)")
         cu.execute("delete from UserGroupTroves where ugtId in (select id from tmpId)")
         # filter out the ones that are still allowed based on other permissions
@@ -179,11 +183,11 @@ class UserGroupTroves(UserGroupTable):
             select 1 from UserGroupAllTroves as ugat
             where userGroupId = ?
               and ugat.instanceId = tmpInstances.instanceId )
-        """, userGroupId, start_transaction=False)
+        """, roleId, start_transaction=False)
         return True
 
-    # list what we have in the repository for a userGroupId
-    def list(self, userGroupId):
+    # list what we have in the repository for a roleId
+    def list(self, roleId):
         """return a list of the troves this usergroup is granted special access"""
         cu = self.db.cursor()
         cu.execute("""
@@ -193,15 +197,14 @@ class UserGroupTroves(UserGroupTable):
         join Items on Instances.itemId = Items.itemId
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
-        where ugt.userGroupId = ? """, userGroupId)
+        where ugt.userGroupId = ? """, roleId)
         return [ ((n,v,f),r) for n,v,f,r in cu.fetchall()]
 
-# class and methods for handling UserGroupAllPermissions operations
-class UserGroupPermissions(UserGroupTable):
-    # adds into the UserGroupAllPermissions table new entries
+# class and methods for handling RoleAllPermissions operations
+class RolePermissions(RoleTable):
+    # adds into the RoleAllPermissions table new entries
     # triggered by one or more recordIds
-    def addId(self, cu, permissionId = None, userGroupId = None,
-              instanceId = None):
+    def addId(self, cu, permissionId = None, roleId = None, instanceId = None):
         where = []
         args = []
         if permissionId is not None:
@@ -210,9 +213,9 @@ class UserGroupPermissions(UserGroupTable):
         if instanceId is not None:
             where.append("Instances.instanceId = ?")
             args.append(instanceId)
-        if userGroupId is not None:
+        if roleId is not None:
             where.append("Permissions.userGroupId = ?")
-            args.append(userGroupId)
+            args.append(roleId)
         whereStr = ""
         if len(where):
             whereStr = "where %s" % (' and '.join(where),)
@@ -236,46 +239,48 @@ class UserGroupPermissions(UserGroupTable):
         %s """ % (whereStr,), args)
         return True
 
-    def deleteId(self, cu, permissionId = None, userGroupId = None,
+    def deleteId(self, cu, permissionId = None, roleId = None,
                  instanceId = None):
         where, args = self.getWhereArgs("where", permissionId=permissionId,
-            userGroupId=userGroupId, instanceId=instanceId)
+            userGroupId=roleId, instanceId=instanceId)
         cu.execute("delete from UserGroupAllPermissions %s" % (where,), args)
         return True
 
-    def rebuild(self, cu, permissionId = None, userGroupId = None, instanceId = None):
-        self.deleteId(cu, permissionId, userGroupId, instanceId)
-        self.addId(cu, permissionId, userGroupId, instanceId)
-        if permissionId is None and userGroupId is None and instanceId is None:
+    def rebuild(self, cu, permissionId = None, roleId = None,
+                instanceId = None):
+        self.deleteId(cu, permissionId, roleId, instanceId)
+        self.addId(cu, permissionId, roleId, instanceId)
+        if permissionId is None and roleId is None and instanceId is None:
             # this was a full rebuild
             self.db.analyze("UserGroupAllPermissions")
         return True
 
-# this class takes care of the UserGroupInstancesCache table, which is a summary
-# of rows present in UserGroupAllTroves and UserGroupAllPermissions tables
-class UserGroupInstances(UserGroupTable):
+# this class takes care of the RoleInstancesCache table, which is
+# a summary of rows present in RoleAllTroves and
+# RoleAllPermissions tables
+class RoleInstances(RoleTable):
     def __init__(self, db):
-        UserGroupTable.__init__(self, db)
-        self.ugt = UserGroupTroves(db)
-        self.ugp = UserGroupPermissions(db)
+        RoleTable.__init__(self, db)
+        self.rt = RoleTroves(db)
+        self.rp = RolePermissions(db)
         self.latest = versionops.LatestTable(db)
 
-    def _getGroupId(self, userGroup):
+    def _getRoleId(self, role):
         cu = self.db.cursor()
         cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
-                   userGroup)
+                   role)
         ret = cu.fetchall()
         if len(ret):
             return ret[0][0]
-        raise errors.GroupNotFound
+        raise errors.RoleNotFound
 
-    def addTroveAccess(self, userGroup, troveList, recursive=True):
-        userGroupId = self._getGroupId(userGroup)
-        ugtList = self.ugt.add(userGroupId, troveList, recursive)
+    def addTroveAccess(self, role, troveList, recursive=True):
+        roleId = self._getRoleId(role)
+        rtList = self.rt.add(roleId, troveList, recursive)
         # we now know the ids of the new acls added. They're useful in
-        # updating the UGIC table
+        # updating the RIC table
         cu = self.db.cursor()
-        # grab the list of instanceIds we are adding to the UGIC table;
+        # grab the list of instanceIds we are adding to the RIC table;
         # we need those for a faster recomputation of the LatestCache table
         schema.resetTable(cu, "tmpInstances")
         cu.execute("""
@@ -288,30 +293,30 @@ class UserGroupInstances(UserGroupTable):
               select 1 from UserGroupInstancesCache as ugi
               where ugi.userGroupId = ?
                 and ugi.instanceId = ugat.instanceId )
-        """ % (",".join("%d" % x for x in ugtList),),
-                   (userGroupId, userGroupId), start_transaction=False)
-        # insert into UGIC and recompute the latest table
+        """ % (",".join("%d" % x for x in rtList),),
+                   (roleId, roleId), start_transaction=False)
+        # insert into RIC and recompute the latest table
         cu.execute("""
         insert into UserGroupInstancesCache (userGroupId, instanceId)
-        select %d, instanceId from tmpInstances """ %(userGroupId,))
+        select %d, instanceId from tmpInstances """ %(roleId,))
         # tmpInstances has instanceIds for which Latest needs to be recomputed
         self.db.analyze("tmpInstances")
-        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
+        self.latest.updateRoleId(cu, roleId, tmpInstances=True)
 
-    def deleteTroveAccess(self, userGroup, troveList):
-        userGroupId = self._getGroupId(userGroup)
-        # remove the UserGroupTrove access
+    def deleteTroveAccess(self, role, troveList):
+        roleId = self._getRoleId(role)
+        # remove the RoleTrove access
         cu = self.db.cursor()
-        self.ugt.delete(userGroupId, troveList)
-        # instanceIds that were removed from UGAT are in tmpInstances now
-        # UGAP might still grant permissions to some, so we filter those out
+        self.rt.delete(roleId, troveList)
+        # instanceIds that were removed from RAT are in tmpInstances now
+        # RAP might still grant permissions to some, so we filter those out
         cu.execute("""
         delete from tmpInstances
         where exists (
             select 1 from UserGroupAllPermissions as ugap
             where ugap.userGroupId = ?
               and ugap.instanceId = tmpInstances.instanceId )
-        """, userGroupId, start_transaction = False)
+        """, roleId, start_transaction = False)
         self.db.analyze("tmpInstances")
         # now we should have in tmpInstances the instanceIds of the
         # troves this user can no longer access.
@@ -319,18 +324,18 @@ class UserGroupInstances(UserGroupTable):
         delete from UserGroupInstancesCache
         where userGroupId = ?
           and instanceId in (select instanceId from tmpInstances)
-        """, userGroupId)
+        """, roleId)
         # tmpInstances has instanceIds for which Latest needs to be recomputed
-        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
+        self.latest.updateRoleId(cu, roleId, tmpInstances=True)
 
-    def listTroveAccess(self, userGroup):
-        userGroupId = self._getGroupId(userGroup)
-        return self.ugt.list(userGroupId)
+    def listTroveAccess(self, role):
+        roleId = self._getRoleId(role)
+        return self.rt.list(roleId)
 
     # changes in the Permissions table
-    def addPermissionId(self, permissionId, userGroupId):
+    def addPermissionId(self, permissionId, roleId):
         cu = self.db.cursor()
-        self.ugp.addId(cu, permissionId = permissionId)
+        self.rp.addId(cu, permissionId = permissionId)
         # figure out newly accessible troves. We keep track separately
         # to speed up the Latest update
         schema.resetTable(cu, "tmpInstances")
@@ -342,7 +347,7 @@ class UserGroupInstances(UserGroupTable):
               select instanceId from UserGroupInstancesCache as ugi
               where ugi.userGroupId = ?
               and ugi.instanceId = ugap.instanceId ) """,
-                   (permissionId, userGroupId),
+                   (permissionId, roleId),
                    start_transaction = False)
         # update UsergroupInstancesCache
         cu.execute("""
@@ -355,9 +360,9 @@ class UserGroupInstances(UserGroupTable):
         group by userGroupId, instanceId
         """, permissionId)
         # update Latest
-        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
+        self.latest.updateRoleId(cu, roleId, tmpInstances=True)
 
-    def updatePermissionId(self, permissionId, userGroupId):
+    def updatePermissionId(self, permissionId, roleId):
         cu = self.db.cursor()
         schema.resetTable(cu, "tmpInstances")
         # figure out how the access is changing
@@ -366,8 +371,8 @@ class UserGroupInstances(UserGroupTable):
         select instanceId from UserGroupAllPermissions
         where permissionId = ? """, permissionId, start_transaction=False)
         # re-add 
-        self.ugp.deleteId(cu, permissionId = permissionId)
-        self.ugp.addId(cu, permissionId = permissionId)
+        self.rp.deleteId(cu, permissionId = permissionId)
+        self.rp.addId(cu, permissionId = permissionId)
         # remove from consideration troves for which we still have access
         cu.execute("""
         delete from tmpInstances
@@ -379,7 +384,7 @@ class UserGroupInstances(UserGroupTable):
             select 1 from UserGroupAllTroves as ugat
             where ugat.userGroupId = ?
               and ugat.instanceId = tmpInstances.instanceId )
-        """, (userGroupId, userGroupId), start_transaction=False)
+        """, (roleId, roleId), start_transaction=False)
         self.db.analyze("tmpInstances")
         # remove trove access from troves that are left
         cu.execute("""
@@ -390,7 +395,7 @@ class UserGroupInstances(UserGroupTable):
               select 1 from UserGroupAllTroves as ugat
               where ugat.userGroupId = UserGroupInstancesCache.userGroupId
                 and ugat.instanceId = UserGroupInstancesCache.instanceId )
-        """, userGroupId)
+        """, roleId)
         # add the new troves now
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
@@ -404,10 +409,11 @@ class UserGroupInstances(UserGroupTable):
                 and ugi.userGroupId = ugap.userGroupId )
         group by userGroupId, instanceId
         """, permissionId)
-        self.latest.updateUserGroupId(cu, userGroupId)
+        self.latest.updateRoleId(cu, roleId)
         return True
+
     # updates the canWrite flag for an acl change
-    def updateCanWrite(self, permissionId, userGroupId):
+    def updateCanWrite(self, permissionId, roleId):
         cu = self.db.cursor()
         # update the flattened table first
         cu.execute("""
@@ -425,12 +431,12 @@ class UserGroupInstances(UserGroupTable):
         where userGroupId = ? and instanceId in (
             select instanceId from UserGroupAllPermissions as ugap2
             where ugap2.permissionId = ? )
-        """, (userGroupId, permissionId))
+        """, (roleId, permissionId))
         return True
-        
-    def deletePermissionId(self, permissionId, userGroupId):
+
+    def deletePermissionId(self, permissionId, roleId):
         cu = self.db.cursor()
-        # compute the list of troves for which no other UGAP/UGAT access exists
+        # compute the list of troves for which no other RAP/RAT access exists
         schema.resetTable(cu, "tmpInstances")
         cu.execute("""
         insert into tmpInstances(instanceId)
@@ -445,24 +451,24 @@ class UserGroupInstances(UserGroupTable):
               select 1 from UserGroupAllTroves as ugat
               where ugat.instanceId = ugi.instanceId
                 and ugat.userGroupId = ? )""",
-                   (userGroupId, userGroupId, permissionId, userGroupId),
+                   (roleId, roleId, permissionId, roleId),
                    start_transaction = False)
         # clean up the flattened table
         cu.execute("delete from UserGroupAllPermissions where permissionId = ?",
                    permissionId)
-        # now we have only the troves which need to be erased out of UGIC
+        # now we have only the troves which need to be erased out of RIC
         self.db.analyze("tmpInstances")
         cu.execute("""
         delete from UserGroupInstancesCache
         where userGroupId = ?
-        and instanceId in (select instanceId from tmpInstances)""", userGroupId)
+        and instanceId in (select instanceId from tmpInstances)""", roleId)
         # update Latest
-        self.latest.updateUserGroupId(cu, userGroupId, tmpInstances=True)
+        self.latest.updateRoleId(cu, roleId, tmpInstances=True)
 
     # a new trove has been comitted to the system
     def addInstanceId(self, instanceId):
         cu = self.db.cursor()
-        self.ugp.addId(cu, instanceId = instanceId)
+        self.rp.addId(cu, instanceId = instanceId)
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
         select userGroupId, instanceId,
@@ -485,6 +491,7 @@ class UserGroupInstances(UserGroupTable):
             cu.execute("delete from %s where instanceId = ?" % (t,),
                        instanceId)
         self.latest.updateInstanceId(cu, instanceId)
+
     def deleteInstanceIds(self, idTableName):
         cu = self.db.cursor()
         for t in [ "UserGroupInstancesCache", "UserGroupAllTroves",
@@ -494,18 +501,18 @@ class UserGroupInstances(UserGroupTable):
         # this case usually does not require recomputing the
         # LatestCache since we only remove !present troves in bulk
         return True
-    
-    # rebuild the UGIC table entries
-    def rebuild(self, userGroupId = None, cu = None):
+
+    # rebuild the RIC table entries
+    def rebuild(self, roleId = None, cu = None):
         if cu is None:
             cu = self.db.cursor()
-        where, args = self.getWhereArgs("where", userGroupId = userGroupId)
+        where, args = self.getWhereArgs("where", userGroupId = roleId)
         cu.execute("delete from UserGroupInstancesCache %s" % (where,), args)
         # first, rebuild the flattened tables
-        logMe(3, "rebuilding UserGroupAllTroves", "userGroupId=%s"%userGroupId)
-        self.ugt.rebuild(cu, userGroupId = userGroupId)
-        logMe(3, "rebuilding UserGroupAllPermissions", "userGroupId=%s"%userGroupId)
-        self.ugp.rebuild(cu, userGroupId = userGroupId)
+        logMe(3, "rebuilding UserGroupAllTroves", "roleId=%s" % roleId)
+        self.rt.rebuild(cu, roleId = roleId)
+        logMe(3, "rebuilding UserGroupAllPermissions", "roleId=%s" % roleId)
+        self.rp.rebuild(cu, roleId = roleId)
         # and now sum it up
         logMe(3, "updating UserGroupInstancesCache from UserGroupAllPermissions")
         cu.execute("""
@@ -514,7 +521,7 @@ class UserGroupInstances(UserGroupTable):
         from UserGroupAllPermissions %s
         group by userGroupId, instanceId
         """ % (where,), args)
-        cond, args = self.getWhereArgs("and", userGroupId = userGroupId)
+        cond, args = self.getWhereArgs("and", userGroupId = roleId)
         logMe(3, "updating UserGroupInstancesCache from UserGroupAllTroves")
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
@@ -528,8 +535,8 @@ class UserGroupInstances(UserGroupTable):
         self.db.analyze("UserGroupInstancesCache")
         # need to rebuild the latest as well
         logMe(3, "rebuilding the LatestCache rows", "userGroupId=%s"%userGroupId)
-        if userGroupId is not None:
-            self.latest.updateUserGroupId(cu, userGroupId)
+        if roleId is not None:
+            self.latest.updateRoleId(cu, roleId)
         else: # this is a full rebuild
             self.latest.rebuild()
         return True

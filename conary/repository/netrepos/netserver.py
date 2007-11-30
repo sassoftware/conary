@@ -43,7 +43,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 60 + 1)
+SERVER_VERSIONS = range(36, 61 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -72,6 +72,13 @@ def requireClientProtocol(protocol):
         return f
 
     return dec
+
+def deprecatedPermissionCall(*args):
+    def f(*args, **kw):
+        raise errors.InvalidClientVersion(
+            'Conary 2.0 is required to manipulate permissions in this '
+            'repository.')
+    return f
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -177,7 +184,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             cacheTimeout = self.authCacheTimeout,
             passwordURL = self.externalPasswordURL,
             entCheckURL = self.entitlementCheckURL)
-        self.ugi = accessmap.UserGroupInstances(self.db)
+        self.ri = accessmap.RoleInstances(self.db)
         self.deptable = deptable.DependencyTables(self.db)
         self.log.reset()
 
@@ -307,33 +314,54 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def addAccessGroup(self, authToken, clientVersion, groupName):
-        if not self.auth.authCheck(authToken, admin = True):
-            raise errors.InsufficientPermission
-        self.log(2, authToken[0], groupName)
-        return self.auth.addGroup(groupName)
+        pass
 
     @accessReadWrite
-    def deleteAccessGroup(self, authToken, clientVersion, groupName):
+    def addRole(self, authToken, clientVersion, role):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], groupName)
-        self.auth.deleteGroup(groupName)
+        self.log(2, authToken[0], role)
+        return self.auth.addRole(role)
+
+
+    @accessReadWrite
+    @deprecatedPermissionCall
+    def deleteAccessGroup(self, authToken, clientVersion, groupName):
+        pass
+
+    @accessReadWrite
+    def deleteRole(self, authToken, clientVersion, role):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], role)
+        self.auth.deleteRole(role)
         return True
 
     @accessReadOnly
+    @deprecatedPermissionCall
     def listAccessGroups(self, authToken, clientVersion):
+        pass
+
+    @accessReadOnly
+    def listRoles(self, authToken, clientVersion):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], 'listAccessGroups')
-        return self.auth.getGroupList()
+        self.log(2, authToken[0], 'listRoles')
+        return self.auth.getRoleList()
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def updateAccessGroupMembers(self, authToken, clientVersion, groupName, members):
+        pass
+
+    @accessReadWrite
+    def updateRoleMembers(self, authToken, clientVersion, role, members):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], 'updateAccessGroupMembers')
-        self.auth.updateGroupMembers(groupName, members)
+        self.log(2, authToken[0], 'updateRoleMembers')
+        self.auth.updateRoleMembers(role, members)
         return True
 
     @accessReadWrite
@@ -345,27 +373,39 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     @accessReadWrite
-    def setUserGroupCanMirror(self, authToken, clientVersion, userGroup, canMirror):
-        if not self.auth.authCheck(authToken, admin = True):
-            raise errors.InsufficientPermission
-        self.log(2, authToken[0], userGroup, canMirror)
-        self.auth.setMirror(userGroup, canMirror)
-        return True
+    @deprecatedPermissionCall
+    def setUserGroupCanMirror(self, authToken, clientVersion,
+                              userGroup, canMirror):
+        pass
+
     @accessReadWrite
-    def setUserGroupIsAdmin(self, authToken, clientVersion, userGroup, admin):
+    def setRoleCanMirror(self, authToken, clientVersion, role, canMirror):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], userGroup, admin)
-        self.auth.setAdmin(userGroup, admin)
+        self.log(2, authToken[0], role, canMirror)
+        self.auth.setMirror(role, canMirror)
+        return True
+
+    @accessReadWrite
+    @deprecatedPermissionCall
+    def setUserGroupIsAdmin(self, authToken, clientVersion, userGroup, admin):
+        pass
+
+    @accessReadWrite
+    def setRoleIsAdmin(self, authToken, clientVersion, role, admin):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], role, admin)
+        self.auth.setAdmin(role, admin)
         return True
 
     @accessReadOnly
-    def listAcls(self, authToken, clientVersion, userGroup):
+    def listAcls(self, authToken, clientVersion, role):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], userGroup)
+        self.log(2, authToken[0], role)
         returner = list()
-        for acl in self.auth.getPermsByGroup(userGroup):
+        for acl in self.auth.getPermsByRole(role):
             if acl['label'] is None:
                 acl['label'] = ""
             if acl['item'] is None:
@@ -375,9 +415,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     @requireClientProtocol(60)
-    def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
+    def addAcl(self, authToken, clientVersion, role, trovePattern,
                label, write = False, remove = False):
-        self.log(2, authToken[0], userGroup, trovePattern, label,
+        self.log(2, authToken[0], role, trovePattern, label,
                  "write=%s remove=%s" % (write, remove))
         if trovePattern == "":
             trovePattern = None
@@ -389,34 +429,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if label == "":
             label = None
-        self.auth.addAcl(userGroup, trovePattern, label, write, remove = remove)
+        self.auth.addAcl(role, trovePattern, label, write, remove = remove)
 
         return True
 
     @accessReadWrite
-    def deleteAcl(self, authToken, clientVersion, userGroup, trovePattern,
-               label):
+    def deleteAcl(self, authToken, clientVersion, role, trovePattern,
+                  label):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], userGroup, trovePattern, label)
+        self.log(2, authToken[0], role, trovePattern, label)
         if trovePattern == "":
             trovePattern = None
 
         if label == "":
             label = None
 
-        self.auth.deleteAcl(userGroup, label, trovePattern)
+        self.auth.deleteAcl(role, label, trovePattern)
 
         return True
 
     @accessReadWrite
     @requireClientProtocol(60)
-    def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
+    def editAcl(self, authToken, clientVersion, role, oldTrovePattern,
                 oldLabel, trovePattern, label, write = False,
                 canRemove = False):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], userGroup,
+        self.log(2, authToken[0], role,
                  "old=%s new=%s" % ((oldTrovePattern, oldLabel),
                                     (trovePattern, label)),
                  "write=%s" % (write,))
@@ -438,7 +478,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         labelId = idtable.IdTable.get(self.troveStore.versionOps.labels, label, None)
         oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
 
-        self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
+        self.auth.editAcl(role, oldTroveId, oldLabelId, troveId, labelId,
                           write, canRemove = canRemove)
 
         return True
@@ -454,26 +494,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return True
 
     @accessReadOnly
+    @deprecatedPermissionCall
     def getUserGroups(self, authToken, clientVersion):
+        pass
+
+    @accessReadOnly
+    def getRoles(self, authToken, clientVersion):
         if not self.auth.check(authToken):
             raise errors.InsufficientPermission
         self.log(2)
-        r = self.auth.getUserGroups(authToken[0])
+        r = self.auth.getRoles(authToken[0])
         return r
 
-    @accessReadWrite
+    @deprecatedPermissionCall
     def addEntitlement(self, authToken, clientVersion, *args):
-        raise errors.InvalidClientVersion(
-            'conary 1.1.x is required to manipulate entitlements in '
-            'this repository server')
+        pass
 
     @accessReadWrite
-    def addEntitlements(self, authToken, clientVersion, entGroup, 
-                        entitlements):
+    def addEntitlementKeys(self, authToken, clientVersion, entClass,
+                           entKeys):
         # self.auth does its own authentication check
-        for entitlement in entitlements:
-            entitlement = self.toEntitlement(entitlement)
-            self.auth.addEntitlement(authToken, entGroup, entitlement)
+        for key in entKeys:
+            key = self.toEntitlement(key)
+            self.auth.addEntitlementKey(authToken, entClass, key)
 
         return True
 
@@ -484,89 +527,129 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             'this repository server')
 
     @accessReadWrite
-    def deleteEntitlements(self, authToken, clientVersion, entGroup, 
-                           entitlements):
+    def deleteEntitlementKeys(self, authToken, clientVersion, entClass,
+                              entKeys):
         # self.auth does its own authentication check
-        for entitlement in entitlements:
-            entitlement = self.toEntitlement(entitlement)
-            self.auth.deleteEntitlement(authToken, entGroup, entitlement)
+        for key in entKeys:
+            key = self.toEntitlement(key)
+            self.auth.deleteEntitlementKey(authToken, entClass, key)
 
         return True
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def addEntitlementGroup(self, authToken, clientVersion, entGroup,
                             userGroup):
+        pass
+
+    @accessReadWrite
+    def addEntitlementClass(self, authToken, clientVersion, entClass,
+                            role):
         # self.auth does its own authentication check
-        self.auth.addEntitlementGroup(authToken, entGroup, userGroup)
+        self.auth.addEntitlementClass(authToken, entClass, role)
         return True
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def deleteEntitlementGroup(self, authToken, clientVersion, entGroup):
+        pass
+
+    @accessReadWrite
+    def deleteEntitlementClass(self, authToken, clientVersion, entClass):
         # self.auth does its own authentication check
-        self.auth.deleteEntitlementGroup(authToken, entGroup)
+        self.auth.deleteEntitlementClass(authToken, entClass)
         return True
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def addEntitlementOwnerAcl(self, authToken, clientVersion, userGroup,
                                entGroup):
+        pass
+
+    @accessReadWrite
+    def addEntitlementClassOwner(self, authToken, clientVersion, role,
+                                 entClass):
         # self.auth does its own authentication check
-        self.auth.addEntitlementOwnerAcl(authToken, userGroup, entGroup)
+        self.auth.addEntitlementClassOwner(authToken, role, entClass)
         return True
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def deleteEntitlementOwnerAcl(self, authToken, clientVersion, userGroup,
                                   entGroup):
+        pass
+
+    @accessReadWrite
+    def deleteEntitlementClassOwner(self, authToken, clientVersion, role,
+                                    entClass):
         # self.auth does its own authentication check
-        self.auth.deleteEntitlementOwnerAcl(authToken, userGroup, entGroup)
+        self.auth.deleteEntitlementClassOwner(authToken, role, entClass)
         return True
 
     @accessReadOnly
-    def listEntitlements(self, authToken, clientVersion, entGroup):
+    def listEntitlementKeys(self, authToken, clientVersion, entClass):
         # self.auth does its own authentication check
         return [ self.fromEntitlement(x) for x in
-                        self.auth.iterEntitlements(authToken, entGroup) ]
+                 self.auth.iterEntitlementKeys(authToken, entClass) ]
 
     @accessReadOnly
+    @deprecatedPermissionCall
     def listEntitlementGroups(self, authToken, clientVersion):
+        pass
+
+    @accessReadOnly
+    def listEntitlementClasses(self, authToken, clientVersion):
         # self.auth does its own authentication check and restricts the
         # list of entitlements being displayed to those the user has
         # permissions to manage
-        return self.auth.listEntitlementGroups(authToken)
+        return self.auth.listEntitlementClasses(authToken)
 
     @accessReadOnly
+    @deprecatedPermissionCall
     def getEntitlementClassAccessGroup(self, authToken, clientVersion,
-                                         classList):
+                                       classList):
+        pass
+
+    @accessReadOnly
+    def getEntitlementClassesRoles(self, authToken, clientVersion,
+                                   classList):
         # self.auth does its own authentication check and restricts the
         # list of entitlements being displayed to the admin user
-        return self.auth.getEntitlementClassAccessGroup(authToken, classList)
+        return self.auth.getEntitlementClassesRoles(authToken, classList)
 
     @accessReadWrite
+    @deprecatedPermissionCall
     def setEntitlementClassAccessGroup(self, authToken, clientVersion,
-                                         classInfo):
+                                       classInfo):
+        pass
+
+    @accessReadWrite
+    def setEntitlementClassesRoles(self, authToken, clientVersion,
+                                   classInfo):
         # self.auth does its own authentication check and restricts the
         # list of entitlements being displayed to the admin user
-        self.auth.setEntitlementClassAccessGroup(authToken, classInfo)
+        self.auth.setEntitlementClassesRoles(authToken, classInfo)
         return ""
 
     @accessReadWrite
-    def addTroveAccess(self, authToken, clientVersion, userGroup, troveList):
+    def addTroveAccess(self, authToken, clientVersion, role, troveList):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.ugi.addTroveAccess(userGroup, troveList, recursive=True)
+        self.ri.addTroveAccess(role, troveList, recursive=True)
         return ""
 
     @accessReadWrite
-    def deleteTroveAccess(self, authToken, clientVersion, userGroup, troveList):
+    def deleteTroveAccess(self, authToken, clientVersion, role, troveList):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.ugi.deleteTroveAccess(userGroup, troveList)
+        self.ri.deleteTroveAccess(role, troveList)
         return ""
     
     @accessReadOnly
-    def listTroveAccess(self, authToken, clientVersion, userGroup):
+    def listTroveAccess(self, authToken, clientVersion, role):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        ret = self.ugi.listTroveAccess(userGroup)
+        ret = self.ri.listTroveAccess(role)
         # strip off the recurse flag; return just the name,version,flavor tuple
         return [ x[0] for x in ret ]
     
@@ -678,8 +761,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                versionType == self._GTL_VERSION_TYPE_LABEL)
 
         # permission check first
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return {}
 
         flavorIndices = {}
@@ -743,13 +826,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
             coreQdict["spec"] = ""
 
-        # because we need to filter through UserGroupInstancesCache
+        # because we need to filter through RoleInstancesCache
         # table, we need to go through the Instances and Nodes tables
         # all the time
         where = []
         where.append(
             "ugi.userGroupId IN (%s)" % (
-            ", ".join("%d" % x for x in userGroupIds),))
+            ", ".join("%d" % x for x in roleIds),))
         # "leaves" == Latest ; "all" == Instances
         coreQdict["latest"] = ""
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
@@ -996,8 +1079,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                    troveTypes = TROVE_QUERY_ALL):
         cu = self.db.cursor()
 
-        groupIds = self.auth.getAuthGroups(cu, authToken)
-        if not groupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return {}
 
         if troveTypes == TROVE_QUERY_PRESENT:
@@ -1018,7 +1101,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             where ugi.userGroupId in (%s)
               and Items.hasTrove = 1
               %s
-            """ % (",".join("%d" % x for x in groupIds),
+            """ % (",".join("%d" % x for x in roleIds),
                    troveTypeClause))
         else:
             cu.execute("""
@@ -1033,7 +1116,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
               and userGroupId in (%s)
               and Items.hasTrove = 1
               %s
-            """ % (",".join("%d" % x for x in groupIds), troveTypeClause),
+            """ % (",".join("%d" % x for x in roleIds), troveTypeClause),
                        labelStr)
         return [ x[0] for x in cu ]
 
@@ -1084,8 +1167,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # faster version for the "get-all" case
         # authenticate this user first
         cu = self.db.cursor()
-        groupIds = self.auth.getAuthGroups(cu, authToken)
-        if not groupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return {}
 
         latestType = self._latestType(troveTypes)
@@ -1107,7 +1190,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Versions on LatestCache.versionId = Versions.versionId
         where LatestCache.userGroupId in (%s)
           and LatestCache.latestType = %d
-        """ % (",".join("%d" % x for x in groupIds), latestType)
+        """ % (",".join("%d" % x for x in roleIds), latestType)
         cu.execute(query)
         ret = {}
         for (trove, version, flavor, timeStamps) in cu:
@@ -1627,10 +1710,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    raise errors.InsufficientPermission
         self.log(2, label, requiresList)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
 	    raise errors.InsufficientPermission
-        ret = self.deptable.resolve(userGroupIds, label,
+        ret = self.deptable.resolve(roleIds, label,
                                     depList = requiresList,
                                     leavesOnly = leavesOnly)
         return ret
@@ -1638,14 +1721,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getDepSuggestionsByTroves(self, authToken, clientVersion, requiresList,
                                   troveList):
-        # the query will run through the UserGroupInstancesCache filter
+        # the query will run through the RoleInstancesCache filter
         # and only return stuff this user has access to....
         self.log(2, troveList, requiresList)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
 	    raise errors.InsufficientPermission
-        ret = self.deptable.resolve(userGroupIds, label = None,
+        ret = self.deptable.resolve(roleIds, label = None,
                                     depList = requiresList,
                                     troveList = troveList)
         return ret
@@ -1815,8 +1898,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(3)
         cu = self.db.cursor()
 
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return {}
         schema.resetTable(cu, 'tmpFileId')
 
@@ -1850,8 +1933,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN UserGroupInstancesCache ON
             TroveFiles.instanceId = UserGroupInstancesCache.instanceId
         WHERE FileStreams.stream IS NOT NULL
-          AND UserGroupInstancesCache.userGroupId IN (%(ugid)s)
-        """ % { 'ugid' : ", ".join("%d" % x for x in userGroupIds) }
+          AND UserGroupInstancesCache.userGroupId IN (%(roleids)s)
+        """ % { 'roleids' : ", ".join("%d" % x for x in roleIds) }
         cu.execute(q)
 
         for (i, stream) in cu:
@@ -1937,7 +2020,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, sourceName, branch, filePrefixes, fileIds)
         cu = self.db.cursor()
 
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
+        roleIds = self.auth.getAuthRoles(cu, authToken)
 
         prefixQuery = ""
         if filePrefixes:
@@ -1977,7 +2060,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ugi.userGroupId in (%s)
         ORDER BY
             Nodes.finalTimestamp DESC
-        """ % (prefixQuery, ",".join("%d" % x for x in userGroupIds))
+        """ % (prefixQuery, ",".join("%d" % x for x in roleIds))
 
         cu.execute(query, (sourceName, branch))
         ids = {}
@@ -2002,10 +2085,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # returns False for troves the user doesn't have permission to view
         self.log(2, troveList)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        results = [ False ] * len(troveList)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return results
+        results = [ False ] * len(troveList)
         schema.resetTable(cu, "tmpNVF")
         def _iterTroveList(troveList):
             for i, item in enumerate(troveList):
@@ -2040,7 +2123,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Instances.instanceId = ugi.instanceId
         WHERE ugi.userGroupId in (%s)
         AND (Instances.isPresent = ? %s) """ % (
-            ",".join("%d" % x for x in userGroupIds), hiddenClause)
+            ",".join("%d" % x for x in roleIds), hiddenClause)
         cu.execute(query, instances.INSTANCE_PRESENT_NORMAL)
         for (row,) in cu:
             results[row] = True
@@ -2051,8 +2134,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          all=False):
         self.log(2, pathList, label, all)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return {}
 
         schema.resetTable(cu, 'tmpPath')
@@ -2084,7 +2167,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND Instances.isPresent = %d
           AND Labels.label = ?
         ORDER BY Nodes.finalTimestamp DESC
-        """ % (",".join("%d" % x for x in userGroupIds),
+        """ % (",".join("%d" % x for x in roleIds),
                instances.INSTANCE_PRESENT_NORMAL)
         cu.execute(query, label)
 
@@ -2425,8 +2508,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
         self.log(2, mark)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return []
         # Since signatures are small blobs, it doesn't make a lot
         # of sense to use a LIMIT on this query...
@@ -2448,7 +2531,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND TroveInfo.changed >= ?
           AND TroveInfo.infoType = %d
         ORDER BY TroveInfo.changed
-        """ % (",".join("%d" % x for x in userGroupIds),
+        """ % (",".join("%d" % x for x in roleIds),
                instances.INSTANCE_PRESENT_NORMAL, trove._TROVEINFO_TAG_SIGS)
         # the fewer query parameters passed in, the better PostgreSQL optimizes the query
         # so we embed the constants in the query and bind the user supplied data
@@ -2466,8 +2549,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
         self.log(2, mark)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return []
         if infoTypes:
             try:
@@ -2513,14 +2596,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Items ON Instances.itemId = Items.itemId
         JOIN Versions ON Instances.versionId = Versions.versionId
         JOIN Flavors ON Instances.flavorId = flavors.flavorId
-        WHERE ugi.userGroupId IN (%(ugids)s)
+        WHERE ugi.userGroupId IN (%(roleids)s)
           AND Instances.changed <= ?
           AND Instances.isPresent = %(present)d
           AND TroveInfo.changed >= ?
           %(infoType)s
         ORDER BY Instances.instanceId, TroveInfo.changed
         """ % {
-            "ugids" : ",".join("%d" % x for x in userGroupIds),
+            "roleids" : ",".join("%d" % x for x in roleIds),
             "present" : instances.INSTANCE_PRESENT_NORMAL,
             "infoType" : infoTypeLimiter,
             "labelLimit" : labelLimit,
@@ -2729,8 +2812,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], mark)
         # only show troves the user is allowed to see
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return []
         # compute the max number of troves with the same mark for
         # dynamic sizing; the client can get stuck if we keep
@@ -2758,7 +2841,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN UserGroups USING(userGroupId)
         WHERE UserGroups.canMirror = 1
           AND UserGroups.userGroupId in (%s)
-        """ % (",".join("%d" % x for x in userGroupIds),))
+        """ % (",".join("%d" % x for x in roleIds),))
         permCount = cu.fetchall()[0][0]
         if permCount == 0:
 	    raise errors.InsufficientPermission
@@ -2793,7 +2876,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         LIMIT %d
         ) as inq
         """ % ( instances.INSTANCE_PRESENT_NORMAL,
-                ",".join("%d" % x for x in userGroupIds),
+                ",".join("%d" % x for x in roleIds),
                 lim * permCount)
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
@@ -2886,8 +2969,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
         schema.resetTable(cu, "tmpNVF")
         schema.resetTable(cu, "tmpInstanceId")
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return []
         for (n,v,f) in troveInfoList:
             cu.execute("insert into tmpNVF(name,version,flavor) values (?,?,?)",
@@ -2923,7 +3006,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Versions on Instances.versionId = Versions.versionId
         join Flavors on Instances.flavorId = Flavors.flavorId
         where ugi.userGroupId in (%s)
-        """ % (",".join("%d" % x for x in userGroupIds), ))
+        """ % (",".join("%d" % x for x in roleIds), ))
         # get the results
         ret = [ set() for x in range(len(troveInfoList)) ]
         for i, n,v,f in cu:
@@ -2946,11 +3029,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
         self.log(2, troveList)
         cu = self.db.cursor()
-        userGroupIds = self.auth.getAuthGroups(cu, authToken)
-        if not userGroupIds:
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
             return []
         ret = [ [] for x in range(len(troveList)) ]
-        d = {"gids" : ",".join(["%d" % x for x in userGroupIds])}
+        d = {"roleids" : ",".join(["%d" % x for x in roleIds])}
         for i, (n, branch, f) in enumerate(troveList):
             assert ( branch.startswith('/') )
             args = [n, '%s/%%' % (branch,)]
@@ -2972,7 +3055,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             join Flavors on Instances.flavorId = Flavors.flavorId
             where Items.item = ?
               and Branches.branch like ?
-              and ugi.userGroupId in (%(gids)s)
+              and ugi.userGroupId in (%(roleids)s)
               %(flavor)s
             """ % d, args)
             for verStr, flavStr in cu:

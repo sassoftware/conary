@@ -177,13 +177,34 @@ class UnknownException(RepositoryError, InternalConaryError):
 class UserAlreadyExists(RepositoryError):
     pass
 
+# FIXME: deprecated, could be returned by pre-2.0 servers
 class GroupAlreadyExists(RepositoryError):
     pass
 
+# FIXME: deprecated, could be returned by pre-2.0 servers
 class GroupNotFound(RepositoryError):
     pass
 
+class RoleAlreadyExists(RepositoryError):
+    pass
+
+class RoleNotFound(RepositoryError):
+    pass
+
+# FIXME: deprecated, could be returned by pre-2.0 servers
 class UnknownEntitlementGroup(RepositoryError):
+    pass
+
+class UnknownEntitlementClass(RepositoryError):
+    pass
+
+class EntitlementClassAlreadyExists(RepositoryError):
+    pass
+
+class EntitlementKeyAlreadyExists(RepositoryError):
+    pass
+
+class EntitlementClassAlreadyHasRole(RepositoryError):
     pass
 
 class InvalidEntitlement(RepositoryError):
