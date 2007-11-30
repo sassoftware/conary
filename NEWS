@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Build Changes:
+    * File level requirements provided by the same file are dropped. (CNY-2177)
+
   o Client Changes:
     * Added keepRequired config option that has the same effect as
       always setting the --keep-required flag on update. (CNY-569)
