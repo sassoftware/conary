@@ -2949,7 +2949,8 @@ class Requires(_addInfo, _dependency):
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
             return
-        f.requires.set(pkg.requiresMap[path])
+        # files should not require items they provide directly. CNY-2177
+        f.requires.set(pkg.requiresMap[path] - f.provides())
         pkg.requires.union(f.requires())
 
     def _addELFRequirements(self, path, m, pkg):

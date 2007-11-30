@@ -20,6 +20,8 @@ class _javaSymbolTable:
         self.classRef = {}
         self.typeRef = {}
 
+def _isValidTLD(refString):
+    return "." in refString
 
 def _parseSymbolTable(contents):
     if len(contents) <= 4 or contents[0:4] != "\xCA\xFE\xBA\xBE":
@@ -94,10 +96,13 @@ def getDeps(contents):
             if 'L' in refString:
                 refString = refString[refString.index('L'):]
                 # pull out all the references in this array
-                reqSet.update(_parseRefs(refString))
+                reqSet.update([x for x in _parseRefs(refString) \
+                        if _isValidTLD(x)])
             # else ignore the array, nothing here for us to record
         else:
-            reqSet.add('.'.join(refString.split('/')))
+            parsedRef = '.'.join(refString.split('/'))
+            if _isValidTLD(parsedRef):
+                reqSet.add(parsedRef)
 
     for referencedTypeID in symbolTable.typeRef.values():
         if referencedTypeID in symbolTable.stringList:

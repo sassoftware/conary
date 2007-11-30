@@ -80,13 +80,16 @@ for entry in iterator:
         userInfo.append("user=%s" % entry.user)
     if entry.revision > 2:
         userInfo.append("entitlements=[%s]" % 
-                            ",".join(x[1] for x in entry.entitlements))
+                            ",".join(x[1] for x in entry.entitlements
+                                      if x[1] is not None))
     elif entry.entClass is not None:
         userInfo.append("entclass=%s" % entry.entClass)
     if hasattr(entry, 'entKey') and entry.entKey is not None:
         userInfo.append("entkey=%s" % entry.entKey)
     if hasattr(entry, 'entitlements') and entry.entitlements is not None:
-        userInfo.append("entitlements=%s" % entry.entitlements)
+        ents = [ x for x in entry.entitlements if x[1] is not None ]
+        if ents:
+            userInfo.append("entitlements=%s" % entry.entitlements)
 
     if userInfo:
         userStr = " ".join(userInfo) + " "
