@@ -1,4 +1,78 @@
-Changes in @NEW@:
+Changes in 2.0.0:
+  o Optimizations:
+    * Reworked commit path to pull all modified streams from the repository
+      or database with one query (CNY-2053)
+    * Unchanged stream sets now return None on diff
+    * Unchanged file streams are now 2-byte, backwards compatible, sequences
+      instead of more complex representations of "nothing changed"
+    * Commit code (both client and server) recognize unchanged files and
+      don't merge stream sets for them.
+    * Distributed changeset creation no longer recompresses file contents
+
+  o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
+    * Added getTroveLatestByLabel as a client-side call
+    * Most repository exceptions are demarshalled using logic in the
+      exception class itself rather than in a large if/elif block (CNY-747)
+    * troveNames and troveNamesByServer methods now accept a troveTypes
+      argument and return present troves only by default (CNY-1838)
+    * the mirror client supports a --fast-sync flag which will only
+      scan for new troves in the source and skip the time-expensive
+      scans for changed trove info records (CNY-1756)
+    * the mirror client supports a --absolute flag which will make it
+      use only absolute changesets to mirror content (CNY-1755)
+    * 'cvc shadow' now commits relative changesets when the shadow is
+      made to the same repository as the original trove
+    * Reworked promote changesets to be relative to either the source of
+      the promote (if promoting within a server) or to the current version
+      on the target (CNY-2202)
+    * Promote no longer recompresses non-config files during changeset
+      assembly (CNY-2202)
+    * Promote now gets file contents and streams from changesets when a
+      lot of them are needed from the same trove (CNY-2022)
+    * Split rollback stack code into a separate class (CNY-2061)
+    * Added rmrollback command to remove old rollbacks (CNY-2061)
+    * Rollback objects now have isLocal() method (CNY-2077)
+    * cvc promote now uses the labels and branches specified in the
+      "from" section of any promote as the place to search for packages
+      (CNY-2235).
+    * Conary now allows a biarch system to have one flavor that expresses
+      both the x86 and x86_64 support.  The flavorPreferences configuration
+      option informs conary to prefer x86_64 packages. This change allows
+      group building to automatically resolve x86 packages. (CNY-525)
+
+
+  o Server Changes:
+    * Fixed scoring for target flavor sets (CNY-1539)
+    * Setting/resetting the admin field permission is handled now by the
+      setUserGroupIsAdmin() call instead of addAcl/editAcl (CNY-1782)
+    * Removed (unimplemented) concept of caps for permissions
+    * Added @requireClientProtocol decorator for server methods
+    * Renamed usergroups to roles in the repository web user interface
+      (CNY-1973)
+    * Reworked server exceptions to have marshalling logic in the exception
+      class instead of in a large if/elif block (CNY-747)
+    * Call log now tracks cache misses (CNY-1843)
+    * Repository no longer passes anonymous-hint to proxy layer (it has
+      been False since 1.1.29)
+    * Server exceptions are marshalled in the proxy layer now instead of
+      in both the proxy and server layers
+    * When the repository database is locked, RepositoryLocked exceptions
+      are now returned for all code paths (CNY-1596)
+    * troveNames method now filter by troveTypes argument (CNY-1838)
+    * getPackageBranchPathIds method no longer requires an acl for the
+      branch; it returns the pathIds and fileIds for troves the user is
+      allowed to see (CNY-2038)
+    * Reworked commit path to check for files which don't have contents
+      available (during a promote or shadow, for example) with one query
+      (CNY-2053)
+    * Added call latency to repository log (CNY-2305)
+
+  o Protocol Changes:
+    * Protocol allows passing keyword arguments for exceptions (CNY-747)
+    * No longer include useAnonymous flag in return value
+
+Changes in 1.2.9:
   o Client Changes:
     * Added keepRequired config option that has the same effect as
       always setting the --keep-required flag on update. (CNY-569)
@@ -38,7 +112,17 @@ Changes in 1.2.8:
       not exist when attempting to run a trove script (e.g., group
       pre/post scripts). (CNY-2303)
 
+  o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+    * CONARY_CLIENT_LOG environment variable can now specify a path for
+      a log of all of the repository calls made by the client (use logcat
+      to view it) (CNY-2313)
+
 Changes in 1.2.7:
+
   o Build Changes:
     * The cvc command now prints out the most recent log message from
       the underlying source code control system when creating new
