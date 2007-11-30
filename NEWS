@@ -10,6 +10,9 @@ Changes in @NEW@:
     * The error message for erased dependencies is now more explicit about
       what happened to the package that is no longer providing dependencies
       and where the package with the missing dependencies came from. (CNY-2248)
+    * We now record the current state of the database to a flat file
+      after updates as a restoration mechanism as an extreme recovery mechanism.
+      (CNY-1801)
 
   o Bug Fixes:
     * The "logcat" script no longer errors out if the log file is empty

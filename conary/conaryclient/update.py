@@ -2603,6 +2603,7 @@ conary erase '%s=%s[%s]'
         self._applyUpdate(updJob, tagScript = tagScript, journal = journal,
                           autoPinList = autoPinList, commitFlags = commitFlags)
         log.syslog.commandComplete()
+        self.recordManifest()
 
         if remainingJobs:
             # FIXME: write the updJob.getTroveSource() changeset(s) to disk
@@ -2616,6 +2617,25 @@ conary erase '%s=%s[%s]'
 
         return None
 
+    def recordManifest(self):
+        """
+            Records the list of currently installed troves to a file
+
+        """
+        if self.cfg.root == ':memory:' or self.cfg.dbPath == ':memory:':
+            return
+        manifest = sorted('%s=%s[%s]\n' % x for x in self.db.iterAllTroves())
+        manifestPath = '%s%s/manifest' % (self.cfg.root, self.cfg.dbPath)
+        fd, tmpfile = tempfile.mkstemp(dir=os.path.dirname(manifestPath),
+                                       prefix='.manifest.')
+        try:
+            os.write(fd, ''.join(manifest))
+            os.close(fd)
+            os.rename(tmpfile, manifestPath)
+        except Exception:
+            if os.path.exists(tmpfile):
+                os.remove(tmpfile)
+            raise
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
