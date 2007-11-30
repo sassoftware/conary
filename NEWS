@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Added keepRequired config option that has the same effect as always 
+      setting the --keep-required flag on update. (CNY-569)
+
 Changes in 1.2.8:
   o Client Changes:
     * Added the cvc derive command. (CNY-2237)

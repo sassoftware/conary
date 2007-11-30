@@ -180,10 +180,9 @@ installed at the same time, this may confuse future update
 operations.
 .TP
 .B \-\-keep-required
-When troves are being erased from the system, conary checks the dependencies
-of the remaining troves to ensure those dependencies remain satisfied. If
-those dependencies are broken, a dependency error is generated. This option
-tells conary to try and leave troves in place to resolve those dependencies.
+This setting controls the configuration option keepRequired.  If keepRequired 
+is True, the conary update command will automatically keep packages that are 
+needed for dependencies.
 .TP
 .B \-\-info, \-i
 Display a summary of what troves will be affected by the update.
@@ -830,6 +829,17 @@ Can also be overridden by the \fBsearchPath\fR configuration option.
 If set to True, conary will ask for confirmation before performing actions that modifying system or repository state.
 Can be overridden by the \fB\-\-interactive\fR or \fB\-\-no-interactive\fR command-line option.
 .TP
+.B keepRequired
+When troves are being erased from the system, conary checks the dependencies
+of the remaining troves to ensure those dependencies remain satisfied. If
+those dependencies are broken, a dependency error is generated. This option
+tells conary to try and leave troves in place to resolve those dependencies.
+
+If keepRequired is True, the conary update command will automatically
+keep packages that are needed for dependencies.
+The keepRequired option is False by default.
+.TP
+
 .B lookaside
 The transient lookaside cache used only during building, normally
 \fI/var/cache/conary\fR

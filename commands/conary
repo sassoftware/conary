@@ -861,6 +861,8 @@ class _UpdateCommand(ConaryCommand):
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
             del argSet['no-resolve']
+        if argSet.pop('keep-required', False):
+            cfg.keepRequired = True
 
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
         kwargs['replaceManagedFiles'] = argSet.pop('replace-managed-files',
@@ -886,7 +888,6 @@ class _UpdateCommand(ConaryCommand):
         kwargs['info'] = argSet.pop('info', False)
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
-        kwargs['keepRequired'] = argSet.pop('keep-required', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
@@ -1026,10 +1027,11 @@ class UpdateAllCommand(_UpdateCommand):
         if argSet.has_key('replace-files'):
             kwargs['replaceFiles'] = True
             del argSet['replace-files']
+        if argSet.pop('keep-required', False):
+            cfg.keepRequired = True
 
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
-        kwargs['keepRequired'] = argSet.pop('keep-required', False)
 
         kwargs['checkPathConflicts'] = \
                                 not argSet.pop('no-conflict-check', False)

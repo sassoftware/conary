@@ -2368,7 +2368,7 @@ conary erase '%s=%s[%s]'
                         resolveRepos = True, syncChildren = False,
                         updateOnly = False, resolveGroupList=None,
                         installMissing = False, removeNotByDefault = False,
-                        keepRequired = False, migrate = False,
+                        keepRequired = None, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
                         applyCriticalOnly = False, restartInfo = None,
                         exactFlavors = False):
@@ -2457,6 +2457,8 @@ conary erase '%s=%s[%s]'
         @type restartInfo: string
         @rtype: dict
         """
+        if keepRequired is None:
+            keepRequired = self.cfg.keepRequired
 
         if self.updateCallback is None:
             self.setUpdateCallback(UpdateCallback())
@@ -2507,8 +2509,6 @@ conary erase '%s=%s[%s]'
                     resolveSource = resolveSource,
                     updateJob = updJob, exactFlavors = exactFlavors)
         except DependencyFailure, e:
-            if e.hasCriticalUpdates() and not applyCriticalOnly:
-                e.setErrorMessage(e.getErrorMessage() + '''\n\n** NOTE: A critical update is available and may fix dependency problems.  To update the critical components only, rerun this command with --apply-critical.''')
             raise
         except:
             if restartChangeSets:
@@ -2625,7 +2625,7 @@ conary erase '%s=%s[%s]'
                         resolveRepos = True, syncChildren = False,
                         updateOnly = False, resolveGroupList=None,
                         installMissing = False, removeNotByDefault = False,
-                        keepRequired = False, migrate = False,
+                        keepRequired = None, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
                         updateJob = None, exactFlavors = False):
         """Create an update job. DEPRECATED, use newUpdateJob and
@@ -2638,6 +2638,8 @@ conary erase '%s=%s[%s]'
         # meaningless at this level.
         # CNY-492
         assert(split)
+        if keepRequired is None:
+            keepRequired = self.cfg.keepRequired
 
         # To go away eventually
         if callback:
