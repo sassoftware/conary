@@ -2199,6 +2199,15 @@ class Provides(_dependency):
     Note: Use {Cr.ComponentProvides} rather than C{r.Provides} to add
     capability flags to components.
 
+    For unusual cases where you want to remove a provision Conary
+    automatically finds, you can specify C{r.Provides(exceptDeps='regexp')}
+    to override all provisions matching a regular expression,
+    C{r.Provides(exceptDeps=('filterexp', 'regexp'))}
+    to override provisions matching a regular expression only for files
+    matching filterexp, or
+    C{r.Provides(exceptDeps=(('filterexp', 'regexp'), ...))} to specify
+    multiple overrides.
+
     EXAMPLES
     ========
 
@@ -2211,6 +2220,10 @@ class Provides(_dependency):
 
     Demonstrates synthesizing a shared library provision for all the
     libperl.so symlinks.
+
+    C{r.Provides(exceptDeps = 'java: .*')}
+
+    Demonstrates removing all java provisions.
     """
     bucket = policy.PACKAGE_CREATION
 
