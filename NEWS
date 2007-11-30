@@ -6,6 +6,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * The "logcat" script no longer errors out if the log file is empty
       or contains None for entitlements. (CNY-2252)
+    * Repositories running under Apache are now correctly displaying
+      the real error when trying to generate the verbose traceback
+      emails. (CNY-2320)
 
 Changes in 1.2.8:
   o Client Changes:
