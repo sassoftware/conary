@@ -2,6 +2,7 @@ Changes in @NEW@:
   o Build Changes:
     * File level requirements provided by the same file are dropped. (CNY-2177)
     * Exclude Java dependencies that do not start with a valid TLD. (CNY-2176)
+    * exceptDeps is now allowed for r.Provides. (CNY-1485)
 
   o Client Changes:
     * Added keepRequired config option that has the same effect as
