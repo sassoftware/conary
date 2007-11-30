@@ -57,8 +57,12 @@ def checkAuth(write = False, admin = False):
                 if not self.repServer.auth.check(self.authToken):
                     raise InvalidPassword
                 # now check for proper permissions
-                if not self.repServer.auth.check(self.authToken, write=write,
-                                                 admin=admin):
+                if write and not self.repServer.auth.check(self.authToken,
+                                                           write = write):
+                    raise errors.InsufficientPermission
+
+                if admin and not self.repServer.auth.authCheck(self.authToken,
+                                                               admin = admin):
                     raise errors.InsufficientPermission
 
             return func(self, **kwargs)
@@ -131,7 +135,7 @@ class HttpHandler(WebHandler):
         d['auth'] = auth
 
         self.hasWrite = self.repServer.auth.check(self.authToken, write=True)
-        self.isAdmin = self.repServer.auth.check(self.authToken, admin=True)
+        self.isAdmin = self.repServer.auth.authCheck(self.authToken, admin=True)
         self.hasEntitlements = False
         self.isAnonymous = self.authToken[0] == 'anonymous'
         self.hasEntitlements = self.repServer.auth.listEntitlementGroups(
@@ -462,43 +466,42 @@ class HttpHandler(WebHandler):
         return self._write("user_admin", netAuth = self.repServer.auth)
 
     @checkAuth(admin = True)
-    @strFields(userGroupName = "")
-    def addPermForm(self, auth, userGroupName):
+    @strFields(roleName = "")
+    def addPermForm(self, auth, roleName):
         groups = self.repServer.auth.getGroupList()
         labels = self.repServer.auth.getLabelList()
         troves = self.repServer.auth.getItemList()
 
-        return self._write("permission", operation='Add', group=userGroupName, trove=None,
+        return self._write("permission", operation='Add', group=roleName, trove=None,
             label=None, groups=groups, labels=labels, troves=troves,
-            writeperm=None, capped=None, admin=None, remove=None)
+            writeperm=None, admin=None, remove=None)
 
     @checkAuth(admin = True)
-    @strFields(group = None, label = "", trove = "")
-    @intFields(writeperm = None, capped = None, admin = None, remove = None)
-    def editPermForm(self, auth, group, label, trove, writeperm, capped, admin,
+    @strFields(role = None, label = "", trove = "")
+    @intFields(writeperm = None, remove = None)
+    def editPermForm(self, auth, role, label, trove, writeperm,
                      remove):
         groups = self.repServer.auth.getGroupList()
         labels = self.repServer.auth.getLabelList()
         troves = self.repServer.auth.getItemList()
 
         #remove = 0
-        return self._write("permission", operation='Edit', group=group, label=label,
+        return self._write("permission", operation='Edit', group=role, label=label,
             trove=trove, groups=groups, labels=labels, troves=troves,
-            writeperm=writeperm, capped=capped, admin=admin, remove=remove)
+            writeperm=writeperm, remove=remove)
 
     @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "",
-               writeperm = "off", capped = "off", admin = "off", remove = "off")
+               writeperm = "off", admin = "off", remove = "off")
     def addPerm(self, auth, group, label, trove,
-                writeperm, capped, admin, remove):
+                writeperm, admin, remove):
         writeperm = (writeperm == "on")
-        capped = (capped == "on")
         admin = (admin == "on")
         remove = (remove== "on")
 
         try:
-            self.repServer.addAcl(self.authToken, 0, group, trove, label,
-               writeperm, capped, admin, remove = remove)
+            self.repServer.addAcl(self.authToken, 60, group, trove, label,
+               write = writeperm, remove = remove)
         except errors.PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
                 error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
@@ -508,17 +511,15 @@ class HttpHandler(WebHandler):
     @checkAuth(admin = True)
     @strFields(group = None, label = "", trove = "",
                oldlabel = "", oldtrove = "",
-               writeperm = "off", capped = "off", admin = "off", remove = "off")
+               writeperm = "off", remove = "off")
     def editPerm(self, auth, group, label, trove, oldlabel, oldtrove,
-                writeperm, capped, admin, remove):
+                writeperm, remove):
         writeperm = (writeperm == "on")
-        capped = (capped == "on")
-        admin = (admin == "on")
         remove = (remove == "on")
 
         try:
-            self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove,
-               label, writeperm, capped, admin, canRemove = remove)
+            self.repServer.editAcl(auth, 60, group, oldtrove, oldlabel, trove,
+               label, write = writeperm, canRemove = remove)
         except errors.PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
                 error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
@@ -526,64 +527,75 @@ class HttpHandler(WebHandler):
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    def addGroupForm(self, auth):
+    def addRoleForm(self, auth):
         users = self.repServer.auth.userAuth.getUserList()
-        return self._write("add_group", modify = False, userGroupName = None, users = users, members = [], canMirror = False)
+        return self._write("add_group", modify = False, userGroupName = None,
+                           users = users, members = [], canMirror = False,
+                           groupIsAdmin = False)
 
     @checkAuth(admin = True)
-    @strFields(userGroupName = None)
-    def manageGroupForm(self, auth, userGroupName):
+    @strFields(roleName = None)
+    def manageRoleForm(self, auth, roleName):
         users = self.repServer.auth.userAuth.getUserList()
-        members = set(self.repServer.auth.getGroupMembers(userGroupName))
-        canMirror = self.repServer.auth.groupCanMirror(userGroupName)
+        members = set(self.repServer.auth.getGroupMembers(roleName))
+        canMirror = self.repServer.auth.groupCanMirror(roleName)
+        isAdmin = self.repServer.auth.groupIsAdmin(roleName)
 
-        return self._write("add_group", userGroupName = userGroupName, users = users, members = members, canMirror = canMirror, modify = True)
+        return self._write("add_group", userGroupName = roleName,
+                           users = users, members = members,
+                           canMirror = canMirror, groupIsAdmin = isAdmin,
+                           modify = True)
 
     @checkAuth(admin = True)
-    @strFields(userGroupName = None, newUserGroupName = None)
+    @strFields(userGroupName = None, newRoleName = None)
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
-    def manageGroup(self, auth, userGroupName, newUserGroupName, memberList,
-                    canMirror):
-        if userGroupName != newUserGroupName:
+    @intFields(isAdmin = False)
+    def manageRole(self, auth, userGroupName, newRoleName, memberList,
+                    canMirror, isAdmin):
+        if userGroupName != newRoleName:
             try:
-                self.repServer.auth.renameGroup(userGroupName, newUserGroupName)
+                self.repServer.auth.renameGroup(userGroupName, newRoleName)
             except errors.GroupAlreadyExists:
                 return self._write("error", shortError="Invalid Group Name",
                     error = "The group name you have chosen is already in use.")
 
-            userGroupName = newUserGroupName
+            userGroupName = newRoleName
 
         self.repServer.auth.updateGroupMembers(userGroupName, memberList)
         self.repServer.auth.setMirror(userGroupName, canMirror)
+        self.repServer.auth.setAdmin(userGroupName, isAdmin)
 
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    @strFields(newUserGroupName = None)
+    @strFields(newRoleName = None)
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
-    def addGroup(self, auth, newUserGroupName, memberList, canMirror):
+    @intFields(isAdmin = False)
+    def addRole(self, auth, newRoleName, memberList, canMirror,
+                 isAdmin):
         try:
-            self.repServer.auth.addGroup(newUserGroupName)
+            self.repServer.auth.addGroup(newRoleName)
         except errors.GroupAlreadyExists:
             return self._write("error", shortError="Invalid Group Name",
                 error = "The group name you have chosen is already in use.")
 
-        self.repServer.auth.updateGroupMembers(newUserGroupName, memberList)
-        self.repServer.auth.setMirror(newUserGroupName, canMirror)
+        self.repServer.auth.updateGroupMembers(newRoleName, memberList)
+        self.repServer.auth.setMirror(newRoleName, canMirror)
+        self.repServer.auth.setAdmin(newRoleName, isAdmin)
 
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    @strFields(userGroupName = None)
-    def deleteGroup(self, auth, userGroupName):
-        self.repServer.auth.deleteGroup(userGroupName)
+    @strFields(roleName = None)
+    def deleteRole(self, auth, roleName):
+        self.repServer.auth.deleteGroup(roleName)
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    @strFields(group = None, label = None, item = None)
-    def deletePerm(self, auth, group, label, item):
+    @strFields(role = None, label = None, item = None)
+    def deletePerm(self, auth, role, label, item):
         # labelId and itemId are optional parameters so we can't
         # default them to None: the fields decorators treat that as
         # required, so we need to reset them to None here:
@@ -592,7 +604,7 @@ class HttpHandler(WebHandler):
         if not item or item == "ALL":
             item = None
 
-        self.repServer.auth.deleteAcl(group, label, item)
+        self.repServer.auth.deleteAcl(role, label, item)
         self._redirect("userlist")
 
     @checkAuth(admin = True)
@@ -604,8 +616,8 @@ class HttpHandler(WebHandler):
     @boolFields(write = False, admin = False, remove = False)
     def addUser(self, auth, user, password, write, admin, remove):
         self.repServer.addUser(self.authToken, 0, user, password)
-        self.repServer.addAcl(self.authToken, 0, user, "", "", write,
-                              capped=False, admin=admin, remove=remove)
+        self.repServer.addAcl(self.authToken, 60, user, "", "", write = write,
+                              remove=remove)
         self._redirect("userlist")
 
     @checkAuth(admin = True)
@@ -632,7 +644,7 @@ class HttpHandler(WebHandler):
                password1 = None, password2 = None)
     def chPass(self, auth, username, oldPassword,
                password1, password2):
-        admin = self.repServer.auth.check(self.authToken, admin=True)
+        admin = self.repServer.auth.authCheck(self.authToken, admin=True)
 
         if username != self.authToken[0]:
             if not admin:
@@ -766,7 +778,7 @@ class HttpHandler(WebHandler):
 
     @checkAuth(write = True)
     def pgpAdminForm(self, auth):
-        admin = self.repServer.auth.check(self.authToken,admin=True)
+        admin = self.repServer.auth.authCheck(self.authToken,admin=True)
 
         if admin:
             users = self.repServer.auth.userAuth.getUserList()

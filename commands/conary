@@ -378,6 +378,20 @@ class RollbackCommand(ConaryCommand):
         client.applyRollback(otherArgs[2], **kwargs)
 _register(RollbackCommand)
 
+class RemoveRollbackCommand(ConaryCommand):
+    commands = ['rmrollback', 'rmrb']
+    paramHelp = "<rollback>"
+    help = 'Remove old rollbacks'
+    commandGroup = 'System Modification'
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if argSet or len(otherArgs) != 3: return self.usage()
+        db = openDatabase(cfg.root, cfg.dbPath)
+        rollbacks.removeRollbacks(db, otherArgs[2])
+_register(RemoveRollbackCommand)
 
 class _AbstractQueryCommand(ConaryCommand):
 
@@ -528,6 +542,7 @@ class RepQueryCommand(_AbstractQueryCommand):
             'latest-versions': optparse.SUPPRESS_HELP, # default
             'leaves'         : 'Return latest version for each unique flavor',
             'show-removed'   : 'Display troves that have been removed from the repos',
+            'show-normal'    : 'Do not display branches that end in a redirect',
             #'show-redirects' : 'Display redirect troves'
             # turned off for now.
             }
@@ -545,6 +560,7 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
         d["show-removed"] = NO_PARAM
+        d["show-normal"] = NO_PARAM
         #d["show-redirects"] = NO_PARAM
         argDef['Trove Selection'].update(d)
 
@@ -612,10 +628,8 @@ class RepQueryCommand(_AbstractQueryCommand):
         if argSet.pop('show-removed', False):
             argSet.pop('show-redirects', False)
             troveTypes = trovesource.TROVE_QUERY_ALL
-        #elif argSet.pop('show-redirects', False):
-        #    troveTypes = trovesource.TROVE_QUERY_PRESENT
-        #else:
-        #    troveTypes = trovesource.TROVE_QUERY_NORMAL
+        elif argSet.pop('show-normal', False):
+            troveTypes = trovesource.TROVE_QUERY_NORMAL
         else:
             troveTypes = trovesource.TROVE_QUERY_PRESENT
         kw['troveTypes'] = troveTypes

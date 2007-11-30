@@ -121,6 +121,7 @@ class SearchSource(AbstractSearchSource):
         """
         m = resolvemethod.BasicResolutionMethod(None, self.db, self.flavor)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 
@@ -207,6 +208,7 @@ class NetworkSearchSource(SearchSource):
                                                     self.flavor,
                                                     searchMethod=searchMethod)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 class TroveSearchSource(SearchSource):
@@ -237,6 +239,7 @@ class TroveSearchSource(SearchSource):
                                                    self.troveList,
                                                    self.flavor)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):

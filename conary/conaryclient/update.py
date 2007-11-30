@@ -2986,7 +2986,7 @@ conary erase '%s=%s[%s]'
                 # if there aren't any entries left in the rollback,
                 # remove it altogether, unless we're about to try again
                 if (rb.getCount() == 0):
-                    self.db.removeLastRollback()
+                    self.db.getRollbackStack().removeLast()
             # rollback the current transaction
             self.db.db.rollback()
             if isinstance(e, database.CommitError):

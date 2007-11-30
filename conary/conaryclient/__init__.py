@@ -124,6 +124,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def setRepos(self, repos):
         self.repos = repos
 
+    def getDatabase(self):
+        return self.db
+
     def disconnectRepos(self):
         self.repos = None
 
@@ -352,13 +355,15 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         Iterate over rollback list.
         Yield (rollbackName, rollback)
         """
-        return self.db.iterRollbacksList()
+        return self.db.getRollbackStack().iter()
 
-    def getSearchSource(self, flavor=0, troveSource=None):
+    def getSearchSource(self, flavor=0, troveSource=None, installLabelPath=0):
         # a flavor of None is common in some cases so we use 0
         # as our "unset" case.
         if flavor is 0:
             flavor = self.cfg.flavor
+        if installLabelPath is 0:
+            installLabelPath = self.cfg.installLabelPath
 
         searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
         if troveSource is None:
@@ -366,7 +371,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if troveSource is None:
                 return None
         searchSource = searchsource.NetworkSearchSource(troveSource,
-                            self.cfg.installLabelPath,
+                            installLabelPath,
                             flavor, self.db,
                             resolveSearchMethod=searchMethod)
         if self.cfg.searchPath:

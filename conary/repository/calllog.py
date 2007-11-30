@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,32 +14,21 @@
 
 import cPickle, mmap, os, struct, time
 
-class CallLogEntry:
+CLIENT_LOG = 1000000
+
+class ClientCallLogEntry:
 
     def __init__(self, info):
         self.revision = info[0]
 
-        if (self.revision == 1):
-            self.entKey = 'unknown'
-            (self.serverName, self.timeStamp, self.remoteIp,
-             (self.user, self.entClass),
-             self.methodName, self.args, self.exceptionStr) = info[1:]
-        elif (self.revision == 2):
-            (self.serverName, self.timeStamp, self.remoteIp,
-             (self.user, self.entClass, self.entKey),
-             self.methodName, self.args, self.exceptionStr) = info[1:]
-        elif (self.revision == 3):
-            (self.serverName, self.timeStamp, self.remoteIp,
-             (self.user, self.entitlements),
-             self.methodName, self.args, self.exceptionStr) = info[1:]
-        else:
-            assert(0)
+        if (self.revision == CLIENT_LOG + 1):
+            (self.url, self.entitlement,
+             self.methodName, self.args, self.result,
+             self.latency) = info[1:]
 
-class CallLogger:
-    logFormatRevision = 3
+class AbstractCallLogger:
 
-    def __init__(self, logPath, serverNameList, readOnly = False):
-        self.serverNameList = serverNameList
+    def __init__(self, logPath, readOnly = False):
         self.path = logPath
         self.readOnly = readOnly
         self.logFd = None
@@ -71,34 +60,25 @@ class CallLogger:
         sb = os.stat(self.path)
         self.inode = (sb.st_dev, sb.st_ino)
 
-    def log(self, remoteIp, authToken, methodName, args, exception = None):
-        # lazy re-open the log file in case it was rotated from underneath us
-        self.reopen()
-        if exception:
-            exception = str(exception)
-
-        (user, entitlements) = authToken[0], authToken[2]
-        logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
-                                time.time(), remoteIp, (user, entitlements),
-                                methodName, args, exception))
-        os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
-
     def __iter__(self):
         fd = os.open(self.path, os.O_RDONLY)
         size = os.fstat(fd).st_size
+        if not size:
+            return
+
         map = mmap.mmap(fd, size, access = mmap.ACCESS_READ)
         i = 0
         while i < size:
             length = struct.unpack("!I", map[i: i + 4])[0]
             i += 4
-            yield CallLogEntry(cPickle.loads(map[i:i + length]))
+            yield self.EntryClass(cPickle.loads(map[i:i + length]))
             i += length
 
         os.close(fd)
 
     def getEntry(self):
         size = struct.unpack("!I", os.read(self.logFd, 4))[0]
-        return CallLogEntry(cPickle.loads(os.read(self.logFd, size)))
+        return self.EntryClass(cPickle.loads(os.read(self.logFd, size)))
 
     def follow(self):
         where = os.lseek(self.logFd, 0, 2)
@@ -110,3 +90,15 @@ class CallLogger:
 
             time.sleep(1)
 
+class ClientCallLogger(AbstractCallLogger):
+
+    EntryClass = ClientCallLogEntry
+    logFormatRevision = CLIENT_LOG + 1
+
+    def log(self, url, entitlement, methodName, args, result, latency = None):
+        # lazy re-open the log file in case it was rotated from underneath us
+        self.reopen()
+
+        logStr = cPickle.dumps((self.logFormatRevision, url, entitlement,
+                                methodName, args, result, latency))
+        os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
