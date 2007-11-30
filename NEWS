@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Client Changes:
     * Added keepRequired config option that has the same effect as always 
       setting the --keep-required flag on update. (CNY-569)
+    * The error message for erased dependencies is now more explicit about
+      what happened to the package that is no longer providing dependencies
+      and where the package with the missing dependencies came from. (CNY-2248)
 
 Changes in 1.2.8:
   o Client Changes:
