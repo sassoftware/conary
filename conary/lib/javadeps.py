@@ -106,6 +106,8 @@ def getDeps(contents):
 
     for referencedTypeID in symbolTable.typeRef.values():
         if referencedTypeID in symbolTable.stringList:
-            reqSet.update(_parseRefs(symbolTable.stringList[referencedTypeID]))
+            reqSet.update([x for x in \
+                    _parseRefs(symbolTable.stringList[referencedTypeID]) \
+                    if _isValidTLD(x)])
 
     return '.'.join(className.split('/')), reqSet
