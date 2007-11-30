@@ -357,48 +357,6 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
         iteration += 1
     return r[:keyLength]
 
-def getPublicKey(keyId, keyFile=''):
-    if keyFile == '':
-        if 'HOME' not in os.environ:
-            keyFile = None
-        else:
-            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
-    try:
-        keyRing = util.ExtendedFile(keyFile, buffering = False)
-    except IOError:
-        raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    return _getPublicKey(keyId, keyRing)
-
-def _getPublicKey(keyId, stream):
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    return pkt.getCryptoKey()
-
-def getPrivateKey(keyId, passPhrase='', keyFile=''):
-    if keyFile == '':
-        if 'HOME' not in os.environ:
-            keyFile = None
-        else:
-            keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
-    try:
-        keyRing = util.ExtendedFile(keyFile, buffering = False)
-    except IOError:
-        raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    return _getPrivateKey(keyId, keyRing, passPhrase)
-
-def _getPrivateKey(keyId, stream, passPhrase):
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    return pkt.getCryptoKey(passPhrase)
-
-def getPublicKeyFromString(keyId, data):
-    keyRing = util.ExtendedStringIO(data)
-    return _getPublicKey(keyId, keyRing)
-
-def getKeyEndOfLifeFromString(keyId, data):
-    keyRing = util.ExtendedStringIO(data)
-    return _getKeyEndOfLife(keyId, keyRing)
-
 def getUserIdsFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
     key = seekKeyById(keyId, keyRing)
@@ -425,19 +383,6 @@ def getFingerprint(keyId, keyFile=''):
     msg = PGP_Message(keyRing)
     pkt = msg.getKeyByKeyId(keyId)
     return pkt.getKeyFingerprint()
-
-def getKeyEndOfLife(keyId, keyFile=''):
-    if keyFile == '':
-        if 'HOME' not in os.environ:
-            keyFile = None
-        else:
-            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
-    try:
-        keyRing = util.ExtendedFile(keyFile, buffering = False)
-    except IOError:
-        raise KeyNotFound(keyId, "Couldn't open keyring")
-
-    return _getKeyEndOfLife(keyId, keyRing)
 
 def addKeys(keys, stream):
     """Add keys to the stream"""
@@ -507,11 +452,6 @@ def addPackets(pkts, stream, pktIdFunc, messageFactory, streamIterFunc):
         return pktIds
     finally:
         fcntl.lockf(fd, fcntl.LOCK_UN)
-
-def _getKeyEndOfLife(keyId, stream):
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    return pkt.getEndOfLife()
 
 def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum
