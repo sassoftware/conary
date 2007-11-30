@@ -15,7 +15,6 @@
 python_files = __init__.py	\
 		accessmap.py	\
 		cacheset.py	\
-		calllog.py	\
 		cltable.py	\
 		deptable.py	\
 		flavors.py	\
