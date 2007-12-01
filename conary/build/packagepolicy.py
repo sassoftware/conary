@@ -2199,6 +2199,15 @@ class Provides(_dependency):
     Note: Use {Cr.ComponentProvides} rather than C{r.Provides} to add
     capability flags to components.
 
+    For unusual cases where you want to remove a provision Conary
+    automatically finds, you can specify C{r.Provides(exceptDeps='regexp')}
+    to override all provisions matching a regular expression,
+    C{r.Provides(exceptDeps=('filterexp', 'regexp'))}
+    to override provisions matching a regular expression only for files
+    matching filterexp, or
+    C{r.Provides(exceptDeps=(('filterexp', 'regexp'), ...))} to specify
+    multiple overrides.
+
     EXAMPLES
     ========
 
@@ -2211,6 +2220,10 @@ class Provides(_dependency):
 
     Demonstrates synthesizing a shared library provision for all the
     libperl.so symlinks.
+
+    C{r.Provides(exceptDeps = 'java: .*')}
+
+    Demonstrates removing all java provisions.
     """
     bucket = policy.PACKAGE_CREATION
 
@@ -2238,6 +2251,7 @@ class Provides(_dependency):
         self.rubyLoadPath = None
         self.perlIncPath = None
         self.pythonSysPathMap = {}
+        self.exceptDeps = []
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -2250,6 +2264,15 @@ class Provides(_dependency):
                 self.sonameSubtrees.update(set(sonameSubtrees))
             else:
                 self.sonameSubtrees.add(sonameSubtrees)
+        exceptDeps = keywords.pop('exceptDeps', None)
+        if exceptDeps:
+            if type(exceptDeps) is str:
+                exceptDeps = ('.*', exceptDeps)
+            assert(type(exceptDeps) == tuple)
+            if type(exceptDeps[0]) is tuple:
+                self.exceptDeps.extend(exceptDeps)
+            else:
+                self.exceptDeps.append(exceptDeps)
         policy.Policy.updateArgs(self, **keywords)
 
     def preProcess(self):
@@ -2265,6 +2288,13 @@ class Provides(_dependency):
             '%(testdir)s',
             '%(debuglibdir)s',
             ]).union(self.binDirs)
+        exceptDeps = []
+        for fE, rE in self.exceptDeps:
+            try:
+                exceptDeps.append((filter.Filter(fE, self.macros), re.compile(rE % self.macros)))
+            except sre_constants.error, e:
+                self.error('Bad regular expression %s for file spec %s: %s', rE, fE, e)
+        self.exceptDeps= exceptDeps
 	for filespec, provision in self.provisions:
 	    self.fileFilters.append(
 		(filter.Filter(filespec, self.macros), provision % self.macros))
@@ -2326,7 +2356,24 @@ class Provides(_dependency):
                 self._addPerlProvides(path, m, pkg)
 
         self.addPathDeps(path, dirpath, pkg, f)
+        self.whiteOut(path, pkg)
         self.unionDeps(path, pkg, f)
+
+    def whiteOut(self, path, pkg):
+        # remove intentionally discarded provides
+        if self.exceptDeps and path in pkg.providesMap:
+            depSet = deps.DependencySet()
+            for depClass, dep in pkg.providesMap[path].iterDeps():
+                for filt, exceptRe in self.exceptDeps:
+                    if filt.match(path):
+                        matchName = '%s: %s' %(depClass.tagName, str(dep))
+                        if exceptRe.match(matchName):
+                            # found one to not copy
+                            dep = None
+                            break
+                if dep is not None:
+                    depSet.addDep(depClass, dep)
+            pkg.providesMap[path] = depSet
 
     def addExplicitProvides(self, path, fullpath, pkg, macros, m, f):
         for (filter, provision) in self.fileFilters:

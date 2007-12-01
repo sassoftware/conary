@@ -7,6 +7,7 @@ Changes in @NEW@:
   o Build Changes:
     * File level requirements provided by the same file are dropped. (CNY-2177)
     * Exclude Java dependencies that do not start with a valid TLD. (CNY-2176)
+    * exceptDeps is now allowed for r.Provides. (CNY-1485)
 
   o Client Changes:
     * Added keepRequired config option that has the same effect as
@@ -14,6 +15,9 @@ Changes in @NEW@:
     * The error message for erased dependencies is now more explicit about
       what happened to the package that is no longer providing dependencies
       and where the package with the missing dependencies came from. (CNY-2248)
+    * We now record the current state of the database to a flat file
+      after updates as a restoration mechanism as an extreme recovery mechanism.
+      (CNY-1801)
 
   o Bug Fixes:
     * The "logcat" script no longer errors out if the log file is empty

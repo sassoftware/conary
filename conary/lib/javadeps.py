@@ -65,7 +65,7 @@ def _parseSymbolTable(contents):
     t = struct.unpack('>H', contents[i:i+2])[0]
     classID = symbolTable.classRef[t]
     className = symbolTable.stringList[classID]
-    
+
     return symbolTable, className, i+2
 
 
@@ -96,8 +96,8 @@ def getDeps(contents):
             if 'L' in refString:
                 refString = refString[refString.index('L'):]
                 # pull out all the references in this array
-                reqSet.update([x for x in _parseRefs(refString) \
-                        if _isValidTLD(x)])
+                reqSet.update((x for x in _parseRefs(refString)
+                               if _isValidTLD(x)))
             # else ignore the array, nothing here for us to record
         else:
             parsedRef = '.'.join(refString.split('/'))
@@ -106,8 +106,8 @@ def getDeps(contents):
 
     for referencedTypeID in symbolTable.typeRef.values():
         if referencedTypeID in symbolTable.stringList:
-            reqSet.update([x for x in \
-                    _parseRefs(symbolTable.stringList[referencedTypeID]) \
-                    if _isValidTLD(x)])
+            reqSet.update((x for x in
+                           _parseRefs(symbolTable.stringList[referencedTypeID])
+                           if _isValidTLD(x)))
 
     return '.'.join(className.split('/')), reqSet
