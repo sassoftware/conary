@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Documentation Changes:
+    * The documentation strings for the update code have been updated
+      to include the most common exceptions raised as part of prepareChangeSet
+      and updateChangeSet. (CNY-1732)
+
   o Build Changes:
     * File level requirements provided by the same file are dropped. (CNY-2177)
     * Exclude Java dependencies that do not start with a valid TLD. (CNY-2176)
