@@ -441,13 +441,13 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         # to document the keyword arguments.
         d = dict(tagScript = tagScript,
             justDatabase = justDatabase,
-            transactionCounter = transactionCounter)
-        if callback is not None:
-            d['callback'] = callback
-        if replaceFiles is not None:
-            d['replaceFiles'] = replaceFiles
-        if justDatabase is not None:
-            d['justDatabase'] = justDatabase
+            transactionCounter = transactionCounter,
+            callback = callback,
+            replaceFiles = replaceFiles,
+        )
+        # If any of these arguments are None, don't even pass them, the
+        # defaults are going to apply
+        d = dict((x, y) for (x, y) in d.items() if y is not None)
         return rollbacks.applyRollback(self, rollbackSpec, **d)
 
     def close(self):
