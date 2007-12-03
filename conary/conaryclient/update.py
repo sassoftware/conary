@@ -2512,6 +2512,7 @@ conary erase '%s=%s[%s]'
             syncChildren = False    # we don't recalculate update info anyway
                                     # so we'll just revert to regular update.
             migrate = False
+            updJob.setRestartedFlag(True)
 
         if syncChildren:
             for name, oldInf, newInfo, isAbs in itemList:
@@ -3241,11 +3242,13 @@ conary erase '%s=%s[%s]'
 
         self._validateJob(list(itertools.chain(*allJobs)))
 
-        # run preinstall scripts
-        if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
-                                     tagScript = tagScript,
-                                     justDatabase = commitFlags.justDatabase):
-            raise UpdateError('error: preupdate script failed')
+        # run preinstall scripts, but only if this job was not restarted
+        if not uJob.getRestartedFlag():
+            if not self.db.runPreScripts(uJob,
+                                         callback = self.getUpdateCallback(),
+                                         tagScript = tagScript,
+                                         justDatabase = commitFlags.justDatabase):
+                raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
         kwargs = dict(
