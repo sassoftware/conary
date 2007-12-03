@@ -44,7 +44,8 @@ class _Source(_AnySource):
                 'dir': '',
                 'keyid': None,
                 'httpHeaders': {},
-                'package': None}
+                'package': None,
+                'sourceDir': None}
 
     def __init__(self, recipe, *args, **keywords):
 	sourcename = args[0]
@@ -151,6 +152,11 @@ class _Source(_AnySource):
             self.guessname = "%(archive_name)s-%(archive_version)s" % self.recipe.macros
 
     def _findSource(self, httpHeaders={}):
+        if self.sourceDir is not None:
+            defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
+            # blank string should map to maindir, not destdir
+            sourceDir = self.sourceDir or '.'
+            return action._expandOnePath(util.joinPaths(sourceDir, self.sourcename), self.recipe.macros, defaultDir = defaultDir)
 
         source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             self.sourcename, self.recipe.name, self.recipe.srcdirs,
