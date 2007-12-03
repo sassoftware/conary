@@ -120,12 +120,12 @@ class LatestTable:
         self.db.analyze("LatestCache")
         return
     
-    def update(self, cu, itemId, branchId, flavorId, userGroupId = None):
+    def update(self, cu, itemId, branchId, flavorId, roleId = None):
         cond = ""
         args = [itemId, branchId, flavorId]
-        if userGroupId is not None:
+        if roleId is not None:
             cond = "and userGroupId = ?"
-            args.append(userGroupId)
+            args.append(roleId)
         cu.execute("""
         delete from LatestCache
         where itemId = ? and branchId = ? and flavorId = ? %s""" % (cond,),
@@ -147,15 +147,15 @@ class LatestTable:
         for itemId, flavorId, branchId in cu.fetchall():
             self.update(cu, itemId, branchId, flavorId)
 
-    def updateUserGroupId(self, cu, userGroupId, tmpInstances=False):
+    def updateRoleId(self, cu, roleId, tmpInstances=False):
         if not tmpInstances:
-            cu.execute("delete from LatestCache where userGroupId = ?", userGroupId)
+            cu.execute("delete from LatestCache where userGroupId = ?", roleId)
             cu.execute("""
             insert into LatestCache
                 (latestType, userGroupId, itemId, branchId, flavorId, versionId)
             select
                 latestType, userGroupId, itemId, branchId, flavorId, versionId
-                from LatestView where userGroupId = ? """, userGroupId)
+                from LatestView where userGroupId = ? """, roleId)
             return
         # we need to be more discriminate since we know what
         # instanceIds are new (they are provided in tmpInstances table)
@@ -164,7 +164,7 @@ class LatestTable:
         from tmpInstances join Instances using(instanceId)
         join Nodes using(itemId, versionId) """)
         for itemId, flavorId, branchId in cu.fetchall():
-            self.update(cu, itemId, branchId, flavorId, userGroupId)
+            self.update(cu, itemId, branchId, flavorId, roleId)
     
 
 class LabelMap(idtable.IdPairSet):

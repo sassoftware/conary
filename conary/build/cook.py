@@ -692,6 +692,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         use.resetUsed()
         use.clearLocalFlags()
+        repos.setFlavorPreferencesByFlavor(buildFlavor)
         use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor, error=False)
         if hasattr(recipeClass, '_localFlavor'):
             # this will only be set if loadRecipe is used.  Allow for some
@@ -1803,6 +1804,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 labelPath = None
 
             try:
+                repos.setFlavorPreferencesByFlavor(buildFlavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
             except AttributeError, msg:
                 log.error('Error setting build flag values: %s' % msg)
@@ -2055,14 +2057,14 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
         rv = recipeObj.recordCalls(recipeObj.setup)
         functionNames = []
         if recordCalls:
-            for (depth, className, fn) in recipeObj.methodsCalled:
-                methodName = className + '.' + fn.__name__
+            for (depth, className, fnName) in recipeObj.methodsCalled:
+                methodName = className + '.' + fnName
                 line = '  ' * depth + methodName
                 functionNames.append(line)
             log.info('Methods called:\n%s' % '\n'.join(functionNames))
             unusedMethods = []
-            for (className, fn) in recipeObj.unusedMethods:
-                methodName = className + '.' + fn.__name__
+            for (className, fnName) in recipeObj.unusedMethods:
+                methodName = className + '.' + fnName
                 line = '  ' + methodName
                 unusedMethods.append(line)
             if unusedMethods:

@@ -108,7 +108,7 @@ class Recipe(object):
                                  '_BaseGroupRecipe']:
                     continue
                 setattr(self, itemName, self._wrapMethod(className, item))
-                self.unusedMethods.add((className, item))
+                self.unusedMethods.add((className, item.__name__))
 
     @classmethod
     def getType(class_):
@@ -122,10 +122,11 @@ class Recipe(object):
     def _recordMethod(self, className, method, *args, **kw):
         if self._recordMethodCalls:
             self.methodDepth += 1
-            self.methodsCalled.append((self.methodDepth, className, method))
+            self.methodsCalled.append((self.methodDepth, className,
+                                       method.__name__))
         rv = method(*args, **kw)
         if self._recordMethodCalls:
-            self.unusedMethods.discard((className, method))
+            self.unusedMethods.discard((className, method.__name__))
             self.methodDepth -= 1
         return rv
 

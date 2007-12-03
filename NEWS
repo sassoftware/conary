@@ -10,6 +10,7 @@ Changes in 2.0.0:
     * Distributed changeset creation no longer recompresses file contents
 
   o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
     * Added getTroveLatestByLabel as a client-side call
     * Most repository exceptions are demarshalled using logic in the
       exception class itself rather than in a large if/elif block (CNY-747)
@@ -35,6 +36,10 @@ Changes in 2.0.0:
     * cvc promote now uses the labels and branches specified in the
       "from" section of any promote as the place to search for packages
       (CNY-2235).
+    * Conary now allows a biarch system to have one flavor that expresses
+      both the x86 and x86_64 support.  The flavorPreferences configuration
+      option informs conary to prefer x86_64 packages. This change allows
+      group building to automatically resolve x86 packages. (CNY-525)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
@@ -60,22 +65,65 @@ Changes in 2.0.0:
     * Reworked commit path to check for files which don't have contents
       available (during a promote or shadow, for example) with one query
       (CNY-2053)
+    * Added call latency to repository log (CNY-2305)
 
   o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
     * No longer include useAnonymous flag in return value
+    * Many repository permission manipulation methods have been
+      renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
+
+Changes in 1.2.9:
+  o Client Changes:
+    * Added keepRequired config option that has the same effect as
+      always setting the --keep-required flag on update. (CNY-569)
+
+  o Bug Fixes:
+    * The "logcat" script no longer errors out if the log file is empty
+      or contains None for entitlements. (CNY-2252)
+
+Changes in 1.2.8:
+  o Client Changes:
+    * Added the cvc derive command. (CNY-2237)
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+    * Unhandled exceptions that are raised inside a progress callback
+      no longer terminate the update process.  A warning is emitted
+      and the update continues. (CNY-2304)
 
   o Internal Changes:
     * The Conary library now has a parallel implementation to gpg
       for the trust algorithm. (CNY-1988)
 
   o Bug Fixes:
-    * A problem occurring when updating troves with sharing a large
+    * A problem occurring when updating troves sharing a large
       number of identical files has been fixed. (CNY-2273)
-    * A regression from Conary 1.2.7 in the way passphrases are passed
-      to the PGP library has been fixed. (CNY-2279)
+    * Repository traceback emails are now more verbose. (CNY-2287)
+    * Methods starting with two underscore characters are considered
+      internal and are no longer passed to the XML-RPC library for
+      marshaling. (CNY-2286)
+    * It is now possible to clone a group that contains references to
+      both a cloned package and the version that the cloned package
+      originated from. (CNY-2302)
+    * When data from stdin is provided to a taghandler, but the
+      taghandler is missing or fails to read some or all of the data,
+      it will no longer result in a database locked error. (CNY-2257)
+    * Conary no longer exits with an unhandled exception if /tmp does
+      not exist when attempting to run a trove script (e.g., group
+      pre/post scripts). (CNY-2303)
+
+  o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+    * CONARY_CLIENT_LOG environment variable can now specify a path for
+      a log of all of the repository calls made by the client (use logcat
+      to view it) (CNY-2313)
 
 Changes in 1.2.7:
+
   o Build Changes:
     * The cvc command now prints out the most recent log message from
       the underlying source code control system when creating new

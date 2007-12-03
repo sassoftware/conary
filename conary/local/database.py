@@ -1391,7 +1391,7 @@ class Database(SqlDbRepository):
 
     def runPreScripts(self, uJob, callback, tagScript = None,
                       isRollback = False, justDatabase = False,
-                      tmpDir = '/tmp'):
+                      tmpDir = '/'):
         if isRollback or justDatabase:
            return True
 

@@ -18,7 +18,7 @@ import httplib
 import itertools
 import os
 import socket
-import sys
+import sys, time
 import urllib
 import xml
 import xmlrpclib
@@ -31,6 +31,7 @@ from conary import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util
+from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
@@ -51,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 60 + 1)
+CLIENT_VERSIONS = range(36, 61 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -69,7 +70,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
                  altHostCallback, protocolVersion, transport, serverName,
-                 entitlementDir):
+                 entitlementDir, callLog):
         xmlrpclib._Method.__init__(self, send, name)
         self.__name = name
         self.__host = host
@@ -80,6 +81,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         self.__serverName = serverName
         self.__entitlementDir = entitlementDir
         self._transport = transport
+        self.__callLog = callLog
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -109,6 +111,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                  retryOnEntitlementTimeout = True):
         newArgs = ( clientVersion, ) + argList
 
+        start = time.time()
+
         try:
             rc = self.__send(self.__name, newArgs)
         except xmlrpclib.ProtocolError, e:
@@ -121,6 +125,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         else:
             usedAnonymous = False
             isException, result = rc
+
+        if self.__callLog:
+            self.__callLog.log(self.__host, self._transport.getEntitlements(),
+                               self.__name, rc, newArgs,
+                               latency = time.time() - start)
 
         if usedAnonymous:
             self.__anonymousCallback()
@@ -220,6 +229,12 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                     raise klass(exceptionArgs[0])
 	    raise errors.UnknownException(exceptionName, exceptionArgs)
 
+    def __getattr__(self, name):
+        # Don't invoke methods that start with __
+        if name.startswith('__'):
+            raise AttributeError(name)
+        return xmlrpclib._Method.__getattr__(self, name)
+
 class ServerProxy(util.ServerProxy):
 
     def __passwordCallback(self):
@@ -278,7 +293,7 @@ class ServerProxy(util.ServerProxy):
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.getProtocolVersion(),
                        self.__transport, self.__serverName,
-                       self.__entitlementDir)
+                       self.__entitlementDir, self.__callLog)
 
     def usedProxy(self):
         return self.__transport.usedProxy
@@ -293,7 +308,7 @@ class ServerProxy(util.ServerProxy):
         return self.__protocolVersion
 
     def __init__(self, url, serverName, transporter, pwCallback, usedMap,
-                 entitlementDir):
+                 entitlementDir, callLog):
         try:
             util.ServerProxy.__init__(self, url, transporter)
         except IOError, e:
@@ -306,6 +321,7 @@ class ServerProxy(util.ServerProxy):
         self.__usedMap = usedMap
         self.__protocolVersion = CLIENT_VERSIONS[-1]
         self.__entitlementDir = entitlementDir
+        self.__callLog = callLog
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
@@ -318,6 +334,11 @@ class ServerCache:
         self.entitlements = entitlements
         self.proxies = proxies
         self.entitlementDir = entitlementDir
+        self.callLog = None
+
+        if 'CONARY_CLIENT_LOG' in os.environ:
+            self.callLog = calllog.ClientCallLogger(
+                                os.environ['CONARY_CLIENT_LOG'])
 
     def __getPassword(self, host, user=None):
         if not self.pwPrompt:
@@ -450,7 +471,8 @@ class ServerCache:
         transporter.setEntitlements(entList)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap,
-                             entitlementDir = self.entitlementDir)
+                             entitlementDir = self.entitlementDir,
+                             callLog = self.callLog)
 
         # Avoid poking at __transport
         server._transport = transporter
@@ -653,13 +675,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #Base64 encode salt
         self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
 
-    def addAccessGroup(self, label, groupName):
-        return self.c[label].addAccessGroup(groupName)
+    def addRole(self, label, role):
+        if self.c[label].getProtocolVersion() < 61:
+            return self.c[label].addAccessGroup(role)
+        return self.c[label].addRole(role)
 
     def addDigitalSignature(self, name, version, flavor, digsig):
         if self.c[version].getProtocolVersion() < 45:
-            raise InvalidServerVersion, "Cannot sign troves on Conary " \
-                    "repositories older than 1.1.20"
+            raise InvalidServerVersion("Cannot sign troves on Conary "
+                                       "repositories older than 1.1.20")
 
         encSig = base64.b64encode(digsig.freeze())
         self.c[version].addDigitalSignature(name, self.fromVersion(version),
@@ -710,17 +734,29 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def deleteUserById(self, label, userId):
         self.c[label].deleteUserById(userId)
 
-    def deleteAccessGroup(self, label, groupName):
-        self.c[label].deleteAccessGroup(groupName)
+    def deleteRole(self, label, role):
+        if self.c[label].getProtocolVersion() < 61:
+            self.c[label].deleteAccessGroup(role)
+            return
+        self.c[label].deleteRole(role)
 
-    def updateAccessGroupMembers(self, label, groupName, members):
-        self.c[label].updateAccessGroupMembers(groupName, members)
+    def updateRoleMembers(self, label, role, members):
+        if self.c[label].getProtocolVersion() < 61:
+            self.c[label].updateAccessGroupMembers(role, members)
+            return
+        self.c[label].updateRoleMembers(role, members)
 
-    def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
-        self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
+    def setRoleCanMirror(self, reposLabel, role, canMirror):
+        if self.c[reposLabel].getProtocolVersion() < 61:
+            self.c[reposLabel].setUserGroupCanMirror(role, canMirror)
+            return
+        self.c[reposLabel].setRoleCanMirror(role, canMirror)
 
-    def setUserGroupIsAdmin(self, reposLabel, userGroup, admin):
-        self.c[reposLabel].setUserGroupIsAdmin(userGroup, admin)
+    def setRoleIsAdmin(self, reposLabel, role, admin):
+        if self.c[reposLabel].getProtocolVersion() < 61:
+            self.c[reposLabel].setUserGroupIsAdmin(role, admin)
+            return
+        self.c[reposLabel].setRoleIsAdmin(role, admin)
 
     def addTroveAccess(self, role, troveList):
         byServer = {}
@@ -746,12 +782,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return [ ( x[0], self.toVersion(x[1]), self.toFlavor(x[2]) ) for x in
                             self.c[serverName].listTroveAccess(role) ]
 
-    def listAcls(self, reposLabel, userGroup):
-        return self.c[reposLabel].listAcls(userGroup)
+    def listAcls(self, reposLabel, role):
+        return self.c[reposLabel].listAcls(role)
 
-    def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
+    def addAcl(self, reposLabel, role, trovePattern, label, write = False,
                remove = False):
-        if self.c[reposLabel].getProtocolVersion() < 60:
+        if self.c[reposLabel].getProtocolVersion() < 61:
             raise errors.InvalidServerVersion(
                     "addAcl only works on Conary 2.0 and later")
 
@@ -765,14 +801,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        self.c[reposLabel].addAcl(userGroup, trovePattern, label,
+        self.c[reposLabel].addAcl(role, trovePattern, label,
                                   write = write, remove = remove)
 
         return True
 
-    def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
+    def editAcl(self, reposLabel, role, oldTrovePattern, oldLabel,
                 trovePattern, label, write = False, canRemove = False):
-        if self.c[reposLabel].getProtocolVersion() < 60:
+        if self.c[reposLabel].getProtocolVersion() < 61:
             raise errors.InvalidServerVersion(
                     "editAcl only works on Conary 2.0 and later")
 
@@ -796,13 +832,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
-        self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
+        self.c[reposLabel].editAcl(role, oldTrovePattern, oldLabel,
                                    trovePattern, label, write = write,
                                    canRemove = canRemove)
 
         return True
 
-    def deleteAcl(self, reposLabel, userGroup, trovePattern, label):
+    def deleteAcl(self, reposLabel, role, trovePattern, label):
         if not label:
             label = "ALL"
         elif type(label) == str:
@@ -813,55 +849,80 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        self.c[reposLabel].deleteAcl(userGroup, trovePattern, label)
+        self.c[reposLabel].deleteAcl(role, trovePattern, label)
         return True
 
     def changePassword(self, label, user, newPassword):
         self.c[label].changePassword(user, newPassword)
 
-    def getUserGroups(self, label):
-        return self.c[label].getUserGroups()
+    def getRoles(self, label):
+        if self.c[label].getProtocolVersion() < 61:
+            return self.c[label].getUserGroups()
+        return self.c[label].getRoles()
 
-    def addEntitlements(self, serverName, entGroup, entitlements):
-        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
-        return self.c[serverName].addEntitlements(entGroup, entitlements)
+    def addEntitlementKeys(self, serverName, entClass, entKeys):
+        entKeys = [ self.fromEntitlement(x) for x in entKeys ]
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].addEntitlements(entClass, entKeys)
+        return self.c[serverName].addEntitlementKeys(entClass, entKeys)
 
-    def deleteEntitlements(self, serverName, entGroup, entitlements):
-        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
-        return self.c[serverName].deleteEntitlements(entGroup, entitlements)
+    def deleteEntitlementKeys(self, serverName, entClass, entKeys):
+        entKeys = [ self.fromEntitlement(x) for x in entKeys ]
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].deleteEntitlements(entClass, entKeys)
+        return self.c[serverName].deleteEntitlementKeys(entClass, entKeys)
 
-    def addEntitlementGroup(self, serverName, entGroup, userGroup):
-        return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
+    def addEntitlementClass(self, serverName, entClass, role):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].addEntitlementGroup(entClass, role)
+        return self.c[serverName].addEntitlementClass(entClass, role)
 
-    def deleteEntitlementGroup(self, serverName, entGroup):
-        return self.c[serverName].deleteEntitlementGroup(entGroup)
+    def deleteEntitlementClass(self, serverName, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].deleteEntitlementGroup(entClass)
+        else:
+            return self.c[serverName].deleteEntitlementClass(entClass)
 
-    def addEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
-        return self.c[serverName].addEntitlementOwnerAcl(userGroup, entGroup)
+    def addEntitlementClassOwner(self, serverName, role, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].addEntitlementOwnerAcl(role, entClass)
+        return self.c[serverName].addEntitlementClassOwner(role, entClass)
 
-    def deleteEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
-        return self.c[serverName].deleteEntitlementOwnerAcl(userGroup, entGroup)
+    def deleteEntitlementClassOwner(self, serverName, role, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].deleteEntitlementOwnerAcl(role, entClass)
+        return self.c[serverName].deleteEntitlementClassOwner(role, entClass)
 
-    def listEntitlements(self, serverName, entGroup):
-        l = self.c[serverName].listEntitlements(entGroup)
+    def listEntitlementKeys(self, serverName, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            l = self.c[serverName].listEntitlements(entClass)
+        else:
+            l = self.c[serverName].listEntitlementKeys(entClass)
         return [ self.toEntitlement(x) for x in l ]
 
-    def listEntitlementGroups(self, serverName):
-        return self.c[serverName].listEntitlementGroups()
+    def listEntitlementClasses(self, serverName):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].listEntitlementGroups()
+        return self.c[serverName].listEntitlementClasses()
 
-    def getEntitlementClassAccessGroup(self, serverName, classList):
-        return self.c[serverName].getEntitlementClassAccessGroup(classList)
+    def getEntitlementClassesRoles(self, serverName, classList):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].getEntitlementClassAccessGroup(classList)
+        return self.c[serverName].getEntitlementClassesRoles(classList)
 
-    def setEntitlementClassAccessGroup(self, serverName, classInfo):
-        return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+    def setEntitlementClassesRoles(self, serverName, classInfo):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+        return self.c[serverName].setEntitlementClassesRoles(classInfo)
 
-    def listAccessGroups(self, serverName):
-        return self.c[serverName].listAccessGroups()
+    def listRoles(self, serverName):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].listAccessGroups()
+        return self.c[serverName].listRoles()
 
     def troveNames(self, label, troveTypes = TROVE_QUERY_PRESENT):
         if self.c[label].getProtocolVersion() < 60:
             return self.c[label].troveNames(self.fromLabel(label))
-
         return self.c[label].troveNames(self.fromLabel(label),
                                         troveTypes = troveTypes)
 

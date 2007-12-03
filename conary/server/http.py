@@ -104,10 +104,10 @@ class HttpHandler(WebHandler):
     def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
 
-        # the case e hvae a closed repository
+        # a closed repository
         if self.repServer is None:
             return apache.HTTP_SERVICE_UNAVAILABLE
-        
+
         auth = self._getAuth()
         self.authToken = auth
 
@@ -134,12 +134,20 @@ class HttpHandler(WebHandler):
         d = dict(self.fields)
         d['auth'] = auth
 
+        if self.authToken[0] != 'anonymous':
+            self.loggedIn = self.repServer.auth.checkPassword(self.authToken)
+            # if they aren't anonymous, and the password didn't check out
+            # ask again.
+            if not self.loggedIn:
+                return self._requestAuth()
+        else:
+            self.loggedIn = False
         self.hasWrite = self.repServer.auth.check(self.authToken, write=True)
         self.isAdmin = self.repServer.auth.authCheck(self.authToken, admin=True)
         self.hasEntitlements = False
         self.isAnonymous = self.authToken[0] == 'anonymous'
-        self.hasEntitlements = self.repServer.auth.listEntitlementGroups(
-                                                        self.authToken)
+        self.hasEntitlements = self.repServer.auth.listEntitlementClasses(
+            self.authToken)
 
         try:
             output = method(**d)
@@ -175,6 +183,7 @@ class HttpHandler(WebHandler):
                            cfg = self.cfg,
                            req = self.req,
                            hasWrite = self.hasWrite,
+                           loggedIn = self.loggedIn,
                            isAdmin = self.isAdmin,
                            isAnonymous = self.isAnonymous,
                            hasEntitlements = self.hasEntitlements,
@@ -188,6 +197,9 @@ class HttpHandler(WebHandler):
     @checkAuth(write=True)
     def login(self, auth):
         self._redirect("browse")
+
+    def logout(self, auth):
+        raise InvalidPassword
 
     @checkAuth(admin=True)
     def log(self, auth):
@@ -468,103 +480,111 @@ class HttpHandler(WebHandler):
     @checkAuth(admin = True)
     @strFields(roleName = "")
     def addPermForm(self, auth, roleName):
-        groups = self.repServer.auth.getGroupList()
+        roles = self.repServer.auth.getRoleList()
         labels = self.repServer.auth.getLabelList()
         troves = self.repServer.auth.getItemList()
 
-        return self._write("permission", operation='Add', group=roleName, trove=None,
-            label=None, groups=groups, labels=labels, troves=troves,
-            writeperm=None, admin=None, remove=None)
+        return self._write("permission", operation='Add',
+                           role=roleName, trove=None, label=None,
+                           roles=roles, labels=labels, troves=troves,
+                           writeperm=None, admin=None, remove=None)
 
     @checkAuth(admin = True)
     @strFields(role = None, label = "", trove = "")
     @intFields(writeperm = None, remove = None)
     def editPermForm(self, auth, role, label, trove, writeperm,
                      remove):
-        groups = self.repServer.auth.getGroupList()
+        roles = self.repServer.auth.getRoleList()
         labels = self.repServer.auth.getLabelList()
         troves = self.repServer.auth.getItemList()
 
         #remove = 0
-        return self._write("permission", operation='Edit', group=role, label=label,
-            trove=trove, groups=groups, labels=labels, troves=troves,
-            writeperm=writeperm, remove=remove)
+        return self._write("permission", operation='Edit', role=role,
+                           label=label, trove=trove, roles=roles,
+                           labels=labels, troves=troves,
+                           writeperm=writeperm, remove=remove)
 
     @checkAuth(admin = True)
-    @strFields(group = None, label = "", trove = "",
+    @strFields(role = None, label = "", trove = "",
                writeperm = "off", admin = "off", remove = "off")
-    def addPerm(self, auth, group, label, trove,
-                writeperm, admin, remove):
+    def addPerm(self, auth, role, label, trove, writeperm, admin, remove):
         writeperm = (writeperm == "on")
         admin = (admin == "on")
         remove = (remove== "on")
 
         try:
-            self.repServer.addAcl(self.authToken, 60, group, trove, label,
-               write = writeperm, remove = remove)
+            self.repServer.addAcl(self.authToken, 60, role, trove, label,
+                                  write = writeperm, remove = remove)
         except errors.PermissionAlreadyExists, e:
-            return self._write("error", shortError="Duplicate Permission",
-                error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
+            return self._write("error", shortError = "Duplicate Permission",
+                               error = ("Permissions have already been set "
+                                        "for %s, please go back and select a "
+                                        "different User, Label or Trove."
+                                        % str(e)))
 
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    @strFields(group = None, label = "", trove = "",
+    @strFields(role = None, label = "", trove = "",
                oldlabel = "", oldtrove = "",
                writeperm = "off", remove = "off")
-    def editPerm(self, auth, group, label, trove, oldlabel, oldtrove,
+    def editPerm(self, auth, role, label, trove, oldlabel, oldtrove,
                 writeperm, remove):
         writeperm = (writeperm == "on")
         remove = (remove == "on")
 
         try:
-            self.repServer.editAcl(auth, 60, group, oldtrove, oldlabel, trove,
-               label, write = writeperm, canRemove = remove)
+            self.repServer.editAcl(auth, 60, role, oldtrove, oldlabel,
+                                   trove, label, write = writeperm,
+                                   canRemove = remove)
         except errors.PermissionAlreadyExists, e:
             return self._write("error", shortError="Duplicate Permission",
-                error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
+                               error = ("Permissions have already been set "
+                                        "for %s, please go back and select "
+                                        "a different User, Label or Trove."
+                                        % str(e)))
 
         self._redirect("userlist")
 
     @checkAuth(admin = True)
     def addRoleForm(self, auth):
         users = self.repServer.auth.userAuth.getUserList()
-        return self._write("add_group", modify = False, userGroupName = None,
+        return self._write("add_role", modify = False, role = None,
                            users = users, members = [], canMirror = False,
-                           groupIsAdmin = False)
+                           isAdmin = False)
 
     @checkAuth(admin = True)
     @strFields(roleName = None)
     def manageRoleForm(self, auth, roleName):
         users = self.repServer.auth.userAuth.getUserList()
-        members = set(self.repServer.auth.getGroupMembers(roleName))
-        canMirror = self.repServer.auth.groupCanMirror(roleName)
-        isAdmin = self.repServer.auth.groupIsAdmin(roleName)
+        members = set(self.repServer.auth.getRoleMembers(roleName))
+        canMirror = self.repServer.auth.roleCanMirror(roleName)
+        isAdmin = self.repServer.auth.roleIsAdmin(roleName)
 
-        return self._write("add_group", userGroupName = roleName,
+        return self._write("add_role", role = roleName,
                            users = users, members = members,
-                           canMirror = canMirror, groupIsAdmin = isAdmin,
+                           canMirror = canMirror, roleIsAdmin = isAdmin,
                            modify = True)
 
     @checkAuth(admin = True)
-    @strFields(userGroupName = None, newRoleName = None)
+    @strFields(roleName = None, newRoleName = None)
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
     @intFields(isAdmin = False)
-    def manageRole(self, auth, userGroupName, newRoleName, memberList,
-                    canMirror, isAdmin):
-        if userGroupName != newRoleName:
+    def manageRole(self, auth, roleName, newRoleName, memberList,
+                   canMirror, isAdmin):
+        if roleName != newRoleName:
             try:
-                self.repServer.auth.renameGroup(userGroupName, newRoleName)
-            except errors.GroupAlreadyExists:
-                return self._write("error", shortError="Invalid Group Name",
-                    error = "The group name you have chosen is already in use.")
+                self.repServer.auth.renameRole(roleName, newRoleName)
+            except errors.RoleAlreadyExists:
+                return self._write("error", shortError="Invalid Role Name",
+                    error = "The role name you have chosen is already in use.")
 
-            userGroupName = newRoleName
+            roleName = newRoleName
 
-        self.repServer.auth.updateGroupMembers(userGroupName, memberList)
-        self.repServer.auth.setMirror(userGroupName, canMirror)
-        self.repServer.auth.setAdmin(userGroupName, isAdmin)
+        self.repServer.auth.updateRoleMembers(roleName, memberList)
+        self.repServer.auth.setMirror(roleName, canMirror)
+        self.repServer.auth.setAdmin(roleName, isAdmin)
 
         self._redirect("userlist")
 
@@ -576,12 +596,12 @@ class HttpHandler(WebHandler):
     def addRole(self, auth, newRoleName, memberList, canMirror,
                  isAdmin):
         try:
-            self.repServer.auth.addGroup(newRoleName)
-        except errors.GroupAlreadyExists:
-            return self._write("error", shortError="Invalid Group Name",
-                error = "The group name you have chosen is already in use.")
+            self.repServer.auth.addRole(newRoleName)
+        except errors.RoleAlreadyExists:
+            return self._write("error", shortError="Invalid Role Name",
+                error = "The role name you have chosen is already in use.")
 
-        self.repServer.auth.updateGroupMembers(newRoleName, memberList)
+        self.repServer.auth.updateRoleMembers(newRoleName, memberList)
         self.repServer.auth.setMirror(newRoleName, canMirror)
         self.repServer.auth.setAdmin(newRoleName, isAdmin)
 
@@ -590,7 +610,7 @@ class HttpHandler(WebHandler):
     @checkAuth(admin = True)
     @strFields(roleName = None)
     def deleteRole(self, auth, roleName):
-        self.repServer.auth.deleteGroup(roleName)
+        self.repServer.auth.deleteRole(roleName)
         self._redirect("userlist")
 
     @checkAuth(admin = True)
@@ -670,102 +690,108 @@ class HttpHandler(WebHandler):
 
     @checkAuth()
     @strFields(entClass = None)
-    def addEntitlementForm(self, auth, entClass):
-        return self._write("add_ent", entClass = entClass)
+    def addEntitlementKeyForm(self, auth, entClass):
+        return self._write("add_ent_key", entClass = entClass)
 
     @checkAuth()
     @strFields(entClass = None)
     def configEntClassForm(self, auth, entClass):
-        groups = self.repServer.auth.getGroupList()
+        allRoles = self.repServer.auth.getRoleList()
 
-        ownerGroup = self.repServer.auth.getEntitlementOwnerAcl(auth, entClass)
-        accessGroups = self.repServer.auth.getEntitlementClassAccessGroup(
-                            auth, [ entClass ] )[entClass]
+        ownerRole = self.repServer.auth.getEntitlementClassOwner(auth, entClass)
+        currentRoles = self.repServer.auth.getEntitlementClassesRoles(
+            auth, [entClass])[entClass]
 
-        return self._write("add_ent_group", groups = groups,
-                           entClass = entClass,
-                           ownerGroup = ownerGroup, accessGroups = accessGroups)
+        return self._write("add_ent_class", allRoles = allRoles,
+                           entClass = entClass, ownerRole = ownerRole,
+                           currentRoles = currentRoles)
 
     @checkAuth()
     @strFields(entClass = None)
     def deleteEntClass(self, auth, entClass):
-        self.repServer.auth.deleteEntitlementGroup(auth, entClass)
+        self.repServer.auth.deleteEntitlementClass(auth, entClass)
         self._redirect('manageEntitlements')
 
     @checkAuth()
-    @strFields(entClass = None, entitlement = None)
-    def addEntitlement(self, auth, entClass, entitlement):
-        self.repServer.auth.addEntitlement(auth, entClass, entitlement)
+    @strFields(entClass = None, entKey = None)
+    def addEntitlementKey(self, auth, entClass, entKey):
+        try:
+            self.repServer.auth.addEntitlementKey(auth, entClass, entKey)
+        except errors.EntitlementKeyAlreadyExists:
+            return self._write("error",
+                               error="Entitlement key already exists")
         self._redirect('manageEntitlementForm?entClass=%s' % entClass)
 
     @checkAuth()
-    @strFields(entClass = None, entitlement = None)
-    def deleteEntitlement(self, auth, entClass, entitlement):
-        self.repServer.auth.deleteEntitlement(auth, entClass, entitlement)
+    @strFields(entClass = None, entKey = None)
+    def deleteEntitlementKey(self, auth, entClass, entKey):
+        self.repServer.auth.deleteEntitlementKey(auth, entClass, entKey)
         self._redirect('manageEntitlementForm?entClass=%s' % entClass)
 
     @checkAuth()
     def manageEntitlements(self, auth):
-        entClassList = self.repServer.listEntitlementGroups(auth, 0)
+        entClassList = self.repServer.listEntitlementClasses(auth, 0)
 
         if self.isAdmin:
             entClassInfo = [
-                (x, self.repServer.auth.getEntitlementOwnerAcl(auth, x),
-                 self.repServer.auth.getEntitlementClassAccessGroup(auth,
-                            [ x ])[x]) for
-                x in entClassList ]
+                (x, self.repServer.auth.getEntitlementClassOwner(auth, x),
+                 self.repServer.auth.getEntitlementClassesRoles(auth, [x])[x])
+                for x in entClassList ]
         else:
             entClassInfo = [ (x, None, None) for x in entClassList ]
 
-        groups = self.repServer.auth.getGroupList()
+        roles = self.repServer.auth.getRoleList()
 
         return self._write("manage_ents", entClasses = entClassInfo,
-                           groups = groups)
+                           roles = roles)
 
     @checkAuth(admin = True)
     def addEntClassForm(self, auth):
-        groups = self.repServer.auth.getGroupList()
-        return self._write("add_ent_group", groups = groups,
-                           entClass = None, ownerGroup = None,
-                           accessGroups = [])
+        allRoles = self.repServer.auth.getRoleList()
+        return self._write("add_ent_class", allRoles = allRoles,
+                           entClass = None, ownerRole = None,
+                           currentRoles = [])
 
     @checkAuth()
     @strFields(entClass = None, entOwner = None)
-    @listFields(str, userGroupList = [])
-    def addEntClass(self, auth, entOwner, userGroupList, entClass):
-        if len(userGroupList) < 1:
-            return self._write("error", error="No access groups specified")
+    @listFields(str, roles = [])
+    def addEntClass(self, auth, entOwner, roles, entClass):
+        if len(roles) < 1:
+            return self._write("error", error="No roles specified")
         try:
-            self.repServer.auth.addEntitlementGroup(auth, entClass,
-                                                    userGroupList[0])
-            self.repServer.auth.setEntitlementClassAccessGroup(auth,
-                                                 { entClass : userGroupList } )
-        except errors.GroupNotFound:
-            return self._write("error", error="Access group does not exist")
+            self.repServer.auth.addEntitlementClass(auth, entClass,
+                                                    roles[0])
+            self.repServer.auth.setEntitlementClassesRoles(
+                auth, { entClass : roles })
+        except errors.RoleNotFound:
+            return self._write("error", error="Role does not exist")
+        except errors.EntitlementClassAlreadyExists:
+            return self._write("error",
+                               error="Entitlement class already exists")
         if entOwner != '*none*':
-            self.repServer.auth.addEntitlementOwnerAcl(auth, entOwner,
-                                                       entClass)
+            self.repServer.auth.addEntitlementClassOwner(auth, entOwner,
+                                                         entClass)
 
         self._redirect('manageEntitlements')
 
     @checkAuth()
     @strFields(entClass = None, entOwner = None)
-    @listFields(str, userGroupList = [])
-    def configEntClass(self, auth, entOwner, userGroupList, entClass):
-        self.repServer.auth.setEntitlementClassAccessGroup(auth,
-                                                { entClass : userGroupList } )
+    @listFields(str, roles = [])
+    def configEntClass(self, auth, entOwner, roles, entClass):
+        self.repServer.auth.setEntitlementClassesRoles(auth,
+                                                       { entClass : roles } )
         if entOwner != '*none*':
-            self.repServer.auth.addEntitlementOwnerAcl(auth, entOwner,
-                                                       entClass)
+            self.repServer.auth.addEntitlementClassOwner(auth, entOwner,
+                                                         entClass)
 
         self._redirect('manageEntitlements')
 
     @checkAuth()
     @strFields(entClass = None)
     def manageEntitlementForm(self, auth, entClass):
-        entitlements = [ x for x in
-            self.repServer.auth.iterEntitlements(auth, entClass) ]
-        return self._write("entlist", entitlements = entitlements,
+        entKeys = [ x for x in
+                    self.repServer.auth.iterEntitlementKeys(auth, entClass) ]
+        return self._write("entlist", entKeys = entKeys,
                            entClass = entClass)
 
     @checkAuth(admin=True)

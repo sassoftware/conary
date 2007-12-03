@@ -126,8 +126,8 @@ class QueryMethod:
             return [flavor]
         flavors = []
         for defaultFlavor in self.defaultFlavorPath:
-            flavors.append(deps.overrideFlavor(defaultFlavor, flavor, 
-                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)) 
+            flavors.append(deps.overrideFlavor(defaultFlavor, flavor,
+                                        mergeType = deps.DEP_MERGE_TYPE_PREFS))
         return flavors
 
     def addQuery(self, troveTup, *params):
@@ -909,9 +909,8 @@ class TroveFinder:
             return self.labelPath
         if not self.allowNoLabel:
             return []
-        return set([ x.branch().label() \
-                    for x in self.troveSource.getTroveVersionList(troveTup[0],
-                                                troveTypes=self.troveTypes)])
+        return self.troveSource.getLabelsForTroveName(troveTup[0],
+                                                troveTypes=self.troveTypes)
 
     def sortNoVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup

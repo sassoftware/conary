@@ -1,4 +1,24 @@
 # this file documents the wire protocol changes for conary.
+Version 61:
+  - The following methods have been renamed for consistency:
+    addAccessGroup -> addRole
+    addEntitlementGroup -> addEntitlementClass
+    addEntitlementOwnerAcl -> addEntitlementClassOwner
+    addEntitlements -> addEntitlementKeys
+    deleteAccessGroup -> deleteRole
+    deleteEntitlementGroup -> deleteEntitlementClass
+    deleteEntitlementOwnerAcl -> deleteEntitlementClassOwner
+    deleteEntitlements -> deleteEntitlementKeys
+    getEntitlementClassAccessGroup -> getEntitlementClassesRoles
+    getUserGroups -> getRoles
+    listAccessGroups -> listRoles
+    listEntitlementGroups -> listEntitlementClasses
+    listEntitlements -> listEntitlementKeys
+    setEntitlementClassAccessGroup -> setEntitlementClassesRoles
+    setUserGroupCanMirror -> setRoleCanMirror
+    setUserGroupIsAdmin -> setRoleIsAdmin
+    updateAccessGroupMembers -> updateRoleMembers
+
 Version 60:
   - server side support for setUserGroupIsAdmin
   - addAcl and editAcl cannot be used for setting the admin flag anymore

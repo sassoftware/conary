@@ -32,7 +32,7 @@ from conary import errors, keymgmt
 from conary import state
 from conary import updatecmd
 from conary import versions
-from conary.build import cook, use, signtrove
+from conary.build import cook, use, signtrove, derive
 from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
@@ -572,7 +572,49 @@ class DescribeCommand(CvcCommand):
         log.setVerbosity(level)
 _register(DescribeCommand)
 
+class DeriveCommand(CvcCommand):
+    commands = ['derive']
+    paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
+    help = 'Aggregation command to shadow, check out and alter a recipe'
+    commandGroup = 'Repository Access'
 
+    docs = {'dir' : 'Derive single trove and check out in directory DIR',
+            'extract-dir': 'extract single binary parent trove in dirctory DIR',
+            'info': 'Display info on shadow/branch'}
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["dir"] = ONE_PARAM
+        argDef["info"] = '-i', NO_PARAM
+        argDef['extract-dir'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
+        checkoutDir = argSet.pop('dir', None)
+        extractDir = argSet.pop('extract-dir', None)
+        info = prep = False
+        if argSet.has_key('info'):
+            del argSet['info']
+            info = True
+
+        if argSet or (len(args) < 3) or ((checkoutDir or extractDir) and len(args) != 3):
+            # no leftover args
+            # usage of --extract-dir or --dir implies only one trove
+            return self.usage()
+
+        target = args[1]
+        troveSpecs = args[2:]
+
+        # we already know there's exactly one troveSpec
+        if extractDir and ':source' in troveSpecs[0].split('=')[0]:
+            # usage of --extract-dir requires specification of a binary trove
+            return self.usage()
+
+        derive.derive(repos, cfg, target, troveSpecs,
+                checkoutDir = checkoutDir, extractDir = extractDir,
+                info = info, callback = callback)
+_register(DeriveCommand)
 
 class DiffCommand(CvcCommand):
     commands = ['diff']

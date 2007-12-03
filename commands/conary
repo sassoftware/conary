@@ -542,6 +542,7 @@ class RepQueryCommand(_AbstractQueryCommand):
             'latest-versions': optparse.SUPPRESS_HELP, # default
             'leaves'         : 'Return latest version for each unique flavor',
             'show-removed'   : 'Display troves that have been removed from the repos',
+            'show-normal'    : 'Do not display branches that end in a redirect',
             #'show-redirects' : 'Display redirect troves'
             # turned off for now.
             }
@@ -559,6 +560,7 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
         d["show-removed"] = NO_PARAM
+        d["show-normal"] = NO_PARAM
         #d["show-redirects"] = NO_PARAM
         argDef['Trove Selection'].update(d)
 
@@ -626,10 +628,8 @@ class RepQueryCommand(_AbstractQueryCommand):
         if argSet.pop('show-removed', False):
             argSet.pop('show-redirects', False)
             troveTypes = trovesource.TROVE_QUERY_ALL
-        #elif argSet.pop('show-redirects', False):
-        #    troveTypes = trovesource.TROVE_QUERY_PRESENT
-        #else:
-        #    troveTypes = trovesource.TROVE_QUERY_NORMAL
+        elif argSet.pop('show-normal', False):
+            troveTypes = trovesource.TROVE_QUERY_NORMAL
         else:
             troveTypes = trovesource.TROVE_QUERY_PRESENT
         kw['troveTypes'] = troveTypes
@@ -875,6 +875,8 @@ class _UpdateCommand(ConaryCommand):
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
             del argSet['no-resolve']
+        if argSet.pop('keep-required', False):
+            cfg.keepRequired = True
 
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
         kwargs['replaceManagedFiles'] = argSet.pop('replace-managed-files',
@@ -900,7 +902,6 @@ class _UpdateCommand(ConaryCommand):
         kwargs['info'] = argSet.pop('info', False)
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
-        kwargs['keepRequired'] = argSet.pop('keep-required', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
@@ -1040,10 +1041,11 @@ class UpdateAllCommand(_UpdateCommand):
         if argSet.has_key('replace-files'):
             kwargs['replaceFiles'] = True
             del argSet['replace-files']
+        if argSet.pop('keep-required', False):
+            cfg.keepRequired = True
 
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
-        kwargs['keepRequired'] = argSet.pop('keep-required', False)
 
         kwargs['checkPathConflicts'] = \
                                 not argSet.pop('no-conflict-check', False)

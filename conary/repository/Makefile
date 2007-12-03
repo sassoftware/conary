@@ -15,6 +15,7 @@
 SUBDIRS=netrepos
 
 python_files = __init__.py	\
+		calllog.py	\
 		changeset.py	\
 		datastore.py	\
 		errors.py	\

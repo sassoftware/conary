@@ -15,7 +15,6 @@
 python_files = __init__.py	\
 		accessmap.py	\
 		cacheset.py	\
-		calllog.py	\
 		cltable.py	\
 		deptable.py	\
 		flavors.py	\
@@ -27,6 +26,7 @@ python_files = __init__.py	\
                 netauth.py	\
 		netserver.py	\
 		proxy.py	\
+		reposlog.py	\
 		troveinfo.py	\
 		trovestore.py	\
 		versionops.py

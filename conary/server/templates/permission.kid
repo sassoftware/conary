@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <?python
-# Copyright (c) 2005 rpath, Inc.
+# Copyright (c) 2005,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -37,8 +37,8 @@
                 <table class="add-form">
                     <tr>
                         <td id="header">Role:</td>
-                        <td py:if="operation!='Edit'" py:content="makeSelect('group', groups, group)"/>
-                        <td py:if="operation=='Edit'"><input name="group" value="${group}" readonly="readonly" type="text" /></td>
+                        <td py:if="operation!='Edit'" py:content="makeSelect('role', roles, role)"/>
+                        <td py:if="operation=='Edit'"><input name="role" value="${role}" readonly="readonly" type="text" /></td>
                     </tr>
                     <tr>
                         <td id="header">Label:</td>

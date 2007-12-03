@@ -22,13 +22,10 @@ import traceback
 
 from conary.lib import coveragehook
 from conary.lib import log
+from conary.lib import util
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
 from conary.server.apachemethods import get, post, putFile
-
-def writeTraceback(wfile, cfg):
-    kid_error.write(wfile, cfg = cfg, pageTitle = "Error",
-                           error = traceback.format_exc())
 
 def formatRequestInfo(req):
     c = req.connection
@@ -68,9 +65,26 @@ def formatRequestInfo(req):
     }
     l = []
     for key, val in sorted(info_dict.items()):
-        l.append('%s: %s' %(key, val))
+        if hasattr(val, 'iteritems') and str(val) > 120:
+            l.append('  %-15s: %s' %(key, '{'))
+            for k, v in sorted(val.items()):
+                l.append('    %s : %s,' % (repr(k), repr(v)))
+            l[-1] += '}'
+        else:
+            l.append('  %-15s: %s' %(key, val))
     info = '\n'.join(l)
     return info
+
+def sendMail(fromEmail, fromEmailName, toEmail, subject, body):
+    msg = MIMEText.MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = '"%s" <%s>' % (fromEmailName, fromEmail)
+    msg['To'] = toEmail
+
+    s = smtplib.SMTP()
+    s.connect()
+    s.sendmail(fromEmail, [toEmail], msg.as_string())
+    s.close()
 
 def logAndEmail(req, cfg, header, msg):
     timeStamp = time.ctime(time.time())
@@ -88,17 +102,6 @@ def logAndEmail(req, cfg, header, msg):
     body += '\nConnection Information:\n'
     body += formatRequestInfo(req)
 
-    def sendMail(fromEmail, fromEmailName, toEmail, subject, body):
-        msg = MIMEText.MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = '"%s" <%s>' % (fromEmailName, fromEmail)
-        msg['To'] = toEmail
-
-        s = smtplib.SMTP()
-        s.connect()
-        s.sendmail(fromEmail, [toEmail], msg.as_string())
-        s.close()
-
     sendMail(cfg.bugsFromEmail, cfg.bugsEmailName, cfg.bugsToEmail, 
              cfg.bugsEmailSubject, body)
 
@@ -106,7 +109,15 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
     timeStamp = time.ctime(time.time())
 
     header = 'Unhandled exception from conary repository:\n\n%s: %s\n\n' % (exception.__name__, e)
-    msg = ''.join(traceback.format_tb(bt))
+
+    # Nicely format the exception
+    out = util.BoundedStringIO()
+    util.formatTrace(exception, e, bt, stream = out, withLocals = False)
+    out.write("\nFull stack:\n")
+    util.formatTrace(exception, e, bt, stream = out, withLocals = True)
+    out.seek(0)
+    msg = out.read()
+
     logAndEmail(req, cfg, header, msg)
     # log error
     log.error(''.join(traceback.format_exception(*sys.exc_info())))
