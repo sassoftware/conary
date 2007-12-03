@@ -25,6 +25,9 @@ Changes in @NEW@:
     * Repositories running under Apache are now correctly displaying
       the real error when trying to generate the verbose traceback
       emails. (CNY-2320)
+    * An update job that includes a critical update and an update to a
+      group that includes a pre-update script will no longer run the
+      script twice. (CNY-2325)
 
 Changes in 1.2.8:
   o Client Changes:
