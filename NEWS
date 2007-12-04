@@ -56,7 +56,6 @@ Changes in 1.2.8:
     * The Conary library now has a parallel implementation to gpg
       for the trust algorithm. (CNY-1988)
 
-Changes in 1.1.31.11:
   o Bug Fixes:
     * A problem occurring when updating troves sharing a large
       number of identical files has been fixed. (CNY-2273)
