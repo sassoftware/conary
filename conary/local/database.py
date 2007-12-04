@@ -766,8 +766,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return os.access(self.dbpath, os.W_OK)
 
     def _initDb(self):
-        self._db = sqldb.Database(self.dbpath)
-        datastore.DataStoreRepository.__init__(self, 
+        self._db = sqldb.Database(self.dbpath, timeout = self._lockTimeout)
+        datastore.DataStoreRepository.__init__(self,
                            dataStore = localrep.SqlDataStore(self.db.db))
 
     def _getDb(self):
@@ -780,7 +780,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     db = property(_getDb)
 
-    def __init__(self, path):
+    def __init__(self, path, timeout=None):
         if path == ":memory:":
             self.dbpath = path
         else:
@@ -790,6 +790,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         repository.AbstractRepository.__init__(self)
         trovesource.SearchableTroveSource.__init__(self)
         self._updateTransactionCounter = False
+        # Locking timeout
+        self._lockTimeout = timeout
 
 class Database(SqlDbRepository):
 
@@ -1668,11 +1670,11 @@ class Database(SqlDbRepository):
         j.revert()
         os.unlink(opJournalPath)
 
-    def __init__(self, root, path):
+    def __init__(self, root, path, timeout = None):
 	self.root = root
 
         if path == ":memory:": # memory-only db
-            SqlDbRepository.__init__(self, ':memory:')
+            SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
         else:
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
@@ -1707,7 +1709,7 @@ class Database(SqlDbRepository):
                 self.lastRollback = -1
             else:
                 self.readRollbackStatus()
-            SqlDbRepository.__init__(self, root + path)
+            SqlDbRepository.__init__(self, root + path, timeout = timeout)
 
 class DatabaseCacheWrapper:
 
