@@ -41,6 +41,12 @@ Changes in 2.0.0:
       option informs conary to prefer x86_64 packages. This change allows
       group building to automatically resolve x86 packages. (CNY-525)
 
+  o Build Changes:
+    * Conary will now ignore flavoring and requirements from elf libraries
+      that are built for architectures other than the architecture that
+      is being built for.  This avoids a common problem where a single
+      extra sparc file library taints an entire package. (CNY-1717)
+
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
     * Setting/resetting the admin field permission is handled now by the
