@@ -638,6 +638,12 @@ class UpdateJob:
     def getFromChangesets(self):
         return self._fromChangesets
 
+    def setRestartedFlag(self, flag):
+        self._restartedFlag = flag
+
+    def getRestartedFlag(self):
+        return self._restartedFlag
+
     def __init__(self, db, searchSource = None, lazyCache = None):
         # 20070714: lazyCache can be None for the users of the old API (when
         # an update job was instantiated directly, instead of using the
@@ -668,6 +674,9 @@ class UpdateJob:
         self._jobPreScripts = []
         # Changesets have been downloaded
         self._changesetsDownloaded = False
+        # This flag gets set if the update job was loaded from the restart
+        # information
+        self._restartedFlag = False
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,

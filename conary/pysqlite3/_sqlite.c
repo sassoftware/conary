@@ -1192,15 +1192,19 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 	result = sqlite3_step(self->p_stmt);
 	MY_END_ALLOW_THREADS(self->con->tstate);
 
-	if (self->description == NULL)
-		self->description = _stmt_get_description(self);
-
 	if (result == SQLITE_ROW) {
 		long long int lval;
 		double dval;
 		int len;
 		const void *blob;
 		const char *text;
+
+		if (self->description == NULL) {
+			self->description = _stmt_get_description(self);
+			if (self->description == NULL) {
+				return NULL;
+			}
+		}
 
 		if (self->reset) {
 			self->reset = 0;
@@ -1476,19 +1480,20 @@ Returns the current definition.";
 static PyObject*
 _stmt_get_description(pysqlstmt* self)
 {
-	int num_fields, i, l, j;
+	int data_count, column_count, i, l, j;
 	PyObject *obj, *col, *type_code;
 	char type_name[255];
 
-	num_fields = sqlite3_column_count(self->p_stmt);
-	if ((obj = PyTuple_New(num_fields)) == NULL) {
+	column_count = sqlite3_column_count(self->p_stmt);
+	data_count = sqlite3_data_count(self->p_stmt);
+	if ((obj = PyTuple_New(column_count)) == NULL) {
 		return NULL;
 	}
 
-	for(i=0; i < num_fields; i++){
+	for(i=0; i < column_count; i++){
 		const char *name = sqlite3_column_name(self->p_stmt, i);
 		const char *ctype = sqlite3_column_decltype(self->p_stmt, i);
-		if (ctype == NULL)
+		if (ctype == NULL && i < data_count)
 			ctype = ctype_to_str(sqlite3_column_type(self->p_stmt,
 								 i));
 		if (ctype == NULL)

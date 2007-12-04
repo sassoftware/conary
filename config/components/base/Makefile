@@ -14,6 +14,7 @@
 
 filter_files =	\
 	cil.py \
+	config.py \
 	data.py \
 	develdocs.py \
 	devellib.py \
@@ -28,7 +29,8 @@ filter_files =	\
 	perl.py \
 	python.py \
 	ruby.py \
-	supdoc.py
+	supdoc.py \
+	taghandler.py
 
 dist_files = Makefile $(filter_files)
 

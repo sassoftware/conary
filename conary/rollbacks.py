@@ -153,6 +153,12 @@ def apply(db, cfg, rollbackSpec, **kwargs):
     return applyRollback(client, rollbackSpec, **kwargs)
 
 def applyRollback(client, rollbackSpec, **kwargs):
+    """
+    Apply a rollback.
+
+    See L{conary.conaryclient.ConaryClient.applyRollback} for a description of
+    the arguments for this function.
+    """
     client.checkWriteableRoot()
     # Record the transaction counter, to make sure the state of the database
     # didn't change while we were computing the rollback list.

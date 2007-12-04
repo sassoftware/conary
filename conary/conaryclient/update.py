@@ -1,4 +1,4 @@
-#
+
 # Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -1280,19 +1280,20 @@ conary erase '%s=%s[%s]'
 
     def _findOverlappingJobs(self, jobSet, troveSource):
         """
-            Returns a list of sets of jobs, where each set has the 
-            following property:
-                for every job in the set, there is another job in the set
-                    such that:
-                    1) the job removes a path that the other job adds
-                    2) the job adds a path that other job removes
-                    3) both jobs add the same path
-                    or
-                    4) both jobs remove the same path (though this should
-                       be impossible because conary only allows one trove
-                       to own a file)
-             All sets in a job should be connected to each other through
-             some chain of these relationships.
+        Returns a list of sets of jobs.
+
+        Each set has the following property:
+
+        For every job in the set, there is another job in the set such that:
+        1) the job removes a path that the other job adds
+        2) the job adds a path that other job removes
+        3) both jobs add the same path
+        or
+        4) both jobs remove the same path (though this should be impossible
+        because conary only allows one trove to own a file)
+
+        All sets in a job should be connected to each other through
+        some chain of these relationships.
         """
         # overlapping is a dict from jobSet id -> overlapping id OR
         # jobSet id -> list of other ids that overlap.
@@ -2040,8 +2041,11 @@ conary erase '%s=%s[%s]'
         return finalJobs
 
     def getUpdateItemList(self):
-        # Returns top-level items, things that need to be updated
-        # in order to update entire system.
+        """
+        Returns I{top-level items}: troves that need to be updated in order to
+        update the entire system.
+        @rtype: list
+        """
         items = ( x for x in self.getPrimaryLocalUpdates() 
                   if (x[1][0] is None
                       or not deps.compatibleFlavors(x[1][1], x[2][1])
@@ -2109,13 +2113,14 @@ conary erase '%s=%s[%s]'
             updated foo (which includes foo:runtime) from branch a to branch b,
             an update job for foo will be returned but not foo:runtime.
 
-            If troveNames are specified, then the changes returned are those
-            _related_ to the given trove name.  They may include changes 
-            of troves with other names, however.  For example, if you 
-            request changes for troves named foo, and foo is included by
-            group-dist, and the only change related to foo you have made
-            is installing group-dist, then a job showing the install of
-            group-dist will be returned.
+            @param troveNames: If specified, then the changes returned are
+            those I{related} to the given trove names. They may include changes
+            of troves with other names, however. For example, if you
+            request changes for troves named C{foo}, and C{foo} is included by
+            C{group-dist}, and the only change related to C{foo} you have made
+            is installing C{group-dist}, then a job showing the install of
+            C{group-dist} will be returned.
+            @type troveNames: list
 
             @rtype: list of jobs
         """
@@ -2241,12 +2246,12 @@ conary erase '%s=%s[%s]'
     def getChildLocalUpdates(self, searchSource, localUpdates,
                              installedTroves=None, missingTroves=None):
         """
-            Given a set of primary local updates - the updates the user
-            is likely to have typed at the command line, return their
-            child updates.  Given a primary update from a -> b, we look 
-            at the children of a and b and see if a child of a is not 
-            installed where a child of b is, and assert that that update is 
-            from childa -> childb.
+        Given a set of primary local updates (the updates the user
+        is likely to have typed at the command line, return their
+        child updates). Given a primary update from a -> b, we look
+        at the children of a and b and see if a child of a is not
+        installed where a child of b is, and assert that that update is
+        from childa -> childb.
         """
         localUpdates = [ x for x in localUpdates 
                          if x[1][0] and not x[1][0].isOnLocalHost() ]
@@ -2340,20 +2345,31 @@ conary erase '%s=%s[%s]'
             cs.merge(newCs)
 
     def loadRestartInfo(self, restartInfo):
+        """Load the restart information (generally happening after installing
+        a critical update), generated with L{saveRestartInfo}"""
         return _loadRestartInfo(restartInfo, self.lzCache)
 
     def saveRestartInfo(self, updJob, remainingJobs):
+        """Save the restart information after applying a critical update, in
+        order to continue after restart.
+
+        The restart information can be loaded with L{loadRestartInfo}"""
         return _storeJobInfo(remainingJobs, updJob)
 
     def cleanRestartInfo(self, restartInfo):
+        """Clean up the restart information (generated with
+        L{saveRestartInfo}).
+        """
         if not restartInfo:
             return
         util.rmtree(restartInfo, ignore_errors=True)
 
     def newUpdateJob(self):
-        """Create a new update job
+        """Create a new update job.
+
         The job can be initialized either by using prepareUpdateJob or by
         thawing it from a frozen representation.
+        @rtype: L{database.UpdateJob}
         @return: the new update job
         """
         updJob = database.UpdateJob(self.db, lazyCache = self.lzCache)
@@ -2378,18 +2394,19 @@ conary erase '%s=%s[%s]'
         within the job are automatically closed. Returns a mapping with
         suggestions for possible dependency resolutions.
 
-        @param updJob: An UpdateJob object
-        @type updJob: conary.local.database.UpdateJob object
+        @param updJob: A L{conary.local.database.UpdateJob} object
+        @type updJob: L{conary.local.database.UpdateJob}
 	@param itemList: A list of change specs:
-        (troveName, (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor),
-        isAbsolute).  isAbsolute specifies whether to try to find an older
-        version of trove on the system to replace if none is specified.
-	If updateByDefault is True, trove names in itemList prefixed
-	by a '-' will be erased. If updateByDefault is False, troves without a
-	prefix will be erased, but troves prefixed by a '+' will be updated.
-        itemList can be None if restartInfo is set (see below).
-        @type itemList: [(troveName, (oldVer, oldFla), 
-                         (newVer, newFla), isAbs), ...]
+            C{(troveName, (oldVersionSpec, oldFlavor),
+            (newVersionSpec, newFlavor), isAbsolute)}.
+            C{isAbsolute} specifies whether to try to find an older
+            version of trove on the system to replace if none is specified.
+            If C{updateByDefault} is C{True}, trove names in C{itemList}
+            prefixed by a '-' will be erased. If C{updateByDefault} is
+            C{False}, troves without a prefix will be erased, but troves
+            prefixed by a '+' will be updated.
+            C{itemList} can be C{None} if C{restartInfo} is set (see below).
+        @type itemList: list
 	@param keepExisting: If True, troves updated not erase older versions
 	of the same trove, as long as there are no conflicting files in either
 	trove.
@@ -2417,9 +2434,10 @@ conary erase '%s=%s[%s]'
         @param sync: Limit acceptabe trove updates only to versions 
         referenced in the local database.
         @type sync: bool
-        @param fromChangesets: When specified, these changesets are used
-        as the source of troves instead of the repository.
-        @type fromChangesets: list of changeset.ChangeSetFromFile
+        @param fromChangesets: When specified, this list of
+        L{changeset.ChangeSetFromFile} objects is used as the source of troves,
+        instead of the repository.
+        @type fromChangesets: list
         @param checkPathConflicts: check that applying the update job would
         not create path conflicts (True by default).
         @type checkPathConflicts: bool
@@ -2443,12 +2461,13 @@ conary erase '%s=%s[%s]'
         @type removeNotByDefault: bool
         @param criticalUpdateInfo: Settings and data needed for critical
         updates
-        @type: CriticalUpdateInfo instance
-        @param resolveSource: Instance of 
-        conaryclient.resolve.DepResolutionMethod to be used for dep resolution.
-        If left blank will be created based on installLabelPath or 
-        resolveGroups.
-        @type: conaryclient.resolveDepResolutionMethod instance
+        @type criticalUpdateInfo: L{CriticalUpdateInfo}
+        @param resolveSource: Instance of
+        L{conaryclient.resolve.DepResolutionMethod} to be used for dep
+        resolution.
+        If left blank, it will be created based on C{installLabelPath} or
+        C{resolveGroups}.
+        @type resolveSource: L{conaryclient.resolve.DepResolutionMethod}
         @param applyCriticalOnly: apply only the critical update.
         @type applyCriticalOnly: bool
         @param restartInfo: If specified, overrides itemList. It specifies the
@@ -2456,6 +2475,25 @@ conary erase '%s=%s[%s]'
         applying the critical update).
         @type restartInfo: string
         @rtype: dict
+
+        @raise DependencyFailure: if the update job cannot be computed
+            because there was a dependecy failure. Finer grained dependency
+            failures are L{DepResolutionFailure}, L{NeededTrovesFailure} and
+            L{EraseDepFailure}.
+
+        @raise ConaryError: if a C{sync} operation was requested, and
+            relative changesets were specified.
+
+        @raise InternalConaryError: if a jobset was inconsistent.
+
+        @raise UpdateError: Generic update error.
+
+        @raise MissingTrovesError: if one of the requested troves could not
+            be found.
+
+        @raise other: Callbacks may generate exceptions on their own. See
+            L{applyUpdateJob} for an explanation of the behavior of exceptions
+            within callbacks.
         """
         if keepRequired is None:
             keepRequired = self.cfg.keepRequired
@@ -2474,6 +2512,7 @@ conary erase '%s=%s[%s]'
             syncChildren = False    # we don't recalculate update info anyway
                                     # so we'll just revert to regular update.
             migrate = False
+            updJob.setRestartedFlag(True)
 
         if syncChildren:
             for name, oldInf, newInfo, isAbs in itemList:
@@ -2527,6 +2566,25 @@ conary erase '%s=%s[%s]'
                     replaceModifiedConfigFiles = False):
         """
         Apply the update job.
+
+        The update job must have been initialized by calling
+        L{prepareUpdateJob}, or thawed using L{database.UpdateJob.thaw}.
+
+        @note:
+          If one of the callbacks raises an exception, the behavior depends
+          on the type of exception.
+            - Uncatchable exceptions (L{SystemExit}, L{KeyboardInterrupt} and
+                exceptions that have a field C{errorIsUncatchable} set to
+                C{True}) will terminate the operation immediately.
+            - Exceptions derived from C{errors.CancelOperationException} (or
+                having a field C{cancelOperation} set to C{True}) will print a
+                warning and stop the operation when the current job finishes.
+                For instance, if an update was split in 3 jobs, and during the
+                application of the second one such an exception is raised,
+                only the first two jobs will be completed.
+            - All other exceptions will only print a warning, and will let the
+                operation succeed.
+
         @param updJob: An UpdateJob object.
         @type updJob: conary.local.database.UpdateJob object
         @param replaceFiles: Replace locally changed files (deprecated).
@@ -2546,18 +2604,26 @@ conary erase '%s=%s[%s]'
         connecting the repository, at the expense of disk space consumption.
         The setting defaults to the value of self.cfg.localRollbacks.
         @type localRollbacks: bool
-        @autoPinList: A list of troves that will not change. Defaults to the
-        value from self.cfg.pinList
+        @param autoPinList: A list of troves that will not change. Defaults to
+        the value from self.cfg.pinList
         @type autoPinList: list
-        @keepJournal: If set, the conary journal file will be left behind
+        @param keepJournal: If set, the conary journal file will be left behind
         (useful only for debugging journal cleanup routines)
         @type keepJournal: bool
-        @noRestart: If set, suppresses the restart after critical updates
-        behavior default to conary.
+        @param noRestart: If set, suppresses the restart after critical updates
+            behavior default to conary.
         @type noRestart: bool
         @return: None if the update was fully applied, or restart information
-        if a critical update was applied and a restart is necessary to make it
-        active.
+        if a critical update was applied and a restart is necessary to
+        make it active.
+
+        @raise InternalConaryError: if a jobset was inconsistent.
+
+        @raise UpdateError: Generic update error.
+
+        @raise other: Callbacks may generate exceptions on their own. See
+            the note for an explanation of the behavior of exceptions
+            within callbacks.
         """
         # A callback object must be supplied
         assert(self.updateCallback is not None)
@@ -2603,6 +2669,7 @@ conary erase '%s=%s[%s]'
         self._applyUpdate(updJob, tagScript = tagScript, journal = journal,
                           autoPinList = autoPinList, commitFlags = commitFlags)
         log.syslog.commandComplete()
+        self.recordManifest()
 
         if remainingJobs:
             # FIXME: write the updJob.getTroveSource() changeset(s) to disk
@@ -2616,6 +2683,25 @@ conary erase '%s=%s[%s]'
 
         return None
 
+    def recordManifest(self):
+        """
+            Records the list of currently installed troves to a file
+
+        """
+        if self.cfg.root == ':memory:' or self.cfg.dbPath == ':memory:':
+            return
+        manifest = sorted('%s=%s[%s]\n' % x for x in self.db.iterAllTroves())
+        manifestPath = '%s%s/manifest' % (self.cfg.root, self.cfg.dbPath)
+        fd, tmpfile = tempfile.mkstemp(dir=os.path.dirname(manifestPath),
+                                       prefix='.manifest.')
+        try:
+            os.write(fd, ''.join(manifest))
+            os.close(fd)
+            os.rename(tmpfile, manifestPath)
+        except Exception:
+            if os.path.exists(tmpfile):
+                os.remove(tmpfile)
+            raise
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
@@ -2628,8 +2714,11 @@ conary erase '%s=%s[%s]'
                         keepRequired = None, migrate = False,
                         criticalUpdateInfo=None, resolveSource = None,
                         updateJob = None, exactFlavors = False):
-        """Create an update job. DEPRECATED, use newUpdateJob and
-        prepareUpdateJob instead"""
+        """
+        DEPRECATED, use L{newUpdateJob} and L{prepareUpdateJob} instead.
+
+        Create an update job.
+        """
         # FIXME: this API has gotten far out of hand.  Refactor when 
         # non backwards compatible API changes are acceptable. 
         # In particular. installMissing and updateOnly have similar meanings,
@@ -2932,6 +3021,9 @@ conary erase '%s=%s[%s]'
         return (uJob, suggMap)
 
     def _validateJob(self, jobSet):
+        """
+        @raise InternalConaryError: the job set is inconsistent.
+        """
         # sanity check for jobSet - never allow a job that would add 
         # or remove the same trove twice to be applied to the system.
         oldTroves = [ (x[0], x[1]) for x in jobSet if x[1][0]]
@@ -3036,6 +3128,15 @@ conary erase '%s=%s[%s]'
         # returning terminates the thread
 
     def getDownloadSizes(self, uJob):
+        """
+        Return the download sizes for each jobset in the update job.
+
+        @param uJob: The update job.
+        @type uJob: L{database.UpdateJob}
+        @rtype: list
+        @return: List of sizes for each jobset
+
+        """
         allJobs = uJob.getJobs()
         flatJobs = [ x for x in itertools.chain(*allJobs) ]
         flatSizes = self.repos.getChangeSetSize(flatJobs)
@@ -3048,6 +3149,14 @@ conary erase '%s=%s[%s]'
         return sizes
 
     def downloadUpdate(self, uJob, destDir):
+        """
+        Download the changesets required in order to apply an update job.
+
+        @param uJob: The update job.
+        @type uJob: L{database.UpdateJob}
+        @param destDir: Directory where the changesets will be stored.
+        @type destDir: path
+        """
         allJobs = uJob.getJobs()
         csFiles = []
         for i, job in enumerate(allJobs):
@@ -3078,7 +3187,10 @@ conary erase '%s=%s[%s]'
                     callback = None, localRollbacks = False,
                     autoPinList = conarycfg.RegularExpressionList(),
                     keepJournal = False):
-        """Apply an update job. DEPRECATED, use applyUpdateJob instead"""
+        """
+        DEPRECATED, use L{applyUpdateJob} instead.
+
+        Apply an update job."""
         commitFlags = database.CommitChangeSetFlags(
             replaceManagedFiles = replaceFiles,
             replaceUnmanagedFiles = replaceFiles,
@@ -3130,11 +3242,13 @@ conary erase '%s=%s[%s]'
 
         self._validateJob(list(itertools.chain(*allJobs)))
 
-        # run preinstall scripts
-        if not self.db.runPreScripts(uJob, callback = self.getUpdateCallback(),
-                                     tagScript = tagScript,
-                                     justDatabase = commitFlags.justDatabase):
-            raise UpdateError('error: preupdate script failed')
+        # run preinstall scripts, but only if this job was not restarted
+        if not uJob.getRestartedFlag():
+            if not self.db.runPreScripts(uJob,
+                                         callback = self.getUpdateCallback(),
+                                         tagScript = tagScript,
+                                         justDatabase = commitFlags.justDatabase):
+                raise UpdateError('error: preupdate script failed')
 
         # Simplify arg passing a bit
         kwargs = dict(
@@ -3314,9 +3428,7 @@ class DependencyFailure(UpdateError):
     def getJobSets(self):
         return self.jobSets
 
-    def formatNVF(self, troveTup, showVersion=True):
-        if not self.cfg:
-            return '%s=%s' % (troveTup[0], troveTup[1].trailingRevision())
+    def formatVF(self, troveTup, showVersion=True):
         if self.cfg.fullVersions:
             version = troveTup[1]
         elif self.cfg.showLabels:
@@ -3327,15 +3439,20 @@ class DependencyFailure(UpdateError):
         else:
             version = ''
 
-        if version:
-            version = '=%s' % version
-
         if self.cfg.fullFlavors:
             flavor = '[%s]' % troveTup[2]
         else:
             flavor = ''
+        return '%s%s' % (version, flavor)
 
-        return '%s%s%s' % (troveTup[0], version, flavor)
+
+    def formatNVF(self, troveTup, showVersion=True):
+        if not self.cfg:
+            return '%s=%s' % (troveTup[0], troveTup[1].trailingRevision())
+        versionFlavor = self.formatVF(troveTup, showVersion=showVersion)
+        if versionFlavor and versionFlavor[0] != '[':
+            return '%s=%s' % (troveTup[0], versionFlavor)
+        return '%s%s' % (troveTup[0], versionFlavor)
 
 class DepResolutionFailure(DependencyFailure):
     """ Unable to resolve dependencies """
@@ -3359,12 +3476,45 @@ class EraseDepFailure(DepResolutionFailure):
 
     def _initErrorMessage(self):
         res = []
-        res.append("Troves being removed create unresolved dependencies:")
+        packagesByErase = {}
+        packagesByInstall = {}
+        for jobSet in self.jobSets:
+            for job in jobSet:
+                newInfo = job[0], job[2][0], job[2][1]
+                oldInfo = job[0], job[1][0], job[1][1]
+                if job[1][0]:
+                    packagesByErase[oldInfo] = newInfo
+                if job[2][0]:
+                    packagesByInstall[newInfo] = oldInfo
+
+        res.append('The following dependencies would no longer be met after this update:\n')
         for (reqBy, depSet, providedBy) in self.getFailures():
-            res.append("    %s requires %s:\n\t%s" %
-                       (self.formatNVF(reqBy),
-                        ' or '.join(self.formatNVF(x) for x in providedBy),
-                        "\n\t".join(str(depSet).split("\n"))))
+            requiredPackages = []
+            providers = []
+            for oldInfo in providedBy:
+                newInfo = packagesByErase[oldInfo]
+                if not newInfo[1]:
+                    status = 'Erased'
+                else:
+                    status = 'Updated to %s' % self.formatVF(newInfo)
+                providedInfo = '%s (%s)' % (self.formatNVF(oldInfo), status)
+                providers.append(providedInfo)
+            if reqBy in packagesByInstall:
+                oldInfo = packagesByInstall[reqBy]
+                if oldInfo[1]:
+                    reqByInfo = '%s (Updated from %s)' % (
+                                            self.formatNVF(reqBy),
+                                                self.formatVF(oldInfo))
+                else:
+                    reqByInfo = '%s (Newly Installed)' % self.formatNVF(reqBy)
+            else:
+                reqByInfo = '%s (Already Installed)' % self.formatNVF(reqBy)
+
+            res.append("  %s requires:\n"
+                       "    %s\n  which was provided by:\n"
+                       "    %s" % (reqByInfo,
+                                   "\n    ".join(str(depSet).split("\n")),
+                               ' or '.join(providers)))
         return '\n'.join(res)
 
 class NeededTrovesFailure(DependencyFailure):

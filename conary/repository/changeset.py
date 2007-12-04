@@ -644,8 +644,8 @@ class ChangeSet(streams.StreamSet):
 
 	@param repos: repository which will be committed to
 	@type repos: repository.Repository
-	@param targetBranchLabel: label of the branch to commit to
-	@type targetBranchLabel: versions.Label
+	@param targetShadowLabel: label of the branch to commit to
+	@type targetShadowLabel: versions.Label
 	"""
 	assert(not targetShadowLabel == versions.LocalLabel())
         # if it's local, Version.parentVersion() has to work everywhere

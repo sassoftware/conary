@@ -92,7 +92,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
     def __call__(self, *args, **kwargs):
         # Keyword arguments are ignored, we just use them to override the
         # protocol version
-        protocolVersion = (kwargs.get('protocolVersion', None) or
+        protocolVersion = (kwargs.pop('protocolVersion', None) or
             self.__protocolVersion)
 
         # always use protocol version 50 for checkVersion.  If we're about
