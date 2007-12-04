@@ -241,8 +241,7 @@ class Config(policy.Policy):
             if lastchar != '\n':
                 self.error("config file %s missing trailing newline" %filename)
         f.close()
-        mode = os.lstat(fullpath)[stat.ST_MODE]
-        self.recipe.ComponentSpec(_config=(filename, mode))
+        self.recipe.ComponentSpec(_config=filename)
 
 
 class ComponentSpec(_filterSpec):
@@ -306,12 +305,8 @@ class ComponentSpec(_filterSpec):
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
-            configPath, mode=keywords.pop('_config')
+            configPath=keywords.pop('_config')
             self.recipe.PackageSpec(_config=configPath)
-            # :config component only if no executable bits set (CNY-1260)
-            nonExecutable = not (mode & 0111)
-            if self.recipe.cfg.configComponent and nonExecutable:
-                self.configFilters.append(('config', re.escape(configPath)))
 
         if args:
             name = args[0]
