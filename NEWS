@@ -34,6 +34,8 @@ Changes in @NEW@:
     * An update job that includes a critical update and an update to a
       group that includes a pre-update script will no longer run the
       script twice. (CNY-2325)
+    * A bug that could cause incorrect SQLite database error messages
+      has been fixed. (CNY-1840)
 
 Changes in 1.2.8:
   o Client Changes:
@@ -49,6 +51,7 @@ Changes in 1.2.8:
     * The Conary library now has a parallel implementation to gpg
       for the trust algorithm. (CNY-1988)
 
+Changes in 1.1.31.11:
   o Bug Fixes:
     * A problem occurring when updating troves sharing a large
       number of identical files has been fixed. (CNY-2273)
