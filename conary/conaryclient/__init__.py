@@ -66,7 +66,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def __init__(self, cfg = None, passwordPrompter = None,
                  resolverClass=resolve.DependencySolver, updateCallback=None):
         """
-        @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
+        @param cfg: a custom L{conarycfg.ConaryConfiguration} object.
                     If None, the standard Conary configuration is loaded
                     from /etc/conaryrc, ~/.conaryrc, and ./conaryrc.
         @type cfg: L{conarycfg.ConaryConfiguration}
@@ -383,8 +383,77 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         else:
             return searchSource
 
-    def applyRollback(self, rollbackSpec, **kwargs):
-        return rollbacks.applyRollback(self, rollbackSpec, **kwargs)
+    def applyRollback(self, rollbackSpec, replaceFiles = None,
+            callback = None, tagScript = None, justDatabase = None,
+            transactionCounter = None):
+        """
+        Apply a rollback.
+
+        @param rollbackSpec: Rollback specififier. This is either a number (in
+        which case it refers to the absolute position in the rollback stack, with
+        0 being the oldest rollback) or a string like C{r.128}, as listed by
+        C{conary rblist}.
+        @type rollbackSpec: string
+
+        @param replaceFiles:
+        @type replaceFiles: bool
+
+        @param callback: Callback for communicating information back to the
+        invoker of this method.
+        @type callback: L{callbacks.UpdateCallback}
+
+        @param tagScript: A tag script.
+        @type tagScript: path
+
+        @param justDatabase: Change only the database, do not revert the
+        filesystem.
+        @type justDatabase: bool
+
+        @param transactionCounter: The Conary database contains a counter that
+        gets incremented with every change. This argument is the counter's value
+        at the time the rollback was computed from the specifier. It is used to
+        ensure that no uninteded rollbacks are performed, if a concurrent update
+        happens between the moment of reading the database state and the moment of
+        performing the rollback.
+        @type transactionCounter: int
+
+        @raise UpdateError: Generic update error. Can occur if the root is not
+        writeable by the user running the command.
+
+        @raise RollbackError: Generic rollback error. Finer grained rollback
+        errors are L{RollbackDoesNotExist} (raised if the rollback specifier
+        was invalid) and L{RollbackOrderError} (if the rollback was attempted not
+        following the rollback stack order). It can also be raised if the database
+        state has changed between the moment the rollback was computed and the
+        moment of performing the rollback. See also the description for
+        C{transactionCounter}.
+
+        @raise RollbackError: Generic rollback error. Finer grained rollback
+        errors are L{RollbackDoesNotExist<database.RollbackDoesNotExist>}
+        (raised if the rollback specifier was invalid) and
+        L{RollbackOrderError<database.RollbackOrderError>}
+        (if the rollback was attempted not
+        following the rollback stack order). It can also be raised if the
+        database state has changed between the moment the rollback was
+        computed and the moment of performing the rollback. See also the
+        description for C{transactionCounter}.
+
+        @raise ConaryError: Generic Conary error. Raised if the user running the
+        command does not have permissions to access the rollback directory, or the
+        directory is missing.
+        """
+        # We used to pass a **kwargs to this function, but that makes it hard
+        # to document the keyword arguments.
+        d = dict(tagScript = tagScript,
+            justDatabase = justDatabase,
+            transactionCounter = transactionCounter,
+            callback = callback,
+            replaceFiles = replaceFiles,
+        )
+        # If any of these arguments are None, don't even pass them, the
+        # defaults are going to apply
+        d = dict((x, y) for (x, y) in d.items() if y is not None)
+        return rollbacks.applyRollback(self, rollbackSpec, **d)
 
     def close(self):
         """Close this client and release all associated resources"""
