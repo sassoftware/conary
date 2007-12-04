@@ -120,12 +120,22 @@ def putData(outFile, data):
 
 
 class moduleFinderProxy:
-    def __init__(self, pythonPath, destdir, sysPath, error):
+    def __init__(self, pythonPath, destdir, libdir, sysPath, error):
         self.error = error
+        environment = os.environ.copy()
+        ldLibraryPath = os.getenv('LD_LIBRARY_PATH')
+        if ldLibraryPath is not None:
+            ldLibraryPath = ldLibraryPath.split(':')
+        else:
+            ldLibraryPath = []
+        ldLibraryPath[0:0] = [destdir+libdir, libdir]
+        ldLibraryPath = ':'.join(ldLibraryPath)
+        environment['LD_LIBRARY_PATH'] = ldLibraryPath
         self.proxyProcess = subprocess.Popen(
             (pythonPath, __file__),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
+            env=environment,
             bufsize=0, close_fds=True)
         sysPath = '\0'.join(sysPath)
         data = '\0'.join(('init', destdir, sysPath))

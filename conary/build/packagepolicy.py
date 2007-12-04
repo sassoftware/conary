@@ -241,8 +241,7 @@ class Config(policy.Policy):
             if lastchar != '\n':
                 self.error("config file %s missing trailing newline" %filename)
         f.close()
-        mode = os.lstat(fullpath)[stat.ST_MODE]
-        self.recipe.ComponentSpec(_config=(filename, mode))
+        self.recipe.ComponentSpec(_config=filename)
 
 
 class ComponentSpec(_filterSpec):
@@ -306,12 +305,8 @@ class ComponentSpec(_filterSpec):
 
     def updateArgs(self, *args, **keywords):
         if '_config' in keywords:
-            configPath, mode=keywords.pop('_config')
+            configPath=keywords.pop('_config')
             self.recipe.PackageSpec(_config=configPath)
-            # :config component only if no executable bits set (CNY-1260)
-            nonExecutable = not (mode & 0111)
-            if self.recipe.cfg.configComponent and nonExecutable:
-                self.configFilters.append(('config', re.escape(configPath)))
 
         if args:
             name = args[0]
@@ -1709,18 +1704,26 @@ class _dependency(policy.Policy):
     def _isPythonModuleCandidate(self, path):
         return path.endswith('.so') or self._isPython(path)
 
-    def _getPythonVersion(self, pythonPath):
+    def _getPythonLibraryPath(self, pythonPath, destdir, libdir):
+        ldLibraryPath = ''
+        if pythonPath.startswith(destdir):
+            ldLibraryPath = 'LD_LIBRARY_PATH=%s%s' %(destdir, libdir)
+        return ldLibraryPath
+
+    def _getPythonVersion(self, pythonPath, destdir, libdir):
+        ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         if pythonPath not in self.pythonVersionCache:
             self.pythonVersionCache[pythonPath] = util.popen(
-                r"""%s -Ec 'import sys;"""
+                r"""%s %s -Ec 'import sys;"""
                  """ print "%%d.%%d" %%sys.version_info[0:2]'"""
-                %pythonPath).read().strip()
+                %(ldLibraryPath, pythonPath)).read().strip()
         return self.pythonVersionCache[pythonPath]
 
-    def _getPythonSysPath(self, pythonPath):
+    def _getPythonSysPath(self, pythonPath, destdir, libdir):
+        ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         return [x.strip() for x in util.popen(
-                r"""%s -Ec 'import sys; print "\0".join(sys.path)'"""
-                %pythonPath).read().split('\0')
+                r"""%s %s -Ec 'import sys; print "\0".join(sys.path)'"""
+                %(ldLibraryPath, pythonPath)).read().split('\0')
                 if x]
 
     def _warnPythonPathNotInDB(self, pathName):
@@ -2450,6 +2453,7 @@ class Provides(_dependency):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
+        libdir = self.macros.libdir
         systemPythonFlags = set()
 
         try:
@@ -2457,9 +2461,9 @@ class Provides(_dependency):
             # from python just built in destdir, or if that is not
             # available, from system conary
             systemPaths = set(self._stripDestDir(
-                self._getPythonSysPath(pythonPath), destdir))
+                self._getPythonSysPath(pythonPath, destdir, libdir), destdir))
 
-            pythonVersion = self._getPythonVersion(pythonPath)
+            pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
 
             # Unlike Requires, we always provide version and
             # libname (lib/lib64/...) in order to facilitate
@@ -3084,6 +3088,7 @@ class Requires(_addInfo, _dependency):
         oldSysPrefix = sys.prefix
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
+        libdir = self.macros.libdir
         pythonVersion = None
         systemPythonFlags = set()
 
@@ -3091,9 +3096,9 @@ class Requires(_addInfo, _dependency):
             # get preferred sys.path (not modified by Conary wrapper)
             # from python just built in destdir, or if that is not
             # available, from system conary
-            systemPaths = self._getPythonSysPath(pythonPath)
+            systemPaths = self._getPythonSysPath(pythonPath, destdir, libdir)
 
-            pythonVersion = self._getPythonVersion(pythonPath)
+            pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
             if not bootstrapPython:
                 # determine dynamically whether to require version
                 # and libname (lib/lib64/...) based on whether the
@@ -3131,13 +3136,14 @@ class Requires(_addInfo, _dependency):
         # load module finder after sys.path is restored
         # in case delayed importer is installed.
         pythonModuleFinder = self._getPythonRequiresModuleFinder(
-            pythonPath, destdir, sysPathForModuleFinder, bootstrapPython)
+            pythonPath, destdir, libdir, sysPathForModuleFinder,
+            bootstrapPython)
 
         self.pythonSysPathMap[pythonPath] = (
             sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
         return self.pythonSysPathMap[pythonPath]
 
-    def _getPythonRequiresModuleFinder(self, pythonPath, destdir, sysPath, bootstrapPython):
+    def _getPythonRequiresModuleFinder(self, pythonPath, destdir, libdir, sysPath, bootstrapPython):
 
         if self.recipe.isCrossCompiling():
             return None
@@ -3145,7 +3151,7 @@ class Requires(_addInfo, _dependency):
             if not bootstrapPython and pythonPath == sys.executable:
                 self.pythonModuleFinderMap[pythonPath] = pydeps.DirBasedModuleFinder(destdir, sysPath)
             else:
-                self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, sysPath, self.error)
+                self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, libdir, sysPath, self.error)
         return self.pythonModuleFinderMap[pythonPath]
 
     def _delPythonRequiresModuleFinder(self):
