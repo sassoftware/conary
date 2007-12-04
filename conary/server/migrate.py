@@ -610,7 +610,7 @@ class MigrateTo_16(SchemaMigration):
         if not createCheckTroveCache(self.db):
             return False
         logMe(2, "creating UserGroupInstancesCache table")
-        ugi = accessmap.UserGroupInstances(self.db)
+        ugi = accessmap.RoleInstances(self.db)
         ugi.rebuild()
         logMe(3, "creating the LatestCache indexes...")
         schema.createLatest(self.db)
