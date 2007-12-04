@@ -209,7 +209,7 @@ class addArchive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=}])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{sourceDir}=])}
 
     DESCRIPTION
     ===========
@@ -275,6 +275,12 @@ class addArchive(_Source):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe
+
+    B{sourceDir} : Instructs C{r.addArchive} to look in the directory
+    specified by C{sourceDir} for the source archive to unpack.
+    An absolute C{sourceDir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{sourceDir} value will be
+    considered relative to C{%(builddir)s}.
 
     EXAMPLES
     ========
@@ -520,7 +526,7 @@ class addPatch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=,] [I{sourceDir}=])}
 
     DESCRIPTION
     ===========
@@ -589,7 +595,13 @@ class addPatch(_Source):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe
-    
+
+    B{sourceDir} : Instructs C{r.addPatch} to look in the directory
+    specified by C{sourceDir} for the patch to apply.
+    An absolute C{sourceDir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{sourceDir} value will be
+    considered relative to C{%(builddir)s}.
+
     EXAMPLES
     ========
 
@@ -809,7 +821,7 @@ class addSource(_Source):
 
     SYNOPSIS
     ========
-    C{r.addSource(I{sourcename}, [I{apply}=,] [I{dest}=,] [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{macros}=,] [I{mode}=,] [I{package}=,] [I{rpm}=,] [I{use}=])}
+    C{r.addSource(I{sourcename}, [I{apply}=,] [I{dest}=,] [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{macros}=,] [I{mode}=,] [I{package}=,] [I{rpm}=,] [I{use}=,] [I{sourceDir}=])}
 
     DESCRIPTION
     ===========
@@ -876,6 +888,12 @@ class addSource(_Source):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe
+
+    B{sourceDir} : Instructs C{r.addSource} to look in the directory
+    specified by C{sourceDir} for the file to install.
+    An absolute C{sourceDir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{sourceDir} value will be
+    considered relative to C{%(builddir)s}.
 
     EXAMPLES
     ========
