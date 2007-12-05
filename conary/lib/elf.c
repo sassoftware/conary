@@ -98,7 +98,7 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 	return 1;
     }
 
-    switch (ident[EI_OSABI]) {
+    switch ((unsigned char) ident[EI_OSABI]) {
       case ELFOSABI_SYSV:	abi = "SysV";	    break;
       case ELFOSABI_HPUX:	abi = "HPUX";	    break;
       case ELFOSABI_NETBSD:	abi = "NetBSD";	    break;
