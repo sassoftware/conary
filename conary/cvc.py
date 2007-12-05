@@ -570,45 +570,53 @@ _register(DescribeCommand)
 
 class DeriveCommand(CvcCommand):
     commands = ['derive']
-    paramHelp = "<newlabel> <trove>[=<version>][[flavor]]+"
+    paramHelp = "<trove>[=<version>][[flavor]]"
     help = 'Aggregation command to shadow, check out and alter a recipe'
     commandGroup = 'Repository Access'
 
     docs = {'dir' : 'Derive single trove and check out in directory DIR',
-            'extract-dir': 'extract single binary parent trove in dirctory DIR',
-            'info': 'Display info on shadow/branch'}
+            'extract': 'extract parent trove into _ROOT_ subdir for editing',
+            'target': 'target label which the derived package should be shadowed to (defaults to buildLabel)',
+            'info': 'Display info on shadow'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["dir"] = ONE_PARAM
         argDef["info"] = '-i', NO_PARAM
-        argDef['extract-dir'] = ONE_PARAM
+        argDef['extract'] = NO_PARAM
+        argDef['target'] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         checkoutDir = argSet.pop('dir', None)
-        extractDir = argSet.pop('extract-dir', None)
+        extract = argSet.pop('extract', False)
+        targetLabel = argSet.pop('target', None)
         info = prep = False
         if argSet.has_key('info'):
             del argSet['info']
             info = True
 
-        if argSet or (len(args) < 3) or ((checkoutDir or extractDir) and len(args) != 3):
-            # no leftover args
-            # usage of --extract-dir or --dir implies only one trove
+        if argSet or len(args) != 2:
             return self.usage()
 
-        target = args[1]
-        troveSpecs = args[2:]
+        troveSpec = args[1]
 
         # we already know there's exactly one troveSpec
-        if extractDir and ':source' in troveSpecs[0].split('=')[0]:
+        if extract and ':source' in troveSpec.split('=')[0]:
             # usage of --extract-dir requires specification of a binary trove
             return self.usage()
+        if targetLabel:
+            try:
+                targetLabel = versions.Label(targetLabel)
+            except:
+                return self.usage()
+        else:
+            targetLabel = cfg.buildLabel
 
-        derive.derive(repos, cfg, target, troveSpecs,
-                checkoutDir = checkoutDir, extractDir = extractDir,
+        callback = derive.DeriveCallback(cfg)
+        derive.derive(repos, cfg, targetLabel, troveSpec,
+                checkoutDir = checkoutDir, extract = extract,
                 info = info, callback = callback)
 _register(DeriveCommand)
 

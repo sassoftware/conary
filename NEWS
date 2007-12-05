@@ -1,4 +1,6 @@
 Changes in @NEW@:
+  o Client Changes:
+    * The interface to cvc derive (added in 1.2.8) has been changed.
   o Bug Fixes:
     * A bug that caused an exception when inspecting ELF files with a
       standalone ABI has been fixed. (CNY-2333)
