@@ -3592,6 +3592,12 @@ class Flavor(policy.Policy):
         self.packageFlavor = deps.Flavor()
         self.troveMarked = False
         self.componentMap = self.recipe.autopkg.componentMap
+        ISD = deps.InstructionSetDependency
+        TISD = deps.TargetInstructionSetDependency
+        instructionDeps = list(self.recipe._buildFlavor.iterDepsByClass(ISD))
+        instructionDeps += list(self.recipe._buildFlavor.iterDepsByClass(TISD))
+        self.allowableIsnSets = [ x.name for x in instructionDeps ]
+
 
     def postProcess(self):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3650,11 +3656,10 @@ class Flavor(policy.Policy):
         # causing the entire package from being flavored inappropriately.
         # Such flavoring requires a bunch of Flaovr exclusions to fix.
         f.flavor.set(flv)
-        if self.troveMarked:
-            return
-        # we only add flavor 
-        self.packageFlavor.union(self.baseArchFlavor)
-        self.troveMarked = True
+        # get the Arch.* dependencies
+        flv.union(self.archFlavor)
+        if isnset in self.allowableIsnSets:
+            self.packageFlavor.union(flv)
 
 class reportMissingBuildRequires(policy.Policy):
     """
