@@ -80,13 +80,47 @@ Changes in 2.0.0:
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
 Changes in 1.2.9:
+  o Documentation Changes:
+    * The documentation strings for the update code have been updated
+      to include the most common exceptions raised as part of prepareChangeSet
+      and updateChangeSet. (CNY-1732)
+
+  o Build Changes:
+    * File level requirements provided by the same file are dropped. (CNY-2177)
+    * Exclude Java dependencies that do not start with a valid TLD. (CNY-2176)
+    * The exceptDeps keyword parameter is now allowed for r.Provides()
+      analogously to r.Requires(). (CNY-1485)
+    * The new sourceDir keyword parameter is now available for for
+      r.addSource(), r.addPatch(), and r.addArchive() to specify that
+      the source is found within the maindir. (CNY-1439)
+    * LD_LIBRARY_PATH is now set when calling bootstrapped python, in
+      order to load correct python libraries. (CNY-2319)
+    * The :config component is built by file location, rather than
+      from files marked as config files by the Config policy.
+      This means that the configComponent configuration item no
+      longer operates. (CNY-2256)
+
   o Client Changes:
     * Added keepRequired config option that has the same effect as
       always setting the --keep-required flag on update. (CNY-569)
+    * The error message for erased dependencies is now more explicit about
+      what happened to the package that is no longer providing dependencies
+      and where the package with the missing dependencies came from. (CNY-2248)
+    * We now record the current state of the database to a flat file
+      after updates as a restoration mechanism as an extreme recovery mechanism.
+      (CNY-1801)
 
   o Bug Fixes:
     * The "logcat" script no longer errors out if the log file is empty
       or contains None for entitlements. (CNY-2252)
+    * Repositories running under Apache are now correctly displaying
+      the real error when trying to generate the verbose traceback
+      emails. (CNY-2320)
+    * An update job that includes a critical update and an update to a
+      group that includes a pre-update script will no longer run the
+      script twice. (CNY-2325)
+    * A bug that could cause incorrect SQLite database error messages
+      has been fixed. (CNY-1840)
 
 Changes in 1.2.8:
   o Client Changes:
@@ -108,7 +142,7 @@ Changes in 1.2.8:
     * Repository traceback emails are now more verbose. (CNY-2287)
     * Methods starting with two underscore characters are considered
       internal and are no longer passed to the XML-RPC library for
-      marshaling. (CNY-2286)
+      marshaling. (CNY-2289)
     * It is now possible to clone a group that contains references to
       both a cloned package and the version that the cloned package
       originated from. (CNY-2302)

@@ -534,7 +534,7 @@ class RoleInstances(RoleTable):
         %s """ % (cond,), args)
         self.db.analyze("UserGroupInstancesCache")
         # need to rebuild the latest as well
-        logMe(3, "rebuilding the LatestCache rows", "userGroupId=%s"%userGroupId)
+        logMe(3, "rebuilding the LatestCache rows", "roleId=%s"%roleId)
         if roleId is not None:
             self.latest.updateRoleId(cu, roleId)
         else: # this is a full rebuild
