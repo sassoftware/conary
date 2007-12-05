@@ -1649,7 +1649,6 @@ class TroveScript(_AnySource):
                                fromClass = self._compatibilityMap)
 
 class addPostInstallScript(TroveScript):
-    _scriptName = 'postInstallScripts'
 
     """
     NAME
@@ -1680,11 +1679,10 @@ class addPostInstallScript(TroveScript):
     B{groupName} : (None) The name of the group to add the script to
     """
 
-class addPostRollbackScript(TroveScript):
+    _scriptName = 'postInstallScripts'
 
-    _scriptName = 'postRollbackScripts'
-    keywords = dict(TroveScript.keywords)
-    keywords['toClass'] = None
+
+class addPostRollbackScript(TroveScript):
 
     """
     NAME
@@ -1717,14 +1715,16 @@ class addPostRollbackScript(TroveScript):
     or a list of integers.
     """
 
+    _scriptName = 'postRollbackScripts'
+    keywords = dict(TroveScript.keywords)
+    keywords['toClass'] = None
+
     def __init__(self, *args, **kwargs):
         TroveScript.__init__(self, *args, **kwargs)
         if self.toClass:
             self._compatibilityMap = self.toClass
 
 class addPostUpdateScript(TroveScript):
-
-    _scriptName = 'postUpdateScripts'
 
     """
     NAME
@@ -1754,9 +1754,9 @@ class addPostUpdateScript(TroveScript):
     B{groupName} : (None) The name of the group to add the script to
     """
 
-class addPreUpdateScript(TroveScript):
+    _scriptName = 'postUpdateScripts'
 
-    _scriptName = 'preUpdateScripts'
+class addPreUpdateScript(TroveScript):
 
     """
     NAME
@@ -1785,6 +1785,8 @@ class addPreUpdateScript(TroveScript):
     B{contents} : (None) The contents of the script
     B{groupName} : (None) The name of the group to add the script to
     """
+
+    _scriptName = 'preUpdateScripts'
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
