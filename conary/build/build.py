@@ -2207,7 +2207,14 @@ class Remove(BuildAction):
     C{r.Remove('/lib/modules/%(kver)s/modules.*')}
 
     Calls C{r.Remove()} to remove the C{modules.*} files from the
-    C{/lib/modules/%(kver)s/} directory.
+    C{/lib/modules/%(kver)s/} directory. Note that this class, like all other
+    build actions, takes globs and not regular expressions. Thus, modules.*
+    would match modules.a, but not modules_a.
+
+    C{r.Remove('%(bindir)s/foo{bar,baz}')
+
+    Calls C{r.Remove()} to remove %(bindir)s/foobar and %(bindir)s/foobaz. This
+    illustrates that build actions accept bash-style expansion.
     
     C{r.Remove('/etc/widget', recursive=True)}
 
