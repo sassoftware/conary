@@ -83,7 +83,7 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
     error = branch.branch(repos, cfg, str(targetLabel),
                   ['%s=%s[%s]' % troveToDerive],
                   makeShadow = True, sourceOnly = True, binaryOnly = False,
-                  info = info, targetFile = None)
+                  info = info)
     if info or error:
         return
     shadowedVersion = troveToDerive[1].createShadow(targetLabel)
