@@ -43,7 +43,7 @@ class ELF(Magic):
 	requires, provides = elf.inspect(fullpath)
         # Filter None abi flags
         requires = [ x for x in requires
-                     if x[0] == 'abi' and x[2][0] is not None ]
+                     if x[0] != 'abi' or x[2][0] is not None ]
         self.contents['requires'] = requires
         self.contents['provides'] = provides
         for req in requires:
