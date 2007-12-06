@@ -53,8 +53,6 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
     """
        Displays information about troves found in repositories
 
-       @param repos: a network repository client 
-       @type repos: repository.netclient.NetworkRepositoryClient
        @param cfg: conary config
        @type cfg: conarycfg.ConaryConfiguration
        @param troveSpecs: troves to search for
@@ -107,11 +105,6 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @param alwaysDisplayHeaders: If true, display headers even when listing  
        files.
        @type alwaysDisplayHeaders: bool
-       @param showRemovedTroves: If True, display troves that have been removed from
-       the repository (default False).
-       @type showRemovedTroves: bool
-       @param showRedirects: If True, display redirects (default False) 
-       @type showRedirects: bool
        @rtype: None
     """
 
@@ -182,7 +175,6 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         @type troveSpecs: list of troveSpecs (n[=v][[f]])
         @param versionFilter: The VERSION_FILTER_* to use.  See man
         page for documentation for now.
-        @type all: bool
         @param flavorFilter: The FLAVOR_FILTER_* to use.  See man
         page for documentation for now.
         @param labelPath: The labelPath to search

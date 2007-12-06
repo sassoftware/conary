@@ -27,14 +27,14 @@
 
     Currently, there are 3 types of SearchSources.
 
-        NetworkSearchSource(repos, installLabelPath, flavor, db=None)
-        - searches the network on the given installLabelPath.
+        - NetworkSearchSource(repos, installLabelPath, flavor, db=None)
+            - searches the network on the given installLabelPath.
 
-        TroveSearchSource(repos, troveList, flavor=None, db=None)
-        - searches the given trove list.
+        - TroveSearchSource(repos, troveList, flavor=None, db=None)
+            - searches the given trove list.
 
-        SearchSourceStack(*sources)
-        - searches the sources in order.
+        - SearchSourceStack(*sources)
+            - searches the sources in order.
 
     For all of these sources, you simply call findTroves(troveSpecs),
     without passing in flavor or installLabelPath.
@@ -248,7 +248,8 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
 
         Method for searching a stack of sources.  Call in the same way
         as a single searchSource:
-            findTroves(troveSpecs, useAffinity=False)
+
+        findTroves(troveSpecs, useAffinity=False)
     """
     def __init__(self, *args, **kw):
         trovesource.SourceStack.__init__(self, *args)
@@ -414,10 +415,10 @@ def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
         Creates a searchSourceStack based on a searchPath.
 
         Valid parameters include:
-            * a label object
-            * a trove tuple
-            * a trove object
-            * a list of any of the above.
+            - a label object
+            - a trove tuple
+            - a trove object
+            - a list of any of the above.
     """
     if troveSource is None:
         troveSource = searchSource.getTroveSource()

@@ -79,36 +79,48 @@ Changes in 2.0.0:
     * Many repository permission manipulation methods have been
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
+Changes in 1.2.10:
+  o Client Changes:
+    * The command line interface to cvc derive (added in Conary 1.2.8)
+      has been changed.  It now derives onto your buildLabel by default,
+      with a --target option to derive onto a different label.
+  o Bug Fixes:
+    * A bug that caused an exception when inspecting ELF files with a
+      standalone ABI has been fixed. (CNY-2333)
+
 Changes in 1.2.9:
   o Documentation Changes:
-    * The documentation strings for the update code have been updated
-      to include the most common exceptions raised as part of prepareChangeSet
-      and updateChangeSet. (CNY-1732)
+    * The documentation strings for the update code have been revised
+      to include the most common exceptions raised as part of
+      prepareChangeSet and updateChangeSet. (CNY-1732)
 
   o Build Changes:
-    * File level requirements provided by the same file are dropped. (CNY-2177)
-    * Exclude Java dependencies that do not start with a valid TLD. (CNY-2176)
-    * The exceptDeps keyword parameter is now allowed for r.Provides()
+    * File level requirements provided by the same file are dropped.
+      (CNY-2177)
+    * Java dependencies that do not start with a valid TLD are now
+      excluded. (CNY-2176)
+    * The exceptDeps keyword parameter is now allowed for r.Provides(),
       analogously to r.Requires(). (CNY-1485)
-    * The new sourceDir keyword parameter is now available for for
+    * The new sourceDir keyword parameter is now available for
       r.addSource(), r.addPatch(), and r.addArchive() to specify that
       the source is found within the maindir. (CNY-1439)
     * LD_LIBRARY_PATH is now set when calling bootstrapped python, in
-      order to load correct python libraries. (CNY-2319)
+      order to load the correct python libraries. (CNY-2319)
     * The :config component is built by file location, rather than
       from files marked as config files by the Config policy.
       This means that the configComponent configuration item no
       longer operates. (CNY-2256)
 
   o Client Changes:
-    * Added keepRequired config option that has the same effect as
-      always setting the --keep-required flag on update. (CNY-569)
-    * The error message for erased dependencies is now more explicit about
-      what happened to the package that is no longer providing dependencies
-      and where the package with the missing dependencies came from. (CNY-2248)
+    * A keepRequired config option has been added. This has the same
+      effect as always setting the --keep-required flag on update.
+      (CNY-569)
+    * The error message for erased dependencies is now more explicit
+      about what happened to the package that is no longer providing
+      dependencies, and where the package with the missing dependencies
+      came from. (CNY-2248)
     * We now record the current state of the database to a flat file
-      after updates as a restoration mechanism as an extreme recovery mechanism.
-      (CNY-1801)
+      after updates as an extreme recovery mechanism.  (CNY-1801)
 
   o Bug Fixes:
     * The "logcat" script no longer errors out if the log file is empty

@@ -247,8 +247,6 @@ class BaseProxy(xmlshims.NetworkConvertors):
         the client used to talk to us.
         @param protocolString: if set, the protocol version the client used
         (i.e. HTTP/1.0)
-        @param targetServerName: if set, the conary server name the
-        request is meant for (as opposed to the internet hostname)
         """
         if methodname not in self.publicCalls:
             if protocol < 60:

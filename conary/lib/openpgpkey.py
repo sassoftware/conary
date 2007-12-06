@@ -41,11 +41,11 @@ class OpenPGPKey(object):
                  'trustLevel', 'signatures', 'id']
     def __init__(self, key, cryptoKey, trustLevel=255):
         """
-        instantiates a OpenPGPKey object
+        Instantiates a OpenPGPKey object
 
         @param key: A PGP key
-        @type fingerprint: instance of openpgpfile.PGP_Key
-        @param cyptoKey: DSA or RSA key object
+        @type key: instance of openpgpfile.PGP_Key
+        @param cryptoKey: DSA or RSA key object
         @type cryptoKey: instance
         @param trustLevel: the trust level of this key, as stored locally
         @type trustLevel: int
@@ -120,7 +120,7 @@ class OpenPGPKey(object):
         key that signed the data.
 
         @param data: the data that has been signed
-	@type name: str
+	@type data: strint
 	@param sig: the digital signature to verify
 	@type sig: 4-tuple (fingerprint, timestamp, signature, K)
         @rtype int

@@ -1301,8 +1301,8 @@ class Branch(VersionSequence):
 	are appended to the branch this object represented. The time
 	stamp is reset as a new version has been created.
 
-	@param verRel: object for the revision
-	@type verRel: Revision
+	@param revision: object for the revision
+	@type revision: Revision
 	"""
 
 	revision.timeStamp = time.time()

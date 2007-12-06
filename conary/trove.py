@@ -788,14 +788,14 @@ class TroveRefsTrovesStream(dict, streams.InfoStream):
     def freeze(self, skipSet = {}):
         """
         Frozen form is a sequence of:
-            total entry size, excluding these two bytes (2 bytes)
-            troveName length (2 bytes)
-            troveName
-            version string length (2 bytes)
-            version string
-            flavor string length (2 bytes)
-            flavor string
-            byDefault value (1 byte, 0 or 1)
+          - total entry size, excluding these two bytes (2 bytes)
+          - troveName length (2 bytes)
+          - troveName
+          - version string length (2 bytes)
+          - version string
+          - flavor string length (2 bytes)
+          - flavor string
+          - byDefault value (1 byte, 0 or 1)
 
         This whole thing is sorted by the string value of each entry. Sorting
         this way is a bit odd, but it's simple and well-defined.
@@ -838,13 +838,13 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
     def freeze(self, skipSet = {}):
         """
         Frozen form is a sequence of:
-            total entry size, excluding these two bytes (2 bytes)
-            pathId (16 bytes)
-            fileId (20 bytes)
-            pathLen (2 bytes)
-            path
-            versionLen (2 bytes)
-            version string
+          - total entry size, excluding these two bytes (2 bytes)
+          - pathId (16 bytes)
+          - fileId (20 bytes)
+          - pathLen (2 bytes)
+          - path
+          - versionLen (2 bytes)
+          - version string
 
         This whole thing is sorted by the string value of each entry. Sorting
         this way is a bit odd, but it's simple and well-defined.
@@ -982,8 +982,8 @@ class Trove(streams.StreamSet):
         Adds a previously computed signatures, allowing signatures to be
         added to troves. All digests must have already been computed.
 
-        @param sig: Signature to add
-        @type sig: VersionedDigitalSignatureSet
+        @param newSigs: Signature to add
+        @type newSigs: VersionedDigitalSignatureSet
         """
         assert(self.verifyDigests())
 
@@ -1478,16 +1478,20 @@ class Trove(streams.StreamSet):
 
 	return fileMap
 
-    def mergeTroveListChanges(self, strongChangeList, weakChangeList, 
+    def mergeTroveListChanges(self, strongChangeList, weakChangeList,
                               redundantOkay = False):
         """
         Merges a set of changes to the included trove list into this
         trove.
 
-        @param changeList: A list or generator specifying a set of
-        trove changes; this is the same as returned by
-        TroveChangeSet.iterChangedTroves()
-        @type changeList: (name, list) tuple
+        @param strongChangeList: A list or generator specifying a set of trove
+        changes; this is the same as returned by
+        TroveChangeSet.iterChangedTroves(strongRefs=True, weakRefs=False)
+        @type strongChangeList: (name, list) tuple
+        @param weakChangeList: A list or generator specifying a set of trove
+        changes; this is the same as returned by
+        TroveChangeSet.iterChangedTroves(strongRefs=False, weakRefs=True)
+        @type weakChangeList: (name, list) tuple
         @param redundantOkay: Redundant changes are normally considered 
         errors
         @type redundantOkay: boolean

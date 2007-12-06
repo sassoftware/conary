@@ -41,6 +41,9 @@ class ELF(Magic):
             self.contents['RPATH'] = elf.getRPATH(fullpath)
             self.contents['Type'] = elf.getType(fullpath)
 	requires, provides = elf.inspect(fullpath)
+        # Filter None abi flags
+        requires = [ x for x in requires
+                     if x[0] != 'abi' or x[2][0] is not None ]
         self.contents['requires'] = requires
         self.contents['provides'] = provides
         for req in requires:
@@ -50,7 +53,6 @@ class ELF(Magic):
         for prov in provides:
             if prov[0] == 'soname':
                 self.contents['soname'] = prov[1]
-
 
 class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):

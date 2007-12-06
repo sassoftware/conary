@@ -1671,15 +1671,18 @@ class Database(SqlDbRepository):
         return self.db.iterFindPathReferences(path, justPresent = justPresent)
 
     def getTrovesWithProvides(self, depSetList, splitByDep=False):
-        """Returns a dict { depSet : [troveTup, troveTup] } of local 
+        """
+        Get the troves that provide each dependency set listed.
+        @return: A dict { depSet : [troveTup, troveTup] } of local
            troves that provide each dependency set listed.
-           @param splitByDep (added for backwards compatibility) If True, 
-           returns dependeny solutions in the standard format, where the 
+        @param splitByDep: (added for backwards compatibility) If True,
+           returns dependeny solutions in the standard format, where the
            solution for each dependency set is a list of lists, where within
            each list is the solution for one dependency in the dependency set.
-           If false, all those lists are combined together into one list
-           of solutions for the entire dependency set.
-           @type splitByDep bool (default False)
+           If False (the default), all those lists are combined together into
+           one list of solutions for the entire dependency set.
+        @type splitByDep: bool
+        @rtype: dict
         """
         rc = self.db.getTrovesWithProvides(depSetList)
         if splitByDep:
