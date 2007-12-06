@@ -79,6 +79,11 @@ Changes in 2.0.0:
     * Many repository permission manipulation methods have been
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
+  o Internal Changes:
+    * Repositories now produce armored PGP keys that include the CRC24
+      checksum described in the Radix-64 encoding section of RFC2440.
+      (CNY-2149)
+
 Changes in 1.2.10:
   o Client Changes:
     * The command line interface to cvc derive (added in Conary 1.2.8)
