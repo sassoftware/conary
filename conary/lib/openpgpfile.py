@@ -12,6 +12,7 @@
 #
 
 import base64
+import binascii
 import errno
 import fcntl
 import itertools
@@ -296,8 +297,7 @@ def fingerprintToInternalKeyId(fingerprint):
     if len(fingerprint) == 0:
         return ''
     fp = fingerprint[-16:]
-    return ''.join([ chr(int(x + y, 16))
-                   for x, y in zip(fp[0::2], fp[1::2])] )
+    return binascii.unhexlify(fp)
 
 def binSeqToString(sequence):
     """sequence is a sequence of unsigned chars.
@@ -487,7 +487,18 @@ def getFingerprints(keyRing):
     return [ x.getKeyFingerprint() for x in msg.iterKeys() ]
 
 def parseAsciiArmorKey(asciiData):
+    """
+    Parse an armored (Radix-64 encoded) PGP message.
+
+    @param asciiData: the Radix-64 encoded PGP message
+    @type asciiData: string
+    @return: the unencoded PGP messsage, or None if the encoded message was
+        incorrect
+    @rtype: string or None
+    @raise PGPError: if the CRC does not match the message
+    """
     data = StringIO(asciiData)
+    crc = None
     nextLine=' '
     try:
         while(nextLine[0] != '-'):
@@ -499,12 +510,24 @@ def parseAsciiArmorKey(asciiData):
         while(nextLine[0] != '=' and nextLine[0] != '-'):
             buf = buf + nextLine
             nextLine = data.readline()
+        if nextLine[0] == '=':
+            # This is the CRC
+            crc = nextLine.strip()[1:]
     except IndexError:
         data.close()
         return
     data.close()
 
-    keyData = base64.b64decode(buf)
+    try:
+        keyData = base64.b64decode(buf)
+    except TypeError:
+        return None
+    if crc:
+        crcobj = CRC24(keyData)
+        ccrc = crcobj.base64digest()
+        if crc != ccrc:
+            raise PGPError("Message does not verify CRC checksum", crc, ccrc)
+
     return keyData
 
 class CRC24(object):
