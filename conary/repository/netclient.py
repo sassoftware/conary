@@ -2404,14 +2404,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         versionStr formats accepted are:
 
-            *^ empty/None
-            *  full version (branch + revision)
-            *  branch
-            *  label  (host@namespace:tag)
-            *  @branchname (@namespace:tag)
-            *  :tag        
-            *^ revision (troveVersion-sourceCount-buildCount)
-            *^ troveVersion 
+            -^ empty/None
+            -  full version (branch + revision)
+            -  branch
+            -  label  (host@namespace:tag)
+            -  @branchname (@namespace:tag)
+            -  :tag        
+            -^ revision (troveVersion-sourceCount-buildCount)
+            -^ troveVersion 
 
         VersionStr types with a ^ by them will be limited to the branches of 
         affinity troves if they exist.

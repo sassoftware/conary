@@ -1194,7 +1194,7 @@ class PGP_BaseKeySig(PGP_BasePacket):
     def _readMPIs(self, stream, algType, discard = True):
         """Read the corresponding number of MPIs for the specified algorithm
         type from the stream
-        @raise UnsupportedEncryptionAlgorithm
+        @raise UnsupportedEncryptionAlgorithm:
         """
         numMPI = self._getMPICount(algType)
         return self._readCountMPIs(stream, numMPI, discard = discard)
@@ -1202,7 +1202,7 @@ class PGP_BaseKeySig(PGP_BasePacket):
     @staticmethod
     def _readCountMPIs(stream, count, discard = True):
         """Read count MPIs from the current position in stream.
-        @raise UnsupportedEncryptionAlgorithm
+        @raise UnsupportedEncryptionAlgorithm:
         """
 
         ret = []
@@ -2291,8 +2291,8 @@ class PGP_MainKey(PGP_Key):
         Verify the self signatures on this key.
         If successful, returns the public key packet associated with this key,
         and crypto key.
-        @return (pubKeyPacket, cryptoKey)
-        @raises BadSelfSignature
+        @return: (pubKeyPacket, cryptoKey)
+        @raises BadSelfSignature:
         """
         if self.version == 3:
             raise InvalidKey("Version 3 keys not supported")
@@ -2318,11 +2318,11 @@ class PGP_MainKey(PGP_Key):
     def isSupersetOf(self, key):
         """Check if this key is a superset of key
         We try to make sure that:
-        - the keys have the same ID
-        - this key's set of revocation signatures is a superset of the other
-          key's revocations
-        - this key's set of subkeys is a superset of the other key's subkeys
-        - this key's set of userids is a superset of the other key's userids
+         - the keys have the same ID
+         - this key's set of revocation signatures is a superset of the other
+           key's revocations
+         - this key's set of subkeys is a superset of the other key's subkeys
+         - this key's set of userids is a superset of the other key's userids
         """
         if self.tag != key.tag:
             raise IncompatibleKey("Attempting to compare different key types")

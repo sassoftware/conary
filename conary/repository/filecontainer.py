@@ -39,23 +39,23 @@ uncompresses the file.
 There are two formats for file table entries. The original format is used
 for all files less than 4GB in size (after compression)::
 
-  SUBFILE_MAGIC (2 bytes)
-  length of file name (2 bytes)
-  length of compressed file data(4 bytes)
-  length of arbitrary data (2 bytes)
-  file name
-  arbitrary file table data
-  file data
+ -SUBFILE_MAGIC (2 bytes)
+ -length of file name (2 bytes)
+ -length of compressed file data(4 bytes)
+ -length of arbitrary data (2 bytes)
+ -file name
+ -arbitrary file table data
+ -file data
 
 Files larger than 4GB are stored somewhat differently:
 
-  LARGE_SUBFILE_MAGIC (2 bytes)
-  length of file name + length of file table data + file length (8 bytes)
-  file name
-  arbitrary file table data
-  file data
-  length of file name (2 bytes)
-  length of arbitrary data (2 bytes)
+ -LARGE_SUBFILE_MAGIC (2 bytes)
+ -length of file name + length of file table data + file length (8 bytes)
+ -file name
+ -arbitrary file table data
+ -file data
+ -length of file name (2 bytes)
+ -length of arbitrary data (2 bytes)
 
 This somewhat tortuous format was designed to accomodate the addFile API not
 knowing the total size being stored as well as the dynamic compression making

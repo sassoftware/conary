@@ -386,9 +386,9 @@ class SearchableTroveSource(AbstractTroveSource):
 
             @param versionFlavorDict: dict of available version flavor pairs
             @type versionFlavorDict: {version -> [flavor]}
-            @param flavorQuery: requested flavors that this query must
+            @param flavorQueryList: requested flavors that this query must
             match.
-            @type flavorQuery: list of flavors
+            @type flavorQueryList: list of flavors
             @param flavorCheck: How to match the flavorQuery against
             the available flavors.
             @type flavorCheck: One of _CHECK_TROVE_STRONG_FLAVOR
@@ -469,29 +469,22 @@ class SearchableTroveSource(AbstractTroveSource):
         """
             @param versionFlavorDict: dict of available version flavor pairs
             @type versionFlavorDict: {version -> [flavor]}
-            @param flavorQuery: requested flavors that this query must
+            @param flavorQueryList: requested flavors that this query must
             match.
-            @type flavorQuery: list of flavors
+            @type flavorQueryList: list of flavors
             @param flavorCheck: How to match the flavorQuery against
             the available flavors.
             @type flavorCheck: One of _CHECK_TROVE_STRONG_FLAVOR
             or _CHECK_TROVE_REG_FLAVOR
             @param flavorFilter: how to limit matching results for return
             against the available troves.
-            @type: one of _GET_TROVE_ALL_FLAVORS,
+            @type flavorFilter: one of _GET_TROVE_ALL_FLAVORS,
             _GET_TROVE_AVAILABLE_FLAVORS, or _GET_TROVE_BEST_FLAVOR
             @type latestFilter: one of _GET_TROVE_ALL_VERSIONS,
             _GET_TROVE_VERY_LATEST
             @param latestFilter: once packages are filtered by flavor
             so that only matching flavors are available, this filter
             chooses how to filter by version timestamp.
-            @param flavorPreferences: A list of tuples of flavors
-            such that if a flavor in an earlier part of the flavorPreference
-            list is available, then no flavors matching only flavors in 
-            the latter part of the list will be acceptable.
-            E.g. [('is:x86_64', 'is:x86') would prefer packages that 
-            had the flavor x86_64 in them over those with x86 in them,
-            even if the x86_64 packages were older.
         """
         if latestFilter == _GET_TROVE_VERY_LATEST:
             versionFlavorList = sorted(versionFlavorDict.iteritems(),

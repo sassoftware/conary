@@ -410,11 +410,11 @@ class DirectedGraph:
         """
             Generates a dot file based on the contents of the graph.
             @param out: file-like object we write to
-            @labelFormatFn: function that takes a node as a parameter
+            @param labelFormatFn: function that takes a node as a parameter
               and returns the output string
-            @edgeFormatFn: function that takes fromNode, toNode, value as 
+            @param edgeFormatFn: function that takes fromNode, toNode, value as 
                            parameters and returns a string for the edge.
-            @filterFn: if given, is a function that returns true if a node
+            @param filterFn: if given, is a function that returns true if a node
             should be included in the graph.
         """
         if isinstance(out, str):

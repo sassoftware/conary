@@ -614,10 +614,12 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
     cmpIdx is the item number in the list of tuples to base comparisons on.
     Duplicates items aren't added.
 
-    @type l: list of tuples
-    @type cmpIdx: int
-    @type needle: object
+    @param haystack: list of tuples.
+    @type haystack: list
+    @param newItem: The item to be inserted
     @type newItem: tuple
+    @param cmpFn: Comparison function
+    @type cmpFn: function
     """
     start = 0
     finish = len(haystack) - 1

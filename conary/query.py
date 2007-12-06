@@ -47,8 +47,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @type troveSpecs: list of troveSpecs (n[=v][[f]])
        @param pathList: paths to match up to troves
        @type pathList: list of strings
-       @param whatRequiresList: list of dependencies to find reqs for
-       @type whatRequiresList: list of strings
+       @param whatProvidesList: list of dependencies to find provides for
+       @type whatProvidesList: list of strings
        @param info: If true, display general information about the trove
        @type info: bool
        @param digSigs: If true, display digital signatures for a trove.

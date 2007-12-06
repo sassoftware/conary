@@ -44,20 +44,20 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
         Finally if extract = True, it installs an version of the binary 
         package into a root.
 
-        @param repos - trovesource to search for and derive packages from
-        @param cfg - configuration to use when deriving the package
-        @type cfg - ConaryConfiguration object
-        @param targetLabel - label to derive from
-        @type targetLabel - versions.Label
-        @param checkoutDir - directory to create the checkout in.  If None,
+        @param repos: trovesource to search for and derive packages from
+        @param cfg: configuration to use when deriving the package
+        @type cfg: ConaryConfiguration object
+        @param targetLabel: label to derive from
+        @type targetLabel: versions.Label
+        @param checkoutDir: directory to create the checkout in.  If None,
                              defaults to currentDir + packageName.
-        @param extract - If True, creates a subdirectory of the checkout named
+        @param extract: If True, creates a subdirectory of the checkout named
                          _ROOT_ with the contents of the binary of the derived
                          package.
-        @param info - If true, only display the information about the shadow
+        @param info: If true, only display the information about the shadow
                       that would be performed if the derive command were
                       completed.
-        @param callback -
+        @param callback:
     """
     if callback is None:
         callback = DeriveCallback()

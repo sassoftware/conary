@@ -2211,7 +2211,7 @@ class Remove(BuildAction):
     build actions, takes globs and not regular expressions. Thus, modules.*
     would match modules.a, but not modules_a.
 
-    C{r.Remove('%(bindir)s/foo{bar,baz}')
+    C{r.Remove('%(bindir)s/foo{bar,baz}')}
 
     Calls C{r.Remove()} to remove %(bindir)s/foobar and %(bindir)s/foobaz. This
     illustrates that build actions accept bash-style expansion.

@@ -401,7 +401,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @type logBuild: bool
     @param logBuild: if True, log the build to a file that will be included
     in the changeset
-    @param allowChangeSet: allow build of this trove when the source version
+    @param allowMissingSource: allow build of this trove when the source version
     specified does not point to an existing source trove.  Warning -- this
     can lead to strange trove setups
     @type allowMissingSource: bool
@@ -583,8 +583,6 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
-    @param redirect: if True, a redirect trove is built instead of a
-    normal trove.
     """
 
     fullName = recipeClass.name
@@ -660,8 +658,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
+    @param recipeClasses: classes which will be instantiated into recipes
+    @type recipeClasses: recipe.Recipe
     @param macros: set of macros for the build
     @type macros: dict
     @rtype: tuple
@@ -673,8 +671,6 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
-    @param redirect: if True, a redirect trove is built instead of a
-    normal trove.
     """
     if groupOptions is None:
         groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
@@ -1602,7 +1598,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         @param searchBuiltTroves: if True, search for binary troves  
         that match the desired trove's name, versionStr and label. 
         @type searchBuiltTroves: bool
-        @return (version, upstreamTrove): upstreamTrove is an instance of the
+        @rtype: tuple
+        @return: (version, upstreamTrove). upstreamTrove is an instance of the
         trove if it was previously built on the same branch.
     """
     srcName = name + ':source'
