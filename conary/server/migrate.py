@@ -497,7 +497,7 @@ def createCheckTroveCache(db):
     return True
         
 class MigrateTo_16(SchemaMigration):
-    Version = (16,0)
+    Version = (16,1)
     # migrate to 16.0
     def migrate(self):
         cu = self.db.cursor()
@@ -615,6 +615,12 @@ class MigrateTo_16(SchemaMigration):
         logMe(3, "creating the LatestCache indexes...")
         schema.createLatest(self.db)
         self.db.analyze("LatestCache")
+        return True
+
+    # create the lock tables
+    def migrate1(self):
+        self.db.loadSchema()
+        schema.createLockTables(self.db)
         return True
     
 def _getMigration(major):
