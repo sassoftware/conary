@@ -151,12 +151,12 @@ class _Source(_AnySource):
         if self.sourcename.endswith('/'):
             self.guessname = "%(archive_name)s-%(archive_version)s" % self.recipe.macros
 
-    def _findSource(self, httpHeaders={}):
+    def _findSource(self, httpHeaders={}, braceGlob = False):
         if self.sourceDir is not None:
             defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
             # blank string should map to maindir, not destdir
             sourceDir = self.sourceDir or '.'
-            return action._expandOnePath(util.joinPaths(sourceDir, self.sourcename), self.recipe.macros, defaultDir = defaultDir)
+            return action._expandOnePath(util.joinPaths(sourceDir, self.sourcename), self.recipe.macros, defaultDir = defaultDir, braceGlob = braceGlob)
 
         source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             self.sourcename, self.recipe.name, self.recipe.srcdirs,
@@ -781,12 +781,21 @@ class addPatch(_Source):
         raise SourceError, 'could not apply patch %s' % patchPath
 
     def doDownload(self):
-	f = self._findSource()
-        self._checkSignature(f)
+        f = self._findSource(braceGlob = self.sourceDir is not None)
+        if isinstance(f, (list, tuple)):
+            [self._checkSignature(x) for x in f]
+        else:
+            self._checkSignature(f)
         return f
 
     def do(self):
-        patchPath = self.doDownload()
+        pathRes = self.doDownload()
+        if not isinstance(pathRes, (list, tuple)):
+            pathRes = (pathRes,)
+        for patchPath in sorted(pathRes):
+            self.doFile(patchPath)
+
+    def doFile(self, patchPath):
         # FIXME: we should probably read in the patch directly now
         # that we aren't just applying in a pipeline
 	provides = "cat"

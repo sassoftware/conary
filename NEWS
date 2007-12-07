@@ -7,6 +7,9 @@ Changes in @NEW@:
     * A bug that caused an exception when inspecting ELF files with a
       standalone ABI has been fixed. (CNY-2333)
 
+  o Build Changes:
+    * addPatch honors braceGlobs when sourceDir is defined. (CNY-1152)
+
 Changes in 1.2.9:
   o Documentation Changes:
     * The documentation strings for the update code have been revised
