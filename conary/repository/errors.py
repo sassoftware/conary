@@ -75,6 +75,9 @@ class RepositoryLocked(RepositoryError):
 class OpenError(RepositoryError):
     """Error occurred opening the repository"""
 
+class RepositoryClosedError(OpenError):
+    """Repository is closed"""
+
 class CommitError(RepositoryError):
     """Error occurred commiting a trove"""
 

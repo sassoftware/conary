@@ -3096,11 +3096,14 @@ class NullAuthorization:
     def check(self, *args, **kwargs):
         """Dummy function that always returns True"""
         return True
-    listEntitlementGroups = check
+    listEntitlementClasses = check
+    authCheck = check
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
-    def callWrapper(self, *args, **kw):
-        return (False, True, ("RepositoryClosed", self.cfg.closed))
+    def callWrapper(self, protocol, port, methodname, *args, **kwargs):
+        if methodname == 'checkVersion':
+            return SERVER_VERSIONS
+        raise errors.RepositoryClosedError(self.cfg.closed)
 
     def __init__(self, cfg):
         self.log = tracelog.getLog(None)
