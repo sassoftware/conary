@@ -86,6 +86,16 @@ Changes in 1.2.10:
     * The command line interface to cvc derive (added in Conary 1.2.8)
       has been changed.  It now derives onto your buildLabel by default,
       with a --target option to derive onto a different label.
+
+  o Server Changes:
+    * 'serializeCommits' has been added as a new boolean server
+      configuration option (CNY-2285)
+    * Servers in maintenance mode are no longer returning Internal
+      Server Errors to clients' GET requests (CNY-2229)
+
+  o Build Changes:
+    * addPatch honors braceGlobs when sourceDir is defined. (CNY-1152)
+
   o Bug Fixes:
     * A bug that caused an exception when inspecting ELF files with a
       standalone ABI has been fixed. (CNY-2333)
