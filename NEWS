@@ -72,17 +72,14 @@ Changes in 2.0.0:
       available (during a promote or shadow, for example) with one query
       (CNY-2053)
     * Added call latency to repository log (CNY-2305)
+    * 'serializeCommits' has been added as a new boolean server
+      configuration option (CNY-2285)
 
   o Protocol Changes:
     * Protocol allows passing keyword arguments for exceptions (CNY-747)
     * No longer include useAnonymous flag in return value
     * Many repository permission manipulation methods have been
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
-
-  o Internal Changes:
-    * Repositories now produce armored PGP keys that include the CRC24
-      checksum described in the Radix-64 encoding section of RFC2440.
-      (CNY-2149)
 
 Changes in 1.2.10:
   o Client Changes:
