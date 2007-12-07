@@ -717,6 +717,23 @@ def createIdTables(db):
         db.commit()
         db.loadSchema()
 
+def createLockTables(db):
+    commit = False
+    cu = db.cursor()
+    if "CommitLock" not in db.tables:
+        cu.execute("""
+            CREATE TABLE CommitLock(
+                lockId          %(PRIMARYKEY)s,
+                lockName        VARCHAR(254) NOT NULL
+            ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["CommitLock"] = []
+        cu.execute("INSERT INTO CommitLock (lockId, lockName) VALUES(0, 'ALL')")
+        commit = True
+    db.createIndex("CommitLock", "CommitLockName_uq", "lockName", unique=True)
+    if commit:
+        db.commit()
+        db.loadSchema()
+
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
     logMe(3)
@@ -913,7 +930,19 @@ def createSchema(db):
     createMetadata(db)
     createMirrorTracking(db)
 
+    createLockTables(db)
 
+# we can only serialize commits after db schema 15.10. We need to
+# do this in a way that avoids the necessity of a major version schema bump
+def lockCommits(db):
+    if db.version < sqllib.DBversion(15,10):
+        return True # noop, can't do it reliably without the CommitLock table
+    cu = db.cursor()
+    # on MySQL this will timout after lock_timeout seconds. MySQL's
+    # server config has to be set to a reasonable value
+    cu.execute("update CommitLock set lockName = lockName")
+    return True
+    
 # this should only check for the proper schema version. This function
 # is called usually from the multithreaded setup, so schema operations
 # should be avoided here

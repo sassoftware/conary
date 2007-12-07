@@ -6,6 +6,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug that caused an exception when inspecting ELF files with a
       standalone ABI has been fixed. (CNY-2333)
+  o Server Changes:
+    * 'serializeCommits' has been added as a new boolean server
+      configuration option (CNY-2285)
 
 Changes in 1.2.9:
   o Documentation Changes:

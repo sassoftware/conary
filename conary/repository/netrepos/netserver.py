@@ -119,7 +119,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.externalPasswordURL = cfg.externalPasswordURL
         self.entitlementCheckURL = cfg.entitlementCheckURL
         self.readOnlyRepository = cfg.readOnlyRepository
-
+        self.serializeCommits = cfg.serializeCommits
+        
         self.__delDB = False
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -154,7 +155,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
             self.__delDB = True
-        schema.checkVersion(self.db)
+        dbVer = schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
 	self.troveStore = trovestore.TroveStore(self.db, self.log)
@@ -1835,6 +1836,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
+        if self.serializeCommits:
+            schema.lockCommits(self.db)
 	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden)
 
 	if not self.commitAction:
@@ -3186,6 +3189,7 @@ class ServerConfig(ConfigFile):
     requireSigs             = CfgBool
     serverName              = CfgLineList(CfgString)
     staticPath              = (CfgPath, '/conary-static')
+    serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
     user                    = CfgUserInfo
