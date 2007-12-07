@@ -1749,7 +1749,7 @@ class Database(SqlDbRepository):
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
         else:
-            SqlDbRepository.__init__(self, root + path)
+            SqlDbRepository.__init__(self, root + path, timeout = timeout)
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
