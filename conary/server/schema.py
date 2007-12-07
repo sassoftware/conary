@@ -1,5 +1,4 @@
-#
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -22,7 +21,7 @@ TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
 # This is the major number of the schema we need
-VERSION = sqllib.DBversion(15)
+VERSION = sqllib.DBversion(16)
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -91,8 +90,9 @@ def createFlavors(db):
         cu.execute("""
         CREATE TABLE FlavorMap(
             flavorId        INTEGER NOT NULL,
-            base            VARCHAR(254),
+            base            VARCHAR(254) NOT NULL,
             sense           INTEGER,
+            depClass        INTEGER NOT NULL,
             flag            VARCHAR(254),
             CONSTRAINT FlavorMap_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
@@ -100,7 +100,7 @@ def createFlavors(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FlavorMap"] = []
         commit = True
-    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId")
+    db.createIndex("FlavorMap", "FlavorMapIndex", "flavorId, depClass, base")
 
     if "FlavorScores" not in db.tables:
         from conary.deps import deps
@@ -166,53 +166,182 @@ def createNodes(db):
         db.commit()
         db.loadSchema()
 
-def createLatest(db):
+def createLatest(db, withIndexes = True):
+    assert("Instances" in db.tables)
+    assert("Nodes" in db.tables)
+    assert("UserGroupInstancesCache" in db.tables)
     cu = db.cursor()
     commit = False
-    if 'Latest' not in db.tables:
+    from conary.repository.netrepos.versionops import LATEST_TYPE_ANY,\
+         LATEST_TYPE_PRESENT, LATEST_TYPE_NORMAL
+    from conary.repository.netrepos.instances import INSTANCE_PRESENT_MISSING,\
+        INSTANCE_PRESENT_NORMAL, INSTANCE_PRESENT_HIDDEN
+    from conary.trove import TROVE_TYPE_NORMAL, TROVE_TYPE_REDIRECT, \
+         TROVE_TYPE_REMOVED
+
+    # LATEST_TYPE_ANY: redirects, removed, and normal
+    if "LatestViewAny_sub" not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewAny_sub AS
+        SELECT
+            ugi.userGroupId AS userGroupId,
+            n.itemId AS itemId,
+            n.branchId AS branchId,
+            i.flavorId AS flavorId,
+            max(n.finalTimestamp) AS finalTimestamp
+        FROM UserGroupInstancesCache AS ugi
+        JOIN Instances AS i USING(instanceId)
+        JOIN Nodes AS n USING(itemId, versionId)
+        WHERE i.isPresent = %(present)d
+        GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        """ % {"present" : INSTANCE_PRESENT_NORMAL, })
+        db.views["LatestViewAny_sub"] = True
+        commit = True
+    if "LatestViewAny"  not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewAny AS
+        SELECT
+            sub.userGroupId AS userGroupId,
+            sub.itemId AS itemId,
+            sub.branchId AS branchId,
+            sub.flavorId AS flavorId,
+            Nodes.versionId AS versionId
+        FROM LatestViewAny_sub as sub
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = sub.flavorId
+          AND Instances.isPresent = %(present)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL})
+        db.views["LatestViewAny"] = True
+        commit = True
+
+    # LATEST_TYPE_PRESENT: redirects and normal
+    if "LatestViewPresent_sub" not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewPresent_sub AS
+        SELECT
+            ugi.userGroupId AS userGroupId,
+            n.itemId AS itemId,
+            n.branchId AS branchId,
+            i.flavorId AS flavorId,
+            max(n.finalTimestamp) AS finalTimestamp
+        FROM UserGroupInstancesCache AS ugi
+        JOIN Instances AS i USING(instanceId)
+        JOIN Nodes AS n USING(itemId, versionId)
+        WHERE i.isPresent = %(present)d
+          AND i.troveType != %(removed)d
+        GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
+        """ % { "present": INSTANCE_PRESENT_NORMAL,
+                "removed"  : TROVE_TYPE_REMOVED, })
+        db.views["LatestViewPresent_sub"] = True
+        commit = True
+    if "LatestViewPresent"  not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestViewPresent AS
+        SELECT
+            sub.userGroupId AS userGroupId,
+            sub.itemId AS itemId,
+            sub.branchId AS branchId,
+            sub.flavorId AS flavorId,
+            Nodes.versionId AS versionId
+        FROM LatestViewPresent_sub as sub
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = sub.flavorId
+          AND Instances.isPresent = %(present)d
+          AND Instances.troveType != %(trove)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL,
+               "trove" : TROVE_TYPE_REMOVED, })
+        db.views["LatestViewPresent"] = True
+        commit = True
+
+    # LATEST_TYPE_NORMAL: hide branches which end in redirects
+    if "LatestViewNormal" not in db.views:
+        assert("LatestViewPresent_sub" in db.views)
+        cu.execute("""
+        CREATE VIEW LatestViewNormal AS
+        SELECT
+            sub.userGroupId AS userGroupId,
+            sub.itemId AS itemId,
+            sub.branchId AS branchId,
+            sub.flavorId AS flavorId,
+            Nodes.versionId AS versionId
+        FROM LatestViewPresent_sub as sub
+        JOIN Nodes USING(itemId, branchId, finalTimestamp)
+        JOIN Instances USING(itemId, versionId)
+        WHERE Instances.flavorId = sub.flavorId
+          AND Instances.isPresent = %(present)d
+          AND Instances.troveType = %(trove)d
+        """ % {"present" : INSTANCE_PRESENT_NORMAL,
+               "trove" : TROVE_TYPE_NORMAL,
+               "removed" : TROVE_TYPE_REMOVED, })
+        db.views["LatestViewNormal"] = True
+        commit = True
+
+    # LatestView is a union of the 3 smaller latest views
+    if "LatestView" not in db.views:
+        cu.execute("""
+        CREATE VIEW LatestView AS
+        SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
+        FROM LatestViewAny
+        UNION ALL
+        SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
+        FROM LatestViewPresent
+        UNION ALL
+        SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
+        FROM LatestViewNormal
+        """ % (LATEST_TYPE_ANY,LATEST_TYPE_PRESENT,LATEST_TYPE_NORMAL))
+        db.views["LatestView"] = True
+        commit = True
+
+    # Latest, as seen by each usergroup
+    if "LatestCache" not in db.tables:
         assert("Items" in db.tables)
         assert("Branches" in db.tables)
         assert("Flavors" in db.tables)
         assert("Versions" in db.tables)
-        assert("Caps" in db.tables)
+        assert("UserGroups" in db.tables)
         cu.execute("""
-        CREATE TABLE Latest(
+        CREATE TABLE LatestCache(
+            userGroupId     INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
             flavorId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
             latestType      INTEGER NOT NULL,
-            capId           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
-            CONSTRAINT Latest_itemId_fk
+            CONSTRAINT LC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT LC_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Latest_branchId_fk
+            CONSTRAINT LC_branchId_fk
                 FOREIGN KEY (branchId) REFERENCES Branches(branchId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Latest_flavorId_fk
+            CONSTRAINT LC_flavorId_fk
                 FOREIGN KEY (flavorId) REFERENCES Flavors(flavorId)
                 ON DELETE RESTRICT ON UPDATE CASCADE,
-            CONSTRAINT Latest_versionId_fk
+            CONSTRAINT LC_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Latest_capId_fk
-                FOREIGN KEY (capId) REFERENCES Caps(capId)
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tables["Latest"] = []
+        db.tables["LatestCache"] = []
         commit = True
-    # this serves as a substitute for a fk index
-    db.createIndex("Latest", "LatestCheckIdx",
-                   "itemId, branchId, flavorId, latestType", unique = True)
-    db.createIndex("Latest", "LatestBranchId_fk", "branchId, itemId")
-    db.createIndex("Latest", "LatestFlavorId_fk", "flavorId, itemId")
-    db.createIndex("Latest", "LatestVersionId_fk", "versionId, itemId")
-    db.createIndex("Latest", "LatestCapId_fk", "capId")
-    db.createIndex("Latest", "LatestChangedIdx", "changed, latestType")
-    if createTrigger(db, "Latest"):
-        commit = True
-
+    if withIndexes:
+        # sanity index that isn't very useful as an index due to its size...
+        db.createIndex("LatestCache", "LC_userGroupId_uniq",
+                       "userGroupId,latestType,itemId,branchId,flavorId",
+                       unique=True)
+        # create needed FKs
+        db.createIndex("LatestCache", "LC_itemId_fk", "itemId")
+        db.createIndex("LatestCache", "LC_branchId_fk", "branchId")
+        db.createIndex("LatestCache", "LC_flavorId_fk", "flavorId")
+        db.createIndex("LatestCache", "LC_versionId_fk", "versionId")
+        if createTrigger(db, "LatestCache"):
+            commit = True
+    
+    # a cache table for netauth.checktrove calls for use in SQL
     if commit:
         db.commit()
         db.loadSchema()
@@ -242,6 +371,7 @@ def createUsers(db):
             userGroupId     %(PRIMARYKEY)s,
             userGroup       VARCHAR(254) NOT NULL,
             canMirror       INTEGER NOT NULL DEFAULT 0,
+            admin           INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroups"] = []
@@ -270,15 +400,10 @@ def createUsers(db):
     db.createIndex("UserGroupMembers", "UserGroupMembersUserIdx",
                    "userId")
 
-    if idtable.createIdTable(db, "Caps", "capId", "capName"):
-        cu.execute("INSERT INTO Caps (capId, capName) VALUES (0, 'UNCAPPED')")
-        commit = True
-
     if "Permissions" not in db.tables:
         assert("Items" in db.tables)
         assert("Labels" in db.tables)
         assert("UserGroups" in db.tables)
-        assert("Caps" in db.tables)
         cu.execute("""
         CREATE TABLE Permissions (
             permissionId    %(PRIMARYKEY)s,
@@ -286,8 +411,6 @@ def createUsers(db):
             labelId         INTEGER NOT NULL,
             itemId          INTEGER NOT NULL,
             canWrite        INTEGER NOT NULL DEFAULT 0,
-            capId           INTEGER NOT NULL DEFAULT 0,
-            admin           INTEGER NOT NULL DEFAULT 0,
             canRemove       INTEGER NOT NULL DEFAULT 0,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Permissions_userGroupId_fk
@@ -298,10 +421,7 @@ def createUsers(db):
                 ON DELETE CASCADE ON UPDATE CASCADE,
             CONSTRAINT Permissions_itemId_fk
                 FOREIGN KEY (itemid) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Permissions_capId_fk
-                FOREIGN KEY (capId) REFERENCES Caps(capId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
+                ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Permissions"] = []
         commit = True
@@ -310,7 +430,6 @@ def createUsers(db):
                    "userGroupId, labelId, itemId", unique = True)
     db.createIndex("Permissions", "PermissionsLabelId_fk", "labelId, userGroupId")
     db.createIndex("Permissions", "PermissionsItemId_fk", "itemId, userGroupId")
-    db.createIndex("Permissions", "PermissionsCapId_fk", "capId")
     if createTrigger(db, "Permissions"):
         commit = True
 
@@ -444,7 +563,7 @@ def createPGPKeys(db):
         db.commit()
         db.loadSchema()
 
-def createTroves(db):
+def createTroves(db, createIndex = True):
     cu = db.cursor()
     commit = False
     if 'FileStreams' not in db.tables:
@@ -458,11 +577,23 @@ def createTroves(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FileStreams"] = []
         commit = True
-    db.createIndex("FileStreams", "FileStreamsIdx",
-                   "fileId", unique = True)
-    db.createIndex("FileStreams", "FileStreamsSha1Idx",
-                   "sha1", unique = False)
+    db.createIndex("FileStreams", "FileStreamsIdx", "fileId", unique = True)
+    db.createIndex("FileStreams", "FileStreamsSha1Idx", "sha1", unique = False)
     if createTrigger(db, "FileStreams"):
+        commit = True
+
+    if "FilePaths" not in db.tables:
+        cu.execute("""
+        CREATE TABLE FilePaths(
+            filePathId      %(PRIMARYKEY)s,
+            path            %(PATHTYPE)s,
+            pathId          %(BINARY16)s,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["FilePaths"] = []
+        commit = True
+    db.createIndex("FilePaths", "FilesPathIdx", "path")
+    if createTrigger(db, "FilePaths"):
         commit = True
 
     if "TroveFiles" not in db.tables:
@@ -471,8 +602,7 @@ def createTroves(db):
             instanceId      INTEGER NOT NULL,
             streamId        INTEGER NOT NULL,
             versionId       INTEGER NOT NULL,
-            pathId          %(BINARY16)s,
-            path            %(PATHTYPE)s,
+            filePathId      INTEGER NOT NULL,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT TroveFiles_instanceId_fk
                 FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
@@ -482,18 +612,20 @@ def createTroves(db):
                 ON DELETE RESTRICT ON UPDATE CASCADE,
             CONSTRAINT TroveFiles_versionId_fk
                 FOREIGN KEY (versionId) REFERENCES Versions(versionId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT TroveFiles_filePathId_fk
+                FOREIGN KEY (filePathId) REFERENCES FilePaths(filePathId)
                 ON DELETE RESTRICT ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["TroveFiles"] = []
         commit = True
-    # FIXME: rename the next two indexes. One day...
-    db.createIndex("TroveFiles", "TroveFilesIdx", "instanceId")
-    db.createIndex("TroveFiles", "TroveFilesIdx2", "streamId")
-    db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
-    db.createIndex("TroveFiles", "TroveFilesPathIdx", "path,instanceId",
-                   unique=True)
-    if createTrigger(db, "TroveFiles"):
-        commit = True
+    if createIndex:
+        db.createIndex("TroveFiles", "TroveFilesInstanceId_fk", "instanceId")
+        db.createIndex("TroveFiles", "TroveFilesStreamId_fk", "streamId")
+        db.createIndex("TroveFiles", "TroveFilesVersionId_fk", "versionId")
+        db.createIndex("TroveFiles", "TroveFilesFilePathId_fk", "filePathId")
+        if createTrigger(db, "TroveFiles"):
+            commit = True
 
     if "TroveTroves" not in db.tables:
         cu.execute("""
@@ -667,9 +799,11 @@ def createLabelMap(db):
     if "LabelMap" not in db.tables:
         cu.execute("""
         CREATE TABLE LabelMap(
+            labelmapId      %(PRIMARYKEY)s,
             itemId          INTEGER NOT NULL,
             labelId         INTEGER NOT NULL,
             branchId        INTEGER NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT LabelMap_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
                 ON DELETE CASCADE ON UPDATE CASCADE,
@@ -681,8 +815,8 @@ def createLabelMap(db):
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["LabelMap"] = []
+        createTrigger(db, "LabelMap")
         commit = True
-    db.createIndex("LabelMap", "LabelMapItemIdx", "itemId")
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
     db.createIndex("LabelMap", "LabelMapItemIdBranchIdIdx", "itemId, branchId")
     db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
@@ -717,6 +851,136 @@ def createIdTables(db):
         db.commit()
         db.loadSchema()
 
+# cached access map for (userGroupId, instanceId)
+def createAccessMaps(db):
+    commit = False
+    cu = db.cursor()
+    # permissions by group. This only expresses/implies read
+    # permissions; for write and remove the acls in Permissions are
+    # controlling
+    if "UserGroupTroves" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupTroves(
+            ugtId           %(PRIMARYKEY)s,
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            recursive       INTEGER NOT NULL DEFAULT 0,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT UserGroupTroves_ugid_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UserGroupTroves_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupTroves"] = []
+        commit = True
+    db.createIndex("UserGroupTroves", "UserGroupTroves_userGroupIdIdx",
+                   "userGroupId,instanceId", unique=True)
+    db.createIndex("UserGroupTroves", "UserGroupTroves_instanceId_fk", "instanceId")
+    if createTrigger(db, "UserGroupTroves"):
+        commit = True
+
+    # this is a flattened version of UserGroupTroves
+    if "UserGroupAllTroves" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        assert("UserGroupTroves" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupAllTroves(
+            ugtId           INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            CONSTRAINT UGAT_ugtId_fk
+                FOREIGN KEY (ugtId) REFERENCES UserGroupTroves(ugtId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAT_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAT_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupAllTroves"] = []
+        commit = True
+    db.createIndex("UserGroupAllTroves", "UGAT_ugtId_fk", "ugtId")
+    db.createIndex("UserGroupAllTroves", "UGAT_userGroupId_fk", "userGroupId")
+    db.createIndex("UserGroupAllTroves", "UGAT_instanceId_fk", "instanceId")
+
+    # this holds in a flat structure the expansion of the Permissions table
+    if "UserGroupAllPermissions" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        assert("Permissions" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupAllPermissions(
+            permissionId    INTEGER NOT NULL,
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT UGAP_permissionId_fk
+                FOREIGN KEY (permissionId) REFERENCES Permissions(permissionId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAP_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGAP_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupAllPermissions"] = []
+        commit = True
+    db.createIndex("UserGroupAllPermissions", "UGAP_permissionId_fk", "permissionId")
+    db.createIndex("UserGroupAllPermissions", "UGAP_userGroupId_fk", "userGroupId")
+    db.createIndex("UserGroupAllPermissions", "UGAP_instanceId_fk", "instanceId")
+
+    # cache of what troves a usergroup can see. Summarizes the stuff from
+    # UserGroupAllTroves and UserGroupAllPermissions
+    if "UserGroupInstancesCache" not in db.tables:
+        assert("UserGroups" in db.tables)
+        assert("Instances" in db.tables)
+        cu.execute("""
+        CREATE TABLE UserGroupInstancesCache(
+            userGroupId     INTEGER NOT NULL,
+            instanceId      INTEGER NOT NULL,
+            canWrite        INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT UGIC_userGroupId_fk
+                FOREIGN KEY (userGroupId) REFERENCES UserGroups(userGroupId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT UGIC_instanceId_fk
+                FOREIGN KEY (instanceId) REFERENCES Instances(instanceId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["UserGroupInstancesCache"] = []
+        commit = True
+    db.createIndex("UserGroupInstancesCache", "UGIC_userGroupIdIdx", "userGroupId,instanceId",
+                   unique=True)
+    db.createIndex("UserGroupInstancesCache", "UGIC_instanceId_fk", "instanceId")
+
+    # a cache table for netauth.checktrove calls for use in SQL
+    if 'CheckTroveCache' not in db.tables:
+        cu.execute("""
+        CREATE TABLE CheckTroveCache(
+            itemId      INTEGER NOT NULL,
+            patternId   INTEGER NOT NULL,
+            CONSTRAINT CheckTroveCache_itemId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT CheckTroveCache_patternId_fk
+                FOREIGN KEY (itemId) REFERENCES Items(itemId)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["CheckTroveCache"] = []
+        commit = True
+    db.createIndex("CheckTroveCache", "CheckTroveCache_itemId_fk",
+                   "itemId,patternId", unique = True)
+    db.createIndex("CheckTroveCache", "CheckTroveCache_patternId_fk", "patternId")
+    if commit:
+        db.commit()
+        db.loadSchema()
+
 def createLockTables(db):
     commit = False
     cu = db.cursor()
@@ -743,13 +1007,14 @@ def setupTempTables(db):
     if "tmpFlavorMap" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpFlavorMap(
-            flavorId    INTEGER,
-            base        VARCHAR(254),
+            flavorId    INTEGER NOT NULL,
+            base        VARCHAR(254) NOT NULL,
             sense       INTEGER,
+            depClass    INTEGER NOT NULL,
             flag        VARCHAR(254)
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpFlavorMap"] = True
-        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,base",
+        db.createIndex("tmpFlavorMap", "tmpFlavorMapBaseIdx", "flavorId,depClass,base",
                        check = False)
         db.createIndex("tmpFlavorMap", "tmpFlavorMapSenseIdx", "flavorId,sense",
                        check = False)
@@ -863,7 +1128,16 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpId"] = True
         db.createIndex("tmpId", "tmpIdIdx", "id", check=False)
-
+    # for processing UserGroupInstancesCache entries
+    if "tmpUGI" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpUGI(
+            userGroupid   INTEGER,
+            instanceId    INTEGER
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpUGI"] = True
+        db.createIndex("tmpUGI", "tmpUGIIdx", "instanceId,userGroupId",
+                       unique=True, check=False)
     if "tmpTroves" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpTroves(
@@ -878,7 +1152,7 @@ def setupTempTables(db):
         # XXX: this index helps postgresql and hurts mysql.
         #db.createIndex("tmpTroves", "tmpTrovesIdx", "item",
         #               check = False)
-        
+    # for processing getPackageBranchpathIds
     if "tmpFilePrefixes" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpFilePrefixes(
@@ -887,7 +1161,7 @@ def setupTempTables(db):
         db.tempTables["tmpFilePrefixes"] = True
         db.createIndex("tmpFilePrefixes", "tmpFilePrefixesPrefixIdx", "prefix",
                        check = False)
-
+    # for processing markRemoved
     if "tmpRemovals" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpRemovals(
@@ -900,12 +1174,37 @@ def setupTempTables(db):
         db.tempTables["tmpRemovals"] = True
         db.createIndex("tmpRemovals", "tmpRemovalsInstances", "instanceId",
                        check = False)
-
+    # for processing getDepSuggestion
+    if "tmpDeps" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpDeps(
+            idx         INTEGER,
+            depNum      INTEGER NOT NULL,
+            class       INTEGER NOT NULL,
+            name        VARCHAR(254) NOT NULL,
+            flag        VARCHAR(254) NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpDeps"] = True
+        db.createIndex("tmpDeps", "tmpDepsIdx", "idx",
+                       check = False)
+        db.createIndex("tmpDeps", "tmpDepsClassIdx", "class",
+                       check = False)
+        db.createIndex("tmpDeps", "tmpDepsNameIdx", "name",
+                       check = False)
+    if "tmpDepNum" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpDepNum(
+            idx         INTEGER NOT NULL,
+            depNum      INTEGER NOT NULL,
+            flagCount   INTEGER NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpDepNum"] = True
+        db.createIndex("tmpDepNum", "tmpDepNumIdx", "idx, depNum",
+                       check = False, unique=True)
     db.commit()
 
 def resetTable(cu, name):
-    cu.execute("DELETE FROM %s" % name,
-               start_transaction = False)
+    cu.execute("DELETE FROM %s" % name, start_transaction = False)
 
 # create the (permanent) server repository schema
 def createSchema(db):
@@ -913,14 +1212,15 @@ def createSchema(db):
         db.loadSchema()
     createIdTables(db)
     createLabelMap(db)
+    createFlavors(db)
+    createInstances(db)
+    createNodes(db)
 
     createUsers(db)
     createEntitlements(db)
     createPGPKeys(db)
-
-    createFlavors(db)
-    createInstances(db)
-    createNodes(db)
+    createAccessMaps(db)
+    
     createChangeLog(db)
     createLatest(db)
 
@@ -932,10 +1232,10 @@ def createSchema(db):
 
     createLockTables(db)
 
-# we can only serialize commits after db schema 15.10. We need to
+# we can only serialize commits after db schema 16.1. We need to
 # do this in a way that avoids the necessity of a major version schema bump
 def lockCommits(db):
-    if db.version < sqllib.DBversion(15,10):
+    if db.version < sqllib.DBversion(16,1):
         return True # noop, can't do it reliably without the CommitLock table
     cu = db.cursor()
     # on MySQL this will timout after lock_timeout seconds. MySQL's

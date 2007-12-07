@@ -126,8 +126,8 @@ class QueryMethod:
             return [flavor]
         flavors = []
         for defaultFlavor in self.defaultFlavorPath:
-            flavors.append(deps.overrideFlavor(defaultFlavor, flavor, 
-                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)) 
+            flavors.append(deps.overrideFlavor(defaultFlavor, flavor,
+                                        mergeType = deps.DEP_MERGE_TYPE_PREFS))
         return flavors
 
     def addQuery(self, troveTup, *params):
