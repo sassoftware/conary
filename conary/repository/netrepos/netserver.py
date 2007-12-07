@@ -3100,9 +3100,7 @@ class NullAuthorization:
 
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, protocol, port, methodname, *args, **kwargs):
-        if methodname == 'checkVersion':
-            return SERVER_VERSIONS
-        raise errors.RepositoryClosedError(self.cfg.closed)
+        raise errors.RepositoryClosed(self.cfg.closed)
 
     def __init__(self, cfg):
         self.log = tracelog.getLog(None)

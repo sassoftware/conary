@@ -75,7 +75,7 @@ class RepositoryLocked(RepositoryError):
 class OpenError(RepositoryError):
     """Error occurred opening the repository"""
 
-class RepositoryClosedError(OpenError):
+class RepositoryClosed(OpenError):
     """Repository is closed"""
 
 class CommitError(RepositoryError):
