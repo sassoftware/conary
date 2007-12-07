@@ -158,7 +158,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def commitChangeSet(self, cs, mirror=False, hidden=False):
+    def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -166,7 +166,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 label = v.branch().label()
 		raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
-        self.troveStore.begin()
+        self.troveStore.begin(serialize)
         if self.requireSigs:
             threshold = openpgpfile.TRUST_FULL
         else:

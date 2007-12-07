@@ -1836,9 +1836,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-        if self.serializeCommits:
-            schema.lockCommits(self.db)
-	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden)
+	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden,
+                                   serialize = self.serializeCommits)
 
 	if not self.commitAction:
 	    return True

@@ -955,10 +955,13 @@ class TroveStore:
         self.itemIdCache = {}
         self.seenFileId = set()
 
-    def begin(self):
+    def begin(self, serialize=False):
         self._cleanCache()
-        return self.db.transaction()
-
+        cu = self.db.transaction()
+        if serialize:
+            schema.lockCommits(self.db)
+        return cu
+    
     def rollback(self):
         self._cleanCache()
         return self.db.rollback()
