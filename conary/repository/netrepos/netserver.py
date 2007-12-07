@@ -3149,6 +3149,13 @@ for attr, val in NetworkRepositoryServer.__dict__.iteritems():
         if hasattr(val, '_accessType'):
             NetworkRepositoryServer.publicCalls.add(attr)
 
+class NullAuthorization:
+    """Authorization class for L{ClosedRepositoryServer} objects"""
+    def check(self, *args, **kwargs):
+        """Dummy function that always returns True"""
+        return True
+    listEntitlementGroups = check
+
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args, **kw):
         return (False, True, ("RepositoryClosed", self.cfg.closed))
@@ -3156,6 +3163,16 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def __init__(self, cfg):
         self.log = tracelog.getLog(None)
         self.cfg = cfg
+        self.troveStore = None
+        if isinstance(cfg.serverName, str):
+            self.serverNameList = [ cfg.serverName ]
+        else:
+            self.serverNameList = cfg.serverName
+        self.map = cfg.repositoryMap
+        self.auth = NullAuthorization()
+
+    def getAsciiOpenPGPKey(self, *args, **kwargs):
+        return None
 
 class HiddenException(Exception):
 
