@@ -1245,6 +1245,9 @@ class Trove(streams.StreamSet):
     def hasFiles(self):
         return len(self.idMap) != 0
 
+    def fileCount(self):
+        return len(self.idMap)
+
     def addTrove(self, name, version, flavor, presentOkay = False,
                  byDefault = True, weakRef = False):
 	"""
@@ -3153,6 +3156,14 @@ class TroveIntegrityError(TroveError):
     Indicates that a checksum did not match
     """
     _error = "Trove Integrity Error: %s=%s[%s] checksum does not match precalculated value"
+
+    def marshall(self, marshaller):
+        return (str(self), marshaller.fromTroveTup(self.nvf)), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return marshaller.toTroveTup(tup[1]), {}
+
     def __init__(self, name=None, version=None, flavor=None, error=None):
         if name:
             self.nvf = (name, version, flavor)
