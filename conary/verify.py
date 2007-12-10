@@ -63,7 +63,7 @@ def verifyTrove(trove, db, cfg):
     for trove in db.walkTroveSet(trove):
         ver = trove.getVersion()
         origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
-                              pristine = True)
+                                pristine = False)
         ver = ver.createShadow(versions.LocalLabel())
         l.append((trove, origTrove, ver, update.UpdateFlags()))
 
