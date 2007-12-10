@@ -2703,6 +2703,126 @@ conary erase '%s=%s[%s]'
                 os.remove(tmpfile)
             raise
 
+    def _combineJobs(self, uJob, splitJob, criticalJobs):
+        """
+        Coming the dependency-ordered list of individual jobs into large jobs
+        for update efficiency. The following rules apply:
+
+        1. Info packages/components must be in there own jobs because of
+        limitations with our user handling (bah). We actually allow them
+        to combine if multiple versions/flavors of a single info package
+        are installed, which doesn't seem quite right but hasn't hurt
+        anything.
+        2. We don't combine groups with other types of troves. Groups may
+        be combined with other groups.
+        3. self.cfg.updateThreshold is the maximum number of troves
+        which may be installed within a single job. The only reason this
+        will be exceeded is if a single dependency job is larger than this.
+        4. We generally break jobs on packages and groups, not on components.
+        The rule for updateThreshold overrides this.
+        5. Jobs are made as large as possible given the other constraints.
+        6. jobs split for critical updates to prevent including non-critical
+        updates in a critical job unnecessarily.
+        7. Try hard to keep packages and components in a single job.
+        """
+
+        combinedJobs = []
+        # First pass combines components with their packages. This means
+        # that non-critical components may get promoted to critical, but
+        # that's not a problem.
+        i = 0
+        while i < len(splitJob):
+            newJob = []
+            combinedJobs.append(newJob)
+            lastName = None
+
+            while i < len(splitJob):
+                thisJob = splitJob[i]
+                if thisJob in criticalJobs:
+                    # we aren't allowed to combine critical jobs
+                    if not newJob:
+                        newJob.extend(thisJob)
+                        i += 1
+
+                    break
+
+                names = set([ x[0].split(':')[0] for x in thisJob ])
+                firstName = list(names)[0]
+                if len(names) != 1:
+                    if lastName is None:
+                        newJob.extend(thisJob)
+                        i += 1
+                    break
+                elif lastName is not None and lastName != firstName:
+                    break
+
+                lastName = firstName
+                newJob.extend(thisJob)
+                i += 1
+
+        newJob = []
+        inGroup = None
+        updateMax = self.cfg.updateThreshold
+        finalCriticalJobs = []
+
+        for jobList in combinedJobs:
+            isCritical = jobList in criticalJobs
+
+            foundGroup = None
+            isInfo = None
+
+            for job in jobList:
+                (name, (oldVersion, oldFlavor),
+                       (newVersion, newFlavor), absolute) = job
+
+                if name.startswith('group-'):
+                    foundGroup = True
+
+                if name.startswith('info-'):
+                    assert(isInfo is True or isInfo is None)
+                    isInfo = True
+                else:
+                    assert(isInfo is False or isInfo is None)
+                    isInfo = False
+
+            if isCritical:
+                if newJob:
+                    uJob.addJob(newJob)
+                    newJob = []
+                    inGroup = None
+
+                finalCriticalJobs.append(len(uJob.getJobs()))
+                uJob.addJob(jobList)
+            elif isInfo:
+                if newJob:
+                    uJob.addJob(newJob)
+                    newJob = []
+
+                uJob.addJob(jobList)
+                isInfo = None
+            elif foundGroup != inGroup:
+                if newJob:
+                    uJob.addJob(newJob)
+                    newJob = []
+
+                newJob.extend(jobList)
+                inGroup = foundGroup
+            else:
+                if (self.cfg.updateThreshold and newJob and
+                         (len(newJob)  + len(jobList))
+                         > self.cfg.updateThreshold):
+                    uJob.addJob(newJob)
+                    newJob = []
+
+                newJob.extend(jobList)
+
+        if newJob:
+            # we don't care if the final job is critical - there
+            # will be no need for a restart in that case.
+            uJob.addJob(newJob)
+
+        uJob.setCriticalJobs(finalCriticalJobs)
+
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback=None,
@@ -2843,8 +2963,6 @@ conary erase '%s=%s[%s]'
 
         self._validateJob(jobSet)
 
-        updateThreshold = self.cfg.updateThreshold
-
         # When keep existing is provided none of the changesets should
         # be relative (since relative change sets, by definition, cause
         # something on the system to get replaced).
@@ -2914,79 +3032,7 @@ conary erase '%s=%s[%s]'
         else:
             criticalJobs = []
 
-        finalCriticalJobs = []
-
-        startNew = True
-        newJob = []
-        for jobList in splitJob:
-            if startNew:
-                newJob = []
-                startNew = False
-                count = 0
-                newJobIsInfo = False
-                inGroup = False
-
-            isCritical = jobList in criticalJobs
-
-
-            foundCollection = False
-            foundGroup = False
-
-            count += len(jobList)
-            isInfo = None                 # neither true nor false
-            infoName = None
-            for job in jobList:
-                (name, (oldVersion, oldFlavor),
-                       (newVersion, newFlavor), absolute) = job
-
-                if name.startswith('group-'):
-                    foundGroup = True
-                elif newVersion is not None and ':' not in name:
-                    foundCollection = True
-
-                if name.startswith('info-'):
-                    assert(isInfo is True or isInfo is None)
-                    isInfo = True
-                    if not infoName:
-                        infoName = name.split(':')[0]
-                else:
-                    assert(isInfo is False or isInfo is None)
-                    isInfo = False
-
-            if (((not isInfo or infoName != name) and newJobIsInfo is True)
-                or foundGroup != inGroup):
-                # We switched from installing info components to
-                # installing fresh components. This has to go into
-                # a separate job from the last one.
-                # FIXME: We also require currently that each info 
-                # job be for the same info trove - that is, can't
-                # have info-foo and info-bar in the same update job
-                # because info-foo might depend on info-bar being
-                # installed already.  This should be fixed.
-                if newJob:
-                    uJob.addJob(newJob)
-                count = len(jobList)
-                newJob = list(jobList)             # make a copy
-                newJobIsInfo = False
-                inGroup = foundGroup
-            else:
-                newJobIsInfo = isInfo
-                newJob += jobList
-
-            if (foundCollection or isCritical
-                or (updateThreshold and (count >= updateThreshold))): 
-                if isCritical:
-                    finalCriticalJobs.append(len(uJob.getJobs()))
-                uJob.addJob(newJob)
-                startNew = True
-
-        if not startNew:
-            # we don't care if the final job is critical - there 
-            # will be no need for a restart in that case.
-            #if isCritical:
-            #    finalCriticalJobs.append(len(uJob.getJobs()))
-            uJob.addJob(newJob)
-        uJob.setCriticalJobs(finalCriticalJobs)
+        self._combineJobs(uJob, splitJob, criticalJobs)
 
         uJob.setTransactionCounter(self.db.getTransactionCounter())
 

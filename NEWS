@@ -40,6 +40,9 @@ Changes in 2.0.0:
       both the x86 and x86_64 support.  The flavorPreferences configuration
       option informs conary to prefer x86_64 packages. This change allows
       group building to automatically resolve x86 packages. (CNY-525)
+    * Conary now tries to install jobs as close to updateThreshold (without
+      going over) as practical for a noticeable performance improvement
+      (CNY-2283)
 
   o Build Changes:
     * Conary will now ignore flavoring and requirements from elf libraries
