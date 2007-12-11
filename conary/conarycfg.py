@@ -550,8 +550,7 @@ class ConaryContext(ConfigSection):
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')
     trustThreshold        =  (CfgInt, 0)
-    updateMinimum         =  (CfgInt, 10)
-    updateThreshold       =  (CfgInt, 20)
+    updateThreshold       =  (CfgInt, 10)
     useDirs               =  (CfgPathList, ('/etc/conary/use',
                                             '/etc/conary/distro/use',
                                             '~/.conary/use'))
