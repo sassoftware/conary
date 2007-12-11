@@ -875,10 +875,10 @@ def checkSyncRepos(config, sourceRepos, targetRepos):
         dstName, dstSet = dst
         counter = 0
         for x in srcSet.difference(dstSet):
-            log.debug(" +", srcName, x)
+            log.debug(" - %s %s " % (srcName, x))
             counter += 1
         for x in dstSet.difference(srcSet):
-            log.debug(" +", dstName, x)
+            log.debug(" + %s %s" % (dstName, x))
             counter += 1
         return counter
     log.debug("Retrieving list of troves from source %s" % str(sourceRepos.c.map))
