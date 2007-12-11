@@ -51,7 +51,10 @@ class DBTroveFiles:
     pathId, versionId, path, instanceId, stream
     """
 
-    addItemStmt = "INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)"
+    addItemStmt = "INSERT INTO DBTroveFiles (pathId, versionId, path, " \
+                                            "fileId, instanceId, isPresent, " \
+                                            "stream) " \
+                                            "VALUES (?, ?, ?, ?, ?, ?, ?)"
 
     def __init__(self, db):
         self.db = db
@@ -112,7 +115,7 @@ class DBTroveFiles:
 	streamId = cu.lastrowid
 
 	for tag in tags:
-	    cu.execute("INSERT INTO DBFileTags VALUES (?, ?)",
+	    cu.execute("INSERT INTO DBFileTags(streamId, tagId) VALUES (?, ?)",
 		       streamId, self.tags[tag])
 
     def iterPath(self, path):
@@ -201,8 +204,9 @@ class DBInstanceTable:
 	    isPresent = 0
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances "
-                   "VALUES (NULL, ?, ?, ?, ?, ?, ?)",
+        cu.execute("INSERT INTO Instances(troveName, versionId, flavorId, "
+                                        " timeStamps, isPresent, pinned) "
+                   "VALUES (?, ?, ?, ?, ?, ?)",
                    (troveName, versionId, flavorId,
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
                     pinned))
@@ -652,7 +656,7 @@ order by
 		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
 			   None, flavor.freeze())
 	    cu.execute("""
-            INSERT INTO Flavors
+            INSERT INTO Flavors (flavorId, flavor)
             SELECT flavorsNeeded.empty, flavorsNeeded.flavor
             FROM flavorsNeeded LEFT OUTER JOIN Flavors USING(flavor)
             WHERE Flavors.flavorId is NULL
@@ -728,7 +732,9 @@ order by
 
         # make sure every trove we include has an instanceid
         cu.execute("""
-            INSERT INTO Instances SELECT NULL, IncludedTroves.troveName,
+            INSERT INTO Instances (troveName, versionId, flavorId,
+                                   timeStamps, isPresent, pinned)
+                                    SELECT IncludedTroves.troveName,
                                            IncludedTroves.versionId,
                                            IncludedTroves.flavorId,
                                            IncludedTroves.timeStamps, 0, 0
@@ -742,7 +748,8 @@ order by
 
         # now include the troves in this one
         cu.execute("""
-            INSERT INTO TroveTroves SELECT ?, instanceId, flags, ?
+            INSERT INTO TroveTroves(instanceId, includedId, flags, inPristine)
+                SELECT ?, instanceId, flags, ?
                 FROM IncludedTroves JOIN Instances ON
                     IncludedTroves.troveName == Instances.troveName AND
                     IncludedTroves.versionId == Instances.versionId AND
@@ -876,7 +883,8 @@ order by
                 flavorStr = "= '%s'" % newFlavor.freeze()
 
             cu.execute("""
-                INSERT INTO TroveTroves SELECT ?, instanceId, ?, 0
+                INSERT INTO TroveTroves (instanceId, includedId, flags,
+                                         inPristine) SELECT ?, instanceId, ?, 0
                     FROM Instances JOIN Versions ON
                         Instances.versionId = Versions.versionId
                     JOIN Flavors ON
@@ -1471,7 +1479,8 @@ order by
                            _iter(mapList))
 
         # now add link collections to these troves
-        cu.execute("""INSERT INTO TroveTroves
+        cu.execute("""INSERT INTO TroveTroves (instanceId, includedId,
+                                               flags, inPristine)
                         SELECT TroveTroves.instanceId, pinnedInst.instanceId,
                                TroveTroves.flags, 0 FROM
                             mlt JOIN Flavors AS pinFlv ON
