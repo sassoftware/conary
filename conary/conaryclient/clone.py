@@ -305,7 +305,7 @@ class ClientClone:
             fileChangeSet = self.repos.createChangeSet(jobList,
                                     withFiles = True, withFileContents = True,
                                     recurse = False, callback = callback)
-            jobFilesNeeded.sort()
+            jobFilesNeeded = sorted(set(jobFilesNeeded))
 	    # fileId, pathId of the last file we saw. we don't need to
 	    # include the same file contents twice (nor can we get them
 	    # twice from fileChangeSet
