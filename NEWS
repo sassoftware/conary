@@ -1,11 +1,14 @@
 Changes in @NEW@:
   o Client Changes:
+    * A new "cvc explain" command has been added. "cvc explain"
+      displays the documentation for recipe methods.  For example,
+      "cvc explain addSource" shows the on-line documentation for the
+      addSource() method. (CNY-2242)
     * The command line interface to cvc derive (added in Conary 1.2.8)
       has been changed.  It now derives onto your buildLabel by default,
       with a --target option to derive onto a different label.
     * verify no longer complains about files which have been removed
       with 'conary remove' (CNY-950)
-    * cvc explain command has been added. (CNY-2242)
 
   o Server Changes:
     * 'serializeCommits' has been added as a new boolean server
