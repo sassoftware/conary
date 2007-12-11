@@ -135,14 +135,18 @@ def docObject(cfg, what):
             obj = obj.theclass
         if isinstance(obj, types.InstanceType):
             obj = obj.__class__
-        found.append((klass, obj))
+        found.append((_parentName(klass), obj))
 
     if len(found) == 1:
-        _formatDoc(_parentName(found[0][0]), found[0][1])
+        _formatDoc(found[0][0], found[0][1])
         return 0
     elif len(found) > 1:
-        print ('Ambiguous recipe method "%s" is defined by %s'
-               % (what, ', '.join(_parentName(x[0]) for x in found)))
+        print ('Ambiguous recipe method "%s" is defined by the following '
+               'classes:\n'
+               '    %s\n'
+               'Specify one of: %s'
+               % (what, ', '.join(x[0] for x in found),
+                  ', '.join('%s.%s' % (x[0], what) for x in found)))
         return 1
     else:
         print 'Unknown recipe method "%s"' %what
