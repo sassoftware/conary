@@ -104,6 +104,8 @@ class ExplainCommand(CvcCommand):
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos=None):
+        if len(args) < 3:
+            return explain.docAll(cfg)
         return explain.docObject(cfg, args[2])
 _register(ExplainCommand)
 

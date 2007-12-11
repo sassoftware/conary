@@ -13,13 +13,71 @@
 
 import sys
 import re
+import inspect
 import pydoc, types
+from conary.build import build
 from conary import versions
 from conary.build import source
-from conary.build import packagerecipe, redirectrecipe, derivedrecipe
+from conary.build import packagepolicy
+from conary.build import packagerecipe, redirectrecipe
 from conary.build import filesetrecipe, grouprecipe, inforecipe
 
 DELETE_CHAR = chr(8)
+
+blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'setModes', 'User', 'Group', 'SupplementalGroup')}
+
+class DummyRepos:
+    def __getattr__(self, what):
+        def f(*args, **kw):
+            return True
+        return f
+
+class DummyPackageRecipe(packagerecipe.PackageRecipe):
+    def __init__(self, cfg):
+        self.name = 'package'
+        self.version = '1.0'
+        packagerecipe.PackageRecipe.__init__(self, cfg, None, None)
+        self._loadSourceActions(lambda x: True)
+        self.loadPolicy()
+
+class DummyGroupRecipe(grouprecipe.GroupRecipe):
+    def __init__(self, cfg):
+        self.name = 'group-dummy'
+        self.version = '1.0'
+        troveCache = grouprecipe.TroveCache(None, None)
+        repos = DummyRepos()
+        grouprecipe.GroupRecipe.__init__(self, repos, cfg,
+                                         versions.Label('a@b:c'), None,
+                                         None)
+
+class DummyFilesetRecipe(filesetrecipe.FilesetRecipe):
+    def __init__(self, cfg):
+        self.name = 'fileset'
+        self.version = '1.0'
+        repos = DummyRepos()
+        filesetrecipe.FilesetRecipe.__init__(self, repos, cfg,
+                                         versions.Label('a@b:c'), None, {})
+
+class DummyRedirectRecipe(redirectrecipe.RedirectRecipe):
+    def __init__(self, cfg):
+        self.name = 'redirect'
+        self.verison = '1.0'
+        redirectrecipe.RedirectRecipe.__init__(self, None, cfg, None, None)
+
+class DummyUserInfoRecipe(inforecipe.UserInfoRecipe):
+    def __init__(self, cfg):
+        self.name = 'info-dummy'
+        self.version = '1.0'
+        inforecipe.UserInfoRecipe.__init__(self, cfg, None, None)
+
+class DummyGroupInfoRecipe(inforecipe.GroupInfoRecipe):
+    def __init__(self, cfg):
+        self.name = 'info-dummy'
+        self.version = '1.0'
+        inforecipe.GroupInfoRecipe.__init__(self, cfg, None, None)
+
+classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
+          DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe]
 
 def _formatString(msg):
     if msg[0] == 'B':
@@ -37,11 +95,7 @@ def _formatString(msg):
     else:
         return msg[2:-1]
 
-def _formatDoc(className, obj):
-    name = obj.__name__
-    docString = obj.__doc__
-    if not docString:
-        docString = 'No documentation available.'
+def _pageDoc(title, docString):
     docStringRe = re.compile('[A-Z]\{[^{}]*\}')
     srch = re.search(docStringRe, docString)
     while srch:
@@ -53,55 +107,27 @@ def _formatDoc(className, obj):
     if sys.stdout.isatty():
         pydoc.pager = lambda x: pydoc.pipepager(x, 'less')
     pydoc.pager("Conary API Documentation: %s\n\n" %
-                _formatString('B{%s.%s}' %(className, name)) + docString)
+            _formatString('B{' + title + '}') + docString)
+
+def _formatDoc(className, obj):
+    name = obj.__name__
+    docString = obj.__doc__
+    if not docString:
+        docString = 'No documentation available.'
+    _pageDoc('%s.%s' % (className, name), docString)
 
 def _parentName(klass):
     return klass.__base__.__name__
 
+def formatDoc(obj):
+    name = obj.__name__
+    docString = obj.__doc__
+    pageDoc(name, docString)
+
 def docObject(cfg, what):
-    class DummyRepos:
-        def __getattr__(self, what):
-            def f(*args, **kw):
-                return True
-            return f
-
-    class DummyPackageRecipe(packagerecipe.PackageRecipe):
-        def __init__(self, cfg):
-            self.name = 'package'
-            self.version = '1.0'
-            packagerecipe.PackageRecipe.__init__(self, cfg, None, None)
-            self._loadSourceActions(lambda x: True)
-            self.loadPolicy()
-
-    class DummyGroupRecipe(grouprecipe.GroupRecipe):
-        def __init__(self, cfg):
-            self.name = 'group-dummy'
-            self.version = '1.0'
-            troveCache = grouprecipe.TroveCache(None, None)
-            repos = DummyRepos()
-            grouprecipe.GroupRecipe.__init__(self, repos, cfg,
-                                             versions.Label('a@b:c'), None,
-                                             None)
-
-    class DummyRedirectRecipe(redirectrecipe.RedirectRecipe):
-        def __init__(self, cfg):
-            self.name = 'redirect'
-            self.verison = '1.0'
-            redirectrecipe.RedirectRecipe.__init__(self, None, cfg, None, None)
-
-## unused - too much overlap with PackageRecipe
-##  class DummyDerivedRecipe(derivedrecipe.DerivedPackageRecipe):
-##      def __init__(self, cfg):
-##          self.name = 'derived'
-##          self.version = '1.0'
-##          derivedrecipe.DerivedPackageRecipe.__init__(self, cfg, None, None)
-
-    class DummyInfoRecipe(inforecipe.UserGroupInfoRecipe):
-        def __init__(self, cfg):
-            self.name = 'info-dummy'
-            self.version = '1.0'
-            inforecipe.UserGroupInfoRecipe.__init__(self, cfg, None, None)
-
+    classList = sys.modules[__name__].classList
+    if what in [_parentName(x).replace('Dummy', '') for x in classList]:
+        return docClass(cfg, what)
     # see if a parent class was specified (to disambiguate)
     className = None
     if '.' in what:
@@ -111,8 +137,6 @@ def docObject(cfg, what):
             return 1
         className, what = split
 
-    classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
-                  DummyInfoRecipe ]
     # filter out by the parent class specified
     if className:
         classList = [ x for x in classList if _parentName(x) == className ]
@@ -122,6 +146,8 @@ def docObject(cfg, what):
     for klass in classList:
         r = klass(cfg)
         if not hasattr(r, what):
+            continue
+        if what in blacklist.get(_parentName(klass), []):
             continue
 
         obj = getattr(r, what)
@@ -151,3 +177,40 @@ def docObject(cfg, what):
     else:
         print 'Unknown recipe method "%s"' %what
         return 1
+
+
+def docClass(cfg, recipeType):
+    classType = 'Dummy' + recipeType
+    r = sys.modules[__name__].__dict__[classType](cfg)
+    r._loadSourceActions(lambda x: True)
+    try:
+        r.loadPolicy()
+    except:
+        # this recipe type doesn't implement loadPolicy
+        r._policyMap = {}
+    display = {}
+    if recipeType in ('PackageRecipe', 'GroupRecipe'):
+        display['Build'] = sorted(x for x in r.externalMethods if x[0] != '_' and x not in blacklist.get(recipeType, []))
+    elif 'InfoRecipe' in recipeType:
+        display['Build'] = ['User', 'Group', 'SupplementalGroup']
+    display['Policy'] = sorted(x for x in r._policyMap if x[0] != '_' and x not in blacklist.get(recipeType, []))
+    if recipeType == 'PackageRecipe':
+        Actions = display['Build'][:]
+        display['Source'] = [x for x in Actions if x.startswith('add')]
+        display['Build'] = [x for x in Actions if x not in display['Source']]
+    for key, val in [x for x in display.iteritems()]:
+        if val:
+            display[key] = '\n    '.join(val)
+        else:
+            del display[key]
+    text = r.__class__.__base__.__doc__
+    if not text:
+        text = 'No documentation available.'
+    text += "\n\n" + '\n\n'.join(["B{%s Actions}:\n    %s" % x for x in sorted(display.iteritems())])
+    _pageDoc(recipeType, text)
+
+def docAll(cfg):
+    text = "B{Available Classes}:\n    "
+    text += '\n    '.join(_parentName(x).replace('Dummy', '') for x in classList)
+    text += "\n    DerivedPackageRecipe: see PackageRecipe (not all methods apply)"
+    _pageDoc('All Classes', text)
