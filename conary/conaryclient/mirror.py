@@ -47,6 +47,9 @@ def parseArgs(argv):
                       default = False,
                       help = "ignore the last-mirrored timestamp in the "
                              "target repository")
+    parser.add_option("--check-sync", dest = "checkSync", action = "store_true",
+                      default = False,
+                      help = "only check if the source and target(s) are in sync")
     parser.add_option("--test", dest = "test", action = "store_true",
                       default = False,
                       help = "skip commiting changes to the target repository")
@@ -110,7 +113,8 @@ def checkConfig(cfg):
             log.error("ERROR: label %s is not on host %s", label, cfg.host)
             raise RuntimeError("label %s is not on host %s", label, cfg.host)
 
-def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=False, infoSync=False):
+def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=False,
+                 infoSync=False, checkSync = False):
     if cfg.lockFile:
         try:
             log.debug('checking for lock file')
@@ -146,6 +150,9 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=Fals
             entitlements=secCfg.entitlement)
         target = TargetRepository(target, cfg, name, test=test)
         targets.append(target)
+    # checkSync is a special operation...
+    if checkSync:
+        return checkSyncRepos(cfg, sourceRepos, targets)        
     # we pass in the sync flag only the first time around, because after
     # that we need the targetRepos mark to advance accordingly after being
     # reset to -1
@@ -174,7 +181,8 @@ def Main(argv=sys.argv[1:]):
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
 
-    mainWorkflow(cfg, callback, options.test, options.sync, options.infoSync)
+    mainWorkflow(cfg, callback, options.test, options.sync, options.infoSync,
+                 options.checkSync)
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
@@ -651,12 +659,7 @@ def getTroveList(src, cfg, mark):
     # since we're returning at least on trove, the caller will make the next mark decision
     return (mark, troveList)
 
-# syncSigs really means "resync all info", but we keep the parameter
-# name for compatibility reasons
-def mirrorRepository(sourceRepos, targetRepos, cfg,
-                     test = False, sync = False, syncSigs = False,
-                     callback = ChangesetCallback()):
-    checkConfig(cfg)
+def _makeTargets(cfg, targetRepos, test = False):
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
     targets = []
@@ -667,6 +670,15 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             targets.append(t)
         else:
             raise RuntimeError("Can not handle unknown target repository type", t)
+    return targets
+
+# syncSigs really means "resync all info", but we keep the parameter
+# name for compatibility reasons
+def mirrorRepository(sourceRepos, targetRepos, cfg,
+                     test = False, sync = False, syncSigs = False,
+                     callback = ChangesetCallback()):
+    checkConfig(cfg)
+    targets = _makeTargets(cfg, targetRepos, test)
     log.debug("-" * 20 + " start loop " + "-" * 20)
 
     hidden = len(targets) > 1 or cfg.useHiddenCommits
@@ -831,3 +843,51 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             target.setMirrorMark(crtMaxMark)
         return -1
     return updateCount
+
+# check if the sourceRepos is in sync with targetRepos
+def checkSyncRepos(config, sourceRepos, targetRepos):
+    checkConfig(config)
+    targets = _makeTargets(config, targetRepos)
+    log.setVerbosity(log.DEBUG)
+        
+    # retrieve the set of troves from a give repository
+    def _getTroveSet(config, repo):
+        def _flatten(troveSpec):
+            l = []
+            for name, versionD in troveSpec.iteritems():
+                for version, flavorList in versionD.iteritems():
+                    l += [ (name, version, flavor) for flavor in flavorList ]
+            return set(l)
+        troveSpecs = {}
+        if config.labels:
+            d = troveSpecs.setdefault(None, {})
+            for l in config.labels:
+                d[l] = ''
+            t = repo.getTroveVersionsByLabel(troveSpecs, troveTypes = netclient.TROVE_QUERY_ALL)
+        else:
+            troveSpecs = {None : None}
+            t = repo.getTroveVersionList(config.host, troveSpecs,
+                                         troveTypes = netclient.TROVE_QUERY_ALL)
+        return _flatten(t)
+    # compare source with each target
+    def _compare(src, dst):
+        srcName, srcSet = src
+        dstName, dstSet = dst
+        counter = 0
+        for x in srcSet.difference(dstSet):
+            log.debug(" +", srcName, x)
+            counter += 1
+        for x in dstSet.difference(srcSet):
+            log.debug(" +", dstName, x)
+            counter += 1
+        return counter
+    log.debug("Retrieving list of troves from source %s" % str(sourceRepos.c.map))
+    sourceSet = _getTroveSet(config, sourceRepos)
+    hasDiff = 0
+    for target in targets:
+        log.debug("Retrieving list of troves from %s %s" % (target.name, str(target.repo.c.map)))
+        targetSet = _getTroveSet(config, target.repo)
+        log.debug("Diffing source and %s" % target.name)
+        hasDiff += _compare( ("source", sourceSet), (target.name, targetSet) )
+    log.debug("Done")
+    return hasDiff
