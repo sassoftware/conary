@@ -9,6 +9,8 @@ Changes in @NEW@:
       with a --target option to derive onto a different label.
     * verify no longer complains about files which have been removed
       with 'conary remove' (CNY-950)
+    * Local rollbacks for removals didn't store the original contents for
+      modified config files (CNY-2350).
 
   o Server Changes:
     * 'serializeCommits' has been added as a new boolean server
