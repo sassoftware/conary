@@ -14,12 +14,14 @@
 
 from conary import trove, versions
 from conary.dbstore import idtable
+from conary.dbstore import sqlerrors
+from conary.repository import trovesource
 from conary.repository.errors import DuplicateBranch, InvalidSourceNameError
 from conary.repository.netrepos import instances, items
 
-LATEST_TYPE_ANY     = 0         # redirects, removed, and normal
-LATEST_TYPE_PRESENT = 1         # redirects and normal
-LATEST_TYPE_NORMAL  = 2         # hide branches which end in redirects
+LATEST_TYPE_ANY     = trovesource.TROVE_QUERY_ALL     # redirects, removed, and normal
+LATEST_TYPE_PRESENT = trovesource.TROVE_QUERY_PRESENT # redirects and normal
+LATEST_TYPE_NORMAL  = trovesource.TROVE_QUERY_NORMAL  # hide branches which end in redirects
 
 class BranchTable(idtable.IdTable):
     def __init__(self, db):
@@ -82,71 +84,88 @@ class LabelTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
+# class and methods for handling LatestCache operations
 class LatestTable:
     def __init__(self, db):
         self.db = db
-
-    def _findLatest(self, cu, itemId, branchId, flavorId, troveTypeFilter = ""):
+    def rebuild(self, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
+        # prepare for rebuild
+        cu.execute("delete from LatestCache")
+        # populate the LatestCache table. We need to split the inserts
+        # into chunks to make sure the backend can handle all the data
+        # we're inserting.
+        def _insertView(cu, latestType):
+            latest = None
+            if latestType == LATEST_TYPE_ANY:
+                latest = "LatestViewAny"
+            elif latestType == LATEST_TYPE_PRESENT:
+                latest = "LatestViewPresent"
+            elif latestType == LATEST_TYPE_NORMAL:
+                latest = "LatestViewNormal"
+            else:
+                raise RuntimeError("Invalid Latest type requested in rebuild %s" %(
+                    latestType))
+            cu.execute("""
+            insert into LatestCache
+                (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+            select
+                %d, userGroupId, itemId, branchId, flavorId, versionId
+            from %s
+            """ % (latestType, latest))
+        _insertView(cu, LATEST_TYPE_ANY)
+        _insertView(cu, LATEST_TYPE_PRESENT)
+        _insertView(cu, LATEST_TYPE_NORMAL)
+        self.db.analyze("LatestCache")
+        return
+    
+    def update(self, cu, itemId, branchId, flavorId, roleId = None):
+        cond = ""
+        args = [itemId, branchId, flavorId]
+        if roleId is not None:
+            cond = "and userGroupId = ?"
+            args.append(roleId)
         cu.execute("""
-            SELECT versionId, troveType FROM Nodes
-                JOIN Instances USING (itemId, versionId)
-                WHERE
-                    Nodes.itemId = ? AND
-                    Nodes.branchId = ? AND
-                    flavorId = ? AND
-                    isPresent = ?
-                    %s
-                ORDER BY finalTimestamp DESC
-                LIMIT 1
-        """ % troveTypeFilter, itemId, branchId, flavorId,
-              instances.INSTANCE_PRESENT_NORMAL)
+        delete from LatestCache
+        where itemId = ? and branchId = ? and flavorId = ? %s""" % (cond,),
+                   args)
+        cu.execute("""
+        insert into LatestCache
+            (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+        select
+            latestType, userGroupId, itemId, branchId, flavorId, versionId
+        from LatestView
+        where itemId = ? and branchId = ? and flavorId = ? %s""" % (cond,),
+                   args)
 
-        try:
-            latestVersionId, troveType = cu.next()
-        except StopIteration:
-            latestVersionId = None
-            troveType = None
+    def updateInstanceId(self, cu, instanceId):
+        cu.execute("""
+        select itemId, flavorId, branchId
+        from Instances join Nodes using(itemId, versionId)
+        where instanceId = ?""", instanceId)
+        for itemId, flavorId, branchId in cu.fetchall():
+            self.update(cu, itemId, branchId, flavorId)
 
-        return latestVersionId, troveType
-
-    def _add(self, cu, itemId, branchId, flavorId, versionId, latestType):
-        cu.execute("""INSERT INTO Latest
-                        (itemId, branchId, flavorId, versionId, latestType)
-                        VALUES (?, ?, ?, ?, ?)""",
-                    itemId, branchId, flavorId, versionId, latestType)
-
-    def update(self, itemId, branchId, flavorId):
-        cu = self.db.cursor()
-        cu.execute("DELETE FROM Latest WHERE itemId=? AND branchId=? AND "
-                   "flavorId=?", itemId, branchId, flavorId)
-
-        versionId, troveType = self._findLatest(cu, itemId, branchId, flavorId)
-
-        if versionId is None:
+    def updateRoleId(self, cu, roleId, tmpInstances=False):
+        if not tmpInstances:
+            cu.execute("delete from LatestCache where userGroupId = ?", roleId)
+            cu.execute("""
+            insert into LatestCache
+                (latestType, userGroupId, itemId, branchId, flavorId, versionId)
+            select
+                latestType, userGroupId, itemId, branchId, flavorId, versionId
+                from LatestView where userGroupId = ? """, roleId)
             return
-
-        self._add(cu, itemId, branchId, flavorId, versionId, LATEST_TYPE_ANY)
-
-        if troveType == trove.TROVE_TYPE_NORMAL:
-            self._add(cu, itemId, branchId, flavorId, versionId,
-                      LATEST_TYPE_PRESENT)
-            self._add(cu, itemId, branchId, flavorId, versionId,
-                      LATEST_TYPE_NORMAL)
-            return
-
-
-        presentVersionId, troveType = \
-            self._findLatest(cu, itemId, branchId, flavorId,
-                            "AND troveType != %d" % trove.TROVE_TYPE_REMOVED)
-        if presentVersionId is not None:
-            self._add(cu, itemId, branchId, flavorId, presentVersionId,
-                      LATEST_TYPE_PRESENT)
-
-        normalVersionId, troveType = self._findLatest(cu, itemId, branchId,
-                     flavorId, "AND troveType = %d" % trove.TROVE_TYPE_NORMAL)
-        if normalVersionId is not None and normalVersionId == presentVersionId:
-            self._add(cu, itemId, branchId, flavorId, normalVersionId,
-                      LATEST_TYPE_NORMAL)
+        # we need to be more discriminate since we know what
+        # instanceIds are new (they are provided in tmpInstances table)
+        cu.execute("""
+        select itemId, flavorId, branchId
+        from tmpInstances join Instances using(instanceId)
+        join Nodes using(itemId, versionId) """)
+        for itemId, flavorId, branchId in cu.fetchall():
+            self.update(cu, itemId, branchId, flavorId, roleId)
+    
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
@@ -217,6 +236,15 @@ class Nodes:
         return False # noop
 
 class SqlVersioning:
+    def __init__(self, db, versionTable, branchTable):
+        self.items = items.Items(db)
+	self.labels = LabelTable(db)
+	self.labelMap = LabelMap(db)
+	self.versionTable = versionTable
+        self.branchTable = branchTable
+	self.needsCleanup = False
+	self.nodes = Nodes(db)
+	self.db = db
 
     def versionsOnBranch(self, itemId, branchId):
 	cu = self.db.cursor()
@@ -243,8 +271,7 @@ class SqlVersioning:
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
-    def createVersion(self, itemId, version, flavorId, sourceName,
-                      updateLatest = True):
+    def createVersion(self, itemId, version, flavorId, sourceName):
 	"""
 	Creates a new versionId for itemId. The branch must already exist
 	for the given itemId.
@@ -276,7 +303,12 @@ class SqlVersioning:
 
 	versionId = self.versionTable.get(version, None)
 	if versionId == None:
-	    self.versionTable.addId(version)
+            try:
+                self.versionTable.addId(version)
+            except sqlerrors.ColumnNotUnique:
+                import sys
+                print >> sys.stderr, 'ERROR: tried to add', version.asString(), 'to version table but it seems to already be there', versionId
+                raise
 	    versionId = self.versionTable.get(version, None)
 
 	if self.nodes.hasRow(itemId, versionId):
@@ -290,9 +322,6 @@ class SqlVersioning:
 				   version.timeStamps())
 
 	return (nodeId, versionId)
-
-    def updateLatest(self, itemId, branchId, flavorId):
-        self.latest.update(itemId, branchId, flavorId)
 
     def createBranch(self, itemId, branch):
 	"""
@@ -313,17 +342,6 @@ class SqlVersioning:
 	self.labelMap.addItem((itemId, labelId), branchId)
 
 	return branchId
-
-    def __init__(self, db, versionTable, branchTable):
-        self.items = items.Items(db)
-	self.labels = LabelTable(db)
-	self.latest = LatestTable(db)
-	self.labelMap = LabelMap(db)
-	self.versionTable = versionTable
-        self.branchTable = branchTable
-	self.needsCleanup = False
-	self.nodes = Nodes(db)
-	self.db = db
 
 class SqlVersionsError(Exception):
     pass

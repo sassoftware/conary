@@ -131,6 +131,8 @@ class BranchShadowCommand(CvcCommand):
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
             'source-only': ('For any binary components listed, shadow/branch'
                             ' their sources instead'),
+             'to-file'   : (VERBOSE_HELP, 'Write changeset to file instead of'
+                                          ' committing to the repository'),
             'info'       : 'Display info on shadow/branch'}
 
     def addParameters(self, argDef):
@@ -138,6 +140,7 @@ class BranchShadowCommand(CvcCommand):
         argDef["binary-only"] = NO_PARAM
         argDef["source-only"] = NO_PARAM
         argDef["info"] = '-i', NO_PARAM
+        argDef["to-file"] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -145,6 +148,7 @@ class BranchShadowCommand(CvcCommand):
         makeShadow =  (args[0] == "shadow")
         sourceOnly = argSet.pop('source-only', False)
         binaryOnly = argSet.pop('binary-only', False)
+        targetFile = argSet.pop("to-file", None)
         info = argSet.pop('info', False)
 
         if argSet: return self.usage()
@@ -155,7 +159,7 @@ class BranchShadowCommand(CvcCommand):
 
         branch.branch(repos, cfg, target, troveSpecs, makeShadow = makeShadow, 
                       sourceOnly = sourceOnly, binaryOnly = binaryOnly,
-                      info = info)
+                      info = info, targetFile = targetFile)
 _register(BranchShadowCommand)
 
 class CheckoutCommand(CvcCommand):
@@ -256,7 +260,7 @@ class PromoteCommand(CvcCommand):
                                    ' Clones only those components'
                                    ' that are installed by default.'),
              'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
-                                           ' to the repository'),
+                                           ' committing to the repository'),
              'all-flavors' : (VERBOSE_HELP, 'Promote all flavors of a'
                                             ' package/group at the same time'
                                             ' (now the default)'),

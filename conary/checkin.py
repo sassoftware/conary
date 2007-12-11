@@ -648,8 +648,8 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
             #        condition on commit.  Catch and raise a reasonable error.
             log.debug('creating shadow of %s for merging...' % state.getLastMerged())
             shadowCs = client.createShadowChangeSet(str(shadowLabel),
-                                [(troveName, state.getLastMerged(), noDeps)])[1]
-            signAbsoluteChangeset(shadowCs, signatureKey)
+                                [(troveName, state.getLastMerged(), noDeps)],
+                                sigKeyId = signatureKey)[1]
 
             # writable changesets can't do merging, so create a parent
             # readonly one
