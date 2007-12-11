@@ -1137,8 +1137,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         allContents = {}
         for key in keyList:
             (tag, contents, compressed) = self.configCache[key]
-            if tag == ChangedFileTypes.file:
-                allContents[key] = (ChangedFileTypes.file, contents, False)
+            if tag != ChangedFileTypes.diff:
+                allContents[key] = (tag, contents, False)
 
         wrapper = DictAsCsf({})
         wrapper.addConfigs(allContents)

@@ -27,6 +27,8 @@ Changes in @NEW@:
     * A bug that caused updates with group scripts to fail when run
       with the '--root' option with a trailing slash in the path has
       been fixed. (CNY-2348)
+    * Rewriting rollback changesets could cause some file placeholders to
+      be lost
 
 Changes in 1.2.9:
   o Documentation Changes:
