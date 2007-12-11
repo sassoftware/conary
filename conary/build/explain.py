@@ -38,6 +38,8 @@ def formatString(msg):
 def formatDoc(obj):
     name = obj.__name__
     docString = obj.__doc__
+    if not docString:
+        docString = 'No documentation available.'
     docStringRe = re.compile('[A-Z]\{[^{}]*\}')
     srch = re.search(docStringRe, docString)
     while srch:
