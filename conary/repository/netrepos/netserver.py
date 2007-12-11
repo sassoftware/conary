@@ -2854,8 +2854,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # elimination we are sure to return at least 'lim' troves
         # back to the client
         query = """
-        select distinct * from (
-        SELECT
+        SELECT DISTINCT
             item, version, flavor,
             Nodes.timeStamps,
             Instances.changed, Instances.troveType
@@ -2876,7 +2875,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND ugi.userGroupId in (%s)
         ORDER BY Instances.changed
         LIMIT %d
-        ) as inq
         """ % ( instances.INSTANCE_PRESENT_NORMAL,
                 ",".join("%d" % x for x in roleIds),
                 lim * permCount)
