@@ -936,6 +936,7 @@ def createSchema(db):
 # do this in a way that avoids the necessity of a major version schema bump
 def lockCommits(db):
     if db.version < sqllib.DBversion(15,10):
+        logMe(1, "WARNING: commitlock noop", db.version)
         return True # noop, can't do it reliably without the CommitLock table
     cu = db.cursor()
     # on MySQL this will timout after lock_timeout seconds. MySQL's
