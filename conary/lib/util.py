@@ -1592,3 +1592,26 @@ def nullifyFileDescriptor(fdesc):
     if fd != fdesc:
         os.dup2(fd, fdesc)
         os.close(fd)
+
+class Timer:
+
+    def start(self):
+        self.started = time.time()
+
+    def stop(self):
+        self.total += (time.time() - self.started)
+        self.started = None
+
+    def get(self):
+        if self.started:
+            running = time.time() - self.started
+        else:
+            running = 0
+
+        return self.total + running
+
+    def __init__(self, start = False):
+        self.started = None
+        self.total = 0
+        if start:
+            self.start()

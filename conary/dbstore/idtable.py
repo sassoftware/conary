@@ -70,7 +70,6 @@ class IdTable:
         id = self.get(item, None)
         if id == None:
             id = self.addId(item)
-
         return id
 
     # DBSTORE: use dbstore sequences
