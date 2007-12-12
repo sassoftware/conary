@@ -54,10 +54,21 @@ class RepositoryMismatch(RepositoryError):
 
 class InsufficientPermission(ConaryError):
 
-    def __init__(self, server = None):
-        self.server = server
+    def __init__(self, server = None, repoName = None, url = None):
+        self.server = self.repoName = self.url = None
+        serverMsg = repoMsg = urlMsg = ""
         if server:
-            msg = ("Insufficient permission to access server %s" % self.server)
+            self.server = server
+            serverMsg = ("server %s" % server)
+        if repoName:
+            self.repoName = repoName
+            repoMsg = ("repository %s" % repoName)
+        if url:
+            self.url = url
+            urlMsg = ("via %s" % url)
+        if server or repoName or url:
+            msg = "Insufficient permission to access %s %s %s" %(
+                repoMsg, serverMsg, urlMsg)
         else:
             msg = "Insufficient permission"
         ConaryError.__init__(self, msg)
