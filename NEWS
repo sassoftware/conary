@@ -1,7 +1,7 @@
 Changes in 1.2.10:
   o Client Changes:
-    * 'conary verify' no longer complains about files which have been
-      removed with 'conary remove'. (CNY-950)
+    * The 'conary verify' command no longer complains about files which
+      have been removed with 'conary remove'. (CNY-950)
     * Local rollbacks for removals now store the original contents for
       modified config files. (CNY-2350)
     * Permission errors now list both the URL and the repository
@@ -9,19 +9,22 @@ Changes in 1.2.10:
 
   o Server Changes:
     * A new boolean server configuration option, 'serializeCommits',
-      has been added. (CNY-2285)
+      has been added to explicitly limit contention in certain cases.
+      Successfully enabling it requires a minor schema update. (CNY-2285)
     * Servers in maintenance mode no longer return Internal Server
-      Errors to clients' GET requests. (CNY-2229)
+      Errors to GET requests from clients. (CNY-2229)
 
   o Build Changes:
-    * addPatch honors braceGlobs when sourceDir is defined. (CNY-1152)
+    * The addPatch() source action honors shell-style brace and glob
+      expansion when sourceDir is defined. (CNY-1152)
     * A new command, "cvc explain", has been added. "cvc explain"
-      displays the documentation for recipe methods. For example,
+      displays the documentation for recipe methods.  For example,
       "cvc explain addSource" shows the on-line documentation for the
-      addSource() method. (CNY-2242)
+      addSource() source action. (CNY-2242)
     * The command line interface to cvc derive (added in Conary 1.2.8)
       has been changed.  It now derives onto your buildLabel by default,
       with a --target option to derive onto a different label.
+      The cvc derive interface is subject to further change.
 
   o Bug Fixes:
     * A bug that caused an exception when inspecting ELF files with a
