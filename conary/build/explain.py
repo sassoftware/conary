@@ -49,6 +49,7 @@ class DummyGroupRecipe(grouprecipe.GroupRecipe):
         grouprecipe.GroupRecipe.__init__(self, repos, cfg,
                                          versions.Label('a@b:c'), None,
                                          None)
+        self._policyMap = {}
 
 class DummyFilesetRecipe(filesetrecipe.FilesetRecipe):
     def __init__(self, cfg):
@@ -57,24 +58,30 @@ class DummyFilesetRecipe(filesetrecipe.FilesetRecipe):
         repos = DummyRepos()
         filesetrecipe.FilesetRecipe.__init__(self, repos, cfg,
                                          versions.Label('a@b:c'), None, {})
+        self._policyMap = {}
 
 class DummyRedirectRecipe(redirectrecipe.RedirectRecipe):
     def __init__(self, cfg):
         self.name = 'redirect'
         self.verison = '1.0'
         redirectrecipe.RedirectRecipe.__init__(self, None, cfg, None, None)
+        self._policyMap = {}
 
 class DummyUserInfoRecipe(inforecipe.UserInfoRecipe):
     def __init__(self, cfg):
         self.name = 'info-dummy'
         self.version = '1.0'
         inforecipe.UserInfoRecipe.__init__(self, cfg, None, None)
+        self._loadSourceActions(lambda x: True)
+        self.loadPolicy()
 
 class DummyGroupInfoRecipe(inforecipe.GroupInfoRecipe):
     def __init__(self, cfg):
         self.name = 'info-dummy'
         self.version = '1.0'
         inforecipe.GroupInfoRecipe.__init__(self, cfg, None, None)
+        self._loadSourceActions(lambda x: True)
+        self.loadPolicy()
 
 classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
           DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe]
@@ -182,12 +189,6 @@ def docObject(cfg, what):
 def docClass(cfg, recipeType):
     classType = 'Dummy' + recipeType
     r = sys.modules[__name__].__dict__[classType](cfg)
-    r._loadSourceActions(lambda x: True)
-    try:
-        r.loadPolicy()
-    except:
-        # this recipe type doesn't implement loadPolicy
-        r._policyMap = {}
     display = {}
     if recipeType in ('PackageRecipe', 'GroupRecipe'):
         display['Build'] = sorted(x for x in r.externalMethods if x[0] != '_' and x not in blacklist.get(recipeType, []))
