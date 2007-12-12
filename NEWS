@@ -11,6 +11,8 @@ Changes in @NEW@:
       with 'conary remove' (CNY-950)
     * Local rollbacks for removals didn't store the original contents for
       modified config files (CNY-2350).
+    * Permission errors now list both the URL and the repository
+      hostname (CNY-2211)
 
   o Server Changes:
     * 'serializeCommits' has been added as a new boolean server
