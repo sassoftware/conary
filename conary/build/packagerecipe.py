@@ -805,7 +805,14 @@ class PackageRecipe(AbstractPackageRecipe):
     EXAMPLE
     =======
 
-    FIXME example
+      class ExamplePackage(PackageRecipe):
+          name = 'example'
+          version = '1.0'
+
+          def setup(r):
+              r.addArchive('http://code.example.com/example/')
+              r.Make()
+              r.MakeInstall()
     """
     internalAbstractBaseClass = 1
     # these initial buildRequires need to be cleared where they would
