@@ -3088,11 +3088,26 @@ class PublicKeyring(object):
             keys = list(keys)
         for key in keys:
             assert(isinstance(key, PGP_MainKey))
-        stream = self._openKeyring()
+        stream = self._openKeyring(readOnly = False)
         keyFingerprints = addKeys(keys, stream)
         self.updateTimestamps(keyFingerprints, timestamp = timestamp)
         return keyFingerprints
 
+    def _extractKey(self, key):
+        if not key:
+            return ""
+        if ord(key[0]) & 0x80:
+            # Most likely already binary
+            return key
+        return parseAsciiArmorKey(key)
+
+    def addKeysAsStrings(self, keys, timestamp = None):
+        sio = util.ExtendedStringIO()
+        for k in keys:
+            assert(isinstance(k, str))
+            sio.write(self._extractKey(k))
+        msg = PGP_Message(sio, start = 0)
+        return self.addKeys(msg.iterMainKeys(), timestamp = timestamp)
 
     def updateTimestamps(self, keyIds, timestamp = None):
         # Expand generators
@@ -3113,7 +3128,7 @@ class PublicKeyring(object):
             pkts.append(pkt)
 
         mtime0 = os.stat(self._tsDbPath)[stat.ST_MTIME]
-        addKeyTimestampPackets(pkts, self._openTsDb())
+        addKeyTimestampPackets(pkts, self._openTsDb(readOnly = False))
         mtime1 = os.stat(self._tsDbPath)[stat.ST_MTIME]
         if mtime0 == mtime1:
             # Cheat, and set the mtime to be a second larger
@@ -3123,12 +3138,20 @@ class PublicKeyring(object):
         # the mtime.
         self._tsDbTimestamp = None
 
-    def _openTsDb(self):
-        return util.ExtendedFile(self._tsDbPath, "r+",
+    def _openTsDb(self, readOnly = True):
+        if readOnly:
+            mode = "r"
+        else:
+            mode = "r+"
+        return util.ExtendedFile(self._tsDbPath, mode,
                 buffering = False)
 
-    def _openKeyring(self):
-        return util.ExtendedFile(self._keyringPath, "r+",
+    def _openKeyring(self, readOnly = True):
+        if readOnly:
+            mode = "r"
+        else:
+            mode = "r+"
+        return util.ExtendedFile(self._keyringPath, mode,
                 buffering = False)
 
     def _parseTsDb(self):
@@ -3138,7 +3161,9 @@ class PublicKeyring(object):
             # Database hasn't changed
             return
 
-        stream = self._openTsDb()
+        allKeys = self._getAllKeys()
+
+        stream = self._openTsDb(readOnly = True)
         fd = stream.fileno()
         try:
             fcntl.lockf(fd, fcntl.LOCK_SH)
@@ -3146,7 +3171,11 @@ class PublicKeyring(object):
             self._cache.clear()
             for pkt in TimestampPacketDatabase(stream).iterTrustPackets():
                 pkt.parse()
-                self._cache[pkt.getKeyId()] = pkt.getRefreshTimestamp()
+                mainKeyId = pkt.getKeyId()
+                ts = pkt.getRefreshTimestamp()
+                self._cache[mainKeyId] = ts
+                for sk in allKeys.get(mainKeyId, []):
+                    self._cache[sk] = ts
         finally:
             fcntl.lockf(fd, fcntl.LOCK_UN)
 
@@ -3157,3 +3186,38 @@ class PublicKeyring(object):
         # XXX for v3 keys, trimming to the last 8 bytes is not the valid way
         # to get the key ID. But it's just a cache.
         return self._cache.get(keyId[-16:], None)
+
+    def getKey(self, keyId):
+        """
+        Retrieve the key.
+
+        @param keyId: the key ID.
+        @type keyId: str
+        @rtype: PGP_Key
+        @return: a key with the specified key ID
+        @raise KeyNotFound: if the key was not found
+        """
+        stream = self._openKeyring(readOnly = True)
+        fd = stream.fileno()
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_SH)
+            msg = PGP_Message(stream)
+            return msg.getKeyByKeyId(keyId)
+        finally:
+            fcntl.lockf(fd, fcntl.LOCK_UN)
+
+    def _getAllKeys(self):
+        # Return all keys and subkeys
+        # We need them in order to handle subkeys too
+        ret = {}
+        stream = self._openKeyring(readOnly = True)
+        fd = stream.fileno()
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_SH)
+            msg = PGP_Message(stream)
+            for pk in msg.iterMainKeys():
+                fp = pk.getKeyId()
+                ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
+            return ret
+        finally:
+            fcntl.lockf(fd, fcntl.LOCK_UN)
