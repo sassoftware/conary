@@ -2611,6 +2611,11 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
             if root != '/':
                 scriptName = scriptName[len(root):]
                 assert(root[0] == '/')
+
+                # Ensure that scriptName is always based at the root.
+                if not scriptName.startswith('/'):
+                    scriptName = '/' + scriptName
+
                 try:
                     os.chroot(root)
                 except:

@@ -23,6 +23,7 @@ python_files = __init__.py	\
 	derivedrecipe.py	\
 	destdirpolicy.py	\
 	errors.py	        \
+	explain.py	        \
 	filter.py 		\
 	filesetrecipe.py	\
 	grouprecipe.py		\
