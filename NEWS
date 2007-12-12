@@ -49,6 +49,9 @@ Changes in 2.0.0:
       that are built for architectures other than the architecture that
       is being built for.  This avoids a common problem where a single
       extra sparc file library taints an entire package. (CNY-1717)
+    * The rarely used "cvc describe" command line interface has been
+      removed. (CNY-2357)
+    * The rarely used "cvcdesc" script has been removed. (CNY-2357)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
