@@ -195,10 +195,22 @@ class GroupRecipe(_BaseGroupRecipe):
 
         - L{createGroup} : Creates a new group
 
+        - L{copyComponents}: Add components to one group by copying them
+        from the components in another group
+
+        - L{moveComponents}: Add components to one group, removing them
+        from the other in the process.
+
         - L{remove} : Removes a trove
 
         - L{removeComponents} : Define components which should not be
         installed
+
+        - L{removeItemsAlsoInGroup}: removes troves in the group specified
+        that are also in the current group
+
+        - L{removeItemsAlsoInNewGroup}: removes troves in the group specified
+        that are also in the current group
 
         - L{Requires} : Defines a runtime requirement for group
 
@@ -294,9 +306,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def Requires(self, requirement, groupName = None):
         """
-        NAME
-        ====
-
         B{C{r.Requires()}} - Defines a runtime requirement for group
 
         SYNOPSIS
@@ -335,9 +344,6 @@ class GroupRecipe(_BaseGroupRecipe):
             byDefault = None, ref = None, components = None, groupName = None,
             use = True, labelPath=None, searchPath=None):
         """
-        NAME
-        ====
-
         B{C{r.add()}} - Adds a trove to a group
 
         SYNOPSIS
@@ -415,9 +421,6 @@ class GroupRecipe(_BaseGroupRecipe):
     def remove(self, name, versionStr = None, flavor = None, groupName = None,
                allowNoMatch=False):
         """
-        NAME
-        ====
-
         B{C{r.remove()}} - Removes a trove
 
         SYNOPSIS
@@ -478,9 +481,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def removeComponents(self, componentList, groupName = None):
         """
-        NAME
-        ====
-
         B{C{r.removeComponents()}} - Define components which should not be
         installed by default
 
@@ -521,9 +521,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def moveComponents(self, componentList, fromGroup, toGroup, byDefault=None):
         """
-        NAME
-        ====
-
         B{C{r.moveComponents()}} - Add components to one group, removing them
         from the other in the process.
 
@@ -551,11 +548,10 @@ class GroupRecipe(_BaseGroupRecipe):
 
         B{toGroup} : The name of the group to move the components to
 
-        B{byDefault} : (None) When specified, this ensures that all the 
-                       components that are added have the byDefault value
-                       specified (either True or False).  If not specified,
-                       the components get the byDefault value they had in the
-                       fromGroup.
+        B{byDefault} : (None) When specified, this ensures that all the
+        components that are added have the byDefault value specified (either
+        True or False).  If not specified, the components get the byDefault
+        value they had in the fromGroup.
 
         EXAMPLES
         ========
@@ -573,9 +569,6 @@ class GroupRecipe(_BaseGroupRecipe):
     def copyComponents(self, componentList, fromGroupName, toGroupName,
                        byDefault=None):
         """
-        NAME
-        ====
-
         B{C{r.copyComponents()}} - Add components to one group by copying them
         from the components in another group.
 
@@ -604,10 +597,9 @@ class GroupRecipe(_BaseGroupRecipe):
         B{toGroup} : The name of the group to copy the components to
 
         B{byDefault} : (None) When specified, this ensures that all the 
-                       components that are added have the byDefault value
-                       specified (either True or False).  If not specified,
-                       the components get the byDefault value they had in the
-                       fromGroup.
+        components that are added have the byDefault value specified
+        (either True or False).  If not specified, the components get
+        the byDefault value they had in the fromGroup.
 
         EXAMPLES
         ========
@@ -624,9 +616,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def setSearchPath(self, *path):
         """
-        NAME
-        ====
-
         B{C{r.setSearchPath()}} - Specify the searchPath to search for troves
 
         SYNOPSIS
@@ -684,9 +673,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def setByDefault(self, byDefault = True, groupName = None):
         """
-        NAME
-        ====
-
         B{C{r.setByDefault()}} - Set troves to be added to group by default
 
         SYNOPSIS
@@ -726,9 +712,6 @@ class GroupRecipe(_BaseGroupRecipe):
                            searchPath = None, flatten=False,
                            copyScripts = False, copyCompatibilityClass = False):
         """
-        NAME
-        ====
-
         B{C{r.addAll()}} - Add all troves directly contained in a given
         reference to groupName
 
@@ -814,11 +797,8 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def removeItemsAlsoInNewGroup(self, name, groupName = None, use = True):
         """
-        NAME
-        ====
-
         B{C{r.removeItemsAlsoInNewGroup()}} - removes troves in the group
-        specified that are also in the current  group.
+        specified that are also in the current group.
 
         SYNOPSIS
         ========
@@ -874,9 +854,6 @@ class GroupRecipe(_BaseGroupRecipe):
                                groupName = None, searchPath = None, 
                                use = True):
         """
-        NAME
-        ====
-
         B{C{r.removeItemsAlsoInGroup()}} - removes troves in the group
         specified that are also in the current group.
 
@@ -943,9 +920,6 @@ class GroupRecipe(_BaseGroupRecipe):
                 searchPath = None, flatten = False, copyScripts = True,
                 copyCompatibilityClass = True):
         """
-        NAME
-        ====
-
         B{C{r.addCopy()}} - Create a copy of I{name} and add that copy
         to groupName.
 
@@ -1031,9 +1005,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def addNewGroup(self, name, groupName = None, byDefault = True, use = True):
         """
-        NAME
-        ====
-
         B{C{r.addNewGroup()}} - Adds one newly created group to another newly
         created group
 
@@ -1087,9 +1058,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def setDefaultGroup(self, groupName):
         """
-        NAME
-        ====
-
         B{C{r.setDefaultGroup()}} - Defines default group
 
         SYNOPSIS
@@ -1124,9 +1092,6 @@ class GroupRecipe(_BaseGroupRecipe):
     def addResolveSource(self, name, versionStr = None, flavor = None,
                          ref = None, use = True):
         """
-        NAME
-        ====
-
         B{C{r.addResolveSource()}} - Specify alternate source for dependency
         resolution
 
@@ -1180,9 +1145,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def addReference(self, name, versionStr = None, flavor = None, ref = None):
         """
-        NAME
-        ====
-
         B{C{r.addReference}} - Adds a reference to a trove
 
         SYNOPSIS
@@ -1234,9 +1196,6 @@ class GroupRecipe(_BaseGroupRecipe):
     def replace(self, name, newVersionStr = None, newFlavor = None, ref = None,
                 groupName = None, allowNoMatch = False, searchPath = None):
         """
-        NAME
-        ====
-
         B{C{r.replace()}} - Replace troves
 
         SYNOPSIS
@@ -1300,9 +1259,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def setLabelPath(self, *path):
         """
-        NAME
-        ====
-
         B{C{r.setLabelPath()}} - Specify the labelPath to search for troves
 
         SYNOPSIS
@@ -1353,9 +1309,6 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def setCompatibilityClass(self, theClass, groupName = None):
         """
-        NAME
-        ====
-
         B{C{r.setCompatibilityClass()}} - Specify the compatibility class
         for this trove.
 
@@ -1407,9 +1360,6 @@ class GroupRecipe(_BaseGroupRecipe):
                     byDefault = None, checkOnlyByDefaultDeps = None,
                     checkPathConflicts = None):
         """
-        NAME
-        ====
-
         B{C{r.createGroup()}} - Creates a new group
 
         SYNOPSIS
