@@ -256,8 +256,7 @@ class RolePermissions(RoleTable):
         return True
 
 # this class takes care of the RoleInstancesCache table, which is
-# a summary of rows present in RoleAllTroves and
-# RoleAllPermissions tables
+# a summary of rows present in RoleAllTroves and RoleAllPermissions tables
 class RoleInstances(RoleTable):
     def __init__(self, db):
         RoleTable.__init__(self, db)
@@ -278,9 +277,9 @@ class RoleInstances(RoleTable):
         roleId = self._getRoleId(role)
         rtList = self.rt.add(roleId, troveList, recursive)
         # we now know the ids of the new acls added. They're useful in
-        # updating the RIC table
+        # updating the UGIC table
         cu = self.db.cursor()
-        # grab the list of instanceIds we are adding to the RIC table;
+        # grab the list of instanceIds we are adding to the UGIC table;
         # we need those for a faster recomputation of the LatestCache table
         schema.resetTable(cu, "tmpInstances")
         cu.execute("""
@@ -295,7 +294,7 @@ class RoleInstances(RoleTable):
                 and ugi.instanceId = ugat.instanceId )
         """ % (",".join("%d" % x for x in rtList),),
                    (roleId, roleId), start_transaction=False)
-        # insert into RIC and recompute the latest table
+        # insert into UGIC and recompute the latest table
         cu.execute("""
         insert into UserGroupInstancesCache (userGroupId, instanceId)
         select %d, instanceId from tmpInstances """ %(roleId,))
@@ -456,7 +455,7 @@ class RoleInstances(RoleTable):
         # clean up the flattened table
         cu.execute("delete from UserGroupAllPermissions where permissionId = ?",
                    permissionId)
-        # now we have only the troves which need to be erased out of RIC
+        # now we have only the troves which need to be erased out of UGIC
         self.db.analyze("tmpInstances")
         cu.execute("""
         delete from UserGroupInstancesCache
@@ -502,7 +501,7 @@ class RoleInstances(RoleTable):
         # LatestCache since we only remove !present troves in bulk
         return True
 
-    # rebuild the RIC table entries
+    # rebuild the UGIC table entries
     def rebuild(self, roleId = None, cu = None):
         if cu is None:
             cu = self.db.cursor()
