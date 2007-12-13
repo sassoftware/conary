@@ -94,7 +94,7 @@ def clearCrossRequires(*crossReqs):
 
 def clearCrossReqs(*crossReqs):
     #log.warning('clearCrossReqs() is deprecated.  Use clearCrossRequires()')
-    clearCrossRequires(*buildReqs)
+    clearCrossRequires(*crossReqs)
 
 def _clearReqs(attrName, reqs):
     # walk the stack backwards until we find the frame
