@@ -133,12 +133,10 @@ def _clearReqs(attrName, reqs):
             setattr(class_, attrName, [])
             return
         # get the set of packages to remove
-        buildReqs = getattr(class_, attrName)
+        buildReqs = set(getattr(class_, attrName))
         remove = set(pkgs)
-        currentDeps = set(buildReqs)
-        toRemove = currentDeps.intersection(remove)
-        for pkg in toRemove:
-            buildReqs.remove(pkg)
+        buildReqs = buildReqs - remove
+        setattr(class_, attrName, list(buildReqs))
 
     for class_ in classes:
         _removePackages(class_, reqs)
