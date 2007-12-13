@@ -395,19 +395,21 @@ class SearchableTroveSource(AbstractTroveSource):
             or _CHECK_TROVE_REG_FLAVOR
             @param flavorFilter: how to limit matching results for return
             against the available troves.
-            @type: one of _GET_TROVE_ALL_FLAVORS,
+            @type flavorFilter: one of _GET_TROVE_ALL_FLAVORS,
             _GET_TROVE_AVAILABLE_FLAVORS, or _GET_TROVE_BEST_FLAVOR
-            @type latestFilter: one of _GET_TROVE_ALL_VERSIONS,
-            _GET_TROVE_VERY_LATEST
             @param latestFilter: once packages are filtered by flavor
             so that only matching flavors are available, this filter
             chooses how to filter by version timestamp.
+            @type latestFilter: one of _GET_TROVE_ALL_VERSIONS,
+            _GET_TROVE_VERY_LATEST
             @param scoreCache: dict that will hold cached flavor scoring 
             results.
+            @type scoreCache: dict
             @param splitByBranch: if True, flavor queries will be applied
             for each branch in the versionFlavorDict as opposed to against
             the versionFlavorDict as a whole.  This is used for 
             getTroveLeavesByLabel.
+            @type splitByBranch: bool
         """
         if splitByBranch:
             versionFlavorDicts = self._splitResultByBranch(
