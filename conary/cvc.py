@@ -100,7 +100,7 @@ _register(AddCommand)
 class ExplainCommand(CvcCommand):
     commands = ['explain']
     paramHelp = 'method'
-    help = 'Explain a recipe method'
+    help = 'Display Conary recipe documentation'
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos=None):
@@ -582,6 +582,7 @@ _register(DescribeCommand)
 
 class DeriveCommand(CvcCommand):
     commands = ['derive']
+    hidden = True
     paramHelp = "<trove>[=<version>][[flavor]]"
     help = 'Aggregation command to shadow, check out and alter a recipe'
     commandGroup = 'Repository Access'
@@ -718,6 +719,7 @@ class AddKeyCommand(CvcCommand):
     help = 'Adds a public key from stdin to a repository'
     commandGroup = 'Key Management'
     docs = {'server'       : 'Repository server to retrieve keys from' }
+    hidden = True
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -742,6 +744,7 @@ class GetKeyCommand(CvcCommand):
     help = 'Retrieves a specified public key from a repository'
     commandGroup = 'Key Management'
     docs = {'server'       : 'Repository server to retrieve keys from' }
+    hidden = True
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -765,6 +768,7 @@ class ListKeysCommand(CvcCommand):
     commandGroup = 'Key Management'
     docs = {'fingerprints' : 'Display fingerprints of keys',
             'server'       : 'Repository server to retrieve keys from' }
+    hidden = True
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -825,7 +829,7 @@ _register(SignCommand)
 class NewPkgCommand(CvcCommand):
     commands = ['newpkg']
     paramHelp = '<name>'
-    help = 'Set up the directory for creating a new package'
+    help = 'Set a directory for creating a new package'
     commandGroup = 'Setup Commands'
     docs = {'dir' : 'create new package in DIR',
             'template' : 'set recipe template to use'}

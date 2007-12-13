@@ -328,6 +328,8 @@ class RevertCommand(ConaryCommand):
     commands = ['revert']
     commandGroup = 'System Modification'
     help = 'Revert the journal from a failed operation.'
+    hidden = True
+
     def runCommand(self, cfg, argSet, otherArgs):
         if argSet or len(otherArgs) > 2: return self.usage()
         updatecmd.revert(cfg)
@@ -642,6 +644,7 @@ class RdiffCommand(ConaryCommand):
              'file-deps'   : 'Show file dependency changes',
              'file-contents' : 'Show file content changes (non-binary)',
            }
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
