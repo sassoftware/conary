@@ -4,6 +4,10 @@ Changes in @NEW@:
       argument. (CNY-2360)
     * The conary.1 manual page now documents the purpose of the
       /etc/conary/components directory. (CNY-2361)
+    * The clearBuildReqs() function now has a synonym called
+      clearBuildRequires() and the clearCrossReqs() function now has a
+      synonym called clearCrossRequires().  The old function names
+      will be deprecated in the future. (CNY-834)
 
 Changes in 1.2.10:
   o Client Changes:

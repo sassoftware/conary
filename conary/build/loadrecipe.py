@@ -84,7 +84,9 @@ def setupRecipeDict(d, filename, directory=None):
     localImport(d, 'conary.build.derivedrecipe', 'DerivedPackageRecipe')
     localImport(d, 'conary.build.packagerecipe', 
                                   ('clearBuildReqs',
+                                   'clearBuildRequires',
                                    'clearCrossReqs',
+                                   'clearCrossRequires',
                                    'PackageRecipe', 
                                    'BuildPackageRecipe',
                                    'CPackageRecipe',

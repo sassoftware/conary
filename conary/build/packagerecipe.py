@@ -76,17 +76,25 @@ class _policyUpdater:
     def __call__(self, *args, **keywords):
 	self.theobject.updateArgs(*args, **keywords)
 
-def clearBuildReqs(*buildReqs):
+def clearBuildRequires(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
     _clearReqs('buildRequires', buildReqs)
 
-def clearCrossReqs(*crossReqs):
+def clearBuildReqs(*buildReqs):
+    #log.warning('clearBuildReqs() is deprecated.  Use clearBuildRequires()')
+    clearBuildRequires(*buildReqs)
+
+def clearCrossRequires(*crossReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
     _clearReqs('crossRequires', crossReqs)
+
+def clearCrossReqs(*crossReqs):
+    #log.warning('clearCrossReqs() is deprecated.  Use clearCrossRequires()')
+    clearCrossRequires(*buildReqs)
 
 def _clearReqs(attrName, reqs):
     def _removePackages(class_, pkgs):
