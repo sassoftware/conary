@@ -103,10 +103,12 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
 
 def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
                     allowChangeSets=True):
-    """ Takes input specifying changeSpecs, such as foo=1.1--1.2,
-        and turns it into (name, (oldVersionSpec, oldFlavorSpec),
-                                 (newVersionSpec, newFlavorSpec), isAbsolute)
-        tuples.
+    """
+    Parse a change specification list, as presented on the command line.
+
+    Takes input specifying changeSpecs, such as C{foo=1.1--1.2},
+    and turns it into C{(name, (oldVersionSpec, oldFlavorSpec),
+    (newVersionSpec, newFlavorSpec), isAbsolute)} tuples.
     """
     applyList = []
 
