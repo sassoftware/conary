@@ -1530,7 +1530,15 @@ def _convertChangeSetV2V1(inPath, outPath):
 
 def getNativeChangesetVersion(protocolVersion):
     """Return the native changeset version supported by a client speaking the
-    supplied protocol version"""
+    supplied protocol version
+    
+    @param protocolVersion: Protocol version that the client negotiated with
+    the server
+    @type protocolVersion: int
+    @rtype: int
+    @return: native changeset version for a client speaking the protocol
+    version
+    """
     # Add more versions as necessary, but do remember to add them to
     # netclient's FILE_CONTAINER_* constants
     if protocolVersion < 38:

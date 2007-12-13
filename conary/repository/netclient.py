@@ -1338,9 +1338,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             changesetVersion = None,
                             mirrorMode = False):
         """
+        Create a changeset file based on a job list.
+
         @param changesetVersion: (optional) request a specific changeset
-            version from the server. The value is one of the FILE_CONTAINER_*
-            constants defined in the NetworkRepositoryClient class.
+            version from the server. The value is one of the C{FILE_CONTAINER_*}
+            constants defined in the L{NetworkRepositoryClient} class. To map
+            a protocol version into a changeset version, use
+            L{repository.changeset.getNativeChangesetVersion}.
         @raise FilesystemError: if the destination file is not writable
         @raise RepositoryError: if a repository error occurred.
         """
