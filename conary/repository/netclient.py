@@ -1338,9 +1338,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             changesetVersion = None,
                             mirrorMode = False):
         """
+        Create a changeset file based on a job list.
+
         @param changesetVersion: (optional) request a specific changeset
-            version from the server. The value is one of the FILE_CONTAINER_*
-            constants defined in the NetworkRepositoryClient class.
+            version from the server. The value is one of the C{FILE_CONTAINER_*}
+            constants defined in the L{NetworkRepositoryClient} class. To map
+            a protocol version into a changeset version, use
+            L{repository.changeset.getNativeChangesetVersion}.
         @raise FilesystemError: if the destination file is not writable
         @raise RepositoryError: if a repository error occurred.
         """
@@ -2403,40 +2407,41 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
 
-        versionStr formats accepted are:
+        I{Version} formats accepted are:
 
-            -^ empty/None
+            - ^ empty/None
             -  full version (branch + revision)
             -  branch
-            -  label  (host@namespace:tag)
-            -  @branchname (@namespace:tag)
-            -  :tag        
-            -^ revision (troveVersion-sourceCount-buildCount)
-            -^ troveVersion 
+            -  label  (C{host@namespace:tag})
+            -  branch name (C{@namespace:tag})
+            -  C{:tag}
+            - ^ revision (C{troveVersion-sourceCount-buildCount})
+            - ^ C{troveVersion}
 
-        VersionStr types with a ^ by them will be limited to the branches of 
+        I{Version} formats with a ^ by them will be limited to the branches of
         affinity troves if they exist.
         
         @param labelPath: label path to search for troves that don't specify a
         label/branch/version to search on
         @type labelPath: label or list of labels
         @param troves: trove specs that list the troves to search for
-        @type troves: set of (name, versionStr, flavor) tuples, where 
-        versionStr or flavor can be None
-        @param defaultFlavor: flavor to use for those troves specifying None
-        as their flavor.  Overridden by relevant flavors found in affinityDb
-        @type flavor or None
+        @type troves: set of C{(name, versionStr, flavor)} tuples, where
+        C{versionStr} or C{flavor} can be C{None}
+        @param defaultFlavor: flavor to use for those troves specifying
+        C{None} as their flavor.  Overridden by relevant flavors found in
+        C{affinityDb}
+        @type defaultFlavor: flavor or None
         @param acrossLabels: if True, for each trove, return the best 
         result for each label listed in the labelPath used.  If False, 
         for each trove, return the best result for the first label that 
         matches.
-        @type boolean
+        @type acrossLabels: bool
         @param acrossFlavors: if True, for each trove, return the best 
         result for each flavor listed in the flavorPath used.  If False, 
         for each trove, return the best result for the first flavor that 
         matches.
-        @type boolean
-        @type affinityDatabase: database to search for affinity troves.  
+        @type acrossFlavors: bool
+        @param affinityDatabase: database to search for affinity troves.  
         Affinity troves for a trove spec match the trove name exactly, and
         match the branch/label requested if explicitly requested in the 
         trove spec.  The affinity trove's flavor will be used if no flavor 
@@ -2445,12 +2450,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         listed in the trove spec.
         @param allowMissing: if true, do not raise an error if a trove spec
         could not be matched in the repository.
-        @type boolean
-        @return a dict whose keys the (name, versionStr, flavor) troves passed
-        to this function.  The value for each key is a list of 
-        (name, version, flavor) tuples that match that key's trove spec.
-        If allowMissing is True, trove specs passed in that do not match any 
-        trove in the repository will not be listed in the return value.
+        @type allowMissing: bool
+        @rtype: dict
+        @return: a dict whose keys are the C{(name, versionStr, flavor)} troves
+        passed to this function.  The value for each key is a list of
+        C{(name, version, flavor)} tuples that match that key's trove spec.
+        If C{allowMissing} is C{True}, trove specs passed in that do not match
+        any trove in the repository will not be listed in the return value.
         """
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,
