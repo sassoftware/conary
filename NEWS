@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Build changes:
+    * PythonSetup synopsis now mentions the setupName keyword
+      argument. (CNY-2360)
+
 Changes in 1.2.10:
   o Client Changes:
     * The 'conary verify' command no longer complains about files which

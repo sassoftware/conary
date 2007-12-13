@@ -1185,7 +1185,7 @@ class PythonSetup(BuildCommand):
     SYNOPSIS
     ========
 
-    C{r.PythonSetup(I{extra args}, [I{action},] [I{purePython},] [I{allowNonPure},] [I{bootstrap},] [I{dir},] [I{rootDir},] [I{purelib},] [I{platlib},] [I{data},] )}
+    C{r.PythonSetup(I{extra args}, [I{setupName}],[I{action},] [I{purePython},] [I{allowNonPure},] [I{bootstrap},] [I{dir},] [I{rootDir},] [I{purelib},] [I{platlib},] [I{data},] )}
 
     DESCRIPTION
     ===========
