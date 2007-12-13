@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Build changes:
     * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
+    * The conary.1 manual page now documents the purpose of the
+      /etc/conary/components directory. (CNY-2361)
 
 Changes in 1.2.10:
   o Client Changes:
