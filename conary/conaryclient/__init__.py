@@ -125,6 +125,11 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.repos = repos
 
     def disconnectRepos(self):
+        """Disconnect the client from repositories.
+
+        This method is useful if the changesets are applied from local media
+        or were previously downloaded with L{downloadUpdate}.
+        """
         self.repos = None
 
     def getMetadata(self, troveList, label, cacheFile = None,
