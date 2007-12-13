@@ -117,8 +117,11 @@ class ChangesetCallback(Callback):
 
     def error(self, msg, *args, **kwargs):
         """Error handling callback
-        If the optional keyword argument exc_text is passed, its value should
-        be printed verbatim since it is traceback information.
+
+        @param msg: A message to display
+        @type msg: str
+        @keyword exc_text: Traceback text that should be printed verbatim
+        @type exc_text: str
         """
         exc_text = kwargs.pop('exc_text', None)
         # Append the traceback to the message
@@ -129,8 +132,11 @@ class ChangesetCallback(Callback):
 
     def warning(self, msg, *args, **kwargs):
         """Warning handling callback
-        If the optional keyword argument exc_text is passed, its value should
-        be printed verbatim since it is traceback information.
+
+        @param msg: A message to display
+        @type msg: str
+        @keyword exc_text: Traceback text that should be printed verbatim
+        @type exc_text: str
         """
         exc_text = kwargs.pop('exc_text', None)
         # Append the traceback to the message
