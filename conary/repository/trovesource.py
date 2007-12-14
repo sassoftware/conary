@@ -278,6 +278,9 @@ class SearchableTroveSource(AbstractTroveSource):
         self._bestFlavor = True
         self._flavorCheck = _CHECK_TROVE_REG_FLAVOR
 
+    def searchLeavesOnly(self):
+        self._getLeavesOnly = True
+
     def searchAsRepository(self):
         self._allowNoLabel = False
         self._bestFlavor = True
