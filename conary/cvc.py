@@ -990,8 +990,7 @@ class CvcMain(command.MainHandler):
         keyCache = openpgpkey.getKeyCache()
         repos = conaryclient.ConaryClient(cfg).getRepos()
         keyCacheCallback = openpgpkey.KeyCacheCallback(repos,
-                                                       cfg,
-                                                       cfg.pubRing[-1])
+                                                       cfg)
         keyCache.setCallback(keyCacheCallback)
 
         rv = options.MainHandler.runCommand(self, thisCommand,

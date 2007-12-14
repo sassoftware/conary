@@ -223,9 +223,6 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             self.publicPaths = path
         else:
             self.publicPaths = [ path ]
-        # We write to the first one, period
-        if self.callback:
-            self.callback.setPublicPath(self.publicPaths[0])
 
     def setTrustDbPath(self, path):
         self.trustDbPaths = [ path ]
@@ -241,11 +238,6 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
     def setCallback(self, callback):
         self.callback = callback
-        pubRing = callback.pubRing
-        if pubRing not in self.publicPaths:
-            self.addPublicPath(pubRing)
-            trustDbPath = '/'.join(pubRing.split('/')[:-1]) + '/trustdb.gpg'
-            self.trustDbPaths.append(trustDbPath)
 
     def getPublicKey(self, keyId, label = None, warn=True):
         """
@@ -284,10 +276,27 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                 return self.publicDict[keyId]
             except (KeyNotFound, IOError):
                 pass
-        # callback should only return True if it found the key.
-        if label and self.callback.getPublicKey(keyId, label, warn=warn):
-            return self.getPublicKey(keyId, warn=warn)
-        raise KeyNotFound(keyId)
+
+        # Key was not found; call the callback to fetch it and pass the
+        # exception if one is raised. If not, store the key in the first
+        # keyring and add it to the cache.
+        keyData = self.callback.getPublicKey(keyId, label, warn=warn)
+        kr = self.getPublicKeyring()
+        kr.addKeysAsStrings([keyData])
+
+        key = kr.getKey(keyId)
+        # Everything is trusted for now
+        trustLevel = 120
+        kobj = OpenPGPKey(key, key.getCryptoKey(), trustLevel)
+        self.publicDict[keyId] = kobj
+        return kobj
+
+    def getPublicKeyring(self):
+        pubRing = self.publicPaths[0]
+        # XXX
+        tsDbPath = os.path.join(os.path.dirname(pubRing), 'tsdb')
+        kr = PublicKeyring(pubRing, tsDbPath)
+        return kr
 
     def getPrivateKey(self, keyId, passphrase=None):
         """
@@ -346,40 +355,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 #OpenPGPKeyFinder: download missing keys from conary servers.
 #-----#
 class KeyCacheCallback(callbacks.KeyCacheCallback):
-    gpgBin = 'gpg'
-    def _getGPGCommonArgs(self, homeDir):
-        return [self.gpgBin, '-q', '--no-tty',
-                '--homedir', homeDir,
-                '--no-greeting', '--no-secmem-warning',
-                '--no-verbose', '--no-mdc-warning',
-                '--no-default-keyring',
-                '--keyring', os.path.basename(self.pubRing),
-                '--batch', '--no-permission-warning',
-                ]
-    def _getGPGExtraArgs(self, source, keyId, warn=True):
-        """Returns extra arguments to pass to GPG, and an optional stream to
-        be used as standard input"""
-        return [
-                '--keyserver', '%sgetOpenPGPKey?search=%s' %(source, keyId),
-                '--keyserver-options', 'timeout=3',
-                '--recv-key', keyId,
-        ], None
-
-    def getPublicKeyring(self):
-        # XXX
-        tsDbPath = os.path.join(os.path.dirname(self.pubRing), 'tsdb')
-        kr = PublicKeyring(self.pubRing, tsDbPath)
-        return kr
-
-    def _retrieveKey(self, source, keyId):
-        try:
-            key = self.repos.getAsciiOpenPGPKey(source, keyId)
-        except KeyNotFound:
-            exc = sys.exc_info()
-            raise _KeyNotFound, _KeyNotFound(keyId), exc[2]
-        return key
-
-    def findOpenPGPKey(self, source, keyId, warn=True):
+    def findOpenPGPKey(self, source, keyId):
         """
         Look up the key in the specified source.
 
@@ -392,11 +368,12 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         @rtype: str
         @return: the unarmored key
         """
-        key = self._retrieveKey(source, keyId)
-
-        kr = self.getPublicKeyring()
-        kr.addKeysAsStrings([key])
-        return True
+        try:
+            key = self.repos.getAsciiOpenPGPKey(source, keyId)
+        except KeyNotFound:
+            exc = sys.exc_info()
+            raise _KeyNotFound, _KeyNotFound(keyId), exc[2]
+        return key
 
     def _formatSource(self, source):
         """Network-aware source formatter"""
@@ -413,20 +390,15 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         @type label: versions.Label
         @param warn: (True by default) warn if key is not available
         @type warn: bool
-        @rtype: book
-        @return: True if the key was found
+        @rtype: str
+        @return: the string that represents the key
+        @raise KeyNotFound: if the key was not found
         """
         keySource = self._formatSource(label)
-        if keySource == None:
-            return False
 
         # findOpenPGPKey can be smart enough to raise exceptions if the key
         # cannot be found
-        try:
-            self.findOpenPGPKey(keySource, keyId, warn=warn)
-        except KeyNotFound:
-            return False
-        return True
+        return self.findOpenPGPKey(keySource, keyId)
 
 class DiskKeyCacheCallback(KeyCacheCallback):
     """Retrieve keys from a directory - keys are saved as <keyid>.asc"""
@@ -434,10 +406,9 @@ class DiskKeyCacheCallback(KeyCacheCallback):
         """For the disk case, this is a no-op"""
         return source
 
-    def _retrieveKey(self, source, keyId):
+    def findOpenPGPKey(self, source, keyId):
+        "@see: KeyCacheCallback.findOpenPGPKey"
         keyFile = os.path.join(self.dirSource, "%s.asc" % keyId.lower())
-        if not os.access(keyFile, os.R_OK):
-            raise _KeyNotFound(keyId)
         try:
             return file(keyFile).read()
         except IOError, e:
@@ -446,8 +417,8 @@ class DiskKeyCacheCallback(KeyCacheCallback):
                 raise _KeyNotFound(keyId)
             raise _KeyNotFound(keyId, str(e))
 
-    def __init__(self, dirSource, cfg = None, pubRing=''):
-        KeyCacheCallback.__init__(self, cfg = cfg, pubRing=pubRing)
+    def __init__(self, dirSource, cfg = None):
+        KeyCacheCallback.__init__(self, cfg = cfg)
         self.dirSource = dirSource
 
 class KeyringCacheCallback(KeyCacheCallback):
@@ -456,7 +427,8 @@ class KeyringCacheCallback(KeyCacheCallback):
         """For the keyring case, this is a no-op"""
         return source
 
-    def _retrieveKey(self, source, keyId):
+    def findOpenPGPKey(self, source, keyId):
+        "@see: KeyCacheCallback.findOpenPGPKey"
         if not os.access(self.srcKeyring, os.R_OK):
             # Keyring doesn't exist
             raise _KeyNotFound(keyId)
@@ -470,8 +442,8 @@ class KeyringCacheCallback(KeyCacheCallback):
         sio.seek(0)
         return sio.read()
 
-    def __init__(self, keyring, pubRing=''):
-        KeyCacheCallback.__init__(self, pubRing=pubRing)
+    def __init__(self, keyring):
+        KeyCacheCallback.__init__(self)
         self.srcKeyring = keyring
 
 _keyCache = OpenPGPKeyFileCache()

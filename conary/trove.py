@@ -1050,9 +1050,7 @@ class Trove(streams.StreamSet):
         found, or the keys are not trusted
         """
         version = self.getVersion()
-        serverName = None
-        if isinstance(version, (versions.VersionSequence, versions.Label)):
-            serverName = version.getHost()
+        vlabel = version.trailingLabel()
         missingKeys = []
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
@@ -1068,6 +1066,7 @@ class Trove(streams.StreamSet):
 
             try:
                 key = keyCache.getPublicKey(signature[0],
+                                            label = vlabel,
                                             serverName=serverName,
                                             # don't warn about missing gpg
                                             # if the threshold is <= 0

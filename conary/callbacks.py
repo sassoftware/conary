@@ -288,14 +288,9 @@ class KeyCacheCallback(Callback):
     def getPublicKey(self, keyId, serverName, warn=False):
         return False
 
-    def setPublicPath(self, path):
-        """Set the path to the public keyring"""
-        self.pubRing = path
-
-    def __init__(self, repos = None, cfg = None, pubRing = ''):
+    def __init__(self, repos = None, cfg = None):
         Callback.__init__(self)
         self.repos = repos
-        self.pubRing = pubRing
         self.cfg = cfg
 
 class CloneCallback(ChangesetCallback):
