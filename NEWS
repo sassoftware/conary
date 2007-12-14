@@ -49,6 +49,9 @@ Changes in 2.0.0:
       that are built for architectures other than the architecture that
       is being built for.  This avoids a common problem where a single
       extra sparc file library taints an entire package. (CNY-1717)
+    * The rarely used "cvc describe" command line interface has been
+      removed. (CNY-2357)
+    * The rarely used "cvcdesc" script has been removed. (CNY-2357)
 
   o Server Changes:
     * Fixed scoring for target flavor sets (CNY-1539)
@@ -86,9 +89,19 @@ Changes in 2.0.0:
 
 Changes in 1.2.10:
   o Client Changes:
+    * A new "cvc explain" command has been added. "cvc explain"
+      displays the documentation for recipe methods.  For example,
+      "cvc explain addSource" shows the on-line documentation for the
+      addSource() method. (CNY-2242)
     * The command line interface to cvc derive (added in Conary 1.2.8)
       has been changed.  It now derives onto your buildLabel by default,
       with a --target option to derive onto a different label.
+    * verify no longer complains about files which have been removed
+      with 'conary remove' (CNY-950)
+    * Local rollbacks for removals didn't store the original contents for
+      modified config files (CNY-2350).
+    * Permission errors now list both the URL and the repository
+      hostname (CNY-2211)
 
   o Server Changes:
     * 'serializeCommits' has been added as a new boolean server
@@ -102,6 +115,11 @@ Changes in 1.2.10:
   o Bug Fixes:
     * A bug that caused an exception when inspecting ELF files with a
       standalone ABI has been fixed. (CNY-2333)
+    * A bug that caused updates with group scripts to fail when run
+      with the '--root' option with a trailing slash in the path has
+      been fixed. (CNY-2348)
+    * Rewriting rollback changesets could cause some file placeholders to
+      be lost
 
 Changes in 1.2.9:
   o Documentation Changes:

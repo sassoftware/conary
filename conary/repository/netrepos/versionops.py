@@ -148,6 +148,26 @@ class LatestTable:
             self.update(cu, itemId, branchId, flavorId)
 
     def updateRoleId(self, cu, roleId, tmpInstances=False):
+        if tmpInstances:
+            # heuristics - we need to determine if it is easier to
+            # recompute the entire latest cache for this roleId or
+            # we should do discrete operations for each (itemId, flavorId) pair
+            cu.execute(""" select count(*) from (
+            select distinct itemId, flavorId from tmpInstances
+            join Instances using(instanceId) ) as q""")
+            tmpCount = cu.fetchone()[0]
+            cu.execute(""" select count(*) from (
+            select distinct itemId, flavorId from UserGroupInstancesCache as ugi
+            join Instances using(instanceId) where ugi.userGroupId = ? ) as q""",
+                       roleId)
+            ugiCount = cu.fetchone()[0]
+            # looping over tmpInstances tuples is only effective if we
+            # process fewer than 1/4 (roughly) of the already existing
+            # entries. Also, 500 entries will result in at least 2000
+            # queries on the backend, which will also take time.
+            if tmpCount > min(1000, ugiCount / 4):
+                # do them all, it is more effective
+                tmpInstances = False
         if not tmpInstances:
             cu.execute("delete from LatestCache where userGroupId = ?", roleId)
             cu.execute("""
@@ -160,7 +180,7 @@ class LatestTable:
         # we need to be more discriminate since we know what
         # instanceIds are new (they are provided in tmpInstances table)
         cu.execute("""
-        select itemId, flavorId, branchId
+        select distinct itemId, flavorId, branchId
         from tmpInstances join Instances using(instanceId)
         join Nodes using(itemId, versionId) """)
         for itemId, flavorId, branchId in cu.fetchall():

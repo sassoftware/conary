@@ -117,7 +117,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             rc = self.__send(self.__name, newArgs)
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
-                raise errors.InsufficientPermission(e.url.split("/")[2])
+                raise errors.InsufficientPermission(
+                    repoName = self.__serverName, url = e.url)
             raise
 
         if clientVersion < 60:

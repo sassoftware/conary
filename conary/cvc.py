@@ -32,7 +32,7 @@ from conary import errors, keymgmt
 from conary import state
 from conary import updatecmd
 from conary import versions
-from conary.build import cook, use, signtrove, derive
+from conary.build import cook, use, signtrove, derive, explain
 from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
@@ -96,6 +96,18 @@ class AddCommand(CvcCommand):
         checkin.addFiles(args[1:], text = text, binary = binary, repos = repos,
                          defaultToText = False)
 _register(AddCommand)
+
+class ExplainCommand(CvcCommand):
+    commands = ['explain']
+    paramHelp = 'method'
+    help = 'Explain a recipe method'
+
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos=None):
+        if len(args) < 3:
+            return explain.docAll(cfg)
+        return explain.docObject(cfg, args[2])
+_register(ExplainCommand)
 
 class AnnotateCommand(CvcCommand):
     commands = ['annotate']

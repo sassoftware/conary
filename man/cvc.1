@@ -161,10 +161,17 @@ error occurs, diff returns a value of 2. If there are differences
 in the local directory, 1 is returned. If no differences are found, 0
 is returned (this convention is consistent with \fBdiff\fR(1).
 .TP 4
+.B explain
+Displays the Conary API Documentation associated with a recipe or action
+within a recipe.  For example, \fBcvc explain addSource\fP will display
+information about using \fBaddSource\fP in a recipe.
+\fBcvc explain PackageRecipe\fP will display information about
+\fBPackageRecipe\fP and list available actions.
+.TP 4
 .B help
 Displays cvc help file.  Can be added to individual commands as an 
-option.  For example, cvc cook help will display help information
-for the cook command.
+option.  For example, \fBcvc cook help\fP will display help information
+for the \fBcook\fP command.
 .TP 4
 .B log [\fI<branch>\fP]
 Prints the log messages for the branch specified by \fBbuildLabel\fP,
@@ -546,5 +553,3 @@ can report undocumented features at http://issues.rpath.com/
 .\"
 .SH "SEE ALSO"
 conary(1)
-.br
-cvcdesc(1)

@@ -612,6 +612,14 @@ class ChangeSet(streams.StreamSet):
 		if fileObj.hasContents:
 		    fullPath = db.root + path
 
+                    if fileObj.flags.isConfig():
+                        cont = filecontents.FromDataStore(db.contentsStore,
+                                    fileObj.contents.sha1())
+                        rollback.addFileContents(pathId, fileId,
+                                                 ChangedFileTypes.file, cont,
+                                                 fileObj.flags.isConfig())
+                        continue
+
 		    if os.path.exists(fullPath):
 			fsFile = files.FileFromFilesystem(fullPath, pathId,
 				    possibleMatch = fileObj)
@@ -1140,8 +1148,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         allContents = {}
         for key in keyList:
             (tag, contents, compressed) = self.configCache[key]
-            if tag == ChangedFileTypes.file:
-                allContents[key] = (ChangedFileTypes.file, contents, False)
+            if tag != ChangedFileTypes.diff:
+                allContents[key] = (tag, contents, False)
 
         wrapper = DictAsCsf({})
         wrapper.addConfigs(allContents)

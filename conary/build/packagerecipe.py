@@ -804,8 +804,17 @@ class PackageRecipe(AbstractPackageRecipe):
 
     EXAMPLE
     =======
+    A sample class that uses PackageRecipe to download source code from
+    a web site, unpack it, run "make", then run "make install"::
 
-    FIXME example
+        class ExamplePackage(PackageRecipe):
+            name = 'example'
+            version = '1.0'
+
+            def setup(r):
+                r.addArchive('http://code.example.com/example/')
+                r.Make()
+                r.MakeInstall()
     """
     internalAbstractBaseClass = 1
     # these initial buildRequires need to be cleared where they would
