@@ -988,7 +988,9 @@ class CvcMain(command.MainHandler):
             del argSet['profile']
 
         keyCache = openpgpkey.getKeyCache()
-        keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
+        repos = conaryclient.ConaryClient(cfg).getRepos()
+        keyCacheCallback = openpgpkey.KeyCacheCallback(repos,
+                                                       cfg,
                                                        cfg.pubRing[-1])
         keyCache.setCallback(keyCacheCallback)
 

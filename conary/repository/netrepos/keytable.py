@@ -18,9 +18,7 @@ except ImportError:
     from StringIO import StringIO
 import base64
 
-from conary.constants import version
 from conary.lib import openpgpfile, openpgpkey, util
-from textwrap import wrap
 
 class OpenPGPKeyTable:
     def __init__(self, db):
@@ -69,16 +67,26 @@ class OpenPGPKeyTable:
         for (keyId, keyBlob) in cu.fetchall():
             origKey = cu.frombinary(keyBlob)
             origKey = openpgpfile.newKeyFromString(origKey)
-            # ensure new key is a superset of old key. we can't allow the
-            # repo to let go of subkeys or revocations.
-            openpgpfile.assertReplaceKeyAllowed(origKey, inKey)
+
+            modified = origKey.merge(inKey)
+            if not modified:
+                # Nothing to do here, the key in our DB is already a superset
+                # of the incoming key
+                break
+            # origKey now is a superset of both the old key and the incoming
+            # key. we can't allow the repo to let go of subkeys or
+            # revocations.
+            sio = StringIO()
+            origKey.writeAll(sio)
+            keyData = sio.getvalue()
+
             #reset the key cache so the changed key shows up
             keyCache = openpgpkey.getKeyCache()
-            keyCache.reset()
+            keyCache.remove(keyId)
             cu.execute('UPDATE PGPKeys set pgpKey=? where keyId=?',
-                       cu.binary(pgpKeyData), keyId)
+                       cu.binary(keyData), keyId)
             break
-        else:
+        else: #for
             cu.execute('INSERT INTO PGPKeys (userId, fingerprint, pgpKey) '
                        'VALUES (?, ?, ?)',
                        (userId, mainFingerprint, cu.binary(pgpKeyData)))
@@ -137,11 +145,9 @@ class OpenPGPKeyTable:
     def getAsciiPGPKeyData(self, keyId):
         # don't trap exceptions--that way we can assume we found a key.
         keyData = self.getPGPKeyData(keyId)
-        crc = openpgpfile.CRC24(keyData).base64digest()
-        keyData = "\n".join(wrap(base64.b64encode(keyData), 72))
-        # Add the CRC
-        keyData += '\n=' + crc
-        return "-----BEGIN PGP PUBLIC KEY BLOCK-----\nVersion: Conary "+version+"\n\n%s\n-----END PGP PUBLIC KEY BLOCK-----" % keyData
+        sio = StringIO()
+        openpgpfile.armorKeyData(keyData, sio)
+        return sio.getvalue()
 
     def getUsersMainKeys(self, user):
         cu = self.db.cursor()

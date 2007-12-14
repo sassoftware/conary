@@ -18,7 +18,7 @@ import pickle
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
 from conary.conaryclient import clone, resolve, update
-from conary.lib import log, util
+from conary.lib import log, util, openpgpkey
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import trovesource
@@ -89,6 +89,14 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             resolverClass = resolve.DependencySolver
 
         self.resolver = resolverClass(self, cfg, self.repos, self.db)
+
+        # Set up the callbacks for the PGP key cache
+        keyCache = openpgpkey.getKeyCache()
+        keyCacheCallback = openpgpkey.KeyCacheCallback(self.repos,
+                                                       cfg,
+                                                       cfg.pubRing[-1])
+        keyCache.setCallback(keyCacheCallback)
+
 
     def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
         if self.repos:
