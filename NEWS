@@ -88,7 +88,7 @@ Changes in 2.0.0:
     * Many repository permission manipulation methods have been
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
-Changes in 1.2.10:
+Changes in 1.2.11:
   o Build changes:
     * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
