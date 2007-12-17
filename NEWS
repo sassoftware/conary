@@ -1,4 +1,14 @@
 Changes in @NEW@:
+  o Client Changes:
+    * The error message printed when Conary encounters an unhandled
+      exception has been changed to reflect the fact that the common
+      case is merely poor handling of the error condition, rather than
+      another bug.  It has also been reformatted to display better in
+      rITS. (CNY-2265)
+    * The "conary-debug" script that collects information to help
+      debug a crash has been enhanced to include the recently-added
+      manifest file. (CNY-2338)
+
   o Build changes:
     * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
@@ -8,6 +18,7 @@ Changes in @NEW@:
       clearBuildRequires() and the clearCrossReqs() function now has a
       synonym called clearCrossRequires().  The old function names
       will be deprecated in the future. (CNY-834)
+
   o Bug Fixes:
     * when building groups, r.addCopy now respects the groupName
       flag. (CNY-2345)
