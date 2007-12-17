@@ -23,7 +23,7 @@ def getAuth(req):
     if not 'Authorization' in req.headers_in:
         authToken = ['anonymous', 'anonymous']
     else:
-        info = req.headers_in['Authorization'].split()
+        info = req.headers_in['Authorization'].split(' ', 1)
         if len(info) != 2 or info[0] != "Basic":
             return None
 
@@ -32,10 +32,10 @@ def getAuth(req):
         except:
             return None
 
-        if authString.count(":") != 1:
-            return None
-
-        authToken = authString.split(":")
+        authToken = authString.split(":", 1)
+        if len(authToken) != 2:
+            # No password
+            authToken.append('')
 
     try:
         entitlementList = parseEntitlement(
