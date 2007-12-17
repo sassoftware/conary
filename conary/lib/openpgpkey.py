@@ -270,7 +270,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
                 if not key:
                     continue
                 # Everything is trusted for now
-                trustLevel = 120
+                trustLevel = openpgpfile.TRUST_ULTIMATE
                 self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
                                                     trustLevel)
                 return self.publicDict[keyId]
@@ -295,7 +295,10 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         pubRing = self.publicPaths[0]
         # XXX
         tsDbPath = os.path.join(os.path.dirname(pubRing), 'tsdb')
-        kr = PublicKeyring(pubRing, tsDbPath)
+        try:
+            kr = PublicKeyring(pubRing, tsDbPath)
+        except IOError:
+            raise _KeyNotFound(None)
         return kr
 
     def getPrivateKey(self, keyId, passphrase=None):
@@ -368,6 +371,8 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
         @rtype: str
         @return: the unarmored key
         """
+        if source is None:
+            raise _KeyNotFound(keyId)
         try:
             key = self.repos.getAsciiOpenPGPKey(source, keyId)
         except KeyNotFound:
@@ -377,7 +382,7 @@ class KeyCacheCallback(callbacks.KeyCacheCallback):
 
     def _formatSource(self, source):
         """Network-aware source formatter"""
-        assert(isinstance(source, versions.Label))
+        assert(source is None or isinstance(source, versions.Label))
         return source
 
     def getPublicKey(self, keyId, label, warn=True):
