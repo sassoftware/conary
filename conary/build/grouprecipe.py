@@ -1000,8 +1000,7 @@ class GroupRecipe(_BaseGroupRecipe):
                     recurse=recurse, groupName = name, flatten = flatten,
                     copyScripts = copyScripts,
                     copyCompatibilityClass = copyCompatibilityClass)
-        for group in self._getGroups(groupName):
-            self.addNewGroup(name)
+        self.addNewGroup(name, groupName=groupName)
 
     def addNewGroup(self, name, groupName = None, byDefault = True, use = True):
         """

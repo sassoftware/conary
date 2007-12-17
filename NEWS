@@ -8,6 +8,9 @@ Changes in @NEW@:
       clearBuildRequires() and the clearCrossReqs() function now has a
       synonym called clearCrossRequires().  The old function names
       will be deprecated in the future. (CNY-834)
+  o Bug Fixes:
+    * when building groups, r.addCopy now respects the groupName
+      flag. (CNY-2345)
 
 Changes in 1.2.10:
   o Client Changes:
