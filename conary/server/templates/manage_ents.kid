@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
- Copyright (c) 2005 rpath, Inc.
+ Copyright (c) 2005-2007 rPath, Inc.
 
  This program is distributed under the terms of the Common Public License,
  version 1.0. A copy of this license should have been distributed with this
@@ -24,27 +24,28 @@
                 <thead>
                     <tr>
                         <td style="width: 25%;">Entitlement Class</td>
-                        <td py:if="isAdmin" py:content="'Permissions Group'"/>
-                        <td py:if="isAdmin" py:content="'Managing Group'"/>
-                        <td style="text-align: center;" py:content="'Manage'"/>
-                        <td style="text-align: center;" py:if="isAdmin" py:content="'Delete'"/>
+                        <td py:if="isAdmin" py:content="'Role'"/>
+                        <td py:if="isAdmin" py:content="'Managing Role'"/>
+                        <td style="text-align: right;">Action</td>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr py:for="i, (entClass, owner, accessGroupList) in enumerate(sorted(entClasses))"
+                    <tr py:for="i, (entClass, owner, roles) in enumerate(sorted(entClasses))"
                         class="${i % 2 and 'even' or 'odd'}">
+                        <td py:content="entClass"/>
                         <td>
-                            <a py:if="isAdmin" href="configEntClassForm?entClass=${entClass}" py:content="entClass"/>
-                            <span py:if="not isAdmin" py:content="entClass"/>
-                        </td>
-                        <td>
-                            <table py:if="isAdmin"><tbody><div py:for="accessGroup in sorted(accessGroupList)" py:strip="True">
-                                <tr><td py:content="accessGroup"/></tr>
+                            <table py:if="isAdmin"><tbody><div py:for="role in sorted(roles)" py:strip="True">
+                                <tr><td py:content="role"/></tr>
                             </div></tbody></table>
                         </td>
                         <td py:if="isAdmin" py:content="owner"/>
-                        <td style="text-align: center;"><a href="manageEntitlementForm?entClass=${entClass}">X</a></td>
-                        <td style="text-align: center;" py:if="isAdmin"><a href="deleteEntClass?entClass=${entClass}">X</a></td>
+                        <td style="text-align: right;">
+                            <a href="manageEntitlementForm?entClass=${entClass}">Manage Keys</a>
+                            <span py:if="isAdmin">&nbsp;|&nbsp;
+                               <a href="configEntClassForm?entClass=${entClass}">Edit Class</a>&nbsp;|&nbsp;
+                               <a href="deleteEntClass?entClass=${entClass}">Delete Class</a>
+                            </span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
