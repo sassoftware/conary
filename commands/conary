@@ -1147,11 +1147,6 @@ class ConaryMain(command.MainHandler):
             lsprof = True
             del argSet['lsprof']
 
-        keyCache = openpgpkey.getKeyCache()
-        keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
-                                                       cfg.pubRing[-1])
-        keyCache.setCallback(keyCacheCallback)
-
         rv = options.MainHandler.runCommand(self, thisCommand, cfg,
                                              argSet, args)
 

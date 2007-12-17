@@ -23,6 +23,7 @@ import stat
 import struct
 import sys
 import tempfile
+import textwrap
 import time
 
 try:
@@ -40,6 +41,7 @@ from Crypto.Cipher import CAST
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
 
+from conary import constants
 from conary.lib import util
 
 # key types defined in RFC 2440 page 49
@@ -279,13 +281,71 @@ def seekKeyById(keyId, keyRing):
     except StopIteration:
         return False
 
-def readKeyData(stream, keyId):
-    """Read the key from the keyring and export it"""
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    sio = StringIO()
-    pkt.writeAll(sio)
-    return sio.getvalue()
+def exportKey(keyId, keyRing, armored=False):
+    """Export the key from the keyring, performing the necessary locking
+
+    @param keyId: the key ID
+    @type keyId: str
+    @param keyRing: the keyring from where the key is to be extracted
+    @type keyRing: file or path
+    @param armor: If True, exports the key in a Radix-64 encoding (armor)
+    @type armor: bool
+    @rtype: stream
+    @return: the key in a stream
+    """
+    if isinstance(keyRing, str):
+        try:
+            keyRing = util.ExtendedFile(keyRing, buffering = False)
+        except (IOError, OSError), e:
+            # if we can't read/find the key, it's not there.
+            raise KeyNotFound(keyId)
+    fd = keyRing.fileno()
+    try:
+        fcntl.lockf(fd, fcntl.LOCK_SH)
+        msg = PGP_Message(keyRing)
+        key = msg.getKeyByKeyId(keyId)
+        # if the key we requested was a subkey, use the main key
+        if isinstance(key, PGP_SubKey):
+            key = key.getParentPacket()
+        sio = util.ExtendedStringIO()
+        key.writeAll(sio)
+    finally:
+        fcntl.lockf(fd, fcntl.LOCK_UN)
+
+    if armored:
+        sio.seek(0)
+        keyData = sio.read()
+        sio.truncate(0)
+        armorKeyData(keyData, sio)
+    sio.seek(0)
+    return sio
+
+def armorKeyData(keyData, stream):
+    """
+    Write the Radix-64 encoded version of the key data.
+
+    @param keyData: key data
+    @type key: str
+    @type stream: A stream open in write mode
+    @type stream: file
+    """
+    assert(isinstance(keyData, str))
+    assert(hasattr(stream, "write"))
+
+    crc = CRC24(keyData).base64digest()
+
+    stream.write("-----BEGIN PGP PUBLIC KEY BLOCK-----\n")
+    stream.write("Version: Conary ")
+    stream.write(constants.version)
+    stream.write("\n\n")
+    for line in textwrap.wrap(base64.b64encode(keyData), 72):
+        stream.write(line)
+        stream.write('\n')
+    # Add the CRC
+    stream.write('=')
+    stream.write(crc)
+    stream.write("\n-----END PGP PUBLIC KEY BLOCK-----")
+    return stream
 
 def verifySelfSignatures(keyId, stream):
     msg = PGP_Message(stream, start = 0)
@@ -572,90 +632,6 @@ def crc24(stream):
 
 def crc24base64(stream):
     return _crc24(stream).base64digest()
-
-# this function will enforce the following rules
-# rule 1: cannot switch main keys
-# rule 2: a PGP Key in the repo may never lose a subkey
-# rule 3: No revocations may be lost
-# rules one and two are to prevent repo breakage
-# rule three is to enforce a modicum of sanity to the security posture
-def assertReplaceKeyAllowed(origKey, newKey):
-    if not newKey.isSupersetOf(origKey):
-        raise IncompatibleKey("Attempting to replace a key with a non-superset")
-
-# this code is GnuPG specific. RFC 2440 indicates the existence of trust
-# packets inside a keyring. GnuPG ignores this convention and keeps trust
-# in a separate file generally called trustdb.gpg
-# records are always 40 bytes long
-# tags we care about are:
-# 1: version stuff. always the first data packet
-# 2 thru 11: we don't care
-# 12: key trust packet
-# 13: userid trust packet
-# the formats of packets tagged 12 and 13 (by reverse engineering)
-# offset 0: packet tag
-# offset 1: reserved
-# offsets 2-21: fingerprint of key/hash of userId 20 bytes either way
-# offset 22: trust/validity value.
-# offsets 23-39 don't matter for our purposes
-# the trust is in the key packet. that will be what's returned once
-# we establish the validity of the key (found in the userid packets)
-def getKeyTrust(trustFile, fingerprint):
-    # give nothing, get nothing
-    if not fingerprint:
-        return TRUST_UNTRUSTED
-    try:
-        trustDb = open(trustFile, 'r')
-    except IOError:
-        return TRUST_UNTRUSTED
-    except:
-        trustDb.close()
-        raise
-    # FIXME: verify trustdb version is 3
-    found = 0
-    done = 0
-    # alter fingerprint to be the form found in the trustDB
-    data = int (fingerprint, 16)
-    keyId = ''
-    while data:
-        keyId = chr(data%256) + keyId
-        data //= 256
-    # seek for the right key record in the trust db
-    while not done:
-        dataChunk = trustDb.read(TRUST_PACKET_LENGTH)
-        if len(dataChunk) == TRUST_PACKET_LENGTH:
-            if (dataChunk[0] == TRP_KEY) and (dataChunk[2:22] == keyId):
-                done = 1
-                found = 1
-        else:
-            done = 1
-    if not found:
-        trustDb.close()
-        return TRUST_UNTRUSTED
-    trust = ord(dataChunk[22])
-    # gnupg assigns lineal order to such things as expired and invalid
-    # in a less than logical fashion. for our purposes, we'll simply
-    # treat them all as untrusted
-    if trust < TRUST_MARGINAL:
-        trust = TRUST_UNTRUSTED
-    # before returning this value, establish the validity of the key
-    # the overall validity of a key is equal to the greatest validity
-    # of any one userId that key has
-    done = 0
-    maxValidity = TRUST_UNTRUSTED
-    while not done:
-        dataChunk = trustDb.read(TRUST_PACKET_LENGTH)
-        if (len(dataChunk) == TRUST_PACKET_LENGTH) and (dataChunk[0] == TRP_USERID):
-            maxValidity = max(maxValidity, ord(dataChunk[22]))
-        else:
-            done = 1
-    trustDb.close()
-    # if the key isn't fully valid, by convention, it can't propogate any
-    # imbued trust to the signatures made by that key
-    if maxValidity >= TRUST_FULL:
-        return trust
-    return TRUST_UNTRUSTED
-
 
 class PacketTypeDispatcher(object):
     _registry = {}
@@ -3075,7 +3051,7 @@ class PublicKeyring(object):
         self._tsDbPath = tsDbPath
         # Create the files if they don't exist
         for f in [self._keyringPath, self._tsDbPath]:
-            file(f, "w")
+            file(f, "a+")
         self._tsDbTimestamp = None
         self._cache = {}
 
@@ -3088,11 +3064,26 @@ class PublicKeyring(object):
             keys = list(keys)
         for key in keys:
             assert(isinstance(key, PGP_MainKey))
-        stream = self._openKeyring()
+        stream = self._openKeyring(readOnly = False)
         keyFingerprints = addKeys(keys, stream)
         self.updateTimestamps(keyFingerprints, timestamp = timestamp)
         return keyFingerprints
 
+    def _extractKey(self, key):
+        if not key:
+            return ""
+        if ord(key[0]) & 0x80:
+            # Most likely already binary
+            return key
+        return parseAsciiArmorKey(key)
+
+    def addKeysAsStrings(self, keys, timestamp = None):
+        sio = util.ExtendedStringIO()
+        for k in keys:
+            assert(isinstance(k, str))
+            sio.write(self._extractKey(k))
+        msg = PGP_Message(sio, start = 0)
+        return self.addKeys(msg.iterMainKeys(), timestamp = timestamp)
 
     def updateTimestamps(self, keyIds, timestamp = None):
         # Expand generators
@@ -3113,7 +3104,7 @@ class PublicKeyring(object):
             pkts.append(pkt)
 
         mtime0 = os.stat(self._tsDbPath)[stat.ST_MTIME]
-        addKeyTimestampPackets(pkts, self._openTsDb())
+        addKeyTimestampPackets(pkts, self._openTsDb(readOnly = False))
         mtime1 = os.stat(self._tsDbPath)[stat.ST_MTIME]
         if mtime0 == mtime1:
             # Cheat, and set the mtime to be a second larger
@@ -3123,12 +3114,20 @@ class PublicKeyring(object):
         # the mtime.
         self._tsDbTimestamp = None
 
-    def _openTsDb(self):
-        return util.ExtendedFile(self._tsDbPath, "r+",
+    def _openTsDb(self, readOnly = True):
+        if readOnly:
+            mode = "r"
+        else:
+            mode = "r+"
+        return util.ExtendedFile(self._tsDbPath, mode,
                 buffering = False)
 
-    def _openKeyring(self):
-        return util.ExtendedFile(self._keyringPath, "r+",
+    def _openKeyring(self, readOnly = True):
+        if readOnly:
+            mode = "r"
+        else:
+            mode = "r+"
+        return util.ExtendedFile(self._keyringPath, mode,
                 buffering = False)
 
     def _parseTsDb(self):
@@ -3138,7 +3137,9 @@ class PublicKeyring(object):
             # Database hasn't changed
             return
 
-        stream = self._openTsDb()
+        allKeys = self._getAllKeys()
+
+        stream = self._openTsDb(readOnly = True)
         fd = stream.fileno()
         try:
             fcntl.lockf(fd, fcntl.LOCK_SH)
@@ -3146,7 +3147,11 @@ class PublicKeyring(object):
             self._cache.clear()
             for pkt in TimestampPacketDatabase(stream).iterTrustPackets():
                 pkt.parse()
-                self._cache[pkt.getKeyId()] = pkt.getRefreshTimestamp()
+                mainKeyId = pkt.getKeyId()
+                ts = pkt.getRefreshTimestamp()
+                self._cache[mainKeyId] = ts
+                for sk in allKeys.get(mainKeyId, []):
+                    self._cache[sk] = ts
         finally:
             fcntl.lockf(fd, fcntl.LOCK_UN)
 
@@ -3157,3 +3162,40 @@ class PublicKeyring(object):
         # XXX for v3 keys, trimming to the last 8 bytes is not the valid way
         # to get the key ID. But it's just a cache.
         return self._cache.get(keyId[-16:], None)
+
+    def getKey(self, keyId):
+        """
+        Retrieve the key.
+
+        @param keyId: the key ID.
+        @type keyId: str
+        @rtype: PGP_Key
+        @return: a key with the specified key ID
+        @raise KeyNotFound: if the key was not found
+        """
+        stream = self._openKeyring(readOnly = True)
+        # exportKey will do the locking for the period we read from the
+        # keyring, and will return a private file object that is not shared
+        # with other processes
+        retStream = exportKey(keyId, stream)
+        # Note that exportKey will export both the main key and the subkeys.
+        # Because of this, we can't blindly grab the first key in the new
+        # keyring.
+        msg = PGP_Message(retStream)
+        return msg.iterByKeyId(keyId).next()
+
+    def _getAllKeys(self):
+        # Return all keys and subkeys
+        # We need them in order to handle subkeys too
+        ret = {}
+        stream = self._openKeyring(readOnly = True)
+        fd = stream.fileno()
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_SH)
+            msg = PGP_Message(stream)
+            for pk in msg.iterMainKeys():
+                fp = pk.getKeyId()
+                ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
+            return ret
+        finally:
+            fcntl.lockf(fd, fcntl.LOCK_UN)
