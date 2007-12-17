@@ -11,6 +11,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * when building groups, r.addCopy now respects the groupName
       flag. (CNY-2345)
+    * the searchPath parameter to groups now works when it contains
+      packages (before it only worked with labels). (CNY-2372)
 
 Changes in 1.2.10:
   o Client Changes:

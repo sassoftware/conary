@@ -363,7 +363,7 @@ def createSearchPathFromStrings(searchPath):
         elif isinstance(item, str):
             if '=' in item:
                 # only troveSpecs have = in them
-                item = [ cmdline.parseTroveSpec(item) ]
+                item = ( cmdline.parseTroveSpec(item), )
             elif '@' in item:
                 try:
                     item = versions.Label(item)
@@ -373,13 +373,13 @@ def createSearchPathFromStrings(searchPath):
                 labelList.append(item)
                 continue
             else:
-                item = [cmdline.parseTroveSpec(item)]
+                item = (cmdline.parseTroveSpec(item),)
         else:
             raise baseerrors.ParseError('Unknown searchPath item "%s"' % item)
         # labels don't get here, so we know that this is not part of a
         # labelPath
         if labelList:
-            finalPath.append(labelList)
+            finalPath.append(tuple(labelList))
             labelList = []
         finalPath.append(item)
     if labelList:
