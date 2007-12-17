@@ -14,9 +14,11 @@
 #
 import os
 
+from conary import conarycfg
 from conary import errors
+from conary import state
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, cfgtypes
 from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
@@ -101,10 +103,12 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
 
 def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
                     allowChangeSets=True):
-    """ Takes input specifying changeSpecs, such as foo=1.1--1.2,
-        and turns it into (name, (oldVersionSpec, oldFlavorSpec),
-                                 (newVersionSpec, newFlavorSpec), isAbsolute)
-        tuples.
+    """
+    Parse a change specification list, as presented on the command line.
+
+    Takes input specifying changeSpecs, such as C{foo=1.1--1.2},
+    and turns it into C{(name, (oldVersionSpec, oldFlavorSpec),
+    (newVersionSpec, newFlavorSpec), isAbsolute)} tuples.
     """
     applyList = []
 
@@ -195,3 +199,28 @@ class TroveSpecError(errors.ParseError):
     def __init__(self, spec, error):
         self.spec = spec
         errors.ParseError.__init__(self, 'Error with spec "%s": %s' % (spec, error))
+
+def setContext(cfg, context=None, environ=None, searchCurrentDir=False):
+    if environ is None:
+        environ = os.environ
+    if context is not None:
+        where = 'given manually'
+    else:
+        context = cfg.context
+        where = 'specified as the default context in the conary configuration'
+        if searchCurrentDir and os.access('CONARY', os.R_OK):
+            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
+            if conaryState.hasContext():
+                context = conaryState.getContext()
+                where = 'specified in the CONARY state file'
+
+        if 'CONARY_CONTEXT' in environ:
+            context = environ['CONARY_CONTEXT']
+            where = 'specified in the CONARY_CONTEXT environment variable'
+    if context:
+        if not cfg.getContext(context):
+            raise cfgtypes.CfgError('context "%s" (%s) does not exist' % (context, where))
+        cfg.setContext(context)
+    return cfg
+
+

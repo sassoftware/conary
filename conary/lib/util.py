@@ -15,6 +15,7 @@
 import bdb
 import bz2
 import debugger
+import fcntl
 import errno
 import log
 import misc
@@ -25,14 +26,16 @@ import shutil
 import signal
 import stat
 import string
+import StringIO
 import subprocess
 import sys
 import tempfile
 import time
-import traceback
 import urllib
 import urlparse
 import weakref
+import xmlrpclib
+import zlib
 
 from conary.lib import fixedglob, log
 
@@ -60,13 +63,14 @@ def mkdirChain(*paths):
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
+        normpath = os.path.normpath(path)
 
         # don't die in case the dir already exists
         try:
-            os.makedirs(path)
+            os.makedirs(normpath)
         except OSError, exc:
             if exc.errno == errno.EEXIST:
-                if os.path.isdir(path):
+                if os.path.isdir(normpath):
                     continue
                 else:
                     raise
@@ -132,34 +136,27 @@ def normurl(url):
     return urlparse.urlunsplit(surl)
 
 errorMessage = '''
-*******************************************************************
-*** An error has occurred in conary:
-***
-*** %(filename)s:%(lineno)s
-*** %(errtype)s: %(errmsg)s
-***
-*** Receiving this message is always due to a bug in conary, not
-*** user error.
-***
-*** The related traceback has been output to %(stackfile)s
-***
-*** To report this error, please run the following script:
-***
-*** conary-debug "%(command)s"
-***
-*** You can attach the resulting archive to a bug report at
-*** http://issues.rpath.com/.
-***
-*******************************************************************
+ERROR: An unexpected condition has occurred in Conary.  This is
+most likely due to insufficient handling of erroneous input, but
+may be some other bug.  In either case, please report the error at
+http://issues.rpath.com/ and attach to the issue the file
+%(stackfile)s
 
-For more information, or if you have trouble with the conary-debug
-command, go to: 
-
+Then, for more complete information, please run the following script:
+conary-debug "%(command)s"
+You can attach the resulting archive to your issue report at
+http://issues.rpath.com/  For more information, or if you have
+trouble with the conary-debug command, go to:
 http://wiki.rpath.com/wiki/Conary:How_To_File_An_Effective_Bug_Report
 
-for more help on reporting issues.
+To get a debug prompt, rerun the command with --debug-all
 
-To get a debug prompt, rerun this command with --debug-all
+Error details follow:
+
+%(filename)s:%(lineno)s
+%(errtype)s: %(errmsg)s
+
+The complete related traceback has been saved as %(stackfile)s
 '''
 _debugAll = False
 
@@ -171,25 +168,32 @@ def genExcepthook(debug=True,
         _debugAll = True
         print >>sys.stderr, '<Turning on KeyboardInterrupt catching>'
 
-    def excepthook(type, value, tb):
-        if type is bdb.BdbQuit:
+    def excepthook(typ, value, tb):
+        if typ is bdb.BdbQuit:
             sys.exit(1)
         sys.excepthook = sys.__excepthook__
-        if not _debugAll and (type == KeyboardInterrupt and not debugCtrlC):
+        if not _debugAll and (typ == KeyboardInterrupt and not debugCtrlC):
             sys.exit(1)
 
-        lines = traceback.format_exception(type, value, tb)
+        out = BoundedStringIO()
+        formatTrace(typ, value, tb, stream = out, withLocals = False)
+        out.write("\nFull stack:\n")
+        formatTrace(typ, value, tb, stream = out, withLocals = True)
+        out.seek(0)
+        tbString = out.read()
+        del out
         if log.syslog is not None:
-            log.syslog.traceback(lines)
+            log.syslog("command failed\n%s", tbString)
 
         if debug or _debugAll:
-            sys.stderr.write(string.joinfields(lines, ""))
+            formatTrace(typ, value, tb, stream = sys.stderr,
+                        withLocals = False)
             if sys.stdout.isatty() and sys.stdin.isatty():
-                debugger.post_mortem(tb, type, value)
+                debugger.post_mortem(tb, typ, value)
             else:
                 sys.exit(1)
         elif log.getVerbosity() is log.DEBUG:
-            log.debug(''.join(lines))
+            log.debug(tbString)
         else:
             cmd = sys.argv[0]
             if cmd.endswith('/commands/conary'):
@@ -197,14 +201,16 @@ def genExcepthook(debug=True,
             elif cmd.endswith('/commands/cvc'):
                 cmd = cmd[:len('/commands/cvc')] + '/bin/cvc'
                 
+            origTb = tb
             cmd = normpath(cmd)
             sys.argv[0] = cmd
             while tb.tb_next: tb = tb.tb_next
             lineno = tb.tb_frame.f_lineno
             filename = tb.tb_frame.f_code.co_filename
             tmpfd, stackfile = tempfile.mkstemp('.txt', prefix)
-            os.write(tmpfd, ''.join(lines))
+            os.write(tmpfd, tbString)
             os.close(tmpfd)
+
             sys.stderr.write(error % dict(command=' '.join(sys.argv),
                                                  filename=filename,
                                                  lineno=lineno,
@@ -377,9 +383,10 @@ def copyfileobj(source, dest, callback = None, digest = None,
     copied = 0
 
     if abortCheck:
-        sourceFd = source.fileno()
+        pollObj = select.poll()
+        pollObj.register(source.fileno(), select.POLLIN)
     else:
-        sourceFd = None
+        pollObj = None
 
     while True:
         if sizeLimit and (sizeLimit - copied < bufSize):
@@ -388,11 +395,12 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if abortCheck:
             # if we need to abortCheck, make sure we check it every time
             # read returns, and every five seconds
-            l1 = []
-            while not l1:
+            l = []
+            while not l:
                 if abortCheck():
                     return None
-                l1, l2, l3 = select.select([ sourceFd ], [], [], 5)
+                l = pollObj.poll(5000)
+
         buf = source.read(bufSize)
         if not buf:
             break
@@ -561,11 +569,17 @@ class ObjectCache(dict):
     def setdefault(self, key, value):
         return dict.setdefault(self, ref(key, self._remove), ref(value))()
 
-def memsize():
-    return memusage()[0]
+def memsize(pid = None):
+    return memusage(pid = pid)[0]
 
-def memusage():
-    pfn = "/proc/self/statm"
+def memusage(pid = None):
+    """Get the memory usage.
+    @param pid: Process to analyze (None for current process)
+    """
+    if pid is None:
+        pfn = "/proc/self/statm"
+    else:
+        pfn = "/proc/%d/statm" % pid
     line = open(pfn).readline()
     # Assume page size is 4k (true for i386). This can be adjusted by reading
     # resource.getpagesize() 
@@ -593,10 +607,12 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
     cmpIdx is the item number in the list of tuples to base comparisons on.
     Duplicates items aren't added.
 
-    @type l: list of tuples
-    @type cmpIdx: int
-    @type needle: object
+    @param haystack: list of tuples.
+    @type haystack: list
+    @param newItem: The item to be inserted
     @type newItem: tuple
+    @param cmpFn: Comparison function
+    @type cmpFn: function
     """
     start = 0
     finish = len(haystack) - 1
@@ -640,6 +656,7 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
 
 def verFormat(cfg, version):
     """Format the version according to the options in the cfg object"""
+    print >> sys.stderr, 'util.verFormat is obsolete as of Conary 1.2'
     if cfg.fullVersions:
         return str(version)
     if cfg.showLabels:
@@ -655,9 +672,18 @@ class ExtendedFile(file):
     def __init__(self, path, mode = "r", buffering = True):
         assert(not buffering)
         file.__init__(self, path, mode, buffering)
+        fcntl.fcntl(self.fileno(), fcntl.F_SETFD, 1)
 
     def pread(self, bytes, offset):
         return misc.pread(self.fileno(), bytes, offset)
+
+class ExtendedStringIO(StringIO.StringIO):
+    def pread(self, bytes, offset):
+        pos = self.tell()
+        self.seek(offset, 0)
+        data = self.read(bytes)
+        self.seek(pos, 0)
+        return data
 
 class PreadWrapper(object):
     # DEPRECATED. Will be removed in 1.1.23.
@@ -1021,6 +1047,11 @@ class LazyFileCache:
             fd._cache = None
         self._fdMap.clear()
 
+    def release(self):
+        """Release the file descriptors kept open by the LazyFile objects"""
+        for fd in self._fdMap.values():
+            fd._close()
+
     __del__ = close
 
 class Flags(object):
@@ -1052,6 +1083,490 @@ def stripUserPassFromUrl(url):
     userPass, host = urllib.splituser(hostUserPass)
     arr[1] = host
     return urlparse.urlunparse(arr)
+
+class FileIgnoreEpipe:
+
+    def ignoreEpipe(fn):
+
+        def wrapper(*args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except IOError, e:
+                if e.errno != errno.EPIPE:
+                    raise
+
+            return
+
+        return wrapper
+
+    @ignoreEpipe
+    def write(self, *args):
+        return self.f.write(*args)
+
+    @ignoreEpipe
+    def close(self, *args):
+        return self.f.close(*args)
+
+    def __getattr__(self, name):
+        return getattr(self.f, name)
+
+    def __init__(self, f):
+        self.f = f
+
+class BoundedStringIO(object):
+    """
+    An IO object that behaves like a StringIO.
+    Data is stored in memory (just like in a StringIO) if shorter than
+    maxMemorySize, or in a temporary file.
+    """
+    defaultMaxMemorySize = 65536
+    __slots__ = ['_backend', '_backendType', 'maxMemorySize']
+    def __init__(self, buf='', maxMemorySize=None):
+        if maxMemorySize is None:
+            maxMemorySize = object.__getattribute__(self, 'defaultMaxMemorySize')
+        self.maxMemorySize = maxMemorySize
+        # Store in memory by default
+        self._backend = StringIO.StringIO(buf)
+        self._backendType = "memory"
+
+    def _writeImpl(self, s):
+        backend = object.__getattribute__(self, '_backend')
+        if isinstance(backend, file):
+            # File backend
+            return backend.write(s)
+        # StringIO backend
+
+        maxMemorySize = object.__getattribute__(self, 'maxMemorySize')
+
+        # Save current position
+        curPos = backend.tell()
+        if curPos + len(s) < maxMemorySize:
+            # No danger to overflow the limit
+            return backend.write(s)
+
+        fd, name = tempfile.mkstemp(suffix=".tmp", prefix="tmpBSIO")
+        # Get rid of the file from the filesystem, we'll keep an open fd to it
+        os.unlink(name)
+        fcntl.fcntl(fd, fcntl.F_SETFD, 1)
+        backendFile = os.fdopen(fd, "w+")
+        # Copy the data from the current StringIO (up to the current position)
+        backend.seek(0)
+        backendFile.write(backend.read(curPos))
+        ret = backendFile.write(s)
+        self._backend = backendFile
+        self._backendType = "file"
+        return ret
+
+    def _truncateImpl(self, size=None):
+        if size is None:
+            # Truncate to current position by default
+            size = self.tell()
+        backend = object.__getattribute__(self, '_backend')
+        maxMemorySize = object.__getattribute__(self, 'maxMemorySize')
+
+        if not isinstance(backend, file):
+            # Memory backend
+            # Truncating always reduces size, so we will not switch to a file
+            # for this case
+            return backend.truncate(size)
+
+        # File backend
+        if size > maxMemorySize:
+            # truncating a file to a size larger than the memory limit - just
+            # pass it through
+            return backend.truncate(size)
+
+        # Need to go from file to memory
+        # Read data from file first
+        backend.seek(0)
+        backendMem = StringIO.StringIO(backend.read(size))
+        self._backendType = "memory"
+        self._backend = backendMem
+        backend.close()
+
+    def getBackendType(self):
+        return object.__getattribute__(self, '_backendType')
+
+    def __getattribute__(self, attr):
+        # Passing calls to known local objects through
+        locs = ['_backend', '_backendType', 'getBackendType', 'maxMemorySize']
+        if attr in locs:
+            return object.__getattribute__(self, attr)
+
+        if attr == 'write':
+            # Return the real implementation of the write method
+            return object.__getattribute__(self, '_writeImpl')
+
+        if attr == 'truncate':
+            # Return the real implementation of the truncate method
+            return object.__getattribute__(self, '_truncateImpl')
+
+        backend = object.__getattribute__(self, '_backend')
+        return getattr(backend, attr)
+
+class ProtectedString(str):
+    """A string that is not printed in tracebacks"""
+    def __safe_str__(self):
+        return "<Protected Value>"
+
+    __repr__ = __safe_str__
+
+class ProtectedTemplate(str):
+    """A string template that hides parts of its components.
+    The first argument is a template (see string.Template for a complete
+    documentation). The values that can be filled in are using the format
+    ${VAR} or $VAR. The keyword arguments are expanding the template.
+    If one of the keyword arguments has a __safe_str__ method, its value is
+    going to be hidden when this object's __safe_str__ is called."""
+    def __new__(cls, templ, **kwargs):
+        tmpl = string.Template(templ)
+        s = str.__new__(cls, tmpl.safe_substitute(kwargs))
+        s._templ = tmpl
+        s._substArgs = kwargs
+        return s
+
+    def __safe_str__(self):
+        nargs = {}
+        for k, v in self._substArgs.iteritems():
+            if hasattr(v, '__safe_str__'):
+                v = "<%s>" % k.upper()
+            nargs[k] = v
+        return self._templ.safe_substitute(nargs)
+
+def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
+    import types
+    import inspect
+    import itertools
+    import repr as reprmod
+    class Repr(reprmod.Repr):
+        def __init__(self, subsequentIndent = ""):
+            reprmod.Repr.__init__(self)
+            self.maxtuple = 20
+            self.maxset = 160
+            self.maxlist = 20
+            self.maxdict = 20
+            self.maxstring = 160
+            self.maxother = 160
+
+            self.maxLineLen = 160
+
+            self.subsequentIndent = subsequentIndent
+            # Pretty-print?
+            self._pretty = True
+
+        def repr_str(self, x, level):
+            if hasattr(x, '__safe_str__'):
+                return reprmod.Repr.repr_str(x.__safe_str__())
+            return reprmod.Repr.repr_str(self, x, level)
+
+        def _pretty_repr(self, pieces, iterLen, level):
+            ret = ', '.join(pieces)
+            if not self._pretty or len(ret) < self.maxLineLen:
+                return ret
+            padding = self.subsequentIndent + "  " * (self.maxlevel - level)
+            sep = ',\n' + padding
+            return '\n' + padding + sep.join(pieces)
+
+        def _repr_iterable(self, x, level, left, right, maxiter, trail=''):
+            n = len(x)
+            if level <= 0 and n:
+                s = '...'
+            else:
+                newlevel = level - 1
+                repr1 = self.repr1
+                pieces = [repr1(elem, newlevel) for elem in itertools.islice(x, maxiter)]
+                if n > maxiter:  pieces.append('...')
+                s = self._pretty_repr(pieces, n, level)
+                if n == 1 and trail:  right = trail + right
+            return '%s%s%s' % (left, s, right)
+
+        def repr_dict(self, x, level):
+            n = len(x)
+            if n == 0: return '{}'
+            if level <= 0: return '{...}'
+            newlevel = level - 1
+            repr1 = self.repr1
+            pieces = []
+            for key in itertools.islice(sorted(x), self.maxdict):
+                oldPretty = self._pretty
+                self._pretty = False
+                keyrepr = repr1(key, newlevel)
+                self._pretty = oldPretty
+
+                oldSubsequentIndent = self.subsequentIndent
+                self.subsequentIndent += ' ' * 4;
+                valrepr = repr1(x[key], newlevel)
+                self.subsequentIndent = oldSubsequentIndent
+
+                pieces.append('%s: %s' % (keyrepr, valrepr))
+            if n > self.maxdict: pieces.append('...')
+            s = self._pretty_repr(pieces, n, level)
+            return '{%s}' % (s,)
+
+
+    def formatOneFrame(tb, stream):
+        fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
+        frame = tb.tb_frame
+        stream.write('  File "%s", line %d, in %s\n' % 
+            (fileName, lineNo, funcName))
+        if text is not None:
+            # If the source file is not available, we may not be able to get 
+            # the line
+            stream.write('    %s\n' % text[idx].strip())
+
+    stream.write(str(excType))
+    stream.write(": ")
+    stream.write(str(excValue))
+    stream.write("\n\n")
+
+    tbStack = []
+    while tb:
+        tbStack.append(tb)
+        tb = tb.tb_next
+
+    if withLocals:
+        tbStack.reverse()
+        msg = "Traceback (most recent call first):\n"
+    else:
+        msg = "Traceback (most recent call last):\n"
+
+    r = Repr(subsequentIndent = " " * 27)
+    ignoredTypes = (types.ClassType, types.ModuleType, types.FunctionType,
+                    types.TypeType)
+
+    stream.write(msg)
+    for tb in tbStack:
+        formatOneFrame(tb, stream)
+
+        if not withLocals:
+            continue
+
+        frame = tb.tb_frame
+        for k, v in sorted(frame.f_locals.items()):
+            if k.startswith('__') and k.endswith('__'):
+                # Presumably internal data
+                continue
+            if isinstance(v, ignoredTypes):
+                continue
+            if hasattr(v, '__class__'):
+                if v.__class__.__name__ == 'ModuleProxy':
+                    continue
+            if hasattr(v, '__safe_str__'):
+                vstr = v.__safe_str__()
+            else:
+                vstr = r.repr(v)
+            stream.write("        %15s : %s\n" % (k, vstr))
+        stream.write("  %s\n\n" % ("*" * 70))
+
+class XMLRPCMarshaller(xmlrpclib.Marshaller):
+    """Marshaller for XMLRPC data"""
+    dispatch = xmlrpclib.Marshaller.dispatch.copy()
+    def dump_string(self, value, write, escape=xmlrpclib.escape):
+        try:
+            value = value.encode("ascii")
+        except UnicodeError:
+            sio = StringIO.StringIO()
+            xmlrpclib.Binary(value).encode(sio)
+            write(sio.getvalue())
+            return
+        return xmlrpclib.Marshaller.dump_string(self, value, write, escape)
+
+    def dump(self, values, stream):
+        write = stream.write
+        if isinstance(values, xmlrpclib.Fault):
+            # Fault instance
+            write("<fault>\n")
+            self._dump({'faultCode' : values.faultCode,
+                        'faultString' : values.faultString},
+                       write)
+            write("</fault>\n")
+        else:
+            write("<params>\n")
+            for v in values:
+                write("<param>\n")
+                self._dump(v, write)
+                write("</param>\n")
+            write("</params>\n")
+
+    def dumps(self, values):
+        sio = StringIO.StringIO()
+        self.dump(values, sio)
+        return sio.getvalue()
+
+    def _dump(self, value, write):
+        # Incorporates Patch #1070046: Marshal new-style objects like
+        # InstanceType
+        try:
+            f = self.dispatch[type(value)]
+        except KeyError:
+            # check if this object can be marshalled as a structure
+            try:
+                value.__dict__
+            except:
+                raise TypeError, "cannot marshal %s objects" % type(value)
+            # check if this class is a sub-class of a basic type,
+            # because we don't know how to marshal these types
+            # (e.g. a string sub-class)
+            for type_ in type(value).__mro__:
+                if type_ in self.dispatch.keys():
+                    raise TypeError, "cannot marshal %s objects" % type(value)
+            f = self.dispatch[InstanceType]
+        f(self, value, write)
+
+    dispatch[str] = dump_string
+    dispatch[ProtectedString] = dump_string
+    dispatch[ProtectedTemplate] = dump_string
+
+class XMLRPCUnmarshaller(xmlrpclib.Unmarshaller):
+    dispatch = xmlrpclib.Unmarshaller.dispatch.copy()
+    def end_base64(self, data):
+        value = xmlrpclib.Binary()
+        value.decode(data)
+        self.append(value.data)
+        self._value = 0
+
+    dispatch["base64"] = end_base64
+
+    def _stringify(self, data):
+        try:
+            return data.encode("ascii")
+        except UnicodeError:
+            return xmlrpclib.Binary(data)
+
+def xmlrpcGetParser():
+    parser, target = xmlrpclib.getparser()
+    # Use our own marshaller
+    target = XMLRPCUnmarshaller()
+    # Reuse the parser class as computed by xmlrpclib
+    parser = parser.__class__(target)
+    return parser, target
+
+def xmlrpcDump(params, methodname=None, methodresponse=None, stream=None,
+               encoding=None, allow_none=False):
+    assert isinstance(params, tuple) or isinstance(params, xmlrpclib.Fault),\
+           "argument must be tuple or Fault instance"
+    if isinstance(params, xmlrpclib.Fault):
+        methodresponse = 1
+    elif methodresponse and isinstance(params, tuple):
+        assert len(params) == 1, "response tuple must be a singleton"
+
+    if not encoding:
+        encoding = "utf-8"
+
+    m = XMLRPCMarshaller(encoding, allow_none)
+    if encoding != "utf-8":
+        xmlheader = "<?xml version='1.0' encoding='%s'?>\n" % str(encoding)
+    else:
+        xmlheader = "<?xml version='1.0'?>\n" # utf-8 is default
+
+    if stream is None:
+        io = StringIO.StringIO(stream)
+    else:
+        io = stream
+
+    # standard XML-RPC wrappings
+    if methodname:
+        if not isinstance(methodname, str):
+            methodname = methodname.encode(encoding)
+        io.write(xmlheader)
+        io.write("<methodCall>\n")
+        io.write("<methodName>%s</methodName>\n" % methodname)
+        m.dump(params, io)
+        io.write("</methodCall>\n")
+    elif methodresponse:
+        io.write(xmlheader)
+        io.write("<methodResponse>\n")
+        m.dump(params, io)
+        io.write("</methodResponse>\n")
+    else:
+        # Return as-is
+        m.dump(params, io)
+
+    if stream is None:
+        return io.getvalue()
+    return ""
+
+def xmlrpcLoad(stream):
+    p, u = xmlrpcGetParser()
+    if hasattr(stream, "read"):
+        # A real stream
+        while 1:
+            data = stream.read(16384)
+            if not data:
+                break
+            p.feed(data)
+    else:
+        # Assume it's a string
+        p.feed(stream)
+    p.close()
+    return u.close(), u.getmethodname()
+
+
+class ServerProxy(xmlrpclib.ServerProxy):
+
+    def _request(self, methodname, params):
+        # Call a method on the remote server
+        request = xmlrpcDump(params, methodname,
+            encoding = self.__encoding, allow_none=self.__allow_none)
+
+        response = self.__transport.request(
+            self.__host,
+            self.__handler,
+            request,
+            verbose=self.__verbose)
+
+        if len(response) == 1:
+            response = response[0]
+
+        return response
+
+    def __getattr__(self, name):
+        # magic method dispatcher
+        if name.startswith('__'):
+            raise AttributeError(name)
+        #from conary.lib import log
+        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name)
+        return self._createMethod(name)
+
+    def _createMethod(self, name):
+        return xmlrpclib._Method(self._request, name)
+
+def copyStream(src, dest, length = None, bufferSize = 16384):
+    """Copy from one stream to another, up to a specified length"""
+    amtread = 0
+    while amtread != length:
+        if length is None:
+            bsize = bufferSize
+        else:
+            bsize = min(bufferSize, length - amtread)
+        buf = src.read(bsize)
+        if not buf:
+            break
+        dest.write(buf)
+        amtread += len(buf)
+    return amtread
+
+def decompressStream(src, bufferSize = 8092):
+    sio = BoundedStringIO()
+    z = zlib.decompressobj()
+    while 1:
+        buf = src.read(bufferSize)
+        if not buf:
+            break
+        sio.write(z.decompress(buf))
+    sio.write(z.flush())
+    return sio
+
+def compressStream(src, level = 5, bufferSize = 16384):
+    sio = BoundedStringIO()
+    z = zlib.compressobj(level)
+    while 1:
+        buf = src.read(bufferSize)
+        if not buf:
+            break
+        sio.write(z.compress(buf))
+    sio.write(z.flush())
+    return sio
 
 def massCloseFileDescriptors(start, unusedCount):
     """Close all file descriptors starting with start, until we hit

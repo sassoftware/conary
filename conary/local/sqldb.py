@@ -51,7 +51,10 @@ class DBTroveFiles:
     pathId, versionId, path, instanceId, stream
     """
 
-    addItemStmt = "INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)"
+    addItemStmt = "INSERT INTO DBTroveFiles (pathId, versionId, path, " \
+                                            "fileId, instanceId, isPresent, " \
+                                            "stream) " \
+                                            "VALUES (?, ?, ?, ?, ?, ?, ?)"
 
     def __init__(self, db):
         self.db = db
@@ -112,7 +115,7 @@ class DBTroveFiles:
 	streamId = cu.lastrowid
 
 	for tag in tags:
-	    cu.execute("INSERT INTO DBFileTags VALUES (?, ?)",
+	    cu.execute("INSERT INTO DBFileTags(streamId, tagId) VALUES (?, ?)",
 		       streamId, self.tags[tag])
 
     def iterPath(self, path):
@@ -128,12 +131,20 @@ class DBTroveFiles:
 		   "AND instanceId=?", (path, instanceId))
 
     def _updatePathIdsPresent(self, instanceId, pathIdList, isPresent):
-        pathIdListPattern = ",".join(( '?' ) * len(pathIdList))
+        # Max number of bound params
+        chunkSize = 990
+        plen = len(pathIdList)
         cu = self.db.cursor()
-
-        cu.execute("UPDATE DBTroveFiles SET isPresent=%d WHERE "
-                   "instanceId=%d AND pathId in (%s)" % (isPresent, 
-                   instanceId, pathIdListPattern), pathIdList)
+        i = 0
+        while i < plen:
+            clen = min(chunkSize, plen - i)
+            bvals = [ isPresent, instanceId ] + pathIdList[i : i + clen]
+            bparams = ','.join('?' * clen)
+            cu.execute("UPDATE DBTroveFiles "
+                       "SET isPresent=? "
+                       "WHERE instanceId=? AND pathId in (%s)" % bparams,
+                       bvals)
+            i += clen
 
     def removePathIds(self, instanceId, pathIdList):
         self._updatePathIdsPresent(instanceId, pathIdList, isPresent = 0)
@@ -193,8 +204,9 @@ class DBInstanceTable:
 	    isPresent = 0
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances "
-                   "VALUES (NULL, ?, ?, ?, ?, ?, ?)",
+        cu.execute("INSERT INTO Instances(troveName, versionId, flavorId, "
+                                        " timeStamps, isPresent, pinned) "
+                   "VALUES (?, ?, ?, ?, ?, ?)",
                    (troveName, versionId, flavorId,
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
                     pinned))
@@ -357,7 +369,9 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
     timeout = 30000
-    def __init__(self, path):
+    def __init__(self, path, timeout = None):
+        if timeout is not None:
+            self.timeout = timeout
         self.db = None
         try:
             self.db = dbstore.connect(path, driver = "sqlite",
@@ -403,9 +417,6 @@ class Database:
 	self.flavorMap = DBFlavorMap(self.db)
 	self.depTables = deptable.DependencyTables(self.db)
 	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
-
-        if not readOnly:
-            self.db.analyze()
 
         self.needsCleanup = False
         self.addVersionCache = {}
@@ -589,13 +600,41 @@ order by
 
 	return theId
 
-    def addTrove(self, trove, pin = False):
+    def _findTroveInstanceId(self, cu, name, version, flavor):
+        if flavor.isEmpty():
+            flavorStr = "IS NULL"
+        else:
+            flavorStr = "= '%s'" % flavor.freeze()
+
+        cu.execute("""
+        SELECT instanceId
+        FROM Instances
+        JOIN Versions USING (versionId)
+        JOIN Flavors ON (Instances.flavorId = Flavors.flavorId)
+        WHERE Instances.troveName = ?
+        AND Versions.version = ?
+        AND Flavors.flavor %s
+        """ % flavorStr, name, str(version))
+
+        rows = list(cu)
+
+        if not len(rows):
+            raise errors.TroveNotFound
+
+        return rows[0][0]
+
+    def addTrove(self, trove, pin = False, oldTroveSpec = None):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()
 	troveVersion = trove.getVersion()
 	troveVersionId = self.getVersionId(troveVersion, {})
 	self.addVersionCache[troveVersion] = troveVersionId
+
+        if oldTroveSpec is not None:
+            oldTroveId = self._findTroveInstanceId(cu, *oldTroveSpec)
+        else:
+            oldTroveId = None
 
 	troveFlavor = trove.getFlavor()
         if not troveFlavor.isEmpty():
@@ -617,7 +656,7 @@ order by
 		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
 			   None, flavor.freeze())
 	    cu.execute("""
-            INSERT INTO Flavors
+            INSERT INTO Flavors (flavorId, flavor)
             SELECT flavorsNeeded.empty, flavorsNeeded.flavor
             FROM flavorsNeeded LEFT OUTER JOIN Flavors USING(flavor)
             WHERE Flavors.flavorId is NULL
@@ -693,7 +732,9 @@ order by
 
         # make sure every trove we include has an instanceid
         cu.execute("""
-            INSERT INTO Instances SELECT NULL, IncludedTroves.troveName,
+            INSERT INTO Instances (troveName, versionId, flavorId,
+                                   timeStamps, isPresent, pinned)
+                                    SELECT IncludedTroves.troveName,
                                            IncludedTroves.versionId,
                                            IncludedTroves.flavorId,
                                            IncludedTroves.timeStamps, 0, 0
@@ -707,7 +748,8 @@ order by
 
         # now include the troves in this one
         cu.execute("""
-            INSERT INTO TroveTroves SELECT ?, instanceId, flags, ?
+            INSERT INTO TroveTroves(instanceId, includedId, flags, inPristine)
+                SELECT ?, instanceId, flags, ?
                 FROM IncludedTroves JOIN Instances ON
                     IncludedTroves.troveName == Instances.troveName AND
                     IncludedTroves.versionId == Instances.versionId AND
@@ -752,7 +794,7 @@ order by
                                       stream, isPresent)
                         VALUES (?, ?, ?, ?, ?, ?)""")
 
-	return (cu, troveInstanceId, stmt)
+	return (cu, troveInstanceId, stmt, oldTroveId)
 
     def _sanitizeTroveCollection(self, cu, instanceId, nameHint = None):
         # examine the list of present, missing, and not inPristine troves
@@ -841,7 +883,8 @@ order by
                 flavorStr = "= '%s'" % newFlavor.freeze()
 
             cu.execute("""
-                INSERT INTO TroveTroves SELECT ?, instanceId, ?, 0
+                INSERT INTO TroveTroves (instanceId, includedId, flags,
+                                         inPristine) SELECT ?, instanceId, ?, 0
                     FROM Instances JOIN Versions ON
                         Instances.versionId = Versions.versionId
                     JOIN Flavors ON
@@ -855,7 +898,7 @@ order by
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None, isPresent = True):
-	(cu, troveInstanceId, addFileStmt) = troveInfo
+	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
 	if fileObj or fileStream:
@@ -874,13 +917,13 @@ order by
                 cu.executemany("INSERT INTO NewFileTags VALUES (?, ?)",
                                itertools.izip(itertools.repeat(pathId), tags))
 	else:
-	    cu.execute("""
-		UPDATE DBTroveFiles SET instanceId=?, isPresent=? WHERE
-		    fileId=? AND pathId=? AND versionId=?""",
-                    troveInstanceId, isPresent, fileId, pathId, versionId)
+            cu.execute("""
+                UPDATE DBTroveFiles SET instanceId=?, isPresent=?, path = ?
+                    WHERE pathId=? AND instanceId=?""",
+                    troveInstanceId, isPresent, path, pathId, oldInstanceId)
 
     def addTroveDone(self, troveInfo):
-	(cu, troveInstanceId, addFileStmt) = troveInfo
+	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 
         cu.execute("""
             INSERT INTO DBTroveFiles (pathId, versionId, path, fileId,
@@ -1022,11 +1065,17 @@ order by
         cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
                        ((x[0], x[1][1]) for x in enumerate(l)),
                        start_transaction = False)
-	cu.execute("""
-	    SELECT DISTINCT row, stream FROM getFilesTbl
-                JOIN DBTroveFiles ON
-		    getFilesTbl.fileId = DBTroveFiles.fileId
-	""")
+
+        # there may be duplicate fileId entries in getFilesTbl
+        # and DBTrovefiles.  To avoid searching through potentially
+        # millions of rows, we perform some more complicated sql.
+        cu.execute("""
+                SELECT row, (SELECT stream
+                              FROM DBTroveFiles AS dbt 
+                              WHERE dbt.fileId = gft.fileId LIMIT 1) AS stream
+                    FROM getfilesTbl AS gft
+                    WHERE stream IS NOT NULL
+        """)
 
         l2 = [ None ] * len(l)
 
@@ -1229,14 +1278,14 @@ order by
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT DBTroveFiles.versionId FROM DBTroveFiles
                         WHERE
-                            DBTroveFiles.instanceId = ?""")
+                            DBTroveFiles.instanceId = ?""", troveInstanceId)
         cu.execute("""
                 INSERT OR IGNORE INTO RemovedVersions
                     SELECT DISTINCT Instances.versionId FROM
                         TroveTroves JOIN Instances ON
-                            TroveTroves.instanceId = Instances.instanceId
+                            TroveTroves.includedId = Instances.instanceId
                         WHERE
-                            TroveTroves.instanceId = ?""")
+                            TroveTroves.instanceId = ?""", troveInstanceId)
 
         wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ]
 
@@ -1430,7 +1479,8 @@ order by
                            _iter(mapList))
 
         # now add link collections to these troves
-        cu.execute("""INSERT INTO TroveTroves
+        cu.execute("""INSERT INTO TroveTroves (instanceId, includedId,
+                                               flags, inPristine)
                         SELECT TroveTroves.instanceId, pinnedInst.instanceId,
                                TroveTroves.flags, 0 FROM
                             mlt JOIN Flavors AS pinFlv ON

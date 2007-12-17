@@ -19,6 +19,7 @@ import re
 import sys
 import tempfile
 import time
+import types
 
 from conary import files, trove, versions, streams
 from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
@@ -44,17 +45,22 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36,51)
+SERVER_VERSIONS = range(36,51 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
 # Decorators for method access
-def accessReadOnly(f):
-    f._accessType = 'readOnly'
+
+def _methodAccess(f, accessType):
+    f._accessType = accessType
     return f
 
-def accessReadWrite(f):
-    f._accessType = 'readWrite'
+def accessReadOnly(f, paramList = []):
+    _methodAccess(f, 'readOnly')
+    return f
+
+def accessReadWrite(f, paramList = []):
+    _methodAccess(f, 'readWrite')
     return f
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -83,84 +89,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALL_FLAVORS      = 2     # all flavors (no scoring)
     _GET_TROVE_BEST_FLAVOR      = 3     # the best flavor for flavorFilter
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
-
-    publicCalls = set([ 'addUser',
-                        'addUserByMD5',
-                        'deleteUserByName',
-                        'addAccessGroup',
-                        'deleteAccessGroup',
-                        'listAccessGroups',
-                        'updateAccessGroupMembers',
-                        'setUserGroupCanMirror',
-                        'listAcls',
-                        'addAcl',
-                        'editAcl',
-                        'deleteAcl',
-                        'changePassword',
-                        'getUserGroups',
-                        'addEntitlement',
-                        'addEntitlements',
-                        'addEntitlementGroup',
-                        'deleteEntitlementGroup',
-                        'addEntitlementOwnerAcl',
-                        'deleteEntitlementOwnerAcl',
-                        'deleteEntitlement',
-                        'deleteEntitlements',
-                        'listEntitlements',
-                        'listEntitlementGroups',
-                        'getEntitlementClassAccessGroup',
-                        'setEntitlementClassAccessGroup',
-                        'updateMetadata',
-                        'getMetadata',
-                        'troveNames',
-                        'getTroveVersionList',
-                        'getTroveVersionFlavors',
-                        'getAllTroveLeaves',
-                        'getTroveVersionsByBranch',
-                        'getTroveLeavesByBranch',
-                        'getTroveLeavesByLabel',
-                        'getTroveVersionsByLabel',
-                        'getTrovesByPaths',
-                        'getFileContents',
-                        'getTroveLatestVersion',
-                        'getChangeSet',
-                        'getChangeSetFingerprints',
-                        'getDepSuggestions',
-                        'getDepSuggestionsByTroves',
-                        'prepareChangeSet',
-                        'presentHiddenTroves',
-                        'commitChangeSet',
-                        'getFileVersions',
-                        'getFileVersion',
-                        'getPackageBranchPathIds',
-                        'hasTroves',
-                        'getCollectionMembers',
-                        'getTrovesBySource',
-                        'addMetadataItems',
-                        'addDigitalSignature',
-                        'addNewAsciiPGPKey',
-                        'addNewPGPKey',
-                        'changePGPKeyOwner',
-                        'getAsciiOpenPGPKey',
-                        'listUsersMainKeys',
-                        'listSubkeys',
-                        'getOpenPGPKeyUserIds',
-                        'getConaryUrl',
-                        'getMirrorMark',
-                        'setMirrorMark',
-                        'getNewSigList',
-                        'getTroveSigs',
-                        'setTroveSigs',
-                        'getNewPGPKeys',
-                        'addPGPKeyList',
-                        'getNewTroveInfo',
-                        'setTroveInfo',
-                        'getNewTroveList',
-                        'getTroveInfo',
-                        'getTroveReferences',
-                        'getTroveDescendants',
-                        'checkVersion' ])
-
 
     def __init__(self, cfg, basicUrl, db = None):
         # FIXME: remove after deprecation period
@@ -191,7 +119,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.externalPasswordURL = cfg.externalPasswordURL
         self.entitlementCheckURL = cfg.entitlementCheckURL
         self.readOnlyRepository = cfg.readOnlyRepository
-
+        self.serializeCommits = cfg.serializeCommits
+        
         self.__delDB = False
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -226,7 +155,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
             self.__delDB = True
-        schema.checkVersion(self.db)
+        dbVer = schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
 	self.troveStore = trovestore.TroveStore(self.db, self.log)
@@ -249,7 +178,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    self.troveStore = self.repos = self.auth = None
             self.open(connect=False)
 
-    def callWrapper(self, protocol, port, methodname, authToken, args,
+    def callWrapper(self, protocol, port, methodname, authToken, 
+                    orderedArgs, kwArgs,
                     remoteIp = None, rawUrl = None, isSecure = False):
         """
         Returns a tuple of (usedAnonymous, Exception, result). usedAnonymous
@@ -279,14 +209,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             try:
                 # the first argument is a version number
                 try:
-                    r = method(authToken, *args)
+                    r = method(authToken, *orderedArgs, **kwArgs)
                 except sqlerrors.DatabaseLocked:
                     raise
                 else:
                     self.db.commit()
 
                     if self.callLog:
-                        self.callLog.log(remoteIp, authToken, methodname, args)
+                        self.callLog.log(remoteIp, authToken, methodname,
+                                         orderedArgs)
 
                     return (False, False, r)
             except sqlerrors.DatabaseLocked, e:
@@ -311,11 +242,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if self.callLog:
             if isinstance(e, HiddenException):
-                self.callLog.log(remoteIp, authToken, methodname, args,
+                self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  exception = e.forLog)
                 e = e.forReturn
             else:
-                self.callLog.log(remoteIp, authToken, methodname, args,
+                self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  exception = e)
 
         if isinstance(e, errors.TroveMissing):
@@ -1452,7 +1383,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource,
-                     changeSetVersion = None, mirrorMode = False):
+                     changeSetVersion = None, mirrorMode = False,
+                     infoOnly = False):
+
+        # infoOnly is for compatibilit with the network call; it's ignored
+        # here (but implemented in the front-side proxy)
 
         def _cvtTroveList(l):
             new = []
@@ -1901,7 +1836,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden)
+	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden,
+                                   serialize = self.serializeCommits)
 
 	if not self.commitAction:
 	    return True
@@ -3188,6 +3124,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def checkVersion(self, authToken, clientVersion):
+        if clientVersion > 50:
+            raise errors.InvalidClientVersion(
+                    'checkVersion call only supports protocol versions 50 '
+                    'and lower')
+
 	if not self.auth.check(authToken, write = False):
 	    raise errors.InsufficientPermission
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
@@ -3199,6 +3140,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         return SERVER_VERSIONS
 
+# this has to be at the end to get the publicCalls list correct; the proxy
+# uses the publicCalls list, so maintaining it 
+NetworkRepositoryServer.publicCalls = set()
+for attr, val in NetworkRepositoryServer.__dict__.iteritems():
+    if type(val) == types.FunctionType:
+        if hasattr(val, '_accessType'):
+            NetworkRepositoryServer.publicCalls.add(attr)
+
+class NullAuthorization:
+    """Authorization class for L{ClosedRepositoryServer} objects"""
+    def check(self, *args, **kwargs):
+        """Dummy function that always returns True"""
+        return True
+    listEntitlementGroups = check
+
 class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, *args, **kw):
         return (False, True, ("RepositoryClosed", self.cfg.closed))
@@ -3206,6 +3162,16 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def __init__(self, cfg):
         self.log = tracelog.getLog(None)
         self.cfg = cfg
+        self.troveStore = None
+        if isinstance(cfg.serverName, str):
+            self.serverNameList = [ cfg.serverName ]
+        else:
+            self.serverNameList = cfg.serverName
+        self.map = cfg.repositoryMap
+        self.auth = NullAuthorization()
+
+    def getAsciiOpenPGPKey(self, *args, **kwargs):
+        return None
 
 class HiddenException(Exception):
 
@@ -3239,6 +3205,7 @@ class ServerConfig(ConfigFile):
     requireSigs             = CfgBool
     serverName              = CfgLineList(CfgString)
     staticPath              = (CfgPath, '/conary-static')
+    serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
     user                    = CfgUserInfo

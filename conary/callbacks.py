@@ -57,6 +57,8 @@ class Callback(object):
                     ' %s', filename, linenum, msg)
         # log the full traceback if debugging (--debug=all)
         log.debug(''.join(traceback.format_exception(*exc_info)))
+        if not hasattr(self, 'exceptions'):
+            self.exceptions = []
         self.exceptions.append(e)
 
     def __getattribute__(self, name):
@@ -67,6 +69,16 @@ class Callback(object):
             return item
 
         return exceptionProtection(item, self._exceptionOccured)
+
+    def cancelOperation(self):
+        """Return True if we should cancel the operation as soon as it is
+        safely possible"""
+        if not hasattr(self, 'exceptions'):
+            return False
+        for exc in self.exceptions:
+            if hasattr(exc, 'cancelOperation'):
+                return exc.cancelOperation
+        return False
 
     def __init__(self):
         self.exceptions = []
@@ -105,8 +117,11 @@ class ChangesetCallback(Callback):
 
     def error(self, msg, *args, **kwargs):
         """Error handling callback
-        If the optional keyword argument exc_text is passed, its value should
-        be printed verbatim since it is traceback information.
+
+        @param msg: A message to display
+        @type msg: str
+        @keyword exc_text: Traceback text that should be printed verbatim
+        @type exc_text: str
         """
         exc_text = kwargs.pop('exc_text', None)
         # Append the traceback to the message
@@ -117,8 +132,11 @@ class ChangesetCallback(Callback):
 
     def warning(self, msg, *args, **kwargs):
         """Warning handling callback
-        If the optional keyword argument exc_text is passed, its value should
-        be printed verbatim since it is traceback information.
+
+        @param msg: A message to display
+        @type msg: str
+        @keyword exc_text: Traceback text that should be printed verbatim
+        @type exc_text: str
         """
         exc_text = kwargs.pop('exc_text', None)
         # Append the traceback to the message
@@ -231,7 +249,7 @@ class UpdateCallback(ChangesetCallback):
         pass
 
     def checkAbort(self):
-        return (self.abortEvent and self.abortEvent.isSet()) or self.exceptions
+        return (self.abortEvent and self.abortEvent.isSet()) or self.cancelOperation()
 
     def setAbortEvent(self, event = None):
         self.abortEvent = event
@@ -288,13 +306,31 @@ class CloneCallback(ChangesetCallback):
     def getCloneChangeLog(self, trv):
         return trv.getChangeLog()
 
-    def determiningCloneTroves(self):
+    def determiningCloneTroves(self, current=0, total=0):
         pass
 
-    def determiningTargets(self):
+    def determiningTargets(self, current=0, total=0):
         pass
 
-    def rewritingFileVersions(self):
+    def targetSources(self, current=0, total=0):
+        pass
+
+    def targetBinaries(self, current=0, total=0):
+        pass
+
+    def checkNeedsFulfilled(self, current=0, total=0):
+        pass
+
+    def rewriteTrove(self, current=0, total=0):
+        pass
+
+    def rewritingFileVersions(self, current=0, total=0):
+        pass
+
+    def requestingFiles(self, number):
+        pass
+
+    def requestingFileContentsWithCount(self, count):
         pass
 
     def gettingCloneData(self):
@@ -327,6 +363,7 @@ class LineOutput:
                 i = self.last - len(msg)
                 self.out.write(" " * i + "\b" * i)
             self.out.flush()
+            self.lastMessage = msg
             self.last = len(msg)
 
     def __del__(self):
@@ -337,4 +374,5 @@ class LineOutput:
 
     def __init__(self, f = sys.stdout):
         self.last = 0
+        self.lastMessage = ''
         self.out = f

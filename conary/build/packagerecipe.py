@@ -33,6 +33,8 @@ from conary.deps import deps
 from conary.lib import log, magic, util
 from conary.local import database
 
+from conary.repository import errors as repoerrors
+
 
 
 crossMacros = {
@@ -74,38 +76,73 @@ class _policyUpdater:
     def __call__(self, *args, **keywords):
 	self.theobject.updateArgs(*args, **keywords)
 
-def clearBuildReqs(*buildReqs):
+def clearBuildRequires(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
     _clearReqs('buildRequires', buildReqs)
 
-def clearCrossReqs(*crossReqs):
+def clearBuildReqs(*buildReqs):
+    #log.warning('clearBuildReqs() is deprecated.  Use clearBuildRequires()')
+    clearBuildRequires(*buildReqs)
+
+def clearCrossRequires(*crossReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
     _clearReqs('crossRequires', crossReqs)
 
-def _clearReqs(attrName, reqs):
-    def _removePackages(class_, pkgs):
-        if not pkgs:
-            setattr(class_, attrName, [])
-        else:
-            for pkg in pkgs:
-                if pkg in getattr(class_, attrName):
-                    getattr(class_, attrName).remove(pkg)
+def clearCrossReqs(*crossReqs):
+    #log.warning('clearCrossReqs() is deprecated.  Use clearCrossRequires()')
+    clearCrossRequires(*crossReqs)
 
-    callerGlobals = inspect.stack()[2][0].f_globals
+def _clearReqs(attrName, reqs):
+    # walk the stack backwards until we find the frame
+    # that looks like a recipe frame.  loadrecipe sets up
+    # a __localImportModules dictionary in the global space
+    # of the module that is created for the recipe.  PackageRecipe
+    # should also be a global in the frame.
+    # First get the stack
+    stack = inspect.stack()
+    # now get the innermost frame, which is the first element of
+    # the stack list.
+    frame = stack.pop(0)[0]
+    while stack:
+        callerGlobals = frame.f_globals
+        if ('PackageRecipe' in callerGlobals
+            and '__localImportModules' in callerGlobals):
+            # if we have PackageRecipe and __localImportModules, we
+            # found the most likely candidate for the recipe frame
+            break
+        # try the next frame up
+        frame = stack.pop(0)[0]
+    if not stack:
+        raise RuntimeError('unable to determine the frame that is '
+                           'creating the recipe class')
+    # get a list of all classes that are derived from AbstractPackageRecipe
     classes = []
     for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
+        if inspect.isclass(value) and issubclass(value, AbstractPackageRecipe):
             classes.append(value)
+
+    # define a convenience function for removing buildReqs from a list
+    # or clearing them.
+    def _removePackages(class_, pkgs):
+        # if no specific buildReqs were mentioned to remove, remove them all
+        if not pkgs:
+            setattr(class_, attrName, [])
+            return
+        # get the set of packages to remove
+        buildReqs = set(getattr(class_, attrName))
+        remove = set(pkgs)
+        buildReqs = buildReqs - remove
+        setattr(class_, attrName, list(buildReqs))
 
     for class_ in classes:
         _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
-            if issubclass(base, _AbstractPackageRecipe):
+            if issubclass(base, AbstractPackageRecipe) and base not in classes:
                 _removePackages(base, reqs)
 
 crossFlavor = deps.parseFlavor('cross')
@@ -120,7 +157,7 @@ def getCrossCompileSettings(flavor):
     isCrossTool = flavor.stronglySatisfies(crossFlavor)
     return None, targetFlavor, isCrossTool
 
-class _AbstractPackageRecipe(Recipe):
+class AbstractPackageRecipe(Recipe):
     buildRequires = [
         'filesystem:runtime',
         'setup:runtime',
@@ -223,12 +260,8 @@ class _AbstractPackageRecipe(Recipe):
                 (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
                 # XXX move this to use more of db.findTrove's features, instead
                 # of hand parsing
-                try:
-                    troves = db.trovesByName(name)
-                    troves = db.getTroves(troves)
-                except errors.TroveNotFound:
-                    missingReqs.append(buildReq)
-                    continue
+                troves = db.trovesByName(name)
+                troves = db.getTroves(troves)
 
                 versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
 
@@ -246,7 +279,7 @@ class _AbstractPackageRecipe(Recipe):
 	db = database.Database(cfg.root, cfg.dbPath)
 
 
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             if not self.macros.sysroot:
                 err = ("cross requirements needed but %(sysroot)s undefined")
                 if raiseError:
@@ -277,7 +310,7 @@ class _AbstractPackageRecipe(Recipe):
         time = sourceVersion.timeStamps()[-1]
 
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
                                                        crossDb)
         else:
@@ -541,7 +574,7 @@ class _AbstractPackageRecipe(Recipe):
             # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
                 flag._set(False)
-            use.setBuildFlagsFromFlavor(self.name, flavor)
+            use.setBuildFlagsFromFlavor(self.name, flavor, error=False)
 
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
@@ -722,7 +755,7 @@ class _AbstractPackageRecipe(Recipe):
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
-	self.macros = macros.Macros()
+	self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()
@@ -779,8 +812,11 @@ class _AbstractPackageRecipe(Recipe):
         self.mainDir(self.nameVer(), explicit=False)
         self._autoCreatedFileCount = 0
 
+# For compatibility with older modules. epydoc doesn't document classes
+# starting with _, see CNY-1848
+_AbstractPackageRecipe = AbstractPackageRecipe
 
-class PackageRecipe(_AbstractPackageRecipe):
+class PackageRecipe(AbstractPackageRecipe):
     """
     NAME
     ====
@@ -803,8 +839,17 @@ class PackageRecipe(_AbstractPackageRecipe):
 
     EXAMPLE
     =======
+    A sample class that uses PackageRecipe to download source code from
+    a web site, unpack it, run "make", then run "make install"::
 
-    FIXME example
+        class ExamplePackage(PackageRecipe):
+            name = 'example'
+            version = '1.0'
+
+            def setup(r):
+                r.addArchive('http://code.example.com/example/')
+                r.Make()
+                r.MakeInstall()
     """
     internalAbstractBaseClass = 1
     # these initial buildRequires need to be cleared where they would
@@ -812,7 +857,7 @@ class PackageRecipe(_AbstractPackageRecipe):
     # of :lib in here is only for runtime, not to link against.
     # Any package that needs to link should still specify the :devel
     # component
-    buildRequires = _AbstractPackageRecipe.buildRequires + [
+    buildRequires = AbstractPackageRecipe.buildRequires + [
         'bzip2:runtime',
         'gzip:runtime',
         'tar:runtime',
@@ -821,7 +866,7 @@ class PackageRecipe(_AbstractPackageRecipe):
     ]
 
     def __init__(self, *args, **kwargs):
-        _AbstractPackageRecipe.__init__(self, *args, **kwargs)
+        AbstractPackageRecipe.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)

@@ -27,6 +27,7 @@ from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
+from conary.conaryclient import cmdline
 from conary.conaryclient.clone import ClientClone
 from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
@@ -65,7 +66,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
     def __init__(self, cfg = None, passwordPrompter = None,
                  resolverClass=resolve.DependencySolver, updateCallback=None):
         """
-        @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
+        @param cfg: a custom L{conarycfg.ConaryConfiguration} object.
                     If None, the standard Conary configuration is loaded
                     from /etc/conaryrc, ~/.conaryrc, and ./conaryrc.
         @type cfg: L{conarycfg.ConaryConfiguration}
@@ -103,7 +104,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         proxy = conarycfg.getProxyFromConfig(cfg)
 
-        return NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
+        repos = NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                                        pwPrompt = passwordPrompter,
                                        localRepository = db,
                                        entitlementDir =
@@ -114,6 +115,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                                           cfg.uploadRateLimit,
                                        entitlements = cfg.entitlement,
                                        proxy = proxy)
+        repos.setFlavorPreferenceList(cfg.flavorPreferences)
+        return repos
 
     def getRepos(self):
         return self.repos
@@ -122,6 +125,11 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         self.repos = repos
 
     def disconnectRepos(self):
+        """Disconnect the client from repositories.
+
+        This method is useful if the changesets are applied from local media
+        or were previously downloaded with L{downloadUpdate}.
+        """
         self.repos = None
 
     def getMetadata(self, troveList, label, cacheFile = None,
@@ -351,45 +359,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         """
         return self.db.iterRollbacksList()
 
-    def _checkChangeSetForLabelConflicts(self, cs):
-        source = trovesource.ChangesetFilesTroveSource(None)
-        source.addChangeSet(cs)
-        # there should be a better way to iterate over all NVF in a source.
-        toCreate = [source.trovesByName(x) for x in source.iterAllTroveNames()]
-
-        conflicts = []
-        branchesByLabel = {}
-        for (n,v,f) in itertools.chain(*toCreate):
-            troveSpec =  (n, str(v.trailingLabel()), None)
-            if troveSpec in branchesByLabel:
-                # We've seen this trove before; was it on a different branch?
-                oEnt = branchesByLabel[troveSpec]
-                if oEnt[0] != v.branch():
-                    conflicts.append(((n,v,f), oEnt[1]))
-            else:
-                branchesByLabel[troveSpec] = (v.branch(), (n,v,f))
-
-        results = self.repos.findTroves(None, branchesByLabel, None,
-                                       bestFlavor = False, getLeaves = True,
-                                       allowMissing = True)
-
-        for troveSpec, troveTups in results.iteritems():
-            if not troveTups:
-                continue
-            # finding one conflict per trove to create is enough
-            troveConflict = None
-            foundPrevious = False
-            branchToCreate, tupToCreate = branchesByLabel[troveSpec]
-            for troveTup in troveTups:
-                if branchToCreate != troveTup[1].branch():
-                    troveConflict = (troveTup, tupToCreate)
-                else:
-                    foundPrevious = True
-                    break 
-            if not foundPrevious and troveConflict:
-                conflicts.append(troveConflict)
-        return conflicts
-
     def getSearchSource(self, flavor=0, troveSource=None):
         # a flavor of None is common in some cases so we use 0
         # as our "unset" case.
@@ -414,5 +383,110 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         else:
             return searchSource
 
-    def applyRollback(self, rollbackSpec, **kwargs):
-        return rollbacks.applyRollback(self, rollbackSpec, **kwargs)
+    def applyRollback(self, rollbackSpec, replaceFiles = None,
+            callback = None, tagScript = None, justDatabase = None,
+            transactionCounter = None):
+        """
+        Apply a rollback.
+
+        @param rollbackSpec: Rollback specififier. This is either a number (in
+        which case it refers to the absolute position in the rollback stack, with
+        0 being the oldest rollback) or a string like C{r.128}, as listed by
+        C{conary rblist}.
+        @type rollbackSpec: string
+
+        @param replaceFiles:
+        @type replaceFiles: bool
+
+        @param callback: Callback for communicating information back to the
+        invoker of this method.
+        @type callback: L{callbacks.UpdateCallback}
+
+        @param tagScript: A tag script.
+        @type tagScript: path
+
+        @param justDatabase: Change only the database, do not revert the
+        filesystem.
+        @type justDatabase: bool
+
+        @param transactionCounter: The Conary database contains a counter that
+        gets incremented with every change. This argument is the counter's value
+        at the time the rollback was computed from the specifier. It is used to
+        ensure that no uninteded rollbacks are performed, if a concurrent update
+        happens between the moment of reading the database state and the moment of
+        performing the rollback.
+        @type transactionCounter: int
+
+        @raise UpdateError: Generic update error. Can occur if the root is not
+        writeable by the user running the command.
+
+        @raise RollbackError: Generic rollback error. Finer grained rollback
+        errors are L{RollbackDoesNotExist} (raised if the rollback specifier
+        was invalid) and L{RollbackOrderError} (if the rollback was attempted not
+        following the rollback stack order). It can also be raised if the database
+        state has changed between the moment the rollback was computed and the
+        moment of performing the rollback. See also the description for
+        C{transactionCounter}.
+
+        @raise RollbackError: Generic rollback error. Finer grained rollback
+        errors are L{RollbackDoesNotExist<database.RollbackDoesNotExist>}
+        (raised if the rollback specifier was invalid) and
+        L{RollbackOrderError<database.RollbackOrderError>}
+        (if the rollback was attempted not
+        following the rollback stack order). It can also be raised if the
+        database state has changed between the moment the rollback was
+        computed and the moment of performing the rollback. See also the
+        description for C{transactionCounter}.
+
+        @raise ConaryError: Generic Conary error. Raised if the user running the
+        command does not have permissions to access the rollback directory, or the
+        directory is missing.
+        """
+        # We used to pass a **kwargs to this function, but that makes it hard
+        # to document the keyword arguments.
+        d = dict(tagScript = tagScript,
+            justDatabase = justDatabase,
+            transactionCounter = transactionCounter,
+            callback = callback,
+            replaceFiles = replaceFiles,
+        )
+        # If any of these arguments are None, don't even pass them, the
+        # defaults are going to apply
+        d = dict((x, y) for (x, y) in d.items() if y is not None)
+        return rollbacks.applyRollback(self, rollbackSpec, **d)
+
+    def close(self):
+        """Close this client and release all associated resources"""
+        self.lzCache.release()
+        # self.db accepts to be closed multiple times
+        self.db.close()
+
+        # Close the log files too
+        log.syslog.close()
+
+def getClient(context=None, environ=None, searchCurrentDir=False, cfg=None):
+    """
+        Returns a ConaryClient object that has the context set as it would
+        be if the conary command line were used.
+
+        This means it checks for the explicit "context" variable passed in
+        manually.  It follows by checking the eviron dict
+        (defaults to os.environ) for the CONARY_CONTEXT variable.  It then
+        falls back to the CONARY file and looks for a context set there.  
+        Finally, if these checks fail to find a context, it will look at the
+        context specified in the cfg variable.
+
+        @param context: a context override string or None
+        @param environ: a dict representing the current environment or None to
+            use os.environ
+        @param searchCurrentDir: if True, look in the current directory for
+            a CONARY file and set the context from there if needed.  Otherwise,
+            do not look for a CONARY file.  (Default False)
+        @param cfg: ConaryConfiguration to use.  If None, read the
+            configuration as conary would, from /etc/conaryrc, ~/.conaryrc,
+            and ./conaryrc.
+    """
+    if cfg is None:
+        cfg = conarycfg.ConaryConfiguration(True)
+    cmdline.setContext(cfg, context, environ, searchCurrentDir)
+    return ConaryClient(cfg)

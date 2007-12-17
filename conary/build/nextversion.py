@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -50,20 +50,19 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         # this is a direct shadow of a binary that is non-existant
         # we look at binary numbers on the target label.
         sourceVersion = sourceVersion.createShadow(targetLabel)
-        targetLabel = None
 
     # search for all the packages that are being created by this cook - 
     # we take the max of all of these versions as our latest.
-    query = dict.fromkeys(pkgNames, 
-                          {sourceVersion.getBinaryVersion().branch() : None })
-    
+    query = dict.fromkeys(pkgNames,
+                  {sourceVersion.getBinaryVersion().trailingLabel() : None })
+
     if repos and not sourceVersion.isOnLocalHost():
-        d = repos.getTroveVersionsByBranch(query,
-                                           troveTypes = repos.TROVE_QUERY_ALL)
+        d = repos.getTroveVersionsByLabel(query,
+                                          troveTypes = repos.TROVE_QUERY_ALL)
     else:
         d = {}
     return _nextVersionFromQuery(d, db, pkgNames, sourceVersion,
-                                 troveFlavorSet, targetLabel=targetLabel,
+                                 troveFlavorSet,
                                  alwaysBumpCount=alwaysBumpCount)
 
 
@@ -71,21 +70,20 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
     # search for all the packages that are being created by this cook -
     # we take the max of all of these versions as our latest.
     query = {}
+    d = {}
     if repos:
         for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
             if sourceVersion.isOnLocalHost():
                 continue
-            pkgNames = set([x.split(':')[-1] for x in troveNames])
+            pkgNames = set([x.split(':')[0] for x in troveNames])
             for pkgName in pkgNames:
                 if pkgName not in query:
                     query[pkgName] = {}
-                query[pkgName][sourceVersion.getBinaryVersion().branch()] = None
+                label = sourceVersion.getBinaryVersion().trailingLabel()
+                query[pkgName][label] = None
 
-    if repos and not sourceVersion.isOnLocalHost():
-        d = repos.getTroveVersionsByBranch(query,
-                                           troveTypes = repos.TROVE_QUERY_ALL)
-    else:
-        d = {}
+        d = repos.getTroveVersionsByLabel(query,
+                                          troveTypes = repos.TROVE_QUERY_ALL)
     nextVersions = []
     for sourceVersion, troveNames, troveFlavors in sourceBinaryList:
         if not isinstance(troveFlavors, (list, tuple, set)):
@@ -93,58 +91,90 @@ def nextVersions(repos, db, sourceBinaryList, alwaysBumpCount=False):
         else:
             troveFlavors = set(troveFlavors)
         newVersion = _nextVersionFromQuery(d, db, troveNames, sourceVersion,
-                                           troveFlavors, 
+                                           troveFlavors,
                                            alwaysBumpCount=alwaysBumpCount)
         nextVersions.append(newVersion)
     return nextVersions
 
 def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
-                          troveFlavorSet, targetLabel=None,
-                          alwaysBumpCount=False):
-    pkgNames = set([x.split(':')[-1] for x in troveNames])
+                          troveFlavorSet, alwaysBumpCount=False):
+    pkgNames = set([x.split(':')[0] for x in troveNames])
     latest = None
     relVersions = []
     for pkgName in pkgNames:
         if pkgName in query:
             for version in query[pkgName]:
                 if (not version.isBranchedBinary()
-                    and version.getSourceVersion() == sourceVersion):
+                    and version.getSourceVersion().trailingRevision() ==
+                            sourceVersion.trailingRevision()
+                    and version.trailingLabel() ==
+                            sourceVersion.trailingLabel()):
                     relVersions.append((version, query[pkgName][version]))
     del pkgName
 
-    if relVersions:
+    defaultLatest = sourceVersion.copy()
+    defaultLatest = defaultLatest.getBinaryVersion()
+    defaultLatest.incrementBuildCount()
+    shadowCount = defaultLatest.trailingRevision().shadowCount()
+
+    matches = [ x for x in relVersions
+                if x[0].trailingRevision().shadowCount() == shadowCount ]
+
+
+    if matches:
         # all these versions only differ by build count.
         # but we can't rely on the timestamp sort, because the build counts
         # are on different packages that might have come from different commits
+        # All these packages should have the same shadow count though,
+        # - which is the shadow could that should
         # XXX does this deal with shadowed versions correctly?
-        relVersions.sort(lambda a, b: cmp(a[0].trailingRevision().buildCount,
-                                          b[0].trailingRevision().buildCount))
-        latest, flavors = relVersions[-1]
-        latest = latest.copy()
 
-        if targetLabel:
-            latest = latest.createShadow(targetLabel)
+        relVersions.sort()
+        matches.sort(key=lambda x: x[0].trailingRevision().buildCount)
+        latest, flavors = matches[-1]
+        latestByStamp = relVersions[-1][0]
+        incCount = False
 
         if alwaysBumpCount:
             # case 1.  There is a binary trove with this source
             # version, and we always want to bump the build count
-            latest.incrementBuildCount()
+            incCount = True
         else:
             if troveFlavorSet & set(flavors):
                 # case 2.  There is a binary trove with this source
                 # version, and our flavor matches one already existing
                 # with this build count, so bump the build count
-                latest.incrementBuildCount()
-            # case 3.  There is a binary trove with this source
-            # version, and our flavor does not exist at this build 
-            # count, so reuse the latest binary version
+                incCount = True
+            elif latest.getSourceVersion() == sourceVersion:
+                # case 3.  There is a binary trove with this source
+                # version, and our flavor does not exist at this build
+                # count.
+
+                if latestByStamp != latest:
+                    # case 3a. the latest possible match for our branch
+                    # is not the _latest_ as defined by getTroveLatestByLabel.
+                    # Avoid adding a new package
+                    # to some older spot in the version tree
+                    incCount = True
+                else:
+                    # case 3b. development has been occuring on this branch
+                    # on this label, and there is an open spot for this
+                    # flavor, so reuse this version.
+                    pass
+            else:
+                # case 4. There is a binary trove on a different branch
+                # (but the same label)
+                incCount = True
+
+        if incCount:
+            revision = latest.trailingRevision().copy()
+            latest = sourceVersion.branch().createVersion(revision)
+            latest.incrementBuildCount()
+
     if not latest:
         # case 4.  There is no binary trove derived from this source 
-        # version.  
-        latest = sourceVersion.copy()
-
-        latest = latest.getBinaryVersion()
-        latest.incrementBuildCount()
+        # version.
+        latest = defaultLatest
     if latest.isOnLocalHost():
         return nextLocalVersion(db, troveNames, latest, troveFlavorSet)
     else:
