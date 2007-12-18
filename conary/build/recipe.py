@@ -240,6 +240,9 @@ class Recipe(object):
         for src in self.getSourcePathList():
             if skipFilter and skipFilter(os.path.basename(src.getPath())):
                 continue
+            if src.sourceDir is not None:
+                # if sourceDir is set, then there's nothing to fetch
+                continue
 
             f = src.fetch(refreshFilter)
             if f:
