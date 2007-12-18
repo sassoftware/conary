@@ -240,9 +240,6 @@ class Recipe(object):
         for src in self.getSourcePathList():
             if skipFilter and skipFilter(os.path.basename(src.getPath())):
                 continue
-            if src.sourceDir is not None:
-                # if sourceDir is set, then there's nothing to fetch
-                continue
 
             f = src.fetch(refreshFilter)
             if f:
@@ -253,7 +250,8 @@ class Recipe(object):
         return files
 
     def getSourcePathList(self):
-        return [ x for x in self._sources if isinstance(x, source._AnySource) ]
+        return [ x for x in self._sources if isinstance(x, source._AnySource)
+                and x.sourceDir is None]
 
     def extraSource(self, action):
         """
