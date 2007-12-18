@@ -201,6 +201,13 @@ class UnsupportedEncryptionAlgorithm(PGPError):
     def __str__(self):
         return "Unsupported encryption algorithm code %s" % self.alg
 
+class UnsupportedHashAlgorithm(PGPError):
+    def __init__(self, alg):
+        self.alg = alg
+
+    def __str__(self):
+        return "Unsupported hash algorithm code %s" % self.alg
+
 class IncompatibleKey(PGPError):
     def __str__(self):
         return self.error
@@ -1090,6 +1097,17 @@ class PGP_BasePacket(object):
             hashObj.update(buf)
 
     @staticmethod
+    def _updateHashBin(hashObj, binSeq):
+        """
+        Update the hash object with binary octets from a sequence of octets
+
+        @param hashObj: a hash object
+        @param binSeq: a sequence of bytes
+        """
+        for b in binSeq:
+            hashObj.update(chr(b))
+
+    @staticmethod
     def checkStreamLength(stream, length):
         """Checks that the stream has exactly the length specified extra
         bytes from the current position"""
@@ -1303,10 +1321,15 @@ class PGP_Signature(PGP_BaseKeySig):
         pkAlg, hashAlg = self.readBin(2)
         hashSig = self.readExact(2)
 
+        # MPI data
+        mpiFile = util.SeekableNestedFile(self._bodyStream,
+            self.bodyLength - self._bodyStream.tell())
+
         self.sigType = sigType
         self.pubKeyAlg = pkAlg
         self.hashAlg = hashAlg
         self.hashSig = hashSig
+        self.mpiFile = mpiFile
 
     def _readSigV4(self):
         sigType, pkAlg, hashAlg = self.readBin(3)
@@ -1541,6 +1564,24 @@ class PGP_Signature(PGP_BaseKeySig):
         self._sigDigest = self._computeSignatureHash(sio)
         return self._sigDigest
 
+    def getDocumentHash(self, stream):
+        """
+        Compute the hash over the supplied document.
+
+        @param stream: stream containing the document to be hashed
+        @type stream: file
+
+        @rtype: str
+        @return: the hash of the supplied document
+        """
+
+        self.parse()
+        if self.sigType != SIG_TYPE_BINARY_DOC:
+            raise PGPError("Non-binary documents not supported")
+
+        digest = self._computeSignatureHash(stream)
+        return digest
+
     def getShortSigHash(self):
         """Return the 16-leftmost bits for the signature hash"""
         self.parse()
@@ -1608,41 +1649,53 @@ class PGP_Signature(PGP_BaseKeySig):
         stream.write(chr(spktType))
         PGP_Signature._copyStream(spktStream, stream)
 
-    def _computeSignatureHash(self, dataFile):
-        """Compute the signature digest for this signature, using the
-        key serialized in dataFile"""
-        self.parse()
-        if self.version != 4:
-            raise InvalidKey("Self signature is not a V4 signature")
-        dataFile.seek(0, SEEK_END)
+    def _completeHashV3(self, hashObj):
+        self._updateHashBin(hashObj, [self.sigType])
+        self._updateHashBin(hashObj, self.creation)
 
+    def _completeHashV4(self, hashObj):
         # (re)compute the hashed packet subpacket data length
         self.hashedFile.seek(0, SEEK_END)
         hSubPktLen = self.hashedFile.tell()
         self.hashedFile.seek(0, SEEK_SET)
 
         # Write signature version, sig type, pub alg, hash alg
-        self._writeBin(dataFile, [ self.version, self.sigType, self.pubKeyAlg,
-                                   self.hashAlg ])
+        self._updateHashBin(hashObj, [ self.version, self.sigType,
+                                       self.pubKeyAlg, self.hashAlg ])
         # Write hashed data length
-        self._writeBin(dataFile, int2ToBytes(hSubPktLen))
+        self._updateHashBin(hashObj, int2ToBytes(hSubPktLen))
         # Write the hashed data
-        self._copyStream(self.hashedFile, dataFile)
+        self._updateHash(hashObj, self.hashedFile)
 
         # We've added 6 bytes for the header
         dataLen = hSubPktLen + 6
 
         # Append trailer - 6-byte trailer
-        self._writeBin(dataFile, [ 0x04, 0xFF,
+        self._updateHashBin(hashObj, [ 0x04, 0xFF,
             (dataLen // 0x1000000) & 0xFF, (dataLen // 0x10000) & 0xFF,
             (dataLen // 0x100) & 0xFF, dataLen & 0xFF ])
+
+    def _computeSignatureHash(self, dataFile):
+        """Compute the signature digest for this signature, using the
+        key serialized in dataFile"""
+        self.parse()
+
+        if not (0 < self.hashAlg <= 2):
+            raise UnsupportedHashAlgorithm(self.hashAlg)
         hashAlgList = [ None, md5, sha]
         hashFunc = hashAlgList[self.hashAlg]
         hashObj = hashFunc.new()
 
-        # Rewind dataFile, we need to hash it
         dataFile.seek(0, SEEK_SET)
         self._updateHash(hashObj, dataFile)
+
+        if self.version == 3:
+            self._completeHashV3(hashObj)
+        elif self.version == 4:
+            self._completeHashV4(hashObj)
+        else:
+            raise InvalidKey("Signature is not a V3 or V4 signature")
+
         sigDigest = hashObj.digest()
         return sigDigest
 
@@ -1671,6 +1724,21 @@ class PGP_Signature(PGP_BaseKeySig):
         if not self.verifySignature(sigString, cryptoKey, digSig,
                                     self.pubKeyAlg, self.hashAlg):
             raise BadSelfSignature(keyId)
+
+    def verifyDocument(self, cryptoKey, stream):
+        """
+        Verify the signature on the supplied document stream
+        """
+        digest = self.getDocumentHash(stream)
+        keyId = self.getSignerKeyId()
+        # Validate it against the short digest
+        if digest[:2] != self.hashSig:
+            raise SignatureError(keyId)
+
+        digSig = self.parseMPIs()
+        if not self.verifySignature(digest, cryptoKey, digSig,
+                                    self.pubKeyAlg, self.hashAlg):
+            raise SignatureError(keyId)
 
     @staticmethod
     def verifySignature(sigString, cryptoKey, signature, pubKeyAlg, hashAlg):
