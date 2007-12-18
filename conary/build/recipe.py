@@ -251,7 +251,7 @@ class Recipe(object):
 
     def getSourcePathList(self):
         return [ x for x in self._sources if isinstance(x, source._AnySource)
-                and x.sourceDir is None]
+                and x.__dict__.get('sourceDir') is None]
 
     def extraSource(self, action):
         """
