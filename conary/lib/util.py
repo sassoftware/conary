@@ -136,34 +136,27 @@ def normurl(url):
     return urlparse.urlunsplit(surl)
 
 errorMessage = '''
-*******************************************************************
-*** An error has occurred in conary:
-***
-*** %(filename)s:%(lineno)s
-*** %(errtype)s: %(errmsg)s
-***
-*** Receiving this message is always due to a bug in conary, not
-*** user error.
-***
-*** The related traceback has been output to %(stackfile)s
-***
-*** To report this error, please run the following script:
-***
-*** conary-debug "%(command)s"
-***
-*** You can attach the resulting archive to a bug report at
-*** http://issues.rpath.com/.
-***
-*******************************************************************
+ERROR: An unexpected condition has occurred in Conary.  This is
+most likely due to insufficient handling of erroneous input, but
+may be some other bug.  In either case, please report the error at
+http://issues.rpath.com/ and attach to the issue the file
+%(stackfile)s
 
-For more information, or if you have trouble with the conary-debug
-command, go to: 
-
+Then, for more complete information, please run the following script:
+conary-debug "%(command)s"
+You can attach the resulting archive to your issue report at
+http://issues.rpath.com/  For more information, or if you have
+trouble with the conary-debug command, go to:
 http://wiki.rpath.com/wiki/Conary:How_To_File_An_Effective_Bug_Report
 
-for more help on reporting issues.
+To get a debug prompt, rerun the command with --debug-all
 
-To get a debug prompt, rerun this command with --debug-all
+Error details follow:
+
+%(filename)s:%(lineno)s
+%(errtype)s: %(errmsg)s
+
+The complete related traceback has been saved as %(stackfile)s
 '''
 _debugAll = False
 

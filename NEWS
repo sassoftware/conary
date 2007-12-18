@@ -89,6 +89,16 @@ Changes in 2.0.0:
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
 Changes in 1.2.11:
+  o Client Changes:
+    * The error message printed when Conary encounters an unhandled
+      exception has been changed to reflect the fact that the common
+      case is merely poor handling of the error condition, rather than
+      another bug.  It has also been reformatted to display better in
+      rITS. (CNY-2265)
+    * The "conary-debug" script that collects information to help
+      debug a crash has been enhanced to include the recently-added
+      manifest file. (CNY-2338)
+
   o Build changes:
     * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
@@ -98,11 +108,14 @@ Changes in 1.2.11:
       clearBuildRequires() and the clearCrossReqs() function now has a
       synonym called clearCrossRequires().  The old function names
       will be deprecated in the future. (CNY-834)
+
   o Bug Fixes:
     * when building groups, r.addCopy now respects the groupName
       flag. (CNY-2345)
     * the searchPath parameter to groups now works when it contains
       packages (before it only worked with labels). (CNY-2372)
+    * A bug that was preventing users with colons in their passwords
+      to use the web interface has been fixed. (CNY-2374)
 
 Changes in 1.2.10:
   o Client Changes:
