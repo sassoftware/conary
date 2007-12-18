@@ -25,14 +25,18 @@ class ClientBranch:
     BRANCH_ALL = BRANCH_SOURCE | BRANCH_BINARY
 
     def createBranchChangeSet(self, newLabel, 
-                              troveList = [], branchType=BRANCH_ALL):
+                              troveList = [], branchType=BRANCH_ALL,
+                              sigKeyId = None):
         return self._createBranchOrShadow(newLabel, troveList, shadow = False, 
-                                          branchType = branchType)
+                                          branchType = branchType,
+                                          sigKeyId = sigKeyId)
 
     def createShadowChangeSet(self, newLabel, troveList = [], 
-                              branchType=BRANCH_ALL):
+                              branchType=BRANCH_ALL,
+                              sigKeyId = None):
         return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
-                                          branchType = branchType)
+                                          branchType = branchType,
+                                          sigKeyId = sigKeyId)
 
     def _checkForLaterShadows(self, newLabel, troves):
         # check to see if we've already shadowed any versions later than
@@ -82,7 +86,7 @@ class ClientBranch:
         return laterShadows
 
     def _createBranchOrShadow(self, newLabel, troveList, shadow,
-                              branchType=BRANCH_ALL):
+                              branchType=BRANCH_ALL, sigKeyId = None):
         cs = changeset.ChangeSet()
         
         seen = set(troveList)
@@ -183,8 +187,21 @@ cannot shadow earlier trove
 
                 key = (trove.getName(), branchedTrove.getVersion(),
                        trove.getFlavor())
-                branchedTroves[key] = branchedTrove.diff(None,
-                                                         absolute = True)[0]
+
+                if sigKeyId is not None:
+                    branchedTrove.addDigitalSignature(sigKeyId)
+                else:
+                    # if no sigKeyId, just add sha1s
+                    branchedTrove.computeDigests()
+
+                # use a relative changeset if we're staying on the same host
+                if branchedTrove.getVersion().trailingLabel().getHost() == \
+                   trove.getVersion().trailingLabel().getHost():
+                    branchedTroves[key] = branchedTrove.diff(trove,
+                                                           absolute = False)[0]
+                else:
+                    branchedTroves[key] = branchedTrove.diff(None,
+                                                           absolute = True)[0]
 
             # check for duplicates
             hasTroves = self.repos.hasTroves(branchedTroves)

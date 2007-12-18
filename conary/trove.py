@@ -595,7 +595,7 @@ class MetadataItem(streams.StreamSet):
         self._updateDigests()
         self.signatures.sign(keyId, version)
 
-    def verifyDigitalSignatures(self, serverName=None):
+    def verifyDigitalSignatures(self, label=None):
         keyCache = openpgpkey.getKeyCache()
         missingKeys = []
         badFingerprints = []
@@ -609,7 +609,7 @@ class MetadataItem(streams.StreamSet):
             for signature in signatures.signatures:
                 try:
                     key = keyCache.getPublicKey(signature[0],
-                                                serverName=serverName,
+                                                label,
                                                 warn=False)
                 except KeyNotFound:
                     missingKeys.append(signature[0])
@@ -645,11 +645,11 @@ class Metadata(streams.OrderedStreamCollection):
             d.update(item)
         return d
 
-    def verifyDigitalSignatures(self, serverName=None):
+    def verifyDigitalSignatures(self, label=None):
         missingKeys = []
         badFingerprints = []
         for item in self:
-            rc = item.verifyDigitalSignatures(serverName=serverName)
+            rc = item.verifyDigitalSignatures(label=label)
             missingKeys.extend(rc[0])
             badFingerprints.extend(rc[1])
         return missingKeys, badFingerprints
@@ -1050,9 +1050,15 @@ class Trove(streams.StreamSet):
         found, or the keys are not trusted
         """
         version = self.getVersion()
-        serverName = None
-        if isinstance(version, (versions.VersionSequence, versions.Label)):
-            serverName = version.getHost()
+        vlabel = None
+        if isinstance(version, versions.Label):
+            vlabel = version
+        elif isinstance(version, versions.Version):
+            vlabel = version.trailingLabel()
+        elif isinstance(version, versions.VersionSequence):
+            allLabels = list(version.iterLabels())
+            if allLabels:
+                vlabel = allLabels[-1]
         missingKeys = []
         badFingerprints = []
         maxTrust = TRUST_UNTRUSTED
@@ -1068,7 +1074,7 @@ class Trove(streams.StreamSet):
 
             try:
                 key = keyCache.getPublicKey(signature[0],
-                                            serverName=serverName,
+                                            label = vlabel,
                                             # don't warn about missing gpg
                                             # if the threshold is <= 0
                                             warn=(threshold > 0))
@@ -1082,7 +1088,7 @@ class Trove(streams.StreamSet):
 
         # verify metadata.  Pass in the server name so it can
         # find additional fingerprints
-        rc = self.troveInfo.metadata.verifyDigitalSignatures(serverName=serverName)
+        rc = self.troveInfo.metadata.verifyDigitalSignatures(label=vlabel)
         metaMissingKeys, metaBadSigs = rc
         missingKeys.extend(metaMissingKeys)
         badFingerprints.extend(metaBadSigs)
@@ -1244,6 +1250,9 @@ class Trove(streams.StreamSet):
 
     def hasFiles(self):
         return len(self.idMap) != 0
+
+    def fileCount(self):
+        return len(self.idMap)
 
     def addTrove(self, name, version, flavor, presentOkay = False,
                  byDefault = True, weakRef = False):
@@ -3153,6 +3162,14 @@ class TroveIntegrityError(TroveError):
     Indicates that a checksum did not match
     """
     _error = "Trove Integrity Error: %s=%s[%s] checksum does not match precalculated value"
+
+    def marshall(self, marshaller):
+        return (str(self), marshaller.fromTroveTup(self.nvf)), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup):
+        return marshaller.toTroveTup(tup[1]), {}
+
     def __init__(self, name=None, version=None, flavor=None, error=None):
         if name:
             self.nvf = (name, version, flavor)

@@ -18,7 +18,7 @@ import pickle
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
 from conary.conaryclient import clone, resolve, update
-from conary.lib import log, util
+from conary.lib import log, util, openpgpkey
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import trovesource
@@ -90,6 +90,13 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         self.resolver = resolverClass(self, cfg, self.repos, self.db)
 
+        # Set up the callbacks for the PGP key cache
+        keyCache = openpgpkey.getKeyCache()
+        keyCacheCallback = openpgpkey.KeyCacheCallback(self.repos,
+                                                       cfg)
+        keyCache.setCallback(keyCacheCallback)
+
+
     def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
         if self.repos:
             if passwordPrompter is None:
@@ -123,6 +130,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
     def setRepos(self, repos):
         self.repos = repos
+
+    def getDatabase(self):
+        return self.db
 
     def disconnectRepos(self):
         """Disconnect the client from repositories.
@@ -357,13 +367,15 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         Iterate over rollback list.
         Yield (rollbackName, rollback)
         """
-        return self.db.iterRollbacksList()
+        return self.db.getRollbackStack().iter()
 
-    def getSearchSource(self, flavor=0, troveSource=None):
+    def getSearchSource(self, flavor=0, troveSource=None, installLabelPath=0):
         # a flavor of None is common in some cases so we use 0
         # as our "unset" case.
         if flavor is 0:
             flavor = self.cfg.flavor
+        if installLabelPath is 0:
+            installLabelPath = self.cfg.installLabelPath
 
         searchMethod = resolvemethod.RESOLVE_LEAVES_FIRST
         if troveSource is None:
@@ -371,7 +383,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             if troveSource is None:
                 return None
         searchSource = searchsource.NetworkSearchSource(troveSource,
-                            self.cfg.installLabelPath,
+                            installLabelPath,
                             flavor, self.db,
                             resolveSearchMethod=searchMethod)
         if self.cfg.searchPath:
