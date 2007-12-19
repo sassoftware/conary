@@ -553,20 +553,60 @@ def getFingerprints(keyRing):
     msg = PGP_Message(keyRing)
     return [ x.getKeyFingerprint() for x in msg.iterKeys() ]
 
-def parseAsciiArmorKey(asciiData):
+def readSignature(fileobj):
+    """
+    Read a signature packet from a stream.
+
+    @param fileobj: a stream to read the key from
+    @type fileobj: stream
+    @rtype: PGP_Signature
+    @return: the Signature packet
+    @raise InvalidPacketError: if the file object does not contain a valid
+    packet
+    """
+    sio = util.ExtendedStringIO()
+    hasData = parseAsciiArmor(fileobj, sio)
+    if not hasData:
+        raise InvalidPacketError("No data found")
+
+    msg = PGP_Message(sio, start = 0)
+    # We can't really have a StopIteration here, if there was no packet in the
+    # message we would have failed in parseAsciiArmor
+    try:
+        pkt = msg.iterPackets().next()
+    except ShortReadError:
+        raise InvalidPacketError("Error reading signature packet")
+    if not isinstance(pkt, PGP_Signature):
+        raise InvalidPacketError("Not a signature packet")
+    return pkt
+
+def parseAsciiArmor(asciiData, dest):
     """
     Parse an armored (Radix-64 encoded) PGP message.
 
     @param asciiData: the Radix-64 encoded PGP message
-    @type asciiData: string
+    @type asciiData: string or stream
+    @param dest: a stream to deposit the message into
+    @type dest: stream
     @return: the unencoded PGP messsage, or None if the encoded message was
         incorrect
-    @rtype: string or None
+    @rtype: bool
+    @return: True if data was decoded, False otherwise
     @raise PGPError: if the CRC does not match the message
     """
-    data = StringIO(asciiData)
+
+    if hasattr(asciiData, 'read'):
+        data = asciiData
+    else:
+        data = StringIO(asciiData)
     crc = None
-    nextLine=' '
+    nextLine = data.read(1)
+    if nextLine and (ord(nextLine[0]) & 0x80):
+        # This is already a binary packet
+        dest.write(nextLine)
+        PGP_BasePacket._copyStream(data, dest)
+        return True
+
     try:
         while(nextLine[0] != '-'):
             nextLine = data.readline()
@@ -581,21 +621,38 @@ def parseAsciiArmorKey(asciiData):
             # This is the CRC
             crc = nextLine.strip()[1:]
     except IndexError:
-        data.close()
-        return
-    data.close()
+        return False
 
     try:
         keyData = base64.b64decode(buf)
     except TypeError:
-        return None
+        return False
     if crc:
         crcobj = CRC24(keyData)
         ccrc = crcobj.base64digest()
         if crc != ccrc:
             raise PGPError("Message does not verify CRC checksum", crc, ccrc)
 
-    return keyData
+    dest.write(keyData)
+    return True
+
+def parseAsciiArmorKey(asciiData):
+    """
+    Parse an armored (Radix-64 encoded) PGP message.
+
+    @param asciiData: the Radix-64 encoded PGP message
+    @type asciiData: string or stream
+    @return: the unencoded PGP messsage, or None if the encoded message was
+        incorrect
+    @rtype: string or None
+    @raise PGPError: if the CRC does not match the message
+    """
+    sio = util.ExtendedStringIO()
+    ret = parseAsciiArmor(asciiData, sio)
+    if not ret:
+        return None
+    sio.seek(0)
+    return sio.read()
 
 class CRC24(object):
     __slots__ = [ '_crc' ]

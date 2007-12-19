@@ -28,10 +28,11 @@ import tempfile
 from conary.lib import debugger, log, magic
 from conary.build import lookaside
 from conary import rpmhelper
-from conary.lib import util
+from conary.lib import openpgpfile, util
 from conary.build import action, errors
 from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest
+from conary.repository import transport
 
 class _AnySource(action.RecipeAction):
 
@@ -102,32 +103,78 @@ class _Source(_AnySource):
 	    log.warning('No GPG signature file found for %s', self.sourcename)
 	    del self.localgpgfile
 
+    def _getPublicKey(self):
+        keyringPath = os.path.join(self.recipe.cfg.buildPath, 'pubring.pgp')
+        tsdbPath = os.path.join(self.recipe.cfg.buildPath, 'pubring.tsdb')
+
+        keyring = openpgpfile.PublicKeyring(keyringPath, tsdbPath)
+
+        try:
+            return keyring.getKey(self.keyid)
+        except openpgpfile.KeyNotFound:
+            pass
+
+        # OK, we don't have the key.
+        keyData = self._downloadPublicKey()
+        keyring.addKeysAsStrings([keyData])
+
+        return keyring.getKey(self.keyid)
+
+    def _downloadPublicKey(self):
+        # Compose URL for downloading the PGP key
+        keyServers = [ 'pgp.mit.edu', 'wwwkeys.pgp.net' ]
+        # Uhm. Proxies are not likely to forward traffic to port 11371, so
+        # avoid using the system-wide proxy setting for now.
+        # proxies = self.recipe.cfg.proxy
+        proxies = {}
+
+        opener = transport.URLOpener(proxies=proxies)
+        keyData = None
+        for ks in keyServers:
+            url = 'http://%s:11371/pks/lookup?op=get&search=0x%s' % (
+                    ks, self.keyid)
+            try:
+                handle = opener.open(url)
+                keyData = openpgpfile.parseAsciiArmorKey(handle)
+                if keyData:
+                    break
+            except transport.TransportError, e:
+                log.info('Error retrieving PGP key %s from key server %s: %s' %
+                    (self.keyid, ks, e))
+                continue
+
+        if keyData is None:
+            raise SourceError, "Failed to retrieve PGP key %s" % self.keyid
+
+        return keyData
+
     def _checkSignature(self, filepath):
         if self.keyid:
             filename = os.path.basename(filepath)
             self._addSignature(filename)
 	if 'localgpgfile' not in self.__dict__:
 	    return
-        if not util.checkPath("gpg"):
-            return
-	# FIXME: our own keyring
-	if not self._checkKeyID(filepath, self.keyid):
-	    # FIXME: only do this if key missing, this is cheap for now
-	    os.system("gpg --no-options --no-secmem-warning --keyserver pgp.mit.edu --recv-keys 0x%s" %self.keyid)
-	    if not self._checkKeyID(filepath, self.keyid):
-		log.error(self.failedtest)
-		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
-        log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
-    def _checkKeyID(self, filepath, keyid):
-	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify '%s' '%s'"
-		      %(self.localgpgfile, filepath))
-	result = p.read()
-	found = result.find("key ID %s" % keyid)
-	if found == -1:
-	    self.failedtest = result
-	    return False
-	return True
+        key = self._getPublicKey()
+
+        doc = open(filepath)
+
+        try:
+            sig = openpgpfile.readSignature(file(self.localgpgfile))
+        except openpgpfile.PGPError:
+            raise SourceError, "Failed to read signature from %s" % self.localgpgfile
+
+        # Does the signature belong to this key?
+        if sig.getSignerKeyId() != key.getKeyId():
+            raise SourceError("Signature file generated with key %s does "
+                "not match supplied key %s" %
+                    (sig.getSignerKeyId(), self.keyid))
+
+        try:
+            sig.verifyDocument(key.getCryptoKey(), doc)
+        except openpgpfile.SignatureError:
+            raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
+        log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
     def _extractFromRPM(self):
         """
