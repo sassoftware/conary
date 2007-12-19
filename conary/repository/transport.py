@@ -229,9 +229,17 @@ class URLOpener(urllib.FancyURLopener):
                 user_passwd, host = urllib.splituser(host)
                 host = urllib.unquote(host)
             realhost = host
-            # SPX: use the full URL here, not just the selector or name
-            # based virtual hosts don't work
-            selector = '%s:%s' %(protocol, url)
+            # We used to send an absolute URI here, instead of just the
+            # selector.
+            # Although this is not totally against standards, it's confusing
+            # PGP servers as well as causing reports of connection
+            # reset by peer errors (CNY-2324)
+            # The original reason why we were sending the full URL was virtual
+            # hosts. Indeed, repositories iwere sometimes expecting an
+            # absolute URIthere (making it more strict than a regular HTTP
+            # server), # but that started to break when we added HTTP proxies
+            # into the mix, for which we have no control over what the
+            # selector is (and for the proxies we tested it's a relative URI)
         else:
             # Request should go through a proxy
             # Check to see if it's a conary proxy
@@ -256,6 +264,7 @@ class URLOpener(urllib.FancyURLopener):
                     selector = "%s://%s%s" % (urltype, realhost, rest)
                 if self.proxyBypass(host, realhost):
                     host = realhost
+                    selector = rest
                 else:
                     self.usedProxy = True
                     # To make it visible for users of this object 

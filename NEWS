@@ -44,6 +44,8 @@ Changes in 2.0.0:
       going over) as practical for a noticeable performance improvement
       (CNY-2283)
     * Conary no longer uses gpg for PGP key management. (CNY-2349)
+    * Conary clients no longer send an absolute URI when talking directly to a
+      repository server. (CNY-2324)
 
   o Build Changes:
     * Conary will now ignore flavoring and requirements from elf libraries
