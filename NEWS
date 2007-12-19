@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.11:
   o Client Changes:
     * The error message printed when Conary encounters an unhandled
       exception has been changed to reflect the fact that the common
@@ -10,7 +10,7 @@ Changes in @NEW@:
       manifest file. (CNY-2338)
 
   o Build changes:
-    * PythonSetup synopsis now mentions the setupName keyword
+    * PythonSetup synopsis now mentions the 'setupName' keyword
       argument. (CNY-2360)
     * The conary.1 manual page now documents the purpose of the
       /etc/conary/components directory. (CNY-2361)
@@ -20,14 +20,14 @@ Changes in @NEW@:
       will be deprecated in the future. (CNY-834)
 
   o Bug Fixes:
-    * when building groups, r.addCopy now respects the groupName
+    * When building groups, r.addCopy now respects the groupName
       flag. (CNY-2345)
-    * the searchPath parameter to groups now works when it contains
+    * The 'searchPath' parameter to groups now works when it contains
       packages (before it only worked with labels). (CNY-2372)
     * A bug that was preventing users with colons in their passwords
       to use the web interface has been fixed. (CNY-2374)
     * Attempting to add entitlements for unknown entitlement classes
-      now raises an UnknownEntitlementGroup exception (CNY-2377)
+      now raises an UnknownEntitlementGroup exception. (CNY-2377)
 
 Changes in 1.2.10:
   o Client Changes:
