@@ -10,7 +10,7 @@ Changes in 1.2.11:
       manifest file. (CNY-2338)
 
   o Build changes:
-    * PythonSetup synopsis now mentions the 'setupName' keyword
+    * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
     * The conary.1 manual page now documents the purpose of the
       /etc/conary/components directory. (CNY-2361)
@@ -28,18 +28,21 @@ Changes in 1.2.11:
       to use the web interface has been fixed. (CNY-2374)
     * Attempting to add entitlements for unknown entitlement classes
       now raises an UnknownEntitlementGroup exception. (CNY-2377)
+    * Committing source packages that use shell-style brace and
+      glob expansion in addPatch() can now be committed to a
+      repository. (CNY-1152)
 
 Changes in 1.2.10:
   o Client Changes:
-    * The 'conary verify' command no longer complains about files which
-      have been removed with 'conary remove'. (CNY-950)
+    * The "conary verify" command no longer complains about files which
+      have been removed with "conary remove". (CNY-950)
     * Local rollbacks for removals now store the original contents for
       modified config files. (CNY-2350)
     * Permission errors now list both the URL and the repository
       hostname. (CNY-2211)
 
   o Server Changes:
-    * A new boolean server configuration option, 'serializeCommits',
+    * A new boolean server configuration option, serializeCommits,
       has been added to explicitly limit contention in certain cases.
       Successfully enabling it requires a minor schema update. (CNY-2285)
     * Servers in maintenance mode no longer return Internal Server
