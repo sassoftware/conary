@@ -1474,6 +1474,64 @@ def compatibleFlavors(flavor1, flavor2):
                     return False
     return True
 
+def getMinimalFlagChanges(dep, depToMatch):
+    if not dep:
+        return [ (flag, FLAG_SENSE_PREFERRED)
+                 for (flag,sense) in depToMatch.getFlags()[0]
+                 if sense == FLAG_SENSE_REQUIRED ]
+    toAdd = []
+    for flag, sense in depToMatch.getFlags()[0]:
+        mySense = dep.flags.get(flag, FLAG_SENSE_UNSPECIFIED)
+        if sense == FLAG_SENSE_REQUIRED:
+            # we must provide this flag and it must not be
+            # DISALLOWED
+            if mySense in (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_DISALLOWED):
+                toAdd.append((flag, FLAG_SENSE_PREFERRED))
+        elif sense == FLAG_SENSE_PREFERRED:
+            if mySense == FLAG_SENSE_DISALLOWED:
+                toAdd.append((flag, FLAG_SENSE_PREFERRED))
+        elif sense == FLAG_SENSE_PREFERNOT:
+            if mySense == FLAG_SENSE_REQUIRED:
+                toAdd.append((flag, FLAG_SENSE_PREFERNOT))
+        elif sense == FLAG_SENSE_DISALLOWED:
+            if mySense in (FLAG_SENSE_PREFERRED, FLAG_SENSE_REQUIRED):
+                toAdd.append((flag, FLAG_SENSE_PREFERNOT))
+    return toAdd
+
+
+def getMinimalCompatibleChanges(flavor, flavorToMatch):
+    getInstructionSetFlavor
+    useFlags = list(flavorToMatch.iterDepsByClass(UseDependency))
+    insDeps = list(flavorToMatch.iterDepsByClass(InstructionSetDependency))
+    targetDeps = list(flavorToMatch.iterDepsByClass(
+                                            TargetInstructionSetDependency))
+    myUseFlags = list(flavor.iterDepsByClass(UseDependency))
+    myInsDeps = list(flavor.iterDepsByClass(InstructionSetDependency))
+    myTargetDeps = list(flavor.iterDepsByClass(
+                                          TargetInstructionSetDependency))
+    finalFlavor = Flavor()
+    if useFlags:
+        useFlags = useFlags[0]
+        if myUseFlags:
+            myUseFlags = myUseFlags[0]
+        flagsNeeded = getMinimalFlagChanges(myUseFlags, useFlags)
+        if flagsNeeded:
+            useDep = Dependency('use', flagsNeeded)
+            finalFlavor.addDep(UseDependency, useDep)
+    for (depClass, toMatchDeps, myDeps) in ((InstructionSetDependency,
+                                             insDeps, myInsDeps),
+                                            (TargetInstructionSetDependency,
+                                             targetDeps, myTargetDeps)):
+        myDeps = dict((x.name, x) for x in myDeps)
+        for dep in toMatchDeps:
+            myDep = myDeps.get(dep.name, None)
+            flagsNeeded = getMinimalFlagChanges(myDep, dep)
+            if myDep is None or flagsNeeded:
+                insDep = Dependency(dep.name, flagsNeeded)
+                finalFlavor.addDep(depClass, insDep)
+    return finalFlavor
+
+
 dependencyCache = util.ObjectCache()
 
 ident = '(?:[0-9A-Za-z_-]+)'
