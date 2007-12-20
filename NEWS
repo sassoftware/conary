@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * The PackageSpec documentation incorrectly stated that you could
+      pass both package and component information to it; this has
+      been corrected to properly redirect to ComponentSpec for this
+      usage. (CNY-2387)
+
 Changes in 1.2.11:
   o Client Changes:
     * The error message printed when Conary encounters an unhandled
