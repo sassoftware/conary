@@ -164,6 +164,8 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     retries = 0
     url = None
 
+    # Save users from themselves - encode some characters automatically
+    name = name.replace(' ', '%20')
     # check for negative cache entries to avoid spamming servers
     negativeName = _createNegativeCacheName(cfg, name, location)
     if os.path.exists(negativeName):

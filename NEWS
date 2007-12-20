@@ -5,6 +5,9 @@ Changes in @NEW@:
       been corrected to properly redirect to ComponentSpec for this
       usage. (CNY-2387)
 
+  o Build Changes:
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+
 Changes in 1.2.11:
   o Client Changes:
     * The error message printed when Conary encounters an unhandled
@@ -16,7 +19,7 @@ Changes in 1.2.11:
       debug a crash has been enhanced to include the recently-added
       manifest file. (CNY-2338)
 
-  o Build changes:
+  o Build Changes:
     * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
     * The conary.1 manual page now documents the purpose of the
