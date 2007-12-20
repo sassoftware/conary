@@ -306,18 +306,13 @@ def exportKey(keyId, keyRing, armored=False):
         except (IOError, OSError), e:
             # if we can't read/find the key, it's not there.
             raise KeyNotFound(keyId)
-    fd = keyRing.fileno()
-    try:
-        fcntl.lockf(fd, fcntl.LOCK_SH)
-        msg = PGP_Message(keyRing)
-        key = msg.getKeyByKeyId(keyId)
-        # if the key we requested was a subkey, use the main key
-        if isinstance(key, PGP_SubKey):
-            key = key.getParentPacket()
-        sio = util.ExtendedStringIO()
-        key.writeAll(sio)
-    finally:
-        fcntl.lockf(fd, fcntl.LOCK_UN)
+    msg = PGP_Message(keyRing)
+    key = msg.getKeyByKeyId(keyId)
+    # if the key we requested was a subkey, use the main key
+    if isinstance(key, PGP_SubKey):
+        key = key.getParentPacket()
+    sio = util.ExtendedStringIO()
+    key.writeAll(sio)
 
     if armored:
         sio.seek(0)
@@ -451,19 +446,21 @@ def getFingerprint(keyId, keyFile=''):
     pkt = msg.getKeyByKeyId(keyId)
     return pkt.getKeyFingerprint()
 
-def addKeys(keys, stream):
-    """Add keys to the stream"""
-    return addPackets(keys, stream, "getKeyFingerprint",
+def addKeys(keys, fpath):
+    """Add keys to the file"""
+    return addPackets(keys, fpath, "getKeyFingerprint",
         PGP_Message, "iterMainKeys")
 
-def addKeyTimestampPackets(pkts, stream):
-    """Add key timestamp packets to the stream"""
-    return addPackets(pkts, stream, "getKeyId",
+def addKeyTimestampPackets(pkts, fpath):
+    """Add key timestamp packets to the file"""
+    return addPackets(pkts, fpath, "getKeyId",
         TimestampPacketDatabase, "iterTrustPackets")
 
-def addPackets(pkts, stream, pktIdFunc, messageFactory, streamIterFunc):
-    """Add packets to the stream. Return the packet IDs for the added packets"""
-    # Expand generators
+def addPackets(pkts, fpath, pktIdFunc, messageFactory, streamIterFunc):
+    """Add packets to the file. Return the packet IDs for the added packets"""
+    # This code really expects the stream to be based on a file, since we need
+    # a fileno() too
+
     pktsDict = {}
     for k in pkts:
         pktId = getattr(k, pktIdFunc)()
@@ -474,25 +471,37 @@ def addPackets(pkts, stream, pktIdFunc, messageFactory, streamIterFunc):
     if not pktsDict:
         return []
 
+    tmpfd, tmpfname = tempfile.mkstemp(prefix=os.path.basename(fpath),
+                                       dir=os.path.dirname(fpath))
+    # XXX This is disgusting. Ideally we should be able to fdopen directly
+    # into an ExtendedFile.
+    tempf = util.ExtendedFile(tmpfname, mode = "w+", buffering = False)
+    os.close(tmpfd)
+
+    pktIds = []
+
     # Lock the stream
-    fd = stream.fileno()
     try:
-        try:
-            fcntl.lockf(fd, fcntl.LOCK_EX)
-        except IOError, e:
-            if e.errno == errno.EBADF:
-                # The file was open in read-only mode
-                raise PGPError("Please pass in a file descriptor open in "
-                               "write mode")
-            raise
-        tempfd, tempf = tempfile.mkstemp()
-        # XXX This is disgusting. Ideally we should be able to fdopen directly
-        # into an ExtendedFile.
-        tempf = util.ExtendedFile(tempf, mode = "w+", buffering = False)
-        os.close(tempfd)
+        stream = file(fpath, "r+")
+        while 1:
+            streamfd = stream.fileno()
+            fcntl.lockf(streamfd, fcntl.LOCK_EX)
+            # We got the lock. Did the file change?
+            # There is a possibility that another writer that was previously
+            # holding the lock replaced the file, which would mean our current
+            # stream is stale.
+            newstream = file(fpath, "r+")
+            oStat = os.fstat(streamfd)
+            nStat = os.fstat(newstream.fileno())
+            if (oStat.st_dev, oStat.st_ino) == (nStat.st_dev, nStat.st_ino):
+                # Same file descriptor, we can continue
+                del oStat, nStat
+                break
+            # Replace our existing stream and continue
+            fcntl.lockf(streamfd, fcntl.LOCK_UN)
+            stream = newstream
 
-        pktIds = []
-
+        # At this point, we have an exclusive lock on the stream
         msg = messageFactory(stream, start = 0)
         for ipkt in getattr(msg, streamIterFunc)():
             iPktId = getattr(ipkt, pktIdFunc)()
@@ -510,15 +519,13 @@ def addPackets(pkts, stream, pktIdFunc, messageFactory, streamIterFunc):
             pkt.writeAll(tempf)
             del pktsDict[pktId]
             pktIds.append(pktId)
+
         # Now copy the keyring back
-        tempf.seek(0, SEEK_SET)
-        stream.seek(0, SEEK_SET)
-        stream.truncate()
-        PGP_BasePacket._copyStream(tempf, stream)
-        stream.flush()
+        tempf.close()
+        os.rename(tmpfname, fpath)
         return pktIds
     finally:
-        fcntl.lockf(fd, fcntl.LOCK_UN)
+        fcntl.lockf(streamfd, fcntl.LOCK_UN)
 
 def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum
@@ -3189,8 +3196,7 @@ class PublicKeyring(object):
             keys = list(keys)
         for key in keys:
             assert(isinstance(key, PGP_MainKey))
-        stream = self._openKeyring(readOnly = False)
-        keyFingerprints = addKeys(keys, stream)
+        keyFingerprints = addKeys(keys, self._keyringPath)
         self.updateTimestamps(keyFingerprints, timestamp = timestamp)
         return keyFingerprints
 
@@ -3229,7 +3235,7 @@ class PublicKeyring(object):
             pkts.append(pkt)
 
         mtime0 = os.stat(self._tsDbPath)[stat.ST_MTIME]
-        addKeyTimestampPackets(pkts, self._openTsDb(readOnly = False))
+        addKeyTimestampPackets(pkts, self._tsDbPath)
         mtime1 = os.stat(self._tsDbPath)[stat.ST_MTIME]
         if mtime0 == mtime1:
             # Cheat, and set the mtime to be a second larger
@@ -3239,46 +3245,26 @@ class PublicKeyring(object):
         # the mtime.
         self._tsDbTimestamp = None
 
-    def _openTsDb(self, readOnly = True):
-        if readOnly:
-            mode = "r"
-        else:
-            mode = "r+"
-        return util.ExtendedFile(self._tsDbPath, mode,
-                buffering = False)
-
-    def _openKeyring(self, readOnly = True):
-        if readOnly:
-            mode = "r"
-        else:
-            mode = "r+"
-        return util.ExtendedFile(self._keyringPath, mode,
-                buffering = False)
-
     def _parseTsDb(self):
         # Stat the timestamp database
-        mtime = os.stat(self._tsDbPath)[stat.ST_MTIME]
+        stream = file(self._tsDbPath)
+        streamfd = stream.fileno()
+        mtime = os.fstat(streamfd).st_mtime
         if self._tsDbTimestamp == mtime:
             # Database hasn't changed
             return
 
         allKeys = self._getAllKeys()
 
-        stream = self._openTsDb(readOnly = True)
-        fd = stream.fileno()
-        try:
-            fcntl.lockf(fd, fcntl.LOCK_SH)
-            self._tsDbTimestamp = os.stat(self._tsDbPath)[stat.ST_MTIME]
-            self._cache.clear()
-            for pkt in TimestampPacketDatabase(stream).iterTrustPackets():
-                pkt.parse()
-                mainKeyId = pkt.getKeyId()
-                ts = pkt.getRefreshTimestamp()
-                self._cache[mainKeyId] = ts
-                for sk in allKeys.get(mainKeyId, []):
-                    self._cache[sk] = ts
-        finally:
-            fcntl.lockf(fd, fcntl.LOCK_UN)
+        self._tsDbTimestamp = mtime
+        self._cache.clear()
+        for pkt in TimestampPacketDatabase(stream).iterTrustPackets():
+            pkt.parse()
+            mainKeyId = pkt.getKeyId()
+            ts = pkt.getRefreshTimestamp()
+            self._cache[mainKeyId] = ts
+            for sk in allKeys.get(mainKeyId, []):
+                self._cache[sk] = ts
 
     def getKeyTimestamp(self, keyId):
         assert(len(keyId) >= 16)
@@ -3298,10 +3284,8 @@ class PublicKeyring(object):
         @return: a key with the specified key ID
         @raise KeyNotFound: if the key was not found
         """
-        stream = self._openKeyring(readOnly = True)
-        # exportKey will do the locking for the period we read from the
-        # keyring, and will return a private file object that is not shared
-        # with other processes
+        stream = file(self._keyringPath)
+        # exportKey will return a fresh file object
         retStream = exportKey(keyId, stream)
         # Note that exportKey will export both the main key and the subkeys.
         # Because of this, we can't blindly grab the first key in the new
@@ -3313,14 +3297,9 @@ class PublicKeyring(object):
         # Return all keys and subkeys
         # We need them in order to handle subkeys too
         ret = {}
-        stream = self._openKeyring(readOnly = True)
-        fd = stream.fileno()
-        try:
-            fcntl.lockf(fd, fcntl.LOCK_SH)
-            msg = PGP_Message(stream)
-            for pk in msg.iterMainKeys():
-                fp = pk.getKeyId()
-                ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
-            return ret
-        finally:
-            fcntl.lockf(fd, fcntl.LOCK_UN)
+        stream = file(self._keyringPath)
+        msg = PGP_Message(stream)
+        for pk in msg.iterMainKeys():
+            fp = pk.getKeyId()
+            ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
+        return ret
