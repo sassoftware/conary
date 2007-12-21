@@ -64,7 +64,7 @@ Changes in 2.0.0:
     * Promote no longer recompresses non-config files during changeset
       assembly. (CNY-2202)
     * Promote now gets file contents and streams from changesets when a
-      lot of them are needed from the same trove. (CNY-2022)
+      lot of them are needed from the same trove. (CNY-2202)
     * The "cvc promote" command now uses the labels and branches
       specified in the "from" section of any promote as the place to
       search for packages (CNY-2235).
