@@ -100,9 +100,8 @@ Changes in 2.0.0:
     * Conary clients no longer send an absolute URI when talking
       directly to a repository server. (CNY-2324)
     * Many repository permission handling methods have been renamed
-      for consistency. For a complete list, see PROTOCOL.versions at
-      http://hg.rpath.com/conary-2.0/raw-file/tip/doc/PROTOCOL.versions
-      (CNY-2298)
+      for consistency. For a complete list, see doc/PROTOCOL.versions
+      in the Conary source code. (CNY-2298)
     * Setting/resetting the admin field permission is now handled by the
       setUserGroupIsAdmin() call instead of addAcl/editAcl. (CNY-1782)
 
