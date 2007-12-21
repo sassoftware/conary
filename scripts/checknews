@@ -30,6 +30,8 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
         f = open(news)
         started = False
         fixVer = None
+        closedStates = [ 'Closed', 'Document', 'Resolved' ]
+        notClosed = []
         for line in f:
             if line.startswith('Changes in'):
                 if started:
@@ -47,6 +49,7 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                 v = [ x for x in versions if x.name == version ]
                 if not v:
                     print 'no such version', version, 'in CNY project'
+                    break
                 fixVer = v[0]
                 versionToId = dict((x.name, x.id) for x in versions)
             match = keyre.search(line)
@@ -58,6 +61,8 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                 print 'getting', key
                 issue = client.getIssue(key)
                 fixVers = [ x for x in issue.fixVersions if x.name == version ]
+                if issue.status not in closedStates:
+                    notClosed.append(key)
                 if not fixVers:
                     print key, 'does not have fix version set to', version
                     fixVersions = issue.fixVersions[:]
@@ -66,6 +71,10 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                     d = { 'id': 'fixVersions',
                           'values': newVersions }
                     client.client.updateIssue(key, [ d ])
+        if notClosed:
+            print "Issues that are not in a closed state (%s):" % \
+                ", ".join(closedStates)
+            print " ".join(notClosed)
 
 class CheckerMain(main.JiraNemoMain, options.MainHandler):
     commandList = [ CheckNewsCommand ]
