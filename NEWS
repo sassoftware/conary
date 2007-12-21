@@ -91,6 +91,17 @@ Changes in 2.0.0:
       renamed for consistency.  For a list, see PROTOCOL.versions. (CNY-2298)
 
 Changes in 1.2.11:
+Changes in 1.2.12:
+  o Bug Fixes:
+    * The PackageSpec documentation incorrectly stated that you could
+      pass both package and component information to it; this has
+      been corrected to properly redirect to ComponentSpec for this
+      usage. (CNY-2387)
+
+  o Build Changes:
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+
+Changes in 1.2.11:
   o Client Changes:
     * The error message printed when Conary encounters an unhandled
       exception has been changed to reflect the fact that the common
@@ -101,7 +112,7 @@ Changes in 1.2.11:
       debug a crash has been enhanced to include the recently-added
       manifest file. (CNY-2338)
 
-  o Build changes:
+  o Build Changes:
     * PythonSetup synopsis now mentions the setupName keyword
       argument. (CNY-2360)
     * The conary.1 manual page now documents the purpose of the
@@ -112,26 +123,29 @@ Changes in 1.2.11:
       will be deprecated in the future. (CNY-834)
 
   o Bug Fixes:
-    * when building groups, r.addCopy now respects the groupName
+    * When building groups, r.addCopy() now respects the groupName
       flag. (CNY-2345)
-    * the searchPath parameter to groups now works when it contains
-      packages (before it only worked with labels). (CNY-2372)
+    * The searchPath parameter in group methods now works when it
+      contains packages (before it worked only with labels). (CNY-2372)
     * A bug that was preventing users with colons in their passwords
       to use the web interface has been fixed. (CNY-2374)
     * Attempting to add entitlements for unknown entitlement classes
-      now raises an UnknownEntitlementGroup exception (CNY-2377)
+      now raises an UnknownEntitlementGroup exception. (CNY-2377)
+    * Committing source packages that use shell-style brace and
+      glob expansion in addPatch() can now be committed to a
+      repository. (CNY-1152)
 
 Changes in 1.2.10:
   o Client Changes:
-    * The 'conary verify' command no longer complains about files which
-      have been removed with 'conary remove'. (CNY-950)
+    * The "conary verify" command no longer complains about files which
+      have been removed with "conary remove". (CNY-950)
     * Local rollbacks for removals now store the original contents for
       modified config files. (CNY-2350)
     * Permission errors now list both the URL and the repository
       hostname. (CNY-2211)
 
   o Server Changes:
-    * A new boolean server configuration option, 'serializeCommits',
+    * A new boolean server configuration option, serializeCommits,
       has been added to explicitly limit contention in certain cases.
       Successfully enabling it requires a minor schema update. (CNY-2285)
     * Servers in maintenance mode no longer return Internal Server

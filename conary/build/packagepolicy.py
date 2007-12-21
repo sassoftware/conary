@@ -282,6 +282,13 @@ class ComponentSpec(_filterSpec):
     Uses C{r.ComponentSpec} to specify that all files below the
     C{%(contentdir)s/manual/} directory are part of the C{:manual} component.
 
+    C{r.ComponentSpec('foo:bar', '%(sharedir)s/foo/')}
+
+    Uses C{r.ComponentSpec} to specify that all files below the
+    C{%(sharedir)s/foo/} directory are part of the C{:bar} component
+    of the C{foo} package, avoiding the need to invoke both the
+    C{ComponentSpec} and C{PackageSpec} policies.
+
     C{r.ComponentSpec(catchall='data')}
 
     Uses C{r.ComponentSpec} to specify that all files not otherwise specified
@@ -457,14 +464,15 @@ class PackageSpec(_filterSpec):
     SYNOPSIS
     ========
 
-    C{r.PackageSpec([I{packagename},] [I{filterexp}])}
+    C{r.PackageSpec(I{packagename}, I{filterexp})}
 
     DESCRIPTION
     ===========
 
-    The C{r.PackageSpec()} policy determines which package and optionally
-    which component each file is in. (Use C{r.ComponentSpec()} to specify
-    the component without specifying the package.)
+    The C{r.PackageSpec()} policy determines which package each file
+    is in. (Use C{r.ComponentSpec()} to specify the component without
+    specifying the package, or to specify C{I{package}:I{component}}
+    in one invocation.)
 
     EXAMPLES
     ========
