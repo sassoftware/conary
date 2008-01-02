@@ -375,3 +375,12 @@ class Database(BaseDatabase):
                 raise sqlerrors.DatabaseLocked(str(e))
             raise
         return cu
+
+    # sqlite doesn't support SQL language to add a foreign key constraint
+    def addForeignKey(self, *args, **kw):
+        return True
+    # same goes true for drop constraint
+    def dropForeignKey(self, *args, **kw):
+        return True
+
+    

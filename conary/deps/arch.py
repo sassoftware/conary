@@ -61,8 +61,8 @@ def flags_x86_64():
     multiarch = flags_i686()
     multiarch[0].append(x86_64)
     # switch to just return muliarch when flavorPreferences are switched on.
-    # return multiarch
-    return [[ x86_64 ]] + multiarch
+    return multiarch
+    #return [[ x86_64 ]] + multiarch
 
 def current():
     return currentArch
@@ -93,17 +93,12 @@ class FlavorPreferences:
 
     # The flavor preferences table is keyed on the current arch
     flavorPreferences = {
-        'alpha'         : ['is: alpha'],
-        'ppc'           : ['is: ppc'],
-        'ppc64'         : ['is: ppc ppc64', 'is: ppc64', 'is: ppc'],
-        'ppc ppc64'     : ['is: ppc ppc64', 'is: ppc64', 'is: ppc'],
-        's390'          : ['is: s390'],
-        'sparc'         : ['is: sparc'],
-        'sparc64'       : ['is: sparc sparc64', 'is: sparc64', 'is: sparc'],
-        'sparc sparc64' : ['is: sparc sparc64', 'is: sparc64', 'is: sparc'],
-        'x86'           : ['is: x86'],
-        'x86_64'        : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
-        'x86 x86_64'    : ['is: x86 x86_64', 'is: x86_64', 'is: x86', ],
+        'ppc64'         : ['is: ppc64', 'is:ppc'],
+        'ppc ppc64'     : ['is: ppc64', 'is:ppc'],
+        'sparc64'       : ['is: sparc64', 'is:sparc'],
+        'sparc sparc64' : ['is: sparc64', 'is:sparc'],
+        'x86_64'        : ['is: x86_64', 'is:x86' ],
+        'x86 x86_64'    : ['is: x86_64', 'is:x86'],
     }
 
     @staticmethod
@@ -114,8 +109,7 @@ class FlavorPreferences:
     @staticmethod
     def getFlavorPreferences(arch):
         return [ deps.parseFlavor(x)
-            for x in FlavorPreferences.getStringFlavorPreferences(arch)
-        ]
+            for x in FlavorPreferences.getStringFlavorPreferences(arch) ]
 
 def getFlavorPreferences(arch = currentArch):
     return FlavorPreferences.getFlavorPreferences(arch)
@@ -129,29 +123,47 @@ class IncompatibleInstructionSets(Exception):
     def __str__(self):
         return "Incompatible architectures: %s: %s" % (self.is1, self.is2)
 
+def getFlavorPreferencesFromFlavor(depSet):
+    arch = getMajorArch(depSet.iterDepsByClass(deps.InstructionSetDependency))
+    if arch is None:
+        return None
+    return getFlavorPreferences([[arch]])
+
 def getMajorArch(depList):
     """Return the major architecture from an instruction set dependency
-    @type depList: list (iterable) of Dependency objects
+    @type depList: list (iterable) of Dependency objects representing
+    architectures.
     @param depGroupL a list (iterable) of Dependency objects.
     @raise IncompatibleInstructionSets: when incompatible architectures are
            present in the list.
     @rtype: instance of Dependency, or None
     @return: major architecture from the list, or None if the list is empty
     """
-
     # Compare instruction sets by looking at the flavor preferences -
-    # the major architecture should be a superset of all other arches
+    # If a minor architecture is allowed to be set for this arch,
+    # then it will have flavor preferences that describe the allowed
+    # flavors.
     majorArch = None
-    archTableSet = set([])
+    depList = list(depList) # accept generators
+    if not depList:
+        return None
+    if len(depList) == 1:
+        return depList[0]
     for dep in depList:
-        prefs = getFlavorPreferences([[dep]])
-        prefsSet = set(prefs)
-        if archTableSet.issubset(prefsSet):
-            archTableSet = set(prefs)
-            majorArch = dep
+        prefs = set(getFlavorPreferences([[dep]]))
+        if not prefs:
             continue
-        if prefsSet.issubset(archTableSet):
-            continue
-        raise IncompatibleInstructionSets(majorArch.name, dep)
-
+        majorArch = dep
+        prefArches = set()
+        for depSet in prefs:
+            for dep in depSet.iterDepsByClass(deps.InstructionSetDependency):
+                prefArches.add(dep.name)
+        break
+    if not majorArch:
+        raise IncompatibleInstructionSets(depList[0].name, depList[1])
+    for dep in depList:
+        if dep.name != majorArch.name and getFlavorPreferences([[dep]]):
+            raise IncompatibleInstructionSets(majorArch.name, dep)
+        elif dep.name not in prefArches:
+            raise IncompatibleInstructionSets(majorArch.name, dep)
     return majorArch
