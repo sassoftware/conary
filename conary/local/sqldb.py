@@ -918,9 +918,11 @@ order by
                                itertools.izip(itertools.repeat(pathId), tags))
 	else:
             cu.execute("""
-                UPDATE DBTroveFiles SET instanceId=?, isPresent=?, path = ?
-                    WHERE pathId=? AND instanceId=?""",
-                    troveInstanceId, isPresent, path, pathId, oldInstanceId)
+              UPDATE DBTroveFiles
+                  SET instanceId=?, isPresent=?, path=?, versionId=?
+                  WHERE pathId=? AND instanceId=?""",
+                    troveInstanceId, isPresent, path, versionId,
+                    pathId, oldInstanceId)
 
     def addTroveDone(self, troveInfo):
 	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo

@@ -4,6 +4,9 @@ Changes in @NEW@:
       pass both package and component information to it; this has
       been corrected to properly redirect to ComponentSpec for this
       usage. (CNY-2387)
+    * An update bug that could result in a trove integrity error when
+      updating packages with files that changed versions but no other
+      information has been fixed. (CNY-2403)
 
   o Build Changes:
     * Spaces in URLs are now automatically escaped. (CNY-2389)
