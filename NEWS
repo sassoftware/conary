@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.1:
   o Build Changes
     * The Requires() policy now inspects Lib: and Lib.private:
       pkg-config keywords in .pc files to find library files, and
