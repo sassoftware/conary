@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o Client API Changes:
+    * A getDatabase() method has been added to the ConaryClient class.
+      This method returns the local system database object.  Code that
+      needs to query the local system database should use this method
+      to obtain the database object. (CNY-2316)
+
   o Bug Fixes:
     * The PackageSpec documentation incorrectly stated that you could
       pass both package and component information to it; this has
