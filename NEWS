@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * An update bug that could result in a trove integrity error when
+      updating packages with files that changed versions but no other
+      information has been fixed. (CNY-2403)
+
 Changes in 2.0.0:
   o Major Changes:
     * The way Conary handles architecture flavors has been changed,
@@ -71,9 +77,6 @@ Changes in 2.0.0:
       pass both package and component information to it; this has
       been corrected to properly redirect to ComponentSpec for this
       usage. (CNY-2387)
-    * An update bug that could result in a trove integrity error when
-      updating packages with files that changed versions but no other
-      information has been fixed. (CNY-2403)
 
   o Client Changes:
     * The "getTroveLatestByLabel" client-side call has been added.
