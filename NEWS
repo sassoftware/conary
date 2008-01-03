@@ -10,6 +10,10 @@ Changes in @NEW@:
 
   o Build Changes:
     * Spaces in URLs are now automatically escaped. (CNY-2389)
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
 
 Changes in 1.2.11:
   o Client Changes:
