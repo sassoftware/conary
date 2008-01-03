@@ -1,9 +1,16 @@
-Changes in @NEW@:
-  o Client API Changes:
+Changes in 1.2.12:
+  o Client Changes:
     * A getDatabase() method has been added to the ConaryClient class.
-      This method returns the local system database object.  Code that
+      This method returns the local system database object. Code that
       needs to query the local system database should use this method
       to obtain the database object. (CNY-2316)
+
+  o Build Changes:
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
 
   o Bug Fixes:
     * The PackageSpec documentation incorrectly stated that you could
@@ -13,13 +20,6 @@ Changes in @NEW@:
     * An update bug that could result in a trove integrity error has
       been fixed. The issue would occur when updating packages where,
       for some files, the only changes are to file versions. (CNY-2403)
-
-  o Build Changes:
-    * Spaces in URLs are now automatically escaped. (CNY-2389)
-    * The Requires() policy now inspects Lib: and Lib.private:
-      pkg-config keywords in .pc files to find library files, and
-      where it finds them, it adds appropriate Conary trove
-      requirements to the .pc files. (CNY-2370)
 
 Changes in 1.2.11:
   o Client Changes:
