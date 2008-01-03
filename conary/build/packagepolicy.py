@@ -2842,6 +2842,12 @@ class Requires(_addInfo, _dependency):
         self.db = None
         self.depCache = self.dbDepCacheClass(self._getDb())
 
+        ISD = deps.InstructionSetDependency
+        TISD = deps.TargetInstructionSetDependency
+        instructionDeps = list(self.recipe._buildFlavor.iterDepsByClass(ISD))
+        instructionDeps += list(self.recipe._buildFlavor.iterDepsByClass(TISD))
+        self.allowableIsnSets = [ x.name for x in instructionDeps ]
+
     def updateArgs(self, *args, **keywords):
         # _privateDepMap is used only for Provides to talk to Requires
         privateDepMap = keywords.pop('_privateDepMap', None)
@@ -2916,7 +2922,12 @@ class Requires(_addInfo, _dependency):
         m = self.recipe.magic[path]
 
         if self._isELF(m, 'requires'):
-            self._addELFRequirements(path, m, pkg)
+            isnset = m.contents['isnset']
+            if isnset in self.allowableIsnSets:
+                # only add requirements for architectures
+                # that we are actually building for (this may include
+                # major and minor architectures)
+                self._addELFRequirements(path, m, pkg)
 
         # now go through explicit requirements
 	for info in self.included:
@@ -3696,6 +3707,12 @@ class Flavor(policy.Policy):
         self.packageFlavor = deps.Flavor()
         self.troveMarked = False
         self.componentMap = self.recipe.autopkg.componentMap
+        ISD = deps.InstructionSetDependency
+        TISD = deps.TargetInstructionSetDependency
+        instructionDeps = list(self.recipe._buildFlavor.iterDepsByClass(ISD))
+        instructionDeps += list(self.recipe._buildFlavor.iterDepsByClass(TISD))
+        self.allowableIsnSets = [ x.name for x in instructionDeps ]
+
 
     def postProcess(self):
 	componentMap = self.recipe.autopkg.componentMap
@@ -3747,9 +3764,17 @@ class Flavor(policy.Policy):
 	flv = deps.Flavor()
         flv.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
         # get the Arch.* dependencies
-        flv.union(self.archFlavor)
+        # set the flavor for the file to match that discovered in the 
+        # magic - but do not let that propagate up to the flavor of 
+        # the package - instead the package will have the flavor that
+        # it was cooked with.  This is to avoid unnecessary or extra files
+        # causing the entire package from being flavored inappropriately.
+        # Such flavoring requires a bunch of Flaovr exclusions to fix.
         f.flavor.set(flv)
-        self.packageFlavor.union(flv)
+        # get the Arch.* dependencies
+        flv.union(self.archFlavor)
+        if isnset in self.allowableIsnSets:
+            self.packageFlavor.union(flv)
 
 class reportMissingBuildRequires(policy.Policy):
     """
