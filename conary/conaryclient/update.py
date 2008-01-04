@@ -1417,28 +1417,8 @@ conary erase '%s=%s[%s]'
                                                    reposVersionsByLabel[label])
         if not downgrades:
             return
-        msg = []
-        msg.append('Updating would install older versions of the following packages.  This means that the installed version on the system is not available in the repository.  To override, specify the version explicitly.\n')
-        for (troveSpec, label), \
-             (localTups, repoTups) in downgrades.iteritems():
-            repoVersions = ['%s/%s[%s]' % (x[1].trailingLabel(),
-                                           x[1].trailingRevision(),
-                                        deps.getInstructionSetFlavor(x[2]))
-                             for x in repoTups]
-            repoVersions = '\n        '.join(repoVersions)
-            localVersions = ['%s/%s[%s]' % (x[1].trailingLabel(),
-                                            x[1].trailingRevision(),
-                                        deps.getInstructionSetFlavor(x[2]))
-                             for x in localTups ]
-            localVersions = '\n        '.join(localVersions)
-            msg.append('\n%s\n'
-                       '    Available versions\n'
-                       '        %s\n'
-                       '    Installed versions\n'
-                       '        %s\n' % (troveSpec[0], repoVersions,
-                                         localVersions))
-            msg = ''.join(msg)
-        raise UpdateError(msg)
+
+        raise DowngradeError(downgrades)
 
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
@@ -3418,6 +3398,33 @@ class UpdateError(ClientError):
     """Base class for update errors"""
     def display(self):
         return str(self)
+
+class DowngradeError(UpdateError):
+    """Update would install an older package than the currently installed one"""
+    def __init__(self, downgrades):
+        self.downgrades = downgrades
+        msg = []
+        msg.append('Updating would install older versions of the following packages.  This means that the installed version on the system is not available in the repository.  To override, specify the version explicitly.\n')
+        for (troveSpec, label), \
+             (localTups, repoTups) in downgrades.iteritems():
+            repoVersions = ['%s/%s[%s]' % (x[1].trailingLabel(),
+                                           x[1].trailingRevision(),
+                                        deps.getInstructionSetFlavor(x[2]))
+                             for x in repoTups]
+            repoVersions = '\n        '.join(repoVersions)
+            localVersions = ['%s/%s[%s]' % (x[1].trailingLabel(),
+                                            x[1].trailingRevision(),
+                                        deps.getInstructionSetFlavor(x[2]))
+                             for x in localTups ]
+            localVersions = '\n        '.join(localVersions)
+            msg.append('\n%s\n'
+                       '    Available versions\n'
+                       '        %s\n'
+                       '    Installed versions\n'
+                       '        %s\n' % (troveSpec[0], repoVersions,
+                                         localVersions))
+        msg = ''.join(msg)
+        UpdateError.__init__(self, msg)
 
 class UpdatePinnedTroveError(UpdateError):
     """An attempt to update/erase a pinned trove."""
