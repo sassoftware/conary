@@ -1,12 +1,9 @@
-Changes in @NEW@:
+Changes in 2.0.2:
   o Build Changes:
     * PGP version 2 signatures are now properly parsed. Version 2
       signatures are documented in the outdated RFC1991 and are
       considered deprecated, but some PGP keys contain them.
       (CNY-2417)
-
-    * An issue that was preventing version 2 PGP signatures from being
-      interpreted has been fixed. (CNY-2417)
 
 Changes in 2.0.1:
   o Build Changes:
