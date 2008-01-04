@@ -5,6 +5,10 @@ Changes in 2.0.2:
       considered deprecated, but some PGP keys contain them.
       (CNY-2417)
 
+  o Bug Fixes:
+    * A bug that caused an unhandled exception when adding a new role
+      in the Conary repository web interface has been fixed.
+
 Changes in 2.0.1:
   o Build Changes:
     * The Requires() policy now inspects Lib: and Lib.private:
