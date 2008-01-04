@@ -1347,10 +1347,12 @@ class PGP_Signature(PGP_BaseKeySig):
         self.initialize()
 
         sigVersion, = self.readBin(1)
-        if sigVersion not in [3, 4]:
+        if sigVersion not in [2, 3, 4]:
             raise InvalidBodyError("Invalid signature version %s" % sigVersion)
         self.version = sigVersion
-        if sigVersion == 3:
+        # Version 2 signatures are documented in RFC1991, and are identical to
+        # version 3 signatures
+        if sigVersion in [2, 3]:
             self._readSigV3()
         else:
             self._readSigV4()
@@ -1525,7 +1527,7 @@ class PGP_Signature(PGP_BaseKeySig):
         """Get the key ID of the issuer for this signature.
         Return None if the packet did not contain an issuer key ID"""
         self.parse()
-        if self.version == 3:
+        if self.version in [2, 3]:
             assert self.signerKeyId is not None
             return binSeqToString(self.signerKeyId)
         # Version 3 packets should have already set signerKeyId

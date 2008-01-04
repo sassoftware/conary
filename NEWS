@@ -1,5 +1,15 @@
+Changes in @NEW@:
+  o Build Changes:
+    * PGP version 2 signatures are now properly parsed. Version 2
+      signatures are documented in the outdated RFC1991 and are
+      considered deprecated, but some PGP keys contain them.
+      (CNY-2417)
+
+    * An issue that was preventing version 2 PGP signatures from being
+      interpreted has been fixed. (CNY-2417)
+
 Changes in 2.0.1:
-  o Build Changes
+  o Build Changes:
     * The Requires() policy now inspects Lib: and Lib.private:
       pkg-config keywords in .pc files to find library files, and
       where it finds them, it adds appropriate Conary trove
