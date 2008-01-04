@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Client Changes:
+    * Conary will not downgrade packages if no version is specified by
+      the user but, due to an out of date mirror or other reasons, the
+      update available for a package is older than the currently installed
+      package. (CNY-2404)
   o Bug Fixes:
     * The PackageSpec documentation incorrectly stated that you could
       pass both package and component information to it; this has
