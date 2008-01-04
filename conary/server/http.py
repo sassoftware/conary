@@ -551,7 +551,7 @@ class HttpHandler(WebHandler):
         users = self.repServer.auth.userAuth.getUserList()
         return self._write("add_role", modify = False, role = None,
                            users = users, members = [], canMirror = False,
-                           isAdmin = False)
+                           roleIsAdmin = False)
 
     @checkAuth(admin = True)
     @strFields(roleName = None)
@@ -559,20 +559,20 @@ class HttpHandler(WebHandler):
         users = self.repServer.auth.userAuth.getUserList()
         members = set(self.repServer.auth.getRoleMembers(roleName))
         canMirror = self.repServer.auth.roleCanMirror(roleName)
-        isAdmin = self.repServer.auth.roleIsAdmin(roleName)
+        roleIsAdmin = self.repServer.auth.roleIsAdmin(roleName)
 
         return self._write("add_role", role = roleName,
                            users = users, members = members,
-                           canMirror = canMirror, roleIsAdmin = isAdmin,
+                           canMirror = canMirror, roleIsAdmin = roleIsAdmin,
                            modify = True)
 
     @checkAuth(admin = True)
     @strFields(roleName = None, newRoleName = None)
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
-    @intFields(isAdmin = False)
+    @intFields(roleIsAdmin = False)
     def manageRole(self, auth, roleName, newRoleName, memberList,
-                   canMirror, isAdmin):
+                   canMirror, roleIsAdmin):
         if roleName != newRoleName:
             try:
                 self.repServer.auth.renameRole(roleName, newRoleName)
@@ -584,7 +584,7 @@ class HttpHandler(WebHandler):
 
         self.repServer.auth.updateRoleMembers(roleName, memberList)
         self.repServer.auth.setMirror(roleName, canMirror)
-        self.repServer.auth.setAdmin(roleName, isAdmin)
+        self.repServer.auth.setAdmin(roleName, roleIsAdmin)
 
         self._redirect("userlist")
 
@@ -592,9 +592,9 @@ class HttpHandler(WebHandler):
     @strFields(newRoleName = None)
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
-    @intFields(isAdmin = False)
+    @intFields(roleIsAdmin = False)
     def addRole(self, auth, newRoleName, memberList, canMirror,
-                 isAdmin):
+                roleIsAdmin):
         try:
             self.repServer.auth.addRole(newRoleName)
         except errors.RoleAlreadyExists:
@@ -603,7 +603,7 @@ class HttpHandler(WebHandler):
 
         self.repServer.auth.updateRoleMembers(newRoleName, memberList)
         self.repServer.auth.setMirror(newRoleName, canMirror)
-        self.repServer.auth.setAdmin(newRoleName, isAdmin)
+        self.repServer.auth.setAdmin(newRoleName, roleIsAdmin)
 
         self._redirect("userlist")
 

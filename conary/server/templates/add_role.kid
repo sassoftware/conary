@@ -43,8 +43,8 @@
                     <tr>
                         <td id="header">Role is admin:</td>
                         <td>
-                            <input type="radio" name="isAdmin" value="1" py:attrs="{'checked' : isAdmin and 'checked' or None }"/>Yes
-                            <input type="radio" name="isAdmin" value="0" py:attrs="{'checked' : (not isAdmin) and 'checked' or None }"/>No
+                            <input type="radio" name="roleIsAdmin" value="1" py:attrs="{'checked' : roleIsAdmin and 'checked' or None }"/>Yes
+                            <input type="radio" name="roleIsAdmin" value="0" py:attrs="{'checked' : (not roleIsAdmin) and 'checked' or None }"/>No
                         </td>
                     </tr>
                     <tr>
