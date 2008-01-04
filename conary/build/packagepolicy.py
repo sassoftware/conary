@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1967,15 +1967,18 @@ class _dependency(policy.Policy):
         troveName = troveNames[0]
 
         # prefer corresponding :devel to :devellib if it exists
-        if troveName.endswith(':devellib'):
-            troveSpec = (
-                troveName.replace(':devellib', ':devel'),
-                None, None
-            )
-            results = db.findTroves(None, [troveSpec],
-                                         allowMissing = True)
-            if troveSpec in results:
-                troveName = results[troveSpec][0][0]
+        package, component = troveName.split(':', 1)
+        if component in ('devellib', 'lib'):
+            for preferredComponent in ('devel', 'devellib'):
+                troveSpec = (
+                    ':'.join((package, preferredComponent)),
+                    None, None
+                )
+                results = db.findTroves(None, [troveSpec],
+                                             allowMissing = True)
+                if troveSpec in results:
+                    troveName = results[troveSpec][0][0]
+                    break
 
         if troveName not in self.recipe._getTransitiveBuildRequiresNames():
             self.recipe.reportMissingBuildRequires(troveName)
@@ -3454,33 +3457,53 @@ class Requires(_addInfo, _dependency):
         # parse pkgconfig file
         variables = {}
         requirements = set()
-        preface = True
+        libDirs = []
+        libraries = set()
+        variableLineRe = re.compile('^[a-zA-Z0-9]+=')
+        filesRequired = []
+
         pcContents = [x.strip() for x in file(fullpath).readlines()]
         for pcLine in pcContents:
-            for var in variables:
-                pcLine = pcLine.replace(var, variables[var])
-            if ':' in pcLine:
-                preface = False
-            if preface:
-                if '=' in pcLine:
-                    key, val = pcLine.split('=', 1)
-                    variables['${%s}' %key] = val
+            # interpolate variables: assume variables are interpreted
+            # line-by-line while processing
+            pcLineIter = pcLine
+            while True:
+                for var in variables:
+                    pcLineIter = pcLineIter.replace(var, variables[var])
+                if pcLine == pcLineIter:
+                    break
+                pcLine = pcLineIter
+            pcLine = pcLineIter
+
+            if variableLineRe.match(pcLine):
+                key, val = pcLine.split('=', 1)
+                variables['${%s}' %key] = val
             else:
-                if pcLine.startswith('Requires') and ':' in pcLine:
-                    pcLine = pcLine.split(':', 1)[1]
+                if (pcLine.startswith('Requires') or
+                    pcLine.startswith('Lib')) and ':' in pcLine:
+                    keyWord, args = pcLine.split(':', 1)
                     # split on ',' and ' '
-                    reqList = itertools.chain(*[x.split(',')
-                                                for x in pcLine.split()])
-                    reqList = [x for x in reqList if x]
-                    versionNext = False
-                    for req in reqList:
-                        if [x for x in '<=>' if x in req]:
-                            versionNext = True
-                            continue
-                        if versionNext:
-                            versionNext = False
-                            continue
-                        requirements.add(req)
+                    argList = itertools.chain(*[x.split(',')
+                                                for x in args.split()])
+                    argList = [x for x in argList if x]
+                    if keyWord.startswith('Requires'):
+                        versionNext = False
+                        for req in argList:
+                            if [x for x in '<=>' if x in req]:
+                                versionNext = True
+                                continue
+                            if versionNext:
+                                versionNext = False
+                                continue
+                            requirements.add(req)
+                    elif keyWord.startswith('Lib'):
+                        for lib in argList:
+                            if lib.startswith('-L'):
+                                libDirs.append(lib[2:])
+                            elif lib.startswith('-l'):
+                                libraries.add(lib[2:])
+                            else:
+                                pass
 
         # find referenced pkgconfig files and add requirements
         for req in requirements:
@@ -3493,27 +3516,57 @@ class Requires(_addInfo, _dependency):
             candidateFileNames = [ x % macros for x in candidateFileNames ]
             candidateFiles = [ util.exists(x) for x in candidateFileNames ]
             if True in candidateFiles:
-                fileRequired = candidateFileNames[candidateFiles.index(True)]
+                filesRequired.append(
+                    (candidateFileNames[candidateFiles.index(True)], 'pkg-config'))
             else:
                 self.warn('pkg-config file %s.pc not found', req)
                 continue
+
+        # find referenced library files and add requirements
+        libraryPaths = sorted(list(self.systemLibPaths))
+        for libDir in libDirs:
+            if libDir not in libraryPaths:
+                libraryPaths.append(libDir)
+        for library in libraries:
+            found = False
+            for libDir in libraryPaths:
+                candidateFileNames = [
+                    macros.destdir+libDir+'/lib'+library+'.so',
+                    macros.destdir+libDir+'/lib'+library+'.a',
+                    libDir+'/lib'+library+'.so',
+                    libDir+'/lib'+library+'.a',
+                ]
+                candidateFiles = [ util.exists(x) for x in candidateFileNames ]
+                if True in candidateFiles:
+                    filesRequired.append(
+                        (candidateFileNames[candidateFiles.index(True)], 'library'))
+                    found = True
+                    break
+
+            if not found:
+                self.warn('library file lib%s not found', library)
+                continue
+
+
+        for fileRequired, fileType in filesRequired:
             if fileRequired.startswith(macros.destdir):
                 # find requirement in packaging
                 fileRequired = fileRequired[len(macros.destdir):]
                 autopkg = self.recipe.autopkg
                 troveName = autopkg.componentMap[fileRequired].name
-                if troveName.endswith(':devellib'):
-                    # prefer corresponding :devel to :devellib
-                    # if it exists
-                    develTroveName = troveName.replace(':devellib', ':devel')
-                    if develTroveName in autopkg.components and autopkg.components[develTroveName]:
-                        # found a non-empty :devel compoment
-                        troveName = develTroveName
+                package, component = troveName.split(':', 1)
+                if component in ('devellib', 'lib'):
+                    for preferredComponent in ('devel', 'devellib'):
+                        develTroveName = ':'.join((package, preferredComponent))
+                        if develTroveName in autopkg.components and autopkg.components[develTroveName]:
+                            # found a non-empty :devel compoment
+                            troveName = develTroveName
+                            break
                 self._addRequirement(path, troveName, [], pkg,
                                      deps.TroveDependencies)
             else:
                 troveName = self._enforceProvidedPath(fileRequired,
-                                                      fileType='pkg-config',
+                                                      fileType=fileType,
                                                       unmanagedError=True)
                 if troveName:
                     self._addRequirement(path, troveName, [], pkg,
