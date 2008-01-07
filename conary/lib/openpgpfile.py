@@ -1610,7 +1610,7 @@ class PGP_Signature(PGP_BaseKeySig):
             pkpkt = parentPacket.getParentPacket().toPublicKey(minHeaderLen = 3)
             pkpkt.write(sio)
             if isinstance(parentPacket, PGP_UserID):
-                parentPacket.writeHash(sio)
+                parentPacket.writeHash(sio, keyVersion = self.version)
             else:
                 parentPacket.toPublicKey(minHeaderLen = 3).write(sio)
         else:
@@ -1922,11 +1922,12 @@ class PGP_UserID(PGP_BasePacket):
                 continue
             yield pkt
 
-    def writeHash(self, stream):
+    def writeHash(self, stream, keyVersion):
         """Write a UserID packet in a stream, in order to be hashed.
-        Described in RFC 2440 5.2.4 computing signatures."""
-        stream.write(chr(self.signingConstant))
-        stream.write(struct.pack("!I", self.bodyLength))
+        Described in RFC 4880 5.2.4 computing signatures."""
+        if keyVersion == 4:
+            stream.write(chr(self.signingConstant))
+            stream.write(struct.pack("!I", self.bodyLength))
         self.writeBody(stream)
 
     def merge(self, other):
@@ -1950,7 +1951,7 @@ class PGP_UserID(PGP_BasePacket):
         If the key is revoked, -1 is returned"""
         # Iterate over all self signatures
         key = self.getParentPacket()
-        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyFingerprint()) ]
+        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyId()) ]
         if not selfSigs:
             raise PGPError("User packet with no self signature")
         revocs = []
@@ -2073,6 +2074,7 @@ class PGP_Key(PGP_BaseKeySig):
             if self.version == 3:
                 return self._keyId[0]
             return self._keyId
+        self.parse()
 
         if self.version == 3:
             # See section "Key IDs and Fingerprints" for a description of how
@@ -2418,24 +2420,25 @@ class PGP_MainKey(PGP_Key):
         @return: (pubKeyPacket, cryptoKey)
         @raises BadSelfSignature:
         """
-        if self.version == 3:
-            raise InvalidKey("Version 3 keys not supported")
+        if self.version not in [3, 4]:
+            raise InvalidKey("Version % keys not supported" % self.version)
         # Convert to a public key (even if it's already a public key)
         pkpkt = self.toPublicKey(minHeaderLen = 3)
-        keyId = pkpkt.getKeyFingerprint()
+        keyFpr = pkpkt.getKeyFingerprint()
+        keyId = pkpkt.getKeyId()
         pgpKey = pkpkt.makePgpKey()
         for sig in self.iterSelfSignatures():
             self.adoptSignature(sig)
-            sig.verify(pgpKey, keyId)
+            sig.verify(pgpKey, keyFpr)
         for uid in self.iterUserIds():
             verified = False
             for sig in uid.iterKeySignatures(keyId):
                 uid.adoptSignature(sig)
-                sig.verify(pgpKey, keyId)
+                sig.verify(pgpKey, keyFpr)
                 verified = True
             if not verified:
                 # No signature. Not good, according to our standards
-                raise BadSelfSignature(keyId)
+                raise BadSelfSignature(keyFpr)
 
         return pkpkt, pgpKey
 
