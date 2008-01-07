@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Build Changes:
+    * PGP version 3 keys are now supported for verification of
+      package signatures. According to RFC4880, version 3 keys are
+      deprecated. (CNY-2420)
+
 Changes in 2.0.2:
   o Build Changes:
     * PGP version 2 signatures are now properly parsed. Version 2
