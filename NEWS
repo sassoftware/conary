@@ -3,7 +3,7 @@ Changes in @NEW@:
     * Conary will not downgrade packages if no version is specified by
       the user but, due to an out of date mirror or other reasons, the
       update available for a package is older than the currently installed
-      package. (CNY-2404)
+      package. (CNY-2402)
 
 Changes in 1.2.12:
   o Client Changes:
