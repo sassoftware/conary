@@ -65,17 +65,14 @@ def mkdirChain(*paths):
             path = os.getcwd() + os.sep + path
         normpath = os.path.normpath(path)
 
-        # don't die in case the dir already exists
         try:
-            os.makedirs(normpath)
+            misc.mkdirIfMissing(normpath)
+            return
         except OSError, exc:
-            if exc.errno == errno.EEXIST:
-                if os.path.isdir(normpath):
-                    continue
-                else:
-                    raise
-            else:
+            if exc.errno != errno.ENOENT:
                 raise
+
+        os.makedirs(normpath)
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2004 rPath, Inc.
+ * Copyright (c) 2004-2008 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -33,6 +33,7 @@ static PyObject * depSplit(PyObject *self, PyObject *args);
 static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
+static PyObject * mkdirIfMissing(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
@@ -49,6 +50,9 @@ static PyMethodDef MiscMethods[] = {
     { "removeIfExists", removeIfExists, METH_VARARGS, 
 	"unlinks a file if it exists; silently fails if it does not exist. "
 	"returns a boolean indicating whether or not a file was removed" },
+    { "mkdirIfMissing", mkdirIfMissing, METH_VARARGS,
+        "Creates a directory if the file does not already exist. EEXIST "
+        "is ignored." },
     { "unpack", unpack, METH_VARARGS },
     { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
@@ -209,6 +213,27 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args) {
 
     if (unlink(fn)) {
         if (errno == ENOENT || errno == ENAMETOOLONG) {
+            Py_INCREF(Py_False);
+            return Py_False;
+        }
+
+        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
+        return NULL;
+    }
+
+    Py_INCREF(Py_True);
+    return Py_True;
+}
+
+static PyObject * mkdirIfMissing(PyObject *self, PyObject *args) {
+    char * fn;
+
+    if (!PyArg_ParseTuple(args, "s", &fn))
+        return NULL;
+
+    /* 0777 lets umask do it's thing */
+    if (mkdir(fn, 0777)) {
+        if (errno == EEXIST) {
             Py_INCREF(Py_False);
             return Py_False;
         }

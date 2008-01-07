@@ -5,6 +5,11 @@ Changes in 2.0.2:
       considered deprecated, but some PGP keys contain them.
       (CNY-2417)
 
+  o Client Changes:
+    * Reworked mkdirChain call to not generate exceptions when the directory
+      already exists. Now exceptions are only generated when intermediate
+      directories don't exist, which is rare (CNY-2405)
+
 Changes in 2.0.1:
   o Build Changes:
     * The Requires() policy now inspects Lib: and Lib.private:
