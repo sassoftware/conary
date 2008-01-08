@@ -5,6 +5,12 @@ Changes in @NEW@:
       update available for a package is older than the currently installed
       package. (CNY-2404)
 
+  o Build Changes:
+    * addPatch honors braceGlobs when sourceDir is defined. (CNY-1152)
+    * Superclasses are now loaded from the filesystem. Superclasses
+      can now be cooked. Doing so will make a changeset that installs
+      the recipe itself on the filesystem. (CNY-983)
+
 Changes in 1.2.12:
   o Client Changes:
     * A getDatabase() method has been added to the ConaryClient class.
