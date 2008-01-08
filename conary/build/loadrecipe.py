@@ -795,7 +795,7 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
                                   buildFlavor = buildFlavor, db = db)
             if loader:
                 for recipeClassName in loader.recipes.keys():
-                    flvSuffix = nvf[0][2] and "[%s]" % nvf[0][2] or ""
+                    flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
                     log.info('Loaded %s from %s=%s%s' % (recipeClassName, nvf[0][0], nvf[0][1], flvSuffix))
     return loader, oldBuildFlavor
 
