@@ -13,6 +13,9 @@ Changes in @NEW@:
     * Superclasses are now loaded from the filesystem. Superclasses
       can now be cooked. Doing so will make a changeset that installs
       the recipe itself on the filesystem. (CNY-983)
+    * When building packages, Conary now reads /etc/ld.so.conf.d/*.conf
+      files to determine whether to include the path in the dependency.
+      (CNY-2433)
 
 Changes in 1.2.12:
   o Client Changes:
