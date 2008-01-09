@@ -555,6 +555,11 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/distro/use',
                                             '~/.conary/use'))
     user                  =  CfgUserInfo
+    baseClassDir          =  (CfgPath, '/usr/share/conary/baseclasses')
+    defaultBasePackages   = (CfgList(CfgString), ['package',
+                                             'buildpackage',
+                                             'cpackage',
+                                             'autopackage'])
 
 
     def _resetSigMap(self):

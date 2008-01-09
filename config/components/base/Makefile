@@ -28,6 +28,7 @@ filter_files =	\
 	locale.py \
 	perl.py \
 	python.py \
+	recipe.py \
 	ruby.py \
 	supdoc.py \
 	taghandler.py

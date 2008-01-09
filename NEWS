@@ -4,6 +4,18 @@ Changes in @NEW@:
       the user but, due to an out of date mirror or other reasons, the
       update available for a package is older than the currently installed
       package. (CNY-2402)
+    * Conary now recognizes /etc/ld.so.conf.d/*.conf files, adding an
+      include line to /etc/ld.so.conf if they exist, and does not add
+      new duplicate entries to /etc/ld.so.conf for directories already
+      specified in /etc/ld.so.conf.d/*.conf files. (CNY-2432)
+
+  o Build Changes:
+    * Superclasses are now loaded from the filesystem. Superclasses
+      can now be cooked. Doing so will make a changeset that installs
+      the recipe itself on the filesystem. (CNY-983)
+    * When building packages, Conary now reads /etc/ld.so.conf.d/*.conf
+      files to determine whether to include the path in the dependency.
+      (CNY-2433)
 
 Changes in 1.2.12:
   o Client Changes:

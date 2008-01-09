@@ -102,11 +102,50 @@ def setupRecipeDict(d, filename, directory=None):
     if not directory:
         directory = os.path.dirname(filename)
     d['directory'] = directory
+    _loadDefaultPackages(d)
     _copyReusedRecipes(d)
+
+global _defaultsLoaded
+_defaultsLoaded = False
+def _loadDefaultPackages(moduleDict):
+    global _defaultsLoaded
+    global _recipesToCopy
+    if not _defaultsLoaded:
+        _defaultsLoaded = True
+        cfg = moduleDict['cfg']
+        db = moduleDict.get('db')
+        if db is None:
+            db = database.Database(cfg.root, cfg.dbPath)
+        oldBuildFlavor = cfg.buildFlavor
+        repos = moduleDict['repos']
+        flavor = moduleDict.get('flavor')
+        buildFlavor = moduleDict.get('buildFlavor')
+        defaultRecipes = {}
+        for defaultPackage in cfg.defaultBasePackages:
+            packagePath = os.path.join(cfg.baseClassDir,
+                    defaultPackage + '.recipe')
+            if os.path.exists(packagePath):
+                loader, oldBuildFlavor = \
+                        _getLoaderFromFilesystem(defaultPackage,
+                                '', deps.parseFlavor(''),
+                                cfg, repos, db, buildFlavor)
+                if not loader:
+                    continue
+                recipe = loader.getRecipe()
+                recipe.internalAbstractBaseClass = True
+                defaultRecipes.update(loader.recipes)
+        _recipesToCopy = [defaultRecipes.get(x.__name__, x) \
+                for x in _recipesToCopy]
+        if flavor is not None:
+            if buildFlavor is None:
+                buildFlavor = cfg.buildFlavor = oldBuildFlavor
+            else:
+                buildFlavor = oldBuildFlavor
+
 
 _recipesToCopy = []
 def _addRecipeToCopy(recipeClass):
-    global recipesToCopy
+    global _recipesToCopy
     _recipesToCopy.append(recipeClass)
 
 def _copyReusedRecipes(moduleDict):
@@ -166,21 +205,23 @@ class RecipeLoader:
         sys.modules[self.file] = self.module
         f = open(filename)
 
-	setupRecipeDict(self.module.__dict__, filename, directory)
-
         # store cfg and repos, so that the recipe can load
         # recipes out of the repository
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
         self.module.__dict__['db'] = db
+        self.module.__dict__['buildFlavor'] = buildFlavor
+
+        setupRecipeDict(self.module.__dict__, filename, directory)
+
         self.module.__dict__['component'] = component
         self.module.__dict__['branch'] = branch
         self.module.__dict__['name'] = pkgname
         self.module.__dict__['ignoreInstalled'] = ignoreInstalled
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
-        self.module.__dict__['buildFlavor'] = buildFlavor
         self.module.__dict__['overrides'] = overrides
+
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -554,7 +595,6 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             return sourceVersion, flavor
         return None
 
-
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
     db = callerGlobals.get('db', None)
@@ -622,6 +662,13 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                   ignoreInstalled=alwaysIgnoreInstalled,
                                   buildFlavor=buildFlavor,
                                   db=db)
+
+    if not loader and not findInstalled:
+        # optimization: look on filesystem and local database to determine if
+        # we have a local copy of the recipe already.
+        loader, oldBuildFlavor = _getLoaderFromFilesystem(
+                os.path.basename(name), versionStr, flavor, cfg, repos, db,
+                buildFlavor)
 
     if not loader:
         if label:
@@ -714,6 +761,44 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     # return the tracked flags to their state before loading this recipe
     use.resetUsed()
     use.setUsed(oldUsed)
+
+def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
+        buildFlavor):
+    loader = oldBuildFlavor = None
+    recipeFile = os.path.join(cfg.baseClassDir, name + '.recipe')
+    if os.path.exists(recipeFile):
+        # existence of recipe path is not enough, verify the trovespec
+        recipeTrvs = db.iterTrovesByPath(recipeFile)
+        match = False
+        if recipeTrvs and recipeTrvs[0]:
+            try:
+                # the only reason to use findTrove is to take advantage
+                # of existing version matching logic
+                nvf = db.findTrove(None, \
+                        (recipeTrvs[0].getName(), versionStr, None))
+                match = bool([x for x in nvf \
+                            if x == recipeTrvs[0].getNameVersionFlavor()])
+            except errors.TroveNotFound:
+                pass
+
+        if match:
+            if flavor is not None and not flavor.isEmpty():
+                if buildFlavor is None:
+                    oldBuildFlavor = cfg.buildFlavor
+                    use.setBuildFlagsFromFlavor()
+                else:
+                    oldBuildFlavor = buildFlavor
+                    buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+            loader = RecipeLoader(recipeFile, cfg, repos = repos,
+                                  ignoreInstalled = True,
+                                  buildFlavor = buildFlavor, db = db)
+            if loader:
+                for recipeClassName in loader.recipes.keys():
+                    flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
+                    log.info('Loaded %s from %s=%s%s' % (recipeClassName, nvf[0][0], nvf[0][1], flvSuffix))
+    return loader, oldBuildFlavor
+
 
 def validateRecipe(recipeClass, packageName, fileName):
     if recipeClass.name[0] not in string.ascii_letters + string.digits:

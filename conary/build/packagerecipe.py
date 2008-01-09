@@ -871,6 +871,9 @@ class PackageRecipe(AbstractPackageRecipe):
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
 
+    def setupAbstractBaseClass(r):
+        r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
+
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)
 
