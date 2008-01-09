@@ -1285,13 +1285,13 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         self.filesRead = False
 
     def send(self, sock):
-    """
-    Sends this changeset over a unix-domain socket.
+        """
+        Sends this changeset over a unix-domain socket.
 
-    @param sock: File descriptor for unix domain socket
-    @type sock: int
-    """
-        
+        @param sock: File descriptor for unix domain socket
+        @type sock: int
+        """
+        pass
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
