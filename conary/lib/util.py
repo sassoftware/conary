@@ -1583,6 +1583,36 @@ def nullifyFileDescriptor(fdesc):
         os.dup2(fd, fdesc)
         os.close(fd)
 
+def sendmsg(sock, dataList, fdList = []):
+    """
+    Sends multiple strings and an optional list of file descriptors through
+    a unix domain socket.
+
+    @param sock: Unix domain socket to send message through
+    @type sock: socket
+    @param dataList: List of strings to send
+    @type dataList: list of str
+    @param fdList: File descriptors to send
+    @type fdList: list of int
+    @rtype: None
+    """
+    misc.sendmsg(sock.fileno(), dataList, fdList)
+
+def recvmsg(sock, dataSize, fdCount = 0):
+    """
+    Receives data and optional file descriptors from a unix domain socket.
+    Returns a (data, fdList) tuple.
+
+    @param sock: Unix domain socket to send message through
+    @type sock: socket
+    @param dataSize: Number of bytes to try to read from the socket.
+    @type dataSize: int
+    @param fdCount: Exact number of file descriptors to read from the socket
+    @type fdCount: int
+    @rtype: tuple
+    """
+    return misc.recvmsg(sock.fileno(), dataSize, fdCount)
+
 class Timer:
 
     def start(self):
