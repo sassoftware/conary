@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.3:
   o Build Changes:
     * PGP version 3 keys are now supported for verification of
       package signatures. According to RFC4880, version 3 keys are
@@ -16,9 +16,12 @@ Changes in @NEW@:
       requirements to the .pc files. (CNY-2370)
 
   o Client Changes:
-    * Reworked mkdirChain call to not generate exceptions when the directory
-      already exists. Now exceptions are only generated when intermediate
-      directories don't exist, which is rare (CNY-2405)
+    * The implementation of the util.mkdirChain function has been
+      changed to no longer use exceptions internally to signal that the
+      directory already exists. Raising exceptions is a relatively
+      expensive operation that slows down the data store. Exceptions are
+      still used internally in the very infrequent case of intermediate
+      directories not existing. (CNY-2405)
     * Conary will not downgrade packages if no version is specified by
       the user, but, due to an out of date mirror or other reasons, the
       update available for a package is older than the currently
