@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -29,7 +29,7 @@ from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
-from conary.lib import log, patch, sha1helper, sigprotect, util
+from conary.lib import log, patch, sha1helper, sigprotect, util, fixedglob
 from conary.local.errors import *
 from conary.repository import changeset, filecontents
 from conary.local.journal import JobJournal, NoopJobJournal
@@ -2062,14 +2062,20 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
 	# normally happens only during testing, but why not be safe?
 	util.mkdirChain(sysetc)
     ldsopath = util.joinPaths(root, '/etc/ld.so.conf')
+    ldsoDpath = util.joinPaths(root, '/etc/ld.so.conf.d')
 
-    try:
-	ldso = file(ldsopath, 'r+')
-	ldsolines = ldso.readlines()
-	ldso.close()
-    except:
+    if util.exists(ldsoDpath):
+        ldsolines = file(ldsopath).readlines()
+    else:
 	# bootstrap
 	ldsolines = []
+
+    ldsoDlines = set()
+    if util.exists(ldsoDpath):
+        # ordering is important for actually loading the libraries,
+        # but within conary we care only about existance
+        for fileName in fixedglob.glob(ldsoDpath+'/*.conf'):
+            ldsoDlines.update(file(fileName).readlines())
 
     newlines = []
     rootlen = len(root)
@@ -2077,9 +2083,14 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
     for path in shlibList:
 	dirname = os.path.dirname(path)[rootlen:]
 	dirline = dirname+'\n'
-	if dirline not in ldsolines:
+        if dirline not in ldsolines and dirline not in ldsoDlines:
 	    ldsolines.append(dirline)
 	    newlines.append(dirname)
+
+    includeEntry = 'include /etc/ld.so.conf.d/*.conf\n'
+    if ldsoDlines and includeEntry not in ldsolines:
+        ldsolines.insert(0, includeEntry)
+        newlines.insert(0, includeEntry.strip())
 
     if newlines:
 	log.debug("adding ld.so.conf entries: %s",
