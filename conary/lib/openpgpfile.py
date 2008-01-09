@@ -2420,6 +2420,7 @@ class PGP_MainKey(PGP_Key):
         @return: (pubKeyPacket, cryptoKey)
         @raises BadSelfSignature:
         """
+        self.parse()
         if self.version not in [3, 4]:
             raise InvalidKey("Version %s keys not supported" % self.version)
         # Convert to a public key (even if it's already a public key)
