@@ -1322,12 +1322,6 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                                 "File %s is not a valid conary changeset: %s" % (fileName, err))
                 self.fileName = fileName
             else:
-                if not hasattr(fileName, 'pread'):
-                    # FIXME: This code is deprecated and will be removed
-                    # in conary 1.1.23
-                    import warnings
-                    warnings.warn('ChangeSetFromFile() requires open file objects have a pread() method.  Use util.ExtendedFile() to create such a file object')
-                    fileName = util.PreadWrapper(fileName)
                 csf = filecontainer.FileContainer(fileName)
                 if hasattr(fileName, 'path'):
                     self.fileName = fileName.path
