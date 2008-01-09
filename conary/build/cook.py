@@ -2051,7 +2051,12 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
 
 def _callSetup(cfg, recipeObj, recordCalls=True):
     try:
-        rv = recipeObj.recordCalls(recipeObj.setup)
+        if 'abstractBaseClass' in recipeObj.__class__.__dict__ and \
+                recipeObj.abstractBaseClass:
+            setupMethod = recipeObj.setupAbstractBaseClass
+        else:
+            setupMethod = recipeObj.setup
+        rv = recipeObj.recordCalls(setupMethod)
         functionNames = []
         if recordCalls:
             for (depth, className, fnName) in recipeObj.methodsCalled:
@@ -2063,7 +2068,10 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
             for (className, fnName) in recipeObj.unusedMethods:
                 methodName = className + '.' + fnName
                 line = '  ' + methodName
-                unusedMethods.append(line)
+                # blacklist abstract setup. there's never a good reason to
+                # override it
+                if methodName != 'PackageRecipe.setupAbstractBaseClass':
+                    unusedMethods.append(line)
             if unusedMethods:
                 log.info('Unused methods:\n%s' % '\n'.join(unusedMethods))
     except Exception, err:

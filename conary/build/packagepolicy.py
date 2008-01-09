@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -28,7 +28,7 @@ from conary import files, trove
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.deps import deps
-from conary.lib import elf, util, pydeps, graph
+from conary.lib import elf, util, pydeps, fixedglob, graph
 from conary.local import database
 
 from elementtree import ElementTree
@@ -2808,7 +2808,7 @@ class Requires(_addInfo, _dependency):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
-        ('SharedLibrary', policy.REQUIRED),
+        ('SharedLibrary', policy.REQUIRED_PRIOR),
         # Requires depends on ELF dep path discovery previously done in Provides
         ('Provides', policy.REQUIRED_PRIOR),
     )
@@ -2892,9 +2892,15 @@ class Requires(_addInfo, _dependency):
         self.bootstrapPythonFlags= set(x%macros
                                        for x in self.bootstrapPythonFlags)
         # anything that any buildreqs have caused to go into ld.so.conf
-        # is a system library by definition
-        self.systemLibPaths |= set(os.path.normpath(x[:-1])
-                                   for x in file('/etc/ld.so.conf').readlines())
+        # or ld.so.conf.d/*.conf is a system library by definition,
+        # but only look at paths, not (for example) "include" lines
+        self.systemLibPaths |= set(os.path.normpath(x.strip())
+            for x in file('/etc/ld.so.conf').readlines()
+            if x.startswith('/'))
+        for fileName in fixedglob.glob('/etc/ld.so.conf.d/*.conf'):
+            self.systemLibPaths |= set(os.path.normpath(x.strip())
+                for x in file(fileName).readlines()
+                if x.startswith('/'))
         self.rpathFixup = [(filter.Filter(x, macros), y % macros)
                            for x, y in self.rpathFixup]
         self.PkgConfigRe = re.compile(
