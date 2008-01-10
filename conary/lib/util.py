@@ -665,15 +665,48 @@ def verFormat(cfg, version):
         return version.trailingRevision().asString()
     return version.asString()
 
-class ExtendedFile(file):
+class ExtendedFile:
 
     def __init__(self, path, mode = "r", buffering = True):
+        self.fd = None
         assert(not buffering)
-        file.__init__(self, path, mode, buffering)
-        fcntl.fcntl(self.fileno(), fcntl.F_SETFD, 1)
+        # we use a file object here to avoid parsing the mode ourself
+        fObj = file(path, mode)
+        self.fd = os.dup(fObj.fileno())
+        fObj.close()
+
+        # set close-on-exec flag
+        fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
+
+    def fileno(self):
+        return self.fd
 
     def pread(self, bytes, offset):
-        return misc.pread(self.fileno(), bytes, offset)
+        return misc.pread(self.fd, bytes, offset)
+
+    def close(self):
+        os.close(self.fd)
+        self.fd = None
+
+    def __del__(self):
+        if self.fd is not None:
+            self.close()
+
+    def read(self, bytes = -1):
+        return os.read(self.fd, bytes)
+
+    def write(self, s):
+        return os.write(self.fd, s)
+
+    def pread(self, bytes, offset):
+        return misc.pread(self.fd, bytes, offset)
+
+    def seek(self, offset, whence = 0):
+        return os.lseek(self.fd, offset, whence)
+
+    def tell(self):
+        # 1 is SEEK_CUR
+        return os.lseek(self.fd, 0, 1)
 
 class ExtendedStringIO(StringIO.StringIO):
     def pread(self, bytes, offset):
