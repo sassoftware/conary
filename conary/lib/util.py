@@ -665,16 +665,11 @@ def verFormat(cfg, version):
         return version.trailingRevision().asString()
     return version.asString()
 
-class ExtendedFile:
 
-    def __init__(self, path, mode = "r", buffering = True):
-        self.fd = None
-        assert(not buffering)
-        # we use a file object here to avoid parsing the mode ourself
-        fObj = file(path, mode)
-        self.fd = os.dup(fObj.fileno())
-        fObj.close()
+class ExtendedFdopen:
 
+    def __init__(self, fd):
+        self.fd = fd
         # set close-on-exec flag
         fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
 
@@ -707,6 +702,17 @@ class ExtendedFile:
     def tell(self):
         # 1 is SEEK_CUR
         return os.lseek(self.fd, 0, 1)
+
+class ExtendedFile(ExtendedFdopen):
+
+    def __init__(self, path, mode = "r", buffering = True):
+        self.fd = None
+        assert(not buffering)
+        # we use a file object here to avoid parsing the mode ourself
+        fObj = file(path, mode)
+        fd = os.dup(fObj.fileno())
+        fObj.close()
+        ExtendedFdopen.__init__(self, fd)
 
 class ExtendedStringIO(StringIO.StringIO):
     def pread(self, bytes, offset):
