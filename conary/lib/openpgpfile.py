@@ -12,15 +12,18 @@
 #
 
 import base64
+import binascii
 import errno
 import fcntl
 import itertools
 import md5
 import os
 import sha
+import stat
 import struct
 import sys
 import tempfile
+import textwrap
 import time
 
 try:
@@ -38,6 +41,7 @@ from Crypto.Cipher import CAST
 from Crypto.PublicKey import RSA
 from Crypto.PublicKey import DSA
 
+from conary import constants
 from conary.lib import util
 
 # key types defined in RFC 2440 page 49
@@ -197,6 +201,13 @@ class UnsupportedEncryptionAlgorithm(PGPError):
     def __str__(self):
         return "Unsupported encryption algorithm code %s" % self.alg
 
+class UnsupportedHashAlgorithm(PGPError):
+    def __init__(self, alg):
+        self.alg = alg
+
+    def __str__(self):
+        return "Unsupported hash algorithm code %s" % self.alg
+
 class IncompatibleKey(PGPError):
     def __str__(self):
         return self.error
@@ -256,7 +267,7 @@ class SignatureError(PGPError):
     pass
 
 def getKeyId(keyRing):
-    pkt = newPacketFromStream(keyRing, start = -1)
+    pkt = PGP_Message.newPacketFromStream(keyRing, start = -1)
     assert pkt is not None
     return pkt.getKeyId()
 
@@ -277,13 +288,66 @@ def seekKeyById(keyId, keyRing):
     except StopIteration:
         return False
 
-def readKeyData(stream, keyId):
-    """Read the key from the keyring and export it"""
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    sio = StringIO()
-    pkt.writeAll(sio)
-    return sio.getvalue()
+def exportKey(keyId, keyRing, armored=False):
+    """Export the key from the keyring, performing the necessary locking
+
+    @param keyId: the key ID
+    @type keyId: str
+    @param keyRing: the keyring from where the key is to be extracted
+    @type keyRing: file or path
+    @param armor: If True, exports the key in a Radix-64 encoding (armor)
+    @type armor: bool
+    @rtype: stream
+    @return: the key in a stream
+    """
+    if isinstance(keyRing, str):
+        try:
+            keyRing = util.ExtendedFile(keyRing, buffering = False)
+        except (IOError, OSError), e:
+            # if we can't read/find the key, it's not there.
+            raise KeyNotFound(keyId)
+    msg = PGP_Message(keyRing)
+    key = msg.getKeyByKeyId(keyId)
+    # if the key we requested was a subkey, use the main key
+    if isinstance(key, PGP_SubKey):
+        key = key.getParentPacket()
+    sio = util.ExtendedStringIO()
+    key.writeAll(sio)
+
+    if armored:
+        sio.seek(0)
+        keyData = sio.read()
+        sio.truncate(0)
+        armorKeyData(keyData, sio)
+    sio.seek(0)
+    return sio
+
+def armorKeyData(keyData, stream):
+    """
+    Write the Radix-64 encoded version of the key data.
+
+    @param keyData: key data
+    @type key: str
+    @type stream: A stream open in write mode
+    @type stream: file
+    """
+    assert(isinstance(keyData, str))
+    assert(hasattr(stream, "write"))
+
+    crc = CRC24(keyData).base64digest()
+
+    stream.write("-----BEGIN PGP PUBLIC KEY BLOCK-----\n")
+    stream.write("Version: Conary ")
+    stream.write(constants.version)
+    stream.write("\n\n")
+    for line in textwrap.wrap(base64.b64encode(keyData), 72):
+        stream.write(line)
+        stream.write('\n')
+    # Add the CRC
+    stream.write('=')
+    stream.write(crc)
+    stream.write("\n-----END PGP PUBLIC KEY BLOCK-----")
+    return stream
 
 def verifySelfSignatures(keyId, stream):
     msg = PGP_Message(stream, start = 0)
@@ -295,8 +359,7 @@ def fingerprintToInternalKeyId(fingerprint):
     if len(fingerprint) == 0:
         return ''
     fp = fingerprint[-16:]
-    return ''.join([ chr(int(x + y, 16))
-                   for x, y in zip(fp[0::2], fp[1::2])] )
+    return binascii.unhexlify(fp)
 
 def binSeqToString(sequence):
     """sequence is a sequence of unsigned chars.
@@ -356,48 +419,6 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
         iteration += 1
     return r[:keyLength]
 
-def getPublicKey(keyId, keyFile=''):
-    if keyFile == '':
-        if 'HOME' not in os.environ:
-            keyFile = None
-        else:
-            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
-    try:
-        keyRing = util.ExtendedFile(keyFile, buffering = False)
-    except IOError:
-        raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    return _getPublicKey(keyId, keyRing)
-
-def _getPublicKey(keyId, stream):
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    return pkt.getCryptoKey()
-
-def getPrivateKey(keyId, passPhrase='', keyFile=''):
-    if keyFile == '':
-        if 'HOME' not in os.environ:
-            keyFile = None
-        else:
-            keyFile=os.environ['HOME'] + '/.gnupg/secring.gpg'
-    try:
-        keyRing = util.ExtendedFile(keyFile, buffering = False)
-    except IOError:
-        raise KeyNotFound(keyId, "Couldn't open pgp keyring")
-    return _getPrivateKey(keyId, keyRing, passPhrase)
-
-def _getPrivateKey(keyId, stream, passPhrase):
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    return pkt.getCryptoKey(passPhrase)
-
-def getPublicKeyFromString(keyId, data):
-    keyRing = util.ExtendedStringIO(data)
-    return _getPublicKey(keyId, keyRing)
-
-def getKeyEndOfLifeFromString(keyId, data):
-    keyRing = util.ExtendedStringIO(data)
-    return _getKeyEndOfLife(keyId, keyRing)
-
 def getUserIdsFromString(keyId, data):
     keyRing = util.ExtendedStringIO(data)
     key = seekKeyById(keyId, keyRing)
@@ -425,73 +446,86 @@ def getFingerprint(keyId, keyFile=''):
     pkt = msg.getKeyByKeyId(keyId)
     return pkt.getKeyFingerprint()
 
-def getKeyEndOfLife(keyId, keyFile=''):
-    if keyFile == '':
-        if 'HOME' not in os.environ:
-            keyFile = None
-        else:
-            keyFile=os.environ['HOME'] + '/.gnupg/pubring.gpg'
-    try:
-        keyRing = util.ExtendedFile(keyFile, buffering = False)
-    except IOError:
-        raise KeyNotFound(keyId, "Couldn't open keyring")
+def addKeys(keys, fpath):
+    """Add keys to the file"""
+    return addPackets(keys, fpath, "getKeyFingerprint",
+        PGP_Message, "iterMainKeys")
 
-    return _getKeyEndOfLife(keyId, keyRing)
+def addKeyTimestampPackets(pkts, fpath):
+    """Add key timestamp packets to the file"""
+    return addPackets(pkts, fpath, "getKeyId",
+        TimestampPacketDatabase, "iterTrustPackets")
 
-def addKeys(keys, stream):
-    """Add keys to the stream"""
-    keysDict = {}
-    for k in keys:
-        keyId = k.getKeyFingerprint()
-        if keyId in keysDict:
-            keysDict[keyId].merge(k)
+def addPackets(pkts, fpath, pktIdFunc, messageFactory, streamIterFunc):
+    """Add packets to the file. Return the packet IDs for the added packets"""
+    # This code really expects the stream to be based on a file, since we need
+    # a fileno() too
+
+    pktsDict = {}
+    for k in pkts:
+        pktId = getattr(k, pktIdFunc)()
+        if pktId in pktsDict:
+            pktsDict[pktId].merge(k)
         else:
-            keysDict[keyId] = k
+            pktsDict[pktId] = k
+    if not pktsDict:
+        return []
+
+    tmpfd, tmpfname = tempfile.mkstemp(prefix=os.path.basename(fpath),
+                                       dir=os.path.dirname(fpath))
+    # XXX This is disgusting. Ideally we should be able to fdopen directly
+    # into an ExtendedFile.
+    tempf = util.ExtendedFile(tmpfname, mode = "w+", buffering = False)
+    os.close(tmpfd)
+
+    pktIds = []
 
     # Lock the stream
-    fd = stream.fileno()
     try:
-        try:
-            fcntl.lockf(fd, fcntl.LOCK_EX)
-        except IOError, e:
-            if e.errno == errno.EBADF:
-                # The file was open in read-only mode
-                raise PGPError("Please pass in a file descriptor open in "
-                               "write mode")
-            raise
-        tempfd, tempf = tempfile.mkstemp()
-        # XXX This is disgusting. Ideally we should be able to fdopen directly
-        # into an ExtendedFile.
-        tempf = util.ExtendedFile(tempf, mode = "w+", buffering = False)
-        os.close(tempfd)
+        stream = file(fpath, "r+")
+        while 1:
+            streamfd = stream.fileno()
+            fcntl.lockf(streamfd, fcntl.LOCK_EX)
+            # We got the lock. Did the file change?
+            # There is a possibility that another writer that was previously
+            # holding the lock replaced the file, which would mean our current
+            # stream is stale.
+            newstream = file(fpath, "r+")
+            oStat = os.fstat(streamfd)
+            nStat = os.fstat(newstream.fileno())
+            if (oStat.st_dev, oStat.st_ino) == (nStat.st_dev, nStat.st_ino):
+                # Same file descriptor, we can continue
+                del oStat, nStat
+                break
+            # Replace our existing stream and continue
+            fcntl.lockf(streamfd, fcntl.LOCK_UN)
+            stream = newstream
 
-        msg = PGP_Message(stream, start = 0)
-        for ikey in msg.iterMainKeys():
-            iKeyId = ikey.getKeyFingerprint()
-            if iKeyId in keysDict:
-                ikey.merge(keysDict[iKeyId])
-                del keysDict[iKeyId]
-            ikey.writeAll(tempf)
-        # Add the rest of the keys
-        for key in keys:
-            keyId = key.getKeyFingerprint()
-            if keyId not in keysDict:
+        # At this point, we have an exclusive lock on the stream
+        msg = messageFactory(stream, start = 0)
+        for ipkt in getattr(msg, streamIterFunc)():
+            iPktId = getattr(ipkt, pktIdFunc)()
+            if iPktId in pktsDict:
+                ipkt.merge(pktsDict[iPktId])
+                pktIds.append(iPktId)
+                del pktsDict[iPktId]
+            ipkt.writeAll(tempf)
+
+        # Add the rest of the packets
+        for pkt in pkts:
+            pktId = getattr(pkt, pktIdFunc)()
+            if pktId not in pktsDict:
                 continue
-            key.writeAll(tempf)
-            del keysDict[keyId]
-        # Now copy the keyring back
-        tempf.seek(0, SEEK_SET)
-        stream.seek(0, SEEK_SET)
-        stream.truncate()
-        PGP_BasePacket._copyStream(tempf, stream)
-        stream.flush()
-    finally:
-        fcntl.lockf(fd, fcntl.LOCK_UN)
+            pkt.writeAll(tempf)
+            del pktsDict[pktId]
+            pktIds.append(pktId)
 
-def _getKeyEndOfLife(keyId, stream):
-    msg = PGP_Message(stream, start = 0)
-    pkt = msg.getKeyByKeyId(keyId)
-    return pkt.getEndOfLife()
+        # Now copy the keyring back
+        tempf.close()
+        os.rename(tmpfname, fpath)
+        return pktIds
+    finally:
+        fcntl.lockf(streamfd, fcntl.LOCK_UN)
 
 def verifyRFC2440Checksum(data):
     # RFC 2440 5.5.3 - Secret Key Packet Formats documents the checksum
@@ -526,9 +560,60 @@ def getFingerprints(keyRing):
     msg = PGP_Message(keyRing)
     return [ x.getKeyFingerprint() for x in msg.iterKeys() ]
 
-def parseAsciiArmorKey(asciiData):
-    data = StringIO(asciiData)
-    nextLine=' '
+def readSignature(fileobj):
+    """
+    Read a signature packet from a stream.
+
+    @param fileobj: a stream to read the key from
+    @type fileobj: stream
+    @rtype: PGP_Signature
+    @return: the Signature packet
+    @raise InvalidPacketError: if the file object does not contain a valid
+    packet
+    """
+    sio = util.ExtendedStringIO()
+    hasData = parseAsciiArmor(fileobj, sio)
+    if not hasData:
+        raise InvalidPacketError("No data found")
+
+    msg = PGP_Message(sio, start = 0)
+    # We can't really have a StopIteration here, if there was no packet in the
+    # message we would have failed in parseAsciiArmor
+    try:
+        pkt = msg.iterPackets().next()
+    except ShortReadError:
+        raise InvalidPacketError("Error reading signature packet")
+    if not isinstance(pkt, PGP_Signature):
+        raise InvalidPacketError("Not a signature packet")
+    return pkt
+
+def parseAsciiArmor(asciiData, dest):
+    """
+    Parse an armored (Radix-64 encoded) PGP message.
+
+    @param asciiData: the Radix-64 encoded PGP message
+    @type asciiData: string or stream
+    @param dest: a stream to deposit the message into
+    @type dest: stream
+    @return: the unencoded PGP messsage, or None if the encoded message was
+        incorrect
+    @rtype: bool
+    @return: True if data was decoded, False otherwise
+    @raise PGPError: if the CRC does not match the message
+    """
+
+    if hasattr(asciiData, 'read'):
+        data = asciiData
+    else:
+        data = StringIO(asciiData)
+    crc = None
+    nextLine = data.read(1)
+    if nextLine and (ord(nextLine[0]) & 0x80):
+        # This is already a binary packet
+        dest.write(nextLine)
+        PGP_BasePacket._copyStream(data, dest)
+        return True
+
     try:
         while(nextLine[0] != '-'):
             nextLine = data.readline()
@@ -539,13 +624,42 @@ def parseAsciiArmorKey(asciiData):
         while(nextLine[0] != '=' and nextLine[0] != '-'):
             buf = buf + nextLine
             nextLine = data.readline()
+        if nextLine[0] == '=':
+            # This is the CRC
+            crc = nextLine.strip()[1:]
     except IndexError:
-        data.close()
-        return
-    data.close()
+        return False
 
-    keyData = base64.b64decode(buf)
-    return keyData
+    try:
+        keyData = base64.b64decode(buf)
+    except TypeError:
+        return False
+    if crc:
+        crcobj = CRC24(keyData)
+        ccrc = crcobj.base64digest()
+        if crc != ccrc:
+            raise PGPError("Message does not verify CRC checksum", crc, ccrc)
+
+    dest.write(keyData)
+    return True
+
+def parseAsciiArmorKey(asciiData):
+    """
+    Parse an armored (Radix-64 encoded) PGP message.
+
+    @param asciiData: the Radix-64 encoded PGP message
+    @type asciiData: string or stream
+    @return: the unencoded PGP messsage, or None if the encoded message was
+        incorrect
+    @rtype: string or None
+    @raise PGPError: if the CRC does not match the message
+    """
+    sio = util.ExtendedStringIO()
+    ret = parseAsciiArmor(asciiData, sio)
+    if not ret:
+        return None
+    sio.seek(0)
+    return sio.read()
 
 class CRC24(object):
     __slots__ = [ '_crc' ]
@@ -590,94 +704,22 @@ def crc24(stream):
 def crc24base64(stream):
     return _crc24(stream).base64digest()
 
-# this function will enforce the following rules
-# rule 1: cannot switch main keys
-# rule 2: a PGP Key in the repo may never lose a subkey
-# rule 3: No revocations may be lost
-# rules one and two are to prevent repo breakage
-# rule three is to enforce a modicum of sanity to the security posture
-def assertReplaceKeyAllowed(origKey, newKey):
-    if not newKey.isSupersetOf(origKey):
-        raise IncompatibleKey("Attempting to replace a key with a non-superset")
+class PacketTypeDispatcher(object):
+    _registry = {}
 
-# this code is GnuPG specific. RFC 2440 indicates the existence of trust
-# packets inside a keyring. GnuPG ignores this convention and keeps trust
-# in a separate file generally called trustdb.gpg
-# records are always 40 bytes long
-# tags we care about are:
-# 1: version stuff. always the first data packet
-# 2 thru 11: we don't care
-# 12: key trust packet
-# 13: userid trust packet
-# the formats of packets tagged 12 and 13 (by reverse engineering)
-# offset 0: packet tag
-# offset 1: reserved
-# offsets 2-21: fingerprint of key/hash of userId 20 bytes either way
-# offset 22: trust/validity value.
-# offsets 23-39 don't matter for our purposes
-# the trust is in the key packet. that will be what's returned once
-# we establish the validity of the key (found in the userid packets)
-def getKeyTrust(trustFile, fingerprint):
-    # give nothing, get nothing
-    if not fingerprint:
-        return TRUST_UNTRUSTED
-    try:
-        trustDb = open(trustFile, 'r')
-    except IOError:
-        return TRUST_UNTRUSTED
-    except:
-        trustDb.close()
-        raise
-    # FIXME: verify trustdb version is 3
-    found = 0
-    done = 0
-    # alter fingerprint to be the form found in the trustDB
-    data = int (fingerprint, 16)
-    keyId = ''
-    while data:
-        keyId = chr(data%256) + keyId
-        data //= 256
-    # seek for the right key record in the trust db
-    while not done:
-        dataChunk = trustDb.read(TRUST_PACKET_LENGTH)
-        if len(dataChunk) == TRUST_PACKET_LENGTH:
-            if (dataChunk[0] == TRP_KEY) and (dataChunk[2:22] == keyId):
-                done = 1
-                found = 1
-        else:
-            done = 1
-    if not found:
-        trustDb.close()
-        return TRUST_UNTRUSTED
-    trust = ord(dataChunk[22])
-    # gnupg assigns lineal order to such things as expired and invalid
-    # in a less than logical fashion. for our purposes, we'll simply
-    # treat them all as untrusted
-    if trust < TRUST_MARGINAL:
-        trust = TRUST_UNTRUSTED
-    # before returning this value, establish the validity of the key
-    # the overall validity of a key is equal to the greatest validity
-    # of any one userId that key has
-    done = 0
-    maxValidity = TRUST_UNTRUSTED
-    while not done:
-        dataChunk = trustDb.read(TRUST_PACKET_LENGTH)
-        if (len(dataChunk) == TRUST_PACKET_LENGTH) and (dataChunk[0] == TRP_USERID):
-            maxValidity = max(maxValidity, ord(dataChunk[22]))
-        else:
-            done = 1
-    trustDb.close()
-    # if the key isn't fully valid, by convention, it can't propogate any
-    # imbued trust to the signatures made by that key
-    if maxValidity >= TRUST_FULL:
-        return trust
-    return TRUST_UNTRUSTED
+    @classmethod
+    def addPacketType(cls, klass):
+        cls._registry[klass.tag] = klass
 
+    @classmethod
+    def getClass(cls, tag):
+        return cls._registry.get(tag, PGP_Packet)
 
-### New-style
 
 class PGP_Message(object):
     __slots__ = ['_f', 'pos']
+    PacketDispatcherClass = PacketTypeDispatcher
+
     def __init__(self, message, start = -1):
         if isinstance(message, str):
             # Assume a path
@@ -695,7 +737,7 @@ class PGP_Message(object):
         self.pos = start
 
     def _getPacket(self):
-        pkt = newPacketFromStream(self._f, start = self.pos)
+        pkt = self.newPacketFromStream(self._f, start = self.pos)
         return pkt
 
     def iterPackets(self):
@@ -705,6 +747,12 @@ class PGP_Message(object):
                 break
             yield pkt
             pkt = pkt.next()
+
+    def iterTrustPackets(self):
+        """Iterate over all trust packets"""
+        for pkt in self.iterPackets():
+            if isinstance(pkt, PGP_Trust):
+                yield pkt
 
     def iterKeys(self):
         """Iterate over all keys"""
@@ -751,23 +799,34 @@ class PGP_Message(object):
                     # This is a subkey, return the main key
                     return pkt.getMainKey()
 
-class PacketTypeDispatcher(object):
-    _registry = {}
+    @classmethod
+    def newPacketFromStream(cls, stream, start = -1):
+        if isinstance(stream, file) and not hasattr(stream, "pread"):
+            # Try to reopen as an ExtendedFile
+            f = util.ExtendedFile(stream.name, buffering = False)
+            f.seek(stream.tell())
+            stream = f
+        return PGP_PacketFromStream(cls).read(stream, start = start)
 
-    @staticmethod
-    def addPacketType(klass):
-        PacketTypeDispatcher._registry[klass.tag] = klass
+    @classmethod
+    def newPacket(cls, tag, bodyStream, newStyle = False, minHeaderLen = 2):
+        """Create a new Packet"""
+        typeDispatcher = cls.PacketDispatcherClass
+        klass = typeDispatcher.getClass(tag)
+        pkt = klass(bodyStream, newStyle = newStyle, minHeaderLen = minHeaderLen)
+        if not hasattr(pkt, 'tag'): # No special class for this packet
+            pkt.setTag(tag)
+        pkt._msgClass = cls
+        return pkt
 
-    @staticmethod
-    def getClass(tag):
-        return PacketTypeDispatcher._registry.get(tag, PGP_Packet)
 
 class PGP_PacketFromStream(object):
-    __slots__ = ['_f', 'tag', 'headerLength', 'bodyLength']
-    def __init__(self):
+    __slots__ = ['_f', 'tag', 'headerLength', 'bodyLength', '_msgClass']
+    def __init__(self, msgClass):
         self.tag = None
         self.headerLength = self.bodyLength = 0
         self._f = None
+        self._msgClass = msgClass
 
     def read(self, fileobj, start = -1):
         """Create packet from stream
@@ -800,8 +859,9 @@ class PGP_PacketFromStream(object):
             _bodyStream.seek(0)
         nextStreamPos = self._f.start + self.headerLength + self.bodyLength
 
-        pkt = newPacket(self.tag, _bodyStream, newStyle = newStyle,
-                        minHeaderLen = self.headerLength)
+        pkt = self._msgClass.newPacket(self.tag, _bodyStream,
+                                      newStyle = newStyle,
+                                      minHeaderLen = self.headerLength)
         pkt.setNextStream(fileobj, nextStreamPos)
         return pkt
 
@@ -872,7 +932,7 @@ class PGP_PacketFromStream(object):
 class PGP_BasePacket(object):
     __slots__ = ['_bodyStream', 'headerLength', 'bodyLength',
                  '_newStyle', '_nextStream', '_nextStreamPos',
-                 '_parentPacket', ]
+                 '_parentPacket', '_msgClass']
 
     tag = None
     BUFFER_SIZE = 16384
@@ -920,7 +980,7 @@ class PGP_BasePacket(object):
         newBodyStream = util.SeekableNestedFile(self._bodyStream.file,
             self._bodyStream.size, self._bodyStream.start)
 
-        newPkt = newPacket(self.tag, newBodyStream,
+        newPkt = self._msgClass.newPacket(self.tag, newBodyStream,
                     newStyle = self._newStyle, minHeaderLen = self.headerLength)
         newPkt.setNextStream(self._nextStream, self._nextStreamPos)
         newPkt.setParentPacket(self.getParentPacket(), clone = False)
@@ -1048,7 +1108,7 @@ class PGP_BasePacket(object):
 
     def readBody(self, bytes = -1):
         """Read bytes from stream"""
-        return self._bodyStream.read(bytes)
+        return self._bodyStream.pread(bytes, 0)
 
     def seek(self, pos, whence = SEEK_SET):
         return self._bodyStream.seek(pos, whence)
@@ -1101,6 +1161,17 @@ class PGP_BasePacket(object):
             hashObj.update(buf)
 
     @staticmethod
+    def _updateHashBin(hashObj, binSeq):
+        """
+        Update the hash object with binary octets from a sequence of octets
+
+        @param hashObj: a hash object
+        @param binSeq: a sequence of bytes
+        """
+        for b in binSeq:
+            hashObj.update(chr(b))
+
+    @staticmethod
     def checkStreamLength(stream, length):
         """Checks that the stream has exactly the length specified extra
         bytes from the current position"""
@@ -1135,7 +1206,8 @@ class PGP_BasePacket(object):
         if self._nextStream is None:
             raise StopIteration()
 
-        newPkt = newPacketFromStream(self._nextStream, self._nextStreamPos)
+        newPkt = self._msgClass.newPacketFromStream(self._nextStream,
+                                                       self._nextStreamPos)
         if newPkt is None:
             raise StopIteration()
 
@@ -1275,10 +1347,12 @@ class PGP_Signature(PGP_BaseKeySig):
         self.initialize()
 
         sigVersion, = self.readBin(1)
-        if sigVersion not in [3, 4]:
+        if sigVersion not in [2, 3, 4]:
             raise InvalidBodyError("Invalid signature version %s" % sigVersion)
         self.version = sigVersion
-        if sigVersion == 3:
+        # Version 2 signatures are documented in RFC1991, and are identical to
+        # version 3 signatures
+        if sigVersion in [2, 3]:
             self._readSigV3()
         else:
             self._readSigV4()
@@ -1313,10 +1387,15 @@ class PGP_Signature(PGP_BaseKeySig):
         pkAlg, hashAlg = self.readBin(2)
         hashSig = self.readExact(2)
 
+        # MPI data
+        mpiFile = util.SeekableNestedFile(self._bodyStream,
+            self.bodyLength - self._bodyStream.tell())
+
         self.sigType = sigType
         self.pubKeyAlg = pkAlg
         self.hashAlg = hashAlg
         self.hashSig = hashSig
+        self.mpiFile = mpiFile
 
     def _readSigV4(self):
         sigType, pkAlg, hashAlg = self.readBin(3)
@@ -1448,7 +1527,7 @@ class PGP_Signature(PGP_BaseKeySig):
         """Get the key ID of the issuer for this signature.
         Return None if the packet did not contain an issuer key ID"""
         self.parse()
-        if self.version == 3:
+        if self.version in [2, 3]:
             assert self.signerKeyId is not None
             return binSeqToString(self.signerKeyId)
         # Version 3 packets should have already set signerKeyId
@@ -1531,7 +1610,7 @@ class PGP_Signature(PGP_BaseKeySig):
             pkpkt = parentPacket.getParentPacket().toPublicKey(minHeaderLen = 3)
             pkpkt.write(sio)
             if isinstance(parentPacket, PGP_UserID):
-                parentPacket.writeHash(sio)
+                parentPacket.writeHash(sio, keyVersion = self.version)
             else:
                 parentPacket.toPublicKey(minHeaderLen = 3).write(sio)
         else:
@@ -1550,6 +1629,24 @@ class PGP_Signature(PGP_BaseKeySig):
 
         self._sigDigest = self._computeSignatureHash(sio)
         return self._sigDigest
+
+    def getDocumentHash(self, stream):
+        """
+        Compute the hash over the supplied document.
+
+        @param stream: stream containing the document to be hashed
+        @type stream: file
+
+        @rtype: str
+        @return: the hash of the supplied document
+        """
+
+        self.parse()
+        if self.sigType != SIG_TYPE_BINARY_DOC:
+            raise PGPError("Non-binary documents not supported")
+
+        digest = self._computeSignatureHash(stream)
+        return digest
 
     def getShortSigHash(self):
         """Return the 16-leftmost bits for the signature hash"""
@@ -1618,41 +1715,53 @@ class PGP_Signature(PGP_BaseKeySig):
         stream.write(chr(spktType))
         PGP_Signature._copyStream(spktStream, stream)
 
-    def _computeSignatureHash(self, dataFile):
-        """Compute the signature digest for this signature, using the
-        key serialized in dataFile"""
-        self.parse()
-        if self.version != 4:
-            raise InvalidKey("Self signature is not a V4 signature")
-        dataFile.seek(0, SEEK_END)
+    def _completeHashV3(self, hashObj):
+        self._updateHashBin(hashObj, [self.sigType])
+        self._updateHashBin(hashObj, self.creation)
 
+    def _completeHashV4(self, hashObj):
         # (re)compute the hashed packet subpacket data length
         self.hashedFile.seek(0, SEEK_END)
         hSubPktLen = self.hashedFile.tell()
         self.hashedFile.seek(0, SEEK_SET)
 
         # Write signature version, sig type, pub alg, hash alg
-        self._writeBin(dataFile, [ self.version, self.sigType, self.pubKeyAlg,
-                                   self.hashAlg ])
+        self._updateHashBin(hashObj, [ self.version, self.sigType,
+                                       self.pubKeyAlg, self.hashAlg ])
         # Write hashed data length
-        self._writeBin(dataFile, int2ToBytes(hSubPktLen))
+        self._updateHashBin(hashObj, int2ToBytes(hSubPktLen))
         # Write the hashed data
-        self._copyStream(self.hashedFile, dataFile)
+        self._updateHash(hashObj, self.hashedFile)
 
         # We've added 6 bytes for the header
         dataLen = hSubPktLen + 6
 
         # Append trailer - 6-byte trailer
-        self._writeBin(dataFile, [ 0x04, 0xFF,
+        self._updateHashBin(hashObj, [ 0x04, 0xFF,
             (dataLen // 0x1000000) & 0xFF, (dataLen // 0x10000) & 0xFF,
             (dataLen // 0x100) & 0xFF, dataLen & 0xFF ])
+
+    def _computeSignatureHash(self, dataFile):
+        """Compute the signature digest for this signature, using the
+        key serialized in dataFile"""
+        self.parse()
+
+        if not (0 < self.hashAlg <= 2):
+            raise UnsupportedHashAlgorithm(self.hashAlg)
         hashAlgList = [ None, md5, sha]
         hashFunc = hashAlgList[self.hashAlg]
         hashObj = hashFunc.new()
 
-        # Rewind dataFile, we need to hash it
         dataFile.seek(0, SEEK_SET)
         self._updateHash(hashObj, dataFile)
+
+        if self.version == 3:
+            self._completeHashV3(hashObj)
+        elif self.version == 4:
+            self._completeHashV4(hashObj)
+        else:
+            raise InvalidKey("Signature is not a V3 or V4 signature")
+
         sigDigest = hashObj.digest()
         return sigDigest
 
@@ -1681,6 +1790,21 @@ class PGP_Signature(PGP_BaseKeySig):
         if not self.verifySignature(sigString, cryptoKey, digSig,
                                     self.pubKeyAlg, self.hashAlg):
             raise BadSelfSignature(keyId)
+
+    def verifyDocument(self, cryptoKey, stream):
+        """
+        Verify the signature on the supplied document stream
+        """
+        digest = self.getDocumentHash(stream)
+        keyId = self.getSignerKeyId()
+        # Validate it against the short digest
+        if digest[:2] != self.hashSig:
+            raise SignatureError(keyId)
+
+        digSig = self.parseMPIs()
+        if not self.verifySignature(digest, cryptoKey, digSig,
+                                    self.pubKeyAlg, self.hashAlg):
+            raise SignatureError(keyId)
 
     @staticmethod
     def verifySignature(sigString, cryptoKey, signature, pubKeyAlg, hashAlg):
@@ -1798,11 +1922,12 @@ class PGP_UserID(PGP_BasePacket):
                 continue
             yield pkt
 
-    def writeHash(self, stream):
+    def writeHash(self, stream, keyVersion):
         """Write a UserID packet in a stream, in order to be hashed.
-        Described in RFC 2440 5.2.4 computing signatures."""
-        stream.write(chr(self.signingConstant))
-        stream.write(struct.pack("!I", self.bodyLength))
+        Described in RFC 4880 5.2.4 computing signatures."""
+        if keyVersion == 4:
+            stream.write(chr(self.signingConstant))
+            stream.write(struct.pack("!I", self.bodyLength))
         self.writeBody(stream)
 
     def merge(self, other):
@@ -1826,7 +1951,7 @@ class PGP_UserID(PGP_BasePacket):
         If the key is revoked, -1 is returned"""
         # Iterate over all self signatures
         key = self.getParentPacket()
-        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyFingerprint()) ]
+        selfSigs = [ x for x in self.iterKeySignatures(key.getKeyId()) ]
         if not selfSigs:
             raise PGPError("User packet with no self signature")
         revocs = []
@@ -1949,6 +2074,7 @@ class PGP_Key(PGP_BaseKeySig):
             if self.version == 3:
                 return self._keyId[0]
             return self._keyId
+        self.parse()
 
         if self.version == 3:
             # See section "Key IDs and Fingerprints" for a description of how
@@ -2294,24 +2420,26 @@ class PGP_MainKey(PGP_Key):
         @return: (pubKeyPacket, cryptoKey)
         @raises BadSelfSignature:
         """
-        if self.version == 3:
-            raise InvalidKey("Version 3 keys not supported")
+        self.parse()
+        if self.version not in [3, 4]:
+            raise InvalidKey("Version %s keys not supported" % self.version)
         # Convert to a public key (even if it's already a public key)
         pkpkt = self.toPublicKey(minHeaderLen = 3)
-        keyId = pkpkt.getKeyFingerprint()
+        keyFpr = pkpkt.getKeyFingerprint()
+        keyId = pkpkt.getKeyId()
         pgpKey = pkpkt.makePgpKey()
         for sig in self.iterSelfSignatures():
             self.adoptSignature(sig)
-            sig.verify(pgpKey, keyId)
+            sig.verify(pgpKey, keyFpr)
         for uid in self.iterUserIds():
             verified = False
             for sig in uid.iterKeySignatures(keyId):
                 uid.adoptSignature(sig)
-                sig.verify(pgpKey, keyId)
+                sig.verify(pgpKey, keyFpr)
                 verified = True
             if not verified:
                 # No signature. Not good, according to our standards
-                raise BadSelfSignature(keyId)
+                raise BadSelfSignature(keyFpr)
 
         return pkpkt, pgpKey
 
@@ -2428,8 +2556,8 @@ class PGP_MainKey(PGP_Key):
 class PGP_PublicAnyKey(PGP_Key):
     pubTag = None
     def toPublicKey(self, minHeaderLen = 2):
-        return newPacket(self.pubTag, self._bodyStream,
-                         minHeaderLen = minHeaderLen)
+        return self._msgClass.newPacket(self.pubTag, self._bodyStream,
+                                           minHeaderLen = minHeaderLen)
 
 class PGP_PublicKey(PGP_PublicAnyKey, PGP_MainKey):
     tag = PKT_PUBLIC_KEY
@@ -2498,7 +2626,8 @@ class PGP_SecretAnyKey(PGP_Key):
         # with the length equal to the position in the body up to the MPIs
         io = util.SeekableNestedFile(self._bodyStream,
             self.mpiFile.start + self.mpiLen, start = 0)
-        pkt = newPacket(self.pubTag, io, minHeaderLen = minHeaderLen)
+        pkt = self._msgClass.newPacket(self.pubTag, io,
+                                         minHeaderLen = minHeaderLen)
         return pkt
 
     def decrypt(self, passPhrase):
@@ -2869,21 +2998,9 @@ class PGP_SecretSubKey(PGP_SubKey, PGP_SecretAnyKey):
 for klass in [PGP_PublicKey, PGP_SecretKey, PGP_PublicSubKey, PGP_SecretSubKey]:
     PacketTypeDispatcher.addPacketType(klass)
 
-def newPacket(tag, bodyStream, newStyle = False, minHeaderLen = 2):
-    """Create a new Packet"""
-    klass = PacketTypeDispatcher.getClass(tag)
-    pkt = klass(bodyStream, newStyle = newStyle, minHeaderLen = minHeaderLen)
-    if not hasattr(pkt, 'tag'): # No special class for this packet
-        pkt.setTag(tag)
-    return pkt
-
-def newPacketFromStream(stream, start = -1):
-    if isinstance(stream, file) and not hasattr(stream, "pread"):
-        # Try to reopen as an ExtendedFile
-        f = util.ExtendedFile(stream.name, buffering = False)
-        f.seek(stream.tell())
-        stream = f
-    return PGP_PacketFromStream().read(stream, start = start)
+class PGP_Trust(PGP_BasePacket):
+    tag = PKT_TRUST
+PacketTypeDispatcher.addPacketType(PGP_Trust)
 
 def newKeyFromString(data):
     """Create a new (main) key from the data
@@ -2893,7 +3010,7 @@ def newKeyFromString(data):
 def newKeyFromStream(stream):
     """Create a new (main) key from the stream
     Returns None if a key was not found"""
-    pkt = newPacketFromStream(stream)
+    pkt = PGP_Message.newPacketFromStream(stream)
     if pkt is None:
         return None
     if not isinstance(pkt, PGP_MainKey):
@@ -2976,3 +3093,219 @@ def num_getRelPrime(q):
             r = (r+1) % q
     os.close(randFD)
     return r
+
+class TimestampPacketDispatcher(PacketTypeDispatcher):
+    _registry = {}
+
+class TimestampPacketDatabase(PGP_Message):
+    PacketDispatcherClass = TimestampPacketDispatcher
+
+class KeyTimestampPacket(PGP_Trust):
+    """This packet is associated with a particular (main) key in
+    order to track its "freshness".
+    """
+    __slots__ = ['_trustPacketVersion', '_keyId', '_refreshTimestamp',
+                 '_parsed']
+    def setUp(self):
+        self._trustPacketVersion = 1
+        self._keyId = None
+        self._refreshTimestamp = None
+        self._parsed = False
+
+    def initialize(self):
+        self.setUp()
+
+    def iterSubPackets(self):
+        return []
+
+    def parse(self, force = False):
+        """Parse the body and initializes the internal data
+        structures for other operations"""
+        if self._parsed and not force:
+            return
+        self.resetBody()
+        # Reset all internal state
+        self.initialize()
+
+        # Key ID
+        self._trustPacketVersion = self.readBin(1)[0]
+        if self._trustPacketVersion != 1:
+            raise PGPError("Unknown trust packet version %s" % self._trustPacketVersion)
+        self._keyId = self.readExact(8)
+        self._refreshTimestamp = int4FromBytes(*self.readBin(4))
+
+        self._parsed = True
+
+    def getKeyId(self):
+        self.parse()
+        return stringToAscii(self._keyId)
+
+    def setKeyId(self, keyId):
+        assert(len(keyId) >= 16)
+        self._keyId = fingerprintToInternalKeyId(keyId)
+
+    def getRefreshTimestamp(self):
+        return self._refreshTimestamp
+
+    def setRefreshTimestamp(self, ts):
+        self._refreshTimestamp = ts
+
+    def rewriteBody(self):
+        """Re-writes the body"""
+        # Re-write ourselves
+        bodyStream = self._writeBodyV1()
+        ns, nsp = self._nextStream, self._nextStreamPos
+        parentPkt = self._parentPacket
+        self.__init__(bodyStream, newStyle = self._newStyle)
+        self.setNextStream(ns, nsp)
+        self.setParentPacket(parentPkt)
+        self.initialize()
+
+    def _writeBodyV1(self):
+        stream = util.ExtendedStringIO()
+        stream.write(binSeqToString([self._trustPacketVersion]))
+        stream.write(self._keyId)
+        stream.write(binSeqToString(int4ToBytes(self._refreshTimestamp)))
+        # Write padding
+        stream.write('\0' * 25)
+        stream.seek(0)
+        return stream
+
+    def merge(self, other):
+        assert self.tag == other.tag
+        ns, nsp = self._nextStream, self._nextStreamPos
+        parentPkt = self._parentPacket
+        self.__init__(other.getBodyStream(), newStyle = self._newStyle)
+        self.setNextStream(ns, nsp)
+        self.setParentPacket(parentPkt)
+        self.initialize()
+
+TimestampPacketDispatcher.addPacketType(KeyTimestampPacket)
+
+class PublicKeyring(object):
+    """A representation of a public keyring."""
+    def __init__(self, keyringPath, tsDbPath):
+        self._keyringPath = keyringPath
+        self._tsDbPath = tsDbPath
+        # Create the files if they don't exist
+        for f in [self._keyringPath, self._tsDbPath]:
+            file(f, "a+")
+        self._tsDbTimestamp = None
+        self._cache = {}
+
+        # For debugging purposes only
+        self._timeIncrement = 1
+
+    def addKeys(self, keys, timestamp = None):
+        # Expand generators
+        if hasattr(keys, 'next'):
+            keys = list(keys)
+        for key in keys:
+            assert(isinstance(key, PGP_MainKey))
+        keyFingerprints = addKeys(keys, self._keyringPath)
+        self.updateTimestamps(keyFingerprints, timestamp = timestamp)
+        return keyFingerprints
+
+    def _extractKey(self, key):
+        if not key:
+            return ""
+        if ord(key[0]) & 0x80:
+            # Most likely already binary
+            return key
+        return parseAsciiArmorKey(key)
+
+    def addKeysAsStrings(self, keys, timestamp = None):
+        sio = util.ExtendedStringIO()
+        for k in keys:
+            assert(isinstance(k, str))
+            sio.write(self._extractKey(k))
+        msg = PGP_Message(sio, start = 0)
+        return self.addKeys(msg.iterMainKeys(), timestamp = timestamp)
+
+    def updateTimestamps(self, keyIds, timestamp = None):
+        # Expand generators
+        if hasattr(keyIds, 'next'):
+            keyIds = list(keyIds)
+        for keyId in keyIds:
+            assert(len(keyId) >= 16)
+
+        if timestamp is None:
+            timestamp = int(time.time())
+
+        pkts = []
+        for keyId in keyIds:
+            pkt = KeyTimestampPacket(util.ExtendedStringIO())
+            pkt.setKeyId(keyId)
+            pkt.setRefreshTimestamp(timestamp)
+            pkt.rewriteBody()
+            pkts.append(pkt)
+
+        mtime0 = os.stat(self._tsDbPath)[stat.ST_MTIME]
+        addKeyTimestampPackets(pkts, self._tsDbPath)
+        mtime1 = os.stat(self._tsDbPath)[stat.ST_MTIME]
+        if mtime0 == mtime1:
+            # Cheat, and set the mtime to be a second larger
+            os.utime(self._tsDbPath, (mtime1, mtime1 + self._timeIncrement))
+        # We know for a fact we've touched the file.
+        # In order to prevent sub-second updates from not being noticed, reset
+        # the mtime.
+        self._tsDbTimestamp = None
+
+    def _parseTsDb(self):
+        # Stat the timestamp database
+        stream = file(self._tsDbPath)
+        streamfd = stream.fileno()
+        mtime = os.fstat(streamfd).st_mtime
+        if self._tsDbTimestamp == mtime:
+            # Database hasn't changed
+            return
+
+        allKeys = self._getAllKeys()
+
+        self._tsDbTimestamp = mtime
+        self._cache.clear()
+        for pkt in TimestampPacketDatabase(stream).iterTrustPackets():
+            pkt.parse()
+            mainKeyId = pkt.getKeyId()
+            ts = pkt.getRefreshTimestamp()
+            self._cache[mainKeyId] = ts
+            for sk in allKeys.get(mainKeyId, []):
+                self._cache[sk] = ts
+
+    def getKeyTimestamp(self, keyId):
+        assert(len(keyId) >= 16)
+
+        self._parseTsDb()
+        # XXX for v3 keys, trimming to the last 8 bytes is not the valid way
+        # to get the key ID. But it's just a cache.
+        return self._cache.get(keyId[-16:], None)
+
+    def getKey(self, keyId):
+        """
+        Retrieve the key.
+
+        @param keyId: the key ID.
+        @type keyId: str
+        @rtype: PGP_Key
+        @return: a key with the specified key ID
+        @raise KeyNotFound: if the key was not found
+        """
+        stream = file(self._keyringPath)
+        # exportKey will return a fresh file object
+        retStream = exportKey(keyId, stream)
+        # Note that exportKey will export both the main key and the subkeys.
+        # Because of this, we can't blindly grab the first key in the new
+        # keyring.
+        msg = PGP_Message(retStream)
+        return msg.iterByKeyId(keyId).next()
+
+    def _getAllKeys(self):
+        # Return all keys and subkeys
+        # We need them in order to handle subkeys too
+        ret = {}
+        stream = file(self._keyringPath)
+        msg = PGP_Message(stream)
+        for pk in msg.iterMainKeys():
+            fp = pk.getKeyId()
+            ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
+        return ret
