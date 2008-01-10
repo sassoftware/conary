@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.14:
   o Client Changes:
     * The /etc/ld.so.conf.d/*.conf handling added to Conary 1.2.13
       introduced a bug that could erase necessary entries from
