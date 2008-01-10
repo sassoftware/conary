@@ -1518,8 +1518,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # hardly matters).
             cu = self.db.cursor()
             schema.resetTable(cu, "tmpNVF")
-            schema.resetTable(cu, "tmpInstanceId")
-            
+
             foundGroups = set()
             foundWeak = set()
             foundCollections = set()
@@ -1553,38 +1552,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            start_transaction=False)
 
             self.db.analyze("tmpNVF")
-            # this is a two step query to avoid the performance
-            # penalty imposed by MySQL not being able to optimize it
-            # right. First we decode the instanceIds from tmpNVF and
-            # then we walk through TroveTroves
-            cu.execute("""
-            insert into tmpInstanceId (idx, instanceid)
-            select tmpNVF.idx, Instances.instanceId
-            from tmpNVF
-            join Items on tmpNVF.name = Items.item
-            join Versions on tmpNVF.version = Versions.version
-            join Flavors on tmpNVF.flavor = Flavors.flavor
-            join Instances on
-                    Items.itemId = Instances.itemId
-                and Versions.versionId = Instances.versionId
-                and Flavors.flavorId = Instances.flavorId
+            cu.execute("""SELECT
+                    tmpNVF.idx, I_Items.item, I_Versions.version,
+                    I_Flavors.flavor, TroveTroves.flags
+                FROM tmpNVF JOIN Items ON tmpNVF.name = Items.item
+                JOIN Versions ON (tmpNVF.version = Versions.version)
+                JOIN Flavors ON (tmpNVF.flavor = Flavors.flavor)
+                JOIN Instances ON
+                    Items.itemId = Instances.itemId AND
+                    Versions.versionId = Instances.versionId AND
+                    Flavors.flavorId = Instances.flavorId
+                JOIN TroveTroves USING (instanceId)
+                JOIN Instances AS I_Instances ON
+                    TroveTroves.includedId = I_Instances.instanceId
+                JOIN Items AS I_Items ON
+                    I_Instances.itemId = I_Items.itemId
+                JOIN Versions AS I_Versions ON
+                    I_Instances.versionId = I_Versions.versionId
+                JOIN Flavors AS I_Flavors ON
+                    I_Instances.flavorId = I_Flavors.flavorId
+                ORDER BY
+                    I_Items.item, I_Versions.version, I_Flavors.flavor
             """)
-            self.db.analyze("tmpInstanceId")
 
-            # now walk through the TroveTroves and get the included items
-            cu.execute("""
-            select tmpInstanceId.idx,
-                Items.item, Versions.version, Flavors.flavor,
-                TroveTroves.flags
-            from tmpInstanceId
-            join TroveTroves on tmpInstanceId.instanceId = TroveTroves.instanceId
-            join Instances on TroveTroves.includedId = Instances.instanceId
-            join Items on Instances.itemId = Items.itemId
-            join Versions on Instances.versionId = Versions.versionId
-            join Flavors on Instances.flavorId = Flavors.flavorId
-            order by Items.item, Versions.version, Flavors.flavor
-            """)
-            
             for (idx, name, version, flavor, flags) in cu:
                 idx = abs(idx) - 1
 
