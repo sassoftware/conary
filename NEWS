@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Fixed a bug when that caused a traceback when moving an unmodified 
+     shadow to tip via promoting. (CNY-2441)
+
 Changes in 1.2.14:
   o Client Changes:
     * The /etc/ld.so.conf.d/*.conf handling added to Conary 1.2.13
