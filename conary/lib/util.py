@@ -1565,7 +1565,7 @@ def sendmsg(sock, dataList, fdList = []):
     @type fdList: list of int
     @rtype: None
     """
-    misc.sendmsg(sock.fileno(), dataList, fdList)
+    return misc.sendmsg(sock.fileno(), dataList, fdList)
 
 def recvmsg(sock, dataSize, fdCount = 0):
     """

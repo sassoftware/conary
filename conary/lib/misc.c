@@ -582,7 +582,7 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
     PyObject * fdList, * dataList, * intObj, * sObj;
     struct msghdr msg;
     struct cmsghdr * ctrlMsg;
-    int fd, i;
+    int fd, i, bytes;
     struct iovec * vectors;
     int * sendFds;
 
@@ -640,13 +640,12 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
         Py_DECREF(intObj);
     }
 
-    if (sendmsg(fd, &msg, 0) < 0) {
+    if ((bytes = sendmsg(fd, &msg, 0)) < 0) {
         PyErr_SetFromErrno(PyExc_OSError);
         return NULL;
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    return PyInt_FromLong(bytes);
 }
 
 static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
