@@ -1,13 +1,47 @@
-Changes in @NEW@:
+Changes in 2.0.3:
   o Build Changes:
     * PGP version 3 keys are now supported for verification of
       package signatures. According to RFC4880, version 3 keys are
       deprecated. (CNY-2420)
+    * Superclasses are now loaded from the filesystem. Superclasses
+      can now be cooked. Doing so will make a changeset that installs
+      the recipe itself on the filesystem. (CNY-983)
+    * When building packages, Conary now reads /etc/ld.so.conf.d/*.conf
+      files to determine whether to include the path in the dependency.
+      (CNY-2433)
+    * The /etc/ld.so.conf.d/*.conf handling added to Conary 1.2.13
+      introduced a bug that could erase necessary entries from
+      ld.so.conf in some circumstances.  This bug has been
+      resolved. (CNY-2440)
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
 
   o Client Changes:
-    * Reworked mkdirChain call to not generate exceptions when the directory
-      already exists. Now exceptions are only generated when intermediate
-      directories don't exist, which is rare (CNY-2405)
+    * The implementation of the util.mkdirChain function has been
+      changed to no longer use exceptions internally to signal that the
+      directory already exists. Raising exceptions is a relatively
+      expensive operation that slows down the data store. Exceptions are
+      still used internally in the very infrequent case of intermediate
+      directories not existing. (CNY-2405)
+    * Conary will not downgrade packages if no version is specified by
+      the user, but, due to an out of date mirror or other reasons, the
+      update available for a package is older than the currently
+      installed package. (CNY-2402)
+    * Conary now recognizes /etc/ld.so.conf.d/*.conf files, adding an
+      include line to /etc/ld.so.conf if they exist, and does not add
+      new duplicate entries to /etc/ld.so.conf for directories already
+      specified in /etc/ld.so.conf.d/*.conf files. (CNY-2432)
+    * A getDatabase() method has been added to the ConaryClient class.
+      This method returns the local system database object. Code that
+      needs to query the local system database should use this method
+      to obtain the database object. (CNY-2316)
+
+  o Bug Fixes:
+    * A bug that caused an unhandled exception when adding a new role
+      in the Conary repository web interface has been fixed.
 
 Changes in 2.0.2:
   o Build Changes:
@@ -15,10 +49,6 @@ Changes in 2.0.2:
       signatures are documented in the outdated RFC1991 and are
       considered deprecated, but some PGP keys contain them.
       (CNY-2417)
-
-  o Bug Fixes:
-    * A bug that caused an unhandled exception when adding a new role
-      in the Conary repository web interface has been fixed.
 
 Changes in 2.0.1:
   o Build Changes:
@@ -174,6 +204,29 @@ Changes in 2.0.0:
     * The XML-RPC protocol now allows passing keyword arguments for
       exceptions.  (CNY-747)
     * XML-RPC return values no longer include the "useAnonymous" flag.
+
+Changes in 1.2.12:
+  o Client Changes:
+    * A getDatabase() method has been added to the ConaryClient class.
+      This method returns the local system database object. Code that
+      needs to query the local system database should use this method
+      to obtain the database object. (CNY-2316)
+
+  o Build Changes:
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
+
+  o Bug Fixes:
+    * The PackageSpec documentation incorrectly stated that you could
+      pass both package and component information to it; this has
+      been corrected to properly redirect to ComponentSpec for this
+      usage. (CNY-2387)
+    * An update bug that could result in a trove integrity error has
+      been fixed. The issue would occur when updating packages where,
+      for some files, the only changes are to file versions. (CNY-2403)
 
 Changes in 1.2.11:
   o Client Changes:

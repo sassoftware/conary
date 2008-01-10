@@ -250,8 +250,8 @@ class RollbackStack:
                     d = os.path.dirname(e.filename)
                     raise OpenError(self.dir, '%s is not a directory' %d)
                 elif e.errno == errno.EACCES:
-                    d = os.path.dirname(e.filename)
-                    raise OpenError(self.dir, 'cannot create directory %s' %d)
+                    raise OpenError(self.dir, 'cannot create directory %s' %
+                                               e.filename)
                 else:
                     raise
 

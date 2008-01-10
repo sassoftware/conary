@@ -1,5 +1,5 @@
 
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1383,6 +1383,43 @@ conary erase '%s=%s[%s]'
                    'Failed to find required troves for update:\n   %s' 
                     % troveList)
 
+    def _confirmLaterPackages(self, findTroveResults):
+        relevantPackages = [ x for x in findTroveResults 
+                              if (not x[1]
+                                  and (x[2] is None or x[2].isEmpty()))  ]
+        localResults = self.db.findTroves(None, relevantPackages, 
+                                               allowMissing=True)
+        downgrades = {}
+        for troveSpec, localVersions in localResults.iteritems():
+            reposVersions = findTroveResults[troveSpec]
+            reposVersionsByLabel = {}
+            localVersionsByLabel = {}
+            for troveTup in reposVersions:
+                label = troveTup[1].trailingLabel()
+                reposVersionsByLabel.setdefault(label, set()).add(troveTup)
+            for troveTup in localVersions:
+                label = troveTup[1].trailingLabel()
+                localVersionsByLabel.setdefault(label, set()).add(troveTup)
+            for name, localVersion, localFlavor in localVersions:
+                label = localVersion.trailingLabel()
+                if label not in reposVersionsByLabel:
+                    continue
+                repoTups = reposVersionsByLabel[label]
+                found = False
+                for name, repoVersion, repoFlavor in repoTups:
+                    # a package will definitely downgrade if all the versions
+                    # listed from the repository are older than it.
+                    if localVersion <= repoVersion:
+                        found = True
+                        break
+                if not found:
+                    downgrades[troveSpec,label] = (localVersionsByLabel[label],
+                                                   reposVersionsByLabel[label])
+        if not downgrades:
+            return
+
+        raise DowngradeError(downgrades)
+
 
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
                          recurse = True, updateMode = True, sync = False,
@@ -1562,18 +1599,19 @@ conary erase '%s=%s[%s]'
                 else:
                     toFind[(troveName, newVersionStr, newFlavorStr)] \
                                     = oldTrove, isAbsolute
-        results = {}
         searchSource = uJob.getSearchSource()
 
         if not useAffinity:
-            results.update(searchSource.findTroves(toFind, useAffinity=False,
-                                                   exactFlavors=exactFlavors))
+            results = searchSource.findTroves(toFind, useAffinity=False,
+                                                   exactFlavors=exactFlavors)
         else:
+            results = {}
             if toFind:
-                results.update(searchSource.findTroves(toFind,
-                                                    useAffinity=True,
-                                                    exactFlavors=exactFlavors))
                 log.lowlevel("looking up troves w/ database affinity")
+                results = searchSource.findTroves(toFind,
+                                                    useAffinity=True,
+                                                    exactFlavors=exactFlavors)
+                self._confirmLaterPackages(results)
             if toFindNoDb:
                 log.lowlevel("looking up troves w/o database affinity")
                 results.update(searchSource.findTroves(toFindNoDb,
@@ -3406,6 +3444,33 @@ class UpdateError(ClientError):
     """Base class for update errors"""
     def display(self):
         return str(self)
+
+class DowngradeError(UpdateError):
+    """Update would install an older package than the currently installed one"""
+    def __init__(self, downgrades):
+        self.downgrades = downgrades
+        msg = []
+        msg.append('Updating would install older versions of the following packages.  This means that the installed version on the system is not available in the repository.  To override, specify the version explicitly.\n')
+        for (troveSpec, label), \
+             (localTups, repoTups) in downgrades.iteritems():
+            repoVersions = ['%s/%s[%s]' % (x[1].trailingLabel(),
+                                           x[1].trailingRevision(),
+                                        deps.getInstructionSetFlavor(x[2]))
+                             for x in repoTups]
+            repoVersions = '\n        '.join(repoVersions)
+            localVersions = ['%s/%s[%s]' % (x[1].trailingLabel(),
+                                            x[1].trailingRevision(),
+                                        deps.getInstructionSetFlavor(x[2]))
+                             for x in localTups ]
+            localVersions = '\n        '.join(localVersions)
+            msg.append('\n%s\n'
+                       '    Available versions\n'
+                       '        %s\n'
+                       '    Installed versions\n'
+                       '        %s\n' % (troveSpec[0], repoVersions,
+                                         localVersions))
+        msg = ''.join(msg)
+        UpdateError.__init__(self, msg)
 
 class UpdatePinnedTroveError(UpdateError):
     """An attempt to update/erase a pinned trove."""
