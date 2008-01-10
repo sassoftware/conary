@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Client Changes:
+    * PGP keys having some self signatures that fail to pass are
+      no longer failing, as long as at least one self signature passes.
+      (CNY-2439)
+
 Changes in 2.0.3:
   o Build Changes:
     * PGP version 3 keys are now supported for verification of

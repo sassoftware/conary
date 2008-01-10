@@ -1196,6 +1196,7 @@ class PGP_BasePacket(object):
     @staticmethod
     def readTimestamp(stream):
         """Reads a timestamp from the stream"""
+        stream.seek(0)
         PGP_BasePacket.checkStreamLength(stream, 4)
         return len4bytes(*PGP_BasePacket._readBin(stream, 4))
 
@@ -1322,7 +1323,7 @@ class PGP_Signature(PGP_BaseKeySig):
     __slots__ = ['version', 'sigType', 'pubKeyAlg', 'hashAlg', 'hashSig',
                  'mpiFile', 'signerKeyId', 'hashedFile', 'unhashedFile',
                  'creation', '_parsed', '_sigDigest', '_parentPacket',
-                 '_hashedSubPackets', '_unhashedSubPackets']
+                 '_hashedSubPackets', '_unhashedSubPackets', '_verifies',]
     tag = PKT_SIG
 
     _parentPacketTypes = set(PKT_ALL_KEYS).union(PKT_ALL_USER)
@@ -1336,6 +1337,7 @@ class PGP_Signature(PGP_BaseKeySig):
         self._sigDigest = None
         self._hashedSubPackets = None
         self._unhashedSubPackets = None
+        self._verifies = None
 
     def parse(self, force = False):
         """Parse the signature body and initializes the internal data
@@ -1619,6 +1621,7 @@ class PGP_Signature(PGP_BaseKeySig):
 
     def resetSignatureHash(self):
         self._sigDigest = None
+        self._verifies = None
 
     def getSignatureHash(self):
         """Compute the signature digest"""
@@ -1789,7 +1792,9 @@ class PGP_Signature(PGP_BaseKeySig):
         digSig = self.parseMPIs()
         if not self.verifySignature(sigString, cryptoKey, digSig,
                                     self.pubKeyAlg, self.hashAlg):
+            self.setVerifies(False)
             raise BadSelfSignature(keyId)
+        self.setVerifies(True)
 
     def verifyDocument(self, cryptoKey, stream):
         """
@@ -1804,7 +1809,9 @@ class PGP_Signature(PGP_BaseKeySig):
         digSig = self.parseMPIs()
         if not self.verifySignature(digest, cryptoKey, digSig,
                                     self.pubKeyAlg, self.hashAlg):
+            self.setVerifies(False)
             raise SignatureError(keyId)
+        self.setVerifies(True)
 
     @staticmethod
     def verifySignature(sigString, cryptoKey, signature, pubKeyAlg, hashAlg):
@@ -1855,6 +1862,12 @@ class PGP_Signature(PGP_BaseKeySig):
         stream = util.ExtendedStringIO()
         self._writeBin(stream, int4ToBytes(int4))
         return stream
+
+    def setVerifies(self, flag=True):
+        self._verifies = flag
+
+    def getVerifies(self):
+        return self._verifies
 
 PacketTypeDispatcher.addPacketType(PGP_Signature)
 
@@ -2163,6 +2176,11 @@ class PGP_Key(PGP_BaseKeySig):
 
         # Iterate over self signatures
         for pkt in self.iterAllSelfSignatures():
+            # If the sig doesn't verify, skip it
+            verifies = pkt.getVerifies()
+            assert verifies is not None, "Please verify signatures first"
+            if not verifies:
+                continue
             if pkt.sigType in SIG_CERTS:
                 eTimestamp = cTimestamp = 0
                 for spktType, dataf in pkt.decodeHashedSubpackets():
@@ -2435,7 +2453,10 @@ class PGP_MainKey(PGP_Key):
             verified = False
             for sig in uid.iterKeySignatures(keyId):
                 uid.adoptSignature(sig)
-                sig.verify(pgpKey, keyFpr)
+                try:
+                    sig.verify(pgpKey, keyFpr)
+                except BadSelfSignature:
+                    continue
                 verified = True
             if not verified:
                 # No signature. Not good, according to our standards
