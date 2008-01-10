@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Client Changes:
+    * The /etc/ld.so.conf.d/*.conf handling added to Conary 1.2.13
+      introduced a bug that could erase necessary entries from
+      ld.so.conf in some circumstances.  This bug has been
+      resolved. (CNY-2440)
+
 Changes in 1.2.13:
   o Client Changes:
     * Conary will not downgrade packages if no version is specified by

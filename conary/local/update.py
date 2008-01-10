@@ -2064,7 +2064,7 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
     ldsopath = util.joinPaths(root, '/etc/ld.so.conf')
     ldsoDpath = util.joinPaths(root, '/etc/ld.so.conf.d')
 
-    if util.exists(ldsoDpath):
+    if util.exists(ldsopath):
         ldsolines = file(ldsopath).readlines()
     else:
 	# bootstrap
