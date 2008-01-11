@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -28,6 +28,7 @@ import stat
 import string
 import StringIO
 import subprocess
+import struct
 import sys
 import tempfile
 import time
@@ -665,13 +666,72 @@ def verFormat(cfg, version):
         return version.trailingRevision().asString()
     return version.asString()
 
+class SendableFileSet:
+
+    tags = {}
+
+    @staticmethod
+    def _register(klass):
+        SendableFileSet.tags[klass._tag] = klass
+
+    def __init__(self):
+        self.l = []
+
+    def add(self, f):
+        self.l.append((f._tag, f._sendInfo()))
+
+    def send(self, sock):
+        fds = list(set([ x[1][0] for x in self.l if x[1][0] is not None ]))
+
+        sendmsg(sock, [ struct.pack("!I", len(fds)) ] )
+        sendmsg(sock, [ struct.pack("!I", len(self.l)) ], fds)
+
+        for tag, (fd, s) in self.l:
+            if fd is None:
+                fdIndex = 0xffffffff
+            else:
+                fdIndex = fds.index(fd)
+
+            sendmsg(sock, [ struct.pack("!BII", len(tag), len(s), fdIndex),
+                                        tag, s ])
+
+    @staticmethod
+    def recv(sock):
+        s = recvmsg(sock, 4)
+        fdCount = struct.unpack("!I", s)[0]
+        s, fds = recvmsg(sock, 4, fdCount)
+        fileCount = struct.unpack("!I", s)[0]
+
+        fileObjects = [ ExtendedFdopen(x) for x in fds ]
+        finalList = []
+
+        for i in range(fileCount):
+            s = recvmsg(sock, 9)
+            tagLen, dataLen, fdIndex = struct.unpack("!BII", s)
+            tag = recvmsg(sock, tagLen)
+            s = recvmsg(sock, dataLen)
+            if fdIndex == 0xffffffff:
+                f = SendableFileSet.tags[tag]._fromInfo(None, s)
+            else:
+                f = SendableFileSet.tags[tag]._fromInfo(fileObjects[fdIndex], s)
+
+            finalList.append(f)
+
+        return finalList
 
 class ExtendedFdopen:
+
+    _tag = 'efd'
 
     def __init__(self, fd):
         self.fd = fd
         # set close-on-exec flag
         fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
+
+    @staticmethod
+    def _fromInfo(ef, s):
+        assert(s == '-')
+        return ef
 
     def fileno(self):
         return self.fd
@@ -703,6 +763,10 @@ class ExtendedFdopen:
         # 1 is SEEK_CUR
         return os.lseek(self.fd, 0, 1)
 
+    def _sendInfo(self):
+        return (self.fd, '-')
+SendableFileSet._register(ExtendedFdopen)
+
 class ExtendedFile(ExtendedFdopen):
 
     def __init__(self, path, mode = "r", buffering = True):
@@ -715,6 +779,14 @@ class ExtendedFile(ExtendedFdopen):
         ExtendedFdopen.__init__(self, fd)
 
 class ExtendedStringIO(StringIO.StringIO):
+
+    _tag = 'efs'
+
+    @staticmethod
+    def _fromInfo(ef, s):
+        assert(ef is None)
+        return ExtendedStringIO(s)
+
     def pread(self, bytes, offset):
         pos = self.tell()
         self.seek(offset, 0)
@@ -722,7 +794,18 @@ class ExtendedStringIO(StringIO.StringIO):
         self.seek(pos, 0)
         return data
 
+    def _sendInfo(self):
+        return (None, self.getvalue())
+SendableFileSet._register(ExtendedStringIO)
+
 class SeekableNestedFile:
+
+    _tag = "snf"
+
+    @staticmethod
+    def _fromInfo(ef, s):
+        size, start = struct.unpack("!II", s)
+        return SeekableNestedFile(ef, size, start = start)
 
     def __init__(self, file, size, start = -1):
         self.file = file
@@ -734,6 +817,10 @@ class SeekableNestedFile:
             self.start = file.tell()
         else:
             self.start = start
+
+    def _sendInfo(self):
+        assert(isinstance(self.file, ExtendedFile))
+        return (self.file.fileno(), struct.pack("!II", self.size, self.start))
 
     def close(self):
         pass
@@ -777,6 +864,7 @@ class SeekableNestedFile:
 
     def tell(self):
         return self.pos
+SendableFileSet._register(SeekableNestedFile)
 
 class BZ2File:
     def __init__(self, fobj):
