@@ -3,6 +3,8 @@ Changes in @NEW@:
     * Fixed a bug when that caused a traceback when moving an unmodified 
      shadow to tip via promoting. (CNY-2441)
     * Don't modify cfg.tmpDir when calling addSvnSnapshot (CNY-2401)
+  o Policies that move files in destdir now track path translations
+    so files will end up in the correct package or component. (CNY-1679)
 
 Changes in 1.2.14:
   o Client Changes:
