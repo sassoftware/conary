@@ -666,14 +666,20 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
     msg.msg_iovlen = 1;
     msg.msg_flags = 0;
 
-    expectedLen = sizeof(*ctrlMsg) + (sizeof(fd) * fdCount);
-    msg.msg_controllen = expectedLen;
-    msg.msg_control = alloca(msg.msg_controllen);
-    ctrlMsg = msg.msg_control;
+    if (fdCount) {
+        expectedLen = sizeof(*ctrlMsg) + (sizeof(fd) * fdCount);
+        msg.msg_controllen = expectedLen;
+        msg.msg_control = alloca(msg.msg_controllen);
+        ctrlMsg = msg.msg_control;
 
-    ctrlMsg->cmsg_len = msg.msg_controllen;
-    ctrlMsg->cmsg_level = SOL_SOCKET;
-    ctrlMsg->cmsg_type = SCM_RIGHTS;
+        ctrlMsg->cmsg_len = msg.msg_controllen;
+        ctrlMsg->cmsg_level = SOL_SOCKET;
+        ctrlMsg->cmsg_type = SCM_RIGHTS;
+    } else {
+        expectedLen = 0;
+        msg.msg_controllen = expectedLen;
+        msg.msg_control = NULL;
+    }
 
     vector.iov_base = malloc(dataLen);
     vector.iov_len = dataLen;
@@ -692,7 +698,7 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
 
     if (msg.msg_controllen != expectedLen) {
         free(vector.iov_base);
-        PyErr_SetString(PyExc_IOError, "unexpected control data size");
+        PyErr_SetString(PyExc_IOError, "unexpected control length");
         return NULL;
     }
 
@@ -708,7 +714,11 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
         PyTuple_SET_ITEM(fdTuple, i, PyInt_FromLong(recvFds[i]));
     }
 
-    rc = Py_BuildValue("s#O", vector.iov_base, bytes, fdTuple);
+    if (fdCount) {
+        rc = Py_BuildValue("s#O", vector.iov_base, bytes, fdTuple);
+    } else {
+        rc = PyString_FromStringAndSize(vector.iov_base, bytes);
+    }
     free(vector.iov_base);
 
     return rc;
