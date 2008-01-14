@@ -581,8 +581,10 @@ class ConaryConfiguration(SectionedConfigFile):
     _allowNewSections     = True
     _defaultSectionType   =  ConaryContext
 
-    def __init__(self, readConfigFiles = False):
+    def __init__(self, readConfigFiles = False, ignoreErrors = False,
+                 readProxyValuesFirst=True):
 	SectionedConfigFile.__init__(self)
+        self._ignoreErrors = ignoreErrors
 
         for info in ConaryContext._getConfigOptions():
             if info[0] not in self:
@@ -590,12 +592,22 @@ class ConaryConfiguration(SectionedConfigFile):
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 
-	if readConfigFiles:
-	    self.readFiles()
+        if readConfigFiles:
+            if readProxyValuesFirst:
+                self.limitToKeys('conaryProxy', 'proxy')
+                self.ignoreUrlIncludes()
+                self.readFiles()
+                self.limitToKeys(False)
+                self.ignoreUrlIncludes(False)
+
+            self.readFiles()
             # Entitlement files are config files
             self.readEntitlementDirectory()
 
         util.settempdir(self.tmpDir)
+
+    def _getProxies(self):
+        return self.proxy
 
     def readEntitlementDirectory(self):
         if not os.path.isdir(self.entitlementDirectory):
