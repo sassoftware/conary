@@ -1286,12 +1286,21 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
     def send(self, sock):
         """
-        Sends this changeset over a unix-domain socket.
+        Sends this changeset over a unix-domain socket. This object remains
+        a valid changeset (it is not affected by the send operation).
 
         @param sock: File descriptor for unix domain socket
         @type sock: int
         """
-        pass
+        fileSet = util.SendableFileSet()
+        for x in self.fileContainers:
+            fileSet.add(x.file)
+        fileSet.send(sock)
+
+        new = self.newTroves.freeze()
+        old = self.oldTroves.freeze()
+        util.sendmsg(sock, [ struct.pack("!QQ", len(new), len(old)),
+                             new, old ])
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
@@ -1380,6 +1389,28 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
         if nextFile:
             self.fileQueue.append(nextFile + (csf,))
+
+class ChangeSetFromSocket(ReadOnlyChangeSet):
+
+    def __init__(self, sock):
+        ReadOnlyChangeSet.__init__(self)
+
+        fileObjs = util.SendableFileSet.recv(sock)
+
+        s = util.recvmsg(sock, 16)
+        (newLen, oldLen) = struct.unpack("!QQ", s)
+
+        for fObj in fileObjs:
+            subCs = ChangeSetFromFile(fObj)
+            self.merge(subCs)
+
+        if newLen:
+            s = util.recvmsg(sock, newLen)
+            self.newTroves.thaw(s)
+
+        if oldLen:
+            s = util.recvmsg(sock, oldLen)
+            self.oldTroves.thaw(s)
 
 # old may be None
 def fileChangeSet(pathId, old, new):
