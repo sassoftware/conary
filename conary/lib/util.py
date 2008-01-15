@@ -17,6 +17,7 @@ import bz2
 import debugger
 import fcntl
 import errno
+import itertools
 import log
 import misc
 import os
@@ -38,7 +39,7 @@ import weakref
 import xmlrpclib
 import zlib
 
-from conary.lib import fixedglob, log
+from conary.lib import fixedglob, graph, log
 
 # Simple ease-of-use extensions to python libraries
 
@@ -678,46 +679,103 @@ class SendableFileSet:
         self.l = []
 
     def add(self, f):
-        self.l.append((f._tag, f._sendInfo()))
+        self.l.append(f)
 
     def send(self, sock):
-        fds = list(set([ x[1][0] for x in self.l if x[1][0] is not None ]))
+        stack = self.l[:]
+        allFds = []
+        toSend = []
+        handled = set()
 
-        sendmsg(sock, [ struct.pack("!I", len(fds)) ] )
-        sendmsg(sock, [ struct.pack("!I", len(self.l)) ], fds)
+        while stack:
+            f = stack.pop()
 
-        for tag, (fd, s) in self.l:
+            if f in handled:
+                continue
+
+            fd = None
+            objDep = None
+
+            dependsOn, s = f._sendInfo()
+
+            if type(dependsOn) == int:
+                fd = dependsOn
+            elif dependsOn is not None:
+                if dependsOn not in handled:
+                    # we depend on something else; handle that item and then
+                    # come back to this one
+                    stack.append(f)
+                    stack.append(dependsOn)
+                    continue
+
+                # we depend on something we know about
+                objDep = dependsOn
+
+            toSend.append((f, fd, objDep, s))
+            handled.add(f)
+
+        fds = list(set([ x[1] for x in toSend if x[1] is not None]))
+        objsById = dict( (id(x[2]), x[2]) for x in toSend )
+
+        sendmsg(sock, [ struct.pack("@I", len(fds)) ] )
+        sendmsg(sock, [ struct.pack("@II", len(self.l), len(toSend)) ], fds)
+
+        for f, fd, objDep, s in toSend:
             if fd is None:
                 fdIndex = 0xffffffff
             else:
                 fdIndex = fds.index(fd)
 
-            sendmsg(sock, [ struct.pack("!BII", len(tag), len(s), fdIndex),
-                                        tag, s ])
+            if objDep is None:
+                depId = 0
+            else:
+                depId = id(objDep)
+
+            sendmsg(sock, [ struct.pack("@BIIPP", len(f._tag), fdIndex,
+                                        len(s), depId, id(f)), f._tag, s ])
+
+        sendmsg(sock, [ struct.pack("@" + ("P" * len(self.l)),
+                                    *[ id(x) for x in self.l] ) ])
 
     @staticmethod
     def recv(sock):
-        s = recvmsg(sock, 4)
-        fdCount = struct.unpack("!I", s)[0]
-        s, fds = recvmsg(sock, 4, fdCount)
-        fileCount = struct.unpack("!I", s)[0]
+        hdrSize = len(struct.pack("@BIIPP", 0, 0, 0, 0, 0))
+        ptrSize = len(struct.pack("@P", 0))
 
-        fileObjects = [ ExtendedFdopen(x) for x in fds ]
-        finalList = []
+        q = IterableQueue()
+        s = recvmsg(sock, 4)
+        fdCount = struct.unpack("@I", s)[0]
+        s, fds = recvmsg(sock, 8, fdCount)
+        objCount, fileCount = struct.unpack("@II", s)
+
+        fileList = []
+        objById = {}
 
         for i in range(fileCount):
-            s = recvmsg(sock, 9)
-            tagLen, dataLen, fdIndex = struct.unpack("!BII", s)
+            s = recvmsg(sock, hdrSize)
+            tagLen, fdIndex, dataLen, depId, thisId = struct.unpack("@BIIPP", s)
             tag = recvmsg(sock, tagLen)
             s = recvmsg(sock, dataLen)
-            if fdIndex == 0xffffffff:
-                f = SendableFileSet.tags[tag]._fromInfo(None, s)
+
+            if fdIndex != 0xffffffff:
+                assert(depId == 0)
+                dep = fds[fdIndex]
+            elif depId != 0:
+                assert(fdIndex == 0xffffffff)
+                dep = objById[depId]
             else:
-                f = SendableFileSet.tags[tag]._fromInfo(fileObjects[fdIndex], s)
+                dep = None
 
-            finalList.append(f)
+            f = SendableFileSet.tags[tag]._fromInfo(dep, s)
+            objById[thisId] = f
 
-        return finalList
+            fileList.append(f)
+
+        fileIds = recvmsg(sock, ptrSize * objCount)
+        fileIds = struct.unpack("@" + ("P" * objCount), fileIds)
+        files = [ objById[x] for x in fileIds]
+
+        return files
 
 class ExtendedFdopen:
 
@@ -729,9 +787,12 @@ class ExtendedFdopen:
         fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
 
     @staticmethod
-    def _fromInfo(ef, s):
+    def _fromInfo(fd, s):
         assert(s == '-')
-        return ef
+        return ExtendedFdopen(fd)
+
+    def _sendInfo(self):
+        return (self.fd, '-')
 
     def fileno(self):
         return self.fd
@@ -763,8 +824,6 @@ class ExtendedFdopen:
         # 1 is SEEK_CUR
         return os.lseek(self.fd, 0, 1)
 
-    def _sendInfo(self):
-        return (self.fd, '-')
 SendableFileSet._register(ExtendedFdopen)
 
 class ExtendedFile(ExtendedFdopen):
@@ -787,6 +846,9 @@ class ExtendedStringIO(StringIO.StringIO):
         assert(ef is None)
         return ExtendedStringIO(s)
 
+    def _sendInfo(self):
+        return (None, self.getvalue())
+
     def pread(self, bytes, offset):
         pos = self.tell()
         self.seek(offset, 0)
@@ -794,18 +856,11 @@ class ExtendedStringIO(StringIO.StringIO):
         self.seek(pos, 0)
         return data
 
-    def _sendInfo(self):
-        return (None, self.getvalue())
 SendableFileSet._register(ExtendedStringIO)
 
 class SeekableNestedFile:
 
     _tag = "snf"
-
-    @staticmethod
-    def _fromInfo(ef, s):
-        size, start = struct.unpack("!II", s)
-        return SeekableNestedFile(ef, size, start = start)
 
     def __init__(self, file, size, start = -1):
         self.file = file
@@ -818,9 +873,13 @@ class SeekableNestedFile:
         else:
             self.start = start
 
+    @staticmethod
+    def _fromInfo(ef, s):
+        size, start = struct.unpack("!II", s)
+        return SeekableNestedFile(ef, size, start = start)
+
     def _sendInfo(self):
-        assert(isinstance(self.file, ExtendedFile))
-        return (self.file.fileno(), struct.pack("!II", self.size, self.start))
+        return (self.file, struct.pack("!II", self.size, self.start))
 
     def close(self):
         pass
