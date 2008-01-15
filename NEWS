@@ -1,8 +1,12 @@
 Changes in @NEW@:
   o Bug Fixes:
-    * Fixed a bug when that caused a traceback when moving an unmodified 
+    * Fixed a bug when that caused a traceback when moving an unmodified
      shadow to tip via promoting. (CNY-2441)
     * Don't modify cfg.tmpDir when calling addSvnSnapshot (CNY-2401)
+    * Fixed a rare bug in which dependency resolution would fail when
+      a dependency that used to be provided by one installed package
+      is now provided by two new packages. (CNY-2459)
+dependency issues.
   o Client Changes:
     * Conary will now use the proxy settings stored in its local configuration
       when loading remote configuration files. (CNY-2363)
