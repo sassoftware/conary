@@ -170,6 +170,8 @@ TRUST_MARGINAL  = 4
 TRUST_FULL      = 5
 TRUST_ULTIMATE  = 6
 
+TRUST_TRUSTED   = 120
+
 #trust packet headers
 TRP_VERSION     = chr(1)
 TRP_KEY         = chr(12)

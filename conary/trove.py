@@ -26,7 +26,7 @@ from conary import streams
 from conary import versions
 from conary.deps import deps
 from conary.lib import misc, sha1helper
-from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED
+from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED, TRUST_TRUSTED
 from conary.lib import openpgpkey
 from conary.streams import ByteStream
 from conary.streams import DependenciesStream, FlavorsStream
@@ -599,6 +599,7 @@ class MetadataItem(streams.StreamSet):
         keyCache = openpgpkey.getKeyCache()
         missingKeys = []
         badFingerprints = []
+        untrustedKeys = set()
         for signatures in self.signatures:
             # verify that recomputing the digest for this version
             # of the signature matches the stored version
@@ -617,7 +618,9 @@ class MetadataItem(streams.StreamSet):
                 lev = key.verifyString(digest, signature)
                 if lev == -1:
                     badFingerprints.append(key.getFingerprint())
-        return missingKeys, badFingerprints
+                elif lev < TRUST_TRUSTED:
+                    untrustedKeys.add(key.getFingerprint())
+        return missingKeys, badFingerprints, untrustedKeys
 
     def freeze(self, *args, **kw):
         self._updateDigests()
@@ -648,11 +651,13 @@ class Metadata(streams.OrderedStreamCollection):
     def verifyDigitalSignatures(self, label=None):
         missingKeys = []
         badFingerprints = []
+        untrustedKeys = set()
         for item in self:
             rc = item.verifyDigitalSignatures(label=label)
             missingKeys.extend(rc[0])
             badFingerprints.extend(rc[1])
-        return missingKeys, badFingerprints
+            untrustedKeys.update(rc[2])
+        return missingKeys, badFingerprints, untrustedKeys
 
 _TROVEINFO_TAG_SIZE           =  0
 _TROVEINFO_TAG_SOURCENAME     =  1
@@ -1061,6 +1066,7 @@ class Trove(streams.StreamSet):
                 vlabel = allLabels[-1]
         missingKeys = []
         badFingerprints = []
+        untrustedKeys = set()
         maxTrust = TRUST_UNTRUSTED
         assert(self.verifyDigests())
 
@@ -1084,14 +1090,17 @@ class Trove(streams.StreamSet):
             lev = key.verifyString(digest(), signature)
             if lev == -1:
                 badFingerprints.append(key.getFingerprint())
+            elif lev < TRUST_TRUSTED:
+                untrustedKeys.add(key.getFingerprint())
             maxTrust = max(lev,maxTrust)
 
-        # verify metadata.  Pass in the server name so it can
+        # verify metadata.  Pass in the label so it can
         # find additional fingerprints
         rc = self.troveInfo.metadata.verifyDigitalSignatures(label=vlabel)
-        metaMissingKeys, metaBadSigs = rc
+        metaMissingKeys, metaBadSigs, metaUntrustedKeys = rc
         missingKeys.extend(metaMissingKeys)
         badFingerprints.extend(metaBadSigs)
+        untrustedKeys.update(metaUntrustedKeys)
 
         if missingKeys and threshold > 0:
             from conary.lib import log
@@ -1103,10 +1112,19 @@ class Trove(streams.StreamSet):
                     "Trove signatures made by the following keys are bad: %s" 
                             % (' '.join(badFingerprints)))
         if maxTrust < threshold:
+            if untrustedKeys:
+                from conary.lib import log
+                log.warning('The trove %s has signatures generated with '
+                    'untrusted keys. You can either resign the trove with a '
+                    'key that you trust, or add one of the keys to the list '
+                    'of trusted keys (the trustedKeys configuration option). '
+                    'The keys that were not trusted are: %s' %
+                        (self.getName(), ', '.join(
+                            "%s" % x[-8:] for x in sorted(untrustedKeys))))
             raise DigitalSignatureVerificationError(
                     "Trove does not meet minimum trust level: %s" 
                             % self.getName())
-        return maxTrust, missingKeys
+        return maxTrust, missingKeys, untrustedKeys
 
     def invalidateDigests(self):
         self.troveInfo.sigs.reset()
