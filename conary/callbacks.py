@@ -294,10 +294,10 @@ class KeyCacheCallback(Callback):
     def getPublicKey(self, keyId, serverName, warn=False):
         return False
 
-    def __init__(self, repositoryMap = None, pubRing = ''):
+    def __init__(self, repos = None, cfg = None):
         Callback.__init__(self)
-        self.repositoryMap = repositoryMap
-        self.pubRing = pubRing
+        self.repos = repos
+        self.cfg = cfg
 
 class CloneCallback(ChangesetCallback):
     def __init__(self, cfg=None):
@@ -324,7 +324,7 @@ class CloneCallback(ChangesetCallback):
     def rewriteTrove(self, current=0, total=0):
         pass
 
-    def rewritingFileVersions(self, current=0, total=0):
+    def buildingChangeset(self, current=0, total=0):
         pass
 
     def requestingFiles(self, number):
