@@ -1,8 +1,9 @@
 Changes in @NEW@:
   o Bug Fixes:
-    * Fixed a bug when that caused a traceback when moving an unmodified
-     shadow to tip via promoting. (CNY-2441)
-    * Don't modify cfg.tmpDir when calling addSvnSnapshot (CNY-2401)
+    * Moving an unmodified shadow to tip via cvc promote no longer causes
+      an error. (CNY-2441)
+    * recipes using addSvnSnapshot no longer modify the conary configuration
+      object's tmpDir setting (CNY-2401)
     * Fixed a rare bug in which dependency resolution would fail when
       a dependency that used to be provided by one installed package
       is now provided by two new packages. (CNY-2459)
@@ -11,7 +12,7 @@ dependency issues.
     * Conary will now use the proxy settings stored in its local configuration
       when loading remote configuration files. (CNY-2363)
   o Build Changes:
-    * Policies that move files in destdir now track path translations
+    * Policies that move files in destdir now track path changes they make
       so files will end up in the correct package or component. (CNY-1679)
 
 Changes in 1.2.14:
