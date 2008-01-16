@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.15:
   o Bug Fixes:
     * Moving an unmodified shadow to tip via cvc promote no longer causes
       an error. (CNY-2441)
