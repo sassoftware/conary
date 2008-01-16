@@ -10,8 +10,6 @@ dependency issues.
   o Client Changes:
     * Conary will now use the proxy settings stored in its local configuration
       when loading remote configuration files. (CNY-2363)
-    * The rollback API now raises a RollbackError instead of returning
-      non-zero on errors. (CNY-1643)
   o Build Changes:
     * Policies that move files in destdir now track path translations
       so files will end up in the correct package or component. (CNY-1679)
