@@ -2,18 +2,20 @@ Changes in 1.2.15:
   o Bug Fixes:
     * Moving an unmodified shadow to tip via cvc promote no longer causes
       an error. (CNY-2441)
-    * recipes using addSvnSnapshot no longer modify the conary configuration
-      object's tmpDir setting (CNY-2401)
+    * Recipes using addSvnSnapshot no longer modify the conary
+      configuration object's tmpDir setting (CNY-2401)
     * Fixed a rare bug in which dependency resolution would fail when
       a dependency that used to be provided by one installed package
       is now provided by two new packages. (CNY-2459)
-dependency issues.
+
   o Client Changes:
-    * Conary will now use the proxy settings stored in its local configuration
-      when loading remote configuration files. (CNY-2363)
+    * Conary will now use the proxy settings stored in its local
+      configuration when loading remote configuration files. (CNY-2363)
   o Build Changes:
-    * Policies that move files in destdir now track path changes they make
-      so files will end up in the correct package or component. (CNY-1679)
+    * Policies that move files in destdir now track path changes they
+      make so that files will end up in the correct package or component
+      after being moved, when "package=" or "component=" has been used
+      in a build action. (CNY-1679)
 
 Changes in 1.2.14:
   o Client Changes:
