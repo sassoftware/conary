@@ -11,6 +11,7 @@ Changes in 1.2.15:
   o Client Changes:
     * Conary will now use the proxy settings stored in its local
       configuration when loading remote configuration files. (CNY-2363)
+
   o Build Changes:
     * Policies that move files in destdir now track path changes they
       make so that files will end up in the correct package or component
