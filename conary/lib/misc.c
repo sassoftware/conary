@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2004 rPath, Inc.
+ * Copyright (c) 2004-2008 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <malloc.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -33,10 +34,13 @@ static PyObject * depSplit(PyObject *self, PyObject *args);
 static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
+static PyObject * mkdirIfMissing(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
 static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
+static PyObject * py_sendmsg(PyObject *self, PyObject *args);
+static PyObject * py_recvmsg(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -49,10 +53,15 @@ static PyMethodDef MiscMethods[] = {
     { "removeIfExists", removeIfExists, METH_VARARGS, 
 	"unlinks a file if it exists; silently fails if it does not exist. "
 	"returns a boolean indicating whether or not a file was removed" },
+    { "mkdirIfMissing", mkdirIfMissing, METH_VARARGS,
+        "Creates a directory if the file does not already exist. EEXIST "
+        "is ignored." },
     { "unpack", unpack, METH_VARARGS },
     { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
     { "massCloseFileDescriptors", py_massCloseFDs, METH_VARARGS },
+    { "sendmsg", py_sendmsg, METH_VARARGS },
+    { "recvmsg", py_recvmsg, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -209,6 +218,27 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args) {
 
     if (unlink(fn)) {
         if (errno == ENOENT || errno == ENAMETOOLONG) {
+            Py_INCREF(Py_False);
+            return Py_False;
+        }
+
+        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
+        return NULL;
+    }
+
+    Py_INCREF(Py_True);
+    return Py_True;
+}
+
+static PyObject * mkdirIfMissing(PyObject *self, PyObject *args) {
+    char * fn;
+
+    if (!PyArg_ParseTuple(args, "s", &fn))
+        return NULL;
+
+    /* 0777 lets umask do it's thing */
+    if (mkdir(fn, 0777)) {
+        if (errno == EEXIST) {
             Py_INCREF(Py_False);
             return Py_False;
         }
@@ -548,6 +578,142 @@ static PyObject * py_massCloseFDs(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
+    PyObject * fdList, * dataList, * intObj, * sObj;
+    struct msghdr msg;
+    struct cmsghdr * ctrlMsg;
+    int fd, i;
+    struct iovec * vectors;
+    int * sendFds;
+
+    if (!PyArg_ParseTuple(args, "iOO", &fd, &dataList, &fdList))
+        return NULL;
+
+    if (!PyList_CheckExact(dataList)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be a list");
+        return NULL;
+    }
+
+    if (!PyList_CheckExact(fdList)) {
+        PyErr_SetString(PyExc_TypeError, "third argument must be a list");
+        return NULL;
+    }
+
+    vectors = alloca(sizeof(*vectors) * PyList_GET_SIZE(dataList));
+    for (i = 0; i < PyList_GET_SIZE(dataList); i++) {
+        sObj = PyList_GET_ITEM(dataList, i);
+        if (!PyString_Check(sObj)) {
+            PyErr_SetString(PyExc_TypeError,
+                            "data objects must be strings");
+            return NULL;
+        }
+
+        vectors[i].iov_base = PyString_AS_STRING(sObj);
+        vectors[i].iov_len = PyString_GET_SIZE(sObj);
+    }
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_iov = vectors;
+    msg.msg_iovlen = PyList_GET_SIZE(dataList);
+    msg.msg_flags = 0;
+
+    msg.msg_controllen = sizeof(*ctrlMsg) + (sizeof(*sendFds) *
+                                PyList_GET_SIZE(fdList));
+    msg.msg_control = alloca(msg.msg_controllen);
+    ctrlMsg = msg.msg_control;
+    sendFds = (int *) CMSG_DATA(ctrlMsg);
+
+    ctrlMsg->cmsg_len = msg.msg_controllen;
+    ctrlMsg->cmsg_level = SOL_SOCKET;
+    ctrlMsg->cmsg_type = SCM_RIGHTS;
+
+    for (i = 0; i < PyList_GET_SIZE(fdList); i++) {
+        intObj = PyList_GET_ITEM(fdList, i);
+        if (!PyInt_Check(intObj)) {
+            PyErr_SetString(PyExc_TypeError,
+                            "integer file descriptor required");
+            return NULL;
+        }
+
+        sendFds[i] = PyInt_AS_LONG(intObj);
+        Py_DECREF(intObj);
+    }
+
+    if (sendmsg(fd, &msg, 0) < 0) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
+    int fd, dataLen, fdCount;
+    struct msghdr msg;
+    struct cmsghdr * ctrlMsg;
+    int i, expectedLen, bytes;
+    struct iovec vector;
+    PyObject * fdTuple, * rc;
+    int * recvFds;
+
+    if (!PyArg_ParseTuple(args, "iii", &fd, &dataLen, &fdCount))
+        return NULL;
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_iov = &vector;
+    msg.msg_iovlen = 1;
+    msg.msg_flags = 0;
+
+    expectedLen = sizeof(*ctrlMsg) + (sizeof(fd) * fdCount);
+    msg.msg_controllen = expectedLen;
+    msg.msg_control = alloca(msg.msg_controllen);
+    ctrlMsg = msg.msg_control;
+
+    ctrlMsg->cmsg_len = msg.msg_controllen;
+    ctrlMsg->cmsg_level = SOL_SOCKET;
+    ctrlMsg->cmsg_type = SCM_RIGHTS;
+
+    vector.iov_base = malloc(dataLen);
+    vector.iov_len = dataLen;
+
+    if ((bytes = recvmsg(fd, &msg, 0)) < 0) {
+        free(vector.iov_base);
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
+
+    if (msg.msg_iovlen != 1) {
+        free(vector.iov_base);
+        PyErr_SetString(PyExc_IOError, "unexpected data vector count");
+        return NULL;
+    }
+
+    if (msg.msg_controllen != expectedLen) {
+        free(vector.iov_base);
+        PyErr_SetString(PyExc_IOError, "unexpected control data size");
+        return NULL;
+    }
+
+    recvFds = (int *) CMSG_DATA(ctrlMsg);
+
+    fdTuple = PyTuple_New(fdCount);
+    if (!fdTuple) {
+        free(vector.iov_base);
+        return NULL;
+    }
+
+    for (i = 0; i < fdCount; i++) {
+        PyTuple_SET_ITEM(fdTuple, i, PyInt_FromLong(recvFds[i]));
+    }
+
+    rc = Py_BuildValue("s#O", vector.iov_base, bytes, fdTuple);
+    free(vector.iov_base);
+
+    return rc;
+}
 
 PyMODINIT_FUNC
 initmisc(void)
