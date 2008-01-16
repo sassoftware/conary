@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Build Changes:
+    * When file conflicts occur while cooking groups, the deps that
+      caused a package to be pulled in are listed. (CNY-2308)
+
 Changes in 1.2.15:
   o Bug Fixes:
     * Moving an unmodified shadow to tip via cvc promote no longer causes

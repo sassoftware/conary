@@ -1431,7 +1431,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
 class SingleGroup(object):
     def __init__(self, name, depCheck, autoResolve, checkOnlyByDefaultDeps,
-                 checkPathConflicts, byDefault = True):
+                 checkPathConflicts, byDefault = True, cache = None):
         assert(isinstance(byDefault, bool))
         self.name = name
         self.depCheck = depCheck
@@ -1439,6 +1439,7 @@ class SingleGroup(object):
         self.checkOnlyByDefaultDeps = checkOnlyByDefaultDeps
         self.checkPathConflicts = checkPathConflicts
         self.byDefault = byDefault
+        self.cache = cache
 
 
         self.addTroveList = []
@@ -1732,7 +1733,25 @@ class SingleGroup(object):
         if reasonType == ADD_REASON_ADDED:
             return "Added directly"
         elif reasonType == ADD_REASON_DEP:
-            return "Added to satisfy dep of %s=%s[%s]" % reason[1]
+            if not self.cache:
+                return "Added to satisfy dep of %s=%s[%s]" % reason[1][0]
+            troveTup = reason[1][0]
+            provTroveTup = reason[1][1]
+            trv = self.cache.getTrove(troveTup)
+            provTrv = self.cache.getTrove(provTroveTup)
+            deps = trv.requires().intersection(provTrv.provides())
+            deps = str(deps).splitlines()
+            if log.getVerbosity() == log.DEBUG:
+                missing = "('" + "', '".join(x for x in deps) + "')"
+            else:
+                missing = "('" + "', '".join(x for x in deps[:5])
+                more = max(0, len(deps) - 5)
+                if more:
+                    missing += "', ... %d more)" % more
+                else:
+                    missing += "')"
+            return "Added to satisfy dep(s): %s required by %s=%s[%s]" % \
+                    (missing, troveTup[0], troveTup[1], troveTup[2])
         elif reasonType == ADD_REASON_INCLUDED:
             return "Included by adding %s=%s[%s]" % reason[1]
         elif reasonType == ADD_REASON_INCLUDED_GROUP:
@@ -2049,6 +2068,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 
     unmatchedGlobalReplaceSpecs = set()
     for group in groupList:
+        group.cache = cache
         for ((troveSpec, ref), allowNoMatch) in replaceSpecs.iteritems():
             group.replaceSpec(isGlobal=True, allowNoMatch=allowNoMatch,
                               ref=ref, *troveSpec)
@@ -2857,7 +2877,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
                             # implicitly through a sub-package.
 
             group.addTrove(provTroveTup, explicit, True, [],
-                           reason=(ADD_REASON_DEP, troveTup))
+                           reason=(ADD_REASON_DEP, (troveTup, provTroveTup)))
             neededTups.append(provTroveTup)
 
     cache.cacheTroves(neededTups)
