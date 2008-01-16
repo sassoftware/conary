@@ -176,27 +176,27 @@ def applyRollback(client, rollbackSpec, **kwargs):
     if rollbackSpec.startswith('r.'):
         try:
             i = rollbackList.index(rollbackSpec)
-        except ValueError:
+        except:
             log.error("rollback '%s' not present" % rollbackSpec)
-            raise database.RollbackDoesNotExist(rollbackSpec)
+            return 1
 
         rollbacks = rollbackList[i:]
         rollbacks.reverse()
     else:
         try:
             rollbackCount = int(rollbackSpec)
-        except ValueError:
+        except:
             log.error("integer rollback count expected instead of '%s'" %
                     rollbackSpec)
-            raise database.RollbackDoesNotExist(rollbackSpec)
+            return 1
 
         if rollbackCount < 1:
             log.error("rollback count must be positive")
-            raise database.RollbackDoesNotExist(rollbackSpec)
+            return 1
         elif rollbackCount > len(rollbackList):
             log.error("rollback count higher then number of rollbacks "
                       "available")
-            raise database.RollbackDoesNotExist(rollbackSpec)
+            return 1
 
         rollbacks = rollbackList[-rollbackCount:]
         rollbacks.reverse()
@@ -205,7 +205,7 @@ def applyRollback(client, rollbackSpec, **kwargs):
         client.db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
     except database.RollbackError, e:
         log.error("%s", e)
-        raise
+        return 1
 
     log.syslog.commandComplete()
 
