@@ -16,6 +16,7 @@ Changes in 2.0.4:
       (CNY-2439)
     * The client enforces the trust model using the internal
       implementation of OpenPGP. (CNY-1895)
+
   o Build Changes:
     * Policies that move files in destdir now track path changes they
       make so that files will end up in the correct package or component
