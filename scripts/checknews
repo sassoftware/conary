@@ -12,9 +12,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-
+import os
 import sys
 import re
+
+if 'JIRANEMO_PATH' in os.environ:
+    sys.path.insert(0, os.environ['JIRANEMO_PATH'])
 # use jiranemo to crib off the configuration files, etc.
 from jiranemo import main
 from conary.lib import options
