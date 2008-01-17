@@ -733,6 +733,12 @@ class AbstractPackageRecipe(Recipe):
     def isCrossCompileTool(self):
         return self._isCrossCompileTool
 
+    def glob(self, expression):
+        return action.Glob(self, expression)
+
+    def regexp(self, expression):
+        return action.Regexp(expression)
+
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance,
