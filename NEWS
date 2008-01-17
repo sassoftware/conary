@@ -5,6 +5,8 @@ Changes in @NEW@:
     * Config policy will automatically append a newline to non-binary files.
       files that are marked as Config and appear to be binary will trigger an
       error. (CNY-2422)
+    * Perl requirements that are not present on the system or provided by the
+      package being built are dropped. (CNY-2180)
 
 Changes in 1.2.15:
   o Bug Fixes:

@@ -2938,6 +2938,9 @@ class Requires(_addInfo, _dependency):
         self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
+        if self.db is None:
+            self.db = database.Database(self.recipe.cfg.root,
+                    self.recipe.cfg.dbPath)
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
 	    return
@@ -3017,8 +3020,12 @@ class Requires(_addInfo, _dependency):
         if self._isPerl(path, m, f):
             perlReqs = self._getPerlReqs(path, fullpath)
             for req in perlReqs:
-                self._addRequirement(path, req, [], pkg,
-                                     deps.PerlDependencies)
+                thisReq = deps.parseDep('perl: ' + req)
+                if self.db.getTrovesWithProvides([thisReq]) or \
+                        [x for x in self.recipe.autopkg.components.values() \
+                            if x.provides.satisfies(thisReq)]:
+                    self._addRequirement(path, req, [], pkg,
+                                         deps.PerlDependencies)
 
         self.whiteOut(path, pkg)
         self.unionDeps(path, pkg, f)
@@ -3466,7 +3473,15 @@ class Requires(_addInfo, _dependency):
         if self.perlReqs is False:
             return []
 
-        p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        cwd = os.getcwd()
+        os.chdir(os.path.dirname(fullpath))
+        try:
+            p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        finally:
+            try:
+                os.chdir(cwd)
+            except:
+                pass
         reqlist = [x.strip().split('//') for x in p.readlines()]
         # make sure that the command completed successfully
         rc = p.close()
