@@ -22,6 +22,7 @@ python_files=	    __init__.py		\
 		    epdb.py     	\
 		    erlcompleter.py	\
 		    fixeddifflib.py	\
+		    fixedfnmatch.py	\
 		    fixedglob.py	\
 		    fixedthreading.py	\
 		    graph.py		\
