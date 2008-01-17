@@ -15,6 +15,7 @@
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
 """
+import codecs
 import imp
 import itertools
 import os
@@ -229,6 +230,22 @@ class Config(policy.Policy):
         if os.path.isfile(fullpath) and util.isregular(fullpath):
             self._markConfig(filename, fullpath)
 
+    def _file_is_binary(self, fn):
+        f = codecs.open(fn, 'r', 'utf-8')
+        try:
+            limit = os.stat(fn)[stat.ST_SIZE]
+            while f.tell() < limit:
+                try:
+                    # if a file is not utf-8 or has null bytes, we'll consider
+                    # it to be a binary file
+                    if chr(0) in f.read(4096):
+                        return True
+                except UnicodeDecodeError:
+                    return True
+        finally:
+            f.close()
+        return False
+
     def _markConfig(self, filename, fullpath):
         self.info(filename)
         f = file(fullpath)
@@ -239,7 +256,16 @@ class Config(policy.Policy):
             lastchar = f.read(1)
             f.close()
             if lastchar != '\n':
-                self.error("config file %s missing trailing newline" %filename)
+                if self._file_is_binary(fullpath):
+                    self.error("binary file '%s' is marked as config" % \
+                            filename)
+                else:
+                    self.warn("adding trailing newline to config file '%s'" % \
+                            filename)
+                    f = open(fullpath, "a")
+                    f.seek(0, 2)
+                    f.write('\n')
+                    f.close()
         f.close()
         self.recipe.ComponentSpec(_config=filename)
 

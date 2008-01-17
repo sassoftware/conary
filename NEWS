@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Build Changes:
     * When file conflicts occur while cooking groups, the deps that
       caused a package to be pulled in are listed. (CNY-2308)
+    * Config policy will automatically append a newline to non-binary files.
+      files that are marked as Config and appear to be binary will trigger an
+      error. (CNY-2422)
 
 Changes in 1.2.15:
   o Bug Fixes:
