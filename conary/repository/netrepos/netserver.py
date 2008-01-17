@@ -2017,7 +2017,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 start = fileIdLen * i
                 end = start + fileIdLen
                 yield fileIds[start : end]
-        # fileIds need to unique at for performance reasons
+        # fileIds need to be unique for performance reasons
         fileIds = set(splitFileIds(fileIds))
         self.log(2, sourceName, branch, filePrefixes, fileIds)
         cu = self.db.cursor()

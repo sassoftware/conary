@@ -126,9 +126,12 @@ class UserAuthorization:
         authorized via these credentials
         """
         cu.execute("""
-        SELECT salt, password, userGroupId, userName FROM Users
+        SELECT Users.salt, Users.password, UserGroups.userGroupId, Users.userName
+        FROM Users
         JOIN UserGroupMembers USING(userId)
-        WHERE userName=? or userName='anonymous'
+        JOIN UserGroups USING(userGroupId)
+        WHERE Users.userName=?
+           OR Users.userName='anonymous' AND UserGroups.canMirror = 0)
         """, user)
 
         result = [ x for x in cu ]
