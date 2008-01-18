@@ -16,6 +16,7 @@ Provides output methods for displaying troves
 """
 
 import itertools
+import textwrap
 import time
 
 #conary
@@ -655,14 +656,11 @@ class TroveFormatter(TroveTupFormatter):
 
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
 
+        for ln in self.formatMetadata(trove):
+            yield ln
         if sourceTrove:
             if not n.endswith(':source'):
                 yield 'Source    : %s' % trove.getSourceName()
-            if hasattr(troveSource, 'getMetadata'):
-                for ln in metadata.formatDetails(troveSource, None, n, 
-                                                 v.branch(), sourceTrove):
-                    yield ln
-
             cl = sourceTrove.getChangeLog()
             if cl:
                 yield "Change log: %s (%s)" % (cl.getName(), cl.getContact())
@@ -678,6 +676,26 @@ class TroveFormatter(TroveTupFormatter):
             yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
             yield "%-30s" % (("Conary version : %s" % trove.troveInfo.conaryVersion()))
 
+    def formatMetadata(self, trove):
+        metadata = trove.getMetadata()
+        if metadata['licenses']:
+            for l in metadata['licenses']:
+                yield "License   : %s" % l
+        if metadata['categories']:
+            for c in metadata['categories']:
+                yield "Category  : %s" % c
+        if metadata['shortDesc']:
+            yield "Summary   : %s" % metadata['shortDesc']
+        if metadata['url']:
+            yield "Url       : %s" % metadata['url']
+        if metadata['longDesc']:
+            wrapper = textwrap.TextWrapper(initial_indent='    ',
+                                           subsequent_indent='    ')
+            wrapped = wrapper.wrap(metadata['longDesc'])
+
+            yield "Description: "
+            for line in wrapped:
+                yield line
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):
         """ Print information about this trove """

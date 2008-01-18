@@ -652,6 +652,7 @@ class ClientClone:
             trv.setLabelPath(labelPath)
 
         trv.changeVersion(newVersion)
+        trv.copyMetadata(trv) # flatten metadata
 
         # look through files which aren't already on the right host for
         # inclusion in the change set

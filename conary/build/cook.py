@@ -615,6 +615,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
     redirList = []
     childList = []
+    troveList = []
     for (fromName, fromFlavor), redirSpecList in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
                             None, type = trove.TROVE_TYPE_REDIRECT)
@@ -635,11 +636,13 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         redir.setSourceName(fullName + ':source')
         redir.setConaryVersion(constants.version)
         redir.setIsCollection(False)
-
-        trvDiff = redir.diff(None, absolute = 1)[0]
-        changeSet.newTrove(trvDiff)
         built.append((redir.getName(), redir.getVersion().asString(), 
                       redir.getFlavor()) )
+        troveList.append(redir)
+    _copyForwardTroveMetadata(repos, troveList, recipeObj)
+    for redir in troveList:
+        trvDiff = redir.diff(None, absolute = 1)[0]
+        changeSet.newTrove(trvDiff)
 
     changeSet.setPrimaryTroveList(set(redirList) - set(childList))
 
@@ -748,6 +751,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
     built = []
     for recipeObj, grpFlavor in builtGroups:
+        troveList = []
         for group in recipeObj.iterGroupList():
             groupName = group.name
             grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
@@ -808,15 +812,19 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                 grpTrv.addTrove(name, targetVersion, grpFlavor, 
                                 byDefault = byDefault, 
                                 weakRef = not explicit)
+            troveList.append(grpTrv)
 
+        for primaryName in recipeObj.getPrimaryGroupNames():
+            changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
+
+        _copyForwardTroveMetadata(repos, troveList, recipeObj)
+        for grpTrv in troveList:
             grpDiff = grpTrv.diff(None, absolute = 1)[0]
             changeSet.newTrove(grpDiff)
 
             built.append((grpTrv.getName(), str(grpTrv.getVersion()),
                                             grpTrv.getFlavor()))
 
-        for primaryName in recipeObj.getPrimaryGroupNames():
-            changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
 
     return (changeSet, built, None)
 
@@ -902,6 +910,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
     fileset.setBuildFlavor(use.allFlagsToFlavor(fullName))
     fileset.computePathHashes()
     
+    _copyForwardTroveMetadata(repos, [fileset], recipeObj)
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newTrove(filesetDiff)
     changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
@@ -1346,6 +1355,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         packageList = relativePackageList
 
+    _copyForwardTroveMetadata(repos,
+                              [x[1] for x in packageList] + grpMap.values(), 
+                              recipeObj)
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:
         changeSet.addPrimaryTrove(packageName, targetVersion, flavor)
@@ -2097,3 +2109,179 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
 	linenum = lastRecipeFrame.tb_frame.f_lineno
         del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))
+
+def _copyForwardTroveMetadata(repos, troveList, recipeObj):
+    """
+        Copies forward metadata from a previous build of this package
+        if possible.  Searches on the current label then one level up
+        (to make sure shadowed sources get metadata from their parent).
+
+        Tries to match the flavor if possible but if it can't, it will use
+        the most recent cook with a different flavor.  If necessary,
+        it will search for metadata for components separately from the package.
+    """
+    log.info('Copying forward metadata to newly built items...')
+    buildBranch = versions.VersionFromString(recipeObj.macros.buildbranch)
+    childrenByTrove = {}
+    allMatches = []
+    troveDict = {}
+    toMatch = []
+    for trv in troveList:
+        troveDict[trv.getNameVersionFlavor()] = trv
+        if ':' in trv.getName():
+            packageName = trv.getName().split(':')[0]
+            packageTup = (packageName, trv.getVersion(), trv.getFlavor())
+            childrenByTrove.setdefault(packageTup, []).append(trv)
+        else:
+            toMatch.append(trv.getNameVersionFlavor())
+    if not toMatch:
+        toMatch = [ x.getNameVersionFlavor() for x in troveList ]
+
+    # step one: find metadata for all collections
+    metadataMatches = _getMetadataMatches(repos, toMatch, buildBranch)
+
+    oldTroveTups = metadataMatches.values()
+    oldTroves = repos.getTroves(oldTroveTups, withFiles=False)
+    troveDict.update(dict(zip(oldTroveTups, oldTroves)))
+
+    unmatchedComponents = []
+    for newTup in toMatch:
+        newTrove = troveDict[newTup]
+        if newTup not in metadataMatches:
+            # couldn't find a match for this package anywhere.
+            continue
+        oldTup = metadataMatches[newTup]
+        oldTrove = troveDict[oldTup]
+        allMatches.append((newTrove, oldTrove, True))
+
+        # next, see if the new collection and the old collection share
+        # components.
+        newTroveComponents = [ x[0] for x in
+                              newTrove.iterTroveList(strongRefs=True)
+                              if ((x[0].split(':')[0], x[1], x[2]) == newTup) ]
+        oldTroveComponents = [ x[0] for x in
+                              oldTrove.iterTroveList(strongRefs=True)
+                              if ((x[0].split(':')[0], x[1], x[2]) == oldTup) ]
+        # unmatched are those components that did not exist in the old
+        # version that we're getting metadata from.
+        unmatched = set(newTroveComponents) - set(oldTroveComponents)
+        unmatchedComponents.extend((x, newTup[1], newTup[2]) for x in unmatched)
+
+        # match up those components that existed both in the old collection
+        # and the new one.
+        componentMatches = set(newTroveComponents) & set(oldTroveComponents)
+        componentMatches = [ (x, oldTup[1], oldTup[2])
+                                for x in componentMatches ]
+        componentMatches = repos.getTroves(componentMatches, withFiles=False)
+        componentMatches = dict((x.getName(), x) for x in componentMatches)
+        for childTrv in childrenByTrove.get(trv.getNameVersionFlavor(), []):
+            match = componentMatches.get(childTrv.getName(), None)
+            if match:
+                allMatches.append((childTrv, match, False))
+
+    if unmatchedComponents:
+        # some components must have been added in this build from the
+        # previous build.
+        metadataMatches = _getMetadataMatches(repos, unmatchedComponents,
+                                              buildBranch)
+        oldTroveTups = metadataMatches.values()
+        oldTroves = repos.getTroves(oldTroveTups, withFiles=False)
+        troveDict.update(dict(zip(oldTroveTups, oldTroves)))
+        for troveTup, matchTup in metadataMatches.items():
+            allMatches.append((troveDict[troveTup], troveDict[matchTup], True))
+
+    for newTrove, oldTrove, logCopy in allMatches:
+        # any metadata that's already been added to this trove
+        # will override any copied metadata
+        items = newTrove.getAllMetadataItems()
+        newTrove.copyMetadata(oldTrove,
+                              skipSet=recipeObj.metadataSkipSet)
+        if logCopy and newTrove.getAllMetadataItems():
+            # if getAllMetadataItems is empty, we didn't copy anything
+            # forward, so dont log:
+            log.info('Copied metadata forward for %s[%s] from version %s[%s]',
+                     newTrove.getName(), newTrove.getFlavor(),
+                     oldTrove.getVersion(), oldTrove.getFlavor())
+
+        # add back any metadata added during the cook, that takes precedence.
+        for item in items:
+            newTrove.troveInfo.metadata.addItem(item)
+    return dict((x[0].getNameVersionFlavor(), x[1].getNameVersionFlavor())
+                 for x in allMatches)
+
+def _getMetadataMatches(repos, troveList, buildBranch):
+    toFind = {}
+    metadataMatches = {}
+
+    # first search on the trailing label, and search up the labelPath.
+    # This should cause metadata to be copied in the case of
+    # source shadow + rebuild.
+    labelPath = list(reversed(list(buildBranch.iterLabels())))
+
+    for n,v,f in troveList:
+        toFind.setdefault((n, None, None), []).append((n,v,f))
+
+    results = repos.findTroves(labelPath, toFind, None, allowMissing=True)
+    for troveSpec, troveTupList in results.iteritems():
+        flavorsByVersion = {}
+        for troveTup in troveTupList:
+            flavorsByVersion.setdefault(troveTup[1], []).append(troveTup[2])
+        # look at the latest troves first
+        matchingVersions = sorted(flavorsByVersion, reverse=True)
+
+        for (name,myVersion,myFlavor) in toFind[troveSpec]:
+            # algorithm to determine which trove to copy metadata from:
+            # If we're rebuilding something that was just built,
+            # then copy the metadata from that package.  Otherwise,
+            # if there's a (very) recent package with a compatible flavor,
+            # then copy from that.  Otherwise, just pick a random (but
+            # well-sorted) random recent package to copy metadata from.
+
+            flavorToUse = None
+            versionToUse = None
+            if matchingVersions[0] == myVersion:
+                # this is a build of a new flavor for this version.
+                # check for exact matches at the previous version as well
+                exactMatchChecks = matchingVersions[1:2]
+                relatedChecks = matchingVersions[0:2]
+            else:
+                exactMatchChecks = matchingVersions[0:1]
+                relatedChecks = matchingVersions[0:1]
+
+            for version in exactMatchChecks:
+                matchingFlavors = flavorsByVersion[version]
+                exactMatch = [ x for x in matchingFlavors if x == myFlavor]
+                if exactMatch:
+                    flavorToUse = exactMatch[0]
+                    versionToUse = version
+                    break
+            if versionToUse:
+                metadataMatches[(name, myVersion, myFlavor)] = (name,
+                                                                versionToUse,
+                                                                flavorToUse)
+                continue
+            for version in relatedChecks:
+                matchingFlavors = flavorsByVersion[version]
+                scoredFlavors = [ (x.score(myFlavor), myFlavor.score(x), x)
+                                        for x in matchingFlavors ]
+                scoredFlavors = [ (max(x[0], x[1]), x[2]) for x in scoredFlavors
+                                    if x[0] is not False or x[1] is not False ]
+                if scoredFlavors:
+                    flavorToUse = scoredFlavors[-1][1]
+                    versionToUse = version
+                    break
+
+            if not versionToUse:
+                # couldn't find recent, flavor related version.  Fall back to
+                # recent version w/ no related flavor.
+                versionToUse = matchingVersions[0]
+                # make sure we're consistent even if we don't
+                # have a good way to pick by sorting the flavors
+                flavorToUse = sorted(flavorsByVersion[version])[0]
+
+            metadataMatches[name, myVersion, myFlavor] = (name,
+                                                          versionToUse,
+                                                          flavorToUse)
+    return metadataMatches
+
+
