@@ -2174,7 +2174,8 @@ def _copyForwardTroveMetadata(repos, troveList, recipeObj):
                                 for x in componentMatches ]
         componentMatches = repos.getTroves(componentMatches, withFiles=False)
         componentMatches = dict((x.getName(), x) for x in componentMatches)
-        for childTrv in childrenByTrove.get(trv.getNameVersionFlavor(), []):
+        for childTrv in childrenByTrove.get(
+                                    newTrove.getNameVersionFlavor(), []):
             match = componentMatches.get(childTrv.getName(), None)
             if match:
                 allMatches.append((childTrv, match, False))
