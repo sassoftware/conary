@@ -2483,6 +2483,12 @@ class Trove(streams.StreamSet):
             self.troveInfo.troveCopiedFrom.add(name, ver, flavor)
 
     def getTroveCopiedFrom(self):
+        """For groups, return the list of troves that were used when
+        a statement like addAll or addCopy was used.
+
+        @rtype: list
+        @return: list of (name, version, flavor) tuples.
+        """
         return [ (x[1].name(), x[1].version(), x[1].flavor())
                  for x in self.troveInfo.troveCopiedFrom.iterAll() ]
 
