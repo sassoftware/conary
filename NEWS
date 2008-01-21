@@ -15,6 +15,9 @@ Changes in @NEW@:
       r.glob and r.regexp. These functions return an object that can be
       substituted for any API parameter that calls for a string based
       regexp or glob. (CNY-2222)
+    * Group recipe actions like "r.addAll" and "r.addCopy" now record
+      the version of the group that is being copied from into the newly
+      created group. (CNY-2359)
     * Add code to display new-style metadata through rq, q, and showchangeset,
       as well as propagate that metadata via cooking, promoting, shadowing,
       and committing source packages.  Entering this metadata must still 

@@ -761,6 +761,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
             grpTrv.setProvides(provides)
 
+            grpTrv.setTroveCopiedFrom(group.iterCopiedFrom())
 
             grpTrv.setBuildTime(buildTime)
             grpTrv.setSourceName(fullName + ':source')
