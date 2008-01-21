@@ -798,7 +798,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
-        _TROVEINFO_TAG_COPIED_FROM   : (LARGE, TroveCopiedFrom,      'troveCopiedFrom' ),
+        _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,      'troveCopiedFrom' )
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
