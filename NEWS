@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Conary now attempts to provide hints about flavor combinations that would
+      work if it cannot find a flavor that matches your exact request 
+      (CNY-1920).
 Changes in 2.0.4:
   o Bug Fixes:
     * Moving an unmodified shadow to tip via cvc promote no longer causes
