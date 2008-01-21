@@ -150,9 +150,9 @@ def apply(db, cfg, rollbackSpec, **kwargs):
                     "applyRollback call", DeprecationWarning)
     from conary import conaryclient
     client = conaryclient.ConaryClient(cfg)
-    return applyRollback(client, rollbackSpec, **kwargs)
+    return applyRollback(client, rollbackSpec, returnOnError = True, **kwargs)
 
-def applyRollback(client, rollbackSpec, **kwargs):
+def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
     """
     Apply a rollback.
 
@@ -176,27 +176,35 @@ def applyRollback(client, rollbackSpec, **kwargs):
     if rollbackSpec.startswith('r.'):
         try:
             i = rollbackList.index(rollbackSpec)
-        except:
+        except ValueError:
             log.error("rollback '%s' not present" % rollbackSpec)
-            return 1
+            if returnOnError:
+                return 1
+            raise database.RollbackDoesNotExist(rollbackSpec)
 
         rollbacks = rollbackList[i:]
         rollbacks.reverse()
     else:
         try:
             rollbackCount = int(rollbackSpec)
-        except:
+        except ValueError:
             log.error("integer rollback count expected instead of '%s'" %
                     rollbackSpec)
-            return 1
+            if returnOnError:
+                return 1
+            raise database.RollbackDoesNotExist(rollbackSpec)
 
         if rollbackCount < 1:
             log.error("rollback count must be positive")
-            return 1
+            if returnOnError:
+                return 1
+            raise database.RollbackDoesNotExist(rollbackSpec)
         elif rollbackCount > len(rollbackList):
             log.error("rollback count higher then number of rollbacks "
                       "available")
-            return 1
+            if returnOnError:
+                return 1
+            raise database.RollbackDoesNotExist(rollbackSpec)
 
         rollbacks = rollbackList[-rollbackCount:]
         rollbacks.reverse()
@@ -205,7 +213,9 @@ def applyRollback(client, rollbackSpec, **kwargs):
         client.db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
     except database.RollbackError, e:
         log.error("%s", e)
-        return 1
+        if returnOnError:
+            return 1
+        raise
 
     log.syslog.commandComplete()
 

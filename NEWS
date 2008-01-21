@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Client Changes:
+    * The rollback API now raises a RollbackError instead of returning
+      non-zero on errors. (CNY-1643)
+
   o Build Changes:
     * When file conflicts occur while cooking groups, the deps that
       caused a package to be pulled in are listed. (CNY-2308)
