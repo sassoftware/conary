@@ -3598,7 +3598,8 @@ class Requires(_addInfo, _dependency):
         for fileRequired, fileType in filesRequired:
             if fileRequired.startswith(macros.destdir):
                 # find requirement in packaging
-                fileRequired = fileRequired[len(macros.destdir):]
+                fileRequired = util.normpath(fileRequired)
+                fileRequired = fileRequired[len(util.normpath(macros.destdir)):]
                 autopkg = self.recipe.autopkg
                 troveName = autopkg.componentMap[fileRequired].name
                 package, component = troveName.split(':', 1)
