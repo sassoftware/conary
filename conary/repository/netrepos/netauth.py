@@ -131,7 +131,7 @@ class UserAuthorization:
         JOIN UserGroupMembers USING(userId)
         JOIN UserGroups USING(userGroupId)
         WHERE Users.userName=?
-           OR Users.userName='anonymous' AND UserGroups.canMirror = 0)
+           OR ( Users.userName='anonymous' AND UserGroups.canMirror = 0 )
         """, user)
 
         result = [ x for x in cu ]
