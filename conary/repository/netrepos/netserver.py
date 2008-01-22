@@ -1095,28 +1095,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if not labelStr:
             cu.execute("""
-            select distinct item
-            from UserGroupInstancesCache as ugi
-            join Instances using (instanceId)
-            join Items using (itemId)
-            where ugi.userGroupId in (%s)
-              and Items.hasTrove = 1
-              %s
+            select Items.item from Items
+            where Items.hasTrove = 1
+              and exists ( select 1
+                  from UserGroupInstancesCache as ugi
+                  join Instances using (instanceId)
+                  where ugi.userGroupId in (%s)
+                    and Instances.itemId = Items.itemId
+                    %s )
             """ % (",".join("%d" % x for x in roleIds),
                    troveTypeClause))
         else:
             cu.execute("""
-            select distinct item
-            from Labels
-            join LabelMap using (labelId)
-            join Nodes using (itemId, branchId)
-            join Instances using (itemId, versionId)
-            join UserGroupInstancesCache using (instanceId)
-            join Items on Items.itemId = LabelMap.itemId
-            where label = ?
-              and userGroupId in (%s)
-              and Items.hasTrove = 1
-              %s
+            select Items.item from Items
+            where Items.hasTrove = 1
+              and exists ( select 1
+                  from Labels
+                  join LabelMap using (labelId)
+                  join Nodes using (itemId, branchId)
+                  join Instances using (itemId, versionId)
+                  join UserGroupInstancesCache as ugi using (instanceId)
+                  where ugi.userGroupId in (%s)
+                    and Labels.label = ?
+                    and LabelMap.itemId = Items.itemId
+                    %s )
             """ % (",".join("%d" % x for x in roleIds), troveTypeClause),
                        labelStr)
         return [ x[0] for x in cu ]
