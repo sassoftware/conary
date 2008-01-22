@@ -184,6 +184,9 @@ class PolicyProviders(TroveTupleList):
 class LoadedTroves(TroveTupleList):
     pass
 
+class TroveCopiedFrom(TroveTupleList):
+    pass
+
 class PathHashes(set, streams.InfoStream):
 
     """
@@ -711,7 +714,8 @@ _TROVEINFO_TAG_COMPAT_CLASS   = 19
 # items added below this point must be DYNAMIC for proper unknown troveinfo
 # handling
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
-_TROVEINFO_TAG_LAST           = 20
+_TROVEINFO_TAG_COPIED_FROM    = 21
+_TROVEINFO_TAG_LAST           = 21
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -794,6 +798,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
+        _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,      'troveCopiedFrom' )
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -2472,6 +2477,20 @@ class Trove(streams.StreamSet):
 
     def getPathHashes(self):
         return self.troveInfo.pathHashes
+
+    def setTroveCopiedFrom(self, itemList):
+        for (name, ver, flavor) in itemList:
+            self.troveInfo.troveCopiedFrom.add(name, ver, flavor)
+
+    def getTroveCopiedFrom(self):
+        """For groups, return the list of troves that were used when
+        a statement like addAll or addCopy was used.
+
+        @rtype: list
+        @return: list of (name, version, flavor) tuples.
+        """
+        return [ (x[1].name(), x[1].version(), x[1].flavor())
+                 for x in self.troveInfo.troveCopiedFrom.iterAll() ]
 
     def __init__(self, name, version = None, flavor = None, changeLog = None, 
                  type = TROVE_TYPE_NORMAL, skipIntegrityChecks = False,

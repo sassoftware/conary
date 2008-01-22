@@ -1454,6 +1454,7 @@ class SingleGroup(object):
         self.componentsToMove = []
         self.requires = deps.DependencySet()
         self.compatibilityClass = None
+        self.copiedFrom = set()
 
         self.troves = {}
         self.reasons = {}
@@ -1782,6 +1783,12 @@ class SingleGroup(object):
     def isEmpty(self):
         return bool(not self.troves and not self.newGroupList)
 
+    def addCopiedFrom(self, name, version, flavor):
+        self.copiedFrom.add((name, version, flavor))
+
+    def iterCopiedFrom(self):
+        for (name, version, flavor) in sorted(self.copiedFrom):
+            yield (name, version, flavor)
 
 class GroupReference:
     """ A reference to a set of troves, created by a trove spec, that
@@ -2260,6 +2267,9 @@ def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
     stack = [(topTrove, topTrove, parentGroup)]
     troveTups = []
 
+    parentGroup.addCopiedFrom(topTrove.getName(), topTrove.getVersion(),
+            topTrove.getFlavor())
+
     while stack:
         trv, byDefaultTrv, parentGroup = stack.pop()
 
@@ -2315,9 +2325,11 @@ def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
                                         childDefaults = byDefaultTrv)
 
                 if troveTup not in createdGroups:
+                    childGroup.addCopiedFrom(*troveTup)
                     childTrove = groupTrvDict[troveTup]
                     stack.append((childTrove, childTrove, childGroup))
                     createdGroups.add(troveTup)
+
             else:
                 parentGroup.addTrove(troveTup, True, byDefault, [],
                                      childDefaults=byDefaultTrv, 
