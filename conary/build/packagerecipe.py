@@ -173,6 +173,8 @@ class AbstractPackageRecipe(Recipe):
         'sqlite:lib',
     ]
     crossRequires = []
+    buildRequirementsOverride = None
+    crossRequirementsOverride = None
 
     Flags = use.LocalFlags
     explicitMainDir = False
@@ -214,9 +216,6 @@ class AbstractPackageRecipe(Recipe):
         """ Checks to see if the build requirements for the recipe
             are installed
         """
-        if self.buildRequirementsOverride is not None:
-            return
-
         def _filterBuildReqsByVersionStr(versionStr, troves):
             if not versionStr:
                 return troves
@@ -810,8 +809,6 @@ class AbstractPackageRecipe(Recipe):
         Recipe.__init__(self, lightInstance = lightInstance,
                         laReposCache = laReposCache, srcdirs = srcdirs)
 	self._build = []
-        self.buildRequirementsOverride = None
-        self.crossRequirementsOverride = None
 
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
