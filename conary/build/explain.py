@@ -18,7 +18,6 @@ import pydoc, types
 from conary.build import build
 from conary import versions
 from conary.build import source
-from conary.build import packagepolicy
 from conary.build import packagerecipe, redirectrecipe
 from conary.build import filesetrecipe, grouprecipe, inforecipe
 

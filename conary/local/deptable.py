@@ -189,7 +189,7 @@ class DependencyWorkTables:
         # Check the dependencies for anything which depends on things which
         # we've removed. We insert those dependencies into our temporary
         # tables (which define everything which needs to be checked) with
-        # a positive depNum which mathes the depNum from the Requires table.
+        # a positive depNum which matches the depNum from the Requires table.
         self.cu.execute("DELETE FROM TmpRequires WHERE depNum > 0")
         self.cu.execute("""
         INSERT INTO TmpRequires
@@ -204,7 +204,7 @@ class DependencyWorkTables:
         self.cu.execute("DELETE FROM DepCheck WHERE depNum > 0")
         self.cu.execute("""
         INSERT INTO DepCheck
-        SELECT
+        SELECT DISTINCT
             Requires.instanceId, Requires.depNum,
             Requires.DepCount, 0, Dependencies.class,
             Dependencies.name, Dependencies.flag

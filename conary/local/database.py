@@ -1504,6 +1504,10 @@ class Database(SqlDbRepository):
                 self.lockFileObj.close()
                 self.lockFileObj = None
         else:
+            if self.lockFile == ":memory:":
+                # not sure how we can lock a :memory: database without
+                # knowing we can drop a lock file (any|some)where
+                return
             try:
                 lockFd = os.open(self.lockFile, os.O_RDWR | os.O_CREAT |
                                                     os.O_EXCL)
@@ -1748,6 +1752,8 @@ class Database(SqlDbRepository):
 
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
+            # use :memory: as a marker not to bother with locking
+            self.lockFile = path 
         else:
             SqlDbRepository.__init__(self, root + path, timeout = timeout)
             self.opJournalPath = util.joinPaths(root, path) + '/journal'

@@ -369,10 +369,10 @@ class URLOpener(urllib.FancyURLopener):
         e = None
         if errcode == 503:
             # Service unavailable, make it a socket error
-            e = socket.error(111, "Repository service unavailable")
+            e = socket.error(111, "Service unavailable")
         elif errcode == 502:
             # Bad gateway (server responded with some broken answer)
-            e = socket.error(111, "Bad Gateway (repository error reported by proxy)")
+            e = socket.error(111, "Bad Gateway (error reported by proxy)")
         if e:
             self._processSocketError(e)
             raise e

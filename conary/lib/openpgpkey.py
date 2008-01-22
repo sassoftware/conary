@@ -32,6 +32,7 @@ from openpgpfile import seekKeyById
 from openpgpfile import parseAsciiArmorKey
 from openpgpfile import PublicKeyring
 from openpgpfile import SEEK_SET, SEEK_END
+from openpgpfile import TRUST_UNTRUSTED, TRUST_TRUSTED
 
 #-----#
 #OpenPGPKey structure:
@@ -237,7 +238,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     def setCallback(self, callback):
         self.callback = callback
 
-    def getPublicKey(self, keyId, label = None, warn=True):
+    def getPublicKey(self, keyId, label = None, warn = True):
         """
         Retrieve a public key.
 
@@ -257,9 +258,19 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         # otherwise search for it
         key = self._getPublicKey(keyId, label = label, warn = warn)
         # Everything is trusted for now
-        trustLevel = openpgpfile.TRUST_ULTIMATE
-        self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
-                                            trustLevel)
+        if self.callback.cfg and self.callback.cfg.trustThreshold > 0:
+            krc = lambda x: self._getPublicKey(x, label=label, warn=warn)
+            trustComputer = Trust(self.callback.cfg.trustedKeys)
+            trustComputer.computeTrust(key.id, keyRetrievalCallback=krc)
+            ret = trustComputer.getTrust(key.id)
+            if ret:
+                _, _, trustLevel = ret
+            else:
+                trustLevel = TRUST_UNTRUSTED
+        else:
+            trustLevel = TRUST_TRUSTED
+        key.trustLevel = trustLevel
+        self.publicDict[keyId] = key
         return self.publicDict[keyId]
 
 
@@ -270,7 +281,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
                 key = seekKeyById(keyId, publicPath)
                 if key:
-                    return key
+                    return OpenPGPKey(key, key.getCryptoKey(), 0)
             except (KeyNotFound, IOError):
                 pass
 
@@ -283,7 +294,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
         key = kr.getKey(keyId)
         assert key is not None, "Failure retrieving the newly-added key"
-        return key
+        return OpenPGPKey(key, key.getCryptoKey(), 0)
 
     def getPublicKeyring(self):
         pubRing = self.publicPaths[0]
@@ -441,8 +452,8 @@ class KeyringCacheCallback(KeyCacheCallback):
         sio.seek(0)
         return sio.read()
 
-    def __init__(self, keyring):
-        KeyCacheCallback.__init__(self)
+    def __init__(self, keyring, cfg=None):
+        KeyCacheCallback.__init__(self, cfg=cfg)
         self.srcKeyring = keyring
 
 _keyCache = OpenPGPKeyFileCache()
@@ -513,7 +524,7 @@ class Trust(object):
         topLevelKeyIds = [ x.getKeyId() for x in topLevelKeyIds if x is not None ]
         # Top-level keys are fully trusted
         topLevelKeyIds = [ x for x in topLevelKeyIds if x in g ]
-        self._trust = dict((x, (self.depthLimit, 120, 120))
+        self._trust = dict((x, (self.depthLimit, TRUST_TRUSTED, TRUST_TRUSTED))
                             for x in topLevelKeyIds)
 
         cb = lambda x: self.trustComputationCallback(x, keyRetrievalCallback)
@@ -544,22 +555,22 @@ class Trust(object):
     def trustComputationCallback(self, nodeIdx, keyRetrievalCallback):
         gt = self._graph
         trust = self._trust
-        classicTrust = int(120 / self.marginals)
-        if 120 % self.marginals:
+        classicTrust = int(TRUST_TRUSTED / self.marginals)
+        if TRUST_TRUSTED % self.marginals:
             classicTrust += 1
 
         nodeId = gt.get(nodeIdx)
         if nodeId not in trust:
             return []
         nodeSigLevel, nodeSigTrust, nodeTrust = trust[nodeId]
-        if nodeSigLevel == 0 or nodeTrust < 120:
+        if nodeSigLevel == 0 or nodeTrust < TRUST_TRUSTED:
             # This node is not trusted, don't propagate its trust to children
             return []
 
         for snIdx in gt.edges[nodeIdx]:
             node = gt.get(snIdx)
             ntlev, ntamt, tramt = trust.setdefault(node,
-                    (nodeSigLevel - 1, 120, 0))
+                    (nodeSigLevel - 1, TRUST_TRUSTED, TRUST_UNTRUSTED))
             # Get the signature
             n = keyRetrievalCallback(node)
             sig = [ x for x in n.signatures if x.getSignerKeyId() == nodeId ]

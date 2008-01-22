@@ -1087,90 +1087,157 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for name, versionList in troveDict.iteritems():
             d[name] = {}.fromkeys(versionList, [ None ])
 
-	return self.getTroveVersionFlavors(d)
+        return self.getTroveVersionFlavors(d)
 
-    def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method, 
-                               branches = False, labels = False, 
+    def _getTroveInfoByVerInfoTuples(self, troveSpecs, bestFlavor, method,
+                               branches = False, labels = False,
                                versions = False, 
                                troveTypes = TROVE_QUERY_PRESENT,
                                getLeaves = False, splitByBranch = False):
         assert(branches + labels + versions == 1)
 
         d = {}
-        for name, verSet in troveSpecs.iteritems():
+        specsByName = {}
+        if not troveSpecs:
+            return [], []
+
+        finalResults = [ [] for x in troveSpecs ]
+        finalAltFlavors = [ [] for x in troveSpecs ]
+
+        if branches:
+            freezeFn = self.fromBranch
+            keyFn = lambda version: version.branch()
+        elif labels:
+            freezeFn = self.fromLabel
+            keyFn = lambda version: version.trailingLabel()
+        elif versions:
+            freezeFn = self.fromVersion
+            keyFn = lambda version: version
+
+
+        for idx, (name, ver, flavor) in enumerate(troveSpecs):
             if not name:
                 name = ""
-
-            for ver, flavors in verSet.iteritems():
-                host = ver.getHost()
-                if branches:
-                    verStr = self.fromBranch(ver)
-                elif versions:
-                    verStr = self.fromVersion(ver)
-                else:
-                    verStr = self.fromLabel(ver)
-
-                versionDict = d.setdefault(host, {})
-                flavorDict = versionDict.setdefault(name, {})
-
-                flavorDict[verStr] = ''
+            host = ver.getHost()
+            verStr = freezeFn(ver)
+            specsByName.setdefault(name, []).append((idx, ver, flavor))
+            versionDict = d.setdefault(host, {})
+            flavorDict = versionDict.setdefault(name, {})
+            # don't pass in a flavor, we'll do all flavor work on this
+            # side.
+            flavorDict[verStr] = ''
 
         result = {}
-	if not d:
-	    return result
-
         for host, requestD in d.iteritems():
             respD = self.c[host].__getattr__(method)(
                             *self._setTroveTypeArgs(host, requestD,
                                                     bestFlavor,
                                                     troveTypes = troveTypes))
             self._mergeTroveQuery(result, respD)
+
+
         if not result:
-            return result
+            return finalResults, []
+
+        filterOptions = self._getFilterOptions(getLeaves, bestFlavor,
+                                               troveTypes,
+                                               splitByBranch=splitByBranch)
+
         scoreCache = {}
-        filteredResult = {}
         for name, versionFlavorDict in result.iteritems():
-            if branches:
-                keyFn = lambda version: version.branch()
-            elif labels:
-                keyFn = lambda version: version.trailingLabel()
-            elif versions:
-                keyFn = lambda version: version
             resultsByKey = {}
+            # create a results dictionary that is based off of the key
+            # passed in.
             for version, flavorList in versionFlavorDict.iteritems():
                 key = keyFn(version)
                 if key not in resultsByKey:
                     resultsByKey[key] = {}
-                resultsByKey[key][version] = flavorList
-            if getLeaves:
-                latestFilter = trovesource._GET_TROVE_VERY_LATEST
-            else:
-                latestFilter = trovesource._GET_TROVE_ALL_VERSIONS
+                if version not in resultsByKey[key]:
+                    vDict = resultsByKey[key][version] = {}
+                else:
+                    vDict = resultsByKey[key][version]
+                for flavor in flavorList:
+                    if flavor not in vDict:
+                        vDict[flavor] = []
+                    vDict[flavor].append(name)
 
-            if bestFlavor:
-                flavorFilter = trovesource._GET_TROVE_BEST_FLAVOR
-            else:
-                flavorFilter = trovesource._GET_TROVE_ALL_FLAVORS
-            flavorCheck = trovesource._CHECK_TROVE_REG_FLAVOR
+            if name in specsByName:
+                queryList = specsByName[name]
+            elif '' in specsByName:
+                queryList =  specsByName['']
+            elif None in specsByName:
+                queryList = specsByName[None]
 
-            if name in troveSpecs:
-                queryDict = troveSpecs[name]
-            elif '' in troveSpecs:
-                queryDict =  troveSpecs['']
-            elif None in troveSpecs:
-                queryDict = troveSpecs[None]
-
-            for versionQuery, flavorQueryList in queryDict.iteritems():
+            # for each relevant query, results are available by versionSepc
+            # (the "key")
+            for idx, versionQuery, flavorQuery in queryList:
                 versionFlavorDict = resultsByKey.get(versionQuery, None)
                 if not versionFlavorDict:
                     continue
-                self._filterResultsByFlavor(name, filteredResult,
+                results, altFlavors = self._filterResultsByFlavor(
                                             versionFlavorDict,
-                                            flavorQueryList, flavorFilter,
-                                            flavorCheck, latestFilter,
-                                            scoreCache, 
-                                            splitByBranch=splitByBranch)
-        return filteredResult
+                                            flavorQuery, filterOptions,
+                                            scoreCache)
+                if altFlavors:
+                    finalAltFlavors[idx].extend(altFlavors)
+                for version, flavorList in results.iteritems():
+                    for flavor in flavorList:
+                        for name in versionFlavorDict[version][flavor]:
+                            finalResults[idx].append((name, version, flavor))
+        for idx, results in enumerate(finalResults):
+            if results:
+                finalAltFlavors[idx] = [] # any results means no alternates
+                                          # are needed
+            else:
+                finalAltFlavors[idx] = list(set(finalAltFlavors[idx]))
+        return finalResults, finalAltFlavors
+
+    def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method,
+                               branches = False, labels = False,
+                               versions = False,
+                               troveTypes = TROVE_QUERY_PRESENT,
+                               getLeaves = False, splitByBranch = False):
+        # if necessary, convert troveSpecs to tuples before
+        # processing.  In tuple form the results need the least
+        # massaging so we do all work in tuple form.
+        troveSpecList = []
+        if isinstance(troveSpecs, dict):
+            for name, versionDict in troveSpecs.iteritems():
+                for version, flavorList in versionDict.iteritems():
+                    if flavorList is None or flavorList is '':
+                        troveSpecList.append((name, version, flavorList))
+                    else:
+                        troveSpecList.extend((name, version, x) for x in
+                                             flavorList)
+        else:
+            troveSpecList = troveSpecs
+        results, altFlavors = self._getTroveInfoByVerInfoTuples(
+                                                 troveSpecList, bestFlavor,
+                                                 method,
+                                                 branches=branches,
+                                                 labels=labels,
+                                                 versions=versions,
+                                                 troveTypes=troveTypes,
+                                                 getLeaves=getLeaves,
+                                                 splitByBranch=splitByBranch)
+        if not isinstance(troveSpecs, dict):
+            return results, altFlavors
+        resultDict = {}
+        for troveList in results:
+            for (name, version, flavor) in troveList:
+                if name not in resultDict:
+                    vDict = resultDict[name] = {}
+                else:
+                    vDict = resultDict[name]
+                if version not in vDict:
+                    fList = vDict[version] = []
+                else:
+                    fList = vDict[version]
+                fList.append(flavor)
+        for name, versionDict in resultDict.iteritems():
+            for version in versionDict:
+                versionDict[version] = list(set(versionDict[version]))
+        return resultDict
 
     def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False,
                                troveTypes = TROVE_QUERY_PRESENT):

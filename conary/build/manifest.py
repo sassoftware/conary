@@ -75,9 +75,15 @@ class Manifest:
             manifest.write('%s\n' % file)
         manifest.close()
 
+    def translatePath(self, path):
+        for oldPath, newPath in self.recipe._pathTranslations:
+            if path == oldPath:
+                path = newPath
+        return path
+
     def load(self):
 
-        fileList = [ re.escape(x[:-1]) \
+        fileList = [ re.escape(self.translatePath(x[:-1])) \
                      for x in open(self.manifestFile).readlines() ]
 
         regexp = '^(?:'+'|'.join(fileList)+')$'
@@ -85,3 +91,26 @@ class Manifest:
 
         return regexp
 
+class ExplicitManifest(Manifest):
+    """This class is used when an exact effect on destdir is known.
+        No walking of the destdir will be performed. Instead each path in the
+        manifest must be explicitly recorded."""
+    def __init__(self, package, recipe, paths = []):
+        self.manifestPaths = set(paths)
+        Manifest.__init__(self, package, recipe)
+
+    def recordPaths(self, paths):
+        if not isinstance(paths, (list, tuple, set)):
+            paths = [paths]
+        destdir = util.normpath(self.recipe.macros.destdir)
+        def _removeDestDir(p):
+            p = util.normpath(p)
+            if p[:len(destdir)] == destdir:
+                return p[len(destdir):]
+            else:
+                return p
+        paths = [_removeDestDir(x % self.recipe.macros) for x in paths]
+        self.manifestPaths.update(paths)
+
+    def walk(self, init = False):
+        self.fileSet = set(self.manifestPaths)

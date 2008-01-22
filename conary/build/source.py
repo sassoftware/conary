@@ -1476,7 +1476,7 @@ class addCvsSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.project,
                  self.tag)
-        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        tmpPath = tempfile.mkdtemp()
         dirName = self.project + '--' + self.tag
         stagePath = tmpPath + os.path.sep + dirName
         os.mkdir(stagePath)
@@ -1486,7 +1486,7 @@ class addCvsSnapshot(_RevisionControl):
                   "tar cjf '%s' '%s'" %
                         (stagePath, self.root, self.tag, self.project,
                          tmpPath, dirName, target, self.project))
-        shutil.rmtree(stagePath)
+        shutil.rmtree(tmpPath)
 
     def __init__(self, recipe, root, project, tag = 'HEAD', **kwargs):
         self.root = root % recipe.macros
@@ -1572,14 +1572,14 @@ class addSvnSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s, revision %s' 
                   % (self.url, self.revision))
-        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        tmpPath = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
         util.execute("svn --quiet export --revision '%s' '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
                         (self.revision, lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
-        shutil.rmtree(stagePath)
+        shutil.rmtree(tmpPath)
 
     def __init__(self, recipe, url, project = None, revision = 'HEAD', **kwargs):
         self.url = url % recipe.macros

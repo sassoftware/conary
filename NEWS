@@ -1,8 +1,32 @@
 Changes in @NEW@:
   o Client Changes:
+    * Conary now attempts to provide hints about flavor combinations that would
+      work if it cannot find a flavor that matches your exact request 
+      (CNY-1920).
+Changes in 2.0.4:
+  o Bug Fixes:
+    * Moving an unmodified shadow to tip via cvc promote no longer causes
+      an error. (CNY-2441)
+    * Recipes using addSvnSnapshot no longer modify the conary
+      configuration object's tmpDir setting (CNY-2401)
+    * Fixed a rare bug in which dependency resolution would fail when
+      a dependency that used to be provided by one installed package
+      is now provided by two new packages. (CNY-2459)
+
+  o Client Changes:
+    * Conary will now use the proxy settings stored in its local
+      configuration when loading remote configuration files. (CNY-2363)
     * PGP keys having some self signatures that fail to pass are
       no longer failing, as long as at least one self signature passes.
       (CNY-2439)
+    * The client enforces the trust model using the internal
+      implementation of OpenPGP. (CNY-1895)
+
+  o Build Changes:
+    * Policies that move files in destdir now track path changes they
+      make so that files will end up in the correct package or component
+      after being moved, when "package=" or "component=" has been used
+      in a build action. (CNY-1679)
 
 Changes in 2.0.3:
   o Build Changes:
