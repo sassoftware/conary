@@ -205,39 +205,6 @@ def signAbsoluteChangesetByConfig(cs, cfg):
     return cs
 
 
-def getRecursiveRequirements(db, troveList, flavorPath):
-    # gets the recursive requirements for the listed packages
-    seen = set()
-    while troveList:
-        depSetList = []
-        for trv in db.getTroves(list(troveList), withFiles=False):
-            required = deps.DependencySet()
-            oldRequired = trv.getRequires()
-            [ required.addDep(*x) for x in oldRequired.iterDeps() 
-              if x[0] != deps.AbiDependency ]
-            depSetList.append(required)
-        seen.update(troveList)
-        sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
-        troveList = set()
-        for depSetSols in sols.itervalues():
-            for depSols in depSetSols:
-                bestChoices = []
-                # if any solution for a dep is satisfied by the installFlavor
-                # path, then choose the solutions that are satisfied as 
-                # early as possible on the flavor path.  Otherwise return
-                # all solutions.
-                for flavor in flavorPath:
-                    bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
-                    if bestChoices:
-                        break
-                if bestChoices:
-                    depSols = set(bestChoices)
-                else:
-                    depSols = set(depSols)
-                depSols.difference_update(seen)
-                troveList.update(depSols)
-    return seen
-
 class GroupCookOptions(object):
 
     def __init__(self, alwaysBumpCount=False, errorOnFlavorChange=False,
@@ -1249,17 +1216,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     buildTime = time.time()
     sourceName = recipeObj.__class__.name + ':source'
 
-    buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
-                    for x in recipeObj.buildReqMap.itervalues())
-    packageReqs = [ x for x in recipeObj.buildReqMap.itervalues() 
-                    if trove.troveIsCollection(x.getName()) ]
-    for package in packageReqs:
-        childPackages = [ x for x in package.iterTroveList(strongRefs=True,
-                                                           weakRefs=True) ]
-        hasTroves = db.hasTroves(childPackages)
-        buildReqs.update(x[0] for x in itertools.izip(childPackages,
-                                                      hasTroves) if x[1])
-    buildReqs = getRecursiveRequirements(db, buildReqs, cfg.flavor)
+    buildReqs = recipeObj.getRecursiveBuildRequirements(db, cfg)
 
     # create all of the package troves we need, and let each package provide
     # itself
@@ -1735,7 +1692,7 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     return loader, recipeClass, sourceVersion
 
 
-def cookItem(repos, cfg, item, prep=0, macros={}, 
+def cookItem(repos, cfg, item, prep=0, macros={},
 	     emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,

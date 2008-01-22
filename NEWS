@@ -19,6 +19,8 @@ Changes in @NEW@:
       as well as propagate that metadata via cooking, promoting, shadowing,
       and committing source packages.  Entering this metadata must still 
       be done through scripts.  (CNY-1808)
+    * Added a hook that allows build requirements to be overridden by
+      rMake (CNY-2427).
 
 Changes in 1.2.15:
   o Bug Fixes:

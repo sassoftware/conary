@@ -16,11 +16,13 @@ import glob
 import os
 import imp
 import inspect
+import itertools
 import sys
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
 from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
+from conary import trove
 
 from conary.build import action
 from conary.build import build
@@ -212,6 +214,8 @@ class AbstractPackageRecipe(Recipe):
         """ Checks to see if the build requirements for the recipe
             are installed
         """
+        if self.buildRequirementsOverride is not None:
+            return
 
         def _filterBuildReqsByVersionStr(versionStr, troves):
             if not versionStr:
@@ -347,15 +351,77 @@ class AbstractPackageRecipe(Recipe):
 
 	db = database.Database(self.cfg.root, self.cfg.dbPath)
         self.transitiveBuildRequiresNames = set(
-            req.getName() for req in self.buildReqMap.itervalues())
+            req.getName() for req in self.getBuildRequirementTroves())
         depSetList = [ req.getRequires()
-                       for req in self.buildReqMap.itervalues() ]
+                       for req in self.getBuildRequirementTroves() ]
         d = db.getTransitiveProvidesClosure(depSetList)
         for depSet in d:
             self.transitiveBuildRequiresNames.update(
                 set(troveTup[0] for troveTup in d[depSet]))
 
         return self.transitiveBuildRequiresNames
+
+    def getBuildRequirementTroves(self):
+        if self.buildRequirementsOverride is not None:
+            return self.db.getTroves(self.buildRequirementsOverride,
+                                     withFiles=False)
+        return self.buildReqMap.values()
+
+    def getCrossRequirementTroves(self):
+        if self.crossRequirementsOverride:
+            return self.db.getTroves(self.crossRequirementsOverride,
+                                     withFiles=False)
+        return self.crossRequires.values()
+
+    def getRecursiveBuildRequirements(self, db, cfg):
+        if self.buildRequirementsOverride is not None:
+            return self.buildRequirementsOverride
+        buildReqs = self.getBuildRequirementTroves()
+        buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
+                        for x in buildReqs)
+        packageReqs = [ x for x in self.buildReqMap.itervalues() 
+                        if trove.troveIsCollection(x.getName()) ]
+        for package in packageReqs:
+            childPackages = [ x for x in package.iterTroveList(strongRefs=True,
+                                                               weakRefs=True) ]
+            hasTroves = db.hasTroves(childPackages)
+            buildReqs.update(x[0] for x in itertools.izip(childPackages,
+                                                          hasTroves) if x[1])
+        buildReqs = self._getRecursiveRequirements(db, buildReqs, cfg.flavor)
+        return buildReqs
+
+    def _getRecursiveRequirements(self, db, troveList, flavorPath):
+        # gets the recursive requirements for the listed packages
+        seen = set()
+        while troveList:
+            depSetList = []
+            for trv in db.getTroves(list(troveList), withFiles=False):
+                required = deps.DependencySet()
+                oldRequired = trv.getRequires()
+                [ required.addDep(*x) for x in oldRequired.iterDeps() 
+                  if x[0] != deps.AbiDependency ]
+                depSetList.append(required)
+            seen.update(troveList)
+            sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
+            troveList = set()
+            for depSetSols in sols.itervalues():
+                for depSols in depSetSols:
+                    bestChoices = []
+                    # if any solution for a dep is satisfied by the installFlavor
+                    # path, then choose the solutions that are satisfied as 
+                    # early as possible on the flavor path.  Otherwise return
+                    # all solutions.
+                    for flavor in flavorPath:
+                        bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
+                        if bestChoices:
+                            break
+                    if bestChoices:
+                        depSols = set(bestChoices)
+                    else:
+                        depSols = set(depSols)
+                    depSols.difference_update(seen)
+                    troveList.update(depSols)
+        return seen
 
     def processResumeList(self, resume):
 	resumelist = []
@@ -744,6 +810,8 @@ class AbstractPackageRecipe(Recipe):
         Recipe.__init__(self, lightInstance = lightInstance,
                         laReposCache = laReposCache, srcdirs = srcdirs)
 	self._build = []
+        self.buildRequirementsOverride = None
+        self.crossRequirementsOverride = None
 
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
