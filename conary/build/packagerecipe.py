@@ -248,8 +248,9 @@ class AbstractPackageRecipe(Recipe):
             return versionMatches
 
         def _filterBuildReqsByFlavor(flavor, troves):
-            troves.sort(key = lambda x: x.getVersion(), reverse=True)
+            troves.sort(key = lambda x: x.getVersion())
             if flavor is None:
+                # get latest
                 return troves[-1]
             for trove in troves:
                 troveFlavor = trove.getFlavor()
@@ -350,9 +351,9 @@ class AbstractPackageRecipe(Recipe):
 
 	db = database.Database(self.cfg.root, self.cfg.dbPath)
         self.transitiveBuildRequiresNames = set(
-            req.getName() for req in self.getBuildRequirementTroves())
+            req.getName() for req in self.getBuildRequirementTroves(db))
         depSetList = [ req.getRequires()
-                       for req in self.getBuildRequirementTroves() ]
+                       for req in self.getBuildRequirementTroves(db) ]
         d = db.getTransitiveProvidesClosure(depSetList)
         for depSet in d:
             self.transitiveBuildRequiresNames.update(
@@ -360,22 +361,23 @@ class AbstractPackageRecipe(Recipe):
 
         return self.transitiveBuildRequiresNames
 
-    def getBuildRequirementTroves(self):
+    def getBuildRequirementTroves(self, db):
         if self.buildRequirementsOverride is not None:
-            return self.db.getTroves(self.buildRequirementsOverride,
-                                     withFiles=False)
+            return db.getTroves(self.buildRequirementsOverride,
+                                withFiles=False)
         return self.buildReqMap.values()
 
     def getCrossRequirementTroves(self):
         if self.crossRequirementsOverride:
-            return self.db.getTroves(self.crossRequirementsOverride,
+            db = database.Database(self.cfg.root, self.cfg.dbPath)
+            return db.getTroves(self.crossRequirementsOverride,
                                      withFiles=False)
         return self.crossRequires.values()
 
     def getRecursiveBuildRequirements(self, db, cfg):
         if self.buildRequirementsOverride is not None:
             return self.buildRequirementsOverride
-        buildReqs = self.getBuildRequirementTroves()
+        buildReqs = self.getBuildRequirementTroves(db)
         buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
                         for x in buildReqs)
         packageReqs = [ x for x in self.buildReqMap.itervalues() 
