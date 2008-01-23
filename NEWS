@@ -29,6 +29,8 @@ Changes in @NEW@:
     * Conary no longer tracebacks when building a package that contains 
       a pkgconfig reference to a file in the current package that is in a
       symlinked directory. (CNY-2455)
+    * The order in which configuration files are read when a glob was
+      passed to includeConfigFile is now deterministic. (CNY-2483)
 
 Changes in 1.2.15:
   o Bug Fixes:
