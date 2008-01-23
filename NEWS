@@ -1,8 +1,4 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * Conary no longer tracebacks when building a package that contains 
-      a pkgconfig reference to a file in the current package that is in a
-      symlinked directory (CNY-2455)
   o Client Changes:
     * The rollback API now raises a RollbackError instead of returning
       non-zero on errors. (CNY-1643)
@@ -11,10 +7,10 @@ Changes in @NEW@:
     * When file conflicts occur while cooking groups, the deps that
       caused a package to be pulled in are listed. (CNY-2308)
     * Config policy will automatically append a newline to non-binary files.
-      files that are marked as Config and appear to be binary will trigger an
-      error. (CNY-2422)
-    * Perl requirements that are not present on the system or provided by the
-      package being built are dropped. (CNY-2180)
+      Files that are marked as Config and appear to be binary will
+      continue to trigger an error as they have previously. (CNY-2422)
+    * Perl requirements that are not present on the system or provided by
+      the package being built are dropped. (CNY-2180)
     * Two expansion functions have been introduced to package recipes:
       r.glob and r.regexp. These functions return an object that can be
       substituted for any API parameter that calls for a string based
@@ -27,7 +23,12 @@ Changes in @NEW@:
       and committing source packages.  Entering this metadata must still 
       be done through scripts.  (CNY-1808)
     * Added a hook that allows build requirements to be overridden by
-      rMake (CNY-2427).
+      rMake. (CNY-2427)
+
+  o Bug Fixes:
+    * Conary no longer tracebacks when building a package that contains 
+      a pkgconfig reference to a file in the current package that is in a
+      symlinked directory. (CNY-2455)
 
 Changes in 1.2.15:
   o Bug Fixes:
