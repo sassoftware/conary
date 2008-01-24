@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.16:
   o Bug Fixes:
     * Conary no longer tracebacks when building a package that contains 
       a pkgconfig reference to a file in the current package that is in a
