@@ -28,7 +28,6 @@ python_files = __init__.py	\
 	conarycfg.py		\
 	constants.py		\
 	cvc.py			\
-        cvcdesc.py              \
 	cscmd.py		\
 	display.py		\
 	errors.py		\

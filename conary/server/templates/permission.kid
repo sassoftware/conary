@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <?python
-# Copyright (c) 2005 rpath, Inc.
+# Copyright (c) 2005,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -28,8 +28,6 @@
     </select>
 
     <head/>
-    <!-- Change the rowspan on the Options: label to 3 when the capped 
-         setting is enabled -->
     <body>
         <div id="inner">
             <h2>${operation} Permission</h2>
@@ -38,9 +36,9 @@
                 <input py:if="operation=='Edit'" name="oldtrove" value="${trove}" type="hidden" />
                 <table class="add-form">
                     <tr>
-                        <td id="header">Group:</td>
-                        <td py:if="operation!='Edit'" py:content="makeSelect('group', groups, group)"/>
-                        <td py:if="operation=='Edit'"><input name="group" value="${group}" readonly="readonly" type="text" /></td>
+                        <td id="header">Role:</td>
+                        <td py:if="operation!='Edit'" py:content="makeSelect('role', roles, role)"/>
+                        <td py:if="operation=='Edit'"><input name="role" value="${role}" readonly="readonly" type="text" /></td>
                     </tr>
                     <tr>
                         <td id="header">Label:</td>
@@ -53,12 +51,6 @@
                     <tr>
                         <td id="header" rowspan="3">Options:</td>
                         <td><input type="checkbox" name="writeperm" py:attrs="{'checked': (writeperm) and 'checked' or None}" /> Write access</td>
-                    </tr>
-                    <tr style="display: none;">
-                        <td><input type="checkbox" name="capped" py:attrs="{'checked': (capped) and 'checked' or None}" /> Capped</td>
-                    </tr>
-                    <tr>
-                        <td><input type="checkbox" name="admin" py:attrs="{'checked': (admin) and 'checked' or None}" /> Admin access</td>
                     </tr>
                     <tr>
                         <td><input type="checkbox" name="remove" py:attrs="{'checked': (remove) and 'checked' or None}" /> Remove</td>

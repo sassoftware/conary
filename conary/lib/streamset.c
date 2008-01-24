@@ -332,6 +332,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     int len, valLen, rc, useAlloca = 0;
     int tagIdx, unknownIdx;
     PyObject * result;
+    int isEmpty = 1;
 
     assert(includeEmpty == INCLUDE_EMPTY || includeEmpty == EXCLUDE_EMPTY);
 
@@ -384,6 +385,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
             if (valLen > 0 || includeEmpty) {
                 /* either we have data or including empty data was
                    requested */
+                isEmpty = 0;
                 rc = addTag(&chptr, ssd->tags[tagIdx].tag,
                             ssd->tags[tagIdx].size, valLen);
                 if (-1 == rc)
@@ -423,6 +425,13 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 
     if (!useAlloca)
 	free(final);
+
+    if (isEmpty && includeEmpty == INCLUDE_EMPTY) {
+        Py_DECREF(result);
+        Py_INCREF(Py_None);
+        result = Py_None;
+    }
+
     return result;
 
  error:
