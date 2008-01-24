@@ -1,5 +1,10 @@
 Changes in @NEW@:
   o Client Changes:
+    * Conary now attempts to provide hints about flavor combinations that would
+      work if it cannot find a flavor that matches your exact request 
+      (CNY-1920).
+
+  o Client Changes:
     * The rollback API now raises a RollbackError instead of returning
       non-zero on errors. (CNY-1643)
 
@@ -30,7 +35,7 @@ Changes in @NEW@:
       a pkgconfig reference to a file in the current package that is in a
       symlinked directory. (CNY-2455)
 
-Changes in 1.2.15:
+Changes in 2.0.4:
   o Bug Fixes:
     * Moving an unmodified shadow to tip via cvc promote no longer causes
       an error. (CNY-2441)
@@ -43,6 +48,11 @@ Changes in 1.2.15:
   o Client Changes:
     * Conary will now use the proxy settings stored in its local
       configuration when loading remote configuration files. (CNY-2363)
+    * PGP keys having some self signatures that fail to pass are
+      no longer failing, as long as at least one self signature passes.
+      (CNY-2439)
+    * The client enforces the trust model using the internal
+      implementation of OpenPGP. (CNY-1895)
 
   o Build Changes:
     * Policies that move files in destdir now track path changes they
@@ -50,15 +60,34 @@ Changes in 1.2.15:
       after being moved, when "package=" or "component=" has been used
       in a build action. (CNY-1679)
 
-Changes in 1.2.14:
-  o Client Changes:
+Changes in 2.0.3:
+  o Build Changes:
+    * PGP version 3 keys are now supported for verification of
+      package signatures. According to RFC4880, version 3 keys are
+      deprecated. (CNY-2420)
+    * Superclasses are now loaded from the filesystem. Superclasses
+      can now be cooked. Doing so will make a changeset that installs
+      the recipe itself on the filesystem. (CNY-983)
+    * When building packages, Conary now reads /etc/ld.so.conf.d/*.conf
+      files to determine whether to include the path in the dependency.
+      (CNY-2433)
     * The /etc/ld.so.conf.d/*.conf handling added to Conary 1.2.13
       introduced a bug that could erase necessary entries from
       ld.so.conf in some circumstances.  This bug has been
       resolved. (CNY-2440)
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
 
-Changes in 1.2.13:
   o Client Changes:
+    * The implementation of the util.mkdirChain function has been
+      changed to no longer use exceptions internally to signal that the
+      directory already exists. Raising exceptions is a relatively
+      expensive operation that slows down the data store. Exceptions are
+      still used internally in the very infrequent case of intermediate
+      directories not existing. (CNY-2405)
     * Conary will not downgrade packages if no version is specified by
       the user, but, due to an out of date mirror or other reasons, the
       update available for a package is older than the currently
@@ -67,14 +96,176 @@ Changes in 1.2.13:
       include line to /etc/ld.so.conf if they exist, and does not add
       new duplicate entries to /etc/ld.so.conf for directories already
       specified in /etc/ld.so.conf.d/*.conf files. (CNY-2432)
+    * A getDatabase() method has been added to the ConaryClient class.
+      This method returns the local system database object. Code that
+      needs to query the local system database should use this method
+      to obtain the database object. (CNY-2316)
+
+  o Bug Fixes:
+    * A bug that caused an unhandled exception when adding a new role
+      in the Conary repository web interface has been fixed.
+
+Changes in 2.0.2:
+  o Build Changes:
+    * PGP version 2 signatures are now properly parsed. Version 2
+      signatures are documented in the outdated RFC1991 and are
+      considered deprecated, but some PGP keys contain them.
+      (CNY-2417)
+
+Changes in 2.0.1:
+  o Build Changes:
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
+
+  o Bug Fixes:
+    * An update bug that could result in a trove integrity error has
+      been fixed. The issue would occur when updating packages where,
+      for some files, the only changes are to file versions. (CNY-2403)
+
+Changes in 2.0.0:
+  o Major Changes:
+    * The way Conary handles architecture flavors has been changed,
+      primarily for better support for multilib systems that support
+      having both 32-bit and 64-bit packages installed.
+    * The Conary repository Access Control List capabilities have been
+      significantly upgraded to support per-trove ACLs. Trove
+      permissions are cached and recalculated whenever the ACLs change
+      or new troves are added to the repository, for better scaling
+      and fast changeset retrieval.
+    * All dependencies on the GnuPG "gpg" program have been removed;
+      Conary now implements the required OpenPGP functionality
+      internally.
+
+  o Optimizations:
+    * Conary 2.0 is significantly faster for many repository commit
+      operations.  Some "cvc promote" operations, in particular,
+      have a 200% performance improvement.  Some group commit
+      operations are 75% faster.  Creating a new shadow can be as much
+      as 100% faster.  Details of some of the changes that provide
+      the improvement are below.
+    * Committing to repositories has been reworked to pull all
+      modified streams from the repository or database with one
+      query. (CNY-2053)
+    * Unchanged stream sets now return None on diff.  This prevents
+      the Conary repository from having to do unnecessary work to
+      retrieve the "old" version of a stream and apply a diff when
+      nothing actually changed.
+    * Unchanged file streams are now 2-byte, backwards compatible,
+      sequences instead of more complex representations of "nothing
+      changed".
+    * The commit code (both client and server) recognizes unchanged
+      files and does not merge stream sets for them.
+    * Distributed changeset creation no longer recompresses file
+      contents.
+    * "cvc promote" no longer recompresses non-config files during
+      changeset assembly. (CNY-2202)
+    * "cvc promote" now gets file contents and streams from changesets
+      when a lot of them are needed from the same trove. (CNY-2202)
+    * Changesets that represent a "cvc promote" operation have been
+      changed to be relative to either the source of the promote (if
+      promoting within a server) or to the current version on the
+      target. (CNY-2202)
+    * The "cvc shadow" command now commits relative changesets when
+      the shadow is made to the same repository as the original trove.
+    * The Conary client now tries to perform update jobs as close to
+      updateThreshold (without going over) as practical for a
+      noticeable performance improvement. (CNY-2283)
+    * Committing changesets to the repository has been modified to
+      check for files which don't have contents available (during a
+      promote or shadow, for example) with one SQL query. Previously,
+      a single SQL query was used to check for each file. (CNY-2053)
 
   o Build Changes:
-    * Superclasses are now loaded from the filesystem. Superclasses
-      can now be cooked. Doing so will make a changeset that installs
-      the recipe itself on the filesystem. (CNY-983)
-    * When building packages, Conary now reads /etc/ld.so.conf.d/*.conf
-      files to determine whether to include the path in the dependency.
-      (CNY-2433)
+    * Conary will now ignore flavoring and requirements from ELF
+      libraries that are built for architectures other than the
+      architecture that is being built for.  This avoids a common
+      problem where a single extra (unused) sparc file library
+      causes an entire package to be flavored to be installed on
+      systems that support both x86 and sparc instruction sets,
+      as that configuration is not meaningful. (CNY-1717)
+    * The rarely used "cvc describe" command line interface has been
+      removed. (CNY-2357)
+    * The rarely used "cvcdesc" script has been removed. (CNY-2357)
+    * Spaces in URLs provided in source actions such as addArchive
+      are now automatically escaped to make them legal URLs. (CNY-2389)
+    * The "cvc promote" command now uses the labels and branches
+      specified in the "from" section of any promote as the place to
+      search for packages (CNY-2235).
+    * The PackageSpec documentation incorrectly stated that you could
+      pass both package and component information to it; this has
+      been corrected to properly redirect to ComponentSpec for this
+      usage. (CNY-2387)
+
+  o Client Changes:
+    * The "getTroveLatestByLabel" client-side call has been added.
+    * Most repository exceptions are demarshalled using logic in the
+      exception class itself rather than in a large if/elif block.
+      (CNY-747)
+    * The "troveNames" and "troveNamesByServer" methods now accept a
+      "troveTypes" argument, and by default return only troves that
+      are present. (CNY-1838)
+    * The mirror client supports a --fast-sync flag which will only
+      scan for new troves in the source and skip the time-expensive
+      scans for changed trove info records. (CNY-1756)
+    * The mirror client supports a --absolute flag which will make it
+      use only absolute changesets to mirror content. (CNY-1755)
+    * The rollback stack code has been split into a separate class.
+      (CNY-2061)
+    * A new "conary rmrollback" command that removes old rollbacks has
+      been added. (CNY-2061)
+    * Rollback objects now have an "isLocal" method to tell whether
+      applying that rollback will require repository access. (CNY-2077)
+    * Conary now allows a biarch system to have one flavor that
+      expresses both the x86 and x86_64 support. The flavorPreferences
+      configuration option informs conary to prefer x86_64 packages.
+      This change allows group building to automatically resolve x86
+      packages. (CNY-525)
+    * Conary no longer uses gnupg for OpenPGP key management. (CNY-2349)
+    * Conary clients no longer send an absolute URI when talking
+      directly to a repository server. (CNY-2324)
+    * Many repository permission handling methods have been renamed
+      for consistency. For a complete list, see doc/PROTOCOL.versions
+      in the Conary source code. (CNY-2298)
+    * Setting/resetting the admin field permission is now handled by the
+      setUserGroupIsAdmin() call instead of addAcl/editAcl. (CNY-1782)
+
+  o Server Changes:
+    * The scoring for target flavor sets has been fixed. (CNY-1539)
+    * The (unimplemented) concept of caps for permissions has been
+      removed.
+    * Server methods have been decorated with the
+      @requireClientProtocol decorator.
+    * The "usergroups" term has been replaced with "roles" in the
+      repository web user interface. (CNY-1973)
+    * Server exceptions have been reworked to have marshalling logic in
+      the exception class instead of in a large if/elif block. (CNY-747)
+    * Server exceptions are marshalled in the proxy layer now instead of
+      in both the proxy and server layers.
+    * When the repository database is locked, "RepositoryLocked"
+      exceptions are now returned for all code paths. (CNY-1596)
+    * The repository call log now tracks changeset cache misses. (CNY-1843)
+    * Repositories no longer pass anonymous hints to the proxy layer.
+      The hint has been False since Conary 1.1.29.
+    * The "troveNames" method now filters by using the "troveTypes"
+      argument. (CNY-1838)
+    * The "getPackageBranchPathIds" method no longer requires access
+      to the entire version history of a package; it returns the
+      pathIds and fileIds for troves the user is allowed to
+      see. Previously, an InsufficientPermission exception was raised
+      if part of the version history of a package was not visible to
+      the user. (CNY-2038)
+    * The repository call log now records the time required to service
+      the request. (CNY-2305)
+    * A "serializeCommits" boolean server configuration option has been
+      added.  This is best turned on for repositories used for development,
+      but is unneeded for repositories that are mirrors. (CNY-2285)
+
+  o Protocol Changes:
+    * The XML-RPC protocol now allows passing keyword arguments for
+      exceptions.  (CNY-747)
+    * XML-RPC return values no longer include the "useAnonymous" flag.
 
 Changes in 1.2.12:
   o Client Changes:
@@ -152,7 +343,7 @@ Changes in 1.2.10:
   o Build Changes:
     * The addPatch() source action honors shell-style brace and glob
       expansion when sourceDir is defined. (CNY-1152)
-    * A new command, "cvc explain", has been added. "cvc explain"
+    * A new "cvc explain" command has been added. "cvc explain"
       displays the documentation for recipe methods.  For example,
       "cvc explain addSource" shows the on-line documentation for the
       addSource() source action. (CNY-2242)
@@ -247,7 +438,17 @@ Changes in 1.2.8:
       not exist when attempting to run a trove script (e.g., group
       pre/post scripts). (CNY-2303)
 
+  o Client Changes:
+    * Added cvc derive as a client-side call (CNY-2237)
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+    * CONARY_CLIENT_LOG environment variable can now specify a path for
+      a log of all of the repository calls made by the client (use logcat
+      to view it) (CNY-2313)
+
 Changes in 1.2.7:
+
   o Build Changes:
     * The cvc command now prints out the most recent log message from
       the underlying source code control system when creating new
