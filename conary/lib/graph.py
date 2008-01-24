@@ -131,9 +131,6 @@ class DirectedGraph:
         self.edges.setdefault(fromIdx, {})[toIdx] = value
         self.edges.setdefault(toIdx, {})
 
-    def getEdge(self, fromItem, toItem):
-        return self.edges[fromIdx, toIdx]
-
     def delete(self, item):
         idx = self.data.getIndex(item)
         self.data.delete(item)

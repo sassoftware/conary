@@ -552,7 +552,7 @@ class SectionedConfigFile(ConfigFile):
         if self.isUrl(val):
             self.readUrl(val, resetSection = False)
         else:
-            for cfgfile in util.braceGlob(val):
+            for cfgfile in sorted(util.braceGlob(val)):
                 self.read(cfgfile, resetSection = False)
 
     def read(self, *args, **kw):
