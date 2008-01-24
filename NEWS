@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.16:
   o Client Changes:
     * The rollback API now raises a RollbackError instead of returning
       non-zero on errors. (CNY-1643)
