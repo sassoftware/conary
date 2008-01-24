@@ -15,6 +15,7 @@
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
 """
+import codecs
 import imp
 import itertools
 import os
@@ -229,6 +230,22 @@ class Config(policy.Policy):
         if os.path.isfile(fullpath) and util.isregular(fullpath):
             self._markConfig(filename, fullpath)
 
+    def _file_is_binary(self, fn):
+        f = codecs.open(fn, 'r', 'utf-8')
+        try:
+            limit = os.stat(fn)[stat.ST_SIZE]
+            while f.tell() < limit:
+                try:
+                    # if a file is not utf-8 or has null bytes, we'll consider
+                    # it to be a binary file
+                    if chr(0) in f.read(4096):
+                        return True
+                except UnicodeDecodeError:
+                    return True
+        finally:
+            f.close()
+        return False
+
     def _markConfig(self, filename, fullpath):
         self.info(filename)
         f = file(fullpath)
@@ -239,7 +256,16 @@ class Config(policy.Policy):
             lastchar = f.read(1)
             f.close()
             if lastchar != '\n':
-                self.error("config file %s missing trailing newline" %filename)
+                if self._file_is_binary(fullpath):
+                    self.error("binary file '%s' is marked as config" % \
+                            filename)
+                else:
+                    self.warn("adding trailing newline to config file '%s'" % \
+                            filename)
+                    f = open(fullpath, "a")
+                    f.seek(0, 2)
+                    f.write('\n')
+                    f.close()
         f.close()
         self.recipe.ComponentSpec(_config=filename)
 
@@ -2918,6 +2944,9 @@ class Requires(_addInfo, _dependency):
         self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
+        if self.db is None:
+            self.db = database.Database(self.recipe.cfg.root,
+                    self.recipe.cfg.dbPath)
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
 	    return
@@ -3002,8 +3031,12 @@ class Requires(_addInfo, _dependency):
         if self._isPerl(path, m, f):
             perlReqs = self._getPerlReqs(path, fullpath)
             for req in perlReqs:
-                self._addRequirement(path, req, [], pkg,
-                                     deps.PerlDependencies)
+                thisReq = deps.parseDep('perl: ' + req)
+                if self.db.getTrovesWithProvides([thisReq]) or \
+                        [x for x in self.recipe.autopkg.components.values() \
+                            if x.provides.satisfies(thisReq)]:
+                    self._addRequirement(path, req, [], pkg,
+                                         deps.PerlDependencies)
 
         self.whiteOut(path, pkg)
         self.unionDeps(path, pkg, f)
@@ -3451,7 +3484,15 @@ class Requires(_addInfo, _dependency):
         if self.perlReqs is False:
             return []
 
-        p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        cwd = os.getcwd()
+        os.chdir(os.path.dirname(fullpath))
+        try:
+            p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        finally:
+            try:
+                os.chdir(cwd)
+            except:
+                pass
         reqlist = [x.strip().split('//') for x in p.readlines()]
         # make sure that the command completed successfully
         rc = p.close()
@@ -3568,7 +3609,8 @@ class Requires(_addInfo, _dependency):
         for fileRequired, fileType in filesRequired:
             if fileRequired.startswith(macros.destdir):
                 # find requirement in packaging
-                fileRequired = fileRequired[len(macros.destdir):]
+                fileRequired = util.normpath(fileRequired)
+                fileRequired = fileRequired[len(util.normpath(macros.destdir)):]
                 autopkg = self.recipe.autopkg
                 troveName = autopkg.componentMap[fileRequired].name
                 package, component = troveName.split(':', 1)

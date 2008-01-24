@@ -862,6 +862,7 @@ class ClientClone:
             trv.setLabelPath(labelPath)
 
         trv.changeVersion(newVersion)
+        trv.copyMetadata(trv) # flatten metadata
 
         for mark, src in _iterAllVersions(trv):
             if chooser.troveInfoNeedsRewrite(mark, src):
