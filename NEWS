@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.5:
   o Client Changes:
     * Conary now attempts to provide hints about flavor combinations that would
       work if it cannot find a flavor that matches your exact request 
