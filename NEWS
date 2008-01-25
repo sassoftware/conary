@@ -24,6 +24,8 @@ Changes in 1.2.16:
       be done through scripts.  (CNY-1808)
     * Added a hook that allows build requirements to be overridden by
       rMake. (CNY-2427)
+    * Build actions that don't match anything (r.Move, r.Copy etc) will
+      now log exactly what they were trying to do. (CNY-2216)
 
   o Bug Fixes:
     * Conary no longer tracebacks when building a package that contains 
