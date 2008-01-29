@@ -721,6 +721,7 @@ def getAlternateFlavorMessage(query):
 
     minimalMatches = []
     archMinimalMatches = []
+    archPartialMatches = []
     for searchQueue, alternateList in query.iterAlternatesByQueue():
         if not alternateList:
             continue
@@ -733,16 +734,21 @@ def getAlternateFlavorMessage(query):
             archNames = set(x.name for x in flavor.iterDepsByClass(ISD))
             for toMatchFlavor in alternateList:
                 minimalMatch = deps.getMinimalCompatibleChanges(flavor,
-                                                              toMatchFlavor)
+                                                              toMatchFlavor,
+                                                              keepArch=True)
                 minimalMatches.append(minimalMatch)
                 matchArchNames = set(x.name for x
-                                   in minimalMatch.iterDepsByClass(ISD))
+                                   in toMatchFlavor.iterDepsByClass(ISD))
                 if not matchArchNames - archNames:
                     # if we don't have to change architectures to match
                     # this flavor, that's much better than the alternative.
                     archMinimalMatches.append(minimalMatch)
+                if matchArchNames & archNames:
+                    archPartialMatches.append(minimalMatch)
     if archMinimalMatches:
         minimalMatches = archMinimalMatches
+    elif archPartialMatches:
+        minimalMatches = archPartialMatches
     if minimalMatches:
         minimalMatches = set(minimalMatches)
         matchesByLength = sorted(((_getFlavorLength(x), x) 

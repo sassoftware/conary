@@ -34,6 +34,8 @@ Changes in 2.0.5:
       symlinked directory. (CNY-2455)
     * The order in which configuration files are read when a glob was
       passed to includeConfigFile is now deterministic. (CNY-2483)
+    * When x86_64 is specified and a biarch package is available, conary
+      will mention the biarch as an alternative flavor instead of the x86 one.
 
   o Server Changes:
     * Roles that have the mirror flag set no longer assume anonymous

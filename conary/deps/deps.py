@@ -1499,7 +1499,7 @@ def getMinimalFlagChanges(dep, depToMatch):
     return toAdd
 
 
-def getMinimalCompatibleChanges(flavor, flavorToMatch):
+def getMinimalCompatibleChanges(flavor, flavorToMatch, keepArch=False):
     getInstructionSetFlavor
     useFlags = list(flavorToMatch.iterDepsByClass(UseDependency))
     insDeps = list(flavorToMatch.iterDepsByClass(InstructionSetDependency))
@@ -1526,7 +1526,7 @@ def getMinimalCompatibleChanges(flavor, flavorToMatch):
         for dep in toMatchDeps:
             myDep = myDeps.get(dep.name, None)
             flagsNeeded = getMinimalFlagChanges(myDep, dep)
-            if myDep is None or flagsNeeded:
+            if myDep is None or flagsNeeded or keepArch:
                 insDep = Dependency(dep.name, flagsNeeded)
                 finalFlavor.addDep(depClass, insDep)
     return finalFlavor
