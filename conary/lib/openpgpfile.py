@@ -2400,7 +2400,7 @@ class PGP_MainKey(PGP_Key):
                     subkey.setBindingSig(pkt)
                     continue
                 # There should not be any other type of signature here
-                assert False, "Unexpected signature type %s" % pkt.sigType
+                continue
             # Ignore other packets
 
     def iterUserIds(self):

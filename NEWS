@@ -4,6 +4,7 @@ Changes in @NEW@:
       will mention the biarch as an alternative flavor instead of the x86 one.
     * Derived packages will now work on x86_64 systems even if a biarch 
       flavor is specified. (CNY-2494)
+    * Signatures of unexpected type on subkeys are now ignored. (CNY-2490)
 
 Changes in 2.0.5:
   o Client Changes:
