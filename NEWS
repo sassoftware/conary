@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Build Changes:
+    * Java dependencies for classes that are not dependency complete
+      are now automatically disabled. To re-enable them, the missing
+      dependencies should be added as buildRequires. (CNY-2175)
+
 Changes in 1.2.16:
   o Client Changes:
     * The rollback API now raises a RollbackError instead of returning
