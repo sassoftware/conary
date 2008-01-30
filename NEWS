@@ -4,6 +4,10 @@ Changes in @NEW@:
       are now automatically disabled. To re-enable them, the missing
       dependencies should be added as buildRequires. (CNY-2175)
 
+  o Bug Fixes:
+    * A minor bug in the display of the password prompt has been fixed.
+      (CNY-2497)
+
 Changes in 1.2.16:
   o Client Changes:
     * The rollback API now raises a RollbackError instead of returning
