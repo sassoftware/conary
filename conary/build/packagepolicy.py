@@ -29,7 +29,7 @@ from conary import files, trove
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.deps import deps
-from conary.lib import elf, util, pydeps, fixedglob, graph
+from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
 
 from elementtree import ElementTree
@@ -1851,7 +1851,7 @@ class _dependency(policy.Policy):
         return m and m.name == 'CIL'
 
     def _isJava(self, m, contents=None):
-        return m and (m.name == 'java' or m.name == 'jar') and self._hasContents(m, contents)
+        return m and isinstance(m, (magic.jar, magic.java)) and self._hasContents(m, contents)
 
     def _isPerlModule(self, path):
         return (path.endswith('.pm') or
@@ -2280,6 +2280,8 @@ class Provides(_dependency):
 	'%(docdir)s/',
     )
 
+    dbDepCacheClass = _DatabaseDepCache
+
     def __init__(self, *args, **keywords):
 	self.provisions = []
         self.sonameSubtrees = set()
@@ -2293,6 +2295,8 @@ class Provides(_dependency):
         self.pythonSysPathMap = {}
         self.exceptDeps = []
 	policy.Policy.__init__(self, *args, **keywords)
+        self.db = None
+        self.depCache = self.dbDepCacheClass(self._getDb())
 
     def updateArgs(self, *args, **keywords):
 	if args:
@@ -2390,6 +2394,9 @@ class Provides(_dependency):
                 self._addCILPolicyProvides(path, pkg, macros)
 
             elif self._isJava(m, 'provides'):
+                # Cache the internal provides
+                if not hasattr(self.recipe, '_internalJavaDepMap'):
+                    self.recipe._internalJavaDepMap = None
                 self._addJavaProvides(path, m, pkg)
 
             elif self._isPerlModule(path):
@@ -2667,8 +2674,77 @@ class Provides(_dependency):
     def _addJavaProvides(self, path, m, pkg):
         if 'provides' not in m.contents or not m.contents['provides']:
             return
-        for prov in m.contents['provides']:
-            self._addDepToMap(path, pkg.providesMap, 
+        if self.recipe._internalJavaDepMap is None:
+            # Instantiate the dictionary of provides from this package
+            self.recipe._internalJavaDepMap = internalJavaDepMap = {}
+            componentMap = self.recipe.autopkg.componentMap
+            for opath in componentMap:
+                om = self.recipe.magic[opath]
+                if not self._isJava(om, 'provides'):
+                    continue
+                # The file could be a .jar, in which case it contains multiple
+                # classes. contents['files'] is a dict, keyed on the file name
+                # within the jar and with a provide and a set of requires as
+                # value.
+                internalJavaDepMap.setdefault(opath, {}).update(
+                                                        om.contents['files'])
+        else:
+            internalJavaDepMap = self.recipe._internalJavaDepMap
+
+        reqs = set()
+        if self._isJava(m, 'requires'):
+            # Extract this file's requires
+            reqs.update(m.contents['requires'])
+            # Remove the ones that are satisfied internally
+            for opath, ofiles in internalJavaDepMap.items():
+                for oclassName, (oclassProv, oclassReqSet) in ofiles.items():
+                    if oclassProv is not None:
+                        reqs.discard(oclassProv)
+
+        # For now, we are only trimming the provides (and requires) for
+        # classes for which the requires are not satisfied, neither internally
+        # nor from the system Conary database. In the future we may need to
+        # build a dependency tree between internal classes, such that we do
+        # the removal transitively (class A requires class B which doesn't
+        # have its deps satisfied should make class A unusable). This can come
+        # at a later time
+
+        if reqs:
+            # Try to resolve these deps against the Conary database
+            depSetList = []
+            depSetMap = {}
+            for req in reqs:
+                depSet = deps.DependencySet()
+                depSet.addDep(deps.JavaDependencies, deps.Dependency(req, []))
+                depSetList.append(depSet)
+                depSetMap[depSet] = req
+            troves = self.depCache.getProvides(depSetList)
+            missingDepSets = set(depSetList) - set(troves)
+            missingReqs = set(depSetMap[x] for x in missingDepSets)
+            if missingReqs:
+                fileDeps = internalJavaDepMap[path]
+                # This file has unsatisfied dependencies.
+                # Walk its list of classes to determine which ones are not
+                # satisfied.
+                satisfiedClasses = dict((fpath, (fprov, freqs))
+                    for (fpath, (fprov, freqs)) in fileDeps.iteritems()
+                        if freqs is not None
+                            and not freqs.intersection(missingReqs))
+                internalJavaDepMap[path] = satisfiedClasses
+
+                self.warn('Provides and requirements for file %s are disabled '
+                          'because of unsatisfied dependencies. To re-enable '
+                          'them, add to the recipe\'s buildRequires the '
+                          'packages that provide the following '
+                          'requirements: %s' %
+                            (path, " ".join(sorted(missingReqs))))
+
+        # Add the remaining provides
+        fileDeps = internalJavaDepMap[path]
+        provs = set(fprov for fpath, (fprov, freqs) in fileDeps.iteritems()
+                        if fprov is not None)
+        for prov in provs:
+            self._addDepToMap(path, pkg.providesMap,
                 deps.JavaDependencies, deps.Dependency(prov, []))
 
 
@@ -3013,9 +3089,7 @@ class Requires(_addInfo, _dependency):
             self._addPkgConfigRequirements(path, fullpath, pkg, macros)
 
         if self._isJava(m, 'requires'):
-            for req in m.contents['requires']:
-                self._addRequirement(path, req, [], pkg,
-                                     deps.JavaDependencies)
+            self._addJavaRequirements(path, m, pkg)
 
         if self._isPerl(path, m, f):
             perlReqs = self._getPerlReqs(path, fullpath)
@@ -3029,6 +3103,17 @@ class Requires(_addInfo, _dependency):
 
         self.whiteOut(path, pkg)
         self.unionDeps(path, pkg, f)
+
+    def _addJavaRequirements(self, path, m, pkg):
+        fileDeps = self.recipe._internalJavaDepMap[path]
+        reqs = set()
+        for fpath, (fprov, freq) in fileDeps.items():
+            if freq is not None:
+                reqs.update(freq)
+        for req in reqs:
+            self._addRequirement(path, req, [], pkg,
+                                 deps.JavaDependencies)
+
 
     def whiteOut(self, path, pkg):
         # remove intentionally discarded dependencies

@@ -89,7 +89,7 @@ class changeset(Magic):
 class jar(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
-        self.contents['files'] = set()
+        self.contents['files'] = filesMap = {}
         self.contents['provides'] = set()
         self.contents['requires'] = set()
 
@@ -103,7 +103,7 @@ class jar(Magic):
                 if not _javaMagic(contents):
                     continue
                 prov, req = javadeps.getDeps(contents)
-                self.contents['files'].add(name)
+                filesMap[name] = (prov, req)
                 if prov:
                     self.contents['provides'].add(prov)
                 if req:
@@ -127,6 +127,7 @@ class java(Magic):
             self.contents['provides'] = set([prov])
         if req:
             self.contents['requires'] = req
+        self.contents['files'] = { path : (prov, req) }
 
 
 class script(Magic):
