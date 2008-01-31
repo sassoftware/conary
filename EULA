@@ -1,0 +1,55 @@
+﻿rPATH APPLICATION SOFTWARE
+CONARY END USER LICENSE AGREEMENT
+
+
+IMPORTANT -- READ CAREFULLY BEFORE USING THIS SOFTWARE:
+
+
+
+The Software governed by this license agreement is a collective work under the U.S. Copyright laws. The Software may be licensed under the Common Public License ("CPL") or a comercial software agreement from rPath, Inc. If the Software, under a commercial software agreement from rPath, is conveyed to the End User, and End User would like to use or distribute the Software, then the End User must comply with the terms contained in this EULA. If the Software, under the CPL, is conveyed to the End User, then the End User must comply with the terms of the CPL.
+
+Upon the use of any rPath Software Application (“Software”) or any appliance in which the Software may be embedded, End User acknowledges that End User has reviewed and agreed to all of the terms and conditions set forth in this document.  If End User DOES NOT AGREE with these terms and conditions, DO NOT USE the Software.
+
+REDISTRIBUTION NOT PERMITTED
+
+As used herein, the following terms have the meanings set forth below:
+
+"Computer" means the hardware, if the hardware is a single computer system whether physical or virtual, or shall mean the computer system with which the hardware operates, if the hardware is a computer system component.
+
+“End User” means the purchasers or licensees who have acquired the Software for their own personal or internal use and without the right to resale, re-market or otherwise distribute the Software.
+“EULA” means an end user license agreement.  This EULA is a legal agreement between you (either an individual or an entity) and rPath, Inc. and its suppliers and licensors (collectively "rPath") for the rPath Software which may include components provided by suppliers and licensors to rPath. 
+“Software” means the source code and object code versions of the product, together with the updates, upgrades, modifications or enhancements owned and provided by rPath to you pursuant to this EULA.
+
+BY USING THE SOFTWARE YOU ACKNOWLEDGE THAT YOU HAVE READ THIS LICENSE AGREEMENT, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS AND CONDITIONS.
+
+This EULA applies to Software applications that are made up of individual software components, each of which was individually written and copyrighted.  
+ANY THIRD PARTY SOFTWARE, INCLUDING ANY THIRD PARTY'S PLUG-IN, THAT MAY BE PROVIDED WITH THE SOFTWARE IS INCLUDED FOR USE AT YOUR OPTION. IF YOU CHOOSE TO USE SUCH THIRD PARTY SOFTWARE, THEN SUCH USE SHALL BE GOVERNED BY SUCH THIRD PARTY'S LICENSE AGREEMENT. rPath IS NOT RESPONSIBLE FOR ANY THIRD PARTY'S SOFTWARE AND SHALL HAVE NO LIABILITY FOR YOUR USE OF THIRD PARTY SOFTWARE.
+rPath hereby grants End User the following license to use the Software in the End User’s facility subject to the terms contained herein subject to the licenses referenced herein.  
+
+1. GRANT OF LICENSE. Upon payment of any fees applicable, rPath hereby grants to you a non-exclusive, personal license to use the Software and any related documentation ("Documentation") subject to the following terms:
+
+a)	You may: (i) use the Software on any single Computer; and (ii) copy the Software for back-up and archival purposes, provided any copy must contain all of the original Software's proprietary notices within the United States and its territories or any other country to which this Software can legally be exported.
+
+b)	The Software is "in use" on a computer when it is loaded into temporary memory or installed in permanent memory (Hard Drive, CD-ROM or other storage device).  You agree to use your best efforts to prevent and protect the contents of the Software and Documentation from unauthorized use or disclosure.  
+
+2. LICENSE RESTRICTIONS. 
+a)	You may not: (i) permit other individuals to use the Software except under the terms listed above; (ii) modify, translate, reverse engineer, decompile, disassemble (except to the extent that this restriction is expressly prohibited by law) or create derivative works based upon the Software or Documentation; (iii) copy the Software or Documentation (except for back-up or archival purposes); (iv) rent, lease, transfer, or otherwise transfer rights to the Software or Documentation; (v) remove any proprietary notices or labels on the Software or Documentation. Any such forbidden use shall immediately terminate your license to the Software. The recording, playback and download features of the Software are intended only for use with public domain or properly licensed content and content creation tools. You may require a patent, copyright, or other license from a third party to create, copy, download, record or save content files for playback by this Software or to serve or distribute such files to be played back by the Software.
+b)	You agree that you shall only use the Software and Documentation in a manner that complies with all applicable laws in the jurisdictions in which you use the Software and Documentation, including, but not limited to, applicable restrictions concerning copyright and other intellectual property rights.
+3. TITLE.  Title, ownership, rights, and intellectual property rights in and to the Software and Documentation shall remain rPath’s and/or its suppliers.  The Software and the Documentation are protected by the copyright laws of the United States and international copyright treaties.  Title, ownership rights and intellectual property rights in and to the content accessed through the Software and the Documentation ("Content") shall be retained by the applicable Content owner and may be protected by applicable copyright or other law.  This EULA gives you no rights to such Content.
+4. DATA RIGHTS.  You should be aware that rPath’s Software contains functions for collecting information related to your use of the Software.  rPath may also collect and track non-personally identifiable information about you including but not limited to your IP address, the type of hardware you use and the type of browser you employ.  rPath reserves the right to compile, save, use within the scope of rPath’s activities, and analyze any and all of your data (registration data, and use history).  rPath intends to use such data for internal purposes only, including without limitation for the purposes of responding to your requests for information and for contacting you.  rPath may provide aggregated statistics about your use of the Software to third parties, but such information will be aggregated so that it does not identify a particular individual or company.
+
+5.  NO WARRANTY.  THE SOFTWARE IS PROVIDED AND LICENSED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, NON-INFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE.
+
+6.  NO LIABILITY.  TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT WILL rPATH, INC. BE LIABLE TO END USER FOR ANY INCIDENTAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, LOST SAVINGS, OR OTHER INCIDENTAL OR CONSEQUENTIAL DAMAGES, ARISING OUT OF THE USE OR INABILITY TO USE THE SOFTWARE OR SOFTWARE PROGRAMS, EVEN IF rPATH, INC. OR A DEALER AUTHORIZED BY rPATH, INC. HAD BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.  IN NO EVENT SHALL rPATH HAVE ANY LIABILITY HEREUNDER.
+
+7.  COMPLETE AGREEMENT.  This EULA constitutes the entire agreement between the parties with respect to the Software and supersedes all prior or contemporaneous communications, agreements and understandings, written or oral, with respect to the subject matter hereof.  This EULA shall not be amended or modified except in a writing signed by authorized representatives of each party.
+
+8.  GENERAL.  If any provision of this EULA is held to be unenforceable, that shall not affect the enforceability of the remaining provisions.  This EULA shall be governed by the laws of the State of North Carolina and of the United States, without regard to any conflict of laws provisions, except that the United Nations Convention on the International Sale of Goods shall not apply.
+
+
+Copyright © 2005 - 2008.  rPath, Inc.  All rights reserved.
+
+"rPath," “rPath” Logo, “Powered by rPath” Logo, ”rPath Appliance Platform” logo, “Conary,”  “rMake,” “rAA,”  “rEA,” “rBuilder,” “rBuilder” Logo, and “rManager” are trademarks and service marks that are the property of rPath, Inc. 
+
+Revised January 30, 2008
+
