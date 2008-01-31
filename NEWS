@@ -8,6 +8,11 @@ Changes in @NEW@:
     * A minor bug in the display of the password prompt has been fixed.
       (CNY-2497)
 
+  o Other changes:
+    * The file EULA_Conary.txt has been added to clarify that Conary
+      is available under two licenses, and to state the conditions
+      under which the two licenses apply.
+
 Changes in 1.2.16:
   o Client Changes:
     * The rollback API now raises a RollbackError instead of returning
