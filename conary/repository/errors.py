@@ -30,6 +30,9 @@ class RepositoryMismatch(RepositoryError):
         return tup[0:2], {}
 
     def __init__(self, right = None, wrong = None):
+        if issubclass(right.__class__, list):
+            right = list(right)
+
         self.right = right
         self.wrong = wrong
         if right and wrong:

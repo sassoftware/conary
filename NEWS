@@ -19,6 +19,10 @@ Changes in @NEW@:
     * A minor bug in the display of the password prompt has been fixed.
       (CNY-2497)
 
+  o Server Changes:
+    * serverName configuration option now allows glob-style wildcards
+      (CNY-2293)
+
   o Other changes:
     * The file EULA_Conary.txt has been added to clarify that Conary
       is available under two licenses, and to state the conditions
