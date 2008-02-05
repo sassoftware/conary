@@ -5,6 +5,8 @@ Changes in @NEW@:
     * Derived packages will now work on x86_64 systems even if a biarch 
       flavor is specified. (CNY-2494)
     * Signatures of unexpected type on subkeys are now ignored. (CNY-2490)
+    * Updating from a package that used to be byDefault False and is now
+      byDefault True will now install the package. (CNY-2507)
 
   o Build Changes:
     * Java dependencies for classes that are not dependency complete

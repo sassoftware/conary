@@ -617,7 +617,8 @@ class ClientUpdate:
                                                job[2][0] is not None)
         primaryLocalUpdates = set((job[0], job[2][0], job[2][1]) 
                                   for job in primaryLocalUpdates)
-
+        localErases = set((job[0], job[1][0], job[1][1]) 
+                           for job in localUpdates if job[2][0] is None)
         # Troves which were locally updated to version on the same branch
         # no longer need to be listed as referenced. The trove which replaced
         # it is always a better match for the new items (installed is better
@@ -858,10 +859,19 @@ followLocalChanges: %s
                         # that trove instead.  If not, we just install this 
                         # trove as a fresh update. 
                         log.lowlevel('replaced trove is not installed')
-                        if (not ((parentInstalled
-                                 and not parentReplacedWasPinned)
-                                 or followLocalChanges
-                                 or installMissingRefs)):
+                        if followLocalChanges:
+                            skipLocal = False
+                        elif installMissingRefs:
+                            skipLocal = False
+                        elif (parentInstalled and not parentReplacedWasPinned):
+                            skipLocal = False
+                        elif replacedInfo not in localErases and not parentReplacedWasPinned:
+                            skipLocal = False
+                        else:
+                            skipLocal = True
+
+
+                        if skipLocal:
                             # followLocalChanges states that, even though
                             # the given trove is not a primary, we still want
                             # replace a localUpdate if available instead of 
@@ -877,6 +887,7 @@ followLocalChanges: %s
                         freshInstallOkay = (isPrimary or
                                             (parentInstalled
                                              and not parentReplacedWasPinned)
+                                            or byDefault
                                             or installMissingRefs)
                         # we always want to install the trove even if there's
                         # no local update to match to if it's a primary, or
@@ -2248,6 +2259,8 @@ conary erase '%s=%s[%s]'
 
             for job in exists.diff(refd)[2]:
                 if not job[2][0]:
+                    #oldInfo = troves[troveIdsByInfo[job[0], job[1][0], job[1][1]]]
+                    #allJobs.append(job)
                     continue
                 newInfo = troves[troveIdsByInfo[job[0], job[2][0], job[2][1]]]
                 if not job[1][0] and newInfo[HASPARENT]:
@@ -2291,14 +2304,19 @@ conary erase '%s=%s[%s]'
         installed where a child of b is, and assert that that update is
         from childa -> childb.
         """
-        localUpdates = [ x for x in localUpdates 
-                         if x[1][0] and not x[1][0].isOnLocalHost() ]
-        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates ]
-        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates ]
+        localUpdates = [ x for x in localUpdates
+                         if not (x[1][0] and x[1][0].isOnLocalHost()) ]
+        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates]
+        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates]
+
+        toGet = [ x for x in oldTroveTups if x[1]]
 
         oldTroveSource = trovesource.stack(searchSource, self.repos)
-        oldTroves = oldTroveSource.getTroves(oldTroveTups, withFiles=False)
-        newTroves = self.db.getTroves(newTroveTups, withFiles=False)
+        oldTroves = oldTroveSource.getTroves(toGet, withFiles=False)
+        troveDict = dict(zip(toGet, oldTroves))
+        toGet = [ x for x in newTroveTups if x[1]]
+        newTroves = self.db.getTroves(toGet, withFiles=False)
+        troveDict.update(zip(toGet, newTroves))
 
         if installedTroves is None:
             assert(missingTroves is None)
@@ -2325,38 +2343,69 @@ conary erase '%s=%s[%s]'
             installedTroves = installedTroves.copy()
             missingTroves = missingTroves.copy()
 
+        erases = set()
         allJobs = []
-        for oldTrove, newTrove in itertools.izip(oldTroves, newTroves):
+        for oldTroveTup, newTroveTup in itertools.izip(oldTroveTups, newTroveTups):
+            erases.discard(oldTroveTup)
             # find the relevant local updates by performing a 
             # diff between oldTrove and a trove based on newTrove
             # that contains only those parts of newTrove that are actually
             # installed.
+            if oldTroveTup[1]:
+                oldTrove = troveDict[oldTroveTup]
+            else:
+                oldTrove = None
+            if newTroveTup[1]:
+                newTrove = troveDict[newTroveTup]
+            else:
+                newTrove = None
 
             notExistsOldTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
             existsNewTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
 
             # only create local updates between old troves that
             # don't exist and new troves that do.
-            for tup, _, isStrong in oldTrove.iterTroveListInfo():
-                if (tup in missingTroves and tup not in oldTroveTups
-                    and not newTrove.hasTrove(*tup)):
-                    notExistsOldTrove.addTrove(*tup)
-            for tup, _, isStrong in newTrove.iterTroveListInfo():
-                if (tup in installedTroves and tup not in newTroveTups
-                    and not oldTrove.hasTrove(*tup)):
-                    existsNewTrove.addTrove( *tup)
+            if oldTrove:
+                for tup, byDefault, isStrong in oldTrove.iterTroveListInfo():
+                    if (tup in missingTroves and tup not in oldTroveTups
+                        and not newTrove.hasTrove(*tup)):
+                        notExistsOldTrove.addTrove(*tup)
+                for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
+                    if (tup in installedTroves and tup not in newTroveTups
+                        and not oldTrove.hasTrove(*tup)):
+                        existsNewTrove.addTrove( *tup)
+                    elif not byDefault and tup in installedTroves:
+                        existsNewTrove.addTrove(*tup)
+                    if byDefault and tup in missingTroves:
+                        notExistsOldTrove.addTrove(*tup)
+            else:
+                for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
+                    if byDefault:
+                        if tup in missingTroves:
+                            notExistsOldTrove.addTrove(*tup)
+                    else:
+                        if tup in installedTroves:
+                            existsNewTrove.addTrove(*tup)
 
             newUpdateJobs = existsNewTrove.diff(notExistsOldTrove)[2]
 
             for newJob in newUpdateJobs:
-                if not newJob[1][0] or not newJob[2][0]:
+                oldInfo = (newJob[0], newJob[1][0], newJob[1][1])
+                if not newJob[1][0]:
+                    continue
+                if not newJob[2][0]:
+                    erases.add(oldInfo)
+                else:
+                    erases.discard(oldInfo)
+                    allJobs.append(newJob)
+                if not oldTrove:
                     continue
 
                 # no trove should be part of more than one update.
-                installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
+                if newJob[2][0]:
+                    installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
                 missingTroves.remove((newJob[0], newJob[1][0], newJob[1][1]))
-                allJobs.append(newJob)
-        return allJobs
+        return allJobs + [(x[0], (x[1], x[2]), (None, None), False) for x in erases]
 
     def _replaceIncomplete(self, cs, localSource, db, repos):
         jobSet = [ (x.getName(), (x.getOldVersion(), x.getOldFlavor()),
