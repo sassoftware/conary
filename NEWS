@@ -1,6 +1,6 @@
 Changes in 1.2.17:
   o Build Changes:
-    * Java dependencies for classes that are not dependency complete
+    * Java dependencies for classes that are not dependency-complete
       are now automatically disabled. To re-enable them, the missing
       dependencies should be added as buildRequires. (CNY-2175)
 
