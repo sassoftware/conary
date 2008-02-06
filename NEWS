@@ -18,18 +18,19 @@ Changes in @NEW@:
   o Bug Fixes:
     * A minor bug in the display of the password prompt has been fixed.
       (CNY-2497)
-    * A Slow SQL query used to remove unused entries from the
-      TroveTroves table has been rewritten to be faster (CNY-2515)
 
   o Server Changes:
     * serverName configuration option now allows glob-style wildcards
       (CNY-2293)
+    * Slow SQL queries used to remove unused entries from the
+      TroveFiles table and TroveTroves table have been rewritten to
+      make markremoved faster with repositories implemented with a 
+      sqlite database. (CNY-2515)
 
   o Other changes:
     * The file EULA_Conary.txt has been added to clarify that Conary
       is available under two licenses, and to state the conditions
       under which the two licenses apply.
-
 
 Changes in 2.0.5:
   o Client Changes:
