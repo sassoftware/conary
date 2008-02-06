@@ -2,7 +2,7 @@
 <html xmlns:py="http://purl.org/kid/ns#"
       xmlns="http://www.w3.org/1999/xhtml">
 <!--
- Copyright (c) 2005,2007 rPath, Inc.
+ Copyright (c) 2005,2008 rPath, Inc.
 
  This program is distributed under the terms of the Common Public License,
  version 1.0. A copy of this license should have been distributed with this
@@ -15,7 +15,7 @@
  full details.
 -->
     <head py:match="item.tag == '{http://www.w3.org/1999/xhtml}head'">
-        <title>Conary Repository (${cfg.serverName})</title>
+        <title>Conary Repository</title>
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/common.css" />
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/repository.css" />
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/custom.css" />
@@ -53,7 +53,7 @@
                         <span py:if="not loggedIn" py:strip="True"><a href="login">Login</a></span>
                         <span py:if="loggedIn" py:strip="True">Welcome, <b>${currentUser}</b><span py:if="isAdmin">&nbsp;(administrator)</span>.&nbsp;&nbsp;<a href="logout">Logout</a></span>
                     </div>
-                    <p style="font-size: smaller;"><span style="font-weight:bold;" py:content="', '.join(cfg.serverName)" /><br />Conary Repository Server ${constants.version}</p>
+                    <p style="font-size: smaller;">Conary Repository Server ${constants.version}</p>
                 </div>
             </div>
             <ul class="menu">
