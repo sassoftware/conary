@@ -62,7 +62,7 @@
                 <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('pgpAdminForm', 'pgpNewKeyForm')) and 'highlighted' or None}"><a href="pgpAdminForm">PGP Keys</a></li>
                 <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'addUserForm', 'addPermForm', 'editPermForm', 'manageRoleForm',)) and 'highlighted' or None}"><a href="userlist">Users and Roles</a></li>
                 <li py:if="loggedIn" py:attrs="{'class': (lastchunk in ('chPassForm', )) and 'highlighted' or None}"><a href="chPassForm">Change Password</a></li>
-                <li py:if="hasEntitlements or isAdmin" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementForm', 'addEntClassForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
+                <li py:if="hasEntitlements or isAdmin" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementKeyForm', 'addEntClassForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
             </ul>
             <ul class="menu submenu">&nbsp;</ul>
             <div class="layout" py:replace="item[:]" />

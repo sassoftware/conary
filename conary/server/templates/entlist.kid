@@ -38,7 +38,7 @@
                 </tbody>
             </table>
             <p>
-                <a href="addEntitlementForm?entClass=${entClass}">Add Entitlement</a>
+                <a href="addEntitlementKeyForm?entClass=${entClass}">Add Entitlement</a>
             </p>
         </div>
     </body>
