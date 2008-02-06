@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.6:
   o Bug Fixes:
     * When x86_64 is specified and a biarch package is available, conary
       will mention the biarch as an alternative flavor instead of the x86 one.
