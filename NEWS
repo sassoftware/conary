@@ -14,8 +14,9 @@ Changes in 2.0.6:
     * Derived packages will now work on x86_64 systems even if a biarch 
       flavor is specified. (CNY-2494)
     * Signatures of unexpected types on subkeys are now ignored. (CNY-2490)
-    * Updating a group in which a package that used to be byDefault False
-      but is now byDefault True will now install the package. (CNY-2507)
+    * When updating a group which contained a package that used to be
+      byDefault False but is now byDefault True, Conary will now install
+      the package. (CNY-2507)
 
   o Server Changes:
     * The serverName configuration option now allows glob-style
