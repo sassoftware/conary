@@ -1,27 +1,25 @@
 Changes in 2.0.6:
-  o Bug Fixes:
-    * When x86_64 is specified and a biarch package is available, conary
-      will mention the biarch as an alternative flavor instead of the x86 one.
-    * Derived packages will now work on x86_64 systems even if a biarch 
-      flavor is specified. (CNY-2494)
-    * Signatures of unexpected types on subkeys are now ignored. (CNY-2490)
-    * Updating from a package that used to be byDefault False and is now
-      byDefault True will now install the package. (CNY-2507)
-
   o Build Changes:
     * Java dependencies for classes that are not dependency-complete
       are now automatically disabled. To re-enable them, the missing
       dependencies should be added as buildRequires. (CNY-2175)
-    * Build actions that don't match anything (r.Move, r.Copy etc) will
-      now log exactly what they were trying to do. (CNY-2216)
+    * Build actions that do not match anything (r.Move, r.Copy, etc.)
+      will now log exactly what they were trying to do. (CNY-2216)
 
   o Bug Fixes:
     * A minor bug in the display of the password prompt has been fixed.
       (CNY-2497)
+    * When x86_64 is specified and a biarch package is available, Conary
+      will mention the biarch as an alternative flavor instead of the x86 one.
+    * Derived packages will now work on x86_64 systems even if a biarch 
+      flavor is specified. (CNY-2494)
+    * Signatures of unexpected types on subkeys are now ignored. (CNY-2490)
+    * Updating a group in which a package that used to be byDefault False
+      but is now byDefault True will now install the package. (CNY-2507)
 
   o Server Changes:
-    * serverName configuration option now allows glob-style wildcards
-      (CNY-2293)
+    * The serverName configuration option now allows glob-style
+      wildcards.  (CNY-2293)
     * Slow SQL queries used to remove unused entries from the
       TroveFiles table and TroveTroves table have been rewritten to
       make markremoved faster with repositories implemented with a 
