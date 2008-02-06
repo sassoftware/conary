@@ -9,7 +9,7 @@ Changes in 2.0.6:
       byDefault True will now install the package. (CNY-2507)
 
   o Build Changes:
-    * Java dependencies for classes that are not dependency complete
+    * Java dependencies for classes that are not dependency-complete
       are now automatically disabled. To re-enable them, the missing
       dependencies should be added as buildRequires. (CNY-2175)
     * Build actions that don't match anything (r.Move, r.Copy etc) will
