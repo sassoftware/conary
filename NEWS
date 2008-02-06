@@ -18,6 +18,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * A minor bug in the display of the password prompt has been fixed.
       (CNY-2497)
+    * A Slow SQL query used to remove unused entries from the
+      TroveTroves table has been rewritten to be faster.
 
   o Server Changes:
     * serverName configuration option now allows glob-style wildcards

@@ -1098,14 +1098,13 @@ class TroveStore:
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
-        LEFT JOIN TroveTroves AS Other ON
-            Instances.instanceId = Other.includedId AND
-            Other.instanceId != ?
         WHERE
-            TroveTroves.instanceId = ? AND
-            Instances.isPresent = ? AND
-            Other.includedId IS NULL
-        """, (instanceId, instanceId, instances.INSTANCE_PRESENT_MISSING),
+         TroveTroves.instanceId = ?
+         and Instances.isPresent = ?
+         and not exists (select instanceId from TroveTroves as Others
+                          where Others.instanceId != ?
+                            and Others.includedId = Instances.instanceId )
+        """, (instanceId, instances.INSTANCE_PRESENT_MISSING, instanceId),
                    start_transaction=False)
         cu.execute("""
         INSERT INTO tmpRemovals (itemId, flavorId, branchId)
