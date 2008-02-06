@@ -2913,7 +2913,9 @@ conary erase '%s=%s[%s]'
         # so make sure that references this fresh db as well.
         import Queue
 
-        db = database.Database(cfg.root, cfg.dbPath)
+        # We do not want the download thread to die with DatabaseLocked
+        # errors, so make the timeout some really large value (5 minutes)
+        db = database.Database(cfg.root, cfg.dbPath, timeout = 300000)
         uJob.troveSource.db = db
         repos = self.createRepos(db, cfg)
         self.updateCallback.setAbortEvent(stopSelf)

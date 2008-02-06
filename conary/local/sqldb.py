@@ -357,7 +357,9 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
     timeout = 30000
-    def __init__(self, path):
+    def __init__(self, path, timeout = None):
+        if timeout is not None:
+            self.timeout = timeout
         self.db = None
         try:
             self.db = dbstore.connect(path, driver = "sqlite",
