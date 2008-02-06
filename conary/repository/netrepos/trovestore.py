@@ -1031,16 +1031,16 @@ class TroveStore:
         # Now remove the files. Gather a list of sha1s of files to remove
         # from the filestore.
         cu.execute("""
-        SELECT FileStreams.streamId, FileStreams.sha1
-        FROM FileStreams
-        JOIN TroveFiles AS Candidates ON
-            FileStreams.streamId = Candidates.streamId
-            AND ( SELECT COUNT(streamId)
-                    FROM TroveFiles as Used
-                   WHERE Used.streamId = Candidates.streamId
-                     AND Used.instanceId != Candidates.instanceId ) = 0
-        WHERE Candidates.instanceId = ?
-        """, instanceId)
+        select FileStreams.streamId, FileStreams.sha1
+        from TroveFiles as TF
+        join FileStreams using(streamId)
+        where TF.instanceId = ?
+          and not exists (
+              select instanceId from TroveFiles as Others
+              where Others.streamId = TF.streamId
+                and Others.instanceId != ? )
+        """, (instanceId, instanceId))
+
         r = cu.fetchall()
         # if sha1 is None, the file has no contents
         candidateSha1sToRemove = [ x[1] for x in r if x[1] is not None ]
@@ -1079,14 +1079,13 @@ class TroveStore:
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
-        LEFT JOIN TroveTroves AS Other ON
-            Instances.instanceId = Other.includedId AND
-            Other.instanceId != ?
         WHERE
-            TroveTroves.instanceId = ? AND
-            Instances.isPresent = ? AND
-            Other.includedId IS NULL
-        """, (instanceId, instanceId, instances.INSTANCE_PRESENT_MISSING),
+         TroveTroves.instanceId = ?
+         and Instances.isPresent = ?
+         and not exists (select instanceId from TroveTroves as Others
+                          where Others.instanceId != ?
+                            and Others.includedId = Instances.instanceId )
+        """, (instanceId, instances.INSTANCE_PRESENT_MISSING, instanceId),
                    start_transaction=False)
         cu.execute("""
         INSERT INTO tmpRemovals (itemId, flavorId, branchId)

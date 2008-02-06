@@ -7,6 +7,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * A minor bug in the display of the password prompt has been fixed.
       (CNY-2497)
+    * Slow SQL queries used to remove unused entries from the
+      TroveFiles table and TroveTroves table have been rewritten to be
+      faster.
 
   o Other changes:
     * The file EULA_Conary.txt has been added to clarify that Conary
