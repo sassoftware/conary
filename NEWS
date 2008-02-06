@@ -7,7 +7,7 @@ Changes in 1.1.31.12:
     * Slow SQL queries used to remove unused entries from the
       TroveFiles table and TroveTroves table have been rewritten to
       make markremoved faster with repositories implemented with a 
-      sqlite database. (CNY-2451)
+      sqlite database. (CNY-2515)
 
   o Other changes:
     * The file EULA_Conary.txt has been added to clarify that Conary
