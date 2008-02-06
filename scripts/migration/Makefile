@@ -20,6 +20,10 @@ dist_files = $(python_files) $(extra_dist)
 
 SUBDIRS	=
 
+install:
+	mkdir -p $(DESTDIR)$(datadir)/conary/migration
+	install -m 755 $(python_files) $(DESTDIR)$(datadir)/conary/migration
+
 all: default-subdirs default-all
 
 dist: default-dist
