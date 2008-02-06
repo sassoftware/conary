@@ -1,12 +1,13 @@
-Changes in @NEW@:
+Changes in 1.1.31.12:
   o Bug Fixes:
     * A bug that could cause incorrect SQLite database error messages
       has been fixed. (CNY-1840)
     * A bug that was preventing users with colons in their passwords
       to use the web interface has been fixed. (CNY-2374)
     * Slow SQL queries used to remove unused entries from the
-      TroveFiles table and TroveTroves table have been rewritten to be
-      faster.
+      TroveFiles table and TroveTroves table have been rewritten to
+      make markremoved faster with repositories implemented with a 
+      sqlite database. (CNY-2451)
 
   o Other changes:
     * The file EULA_Conary.txt has been added to clarify that Conary
