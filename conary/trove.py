@@ -2749,6 +2749,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	return self.oldFiles
 
     def getName(self):
+        """
+        Get the name of the trove.
+        @return: name of the trove.
+        @rtype: string
+        """
 	return self.name()
 
     def getTroveInfoDiff(self):
@@ -2828,9 +2833,23 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def isRollbackFence(self, oldCompatibilityClass = None, update = False):
         """
-        oldCompatibilityClass of None means we don't use compatibility
-        class checks to restruct rollbacks.
+        Determine whether an update from the given oldCompatibilityClass to the
+        version represented by this changeset would cross a rollback fence.  If
+        an update crosses a rollback fence, then it is not allowed to be rolled
+        back.
+        @param oldCompatibilityClass: the old compatibility class.  If this is
+        None, then compatibility class checks isn't used to restrict rollbacks,
+        so this will return False.
+        @type oldCompatibilityClass: integer or None
+        @param update: unused
+        @type update: any
+        @return: whether applying this changeset would cross a rollback fence.
+        @rtype: boolean
+        @raises AssertionError: if the input oldCompatibilityClass is neither
+        an integer nor None.
         """
+        # FIXME: why is the update parameter unused?  Is this for
+        # backwards-compatibility?
         if oldCompatibilityClass is None:
             return False
         assert(type(oldCompatibilityClass) == int)
@@ -2842,6 +2861,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if oldCompatibilityClass == thisCompatClass:
             return False
 
+        # FIXME: the rollbackScript variable below is never used.
         rollbackScript = self.getPostRollbackScript()
         postRollback = self._getScriptObj(_TROVESCRIPTS_POSTROLLBACK)
 
@@ -2873,12 +2893,24 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	self.changeLog.thaw(cl.freeze())
 
     def getOldVersion(self):
+        """
+        Get the old version of the trove this changeset applies to.  For an
+        absolute changeset, this is None
+        @return: old version
+        @rtype: conary.versions.Version object or None
+        """
 	return self.oldVersion()
 
     def getOldNameVersionFlavor(self):
         return self.name(), self.oldVersion(), self.oldFlavor()
 
     def getNewVersion(self):
+        """
+        Get the new version of the trove that'd be installed after applying
+        this changeset.
+        @return: new version
+        @rtype: conary.versions.Version object
+        """
 	return self.newVersion()
 
     def getNewNameVersionFlavor(self):
