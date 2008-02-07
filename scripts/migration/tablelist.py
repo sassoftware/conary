@@ -31,7 +31,6 @@ TableList = [
     'Entitlements',
     'EntitlementOwners',
     'EntitlementAccessMap',
-    'Caps',
     'Permissions',
     'FileStreams',
     'Nodes',
@@ -39,7 +38,6 @@ TableList = [
     'Instances',
     'TroveInfo',
     'Dependencies',
-    'Latest',
     'Metadata',
     'MetadataItems',
     'PGPKeys',
@@ -49,4 +47,12 @@ TableList = [
     'TroveRedirects',
     'TroveTroves',
     'TroveFiles',
+    'commitlock',
+    'usergroupinstancescache',
+    'checktrovecache',
+    'filepaths',
+    'usergrouptroves',
+    'usergroupallpermissions',
+    'usergroupalltroves',
+    'latestcache'
     ]

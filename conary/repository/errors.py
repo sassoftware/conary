@@ -67,6 +67,8 @@ class InsufficientPermission(ConaryError):
             self.repoName = repoName
             repoMsg = ("repository %s" % repoName)
         if url:
+            from conary.lib import epdb
+            epdb.st()
             self.url = url
             urlMsg = ("via %s" % url)
         if server or repoName or url:
