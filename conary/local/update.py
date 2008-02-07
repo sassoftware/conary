@@ -2518,6 +2518,8 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
     os.close(scriptFd)
 
     if tagScript is not None:
+        scriptName = scriptName[len(root):]
+
         f = open(tagScript, "a", 0600)
         if isPre:
             f.write('# ')

@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * When using the tagScript argument with the client's applyUpdateJob
+      call, the paths to group scripts to be executed are stored relative
+      to the root of the installation, instead of absolute. The tag
+      script is always supposed to be executed under chroot. (CNY-2523)
+
 Changes in 1.1.31.12:
   o Bug Fixes:
     * A bug that could cause incorrect SQLite database error messages
