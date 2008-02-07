@@ -86,9 +86,19 @@ class Callback(object):
 class ChangesetCallback(Callback):
 
     def preparingChangeSet(self):
+        """
+        Called before an update begins and before it looks for the requested
+        troves.
+
+        @return: None
+        """
         pass
 
     def requestingChangeSet(self):
+        """
+        Called right before requesting a changeset from a repository.
+        @return: None
+        """
         pass
 
     def sendingChangeset(self, sent, total):
@@ -98,15 +108,43 @@ class ChangesetCallback(Callback):
         self.rate = rate
 
     def downloadingChangeSet(self, got, need):
+        """
+        Called when downloading a changeset.
+        @param got: number of bytes received so far.
+        @type got: integer
+        @param need: number of bytes total to be retrieved.
+        @type need: integer
+        @return: None
+        """
         pass
 
     def requestingFileContents(self):
+        """
+        Called right before requesting file contents from a repository.
+        @return: None
+        """
         pass
 
     def downloadingFileContents(self, got, need):
+        """
+        Called when downloading file contents.
+        @param got: number of bytes received so far.
+        @type got: integer
+        @param need: number of bytes total to be retrieved
+        @type need: integer
+        @return: None
+        """
         pass
 
     def setChangesetHunk(self, hunk, hunkCount):
+        """
+        Called when creating changesets, such as when downloading changesets.
+        @param hunk: the number of the changeset being created (starts at 1)
+        @type hunk: integer
+        @param hunkCount: total number of changesets to be created.
+        @type hunkCount: integer
+        @return: None
+        """
         pass
 
     def checkAbort(self):
@@ -189,40 +227,124 @@ class CookCallback(ChangesetCallback):
 class UpdateCallback(ChangesetCallback):
 
     def resolvingDependencies(self):
+        """
+        Called after requested troves have been found and before it resolves
+        dependencies.
+
+        @return: None
+        """
         pass
 
     def creatingRollback(self):
+        """
+        Called when a local rollback changeset is being created.
+        @return: None
+        """
         pass
 
     def preparingUpdate(self, troveNum, troveCount):
+        """
+        Called while preparing to apply a given trove to the local file system.
+        @param troveNum: the number of the trove currently being examined
+        (starts at 1)
+        @type troveNum: integer
+        @param troveCount: the total number of troves to be applied.
+        @type troveCount: integer
+        @return None
+        """
         pass
 
     def creatingDatabaseTransaction(self, troveNum, troveCount):
+        """
+        Called when creating a database transaction for each trove.
+        @param troveNum: the number of the trove currently being examined
+        (starts at 1)
+        @type troveNum: integer
+        @param troveCount: the total number of troves.
+        @type troveCount: integer
+        @return: None
+        """
         pass
 
     def restoreFiles(self, size, totalSize):
+        """
+        Called right before writing a file to the file system.
+        @param size: number of bytes in the current file
+        @type size: integer
+        @param totalSize: total number of bytes to be written in the current
+        file system job
+        @type totalSize: integer
+        @return: None
+        """
         pass
 
     def removeFiles(self, fileNum, total):
+        """
+        Called right before removing each file during an update or rollback.
+        @param fileNum: the number of the file being removed (starts at 1).
+        @type fileNum: integer
+        @param total: total number of files to be removed.
+        @type total: integer
+        @return: None
+        """
         pass
 
     def runningPreTagHandlers(self):
+        """
+        Called right before running the pre action of tag handlers.
+        @return: None
+        """
         pass
 
     def runningPostTagHandlers(self):
+        """
+        Called right before running the post action of tag handlers.
+        @return: None
+        """
         pass
 
     def committingTransaction(self):
+        """
+        Called right before committing a database transaction.  This is called
+        at the end of each update job.
+        @return: None
+        """
         pass
 
     def updateDone(self):
+        """
+        Called when each update job finishes.  Recall that an update operation
+        may be split into multiple jobs.
+
+        @return: None
+        """
         pass
 
     def tagHandlerOutput(self, tag, msg, stderr = False):
+        """
+        Called when a tag handler outputs text to stdout or stderr.  This
+        method is called once for each line that's output.
+        @param tag: name of the tag handler
+        @type tag: string
+        @param msg: line that was output
+        @type msg: string
+        @param stderr: whether this was output to stderr.  False indicates
+        this was output to stdout.
+        @type stderr: boolean
+        @return: None
+        """
         print "[%s] %s" % (tag, msg),
 
     def troveScriptOutput(self, typ, msg):
-        """Called for each line of output generated by the script execution.
+        """
+        Called for each line of output generated by the trove script execution.
+        @param typ: contains the name of the trove followed by stage, where
+        stage is one of "postrollback", "postupdate", "postinstall",
+        "preupdate", e.g. "group-dist postupdate"
+        @type typ: string
+        @param msg: the line output by the trove script.
+        @type msg: string
+        @return: None
         """
         print "[%s] %s" % (typ, msg)
 
@@ -236,16 +358,49 @@ class UpdateCallback(ChangesetCallback):
         pass
 
     def troveScriptFailure(self, typ, errcode):
-        """Called if the script execution fails"""
+        """
+        Called if the script execution fails
+        @param typ: name of the script followed by stage.
+        @type typ: string
+        @param errcode: non-zero error code returned by the trove script.
+        @type errcode: integer
+        @return: None
+        """
         print "[%s] %s" % (typ, errcode)
 
     def setUpdateHunk(self, hunk, hunkCount):
+        """
+        Called before applying a given update job.
+        @param hunk: the number of the update job being applied (starts at 1)
+        @type hunk: integer
+        @param hunkCount: the total number of update jobs.
+        @type hunkCount: integer
+        @return: None
+        """
         pass
 
     def setUpdateJob(self, job):
+        """
+        Called right before applying the given update job.
+        @param job: the update job about to be applied.
+        @type job: a set, where each item is a tuple containing C{(troveName,
+        (oldVersionSpec, oldFlavor), (newVersionSpec, newFlavor), isAbsolute)}
+        @see conaryclient.update.ClientUpdate.prepareUpdateJob
+        @return: None
+        """
         pass
 
     def done(self):
+        """
+        Called after an update.
+
+        More specifically, when:
+         - an update finishes
+         - a fatal exception occurs before an update
+         - the info option is passed in and after the job set is determined
+         - extra troves are resolved in after the job set is determined
+         - after restarting an update that contains critical troves
+        """
         pass
 
     def checkAbort(self):

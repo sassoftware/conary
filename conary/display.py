@@ -681,6 +681,9 @@ class TroveFormatter(TroveTupFormatter):
         if metadata['licenses']:
             for l in metadata['licenses']:
                 yield "License   : %s" % l
+        if metadata['crypto']:
+            for l in metadata['crypto']:
+                yield "Crypto    : %s" % l
         if metadata['categories']:
             for c in metadata['categories']:
                 yield "Category  : %s" % c
