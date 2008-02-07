@@ -80,7 +80,7 @@ smoketest: archive
 forcedist: $(dist_files) smoketest
 
 tag:
-	hg tag conary-$(VERSION)
+	hg tag -f conary-$(VERSION)
 
 clean: clean-subdirs default-clean
 
