@@ -31,16 +31,18 @@ from conary import flavorcfg
 
 class ServerGlobList(list):
 
-    def find(self, server, allMatches = False):
+    multipleMatches = False
+
+    def find(self, server):
         l = []
         for (serverGlob, item) in ServerGlobList.__iter__(self):
             # this is case insensitve, which is perfect for hostnames
             if fnmatch.fnmatch(server, serverGlob):
-                if not allMatches:
+                if not self.multipleMatches:
                     return item
                 l.append(item)
 
-        if not allMatches:
+        if not self.multipleMatches:
             return None
 
         return l
@@ -81,7 +83,7 @@ class ServerGlobList(list):
         removeOld = False
         for i, (serverGlob, info) in enumerate(ServerGlobList.__iter__(self)):
             if fnmatch.fnmatch(newItem[0], serverGlob):
-                if serverGlob == newItem[0]:
+                if not self.multipleMatches and serverGlob == newItem[0]:
                     removeOld = True
                 location = i
                 break
@@ -139,7 +141,8 @@ class CfgUserInfoItem(CfgType):
         elif len(val) == 2:
             return (val[0], val[1], None)
         else:
-            return tuple(val)
+            pw = (val[2] is not None and util.ProtectedString(val[2])) or None
+            return (val[0], val[1], pw)
 
     def format(self, val, displayOptions=None):
         serverGlob, user, password = val
@@ -162,8 +165,10 @@ class CfgUserInfo(CfgList):
 
 class EntitlementList(ServerGlobList):
 
+    multipleMatches = True
+
     def addEntitlement(self, serverGlob, entitlement, entClass = None):
-        self.append((serverGlob, (entClass, entitlement)))
+        self.append((serverGlob, (entClass, util.ProtectedString(entitlement))))
 
 class CfgEntitlementItem(CfgType):
     def parseString(self, str):
@@ -176,11 +181,11 @@ class CfgEntitlementItem(CfgType):
                 "Please change the 'entitlement %s' config line to\n"
                 "'entitlement %s %s'" % (str, val[0], val[2]),
                 DeprecationWarning)
-            return (val[0], (val[1], val[2]))
+            return (val[0], (val[1], util.ProtectedString(val[2])))
         elif len(val) != 2:
             raise ParseError("expected <hostglob> <entitlement>")
 
-        return (val[0], (None, val[1]))
+        return (val[0], (None, util.ProtectedString(val[1])))
 
     def format(self, val, displayOptions=None):
         if val[1][0] is None:
@@ -496,9 +501,11 @@ class ConaryContext(ConfigSection):
     environment           =  CfgDict(CfgString)
     excludeTroves         =  CfgRegExpList
     flavor                =  CfgList(CfgFlavor)
+    flavorPreferences     =  CfgList(CfgFlavor)
     fullVersions          =  CfgBool
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
+    keepRequired          =  CfgBool
     installLabelPath      =  CfgInstallLabelPath
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPathList, ('/var/log/conary',
@@ -548,6 +555,11 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/distro/use',
                                             '~/.conary/use'))
     user                  =  CfgUserInfo
+    baseClassDir          =  (CfgPath, '/usr/share/conary/baseclasses')
+    defaultBasePackages   = (CfgList(CfgString), ['package',
+                                             'buildpackage',
+                                             'cpackage',
+                                             'autopackage'])
 
 
     def _resetSigMap(self):
@@ -569,8 +581,10 @@ class ConaryConfiguration(SectionedConfigFile):
     _allowNewSections     = True
     _defaultSectionType   =  ConaryContext
 
-    def __init__(self, readConfigFiles = False):
+    def __init__(self, readConfigFiles = False, ignoreErrors = False,
+                 readProxyValuesFirst=True):
 	SectionedConfigFile.__init__(self)
+        self._ignoreErrors = ignoreErrors
 
         for info in ConaryContext._getConfigOptions():
             if info[0] not in self:
@@ -578,12 +592,22 @@ class ConaryConfiguration(SectionedConfigFile):
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 
-	if readConfigFiles:
-	    self.readFiles()
+        if readConfigFiles:
+            if readProxyValuesFirst:
+                self.limitToKeys('conaryProxy', 'proxy')
+                self.ignoreUrlIncludes()
+                self.readFiles()
+                self.limitToKeys(False)
+                self.ignoreUrlIncludes(False)
+
+            self.readFiles()
             # Entitlement files are config files
             self.readEntitlementDirectory()
 
         util.settempdir(self.tmpDir)
+
+    def _getProxies(self):
+        return self.proxy
 
     def readEntitlementDirectory(self):
         if not os.path.isdir(self.entitlementDirectory):
@@ -688,6 +712,9 @@ class ConaryConfiguration(SectionedConfigFile):
         # buildFlavor is installFlavor + overrides
         self.buildFlavor = deps.overrideFlavor(self.flavor[0], 
                                                     self.buildFlavor)
+        # disable flavorPreferences for now
+        #if self.isDefault('flavorPreferences'):
+        #    self.flavorPreferences = arch.getFlavorPreferences()
 	self.flavorConfig.populateBuildFlags()
 
 def selectSignatureKey(cfg, label):
@@ -807,13 +834,14 @@ def loadEntitlementFromProgram(fullPath, serverName):
         try:
             try:
                 os.close(readFd)
-                os.close(sys.stdin.fileno())
+                # close stdin
+                os.close(0)
 
                 # both error and stderr are redirected  - the entitlement
                 # should be on stdout, and error info should be 
                 # on stderr.
-                os.dup2(writeFd, sys.stdout.fileno())
-                os.dup2(stdErrWrite, sys.stderr.fileno())
+                os.dup2(writeFd, 1)
+                os.dup2(stdErrWrite, 2)
                 os.close(writeFd)
                 os.close(stdErrWrite)
                 util.massCloseFileDescriptors(3, 252)

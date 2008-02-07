@@ -82,7 +82,9 @@ class FilesystemError(ConaryError):
         ConaryError.__init__(self, *args, **kwargs)
 
 class TroveNotFound(ConaryError):
-    """Returned from findTrove when no trove is matched"""
+    """
+    No trove was found or the match parameters were incorrectly specified.
+    """
 
 class LabelPathNeeded(TroveNotFound):
     """Returned from findTrove when a label path is required but wasn't given"""
@@ -155,6 +157,11 @@ class ReexecRequired(ConaryError):
         self.execParams = params
         self.data = data
         ConaryError.__init__(self, msg)
+
+class CancelOperationException(Exception):
+    """Inherit from this class and throw exceptions of this type if you
+    want a callback to stop an update at the end of the job"""
+    cancelOperation = True
 
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 

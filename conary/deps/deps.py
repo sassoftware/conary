@@ -123,7 +123,7 @@ class BaseDependency(object):
 
 class Dependency(BaseDependency):
 
-    __slots__ = ( 'name', 'flags' )
+    __slots__ = ( 'name', 'flags', )
 
     def __hash__(self):
 	val = hash(self.name)
@@ -1219,6 +1219,24 @@ def _filterDeps(depClass, dep, filterDeps):
     if not depClass.depNameSignificant and not finalFlags:
         return None
     return Dependency(dep.name, finalFlags)
+
+def getInstructionSetFlavor(flavor):
+    if flavor is None:
+        return None
+    newFlavor = Flavor()
+    targetISD = TargetInstructionSetDependency
+    ISD = InstructionSetDependency
+
+    # get just the arches, not any arch flags like mmx
+    newFlavor.addDeps(ISD,
+                      [Dependency(x[1].name) for x in flavor.iterDeps() 
+                       if x[0] is ISD])
+    targetDeps = [ Dependency(x[1].name) for x in flavor.iterDeps() 
+                  if x[0] is targetISD ]
+
+    if targetDeps:
+        newFlavor.addDeps(targetISD, targetDeps)
+    return newFlavor
 
 def formatFlavor(flavor):
     """

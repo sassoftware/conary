@@ -446,6 +446,10 @@ class Label(AbstractLabel):
 	return self.asString()
 
     def getHost(self):
+        """
+        @return: repository hostname portion of the label.
+        @rtype: string
+        """
 	return self.host
 
     def getNamespace(self):
@@ -517,9 +521,9 @@ class Label(AbstractLabel):
 		(self.namespace, self.branch) = rest.split(":")
 
 	if not self.namespace:
-	    raise ParseError("namespace may not be empty: %s" % value)
+	    raise ParseError("namespace may not be empty")
 	if not self.branch:
-	    raise ParseError("branch tag not be empty: %s" % value)
+	    raise ParseError("branch tag may not be empty")
 
 class StaticLabel(Label):
 
@@ -587,8 +591,13 @@ class VersionSequence(AbstractVersion):
     def __cmp__(self, other):
         if self.__class__ != other.__class__:
             return NotImplemented
-	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
-	return cmp(self.versions[-1].timeStamp, other.versions[-1].timeStamp)
+        vthis = self.versions[-1]
+        vother = other.versions[-1]
+        if hasattr(vthis, 'timeStamp') and hasattr(vother, 'timeStamp'):
+            return cmp(vthis.timeStamp, vother.timeStamp)
+        if vthis.__class__ != vother.__class__:
+            return NotImplemented
+        return cmp(vthis, vother)
 
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
@@ -653,7 +662,15 @@ class VersionSequence(AbstractVersion):
 	@param defaultBranch: If set this is stripped fom the beginning
 	of the version to give a shorter string representation.
 	@type defaultBranch: Version
+
+        @param frozen: whether to return a frozen representation, which encodes
+        more information.
+        @type frozen: boolean
+
+        @return: a string representation of the version.
 	@rtype: str
+
+        @raise AssertionError: if defaultBranch is not an instance of Branch.
 	"""
         if self.strRep is not None and not defaultBranch and not frozen:
 	    return self.strRep
@@ -785,8 +802,9 @@ class VersionSequence(AbstractVersion):
 
     def getHost(self):
         """
-        Returns the host name from the youngest label in this
+        @return: the host name from the youngest label in this
         version sequence.  If there are no labels, None is returned.
+        @rtype: string or None
         """
         for item in reversed(self.versions):
             if isinstance(item, Label):
@@ -1025,17 +1043,19 @@ class Version(VersionSequence):
         self.versions[-1].resetTimeStamp()
 
     def trailingRevision(self):
-	"""
-	Returns the AbstractRevision object at the end of the version.
+        """
+        Returns the Revision object at the end of the version.
+        For example, the trailing revision of
+        '/conary.rpath,com@rpl:devel/1-1-1' is '1-1-1'.
 
-	@rtype: AbstactVersion
-	"""
+        @return: Revision object at the end of the version.
+        @rtype: versions.Revision object
+        """
 	return self.versions[-1]
 
     def trailingLabel(self):
         """
-        Returns the last label object in the version.
-
+        @return: the last label object in the version.
         @rtype: AbstractLabel
         """
 
@@ -1296,8 +1316,8 @@ class Branch(VersionSequence):
 	are appended to the branch this object represented. The time
 	stamp is reset as a new version has been created.
 
-	@param verRel: object for the revision
-	@type verRel: Revision
+	@param revision: object for the revision
+	@type revision: Revision
 	"""
 
 	revision.timeStamp = time.time()

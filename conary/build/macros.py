@@ -21,11 +21,12 @@ import re
 from conary.build.errors import MacroKeyError
 
 class Macros(dict):
-    def __init__(self, macros={}, shadow=False):
+    def __init__(self, macros={}, shadow=False, ignoreUnknown=False):
 	self.__tracked = {}
 	self.__track = False
 	self.__overrides = {}
         self.__callbacks = {}
+        self.__ignoreUnknown = ignoreUnknown
 	if shadow:
 	    self.__macros = macros
 	else:
@@ -100,6 +101,8 @@ class Macros(dict):
             except KeyError:
                 # let's make this error message more helpful
                 # so our users will have a chance of debugging.
+                if self.__ignoreUnknown:
+                    return ''
                 raise MacroKeyError(name)
 
 	    value = self.__macros[name]

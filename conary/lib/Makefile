@@ -17,18 +17,20 @@ python_files=	    __init__.py		\
 		    cfgtypes.py		\
 		    logparse.py		\
 		    coveragehook.py	\
-		    enum.py		\
 		    debugger.py		\
-		    erlcompleter.py	\
+		    enum.py		\
 		    epdb.py     	\
+		    erlcompleter.py	\
 		    fixeddifflib.py	\
+		    fixedfnmatch.py	\
 		    fixedglob.py	\
 		    fixedthreading.py	\
 		    graph.py		\
 		    importer.py		\
 		    javadeps.py     	\
-		    log.py		\
 		    logger.py		\
+		    logparse.py		\
+		    log.py		\
 		    magic.py		\
 		    openpgpfile.py	\
 		    openpgpkey.py	\
@@ -36,6 +38,7 @@ python_files=	    __init__.py		\
 		    patch.py		\
 		    pydeps.py           \
 		    sha1helper.py	\
+		    sigprotect.py	\
 		    stackutil.py	\
 		    tracelog.py		\
 		    util.py

@@ -19,7 +19,7 @@ except ImportError:
 import base64
 
 from conary.constants import version
-from conary.lib import openpgpfile, openpgpkey
+from conary.lib import openpgpfile, openpgpkey, util
 from textwrap import wrap
 
 class OpenPGPKeyTable:
@@ -47,26 +47,20 @@ class OpenPGPKeyTable:
         # this ignore duplicate keys
         cu = self.db.cursor()
 
-        keyRing = StringIO(pgpKeyData)
-
-        # make sure it's a public key
-        keyType = openpgpfile.readBlockType(keyRing)
-        keyRing.seek(-1,1)
-        if (keyType >> 2) & 15 != openpgpfile.PKT_PUBLIC_KEY:
-            raise openpgpfile.IncompatibleKey('Key must be a public key')
-
-        if openpgpfile.countKeys(keyRing) != 1:
+        stream = util.ExtendedStringIO(pgpKeyData)
+        if openpgpfile.countKeys(stream) != 1:
             raise openpgpfile.IncompatibleKey( \
                 'Submit only one key at a time.')
 
-        limit = len(pgpKeyData)
-        while keyRing.tell() < limit:
-            openpgpfile.verifySelfSignatures(openpgpfile.getKeyId(keyRing),
-                                             keyRing)
-            openpgpfile.seekNextKey(keyRing)
-        keyRing.seek(0)
+        inKey = openpgpfile.newKeyFromStream(stream)
 
-        mainFingerprint = openpgpfile.getKeyId(keyRing)
+        # make sure it's a public key
+        if not isinstance(inKey, openpgpfile.PGP_PublicKey):
+            raise openpgpfile.IncompatibleKey('Key must be a public key')
+
+        inKey.verifySelfSignatures()
+
+        mainFingerprint = inKey.getKeyFingerprint()
 
         # if key already exists we need to ensure it's safe to overwrite
         # the old one, and then just do it.
@@ -74,9 +68,10 @@ class OpenPGPKeyTable:
                        mainFingerprint)
         for (keyId, keyBlob) in cu.fetchall():
             origKey = cu.frombinary(keyBlob)
+            origKey = openpgpfile.newKeyFromString(origKey)
             # ensure new key is a superset of old key. we can't allow the
             # repo to let go of subkeys or revocations.
-            openpgpfile.assertReplaceKeyAllowed(origKey, pgpKeyData)
+            openpgpfile.assertReplaceKeyAllowed(origKey, inKey)
             #reset the key cache so the changed key shows up
             keyCache = openpgpkey.getKeyCache()
             keyCache.reset()
@@ -89,7 +84,9 @@ class OpenPGPKeyTable:
                        (userId, mainFingerprint, cu.binary(pgpKeyData)))
             keyId = cu.lastrowid
 
-        keyFingerprints = openpgpfile.getFingerprints(keyRing)
+        keyFingerprints = [ mainFingerprint ]
+        keyFingerprints.extend(x.getKeyFingerprint() for x in inKey.iterSubKeys())
+
         for fingerprint in keyFingerprints:
             cu.execute("SELECT COUNT(*) FROM PGPFingerprints "
                        "WHERE keyId = ? and fingerprint = ?",
@@ -190,14 +187,12 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
         fingerprint = self.keyTable.getFingerprint(keyId)
         keyData = self.keyTable.getPGPKeyData(keyId)
 
-        # instantiate the crypto key object from the raw key data
-        cryptoKey = openpgpfile.getPublicKeyFromString(keyId, keyData)
-
-        # get end of life data
-        revoked, timestamp = openpgpfile.getKeyEndOfLifeFromString(keyId, keyData)
+        # instantiate the key object from the raw key data
+        key = openpgpfile.getKeyFromString(keyId, keyData)
 
         # populate the cache
         # note keys in the repository are always considered fully trusted
-        self.publicDict[keyId] = openpgpkey.OpenPGPKey(fingerprint, cryptoKey, revoked, timestamp, openpgpfile.TRUST_FULL)
+        self.publicDict[keyId] = openpgpkey.OpenPGPKey(key, key.getCryptoKey(),
+                                                       openpgpfile.TRUST_FULL)
         return self.publicDict[keyId]
 

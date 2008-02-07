@@ -114,14 +114,23 @@ def Path(str):
     if str in ["stdin", "stdout", "stderr"]:
         return _Path(str)
     if str not in _pathCache:
+
         if '~' not in str and '$' not in str and str[0] == '/':
             p = _Path(str)
+        elif str == ':memory:':
+            p = _Path(str)
         else:
-            p = _ExpandedPath(str)
+            try:
+                p = _ExpandedPath(str)
+            except OSError:
+                p = _Path(str)
         _pathCache[str] = p
         return p
-    elif '~' in str or '$' in str or str[0] != '/':
-        p = _ExpandedPath(str)
+    elif '~' in str or '$' in str or (str[0] != '/' and str != ':memory:'):
+        try:
+            p = _ExpandedPath(str)
+        except OSError:
+            p = _Path(str)
         if p != _pathCache[str]:
             _pathCache[str] = p
     return _pathCache[str]

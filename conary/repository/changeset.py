@@ -436,6 +436,10 @@ class ChangeSet(streams.StreamSet):
                             invertedTrove.newTroveVersion(name, version, flavor,
                                trv.includeTroveByDefault(name, version, flavor),
                                weakRef = weak)
+                        elif oper == "~":
+                            # invert byDefault flag
+                            invertedTrove.changedTrove(name, version, flavor, not byDef,
+                                                       weakRef = weak)
 
 	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)
@@ -604,6 +608,14 @@ class ChangeSet(streams.StreamSet):
 		if fileObj.hasContents:
 		    fullPath = db.root + path
 
+                    if fileObj.flags.isConfig():
+                        cont = filecontents.FromDataStore(db.contentsStore,
+                                    fileObj.contents.sha1())
+                        rollback.addFileContents(pathId, fileId,
+                                                 ChangedFileTypes.file, cont,
+                                                 fileObj.flags.isConfig())
+                        continue
+
 		    if os.path.exists(fullPath):
 			fsFile = files.FileFromFilesystem(fullPath, pathId,
 				    possibleMatch = fileObj)
@@ -636,8 +648,8 @@ class ChangeSet(streams.StreamSet):
 
 	@param repos: repository which will be committed to
 	@type repos: repository.Repository
-	@param targetBranchLabel: label of the branch to commit to
-	@type targetBranchLabel: versions.Label
+	@param targetShadowLabel: label of the branch to commit to
+	@type targetShadowLabel: versions.Label
 	"""
 	assert(not targetShadowLabel == versions.LocalLabel())
         # if it's local, Version.parentVersion() has to work everywhere
@@ -1125,8 +1137,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         allContents = {}
         for key in keyList:
             (tag, contents, compressed) = self.configCache[key]
-            if tag == ChangedFileTypes.file:
-                allContents[key] = (ChangedFileTypes.file, contents, False)
+            if tag != ChangedFileTypes.diff:
+                allContents[key] = (tag, contents, False)
 
         wrapper = DictAsCsf({})
         wrapper.addConfigs(allContents)
@@ -1426,6 +1438,7 @@ def CreateFromFilesystem(troveList):
     return cs
 
 class DictAsCsf:
+    maxMemSize = 16384
 
     def getNextFile(self):
         if self.next >= len(self.items):
@@ -1435,27 +1448,18 @@ class DictAsCsf:
         self.next += 1
 
         f = contObj.get()
-        contents = f.read(16384)
-        if len(contents) == 16384:
-            # too big; compress using a temporary file
-            (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
-            os.unlink(path)
-            gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
-            gzf.write(contents)
-            util.copyfileobj(f, gzf)
-            # don't close the result of contObj.get(); we may need it again
-            # but do close gzf, so we're sure that any buffers are flushed
-            # to disk
-            gzf.close()
-            os.lseek(fd, 0, 0)
-            f = os.fdopen(fd, "r")
-            return (name, contType, f)
-        else:
-            compressedFile = StringIO()
-            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-            gzf.write(contents)
-            gzf.close()
-            compressedFile.seek(0)
+        compressedFile = util.BoundedStringIO(maxMemorySize = self.maxMemSize)
+        bufSize = 16384
+
+        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+        while 1:
+            buf = f.read(bufSize)
+            if not buf:
+                break
+            gzf.write(buf)
+        gzf.close()
+
+        compressedFile.seek(0)
 
         return (name, contType, compressedFile)
 
@@ -1526,7 +1530,15 @@ def _convertChangeSetV2V1(inPath, outPath):
 
 def getNativeChangesetVersion(protocolVersion):
     """Return the native changeset version supported by a client speaking the
-    supplied protocol version"""
+    supplied protocol version
+    
+    @param protocolVersion: Protocol version that the client negotiated with
+    the server
+    @type protocolVersion: int
+    @rtype: int
+    @return: native changeset version for a client speaking the protocol
+    version
+    """
     # Add more versions as necessary, but do remember to add them to
     # netclient's FILE_CONTAINER_* constants
     if protocolVersion < 38:
