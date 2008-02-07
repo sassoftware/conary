@@ -88,7 +88,9 @@ class FilesystemError(ConaryError):
         ConaryError.__init__(self, *args, **kwargs)
 
 class TroveNotFound(ConaryError):
-    """Returned from findTrove when no trove is matched"""
+    """
+    No trove was found or the match parameters were incorrectly specified.
+    """
 
 class LabelPathNeeded(TroveNotFound):
     """Returned from findTrove when a label path is required but wasn't given"""

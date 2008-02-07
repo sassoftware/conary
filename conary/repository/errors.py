@@ -58,6 +58,20 @@ class RepositoryMismatch(RepositoryError):
 class InsufficientPermission(ConaryError):
 
     def __init__(self, server = None, repoName = None, url = None):
+        """
+        Initialize an InsufficientPermission exception object.  This exception
+        is raised when privileged methods are called without the correct
+        authorization token.
+
+        @param server: Name of the host where access is denied.
+        @type server: string
+
+        @param repoName: Name of the repository where access is denied.
+        @type repoName: string
+
+        @param url: URL of the call where access is denied.
+        @type url: string
+        """
         self.server = self.repoName = self.url = None
         serverMsg = repoMsg = urlMsg = ""
         if server:
@@ -87,7 +101,11 @@ class RepositoryLocked(RepositoryError):
         return 'The repository is currently busy.  Try again in a few moments.'
 
 class OpenError(RepositoryError):
-    """Error occurred opening the repository"""
+    """
+    Error occurred opening the repository.
+    This is can be due to network error, repository map configuration error, or
+    other problems.
+    """
 
 class RepositoryClosed(OpenError):
     """Repository is closed"""
