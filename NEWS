@@ -1,10 +1,3 @@
-Changes in @NEW@:
-  o Bug Fixes:
-    * When using the tagScript argument with the client's applyUpdateJob
-      call, the paths to group scripts to be executed are stored relative
-      to the root of the installation, instead of absolute. The tag
-      script is always supposed to be executed under chroot. (CNY-2523)
-
 Changes in 1.1.31.12:
   o Bug Fixes:
     * A bug that could cause incorrect SQLite database error messages
@@ -13,8 +6,12 @@ Changes in 1.1.31.12:
       to use the web interface has been fixed. (CNY-2374)
     * Slow SQL queries used to remove unused entries from the
       TroveFiles table and TroveTroves table have been rewritten to
-      make markremoved faster with repositories implemented with a 
+      make some queries faster with repositories implemented with a
       sqlite database. (CNY-2515)
+    * When using the tagScript argument with the client's applyUpdateJob
+      call, the paths to group scripts to be executed are stored relative
+      to the root of the installation, instead of absolute. The tag
+      script is always supposed to be executed under chroot. (CNY-2523)
 
   o Other changes:
     * The file EULA_Conary.txt has been added to clarify that Conary
