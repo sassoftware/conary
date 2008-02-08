@@ -40,7 +40,7 @@ export their namespaces.
 import itertools
 
 #conary
-from conary.deps import deps
+from conary.deps import arch, deps
 from conary.lib import log
 from conary.errors import CvcError
 
@@ -633,8 +633,10 @@ class UseCollection(Collection):
  
 class LocalFlag(Flag):
 
-    def __init__(self, name, parent, track=False, required=False):
-        Flag.__init__(self, name, parent, track=track, required=required)
+    def __init__(self, name, parent, track=False, required=False, path=None,
+                 platform=False):
+        Flag.__init__(self, name, parent, track=track, required=required,
+                      path=path, platform=platform)
         self._override = False
 
     def _set(self, value=True, override=False):
@@ -764,7 +766,8 @@ def localFlagsToFlavor(recipeName):
 
 def platformFlagsToFlavor(recipeName=None):
     flags = []
-    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), LocalFlags._iterAll()):
+    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), 
+                                LocalFlags._iterAll()):
         if flag.isPlatformFlag():
             flags.append(flag)
     return createFlavor(recipeName, flags, error=False)
@@ -848,30 +851,23 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                                                'localflag %s when no trove '
                                                'name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
-            if len([ x for x in depGroup.getDeps()]) > 1:
-                setOnlyIfMajArchSet = True
-                found = False
-            else:
-                setOnlyIfMajArchSet = False
+            found = False
+            try:
+                majorArch = arch.getMajorArch(depGroup.getDeps())
+            except arch.IncompatibleInstructionSets, e:
+                raise RuntimeError(str(e))
 
-            for dep in depGroup.getDeps():
-                majarch = dep.name
-                if setOnlyIfMajArchSet and not Arch[majarch]:
-                    continue
-                found = True
+            if majorArch is None:
+                # No IS deps?
+                return
 
-                subarches = []
-                for (flag, sense) in dep.flags.iteritems():
-                    if sense in (deps.FLAG_SENSE_REQUIRED,
-                                 deps.FLAG_SENSE_PREFERRED):
-                        subarches.append(flag)
-                Arch._setArch(majarch, subarches)
+            subarches = []
+            for (flag, sense) in majorArch.flags.iteritems():
+                if sense in (deps.FLAG_SENSE_REQUIRED,
+                             deps.FLAG_SENSE_PREFERRED):
+                    subarches.append(flag)
+            Arch._setArch(majorArch.name, subarches)
 
-            if setOnlyIfMajArchSet and not found:
-                if error:
-                    raise RuntimeError, ('Cannot set arctitecture build flags'
-                                         ' to multiple architectures:'
-                                         ' %s: %s' % (recipeName, flavor))
 Arch = ArchCollection()
 Use = UseCollection()
 LocalFlags = LocalFlagCollection()

@@ -298,7 +298,8 @@ class ChangeSetJob:
     storeOnlyConfigFiles = False
 
     def addTrove(self, oldTroveSpec, trove, hidden = False):
-	return self.repos.addTrove(trove, hidden = hidden)
+	return self.repos.addTrove(trove, hidden = hidden,
+                                   oldTroveSpec = oldTroveSpec)
 
     def addTroveDone(self, troveId, mirror=False):
 	self.repos.addTroveDone(troveId, mirror=mirror)
@@ -430,9 +431,12 @@ class ChangeSetJob:
 
             self.checkTroveSignatures(newTrove, callback=callback)
 
-	    troveInfo = self.addTrove(
-                    (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
-                    hidden = hidden)
+            if oldTroveVersion is not None:
+                troveInfo = self.addTrove(
+                        (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
+                        hidden = hidden)
+            else:
+                troveInfo = self.addTrove(None, newTrove, hidden = hidden)
 
 	    for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
 		tuple = newFileMap.get(pathId, None)

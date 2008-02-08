@@ -18,10 +18,12 @@ python_files = __init__.py	\
 	buildinfo.py		\
 	buildpackage.py		\
 	cook.py			\
+	derive.py		\
 	derivedpolicy.py	\
 	derivedrecipe.py	\
 	destdirpolicy.py	\
 	errors.py	        \
+	explain.py	        \
 	filter.py 		\
 	filesetrecipe.py	\
 	grouprecipe.py		\

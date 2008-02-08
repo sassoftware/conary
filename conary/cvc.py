@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -28,11 +28,11 @@ from conary import conarycfg
 from conary import conaryclient
 from conary import constants
 from conary import deps
-from conary import errors
+from conary import errors, keymgmt
 from conary import state
 from conary import updatecmd
 from conary import versions
-from conary.build import cook, use, signtrove
+from conary.build import cook, use, signtrove, derive, explain
 from conary.build import errors as builderrors
 from conary.lib import cfg
 from conary.lib import log
@@ -96,6 +96,18 @@ class AddCommand(CvcCommand):
         checkin.addFiles(args[1:], text = text, binary = binary, repos = repos,
                          defaultToText = False)
 _register(AddCommand)
+
+class ExplainCommand(CvcCommand):
+    commands = ['explain']
+    paramHelp = 'method'
+    help = 'Display Conary recipe documentation'
+
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos=None):
+        if len(args) < 3:
+            return explain.docAll(cfg)
+        return explain.docObject(cfg, args[2])
+_register(ExplainCommand)
 
 class AnnotateCommand(CvcCommand):
     commands = ['annotate']
@@ -244,9 +256,15 @@ class PromoteCommand(CvcCommand):
                                      ' being cloned'),
              'default-only'    : (VERBOSE_HELP, 'EXPERIMENTAL - '
                                    ' Clones only those components'
-                                   'that are installed by default.'),
+                                   ' that are installed by default.'),
              'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
-                                           ' to the repository')
+                                           ' to the repository'),
+             'all-flavors' : (VERBOSE_HELP, 'Promote all flavors of a'
+                                            ' package/group at the same time'
+                                            ' (now the default)'),
+             'exact-flavors' : (VERBOSE_HELP, 'Specified flavors must match'
+                                              'the package/group flavors'
+                                              'exactly to promote')
            }
 
     def addParameters(self, argDef):
@@ -256,10 +274,12 @@ class PromoteCommand(CvcCommand):
         argDef["message"] = '-m', ONE_PARAM
         argDef["test"] = NO_PARAM
         argDef["all-flavors"] = NO_PARAM
+        argDef["exact-flavors"] = NO_PARAM
         argDef["without-sources"] = NO_PARAM
         argDef["with-sources"] = NO_PARAM
         argDef["default-only"] = NO_PARAM
         argDef["to-file"] = ONE_PARAM
+        argDef["exact-flavors"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -279,17 +299,18 @@ class PromoteCommand(CvcCommand):
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
-        allFlavors = argSet.pop("all-flavors", False)
+        allFlavors = argSet.pop("all-flavors", True)
         cloneSources = not argSet.pop("without-sources", False)
         argSet.pop("with-sources", False)
         targetFile = argSet.pop("to-file", False)
         defaultOnly = argSet.pop("default-only", False)
+        exactFlavors = argSet.pop("exact-flavors", False)
         clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test,
                             cloneSources=cloneSources, allFlavors=allFlavors,
                             cloneOnlyByDefaultTroves=defaultOnly,
-                            targetFile=targetFile)
+                            targetFile=targetFile, exactFlavors=exactFlavors)
 _register(PromoteCommand)
 
 
@@ -559,7 +580,58 @@ class DescribeCommand(CvcCommand):
         log.setVerbosity(level)
 _register(DescribeCommand)
 
+class DeriveCommand(CvcCommand):
+    commands = ['derive']
+    hidden = True
+    paramHelp = "<trove>[=<version>][[flavor]]"
+    help = 'Aggregation command to shadow, check out and alter a recipe'
+    commandGroup = 'Repository Access'
 
+    docs = {'dir' : 'Derive single trove and check out in directory DIR',
+            'extract': 'extract parent trove into _ROOT_ subdir for editing',
+            'target': 'target label which the derived package should be shadowed to (defaults to buildLabel)',
+            'info': 'Display info on shadow'}
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef["dir"] = ONE_PARAM
+        argDef["info"] = '-i', NO_PARAM
+        argDef['extract'] = NO_PARAM
+        argDef['target'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False,
+                   callback = None, repos = None):
+        args = args[1:]
+        checkoutDir = argSet.pop('dir', None)
+        extract = argSet.pop('extract', False)
+        targetLabel = argSet.pop('target', None)
+        info = prep = False
+        if argSet.has_key('info'):
+            del argSet['info']
+            info = True
+
+        if argSet or len(args) != 2:
+            return self.usage()
+
+        troveSpec = args[1]
+
+        # we already know there's exactly one troveSpec
+        if extract and ':source' in troveSpec.split('=')[0]:
+            # usage of --extract-dir requires specification of a binary trove
+            return self.usage()
+        if targetLabel:
+            try:
+                targetLabel = versions.Label(targetLabel)
+            except:
+                return self.usage()
+        else:
+            targetLabel = cfg.buildLabel
+
+        callback = derive.DeriveCallback(cfg)
+        derive.derive(repos, cfg, targetLabel, troveSpec,
+                checkoutDir = checkoutDir, extract = extract,
+                info = info, callback = callback)
+_register(DeriveCommand)
 
 class DiffCommand(CvcCommand):
     commands = ['diff']
@@ -641,6 +713,83 @@ class RenameCommand(CvcCommand):
         checkin.renameFile(args[1], args[2], repos=repos)
 _register(RenameCommand)
 
+class AddKeyCommand(CvcCommand):
+    commands = ['addkey']
+    paramHelp = '<user>'
+    help = 'Adds a public key from stdin to a repository'
+    commandGroup = 'Key Management'
+    docs = {'server'       : 'Repository server to retrieve keys from' }
+    hidden = True
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['server'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        if len(args) == 3:
+            user = args[2]
+        elif len(args) == 2:
+            user = None
+        else:
+            return self.usage()
+
+        server = argSet.pop('server', None)
+        keymgmt.addKey(cfg, server, user)
+_register(AddKeyCommand)
+
+class GetKeyCommand(CvcCommand):
+    commands = ['getkey']
+    paramHelp = 'fingerprint'
+    help = 'Retrieves a specified public key from a repository'
+    commandGroup = 'Key Management'
+    docs = {'server'       : 'Repository server to retrieve keys from' }
+    hidden = True
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['server'] = ONE_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        if len(args) != 3:
+            return self.usage()
+        else:
+            fingerprint = args[2]
+
+        server = argSet.pop('server', None)
+        keymgmt.showKey(cfg, server, fingerprint)
+_register(GetKeyCommand)
+
+class ListKeysCommand(CvcCommand):
+    commands = ['listkeys']
+    paramHelp = '[user]'
+    help = 'Lists the public key fingerprints for a specified user'
+    commandGroup = 'Key Management'
+    docs = {'fingerprints' : 'Display fingerprints of keys',
+            'server'       : 'Repository server to retrieve keys from' }
+    hidden = True
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['server'] = ONE_PARAM
+        argDef['fingerprints'] = NO_PARAM
+
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        if len(args) > 3:
+            return self.usage()
+        elif len(args) == 3:
+            user = args[2]
+        else:
+            user = None
+
+        server = argSet.pop('server', None)
+        showFps = 'fingerprints' in argSet
+
+        keymgmt.displayKeys(cfg, server, user, showFingerprints = showFps)
+_register(ListKeysCommand)
+
 class RevertCommand(CvcCommand):
     commands = ['revert']
     help = 'Revert local changes to one or more files'
@@ -680,7 +829,7 @@ _register(SignCommand)
 class NewPkgCommand(CvcCommand):
     commands = ['newpkg']
     paramHelp = '<name>'
-    help = 'Set up the directory for creating a new package'
+    help = 'Set a directory for creating a new package'
     commandGroup = 'Setup Commands'
     docs = {'dir' : 'create new package in DIR',
             'template' : 'set recipe template to use'}
@@ -788,18 +937,17 @@ _register(StatCommand)
 
 class UpdateCommand(CvcCommand):
     commands = ['update', 'up']
-    paramHelp = "[<version>]"
-    help = 'Update files in current directory to a different version'
+    paramHelp = "[<dir>=<version>]*"
+    help = 'Update files in one or more directories to a different version'
     commandGroup = 'File Operations'
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
-        args = args[1:]
-        if argSet or not args or len(args) > 2: return self.usage()
+        args = args[2:]
+        if argSet: return self.usage()
 
-        args[0] = repos
         kwargs = {'callback': callback}
-        checkin.updateSrc(*args, **kwargs)
+        checkin.updateSrc(repos, versionList = args, **kwargs)
 _register(UpdateCommand)
 
 
@@ -883,6 +1031,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
                                   repos=repos)
 
 def main(argv=sys.argv):
+    sys.stdout = util.FileIgnoreEpipe(sys.stdout)
     try:
         argv = list(argv)
         debugAll = '--debug-all' in argv

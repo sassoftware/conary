@@ -425,10 +425,8 @@ class TroveStore:
 
             # sanity check - version/flavor of components must match the
             # version/flavor of the package
-            assert(trv.isRedirect() or
-                            (not isPackage or version == trv.getVersion()))
-            assert(trv.isRedirect() or
-                            (not isPackage or flavor == trv.getFlavor()))
+            assert(not isPackage or version == trv.getVersion())
+            assert(not isPackage or flavor == trv.getFlavor())
             cu.execute("""
             INSERT INTO tmpTroves (item, version, frozenVersion, flavor, flags)
             VALUES (?, ?, ?, ?, ?)
@@ -957,10 +955,13 @@ class TroveStore:
         self.itemIdCache = {}
         self.seenFileId = set()
 
-    def begin(self):
+    def begin(self, serialize=False):
         self._cleanCache()
-        return self.db.transaction()
-
+        cu = self.db.transaction()
+        if serialize:
+            schema.lockCommits(self.db)
+        return cu
+    
     def rollback(self):
         self._cleanCache()
         return self.db.rollback()

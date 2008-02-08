@@ -259,6 +259,10 @@ class Policy(action.RecipeAction):
             if expression in seen:
                 # only put each expression on the list once
                 continue
+            if isinstance(expression, action.Glob):
+                expression = expression()
+            elif isinstance(expression, action.Regexp):
+                expression = expression.pattern
             seen.append(expression)
             args, kwargs = self.filterExpArgs(expression)
             filterList.append(filter.Filter(*args, **kwargs))
@@ -367,12 +371,17 @@ class Policy(action.RecipeAction):
         return False
 
     def mtimeChanged(self, path):
-        newPath = util.joinPaths(self.rootdir, path)
+        newPath = util.joinPaths(self.macros.destdir, path)
         if not util.exists(newPath):
             return True
+        oldMtime = self.recipe._derivedFiles.get(path, None)
         try:
-            oldMtime = self.recipe._derivedFiles[path]
-            newMtime = os.lstat(newPath).st_mtime
+            if os.path.islink(newPath):
+                # symlinks are special, we compare the target of the link
+                # instead of the mtime
+                newMtime = os.readlink(newPath)
+            else:
+                newMtime = os.lstat(newPath).st_mtime
             return oldMtime != newMtime
         except:
             return True

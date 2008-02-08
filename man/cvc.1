@@ -1,24 +1,23 @@
 .\" Copyright (c) 2004-2006 rPath, Inc.
-.TH CVC 1 "12 January 2006" "rPath, Inc."
+.TH CVC 1 "13 November 2007" "rPath, Inc."
 .SH NAME
 cvc \- Conary source management
 .SH SYNOPSIS
-.B cvc \fIcommand \fR[\fI<args>\fR]
+.B cvc command [\fI<args>\fP]
 .SH DESCRIPTION
 \fBConary\fR is a software configuration manager that uses distributed,
 network-based, versioned repositories rather than disparate package
 files as its canonical source of data.  Conary uses the repository
-versioning to intelligently merge configuration files, file ownership
-and permissions, and so forth.  The \fIC\fPonary \fIv\fPersion
+versioning to intelligently merge configuration files, file ownership, 
+file permissions, and so forth.  The \fIC\fPonary \fIv\fPersion
 \fIc\fPontrol program, called \fBcvc\fP, handles build and source
 management, and is responsible for all changes to the repository.
 .SH REFERENCE
 cvc has several common command-line arguments which modify
-configuration entries and are documented with those configuration
-entries.  The rest of its command-line arguments are specific to
-which cvc \fBcommand\fP you are running, and are documented with
-the commands.
-.SS "Building Components and Packages"
+configuration entries.  The rest of its command-line arguments 
+are specific to which cvc \fBcommand\fP you are running, and are 
+documented within the commands.
+.SS "Build Management"
 A source component is checked out into a \fBsource directory\fP
 with the \fBcheckout\fP command, or a source component and
 source directory are created with the \fBcvc newpkg\fP subcommand.
@@ -32,58 +31,205 @@ source package or schedule a change to be applied to the repository by the next
 .PP
 The default branch on which each of these commands operates
 is specified by the \fBbuildLabel\fP configuration entry
-(see below).
 .PP
-The following \fBcommands\fP to \fBcvc\fP are used to create,
-modify, and cook source components:
-.TP 4
-.B cook \fI[\fR\-\-prep\fI] [\fR--macros file\fI] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-download\fI] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-resume[=(<linenums>|policy)]] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-flavor <flavor>] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-macro '<macro> <string>'] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-ignore-buildreqs] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-show-buildreqs] \e
-.PD 0
-.TP
-.B \ \ \ \ \ [\fR\-\-signature-key <fingerprint>|None] \e
-.PD 0
-.TP
-.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>[=<version>]...
-.PD
+.SH FILE OPERATIONS
+cvc commands that are used to manage files in the source directory.
+Repository interactive commands are located in REPOSITORY ACCESS.
 
-Build a package.  If \fB\-\-prep\fP is specified, the source code is
-unpacked, but is not built. If \fB\-\-download\fP is specified, the source code
-is downloaded into your lookaside, but is not unpacked or built. If
-\fB\-\-macros\fP is specified, it names a file (containing one macro
-definition per line) to apply to the recipe macro set. Macro files can also
-contain comments starting with "#" and blank lines.
-.IP
-If \fB\-\-resume=<linenums>\fP is specified, 
-conary will cook the specified line numbers of the recipe.  The format of
-<linenums> is any number of pairs of n or n:m 
-separated by commas, where n and m are line numbers in the recipe.  
-If the initial line number in a pair is left off, leaving :m, 
-conary will begin cooking from the beginning of the file.  
-If the final line number is left off, leaving n:, conary will cook
-until the end 
-of the file, run all the policy, and create a changeset.  A \-\-resume=n without
-a colon is equivalent to n:n, if there are other ranges given to \-\-resume,
+.TP 4
+.B add \fIfile...\fP
+Adds all the files listed on the command line to the source
+component. In extremely rare cases, adding files may prompt to specify the
+file type with a \fB\-\-text\fP or \fB\-\-binary\fP argument to add.
+.TP 4
+.B merge [\fI<revision>\fP]
+Run from a source directory containing a shadow, this merges changes made
+on the parent branch since the last \fBshadow\fP or \fBmerge\fP command
+into the shadow.
+
+If <revision> is specified, changes made to the upstream branch up to that 
+revision will be made.  Revision may be specified as either as the upstream version or the <upstream version>-<source count>.  For convenience when cutting and pasting, a full version is accepted, but the full version must be on correct parent branch.
+.TP 4
+.B refresh [\fI<fileglob>...\fP]
+This source command reloads URL-referenced autosource files specified by 
+\fI<fileglob>\fP arguments from the upstream source at the next \fBcook\fP 
+command usage. The \fI<fileglob>\fP arguments are globs matched only against 
+the basename of the file, and not the entire URL. If refresh is invoked 
+without \fI<fileglob>\fP arguments, all autosource files will be reloaded.
+.TP 4
+.B remove \fI<filename>...\fP
+Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
+the file from the filesystem and marks it to be removed from the next
+version checked into the repository at the next \fBcvc commit\fP.
+Synonyms: \fBrm\fP
+.TP 4
+.B rename \fI<oldname> <newname>\fP
+Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
+and marks it to be removed from the repository at the next
+\fBcvc commit\fP.
+.TP 4
+.B revert [\fI<filename>...\fP]
+Any changes made to local files are reverted. If one or more filenames
+are passed as arguments, only the changes made to those files are reverted.
+.TP 4
+.B set \fI<filename>...>/fP \fI[--text]\fP \fI[--binary]\fP
+Binary and text files in source components are handled slightly differently
+with diff/patch style merging being used for text files. This command lets
+the user switch a file between binary and text modes.
+.TP 4
+.B update [\fI<dir>=<version>\fP]*
+Updates one or more directories, merging changes when possible.  When no
+directory is specified, the current directory is updated to the latest
+version.  Specifying one or more directories updates each directory to its
+latest version.  To update to a version other than the latest, specify the
+version alone (to update the current directory) or with each directory
+listed.
+Synonyms: \fBup\fP
+.SH INFORMATION DISPLAY
+Commands that display cvc configuration and configuration files.  These commands
+may be used interactively to set configuration in some instances as well.
+
+.TP 4
+.B annotate \fI<file>\fP
+Show the version, date, and author of each of the lines in \fI<file>.
+\fI<file> must be a file in a conary source dir.
+.TP 4
+.B config \fI<option>\fP
+Display the current configuration.
+.RS 4
+.TP 4
+.B \-\-build-label=LABEL
+Use build label LABEL as default search location
+.TP 4
+.B \-\-config="KEY VALUE"
+Set config KEY to VALUE
+Synonyms: \fB \-c "KEY VALUE"\fP
+.TP 4
+.B \-\-config-file=PATH
+Read PATH configuration file
+.TP 4
+.B \-\-context=CONTEXT
+Set the current context
+.TP 4
+.B \-\-debug=DEBUG
+Print helpful debugging output (use --debug=all for internal debug info)
+.TP 4
+.B \-\-flavors
+Display configuration with complete flavors where applicable
+.TP 4
+.B \-\-full-versions
+Always display complete version strings
+.TP 4
+.B \-\-install-label=LABEL
+Set the installLabel
+.TP 4
+.B \-\-interactive
+ask questions before performing actions that change system or repository state
+.TP 4
+.B \-\-pubring=PUBRING
+Sets the public key to PUBRING
+.TP 4
+.B \-\-quiet
+Do not display extra information when displaying configuration
+.TP 4
+.B \-\-root=ROOT
+Use the conary database at ROOT.
+Synonyms: \fB \-r ROOT\fP
+.TP 4
+.B \-\-skip-default-config
+Do not read default configuration
+.TP 4
+.B \-\-verbose=VERBOSE
+Displays more verbose output of configuration
+.TP 4
+.B \-\-show-contexts
+Display contexts as well as current configuration
+.TP 4 
+.B \-\-show-files
+Shows files as well as the current configuration
+.TP 4
+.B \-\-show-passwords
+Do not mask passwords when displaying configuration
+.RE
+.TP 4
+.B diff
+Show (in a slightly extended unified diff format) the changes that
+have been made in the current source directory since the last
+\fBcvc commit\fP
+(or, if no commit, since the source component was checked out). If an
+error occurs, diff returns a value of 2. If there are differences
+in the local directory, 1 is returned. If no differences are found, 0
+is returned (this convention is consistent with \fBdiff\fR(1).
+.TP 4
+.B explain
+Displays the Conary API Documentation associated with a recipe or action
+within a recipe.  For example, \fBcvc explain addSource\fP will display
+information about using \fBaddSource\fP in a recipe.
+\fBcvc explain PackageRecipe\fP will display information about
+\fBPackageRecipe\fP and list available actions.
+.TP 4
+.B help
+Displays cvc help file.  Can be added to individual commands as an 
+option.  For example, \fBcvc cook help\fP will display help information
+for the \fBcook\fP command.
+.TP 4
+.B log [\fI<branch>\fP]
+Prints the log messages for the branch specified by \fBbuildLabel\fP,
+or for \fI<branch>\fP if specified.
+.TP 4
+.B rdiff \fI<name> <oldver> <newver>\fP
+This source command operates only on the repository, not on a
+source directory.  It creates a diff between two versions of
+a source trove from the repository.
+.TP 4
+.B status
+This command displays the status of changed files in the working directory.
+Synonyms:  \fBstat\fP, \fBst\fP
+
+.nf
+The following are possible file status codes returned by \fBstatus\fP:
+A = added
+M = modified
+R = removed
+? = not tracked
+.fi
+.SH KEY MANAGEMENT
+Commands used for client-server public key interaction
+
+.TP 4
+.B addkey [\fI<user>\fP]
+Reads the ASCII armored public key from stdin and adds it as a key for
+the specified user.  If no user is specified, the default user for that
+server is used.
+.TP 4
+.B getkey [\fI<keyid>\fP]
+Displays the ASCII armored public key for the given keyId (a full fingerprint
+may also be used).
+.TP 4
+.B listkeys [\fI<user>\fP]
+Displays the keyIds for the public keys stored on a server for a user
+user. If no user is specified, the default user for that server is used.
+.SH RECIPE BUILDING
+.TP 4
+.B cook [\fI<args>\fP]
+.RS 4
+.TP 4
+.B \-\-prep
+The source code is unpacked, but is not built.
+.TP 4
+.B \-\-download
+The source  code  is downloaded into your lookaside, but is not 
+unpacked or built.
+.TP 4
+.B \-\-resume=<linenums>\fP 
+Conary will cook the specified line numbers of the recipe.  The format 
+of <linenums> is any number of pairs of n or n:m separated by commas, 
+where n and m are line numbers in the recipe.  If the initial line 
+number in a pair is left off, leaving :m, conary will begin cooking 
+from the beginning of the file.  If the final line number is left off, 
+leaving n:, conary will cook until the end of the file, run all the 
+policy, and create a changeset.  A \fB\-\-resume=n\fP without a colon is 
+equivalent to n:n, if there are other ranges given to \-\-resume,
 or n: if it is the only argument given to \-\-resume.  All resume line 
 numbers must be provided in increasing order.
 
@@ -99,44 +245,51 @@ Example: cvc cook \-\-resume=5:10,15,35:
 
 Note that the \fB\-\-resume\fP option may
 be used only with local recipe files, not source components being
-built directly from a repository.
-.IP 
-The \-\-flavor option can be used to override the default Use flags, 
+built directly from a repository. 
+.TP 4
+.B \-\-flavor 
+Can be used to override the default Use flags, 
 package-specific flags, and arch Flags  for this instantiation.   
 The format is exactly as it is shown in conary config flavors.  The 
 flavor specified here overrides flavors specified in the buildFlavor
 config option.
-.IP
-The \-\-macro option assigns the given string value to <macro>.  
+.TP 4
+.B \-\-macro
+Assigns the given string value to <macro>.  
 The value given overrides any attempt to reset the value later in the 
 recipe.  The macro and its boolean value must be enclosed in quotes. Macros
 defined using \-\-macro override macros defined in a file specified by
-\-\-macros.
-.IP 
-The \-\-no-clean option does not clean up the build directories
-after the build is complete, even if the build is successful.
-This can be useful for rerunning policy for a complete build using 
-\-\-resume, or for examining the completed build directories.
-.IP 
-The \-\-ignore-buildreqs option (also available as the \-\-no-deps
-option) prevents conary from raising an error 
-if a component or package listed as a build requirement for the package
-is not installed on the build system.
+\-\-macros.  If \fB\-\-macros\fP is specified, it names 
+a file (containing one macro definition per line) to apply to the 
+recipe macro set. Macro files can also contain comments starting 
+with "#" and blank lines. 
+.TP 4
+.B \-\-no-clean 
+Does not clean up the build directories after the build is complete, 
+even if the build is successful.  This can be useful for rerunning 
+policy for a complete build using \-\-resume, or for examining the 
+completed build directories.
+.TP 4
+.B \-\-ignore-buildreqs 
+Prevents conary from raising an error if a component or package listed 
+as a build requirement for the package is not installed on the build 
+system. (also available as the \-\-no-deps option)
+.TP 4
+.B \-\-show-buildreqs 
+Prints the complete list of build dependencies, one dependency per 
+line.  This includes dependencies not explicitly specified in the 
+recipe but instead inherited from superclasses.  No other build 
+actions are performed.
+.TP 4
+.B \-\-signature\-key 
+The OpenPGP key in the local keyring with that fingerprint will be used 
+to create trove signatures for all troves created during the cook. 
+The repository must recognize the OpenPGP key that made the trove signature 
+or the respective troves will be rejected. If \-\-signature\-key None 
+is specified, generation of trove signatures will be disabled.
 .IP
-The \-\-show-buildreqs option prints the complete list of build dependencies,
-one dependency per line.  This includes dependencies not explicitly
-specified in the recipe but instead inherited from superclasses.
-No other build actions are performed.
-.IP
-If \-\-signature\-key is specified, the OpenPGP key in the local keyring with 
-that fingerprint will be used to create trove signatures for all troves created 
-during the cook. The repository must recognize the OpenPGP key that made the 
-trove signature or the respective troves will be rejected. If 
-\-\-signature\-key None is specified, generation of trove signatures will be 
-disabled.
-.IP
-If the thing to be cooked ends in \fB.recipe\fP, then
-it must be a recipe file and the package will be cooked from the
+If the item to be cooked ends in \fB.recipe\fP, then
+it is a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
 the package will be cooked from the repository.  If a version is 
 specified, it must be a source version for that component.
@@ -144,16 +297,10 @@ specified, it must be a source version for that component.
 Conary caches already-downloaded sources aggresively, both on the
 local system and in the repository.  To refresh either cache, see
 the \fBrefresh\fP command.
+.RE
+.SH REPOSITORY ACCESS
+Explain Repository Access Here...
 .TP 4
-.B add \fIfile...\fP
-Adds all the files listed on the command line to the source
-component. In extremely rare cases, adding files may prompt to specify the
-file type with a \fB\-\-text\fP or \fB\-\-binary\fP argument to add.
-.TP
-.B annotate \fI<file>\fP
-Show the version, date, and author of each of the lines in \fI<file>.
-\fI<file> must be a file in a conary source dir.
-.TP
 .B checkout [\-\-dir \fI<dir>\fP] \fI<trove\fP[=\fIversion\fP]>\fP
 Check the \fI<trove>\fB:source\fR component out of the repository
 and put it in directory \fI<dir>\fP if specified, and directory
@@ -162,12 +309,9 @@ specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
 Multiple source troves may be specified if the \-\-dir option is
 not used.
 Synonyms: \fBco\fP
-.TP
 .B clone newclone [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Clones a trove from one repository to another. This is similar to shadowing in
-that it creates a new trove with information from another. However, unlike
-shadowing, cloning will not create a new label on the target branch and it is
-not possible to merge changes (see "merge" later in this document) with clone.
+that it creates a new trove with information from another.
 Unlike shadowing, \fBnewclone\fP must be a full branch name. See the
 \fBExamples\fP section for more information.
 .RS 4
@@ -190,7 +334,7 @@ Normally, cvc tried to rewrite any build information stored with the trove, such
 .B \-\-test
 Go through the entire process of creating the clone changeset, but do not commit it to the repository.
 .RE
-.TP
+.TP 4
 .B commit [\-\-message|\-m \fI<message>\fP] [\-\-log\-file \fI<file>\fP]\fP
 Different from \fBconary commit\fP, \fBcvc commit\fP
 commits all the changes in the source directory to the repository. 
@@ -208,46 +352,32 @@ and terminate the message with a single period character on a line to finish.
 Pressing CTRL-D (EOF) will cancel both the message input and commit.
 
 Synonyms: \fBci\fP
-.TP
-.B context [name] [\-\-show-passwords]\fP
-When not passed a name, displays information about the current context.
-See \fIman conary\fP for more information on contexts, and the show-passwords
-option.
-.IP
-When passed a name, sets the context to <name> for the current directory.
-That context will then be used for all conary
-operations in the directory.  The commands \fBcvc checkout\fP and 
-\fBcvc newpkg\fP will transfer the current context into their newly 
-created directories.
-.TP
+.TP 4
 .B describe \fI<xml file>\fP
 Update the metadata of the source trove in the current source directory
 based on the contents of \fI<xml file>\fP.
+.RS 4
+.TP 4
+.B \-\-server [\fI<servername>\fP]
+The named repository server is queried instead of the server for the
+current \fRbuildLabel\fP.
+.RE
+.RS 4
+.TP 4
+.B \-\-server [\fI<servername>\fP]
+The named repository server is queried instead of the server for the
+current \fRbuildLabel\fP.
+.RE
+.RS 4
+.TP 4
+.B \-\-fingerprints
+Display the full fingerprint for each key instead of the key id.
 .TP
-.B diff
-Show (in a slightly extended unified diff format) the changes that
-have been made in the current source directory since the last
-\fBcvc commit\fP
-(or, if no commit, since the source component was checked out). If an
-error occurs, diff returns a value of 2. If there are differences
-in the local directory, 1 is returned. If no differences are found, 0
-is returned (this convention is consistent with \fBdiff\fR(1).
-.TP
-.B log [\fI<branch>\fP]
-Prints the log messages for the branch specified by \fBbuildLabel\fP,
-or for \fI<branch>\fP if specified.
-.TP
-.B newpkg [\fI--template <recipeTemplate>\fP] \fI<name\fP[=\fIlabel\fP]>\fP
-Creates a new package.
-.TP
-.B merge [\fI<revision>\fP]
-Run from a source directory containing a shadow, this merges changes made
-on the parent branch since the last \fBshadow\fP or \fBmerge\fP command
-into the shadow.
-
-If <revision> is specified, changes made to the upstream branch up to that 
-revision will be made.  Revision may be specified as either as the upstream version or the <upstream version>-<source count>.  For convenience when cutting and pasting, a full version is accepted, but the full version must be on correct parent branch.
-.TP
+.B \-\-server [\fI<servername>\fP]
+The named repository server is queried instead of the server for the
+current \fRbuildLabel\fP.
+.RE
+.TP 4
 .B promote [\fIpackage/groupname\fP[=\fIversion\fP][\fI<flavor>\fP]]+ [\fIfromLoc\fP--\fItoLoc\fP]+
 Clones (copies) a set of packages from one set of labels to another.
 
@@ -256,7 +386,7 @@ that it creates a new trove with information from another. However, unlike
 shadowing, cloning will not create a new label on the target branch and it is
 not possible to merge changes (see "merge" later in this document) with clone.
 
-fromLoc and toLoc and be one of the following forms:
+fromLoc and toLoc can be one of the following forms:
 <branch> - /conary.rpath.com@rpl:devel//1, e.g.
 <label> - conary.rpath.com@rpl:devel, e.g.
 <partial label> - @rpl:devel, :devel, e.g.
@@ -270,9 +400,10 @@ toLoc.  If a package is specified and it matches a from label, then it will be c
 Sources are always cloned with binaries.
 
 There are limits to the promotes one can make - one can clone between siblings - from /A//B to /A//C, for example, or uphill to parents - from /A//B to /A, or to siblings of parents - from /A//B/C to /A//D, or from /A//B//C to /D. One cannot clone from branch /A//B to /C//D, because there is no relationship between the parents of these two branches, /A != /C.  All promotes other than sibling promotes must be specified via branches.
+.RS 4
 .TP 4
-.B \-\-all-flavors
-Clone all flavors for the latest versions of the specified troves.
+.B \-\-all-flavors (deprecated)
+Clone all flavors for the latest versions of the specified troves.  Now on by default.
 .TP 4
 .B \-\-without-sources
 Do not automatically clone the source for every package you are cloning.  This 
@@ -289,40 +420,10 @@ Normally, cvc tried to rewrite any build information stored with the trove, such
 .TP
 .B \-\-test
 Go through the entire process of creating the clone changeset, but do not commit it to the repository.
+.TP
+.B \-\-exact\-flavors
+Only promote exactly the packages with the flavors you specify, without merging in your system flavor.
 .RE
-.TP
-
-.B rdiff \fI<name> <oldver> <newver>\fP
-This source command operates only on the repository, not on a
-source directory.  It creates a diff between two versions of
-a source trove from the repository.
-.TP
-.B refresh [\fI<fileglob>...\fP]
-This source command reloads URL-referenced autosource files specified by 
-\fI<fileglob>\fP arguments from the upstream source at the next \fBcook\fP 
-command usage. The \fI<fileglob>\fP arguments are globs matched only against 
-the basename of the file, and not the entire URL. If refresh is invoked 
-without \fI<fileglob>\fP arguments, all autosource files will be reloaded.
-.TP
-.B remove \fI<filename>...\fP
-Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
-the file from the filesystem and marks it to be removed from the next
-version checked into the repository at the next \fBcvc commit\fP.
-Synonyms: \fBrm\fP
-.TP
-.B rename \fI<oldname> <newname>\fP
-Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
-and marks it to be removed from the repository at the next
-\fBcvc commit\fP.
-.TP
-.B revert [\fI<filename>...\fP]
-Any changes made to local files are reverted. If one or more filenames
-are passed as arguments, only the changes made to those files are reverted.
-.TP
-.B set \fI<filename>...>/fP \fI[--text]\fP \fI[--binary]\fP
-Binary and text files in source components are handled slightly differently
-with diff/patch style merging being used for text files. This command lets
-the user switch a file between binary and text modes.
 .TP
 .B shadow \fInewshadow [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Creates a new shadow (identified by the label \fInewshadow\fP) in the
@@ -343,27 +444,34 @@ signatureKeyMap settings specified in config files. The repositories affected
 must recognize the OpenPGP key(s) that made the trove signature(s) or the 
 respective signatures will be rejected.
 .TP
-.B status
-This command displays the status of changed files in the working directory.
-Synonyms:  \fBstat\fP, \fBst\fP
-
-.nf
-The following are possible file status codes returned by \fBstatus\fP:
-A = added
-M = modified
-R = removed
-? = not tracked
-.fi
+.B derive [\fIpackagename\fP[=\fIversion\fP][\fI<flavor>\fP]]
+Creates a derived package in one step. This is an aggregation function to
+shadow, check out and patch a package in one step. derive performs a
+source\-only shadow of \fI<package>:source\fR to your \fIbuildLabel\fR.
+.RS 4
 .TP
-.B update [\fI<version>\fP]
-Updates the current source directory to the latest version, or to
-\fI<version>\fP if specified.  Merges changes when possible.
-Synonyms: \fBup\fP
+.B \-\-dir
+Check the \fI<newshadow>:source\fR component out of the repository
+and put it in directory \fI<dir>\fP instead of directory.
+Only one \fI<trove>\fP may be specified if this flag is used.
+\fI<trove>\fP.
+.TP
+.B \-\-extract\
+Check the \fI<trove>\fP package out of the repository and put it in _ROOT_.
+\fI<Trove>\fP must be a binary trove if this flag is used.
+.TP
+.B \-\-info, \-i
+Determine the packages and groups that would be created by the shadow and display that information, without actually shadowing.
+.TP
+.B \-\-target <label>
+Set the label to create the shadow and derived package on.  Defaults to 
+buildLabel.
+.RE
 .RE
 .\"
 .\"
 .\"
-.SH TROVE SIGNATURES
+.SS Trove Signatures
 .TP 4
 .B Discussion
 .br
@@ -391,6 +499,22 @@ place of the full fingerprint. For example:
 .br
 All refer to the exact same OpenPGP Key
 .RE
+.SH SETUP COMMANDS
+Commands used in the creation of new contexts and packages for software creation.
+.TP 4
+.B newpkg [\fI--template <recipeTemplate>\fP] \fI<name\fP[=\fIlabel\fP]>\fP
+Creates a new package.
+.TP 4
+.B context [name] [\-\-show-passwords]\fP
+When not passed a name, displays information about the current context.
+See \fIman conary\fP for more information on contexts, and the show-passwords
+option.
+.IP
+When passed a name, sets the context to <name> for the current directory.
+That context will then be used for all conary
+operations in the directory.  The commands \fBcvc checkout\fP and 
+\fBcvc newpkg\fP will transfer the current context into their newly 
+created directories.
 .\"
 .\"
 .\"
