@@ -1,3 +1,9 @@
+Changes in @NEW@:
+    * When using the tagScript argument with the client's applyUpdateJob
+      call, the paths to group scripts to be executed are stored relative
+      to the root of the installation, instead of absolute. The tag
+      script is always supposed to be executed under chroot. (CNY-2523)
+
 Changes in 2.0.6:
   o Build Changes:
     * Java dependencies for classes that are not dependency-complete

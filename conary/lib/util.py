@@ -1273,7 +1273,6 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
 
     def formatOneFrame(tb, stream):
         fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
-        frame = tb.tb_frame
         stream.write('  File "%s", line %d, in %s\n' % 
             (fileName, lineNo, funcName))
         if text is not None:
@@ -1289,7 +1288,10 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     tbStack = []
     while tb:
         tbStack.append(tb)
-        tb = tb.tb_next
+        if hasattr(tb, 'tb_next'):
+            tb = tb.tb_next
+        else:
+            tb = tb.f_back
 
     if withLocals:
         tbStack.reverse()
@@ -1308,7 +1310,10 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
         if not withLocals:
             continue
 
-        frame = tb.tb_frame
+        if hasattr(tb, 'tb_frame'):
+            frame = tb.tb_frame
+        else:
+            frame = tb
         for k, v in sorted(frame.f_locals.items()):
             if k.startswith('__') and k.endswith('__'):
                 # Presumably internal data
