@@ -29,7 +29,8 @@ Changes in @NEW@:
     * The file EULA_Conary.txt has been added to clarify that Conary
       is available under two licenses, and to state the conditions
       under which the two licenses apply.
-
+    * Reading metadata from RPM files now validates the size of the RPM
+      and the sha1 of the full set of metadata.
 
 Changes in 2.0.5:
   o Client Changes:
