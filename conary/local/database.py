@@ -22,7 +22,7 @@ import shutil
 from conary import constants, files, trove, versions
 from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
-from conary.errors import DatabaseLockedError
+from conary.errors import DatabaseLockedError, DecodingError
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
@@ -221,7 +221,10 @@ class UpdateJob:
         return drep
 
     def _loadFrozenRepr(self, jobfile):
-        ((drep, ), _) = util.xmlrpcLoad(open(jobfile))
+        try:
+            ((drep, ), _) = util.xmlrpcLoad(open(jobfile))
+        except util.xmlrpclib.ResponseError:
+            raise DecodingError("Error loading marshaled data")
 
         if 'dumpVersion' not in drep or drep['dumpVersion'] > self._dumpVersion:
             # We don't understand this format
@@ -247,6 +250,7 @@ class UpdateJob:
         drep['itemList'] = self._freezeItemList()
         drep['keywordArguments'] = self.getKeywordArguments()
         drep['fromChangesets'] = self._freezeFromChangesets()
+        drep['commitChangesetFlags'] = self._freezeCommitChangesetFlags()
         return drep
 
     def loadInvocationInfo(self, jobfile):
@@ -257,6 +261,8 @@ class UpdateJob:
         self.setItemList(self._thawItemList(drep['itemList']))
         self.setKeywordArguments(drep['keywordArguments'])
         self.setFromChangesets(self._thawFromChangesets(drep.get('fromChangesets', [])))
+        self.setCommitChangesetFlags(self._thawCommitChangesetFlags(
+            drep.get('commitChangesetFlags', None)))
         return drep
 
     def thaw(self, frzdir):
@@ -428,6 +434,21 @@ class UpdateJob:
         return [ (t[0],self. __thawVF(t[1]), self.__thawVF(t[2]), bool(t[3]))
                  for t in frzrep ]
 
+    def _freezeCommitChangesetFlags(self):
+        flags = self.getCommitChangesetFlags()
+        if flags is None:
+            return {}
+        return dict((x, int(getattr(flags, x))) for x in flags.__slots__)
+
+    def _thawCommitChangesetFlags(self, frzrep):
+        frzdict = dict()
+        if frzrep is not None:
+            for k, v in frzrep.items():
+                if k in CommitChangeSetFlags.__slots__:
+                    frzdict[k] = bool(v)
+        flags = CommitChangeSetFlags(**frzdict)
+        return flags
+
     def setInvalidateRollbacksFlag(self, flag):
         self._invalidateRollbackStack = bool(flag)
 
@@ -482,6 +503,12 @@ class UpdateJob:
     def getRestartedFlag(self):
         return self._restartedFlag
 
+    def setCommitChangesetFlags(self, commitFlags):
+        self._commitFlags = commitFlags
+
+    def getCommitChangesetFlags(self):
+        return self._commitFlags
+
     def __init__(self, db, searchSource = None, lazyCache = None):
         # 20070714: lazyCache can be None for the users of the old API (when
         # an update job was instantiated directly, instead of using the
@@ -515,6 +542,8 @@ class UpdateJob:
         # This flag gets set if the update job was loaded from the restart
         # information
         self._restartedFlag = False
+
+        self._commitFlags = None
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,

@@ -22,7 +22,7 @@ from conary import conarycfg, constants
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import cmdline, resolve
 from conary.deps import deps
-from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError
+from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError, DecodingError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
@@ -2382,10 +2382,10 @@ conary erase '%s=%s[%s]'
 
             cs.merge(newCs)
 
-    def loadRestartInfo(self, restartInfo):
+    def loadRestartInfo(self, restartInfo, updJob):
         """Load the restart information (generally happening after installing
         a critical update), generated with L{saveRestartInfo}"""
-        return _loadRestartInfo(restartInfo, self.lzCache)
+        return _loadRestartInfo(restartInfo, updJob)
 
     def saveRestartInfo(self, updJob, remainingJobs):
         """Save the restart information after applying a critical update, in
@@ -2545,7 +2545,8 @@ conary erase '%s=%s[%s]'
         restartChangeSets = []
         if restartInfo:
             # ignore itemList passed in, we load it from the restart info
-            itemList, restartChangeSets = self.loadRestartInfo(restartInfo)
+            itemList, restartChangeSets = self.loadRestartInfo(restartInfo,
+                                                               updJob)
             recurse = False
             syncChildren = False    # we don't recalculate update info anyway
                                     # so we'll just revert to regular update.
@@ -2669,26 +2670,37 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        if updJob.getRestartedFlag():
+            # If we're applying the second part of a job (after the critical
+            # update has been applied), grab the commit flags from the main
+            # invocation
+            commitFlags = updJob.getCommitChangesetFlags()
+        else:
+            commitFlags = database.CommitChangeSetFlags()
+
         # In migrate mode we replace modified and unmanaged files (CNY-1868)
         # This can be overridden with arguments
         if updJob.getKeywordArguments().get('migrate', False):
-            replaceModifiedFiles = True
-            replaceUnmanagedFiles = True
+            commitFlags.replaceModifiedFiles = replaceModifiedFiles = True
+            commitFlags.replaceUnmanagedFiles = replaceUnmanagedFiles = True
 
-        if replaceFiles is not None:
-            replaceManagedFiles = replaceFiles
-            replaceUnmanagedFiles = replaceFiles
-            replaceModifiedFiles = replaceFiles
-            replaceModifiedConfigFiles = replaceFiles
+        if not updJob.getRestartedFlag():
+            # Don't allow for the flags to be modified if this job came from a
+            # restart
+            if replaceFiles is not None:
+                replaceManagedFiles = replaceFiles
+                replaceUnmanagedFiles = replaceFiles
+                replaceModifiedFiles = replaceFiles
+                replaceModifiedConfigFiles = replaceFiles
 
-        commitFlags = database.CommitChangeSetFlags(
-            replaceManagedFiles = replaceManagedFiles,
-            replaceUnmanagedFiles = replaceUnmanagedFiles,
-            replaceModifiedFiles = replaceModifiedFiles,
-            replaceModifiedConfigFiles = replaceModifiedConfigFiles,
-            justDatabase = justDatabase,
-            localRollbacks = localRollbacks,
-            test = test, keepJournal = keepJournal)
+            commitFlags.replaceManagedFiles = replaceManagedFiles
+            commitFlags.replaceUnmanagedFiles = replaceUnmanagedFiles
+            commitFlags.replaceModifiedFiles = replaceModifiedFiles
+            commitFlags.replaceModifiedConfigFiles = replaceModifiedConfigFiles
+            commitFlags.justDatabase = justDatabase
+            commitFlags.localRollbacks = localRollbacks
+            commitFlags.test = test
+            commitFlags.keepJournal = keepJournal
 
         if autoPinList is None:
             autoPinList = self.cfg.pinTroves
@@ -2716,6 +2728,7 @@ conary erase '%s=%s[%s]'
             # (ignore ordering).
             # do depresolution on that job set to compare contents and warn
             # if contents have changed.
+            updJob.setCommitChangesetFlags(commitFlags)
             restartDir = self.saveRestartInfo(updJob, remainingJobs)
             return restartDir
 
@@ -3052,8 +3065,12 @@ conary erase '%s=%s[%s]'
             exactFlavors = False)
         # Make sure we store them as booleans
         kwargs = dict( (k, bool(v)) for k, v in kwargs.iteritems())
+        if not uJob.getRestartedFlag():
+            # If we were already a restart, don't bother to change the keyword
+            # arguments, they should be the same as for the original set
+            uJob.setKeywordArguments(kwargs)
+
         uJob.setItemList(itemList)
-        uJob.setKeywordArguments(kwargs)
         uJob.setFromChangesets(fromChangesets)
 
         return (uJob, suggMap)
@@ -3695,7 +3712,8 @@ def _storeJobInfo(remainingJobs, updJob):
 
     return restartDir
 
-def _loadRestartInfo(restartDir, lazyFileCache):
+def _loadRestartInfo(restartDir, updJob):
+    lazyFileCache = updJob.lzCache
     changeSetList = []
     # Skip files that are not changesets (.ccs).
     # This was the first attempt to fix CNY-1034, but it would break
@@ -3733,5 +3751,13 @@ def _loadRestartInfo(restartDir, lazyFileCache):
     # If there was something to be done with the version information, it would
     # be performed by now. Clean up the misc directory
     util.rmtree(restartDir + "misc", ignore_errors=True)
+
+    # Load the invocation information, if available
+    invInfoFile = util.joinPaths(restartDir, 'job-invocation')
+    if os.path.exists(invInfoFile):
+        try:
+            updJob.loadInvocationInfo(invInfoFile)
+        except DecodingError:
+            pass
     return finalJobSet, changeSetList
 

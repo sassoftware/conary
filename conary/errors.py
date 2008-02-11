@@ -158,6 +158,12 @@ class ReexecRequired(ConaryError):
         self.data = data
         ConaryError.__init__(self, msg)
 
+class DecodingError(ConaryError):
+    """
+    An error occurred while loading the frozen representation of a data
+    structure
+    """
+
 class CancelOperationException(Exception):
     """Inherit from this class and throw exceptions of this type if you
     want a callback to stop an update at the end of the job"""
