@@ -16,6 +16,7 @@
 # list of tables we migrate, in order
 TableList = [
     'LatestMirror',
+    'CommitLock',
     'Branches',
     'Items',
     'Versions',
@@ -46,13 +47,12 @@ TableList = [
     'Requires',
     'TroveRedirects',
     'TroveTroves',
+    'FilePaths',
     'TroveFiles',
-    'commitlock',
-    'usergroupinstancescache',
-    'checktrovecache',
-    'filepaths',
-    'usergrouptroves',
-    'usergroupallpermissions',
-    'usergroupalltroves',
-    'latestcache'
+    'CheckTroveCache',
+    'UserGroupTroves',
+    'UserGroupInstancesCache',
+    'UserGroupAllPermissions',
+    'UserGroupAllTroves',
+    'LatestCache'
     ]
