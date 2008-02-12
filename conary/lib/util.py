@@ -1007,7 +1007,7 @@ class LazyFileCache:
         return fd
 
     def _getFdCount(self):
-        return len(os.listdir("/proc/self/fd"))
+        return countOpenFileDescriptors()
 
     def _getCounter(self):
         ret = self._fdCounter;
@@ -1590,3 +1590,7 @@ def nullifyFileDescriptor(fdesc):
     if fd != fdesc:
         os.dup2(fd, fdesc)
         os.close(fd)
+
+def countOpenFileDescriptors():
+    """Return the number of open file descriptors for this process."""
+    return misc.countOpenFileDescriptors()
