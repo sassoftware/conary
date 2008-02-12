@@ -4,10 +4,6 @@ Changes in @NEW@:
       (CNP-93)
 
   o Bug Fixes:
-    * When using the tagScript argument with the client's applyUpdateJob
-      call, the paths to group scripts to be executed are stored relative
-      to the root of the installation, instead of absolute. The tag
-      script is always supposed to be executed under chroot. (CNY-2523)
     * When resuming the update after the execution of a critical update,
       Conary will now use the original file replacement flags. This
       corrects file conflict errors in a migrate when a critical update
@@ -17,6 +13,8 @@ Changes in @NEW@:
       process. However, under certain circumstances the directory is not
       readable. The lazy file cache now uses a poll(2)-based technique.
       (CNY-2536)
+    * If the directory where the public keyring is stored does not exist,
+      it is now automatically created. (CNY-2504)
 
 Changes in 2.0.6:
   o Build Changes:

@@ -3260,6 +3260,7 @@ class PublicKeyring(object):
         self._tsDbPath = tsDbPath
         # Create the files if they don't exist
         for f in [self._keyringPath, self._tsDbPath]:
+            util.mkdirChain(os.path.dirname(f))
             file(f, "a+")
         self._tsDbTimestamp = None
         self._cache = {}
