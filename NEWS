@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Build Changes:
+    * Handling pkg-config dependencies has been moved to conary-policy.
+      (CNP-93)
+
+  o Bug Fixes:
     * When using the tagScript argument with the client's applyUpdateJob
       call, the paths to group scripts to be executed are stored relative
       to the root of the installation, instead of absolute. The tag
