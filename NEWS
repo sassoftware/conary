@@ -1,8 +1,4 @@
 Changes in @NEW@:
-    * When using the tagScript argument with the client's applyUpdateJob
-      call, the paths to group scripts to be executed are stored relative
-      to the root of the installation, instead of absolute. The tag
-      script is always supposed to be executed under chroot. (CNY-2523)
     * When resuming the update after the execution of a critical update,
       Conary will now use the original file replacement flags. This
       corrects file conflict errors in a migrate when a critical update
@@ -21,10 +17,6 @@ Changes in 1.2.17:
       TroveFiles table and TroveTroves table have been rewritten to
       make some queries faster with repositories implemented with a
       sqlite database. (CNY-2515)
-    * When using the tagScript argument with the client's applyUpdateJob
-      call, the paths to group scripts to be executed are stored relative
-      to the root of the installation, instead of absolute. The tag
-      script is always supposed to be executed under chroot. (CNY-2523)
     * When using the tagScript argument with the client's applyUpdateJob
       call, the paths to group scripts to be executed are stored relative
       to the root of the installation, instead of absolute. The tag
