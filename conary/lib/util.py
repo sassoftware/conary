@@ -60,22 +60,20 @@ def isregular(path):
     return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
 
 def mkdirChain(*paths):
+    _ignoredErrors = set([errno.ENOENT, errno.ENOTDIR, errno.EACCES])
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
         normpath = os.path.normpath(path)
 
-        # don't die in case the dir already exists
         try:
-            os.makedirs(normpath)
+            misc.mkdirIfMissing(normpath)
+            return
         except OSError, exc:
-            if exc.errno == errno.EEXIST:
-                if os.path.isdir(normpath):
-                    continue
-                else:
-                    raise
-            else:
+            if exc.errno not in _ignoredErrors:
                 raise
+
+        os.makedirs(normpath)
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]
@@ -684,37 +682,6 @@ class ExtendedStringIO(StringIO.StringIO):
         data = self.read(bytes)
         self.seek(pos, 0)
         return data
-
-class PreadWrapper(object):
-    # DEPRECATED. Will be removed in 1.1.23.
-    __slots__ = ('f', 'path')
-
-    def __init__(self, f):
-        self.path = None
-        if not hasattr(f, 'mode'):
-            if hasattr(f, 'path'):
-                # this is an rMake LazyFile
-                self.path = f.path
-            else:
-                raise ValueError('PreadWrapper does not know how to handle this file object')
-        elif f.mode != 'r':
-            raise ValueError('PreadWrapper.__init__() requires a read-only file object')
-        self.f = f
-
-    def __getattr__(self, attr):
-        if attr != 'pread':
-            return getattr(self.f, attr)
-        else:
-            return self.pread
-
-    def pread(self, bytes, offset):
-        if self.path:
-            # hack for rMake compatibility
-            f = open(self.path, 'r')
-            buf = misc.pread(f.fileno(), bytes, offset)
-            f.close()
-            return buf
-        return misc.pread(self.fileno(), bytes, offset)
 
 class SeekableNestedFile:
 
@@ -1590,6 +1557,59 @@ def nullifyFileDescriptor(fdesc):
     if fd != fdesc:
         os.dup2(fd, fdesc)
         os.close(fd)
+
+def sendmsg(sock, dataList, fdList = []):
+    """
+    Sends multiple strings and an optional list of file descriptors through
+    a unix domain socket.
+
+    @param sock: Unix domain socket to send message through
+    @type sock: socket
+    @param dataList: List of strings to send
+    @type dataList: list of str
+    @param fdList: File descriptors to send
+    @type fdList: list of int
+    @rtype: None
+    """
+    misc.sendmsg(sock.fileno(), dataList, fdList)
+
+def recvmsg(sock, dataSize, fdCount = 0):
+    """
+    Receives data and optional file descriptors from a unix domain socket.
+    Returns a (data, fdList) tuple.
+
+    @param sock: Unix domain socket to send message through
+    @type sock: socket
+    @param dataSize: Number of bytes to try to read from the socket.
+    @type dataSize: int
+    @param fdCount: Exact number of file descriptors to read from the socket
+    @type fdCount: int
+    @rtype: tuple
+    """
+    return misc.recvmsg(sock.fileno(), dataSize, fdCount)
+
+class Timer:
+
+    def start(self):
+        self.started = time.time()
+
+    def stop(self):
+        self.total += (time.time() - self.started)
+        self.started = None
+
+    def get(self):
+        if self.started:
+            running = time.time() - self.started
+        else:
+            running = 0
+
+        return self.total + running
+
+    def __init__(self, start = False):
+        self.started = None
+        self.total = 0
+        if start:
+            self.start()
 
 def countOpenFileDescriptors():
     """Return the number of open file descriptors for this process."""

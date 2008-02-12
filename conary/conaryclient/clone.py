@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -43,13 +43,14 @@ import tempfile
 import time
 
 from conary import callbacks
-from conary import errors
+from conary import errors, files
 from conary import trove
 from conary import versions
 from conary.build.nextversion import nextVersions
+from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import log
-from conary.repository import changeset
+from conary.repository import changeset, filecontents
 from conary.repository import trovesource
 from conary.repository import errors as neterrors
 
@@ -88,7 +89,10 @@ class CloneJob(object):
     def isEmpty(self):
         return not self.cloneJob
 
+# target for the maximum number of files to handle in one pass
 MAX_CLONE_FILES  = 5000
+# threshhold for using a changeset instead of getting individual files
+CHANGESET_MULTIPLE = 3
 
 class ClientClone:
 
@@ -142,44 +146,237 @@ class ClientClone:
             log.warning('Nothing to clone!')
             return False, None
 
-        cs, newFilesNeeded = self._buildChangeSet(chooser, cloneMap, cloneJob,
-                                                  leafMap, troveCache, callback)
-        if cs is None:
+        newTroveList = self._buildTroves(chooser, cloneMap, cloneJob,
+                                         leafMap, troveCache, callback)
+        if newTroveList is None:
             return False, None
 
-        _logMe('changeset built')
+        _logMe('new troves calculated')
+
         if cloneOptions.infoOnly:
+            # build an absolute changeset. it's faster and easier.
+            cs = changeset.ChangeSet()
+            for oldVersion, newTrove in newTroveList:
+                cs.newTrove(newTrove.diff(None, absolute = True)[0])
             callback.done()
             return True, cs
-        finalCs = changeset.ReadOnlyChangeSet()
-        finalCs.merge(cs)
-        pathList = []
-        total = len(newFilesNeeded)
-        current = 0
-        callback.rewritingFileVersions(current, total)
-        if len(newFilesNeeded) > MAX_CLONE_FILES:
-            while newFilesNeeded:
-                cs = changeset.ChangeSet()
-                files = newFilesNeeded[:MAX_CLONE_FILES]
-                self._addCloneFiles(cs, files, callback, current, total)
-                newFilesNeeded = newFilesNeeded[MAX_CLONE_FILES:]
-                fd, path = tempfile.mkstemp(prefix='conary-promote-')
-                os.close(fd)
-                cs.writeToFile(path)
-                finalCs.merge(changeset.ChangeSetFromFile(path))
-                os.remove(path)
-                current += MAX_CLONE_FILES
-                callback.rewritingFileVersions(current, total)
-        else:
-            # don't bother writing to disk
-            cs = changeset.ChangeSet()
-            self._addCloneFiles(cs, newFilesNeeded, callback, current, total)
-            finalCs.merge(cs)
-            current += len(newFilesNeeded)
-            callback.rewritingFileVersions(current, total)
+
+        finalCs = self._buildChangeSet(troveCache, newTroveList, callback)
+
         callback.prefix = ''
         callback.done()
         return True, finalCs
+
+    def _buildChangeSet(self, troveCache, finalTroveList, callback):
+        def _sameHost(v1, v2):
+            return v1.trailingLabel().getHost() == v2.trailingLabel().getHost()
+
+        # What should each TroveChangeSet be relative to? If the original
+        # version was on the same server, great (because we don't have to
+        # include any file contents!). Otherwise, look for something on the
+        # target label because it is likely close to the new one.
+        #
+        # Note that what the diff is relative to is not the same as the
+        # fromVersion in the finalTroveList. fromVersion is the version
+        # we're cloning/shadowing from. The diff is always relative to
+        # something in the target repository. We call the version the diff
+        # is relative to the oldVersion.
+        searchDict = {}
+        for (fromVersion, finalTrove) in finalTroveList:
+            if not _sameHost(fromVersion, finalTrove.getVersion()):
+                name, version, flavor = finalTrove.getNameVersionFlavor()
+                label = version.trailingLabel()
+                searchDict.setdefault(name, {})
+                searchDict[name].setdefault(label, [])
+                searchDict[name][label].append(flavor)
+
+        matches = self.repos.getTroveLeavesByLabel(searchDict)
+
+        oldTrovesNeeded = []
+        for (fromVersion, finalTrove) in finalTroveList:
+            name, version, flavor = finalTrove.getNameVersionFlavor()
+            if _sameHost(fromVersion, finalTrove.getVersion()):
+                oldTrovesNeeded.append((name, fromVersion, flavor))
+            else:
+                match = None
+                versionD = matches.get(name, {})
+                for matchVersion, flavorList in versionD.iteritems():
+                    if (matchVersion.trailingLabel() ==
+                                version.trailingLabel()
+                            and flavor in flavorList):
+                        match = matchVersion
+
+                if match is None:
+                    # keep oldTrovesNeeded parallel to finalTroveList
+                    oldTrovesNeeded.append(None)
+                else:
+                    oldTrovesNeeded.append((name, match, flavor))
+
+        oldTroves = troveCache.getTroves(
+            [ x for x in oldTrovesNeeded if x is not None ], withFiles=True)
+
+        # we periodically write file contents to disk and merge in a new
+        # changeset to save RAM. promotes can get large.
+        #
+        # Now to try and explain getting file streams and contents. If there
+        # are few contents changed, we're better off using getFileVersions, but
+        # if lots changes, we're better off just grabbing the whole bloody
+        # changeset. If more than 1/3rd of the files changed, let's grab the
+        # changeset. Note that this percent is completely arbitrary. We also
+        # want to consolidate getFileVersions() and createChangeSet() calls.
+        # Once we've found 5000 files to add to the current change set, we'll
+        # add those, write the change set, merge it, and start again. Got all
+        # that?
+        finalCs = changeset.ReadOnlyChangeSet()
+        cs = changeset.ChangeSet()
+        fileCount = 0
+        jobList = []
+        jobFilesNeeded = []
+        individualFilesNeeded = []
+
+        # make sure we write out the final changeset
+        lastTrove = finalTroveList[-1][1]
+        for current, (oldTroveInfo, (fromVersion, finalTrove)) in \
+                    enumerate(itertools.izip(oldTrovesNeeded, finalTroveList)):
+            if oldTroveInfo is not None:
+                oldTrove = oldTroves.pop(0)
+                assert(_sameHost(oldTrove.getVersion(),
+                       finalTrove.getVersion()))
+            else:
+                oldTrove = None
+
+            # We can't trust filesNeeded diff returns here because it only
+            # tells us about files whose fileId's have changed, but we need
+            # to know about files whose versions changed as well (as those
+            # may have moved servers). New files and changed files are
+            # of interest (remember we're not necessarily diffing against
+            # the fromVersion, so there could be new files).
+            trvCs = finalTrove.diff(oldTrove,
+                                    absolute = oldTrove is not None)[0]
+
+            cs.newTrove(trvCs)
+
+            # this is in the cache already, so there isn't any reason to
+            # worry about optimizing the number of calls
+            fromTrove = troveCache.getTrove((finalTrove.getName(),
+                                fromVersion, finalTrove.getFlavor()))
+            filesNeeded = []
+
+            for pathId, path, newFileId, finalFileVersion in \
+                                                    trvCs.getNewFileList():
+                # oldFileId is None because this is a new file
+                fromFileVersion = fromTrove.getFile(pathId)[2]
+                filesNeeded.append((pathId, newFileId, None, fromFileVersion))
+
+            for pathId, path, newFileId, finalFileVersion in \
+                                                    trvCs.getChangedFileList():
+                fromFileVersion = fromTrove.getFile(pathId)[2]
+                if _sameHost(fromFileVersion, finalFileVersion):
+                    # The server already has this file on it; no reason to
+                    # commit it again
+                    continue
+
+                oldFileId = oldTrove.getFile(pathId)[1]
+                filesNeeded.append((pathId, newFileId, oldFileId,
+                                    fromFileVersion))
+
+
+            if ((len(filesNeeded) * CHANGESET_MULTIPLE) >=
+                                        finalTrove.fileCount()):
+                # get the whole change set for this.
+                jobList.append((finalTrove.getName(),
+                                    (None, None),
+                                    (fromVersion, finalTrove.getFlavor()),
+                                True))
+                # it's important that this have (pathId, newFileId) first
+                # to ensure we're walking the changeset in the right order
+                # after we sort it
+                jobFilesNeeded += filesNeeded
+            else:
+                individualFilesNeeded += filesNeeded
+
+            fileCount += len(filesNeeded)
+
+            if finalTrove != lastTrove and fileCount < MAX_CLONE_FILES:
+                continue
+
+            callback.buildingChangeset(current + 1, len(finalTroveList))
+
+            fileChangeSet = self.repos.createChangeSet(jobList,
+                                    withFiles = True, withFileContents = True,
+                                    recurse = False, callback = callback)
+            jobFilesNeeded = sorted(set(jobFilesNeeded))
+	    # fileId, pathId of the last file we saw. we don't need to
+	    # include the same file contents twice (nor can we get them
+	    # twice from fileChangeSet
+            lastContents = (None, None)
+            # walk the filesNeeded for the files we're getting from changesets
+            for (pathId, newFileId, oldFileId, fromFileVersion) in \
+                                jobFilesNeeded:
+                # we could diff here, but why bother? we don't have anything
+                # to diff against anyway
+                filecs = fileChangeSet.getFileChange(None, newFileId)
+                cs.addFile(oldFileId, newFileId, filecs)
+
+                # A word on ptr types. This blindly copies them, assuming
+                # that we'll copy the file which actually includes the
+                # contents as well. If that assumption is wrong, then those
+                # file contents are already in the repository so we don't
+                # need them anyway. That leaves a changeset with broken
+                # ptr links, but it commits just fine.
+
+                if (files.frozenFileHasContents(filecs) and
+			(pathId, newFileId) != lastContents):
+                    # this copies the contents from the old changeset to the
+                    # new without recompressing
+                    (contType, contents) = fileChangeSet.getFileContents(
+                                                        pathId, newFileId,
+                                                        compressed = True)
+                    cs.addFileContents(pathId, newFileId,
+                                   contType, contents,
+                                   files.frozenFileFlags(filecs).isConfig(),
+                                   compressed = True)
+		    #lastContents = (pathId, newFileId)
+
+            # now collect up the random files and handle those
+            allFileObjects = self.repos.getFileVersions(
+                [ (x[0], x[1], x[3]) for x in individualFilesNeeded ])
+            contentsNeeded = []
+            for fileObject, (pathId, newFileId, oldFileId, fromFileVersion) in \
+                    itertools.izip(allFileObjects, individualFilesNeeded):
+                diff, hash = changeset.fileChangeSet(pathId, None, fileObject)
+                cs.addFile(oldFileId, newFileId, diff)
+                if hash:
+                    contentsNeeded.append(
+                            ((pathId, fileObject.flags.isConfig()),
+                             (newFileId, fromFileVersion)))
+
+            allContents = self.repos.getFileContents(
+                                [ x[1] for x in contentsNeeded ],
+                                compressed = True,
+                                callback = callback)
+            for (contents, ((pathId, isCfg), (newFileId, fromFileVersion))) in \
+                                itertools.izip(allContents, contentsNeeded):
+                cs.addFileContents(pathId, newFileId,
+                                   changeset.ChangedFileTypes.file,
+                                   contents, isCfg,
+                                   compressed = True)
+
+            del fileChangeSet, allContents, allFileObjects
+
+            fd, path = tempfile.mkstemp(prefix='conary-promote-')
+            os.close(fd)
+            cs.writeToFile(path)
+            finalCs.merge(changeset.ChangeSetFromFile(path))
+            os.remove(path)
+            cs = changeset.ChangeSet()
+
+            fileCount = 0
+            jobList = []
+            jobFilesNeeded = []
+            individualFilesNeeded = []
+
+        return finalCs
 
     def _createCloneJob(self, cloneOptions, chooser, troveCache):
         cloneJob = CloneJob(cloneOptions)
@@ -599,39 +796,52 @@ class ClientClone:
             return False
         return True
 
-    def _buildChangeSet(self, chooser, cloneMap, cloneJob, leafMap, troveCache,
-                        callback):
-        allFilesNeeded = []
-        cs = changeset.ChangeSet()
+    def _buildTroves(self, chooser, cloneMap, cloneJob, leafMap, troveCache,
+                     callback):
+        # fill the trove cache with a single repository call
         allTroveList = [x[0] for x in cloneJob.iterTargetList()]
-        allTroves = troveCache.getTroves(allTroveList, withFiles=True)
+        troveCache.getTroves(allTroveList, withFiles=True)
+        del allTroveList
+
         current = 0
+        finalTroves = []
         total = len(list(cloneJob.iterTargetList()))
         for troveTup, newVersion in cloneJob.iterTargetList():
             current += 1
             callback.rewriteTrove(current, total)
             trv = troveCache.getTrove(troveTup, withFiles=True)
-            newFilesNeeded = self._rewriteTrove(trv, newVersion, chooser,
-                                                cloneMap, cloneJob, leafMap,
-                                                troveCache)
-            if newFilesNeeded is None:
-                return None, None
-            allFilesNeeded.extend(newFilesNeeded)
+            oldVersion = trv.getVersion()
+            newTrv = self._rewriteTrove(trv, newVersion, chooser, cloneMap,
+                                        cloneJob, leafMap, troveCache)
+            if not newTrv:
+                return None
+
             # make sure we haven't deleted all the child troves from 
             # a group.  This could happen, for example, if a group 
             # contains all byDefault False components.
             if trove.troveIsCollection(troveTup[0]):
-                if not list(trv.iterTroveList(strongRefs=True)):
-                    raise CloneError("Clone would result in empty collection %s=%s[%s]" % (troveTup))
-            trvCs = trv.diff(None, absolute = True)[0]
-            cs.newTrove(trvCs)
-            if ":" not in trv.getName():
-                cs.addPrimaryTrove(trv.getName(), trv.getVersion(),
-                                   trv.getFlavor())
-        return cs, allFilesNeeded
+                if not list(newTrv.iterTroveList(strongRefs=True)):
+                    raise CloneError("Clone would result in empty collection "
+                                     "%s=%s[%s]" % (troveTup))
+
+            sigKeyId = selectSignatureKey(self.cfg,
+                                        newTrv.getVersion().trailingLabel())
+
+            if sigKeyId is not None:
+                newTrv.addDigitalSignature(sigKeyId)
+            else:
+                # if no sigKeyId, just add sha1s
+                newTrv.computeDigests()
+
+            finalTroves.append((oldVersion, newTrv))
+
+        return finalTroves
 
     def _rewriteTrove(self, trv, newVersion, chooser, cloneMap,
                       cloneJob, leafMap, troveCache):
+        # make a copy so we don't corrupt the copy in the trove cache
+        trv = trv.copy()
+
         filesNeeded = []
         troveName, troveVersion, troveFlavor = trv.getNameVersionFlavor()
         troveBranch = troveVersion.branch()
@@ -653,14 +863,6 @@ class ClientClone:
 
         trv.changeVersion(newVersion)
         trv.copyMetadata(trv) # flatten metadata
-
-        # look through files which aren't already on the right host for
-        # inclusion in the change set
-        newVersionHost = newVersion.trailingLabel().getHost()
-        newBranch = newVersion.branch()
-        for (pathId, path, fileId, version) in trv.iterFileList():
-            if version.getHost() != newVersionHost:
-                filesNeeded.append((pathId, fileId, version))
 
         for mark, src in _iterAllVersions(trv):
             if chooser.troveInfoNeedsRewrite(mark, src):
@@ -718,34 +920,7 @@ class ClientClone:
                          # make sure this doesn't get committed
             trv.computeDigests()
 
-        return filesNeeded
-
-    def _addCloneFiles(self, cs, newFilesNeeded, callback, current, total):
-        callback.requestingFiles(len(newFilesNeeded))
-        fileObjs = self.repos.getFileVersions(newFilesNeeded)
-        callback.rewritingFileVersions(current, total)
-        contentsNeeded = []
-        pathIdsNeeded = []
-        fileObjsNeeded = []
-        for ((pathId, newFileId, newFileVersion), fileObj) in \
-                            itertools.izip(newFilesNeeded, fileObjs):
-            (filecs, contentsHash) = changeset.fileChangeSet(pathId, None,
-                                                             fileObj)
-
-            cs.addFile(None, newFileId, filecs)
-            if fileObj.hasContents:
-                contentsNeeded.append((newFileId, newFileVersion))
-                pathIdsNeeded.append(pathId)
-                fileObjsNeeded.append(fileObj)
-
-        contents = self.repos.getFileContents(contentsNeeded, callback=callback)
-        for pathId, (fileId, fileVersion), fileCont, fileObj in \
-                itertools.izip(pathIdsNeeded, contentsNeeded, contents, 
-                               fileObjsNeeded):
-
-            cs.addFileContents(pathId, fileId, changeset.ChangedFileTypes.file,
-                               fileCont, cfgFile = fileObj.flags.isConfig(), 
-                               compressed = False)
+        return trv
 
 def _iterAllVersions(trv, rewriteTroveInfo=True):
     # return all versions which need rewriting except for file versions

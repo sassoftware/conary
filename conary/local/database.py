@@ -54,10 +54,20 @@ class Rollback:
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 
-    def _getChangeSets(self, item):
-        repos = changeset.ChangeSetFromFile(self.reposName % (self.dir, item))
-        local = changeset.ChangeSetFromFile(self.localName % (self.dir, item))
-        return (repos, local)
+    def _getChangeSets(self, item, repos = True, local = True):
+        if repos:
+            reposCs = changeset.ChangeSetFromFile(
+                                        self.reposName % (self.dir, item))
+        else:
+            reposCs = False
+
+        if local:
+            localCs = changeset.ChangeSetFromFile(
+                                        self.localName % (self.dir, item))
+        else:
+            localCs = False
+
+        return (reposCs, localCs)
 
     def getLast(self):
         if not self.count:
@@ -67,6 +77,20 @@ class Rollback:
     def getLocalChangeset(self, i):
         local = changeset.ChangeSetFromFile(self.localName % (self.dir, i))
         return local
+
+    def isLocal(self):
+        """
+        Return True if every element of the rollback is locally available,
+        False otherwise.
+        """
+        for i in range(self.count):
+            (reposCs, localCs) = self._getChangeSets(i, repos = True,
+                                                     local = False)
+            for trvCs in reposCs.iterNewTroveList():
+                if trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
+                    return False
+
+        return True
 
     def removeLast(self):
         if self.count == 0:
@@ -94,6 +118,144 @@ class Rollback:
         else:
             self.stored = False
             self.count = 0
+
+class RollbackStack:
+
+    def _readStatus(self):
+        if not os.path.exists(self.statusPath):
+            self.first = 0
+            self.last = -1
+            return
+
+        try:
+            f = open(self.statusPath)
+            (first, last) = f.read()[:-1].split()
+            self.first = int(first)
+            self.last = int(last)
+            f.close()
+        except IOError, e:
+            if e.errno == errno.EACCES:
+                self.first = None
+                self.last = None
+            else:
+                raise
+
+    def _ensureReadableRollbackStack(self):
+        if (self.first, self.last) == (None, None):
+            raise ConaryError("Unable to open rollback directory")
+
+    def writeStatus(self):
+        newStatus = self.statusPath + ".new"
+
+        fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
+        os.write(fd, "%s %d\n" % (self.first, self.last))
+        os.close(fd)
+
+        os.rename(newStatus, self.statusPath)
+
+    def new(self):
+        rbDir = "/%s/%d" % (self.dir, self.last + 1)
+        if os.path.exists(rbDir):
+            shutil.rmtree(rbDir)
+        os.mkdir(rbDir, 0700)
+        self.last += 1
+        self.writeStatus()
+        return Rollback(rbDir)
+
+    def hasRollback(self, name):
+        try:
+            num = int(name[2:])
+        except ValueError:
+            return False
+
+        self._ensureReadableRollbackStack()
+
+        if (num >= self.first and num <= self.last):
+            return True
+
+        return False
+
+    def getRollback(self, name):
+        if not self.hasRollback(name): return None
+
+        num = int(name[2:])
+        dir = self.dir + "/" + "%d" % num
+        return Rollback(dir, load = True)
+
+    def removeFirst(self):
+        name = 'r.%d' % self.first
+        self.remove(name)
+
+    def removeLast(self):
+        name = 'r.%d' % self.last
+        self.remove(name)
+
+    def getList(self):
+        self._ensureReadableRollbackStack()
+        list = []
+        for i in range(self.first, self.last + 1):
+            list.append("r.%d" % i)
+
+        return list
+
+    # name looks like "r.%d"
+    def remove(self, name):
+        rollback = int(name[2:])
+        assert(rollback == self.first or rollback == self.last)
+
+        try:
+            shutil.rmtree(self.dir + "/%d" % rollback)
+        except OSError, e:
+            if e.errno == 2:
+                pass
+        if rollback == self.last:
+            self.last -= 1
+        elif rollback == self.first:
+            self.first += 1
+        else:
+            assert(0)
+
+        self.writeStatus()
+
+    def invalidate(self):
+        """
+        Invalidate the rollback stack. It doesn't remove the rollbacks
+        though.
+        """
+        # Works nicely for the very beginning
+        # (when rollbackStack.first, rollbackStack.last) = (0, -1)
+        self.first = self.last + 1
+        self.writeStatus()
+
+    def iter(self):
+        """Generator for rollback data.
+        Returns a list of (rollbackName, rollback)
+        """
+        for rollbackName in reversed(self.getList()):
+            rb = self.getRollback(rollbackName)
+            yield (rollbackName, rb)
+
+    def __init__(self, rbDir):
+        self.dir = rbDir
+        self.statusPath = self.dir + '/status'
+
+        if not os.path.exists(self.dir):
+            try:
+                util.mkdirChain(os.path.dirname(self.dir))
+                os.mkdir(self.dir, 0700)
+            except OSError, e:
+                if e.errno == errno.ENOTDIR:
+                    # when making a directory, the parent
+                    # was not a directory
+                    d = os.path.dirname(e.filename)
+                    raise OpenError(self.dir, '%s is not a directory' %d)
+                elif e.errno == errno.EACCES:
+                    raise OpenError(self.dir, 'cannot create directory %s' %
+                                               e.filename)
+                else:
+                    raise
+
+        self._readStatus()
 
 class UpdateJob:
     def __del__(self):
@@ -1125,7 +1287,7 @@ class Database(SqlDbRepository):
 	if (rollbackPhase is None) and not commitFlags.test:
             rollback = uJob.getRollback()
             if rollback is None:
-                rollback = self.createRollback()
+                rollback = self.rollbackStack.new()
                 uJob.setRollback(rollback)
             rollback.add(reposRollback, localRollback)
             del rollback
@@ -1267,7 +1429,7 @@ class Database(SqlDbRepository):
 
         if rollbackPhase is None and updateDatabase and \
                 csJob.invalidateRollbacks():
-            self.invalidateRollbacks()
+            self.rollbackStack.invalidate()
 
         if rollbackPhase is not None:
             return fsJob
@@ -1362,11 +1524,11 @@ class Database(SqlDbRepository):
 
             rb.add(reposCs, localCs)
 
-        rb = self.createRollback()
+        rb = self.rollbackStack.new()
         try:
             _doRemove(self, rb, pathList)
         except Exception, e:
-            self.removeRollback("r." + rb.dir.split("/")[-1])
+            self.rollbackStack.removeLast()
             raise
 
         self._updateTransactionCounter = True
@@ -1410,100 +1572,8 @@ class Database(SqlDbRepository):
 
             self.lockFileObj = os.fdopen(lockFd)
 
-    def createRollback(self):
-	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
-        if os.path.exists(rbDir):
-            shutil.rmtree(rbDir)
-        os.mkdir(rbDir, 0700)
-	self.lastRollback += 1
-        self.writeRollbackStatus()
-        return Rollback(rbDir)
-
-    # name looks like "r.%d"
-    def removeRollback(self, name):
-	rollback = int(name[2:])
-        try:
-            shutil.rmtree(self.rollbackCache + "/%d" % rollback)
-        except OSError, e:
-            if e.errno == 2:
-                pass
-	if rollback == self.lastRollback:
-	    self.lastRollback -= 1
-	    self.writeRollbackStatus()
-
-    def removeLastRollback(self):
-        name = 'r.%d' %self.lastRollback
-        self.removeRollback(name)
-
-    def writeRollbackStatus(self):
-	newStatus = self.rollbackCache + ".new"
-
-        fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
-        os.write(fd, "%s %d\n" % (self.firstRollback, self.lastRollback))
-        os.close(fd)
-
-	os.rename(newStatus, self.rollbackStatus)
-
-    def getRollbackList(self):
-        self._ensureReadableRollbackStack()
-	list = []
-	for i in range(self.firstRollback, self.lastRollback + 1):
-	    list.append("r.%d" % i)
-
-	return list
-
-    def iterRollbacksList(self):
-        """Generator for rollback data.
-        Returns a list of (rollbackName, rollback)
-        """
-        for rollbackName in reversed(self.getRollbackList()):
-            rb = self.getRollback(rollbackName)
-            yield (rollbackName, rb)
-
-    def invalidateRollbacks(self):
-        """Invalidate the rollback stack."""
-        # Works nicely for the very beginning
-        # (when firstRollback, lastRollback) = (0, -1)
-        self.firstRollback = self.lastRollback + 1
-        self.writeRollbackStatus()
-
-    def readRollbackStatus(self):
-        try:
-            f = open(self.rollbackStatus)
-            (first, last) = f.read()[:-1].split()
-            self.firstRollback = int(first)
-            self.lastRollback = int(last)
-            f.close()
-        except IOError, e:
-            if e.errno == errno.EACCES:
-                self.firstRollback = None
-                self.lastRollback = None
-            else:
-                raise
-
-    def _ensureReadableRollbackStack(self):
-        if (self.firstRollback, self.lastRollback) == (None, None):
-            raise ConaryError("Unable to open rollback directory")
-
-    def hasRollback(self, name):
-	try:
-	    num = int(name[2:])
-	except ValueError:
-	    return False
-
-        self._ensureReadableRollbackStack()
-
-	if (num >= self.firstRollback and num <= self.lastRollback):
-	    return True
-	
-	return False
-
-    def getRollback(self, name):
-	if not self.hasRollback(name): return None
-
-	num = int(name[2:])
-        dir = self.rollbackCache + "/" + "%d" % num
-        return Rollback(dir, load = True)
+    def getRollbackStack(self):
+        return self.rollbackStack
 
     def applyRollbackList(self, *args, **kwargs):
         try:
@@ -1522,9 +1592,9 @@ class Database(SqlDbRepository):
             raise RollbackError(names, "Database state has changed, please "
                 "run the rollback command again")
 
-	last = self.lastRollback
+	last = self.rollbackStack.last
 	for name in names:
-	    if not self.hasRollback(name):
+	    if not self.rollbackStack.hasRollback(name):
 		raise RollbackDoesNotExist(name)
 
 	    num = int(name[2:])
@@ -1538,7 +1608,7 @@ class Database(SqlDbRepository):
         # in the work count though.
         totalCount = 0
         for name in names:
-            rb = self.getRollback(name)
+            rb = self.rollbackStack.getRollback(name)
             totalCount += 0
 
             for i in xrange(rb.getCount()):
@@ -1550,7 +1620,7 @@ class Database(SqlDbRepository):
 
         itemCount = 0
         for i, name in enumerate(names):
-	    rb = self.getRollback(name)
+	    rb = self.rollbackStack.getRollback(name)
 
             # we don't want the primary troves from reposCs to win, so get
             # rid of them (otherwise we're left with redirects!). primaries
@@ -1630,7 +1700,7 @@ class Database(SqlDbRepository):
 
                 (reposCs, localCs) = rb.getLast()
 
-            self.removeRollback(name)
+            self.rollbackStack.removeLast()
 
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
@@ -1722,6 +1792,7 @@ class Database(SqlDbRepository):
             # use :memory: as a marker not to bother with locking
             self.lockFile = path 
         else:
+            SqlDbRepository.__init__(self, root + path, timeout = timeout)
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
@@ -1734,28 +1805,10 @@ class Database(SqlDbRepository):
             self.lockFileObj = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
-            if not os.path.exists(self.rollbackCache):
-                try:
-                    util.mkdirChain(top)
-                    os.mkdir(self.rollbackCache, 0700)
-                except OSError, e:
-                    if e.errno == errno.ENOTDIR:
-                        # when making a directory, the partent
-                        # wat not a directory
-                        d = os.path.dirname(e.filename)
-                        raise OpenError(top, '%s is not a directory' %d)
-                    elif e.errno == errno.EACCES:
-                        d = os.path.dirname(e.filename)
-                        raise OpenError(top, 'cannot create directory %s' %d)
-                    else:
-                        raise
-
-            if not os.path.exists(self.rollbackStatus):
-                self.firstRollback = 0
-                self.lastRollback = -1
-            else:
-                self.readRollbackStatus()
-            SqlDbRepository.__init__(self, root + path, timeout = timeout)
+            try:
+                self.rollbackStack = RollbackStack(self.rollbackCache)
+            except OpenError, e:
+                raise OpenError(top, e.msg)
 
 class DatabaseCacheWrapper:
 

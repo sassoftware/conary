@@ -89,6 +89,7 @@ class SearchSource(AbstractSearchSource):
             if hasattr(source, method):
                 setattr(self, method, getattr(source, method))
 
+
     def getTroveSource(self):
         """
             Returns the source that this stack is wrapping, if there is one.
@@ -121,8 +122,11 @@ class SearchSource(AbstractSearchSource):
         """
         m = resolvemethod.BasicResolutionMethod(None, self.db, self.flavor)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
+    def getFlavorPreferenceList(self):
+        return self.source.getFlavorPreferenceList()
 
 class NetworkSearchSource(SearchSource):
     """
@@ -207,6 +211,7 @@ class NetworkSearchSource(SearchSource):
                                                     self.flavor,
                                                     searchMethod=searchMethod)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 class TroveSearchSource(SearchSource):
@@ -223,9 +228,12 @@ class TroveSearchSource(SearchSource):
             troveList = troveSource.getTroves(troveList, withFiles=False)
         else:
             troveTups = [ x.getNameVersionFlavor() for x in troveList ]
-        troveSource = trovesource.TroveListTroveSource(troveSource, troveTups)
-        troveSource.searchWithFlavor()
-        SearchSource.__init__(self, troveSource, flavor, db)
+        newTroveSource = trovesource.TroveListTroveSource(troveSource, troveTups)
+        newTroveSource.searchWithFlavor()
+        newTroveSource.setFlavorPreferenceList(
+                                    troveSource.getFlavorPreferenceList())
+        newTroveSource.searchLeavesOnly()
+        SearchSource.__init__(self, newTroveSource, flavor, db)
         self.troveList = troveList
 
     def getResolveMethod(self):
@@ -237,6 +245,7 @@ class TroveSearchSource(SearchSource):
                                                    self.troveList,
                                                    self.flavor)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
@@ -254,6 +263,12 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         self.resolveSearchMethod =  kw.pop('resolveSearchMethod',
                                            resolvemethod.RESOLVE_ALL)
 
+    def getFlavorPreferenceList(self):
+        return self.sources[0].getFlavorPreferenceList()
+
+    def setFlavorPreferenceList(self, flavorList):
+        for source in self.sources:
+            source.setFlavorPreferenceList(self, flavorList)
 
     def getTroveSource(self):
         if len(self.sources) == 1:
