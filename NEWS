@@ -1,8 +1,18 @@
 Changes in @NEW@:
+  o Build Changes:
+    * Handling pkg-config dependencies has been moved to conary-policy.
+      (CNP-93)
+
+  o Bug Fixes:
     * When resuming the update after the execution of a critical update,
       Conary will now use the original file replacement flags. This
       corrects file conflict errors in a migrate when a critical update
       was present. (CNY-2513)
+    * The lazy file cache was using /proc/self/fd as a method of
+      determining the number of open file descriptors for the current
+      process. However, under certain circumstances the directory is not
+      readable. The lazy file cache now uses a poll(2)-based technique.
+      (CNY-2536)
 
 Changes in 1.2.17:
   o Build Changes:

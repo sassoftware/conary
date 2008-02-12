@@ -385,7 +385,15 @@ class UpdateJob:
         return self.lzCache
 
     def _freezeFromChangesets(self):
-        ret = [ x.fileName for x in self._fromChangesets if x.fileName ]
+        ret = []
+        cwd = os.getcwd()
+        for f in self._fromChangesets:
+            if not f.fileName:
+                continue
+            fn = f.fileName
+            if not fn.startswith('/'):
+                fn = util.joinPaths(cwd, fn)
+            ret.append(fn)
         return ret
 
     def _thawFromChangesets(self, rlist):
