@@ -3125,7 +3125,7 @@ class HiddenException(Exception):
 
 class GlobListType(list):
 
-    def __del__(self):
+    def __delitem__(self, key):
         raise NotImplementedError
 
     def __init__(self, *args):
