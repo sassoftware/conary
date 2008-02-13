@@ -16,6 +16,10 @@ Changes in @NEW@:
     * If the directory where the public keyring is stored does not exist,
       it is now automatically created. (CNY-2504)
 
+  o Other changes:
+    * Reading metadata from RPM files now validates the size of the RPM
+      and the sha1 of the full set of metadata.
+
 Changes in 2.0.6:
   o Build Changes:
     * Java dependencies for classes that are not dependency-complete
