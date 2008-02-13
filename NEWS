@@ -18,6 +18,10 @@ Changes in @NEW@:
       readable. The lazy file cache now uses a poll(2)-based technique.
       (CNY-2536)
 
+  o Other changes:
+    * Reading metadata from RPM files now validates the size of the RPM
+      and the sha1 of the full set of metadata.
+
 Changes in 2.0.6:
   o Build Changes:
     * Java dependencies for classes that are not dependency-complete
