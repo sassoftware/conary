@@ -670,6 +670,7 @@ def verFormat(cfg, version):
 class SendableFileSet:
 
     tags = {}
+    ptrSize = len(struct.pack("@P", 0))
 
     @staticmethod
     def _register(klass):
@@ -677,6 +678,17 @@ class SendableFileSet:
 
     def __init__(self):
         self.l = []
+
+    @staticmethod
+    def sendObjIds(sock, l):
+        sendmsg(sock, [ struct.pack("@" + ("P" * len(l)),
+                                   *[ id(x) for x in l] ) ])
+
+    @staticmethod
+    def recvObjIds(sock, count):
+        s = recvmsg(sock, SendableFileSet.ptrSize * count)
+        idList = struct.unpack("@" + ("P" * count), s)
+        return idList
 
     def add(self, f):
         self.l.append(f)
@@ -694,24 +706,26 @@ class SendableFileSet:
                 continue
 
             fd = None
-            objDep = None
+            objDepList = []
 
             dependsOn, s = f._sendInfo()
 
             if type(dependsOn) == int:
                 fd = dependsOn
             elif dependsOn is not None:
-                if dependsOn not in handled:
-                    # we depend on something else; handle that item and then
-                    # come back to this one
+                assert(type(dependsOn) == list)
+                assert(len(dependsOn) == 1)
+
+                notHandled = list(set(dependsOn) - set(handled))
+                if notHandled:
                     stack.append(f)
-                    stack.append(dependsOn)
+                    stack.extend(notHandled)
                     continue
 
                 # we depend on something we know about
-                objDep = dependsOn
+                objDepList = dependsOn
 
-            toSend.append((f, fd, objDep, s))
+            toSend.append((f, fd, objDepList, s))
             handled.add(f)
 
         fds = list(set([ x[1] for x in toSend if x[1] is not None]))
@@ -720,27 +734,24 @@ class SendableFileSet:
         sendmsg(sock, [ struct.pack("@I", len(fds)) ] )
         sendmsg(sock, [ struct.pack("@II", len(self.l), len(toSend)) ], fds)
 
-        for f, fd, objDep, s in toSend:
+        for f, fd, objDepList, s in toSend:
             if fd is None:
                 fdIndex = 0xffffffff
             else:
                 fdIndex = fds.index(fd)
 
-            if objDep is None:
-                depId = 0
-            else:
-                depId = id(objDep)
+            depList = objDepList
 
-            sendmsg(sock, [ struct.pack("@BIIPP", len(f._tag), fdIndex,
-                                        len(s), depId, id(f)), f._tag, s ])
+            sendmsg(sock, [ struct.pack("@BIIIP", len(f._tag), fdIndex,
+                                        len(s), len(depList), id(f)),
+                            f._tag, s ])
+            self.sendObjIds(sock, depList)
 
-        sendmsg(sock, [ struct.pack("@" + ("P" * len(self.l)),
-                                    *[ id(x) for x in self.l] ) ])
+        self.sendObjIds(sock, self.l)
 
     @staticmethod
     def recv(sock):
         hdrSize = len(struct.pack("@BIIPP", 0, 0, 0, 0, 0))
-        ptrSize = len(struct.pack("@P", 0))
 
         q = IterableQueue()
         s = recvmsg(sock, 4)
@@ -753,16 +764,20 @@ class SendableFileSet:
 
         for i in range(fileCount):
             s = recvmsg(sock, hdrSize)
-            tagLen, fdIndex, dataLen, depId, thisId = struct.unpack("@BIIPP", s)
+            tagLen, fdIndex, dataLen, depLen, thisId = struct.unpack("@BIIIP", s)
             tag = recvmsg(sock, tagLen)
             s = recvmsg(sock, dataLen)
+            if not depLen:
+                depList = []
+            else:
+                depList = SendableFileSet.recvObjIds(sock, depLen)
 
             if fdIndex != 0xffffffff:
-                assert(depId == 0)
+                assert(not depList)
                 dep = fds[fdIndex]
-            elif depId != 0:
+            elif depList:
                 assert(fdIndex == 0xffffffff)
-                dep = objById[depId]
+                dep = [ objById[x] for x in depList ]
             else:
                 dep = None
 
@@ -771,8 +786,7 @@ class SendableFileSet:
 
             fileList.append(f)
 
-        fileIds = recvmsg(sock, ptrSize * objCount)
-        fileIds = struct.unpack("@" + ("P" * objCount), fileIds)
+        fileIds = SendableFileSet.recvObjIds(sock, objCount)
         files = [ objById[x] for x in fileIds]
 
         return files
@@ -874,12 +888,13 @@ class SeekableNestedFile:
             self.start = start
 
     @staticmethod
-    def _fromInfo(ef, s):
+    def _fromInfo(efList, s):
+        assert(len(efList) == 1)
         size, start = struct.unpack("!II", s)
-        return SeekableNestedFile(ef, size, start = start)
+        return SeekableNestedFile(efList[0], size, start = start)
 
     def _sendInfo(self):
-        return (self.file, struct.pack("!II", self.size, self.start))
+        return ([ self.file ], struct.pack("!II", self.size, self.start))
 
     def close(self):
         pass
