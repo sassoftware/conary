@@ -302,8 +302,11 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         tsDbPath = os.path.join(os.path.dirname(pubRing), 'tsdb')
         try:
             kr = PublicKeyring(pubRing, tsDbPath)
-        except IOError:
-            raise _KeyNotFound(None)
+        except openpgpfile.PGPError, e:
+            # Mark the error as uncatchable, so it can pass through and stop
+            # the update
+            e.errorIsUncatchable = True
+            raise
         return kr
 
     def getPrivateKey(self, keyId, passphrase=None):

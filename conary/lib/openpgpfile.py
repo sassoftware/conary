@@ -189,6 +189,9 @@ class PGPError(Exception):
 class InvalidPacketError(PGPError):
     pass
 
+class KeyringError(PGPError):
+    pass
+
 class MalformedKeyRing(PGPError):
     def __str__(self):
         return self.error
@@ -3260,8 +3263,11 @@ class PublicKeyring(object):
         self._tsDbPath = tsDbPath
         # Create the files if they don't exist
         for f in [self._keyringPath, self._tsDbPath]:
-            util.mkdirChain(os.path.dirname(f))
-            file(f, "a+")
+            try:
+                util.mkdirChain(os.path.dirname(f))
+                file(f, "a+")
+            except (IOError, OSError), e:
+                raise KeyringError(e.errno, e.strerror, e.filename)
         self._tsDbTimestamp = None
         self._cache = {}
 
