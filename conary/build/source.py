@@ -182,11 +182,11 @@ class _Source(_AnySource):
             toFetch = self.rpm
         else:
             toFetch = self.sourcename
-            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                                  toFetch, self.recipe.name,
-                                  self.recipe.srcdirs, localOnly=True,
-                                  allowNone=True)
-            return f
+        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                              toFetch, self.recipe.name,
+                              self.recipe.srcdirs, localOnly=True,
+                              allowNone=True)
+        return f
 
     def getPath(self):
         if self.rpm:
@@ -1645,6 +1645,17 @@ class TroveScript(_AnySource):
                 raise RecipeFileError('file "%s" not found for group script' %
                                       self.sourcename)
             self.contents = open(f).read()
+
+    def fetchLocal(self):
+        # Used by rMake to find files that are not autosourced.
+        if self.contents is None:
+            toFetch = self.sourcename
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                                  toFetch, self.recipe.name,
+                                  self.recipe.srcdirs, localOnly=True,
+                                  allowNone=True)
+            return f
+
 
     def getPath(self):
         return self.sourcename
