@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1284,6 +1284,36 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.filesRead = False
 
+    _tag = 'ccs-ro'
+
+    @staticmethod
+    def _fromInfo(fileObjList, s):
+        cs = ReadOnlyChangeSet()
+
+        for fObj in fileObjList:
+            subCs = ChangeSetFromFile(fObj)
+            cs.merge(subCs)
+
+        (newLen, oldLen) = struct.unpack("!QQ", s[0:16])
+
+        if newLen:
+            newTroveStr = s[16:16 + newLen]
+            cs.newTroves.thaw(newTroveStr)
+
+        if oldLen:
+            oldTroveStr = s[-oldLen:]
+            cs.oldTroves.thaw(oldTroveStr)
+
+        return cs
+
+    def _sendInfo(self):
+        fileObjs = [ x.file for x in self.fileContainers ]
+        new = self.newTroves.freeze()
+        old = self.oldTroves.freeze()
+
+        s = struct.pack("!QQ", len(new), len(old)) + new + old
+        return (fileObjs, s)
+
     def send(self, sock):
         """
         Sends this changeset over a unix-domain socket. This object remains
@@ -1293,14 +1323,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         @type sock: int
         """
         fileSet = util.SendableFileSet()
-        for x in self.fileContainers:
-            fileSet.add(x.file)
+        fileSet.add(self)
         fileSet.send(sock)
-
-        new = self.newTroves.freeze()
-        old = self.oldTroves.freeze()
-        util.sendmsg(sock, [ struct.pack("!QQ", len(new), len(old)),
-                             new, old ])
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
@@ -1311,6 +1335,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.lastCsf = None
         self.fileQueue = []
+util.SendableFileSet._register(ReadOnlyChangeSet)
 
 class ChangeSetFromFile(ReadOnlyChangeSet):
 
@@ -1390,27 +1415,11 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         if nextFile:
             self.fileQueue.append(nextFile + (csf,))
 
-class ChangeSetFromSocket(ReadOnlyChangeSet):
+def ChangeSetFromSocket(sock):
 
-    def __init__(self, sock):
-        ReadOnlyChangeSet.__init__(self)
-
-        fileObjs = util.SendableFileSet.recv(sock)
-
-        s = util.recvmsg(sock, 16)
-        (newLen, oldLen) = struct.unpack("!QQ", s)
-
-        for fObj in fileObjs:
-            subCs = ChangeSetFromFile(fObj)
-            self.merge(subCs)
-
-        if newLen:
-            s = util.recvmsg(sock, newLen)
-            self.newTroves.thaw(s)
-
-        if oldLen:
-            s = util.recvmsg(sock, oldLen)
-            self.oldTroves.thaw(s)
+    fileObjs = util.SendableFileSet.recv(sock)
+    assert(len(fileObjs) == 1)
+    return fileObjs[0]
 
 # old may be None
 def fileChangeSet(pathId, old, new):
