@@ -1383,37 +1383,34 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
     _tag = 'ccs-ro'
 
+    def _sendInfo(self):
+        (fileList, hdr) = ChangeSet._sendInfo(self)
+
+        fileList = [ x.file for x in self.fileContainers ] + fileList
+
+        s = struct.pack("!I", len(self.fileContainers)) + hdr
+        return (fileList, s)
+
     @staticmethod
     def _fromInfo(fileObjList, s):
-        cs = ReadOnlyChangeSet()
+        containerCount = struct.unpack("!I", s[0:4])[0]
+        fileContainers = fileObjList[0:containerCount]
 
-        for fObj in fileObjList:
-            subCs = ChangeSetFromFile(fObj)
-            cs.merge(subCs)
+        partialCs = ChangeSet._fromInfo(fileObjList[containerCount:], s[4:])
+        fullCs = ReadOnlyChangeSet()
+        fullCs.merge(partialCs)
 
-        (newLen, oldLen) = struct.unpack("!QQ", s[0:16])
+        for fObj in fileContainers:
+            csf = filecontainer.FileContainer(fObj)
+            fullCs.fileContainers.append(csf)
 
-        if newLen:
-            newTroveStr = s[16:16 + newLen]
-            cs.newTroves.thaw(newTroveStr)
+        # this sets up fullCs.fileQueue based on the containers we just loaded
+        fullCs.reset()
 
-        if oldLen:
-            oldTroveStr = s[-oldLen:]
-            cs.oldTroves.thaw(oldTroveStr)
-
-        return cs
-
-    def _sendInfo(self):
-        fileObjs = [ x.file for x in self.fileContainers ]
-        new = self.newTroves.freeze()
-        old = self.oldTroves.freeze()
-
-        s = struct.pack("!QQ", len(new), len(old)) + new + old
-        return (fileObjs, s)
+        return fullCs
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
-	self.configCache = {}
         self.filesRead = False
         self.csfWrappers = []
         self.fileContainers = []
