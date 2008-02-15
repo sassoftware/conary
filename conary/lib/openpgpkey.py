@@ -32,6 +32,7 @@ from openpgpfile import seekKeyById
 from openpgpfile import parseAsciiArmorKey
 from openpgpfile import PublicKeyring
 from openpgpfile import SEEK_SET, SEEK_END
+from openpgpfile import TRUST_UNTRUSTED, TRUST_TRUSTED
 
 #-----#
 #OpenPGPKey structure:
@@ -209,13 +210,10 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         self.callback = callback
         if 'HOME' not in os.environ:
             self.publicPaths  = [ '/etc/conary/pubring.gpg' ]
-            self.trustDbPaths = [ '/etc/conary/trustdb.gpg' ]
             self.privatePath  = None
         else:
             self.publicPaths  = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
                                   '/etc/conary/pubring.gpg' ]
-            self.trustDbPaths = [ os.environ['HOME'] + '/.gnupg/trustdb.gpg',
-                                  '/etc/conary/trustdb.gpg' ]
             self.privatePath  = os.environ['HOME'] + '/.gnupg/secring.gpg'
 
     def setPublicPath(self, path):
@@ -225,7 +223,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             self.publicPaths = [ path ]
 
     def setTrustDbPath(self, path):
-        self.trustDbPaths = [ path ]
+        import warnings
+        warnings.warn("setTrustDbPath is deprecated", DeprecationWarning)
 
     def addPublicPath(self, path):
         if isinstance(path, list):
@@ -239,7 +238,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     def setCallback(self, callback):
         self.callback = callback
 
-    def getPublicKey(self, keyId, label = None, warn=True):
+    def getPublicKey(self, keyId, label = None, warn = True):
         """
         Retrieve a public key.
 
@@ -257,39 +256,45 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             return self.publicDict[keyId]
 
         # otherwise search for it
+        key = self._getPublicKey(keyId, label = label, warn = warn)
+        # Everything is trusted for now
+        if self.callback.cfg and self.callback.cfg.trustThreshold > 0:
+            krc = lambda x: self._getPublicKey(x, label=label, warn=warn)
+            trustComputer = Trust(self.callback.cfg.trustedKeys)
+            trustComputer.computeTrust(key.id, keyRetrievalCallback=krc)
+            ret = trustComputer.getTrust(key.id)
+            if ret:
+                _, _, trustLevel = ret
+            else:
+                trustLevel = TRUST_UNTRUSTED
+        else:
+            trustLevel = TRUST_TRUSTED
+        key.trustLevel = trustLevel
+        self.publicDict[keyId] = key
+        return self.publicDict[keyId]
+
+
+    def _getPublicKey(self, keyId, label = None, warn = True):
         for i in range(len(self.publicPaths)):
             try:
                 publicPath = self.publicPaths[i]
-                try:
-                    trustDbPath = self.trustDbPaths[i]
-                except:
-                    pass
 
-                # translate the keyId to a full fingerprint for consistency
                 key = seekKeyById(keyId, publicPath)
-                if not key:
-                    continue
-                # Everything is trusted for now
-                trustLevel = openpgpfile.TRUST_ULTIMATE
-                self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
-                                                    trustLevel)
-                return self.publicDict[keyId]
+                if key:
+                    return OpenPGPKey(key, key.getCryptoKey(), 0)
             except (KeyNotFound, IOError):
                 pass
 
         # Key was not found; call the callback to fetch it and pass the
         # exception if one is raised. If not, store the key in the first
-        # keyring and add it to the cache.
+        # keyring
         keyData = self.callback.getPublicKey(keyId, label, warn=warn)
         kr = self.getPublicKeyring()
         kr.addKeysAsStrings([keyData])
 
         key = kr.getKey(keyId)
-        # Everything is trusted for now
-        trustLevel = 120
-        kobj = OpenPGPKey(key, key.getCryptoKey(), trustLevel)
-        self.publicDict[keyId] = kobj
-        return kobj
+        assert key is not None, "Failure retrieving the newly-added key"
+        return OpenPGPKey(key, key.getCryptoKey(), 0)
 
     def getPublicKeyring(self):
         pubRing = self.publicPaths[0]
@@ -297,8 +302,11 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         tsDbPath = os.path.join(os.path.dirname(pubRing), 'tsdb')
         try:
             kr = PublicKeyring(pubRing, tsDbPath)
-        except IOError:
-            raise _KeyNotFound(None)
+        except openpgpfile.PGPError, e:
+            # Mark the error as uncatchable, so it can pass through and stop
+            # the update
+            e.errorIsUncatchable = True
+            raise
         return kr
 
     def getPrivateKey(self, keyId, passphrase=None):
@@ -447,8 +455,8 @@ class KeyringCacheCallback(KeyCacheCallback):
         sio.seek(0)
         return sio.read()
 
-    def __init__(self, keyring):
-        KeyCacheCallback.__init__(self)
+    def __init__(self, keyring, cfg=None):
+        KeyCacheCallback.__init__(self, cfg=cfg)
         self.srcKeyring = keyring
 
 _keyCache = OpenPGPKeyFileCache()
@@ -465,9 +473,8 @@ class Trust(object):
     depthLimit = 10
     marginals = 3
 
-    def __init__(self, topLevelKeys, keyCache):
+    def __init__(self, topLevelKeys):
         self.topLevelKeys = topLevelKeys
-        self.keyCache = keyCache
         self._graph = None
         # self._trust is a dictionary, keyed on the node index, and with 3
         # values: (node trust level, node trust amount, actual trust)
@@ -482,9 +489,9 @@ class Trust(object):
         # Requesting keys by the short name will populate _idMap
         self._idMap = {}
 
-    def _getKey(self, keyId):
+    def _getKey(self, keyId, keyRetrievalCallback):
         try:
-            key = self.keyCache.getPublicKey(keyId)
+            key = keyRetrievalCallback(keyId)
             realKeyId = key.getKeyId()
             if key != realKeyId:
                 self._idMap[keyId] = realKeyId
@@ -492,21 +499,22 @@ class Trust(object):
         except KeyNotFound:
             return None
 
-    def computeTrust(self, keyId):
+    def computeTrust(self, keyId, keyRetrievalCallback):
         self._graph = graph.DirectedGraph()
         g = self._graph
         self._trust.clear()
         self._depth.clear()
 
         # Normalize the key
-        key = self._getKey(keyId)
+        key = self._getKey(keyId, keyRetrievalCallback)
         if key is None:
             return {}, {}
         keyId = key.getKeyId()
         g.addNode(keyId)
+        cb = lambda x: self.getChildrenCallback(x, keyRetrievalCallback)
         starts, finishes, trees, pred, depth = g.doBFS(
             start = keyId,
-            getChildrenCallback = self.getChildrenCallback,
+            getChildrenCallback = cb,
             depthLimit = self.depthLimit)
 
         # Start walking the tree in reverse order, validating the trust of
@@ -514,16 +522,17 @@ class Trust(object):
         gt = g.transpose()
         self._graph = gt
 
-        topLevelKeyIds = [ self._getKey(x) for x in self.topLevelKeys ]
+        topLevelKeyIds = [ self._getKey(x, keyRetrievalCallback)
+                             for x in self.topLevelKeys ]
         topLevelKeyIds = [ x.getKeyId() for x in topLevelKeyIds if x is not None ]
         # Top-level keys are fully trusted
         topLevelKeyIds = [ x for x in topLevelKeyIds if x in g ]
-        self._trust = dict((x, (self.depthLimit, 120, 120))
+        self._trust = dict((x, (self.depthLimit, TRUST_TRUSTED, TRUST_TRUSTED))
                             for x in topLevelKeyIds)
 
+        cb = lambda x: self.trustComputationCallback(x, keyRetrievalCallback)
         tstart, tfinishes, ttrees, tpred, tdepth = gt.doBFS(
-            start = topLevelKeyIds,
-            getChildrenCallback = self.trustComputationCallback)
+            start = topLevelKeyIds, getChildrenCallback = cb)
         self._depth = dict((g.get(x), y) for x, y in tdepth.items())
         return self._trust, self._depth
 
@@ -535,10 +544,10 @@ class Trust(object):
         keyId = self._idMap.get(keyId, keyId)
         return self._depth.get(keyId, None)
 
-    def getChildrenCallback(self, nodeIdx):
+    def getChildrenCallback(self, nodeIdx, keyRetrievalCallback):
         nodeId = self._graph.get(nodeIdx)
         try:
-            node = self.keyCache.getPublicKey(nodeId)
+            node = keyRetrievalCallback(nodeId)
         except KeyNotFound:
             return []
 
@@ -546,32 +555,32 @@ class Trust(object):
             self._graph.addEdge(nodeId, sig.getSignerKeyId())
         return self._graph.edges[nodeIdx]
 
-    def trustComputationCallback(self, nodeIdx):
+    def trustComputationCallback(self, nodeIdx, keyRetrievalCallback):
         gt = self._graph
         trust = self._trust
-        classicTrust = int(120 / self.marginals)
-        if 120 % self.marginals:
+        classicTrust = int(TRUST_TRUSTED / self.marginals)
+        if TRUST_TRUSTED % self.marginals:
             classicTrust += 1
 
         nodeId = gt.get(nodeIdx)
         if nodeId not in trust:
             return []
         nodeSigLevel, nodeSigTrust, nodeTrust = trust[nodeId]
-        if nodeSigLevel == 0 or nodeTrust < 120:
+        if nodeSigLevel == 0 or nodeTrust < TRUST_TRUSTED:
             # This node is not trusted, don't propagate its trust to children
             return []
 
         for snIdx in gt.edges[nodeIdx]:
             node = gt.get(snIdx)
             ntlev, ntamt, tramt = trust.setdefault(node,
-                    (nodeSigLevel - 1, 120, 0))
+                    (nodeSigLevel - 1, TRUST_TRUSTED, TRUST_UNTRUSTED))
             # Get the signature
-            n = self.keyCache.getPublicKey(node)
+            n = keyRetrievalCallback(node)
             sig = [ x for x in n.signatures if x.getSignerKeyId() == nodeId ]
             assert(sig)
             sig = sig[0]
 
-            if not sig.verifies(self.keyCache.getPublicKey):
+            if not sig.verifies(keyRetrievalCallback):
                 continue
 
             if sig.trustLevel is not None:

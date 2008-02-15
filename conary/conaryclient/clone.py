@@ -862,6 +862,7 @@ class ClientClone:
             trv.setLabelPath(labelPath)
 
         trv.changeVersion(newVersion)
+        trv.copyMetadata(trv) # flatten metadata
 
         for mark, src in _iterAllVersions(trv):
             if chooser.troveInfoNeedsRewrite(mark, src):
@@ -1419,12 +1420,17 @@ class LeafMap(object):
                              for x in targetBranchVersionList
                              if (x.trailingRevision().getVersion()
                                  == revision.getVersion()) ]
+        if (revision in matchingUpstream
+            and desiredVersion.shadowLength() > revision.shadowCount()):
+            desiredVersion.incrementSourceCount()
+            revision = desiredVersion.trailingRevision()
+
         if matchingUpstream:
             def _sourceCounts(revision):
                 return list(revision.getSourceCount().iterCounts())
-            revisionCount = _sourceCounts(revision)[:-1]
+            shadowCounts = _sourceCounts(revision)
             matchingShadowCounts = [ x for x in matchingUpstream
-                                     if _sourceCounts(x)[:-1] == revisionCount ]
+                               if _sourceCounts(x)[:-1] == shadowCounts[:-1] ]
             if matchingShadowCounts:
                 latest = sorted(matchingShadowCounts, key=_sourceCounts)[-1]
                 if (revision in matchingShadowCounts

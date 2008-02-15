@@ -15,6 +15,7 @@
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
 """
+import codecs
 import imp
 import itertools
 import os
@@ -28,7 +29,7 @@ from conary import files, trove
 from conary.build import buildpackage, filter, policy
 from conary.build import tags, use
 from conary.deps import deps
-from conary.lib import elf, util, pydeps, fixedglob, graph
+from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
 
 from elementtree import ElementTree
@@ -229,6 +230,22 @@ class Config(policy.Policy):
         if os.path.isfile(fullpath) and util.isregular(fullpath):
             self._markConfig(filename, fullpath)
 
+    def _file_is_binary(self, fn):
+        f = codecs.open(fn, 'r', 'utf-8')
+        try:
+            limit = os.stat(fn)[stat.ST_SIZE]
+            while f.tell() < limit:
+                try:
+                    # if a file is not utf-8 or has null bytes, we'll consider
+                    # it to be a binary file
+                    if chr(0) in f.read(4096):
+                        return True
+                except UnicodeDecodeError:
+                    return True
+        finally:
+            f.close()
+        return False
+
     def _markConfig(self, filename, fullpath):
         self.info(filename)
         f = file(fullpath)
@@ -239,7 +256,16 @@ class Config(policy.Policy):
             lastchar = f.read(1)
             f.close()
             if lastchar != '\n':
-                self.error("config file %s missing trailing newline" %filename)
+                if self._file_is_binary(fullpath):
+                    self.error("binary file '%s' is marked as config" % \
+                            filename)
+                else:
+                    self.warn("adding trailing newline to config file '%s'" % \
+                            filename)
+                    f = open(fullpath, "a")
+                    f.seek(0, 2)
+                    f.write('\n')
+                    f.close()
         f.close()
         self.recipe.ComponentSpec(_config=filename)
 
@@ -1825,7 +1851,7 @@ class _dependency(policy.Policy):
         return m and m.name == 'CIL'
 
     def _isJava(self, m, contents=None):
-        return m and (m.name == 'java' or m.name == 'jar') and self._hasContents(m, contents)
+        return m and isinstance(m, (magic.jar, magic.java)) and self._hasContents(m, contents)
 
     def _isPerlModule(self, path):
         return (path.endswith('.pm') or
@@ -2254,6 +2280,8 @@ class Provides(_dependency):
 	'%(docdir)s/',
     )
 
+    dbDepCacheClass = _DatabaseDepCache
+
     def __init__(self, *args, **keywords):
 	self.provisions = []
         self.sonameSubtrees = set()
@@ -2267,6 +2295,8 @@ class Provides(_dependency):
         self.pythonSysPathMap = {}
         self.exceptDeps = []
 	policy.Policy.__init__(self, *args, **keywords)
+        self.db = None
+        self.depCache = self.dbDepCacheClass(self._getDb())
 
     def updateArgs(self, *args, **keywords):
 	if args:
@@ -2364,6 +2394,9 @@ class Provides(_dependency):
                 self._addCILPolicyProvides(path, pkg, macros)
 
             elif self._isJava(m, 'provides'):
+                # Cache the internal provides
+                if not hasattr(self.recipe, '_internalJavaDepMap'):
+                    self.recipe._internalJavaDepMap = None
                 self._addJavaProvides(path, m, pkg)
 
             elif self._isPerlModule(path):
@@ -2641,8 +2674,77 @@ class Provides(_dependency):
     def _addJavaProvides(self, path, m, pkg):
         if 'provides' not in m.contents or not m.contents['provides']:
             return
-        for prov in m.contents['provides']:
-            self._addDepToMap(path, pkg.providesMap, 
+        if self.recipe._internalJavaDepMap is None:
+            # Instantiate the dictionary of provides from this package
+            self.recipe._internalJavaDepMap = internalJavaDepMap = {}
+            componentMap = self.recipe.autopkg.componentMap
+            for opath in componentMap:
+                om = self.recipe.magic[opath]
+                if not self._isJava(om, 'provides'):
+                    continue
+                # The file could be a .jar, in which case it contains multiple
+                # classes. contents['files'] is a dict, keyed on the file name
+                # within the jar and with a provide and a set of requires as
+                # value.
+                internalJavaDepMap.setdefault(opath, {}).update(
+                                                        om.contents['files'])
+        else:
+            internalJavaDepMap = self.recipe._internalJavaDepMap
+
+        reqs = set()
+        if self._isJava(m, 'requires'):
+            # Extract this file's requires
+            reqs.update(m.contents['requires'])
+            # Remove the ones that are satisfied internally
+            for opath, ofiles in internalJavaDepMap.items():
+                for oclassName, (oclassProv, oclassReqSet) in ofiles.items():
+                    if oclassProv is not None:
+                        reqs.discard(oclassProv)
+
+        # For now, we are only trimming the provides (and requires) for
+        # classes for which the requires are not satisfied, neither internally
+        # nor from the system Conary database. In the future we may need to
+        # build a dependency tree between internal classes, such that we do
+        # the removal transitively (class A requires class B which doesn't
+        # have its deps satisfied should make class A unusable). This can come
+        # at a later time
+
+        if reqs:
+            # Try to resolve these deps against the Conary database
+            depSetList = []
+            depSetMap = {}
+            for req in reqs:
+                depSet = deps.DependencySet()
+                depSet.addDep(deps.JavaDependencies, deps.Dependency(req, []))
+                depSetList.append(depSet)
+                depSetMap[depSet] = req
+            troves = self.depCache.getProvides(depSetList)
+            missingDepSets = set(depSetList) - set(troves)
+            missingReqs = set(depSetMap[x] for x in missingDepSets)
+            if missingReqs:
+                fileDeps = internalJavaDepMap[path]
+                # This file has unsatisfied dependencies.
+                # Walk its list of classes to determine which ones are not
+                # satisfied.
+                satisfiedClasses = dict((fpath, (fprov, freqs))
+                    for (fpath, (fprov, freqs)) in fileDeps.iteritems()
+                        if freqs is not None
+                            and not freqs.intersection(missingReqs))
+                internalJavaDepMap[path] = satisfiedClasses
+
+                self.warn('Provides and requirements for file %s are disabled '
+                          'because of unsatisfied dependencies. To re-enable '
+                          'them, add to the recipe\'s buildRequires the '
+                          'packages that provide the following '
+                          'requirements: %s' %
+                            (path, " ".join(sorted(missingReqs))))
+
+        # Add the remaining provides
+        fileDeps = internalJavaDepMap[path]
+        provs = set(fprov for fpath, (fprov, freqs) in fileDeps.iteritems()
+                        if fprov is not None)
+        for prov in provs:
+            self._addDepToMap(path, pkg.providesMap,
                 deps.JavaDependencies, deps.Dependency(prov, []))
 
 
@@ -2903,8 +3005,6 @@ class Requires(_addInfo, _dependency):
                 if x.startswith('/'))
         self.rpathFixup = [(filter.Filter(x, macros), y % macros)
                            for x, y in self.rpathFixup]
-        self.PkgConfigRe = re.compile(
-            r'(%(libdir)s|%(datadir)s)/pkgconfig/.*\.pc$' %macros)
         exceptDeps = []
         for fE, rE in self.exceptDeps:
             try:
@@ -2918,6 +3018,9 @@ class Requires(_addInfo, _dependency):
         self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
+        if self.db is None:
+            self.db = database.Database(self.recipe.cfg.root,
+                    self.recipe.cfg.dbPath)
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
 	    return
@@ -2991,22 +3094,32 @@ class Requires(_addInfo, _dependency):
             name, ver = self._CILPolicyProvides[path]
             self._addRequirement(path, name, [ver], pkg, deps.CILDependencies)
 
-        if self.PkgConfigRe.match(path):
-            self._addPkgConfigRequirements(path, fullpath, pkg, macros)
-
         if self._isJava(m, 'requires'):
-            for req in m.contents['requires']:
-                self._addRequirement(path, req, [], pkg,
-                                     deps.JavaDependencies)
+            self._addJavaRequirements(path, m, pkg)
 
         if self._isPerl(path, m, f):
             perlReqs = self._getPerlReqs(path, fullpath)
             for req in perlReqs:
-                self._addRequirement(path, req, [], pkg,
-                                     deps.PerlDependencies)
+                thisReq = deps.parseDep('perl: ' + req)
+                if self.db.getTrovesWithProvides([thisReq]) or \
+                        [x for x in self.recipe.autopkg.components.values() \
+                            if x.provides.satisfies(thisReq)]:
+                    self._addRequirement(path, req, [], pkg,
+                                         deps.PerlDependencies)
 
         self.whiteOut(path, pkg)
         self.unionDeps(path, pkg, f)
+
+    def _addJavaRequirements(self, path, m, pkg):
+        fileDeps = self.recipe._internalJavaDepMap[path]
+        reqs = set()
+        for fpath, (fprov, freq) in fileDeps.items():
+            if freq is not None:
+                reqs.update(freq)
+        for req in reqs:
+            self._addRequirement(path, req, [], pkg,
+                                 deps.JavaDependencies)
+
 
     def whiteOut(self, path, pkg):
         # remove intentionally discarded dependencies
@@ -3451,7 +3564,15 @@ class Requires(_addInfo, _dependency):
         if self.perlReqs is False:
             return []
 
-        p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        cwd = os.getcwd()
+        os.chdir(os.path.dirname(fullpath))
+        try:
+            p = os.popen('%s %s' %(self.perlReqs, fullpath))
+        finally:
+            try:
+                os.chdir(cwd)
+            except:
+                pass
         reqlist = [x.strip().split('//') for x in p.readlines()]
         # make sure that the command completed successfully
         rc = p.close()
@@ -3469,128 +3590,6 @@ class Requires(_addInfo, _dependency):
         reqlist = ['::'.join(x.split('/')).rsplit('.', 1)[0] for x in reqlist]
 
         return reqlist
-
-    def _addPkgConfigRequirements(self, path, fullpath, pkg, macros):
-        # parse pkgconfig file
-        variables = {}
-        requirements = set()
-        libDirs = []
-        libraries = set()
-        variableLineRe = re.compile('^[a-zA-Z0-9]+=')
-        filesRequired = []
-
-        pcContents = [x.strip() for x in file(fullpath).readlines()]
-        for pcLine in pcContents:
-            # interpolate variables: assume variables are interpreted
-            # line-by-line while processing
-            pcLineIter = pcLine
-            while True:
-                for var in variables:
-                    pcLineIter = pcLineIter.replace(var, variables[var])
-                if pcLine == pcLineIter:
-                    break
-                pcLine = pcLineIter
-            pcLine = pcLineIter
-
-            if variableLineRe.match(pcLine):
-                key, val = pcLine.split('=', 1)
-                variables['${%s}' %key] = val
-            else:
-                if (pcLine.startswith('Requires') or
-                    pcLine.startswith('Lib')) and ':' in pcLine:
-                    keyWord, args = pcLine.split(':', 1)
-                    # split on ',' and ' '
-                    argList = itertools.chain(*[x.split(',')
-                                                for x in args.split()])
-                    argList = [x for x in argList if x]
-                    if keyWord.startswith('Requires'):
-                        versionNext = False
-                        for req in argList:
-                            if [x for x in '<=>' if x in req]:
-                                versionNext = True
-                                continue
-                            if versionNext:
-                                versionNext = False
-                                continue
-                            requirements.add(req)
-                    elif keyWord.startswith('Lib'):
-                        for lib in argList:
-                            if lib.startswith('-L'):
-                                libDirs.append(lib[2:])
-                            elif lib.startswith('-l'):
-                                libraries.add(lib[2:])
-                            else:
-                                pass
-
-        # find referenced pkgconfig files and add requirements
-        for req in requirements:
-            candidateFileNames = [
-                '%(destdir)s%(libdir)s/pkgconfig/'+req+'.pc',
-                '%(destdir)s%(datadir)s/pkgconfig/'+req+'.pc',
-                '%(libdir)s/pkgconfig/'+req+'.pc',
-                '%(datadir)s/pkgconfig/'+req+'.pc',
-            ]
-            candidateFileNames = [ x % macros for x in candidateFileNames ]
-            candidateFiles = [ util.exists(x) for x in candidateFileNames ]
-            if True in candidateFiles:
-                filesRequired.append(
-                    (candidateFileNames[candidateFiles.index(True)], 'pkg-config'))
-            else:
-                self.warn('pkg-config file %s.pc not found', req)
-                continue
-
-        # find referenced library files and add requirements
-        libraryPaths = sorted(list(self.systemLibPaths))
-        for libDir in libDirs:
-            if libDir not in libraryPaths:
-                libraryPaths.append(libDir)
-        for library in libraries:
-            found = False
-            for libDir in libraryPaths:
-                candidateFileNames = [
-                    macros.destdir+libDir+'/lib'+library+'.so',
-                    macros.destdir+libDir+'/lib'+library+'.a',
-                    libDir+'/lib'+library+'.so',
-                    libDir+'/lib'+library+'.a',
-                ]
-                candidateFiles = [ util.exists(x) for x in candidateFileNames ]
-                if True in candidateFiles:
-                    filesRequired.append(
-                        (candidateFileNames[candidateFiles.index(True)], 'library'))
-                    found = True
-                    break
-
-            if not found:
-                self.warn('library file lib%s not found', library)
-                continue
-
-
-        for fileRequired, fileType in filesRequired:
-            if fileRequired.startswith(macros.destdir):
-                # find requirement in packaging
-                fileRequired = fileRequired[len(macros.destdir):]
-                autopkg = self.recipe.autopkg
-                troveName = autopkg.componentMap[fileRequired].name
-                package, component = troveName.split(':', 1)
-                if component in ('devellib', 'lib'):
-                    for preferredComponent in ('devel', 'devellib'):
-                        develTroveName = ':'.join((package, preferredComponent))
-                        if develTroveName in autopkg.components and autopkg.components[develTroveName]:
-                            # found a non-empty :devel compoment
-                            troveName = develTroveName
-                            break
-                self._addRequirement(path, troveName, [], pkg,
-                                     deps.TroveDependencies)
-            else:
-                troveName = self._enforceProvidedPath(fileRequired,
-                                                      fileType=fileType,
-                                                      unmanagedError=True)
-                if troveName:
-                    self._addRequirement(path, troveName, [], pkg,
-                                         deps.TroveDependencies)
-
-
-
 
     def _markManualRequirement(self, info, path, pkg, m):
         flags = []
@@ -3661,6 +3660,44 @@ class Requires(_addInfo, _dependency):
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
+class _basePluggableRequires(Requires):
+    """
+    Base class for pluggable Requires policies.
+    """
+
+    # This set of policies get executed before the Requires policy,
+    # and inherits the Requires' ordering constraints
+    requires = list(Requires.requires) + [
+        ('Requires', policy.REQUIRED_SUBSEQUENT),
+    ]
+
+    def preProcess(self):
+        # We want to inherit the exceptions from the Requires class, so we
+        # need to peek into the Required policy object. We can still pass
+        # explicit exceptions into the pluggable sub-policies, and they will
+        # only apply to the sub-policy.
+        exceptions = self.recipe._policyMap['Requires'].exceptions
+        if exceptions:
+            Requires.updateArgs(self, exceptions=exceptions)
+        Requires.preProcess(self)
+
+    def doFile(self, path):
+        componentMap = self.recipe.autopkg.componentMap
+        if path not in componentMap:
+            return
+        pkg = componentMap[path]
+        f = pkg.getFile(path)
+        macros = self.recipe.macros
+        fullpath = macros.destdir + path
+
+        self.addPluggableRequirements(path, fullpath, pkg, macros)
+
+        self.whiteOut(path, pkg)
+        self.unionDeps(path, pkg, f)
+
+    def addPluggableRequirements(self, path, fullpath, pkg, macros):
+        """Override in subclasses"""
+        pass
 
 class Flavor(policy.Policy):
     """

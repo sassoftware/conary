@@ -42,7 +42,7 @@ import textwrap
 from conary.build import action
 from conary.lib import fixedglob, log, util
 from conary.build.use import Use
-from conary.build.manifest import Manifest
+from conary.build.manifest import Manifest, ExplicitManifest
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -64,6 +64,7 @@ class BuildAction(action.RecipeAction):
     passes macros to the C{do()} method.
     """
     keywords = {'package': None}
+    useExplicitManifest = False
     def __init__(self, recipe, *args, **keywords):
 	"""
 	@keyword use: Optional argument; Use flag(s) telling whether
@@ -91,7 +92,11 @@ class BuildAction(action.RecipeAction):
 
     def initManifest(self, recipe):
         if self.package:
-            self.manifest = Manifest(package=self.package, recipe=recipe)
+            if self.useExplicitManifest:
+                self.manifest = ExplicitManifest(package = self.package,
+                        recipe = recipe)
+            else:
+                self.manifest = Manifest(package=self.package, recipe=recipe)
 
     def doAction(self):
 	if self.debug:
@@ -122,6 +127,19 @@ class BuildAction(action.RecipeAction):
         @type macros: macros.Macros
         """
         raise AssertionError, "do method not implemented"
+
+    def missingFiles(self, files, warn = False):
+        if len(files) == 1:
+            fileMsg = "'" + files[0] + "'"
+        else:
+            fileMsg = "('" + "', '".join(x for x in files) + "')"
+        message = "%s: No files matched: %s" % \
+                (self.__class__.__name__, fileMsg)
+        if warn:
+            log.warning(message)
+        else:
+            raise RuntimeError("%s: No files matched: %s" % \
+                    (self.__class__.__name__, fileMsg))
 
 
 class BuildCommand(BuildAction, action.ShellCommand):
@@ -1408,6 +1426,7 @@ class Ldconfig(BuildCommand):
 
 class _FileAction(BuildAction):
     keywords = {'component': None}
+    useExplicitManifest = True
 
     def __init__(self, recipe, *args, **keywords):
         BuildAction.__init__(self, recipe, *args, **keywords)
@@ -1422,10 +1441,6 @@ class _FileAction(BuildAction):
             package = self.component.split(':')[0]
             if package:
                 recipe.packages[package] = True
-
-    def initManifest(self, recipe):
-        # _FileAction does not need Manifest to do package= kwarg
-        pass
 
     def chmod(self, destdir, path, mode=None):
         isDestFile =  path.startswith(destdir)
@@ -1556,7 +1571,7 @@ class Desktopfile(BuildCommand, _FileAction):
 		' %(args)s')
     keywords = {'vendor': 'net',
 		'category': None}
-
+    useExplicitManifest = False
 
     def do(self, macros):
 	if not Use.desktop:
@@ -1724,10 +1739,13 @@ class SetModes(_FileAction):
 	for f in files:
 	    log.info('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros.destdir, f)
+            if self.manifest:
+                self.manifest.recordPaths(f)
 	    self.setComponents(macros.destdir, f)
 
 class _PutFiles(_FileAction):
-    keywords = { 'mode': -1, 'preserveSymlinks' : False }
+    keywords = { 'mode': -1, 'preserveSymlinks' : False, 'allowNoMatch' : False}
+    useExplicitManifest = False
 
     def do(self, macros):
         dest = action._expandOnePath(self.toFile, macros)
@@ -1736,6 +1754,8 @@ class _PutFiles(_FileAction):
         fromFiles = action._expandPaths(self.fromFiles, macros)
         if not os.path.isdir(dest) and len(fromFiles) > 1:
             raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
+        elif len(fromFiles) == 0:
+            self.missingFiles(self.fromFiles, warn = self.allowNoMatch)
         for source in fromFiles:
             self._do_one(source, dest, macros.destdir)
 
@@ -2006,7 +2026,7 @@ class Symlink(_FileAction):
     # This keyword is preserved only for compatibility for existing
     # recipes; DanglingSymlinks policy should enforce non-dangling
     # status when it matters.
-    keywords = { 'allowDangling': True }
+    keywords = { 'allowDangling': True , 'allowNoMatch': False}
 
     def do(self, macros):
 	dest = action._expandOnePath(self.toFile, macros)
@@ -2052,6 +2072,8 @@ class Symlink(_FileAction):
 
         if len(sources) > 1 and not targetIsDir:
             raise TypeError, 'creating multiple symlinks, but destination is not a directory'
+        elif len(sources) == 0:
+            self.missingFiles(self.fromFiles, warn = self.allowNoMatch)
 
         for source in sources:
             if targetIsDir:
@@ -2065,6 +2087,8 @@ class Symlink(_FileAction):
 	    if source[0] == '.':
 		log.warning('back-referenced symlink %s should probably be replaced by absolute symlink (start with "/" not "..")', source)
 	    os.symlink(util.normpath(source), to)
+            if self.manifest:
+                self.manifest.recordPaths(to)
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -2132,6 +2156,7 @@ class Link(_FileAction):
     Demonstrates calling C{r.Link()} to create a hard link from the file
     C{%(bindir)s/passwd} to the file C{%(bindir)s/mumble}.
     """
+
     def do(self, macros):
 	d = macros['destdir']
         self.existingpath = self.existingpath % macros
@@ -2150,6 +2175,8 @@ class Link(_FileAction):
 	    if os.path.exists(n) or os.path.islink(n):
 		os.remove(n)
 	    os.link(e, n)
+            if self.manifest:
+                self.manifest.recordPaths(n)
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -2221,11 +2248,15 @@ class Remove(BuildAction):
     Calls C{r.Remove()} to remove both the content in the C{/etc/widget}
     directory, and the C{/etc/widget} directory.
     """
-    keywords = { 'recursive': False }
+    keywords = { 'recursive': False , 'allowNoMatch': False}
 
     def do(self, macros):
-	for path in action._expandPaths(self.filespecs,
-                                        macros, braceGlob=False):
+        # expand braceglobs only for match checking
+        paths = action._expandPaths(self.filespecs, macros, braceGlob = True)
+        if not paths:
+            self.missingFiles(self.filespecs, warn = self.allowNoMatch)
+        paths = action._expandPaths(self.filespecs, macros, braceGlob = False)
+        for path in paths:
 	    if self.recursive:
 		util.rmtree(path, ignore_errors=True)
 	    else:
@@ -2360,6 +2391,8 @@ class Replace(BuildAction):
 
     def do(self, macros):
         paths = action._expandPaths(self.paths, macros, error=False)
+        if self.manifest:
+            self.manifest.recordPaths(paths)
         log.info("Replacing '%s' in %s",
                   "', '".join(["' -> '".join(x) for x in self.regexps ] ),
                   ' '.join(paths))
@@ -2489,6 +2522,7 @@ class Doc(_FileAction):
                 'dir': '',
 		'mode': 0644,
 		'dirmode': 0755}
+    useExplicitManifest = False
 
     def do(self, macros):
 	macros = macros.copy()
@@ -2646,6 +2680,8 @@ class Create(_FileAction):
 		f = file(fullpath, 'w')
 		f.write(contents)
 		f.close()
+                if self.manifest:
+                    self.manifest.recordPaths(fullpath)
 		self.setComponents(macros.destdir, fullpath)
 		self.chmod(macros.destdir, fullpath)
 
@@ -2715,6 +2751,8 @@ class MakeDirs(_FileAction):
 
     def do(self, macros):
         for path in action._expandPaths(self.paths, macros, braceGlob=False):
+            if self.manifest:
+                self.manifest.recordPaths(path)
             dirs = util.braceExpand(path)
             for d in dirs:
                 if d.endswith('/'):
@@ -2815,6 +2853,7 @@ exit $failed
 		'recursive' : False,
 		'autoBuildMakeDependencies' : True,
 		'subdirs'   : [] }
+    useExplicitManifest = False
 
 
     def __init__(self, recipe, *args, **keywords):
@@ -3294,6 +3333,8 @@ class XInetdService(_FileAction):
                     macros.sysconfdir, 'xinetd.d', self.serviceName))
 
         dest = macros.destdir+self.filename
+        if self.manifest:
+            self.manifest.recordPaths(dest)
 	util.mkdirChain(os.path.dirname(dest))
         f = file(dest, 'w')
         f.write('\n'.join(c) %self.__dict__ %macros)
@@ -3675,6 +3716,8 @@ class MakeFIFO(_FileAction):
             log.info('creating fifo %s' % fullpath)
             util.mkdirChain(os.path.dirname(fullpath))
             os.mkfifo(fullpath)
+            if self.manifest:
+                self.manifest.recordPaths(fullpath)
             self.setComponents(macros.destdir, fullpath)
             self.chmod(macros.destdir, fullpath)
 

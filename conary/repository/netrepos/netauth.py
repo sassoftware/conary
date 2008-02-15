@@ -125,14 +125,16 @@ class UserAuthorization:
         Given a user and password, return the list of roles that are
         authorized via these credentials
         """
+
         cu.execute("""
-        SELECT salt, password, userGroupId, userName FROM Users
+        SELECT Users.salt, Users.password, UserGroupMembers.userGroupId,
+               Users.userName, UserGroups.canMirror
+        FROM Users
         JOIN UserGroupMembers USING(userId)
-        WHERE userName=? or userName='anonymous'
+        JOIN UserGroups USING(userGroupId)
+        WHERE Users.userName = ? OR Users.userName = 'anonymous'
         """, user)
-
         result = [ x for x in cu ]
-
         if not result:
             return set()
 
@@ -141,9 +143,11 @@ class UserAuthorization:
         # password for 'anonymous'. Using a bad password still allows
         # anonymous access
         userPasswords = [ x for x in result if x[3] != 'anonymous' ]
+        # mirror users do not have an anonymous fallback
+        if userPasswords and userPasswords[0][4] == 1:
+            allowAnonymous = False
         if not allowAnonymous:
             result = userPasswords
-
         if userPasswords and not self._checkPassword(
                                         user,
                                         cu.frombinary(userPasswords[0][0]),

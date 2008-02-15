@@ -1032,8 +1032,8 @@ class TroveStore:
         # Look for path/pathId combinarions we don't need anymore
         cu.execute("""
         select FilePaths.filePathId
-        from FilePaths
-        join TroveFiles as TF using(filePathId)
+        from TroveFiles as TF
+        join FilePaths using(filePathId)
         where TF.instanceId = ?
           and not exists (
               select instanceId from TroveFiles as Others
@@ -1047,8 +1047,8 @@ class TroveStore:
         # from the filestore.
         cu.execute("""
         select FileStreams.streamId, FileStreams.sha1
-        from FileStreams
-        join TroveFiles as TF using(streamId)
+        from TroveFiles as TF
+        join FileStreams using(streamId)
         where TF.instanceId = ?
           and not exists (
               select instanceId from TroveFiles as Others
@@ -1098,14 +1098,13 @@ class TroveStore:
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
-        LEFT JOIN TroveTroves AS Other ON
-            Instances.instanceId = Other.includedId AND
-            Other.instanceId != ?
         WHERE
-            TroveTroves.instanceId = ? AND
-            Instances.isPresent = ? AND
-            Other.includedId IS NULL
-        """, (instanceId, instanceId, instances.INSTANCE_PRESENT_MISSING),
+         TroveTroves.instanceId = ?
+         and Instances.isPresent = ?
+         and not exists (select instanceId from TroveTroves as Others
+                          where Others.instanceId != ?
+                            and Others.includedId = Instances.instanceId )
+        """, (instanceId, instances.INSTANCE_PRESENT_MISSING, instanceId),
                    start_transaction=False)
         cu.execute("""
         INSERT INTO tmpRemovals (itemId, flavorId, branchId)

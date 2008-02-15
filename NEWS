@@ -1,3 +1,128 @@
+Changes in 2.0.7:
+  o Build Changes:
+    * Handling pkg-config dependencies has been moved to conary-policy.
+      (CNP-93)
+
+  o Bug Fixes:
+    * When resuming the update after the execution of a critical update,
+      Conary will now use the original file replacement flags. This
+      corrects file conflict errors in a migrate when a critical update
+      was present. (CNY-2513)
+    * The lazy file cache was using /proc/self/fd as a method of
+      determining the number of open file descriptors for the current
+      process. However, under certain circumstances the directory is not
+      readable. The lazy file cache now uses a poll(2)-based technique.
+      (CNY-2536)
+    * If the directory where the public keyring is stored does not exist,
+      it is now automatically created. (CNY-2504)
+
+  o Other changes:
+    * Reading metadata from RPM files now validates the size of the RPM
+      and the sha1 of the full set of metadata.
+
+Changes in 2.0.6:
+  o Build Changes:
+    * Java dependencies for classes that are not dependency-complete
+      are now automatically disabled. To re-enable them, the missing
+      dependencies should be added as buildRequires. (CNY-2175)
+    * Build actions that do not match anything (r.Move, r.Copy, etc.)
+      will now log exactly what they were trying to do. (CNY-2216)
+
+  o Bug Fixes:
+    * A minor bug in the display of the password prompt has been fixed.
+      (CNY-2497)
+    * When x86_64 is specified and a biarch package is available, Conary
+      will mention the biarch as an alternative flavor instead of the x86 one.
+    * Derived packages will now work on x86_64 systems even if a biarch 
+      flavor is specified. (CNY-2494)
+    * Signatures of unexpected types on subkeys are now ignored. (CNY-2490)
+    * When updating a group which contained a package that used to be
+      byDefault False but is now byDefault True, Conary will now install
+      the package. (CNY-2507)
+    * When using the tagScript argument with the client's applyUpdateJob
+      call, the paths to group scripts to be executed are stored relative
+      to the root of the installation, instead of absolute. The tag
+      script is always supposed to be executed under chroot. (CNY-2523)
+
+  o Server Changes:
+    * The serverName configuration option now allows glob-style
+      wildcards.  (CNY-2293)
+    * Slow SQL queries used to remove unused entries from the
+      TroveFiles table and TroveTroves table have been rewritten to
+      make some queries faster with repositories implemented with a
+      sqlite database. (CNY-2515)
+
+  o Other changes:
+    * The file EULA_Conary.txt has been added to clarify that Conary
+      is available under two licenses, and to state the conditions
+      under which the two licenses apply.
+
+Changes in 2.0.5:
+  o Client Changes:
+    * Conary now attempts to provide hints about flavor combinations that would
+      work if it cannot find a flavor that matches your exact request 
+      (CNY-1920).
+    * The rollback API now raises a RollbackError instead of returning
+      non-zero on errors. (CNY-1643)
+
+  o Build Changes:
+    * When file conflicts occur while cooking groups, the deps that
+      caused a package to be pulled in are listed. (CNY-2308)
+    * Config policy will automatically append a newline to non-binary files.
+      Files that are marked as Config and appear to be binary will
+      continue to trigger an error as they have previously. (CNY-2422)
+    * Perl requirements that are not present on the system or provided by
+      the package being built are dropped. (CNY-2180)
+    * Two expansion functions have been introduced to package recipes:
+      r.glob and r.regexp. These functions return an object that can be
+      substituted for any API parameter that calls for a string based
+      regexp or glob. (CNY-2222)
+    * Group recipe actions like "r.addAll" and "r.addCopy" now record
+      the version of the group that is being copied from into the newly
+      created group. (CNY-2359)
+    * Add code to display new-style metadata through rq, q, and showchangeset,
+      as well as propagate that metadata via cooking, promoting, shadowing,
+      and committing source packages.  Entering this metadata must still 
+      be done through scripts.  (CNY-1808)
+    * Added a hook that allows build requirements to be overridden by
+      rMake. (CNY-2427)
+
+  o Bug Fixes:
+    * Conary no longer tracebacks when building a package that contains 
+      a pkgconfig reference to a file in the current package that is in a
+      symlinked directory. (CNY-2455)
+    * The order in which configuration files are read when a glob was
+      passed to includeConfigFile is now deterministic. (CNY-2483)
+
+  o Server Changes:
+    * Roles that have the mirror flag set no longer assume anonymous
+      fallback for trove access authentication (CNY-2473)
+
+Changes in 2.0.4:
+  o Bug Fixes:
+    * Moving an unmodified shadow to tip via cvc promote no longer causes
+      an error. (CNY-2441)
+    * Recipes using addSvnSnapshot no longer modify the conary
+      configuration object's tmpDir setting (CNY-2401)
+    * Fixed a rare bug in which dependency resolution would fail when
+      a dependency that used to be provided by one installed package
+      is now provided by two new packages. (CNY-2459)
+
+  o Client Changes:
+    * Conary will now use the proxy settings stored in its local
+      configuration when loading remote configuration files. (CNY-2363)
+    * PGP keys having some self signatures that fail to pass are
+      no longer failing, as long as at least one self signature passes.
+      (CNY-2439)
+    * The client enforces the trust model using the internal
+      implementation of OpenPGP. (CNY-1895)
+
+  o Build Changes:
+    * Policies that move files in destdir now track path changes they
+      make so that files will end up in the correct package or component
+      after being moved, when "package=" or "component=" has been used
+      in a build action. (CNY-1679)
+
 Changes in 2.0.3:
   o Build Changes:
     * PGP version 3 keys are now supported for verification of
@@ -751,6 +876,62 @@ Changes in 1.1.91:
     * The 'cvc update' and 'cvc diff' commands now accept a source
       version argument without a source count. (CNY-1921)
 
+  o Server Changes:
+    * Setting "forceSSL" once again requires a HTTPS connection be
+      used when authentication data is passed to an Apache based
+      Conary Repository. (CNY-1880)
+    * A bug that caused incorrect values for sourceItemId and
+      clonedFromId to be used when groups and components were
+      committed as part of one changeset has been fixed. (CNY-1903)
+    * A bug that caused the Latest table to be rebuilt incorrectly
+      when migrating to schema version 15.0 has been fixed.
+      (CNY-1909)
+
+  o Build Changes:
+    * Redirects will now be followed in group recipes. Previously,
+      including redirects would result in an error. (CNY-1693)
+    * Derived recipes can now be based on troves which have files
+      that have the same content (SHA1) as each other but are
+      members of different link groups (are not intended to be
+      installed as hard links to each other). (CNY-1733)
+    * Derived packages now work properly if the troves they are based
+      on contain dangling symlinks. (CNY-1914)
+    * Symbolic links that have not changed in a derived package are
+      now correctly ignored by policies that are not interested in
+      unmodified files. (CNY-1879)
+    * The build flavor string used for building a trove is now stored
+      as part of that trove's troveInfo field. (CNY-1678)
+    * Looking up path IDs now stops when all files have been found,
+      instead of always walking the shadow hierarchy. (CNY-1911)
+    * multilib cooks set only Arch.x86_64. (CNY-1711)
+
+  o Bug Fixes:
+    * The new OpenPGP parsing code now accepts Version 3 keys and
+      signatures, without verifying them. (CNY-1931)
+    * A file descriptor leak in the getFileContents method has been
+      fixed.
+    * If ignoreErrors is set for a configuration file, that setting is
+      now honored for contexts as well.
+    * Troves with large numbers of identical files now erase faster,
+      thanks to a SQL fix in sqldb.iterFiles. (CNY-1937)
+    * Python dependency determination now properly ignores filenames
+      like "python.so" when looking for version flags. (CNY-1940)
+    * Conary now correctly avoids assuming that standard I/O files
+      are objects with fileno() methods. Previously, calling
+      Conary interfaces with non-file objects associated with
+      standard input, output, or error could trace back. (CNY-1946)
+    * The --buildreqs option for 'conary q' now functions when
+      multiple build requirements have the same name.
+    * An issue related to the flavor preferences list not being
+      properly populated when a group was cooked has been fixed.
+      (CNY-1951)
+
+  o Other Changes:
+    * Conary tracebacks now report values for each variable in the
+      local namespace in each frame. (CNY-1922)
+    * select() calls have been replaced with poll() for higher
+      efficiency. (CNY-1933)
+
 Changes in 1.1.35:
   o Client Changes:
     * Unknown trove info types in the database are stored in extracted
@@ -842,50 +1023,9 @@ Changes in 1.1.31.4:
       when migrating to schema version 15.0 has been fixed.
       (CNY-1909)
 
-  o Build Changes:
-    * Redirects will now be followed in group recipes. Previously,
-      including redirects would result in an error. (CNY-1693)
-    * Derived recipes can now be based on troves which have files
-      that have the same content (SHA1) as each other but are
-      members of different link groups (are not intended to be
-      installed as hard links to each other). (CNY-1733)
-    * Derived packages now work properly if the troves they are based
-      on contain dangling symlinks. (CNY-1914)
-    * Symbolic links that have not changed in a derived package are
-      now correctly ignored by policies that are not interested in
-      unmodified files. (CNY-1879)
-    * The build flavor string used for building a trove is now stored
-      as part of that trove's troveInfo field. (CNY-1678)
-    * Looking up path IDs now stops when all files have been found,
-      instead of always walking the shadow hierarchy. (CNY-1911)
-    * multilib cooks set only Arch.x86_64. (CNY-1711)
-
-  o Bug Fixes:
-    * The new OpenPGP parsing code now accepts Version 3 keys and
-      signatures, without verifying them. (CNY-1931)
-    * A file descriptor leak in the getFileContents method has been
-      fixed.
-    * If ignoreErrors is set for a configuration file, that setting is
-      now honored for contexts as well.
-    * Troves with large numbers of identical files now erase faster,
-      thanks to a SQL fix in sqldb.iterFiles. (CNY-1937)
-    * Python dependency determination now properly ignores filenames
-      like "python.so" when looking for version flags. (CNY-1940)
-    * Conary now correctly avoids assuming that standard I/O files
-      are objects with fileno() methods. Previously, calling
-      Conary interfaces with non-file objects associated with
-      standard input, output, or error could trace back. (CNY-1946)
-    * The --buildreqs option for 'conary q' now functions when
-      multiple build requirements have the same name.
-    * An issue related to the flavor preferences list not being
-      properly populated when a group was cooked has been fixed.
-      (CNY-1951)
-
-  o Other Changes:
-    * Conary tracebacks now report values for each variable in the
-      local namespace in each frame. (CNY-1922)
-    * select() calls have been replaced with poll() for higher
-      efficiency. (CNY-1933)
+  o Client changes:
+    * Large files are now compressed on disk instead of in memory when
+      creating rollbacks. (CNY-1896)
 
 Changes in 1.1.90:
   o Major Changes:

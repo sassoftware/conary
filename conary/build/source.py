@@ -120,22 +120,27 @@ class _Source(_AnySource):
 
         return keyring.getKey(self.keyid)
 
-    def _downloadPublicKey(self):
-        # Compose URL for downloading the PGP key
-        keyServers = [ 'pgp.mit.edu', 'wwwkeys.pgp.net' ]
+    def _doDownloadPublicKey(self, keyServer):
         # Uhm. Proxies are not likely to forward traffic to port 11371, so
         # avoid using the system-wide proxy setting for now.
         # proxies = self.recipe.cfg.proxy
         proxies = {}
 
         opener = transport.URLOpener(proxies=proxies)
+        url = 'http://%s:11371/pks/lookup?op=get&search=0x%s' % (
+                keyServer, self.keyid)
+        handle = opener.open(url)
+        keyData = openpgpfile.parseAsciiArmorKey(handle)
+        return keyData
+
+    def _downloadPublicKey(self):
+        # Compose URL for downloading the PGP key
+        keyServers = [ 'subkeys.pgp.net', 'pgp.mit.edu', 'wwwkeys.pgp.net' ]
         keyData = None
-        for ks in keyServers:
-            url = 'http://%s:11371/pks/lookup?op=get&search=0x%s' % (
-                    ks, self.keyid)
+        # Walk the list several times before giving up
+        for ks in itertools.chain(*([ keyServers ] * 3)):
             try:
-                handle = opener.open(url)
-                keyData = openpgpfile.parseAsciiArmorKey(handle)
+                keyData = self._doDownloadPublicKey(ks)
                 if keyData:
                     break
             except transport.TransportError, e:
@@ -1471,7 +1476,7 @@ class addCvsSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.project,
                  self.tag)
-        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        tmpPath = tempfile.mkdtemp()
         dirName = self.project + '--' + self.tag
         stagePath = tmpPath + os.path.sep + dirName
         os.mkdir(stagePath)
@@ -1481,7 +1486,7 @@ class addCvsSnapshot(_RevisionControl):
                   "tar cjf '%s' '%s'" %
                         (stagePath, self.root, self.tag, self.project,
                          tmpPath, dirName, target, self.project))
-        shutil.rmtree(stagePath)
+        shutil.rmtree(tmpPath)
 
     def __init__(self, recipe, root, project, tag = 'HEAD', **kwargs):
         self.root = root % recipe.macros
@@ -1567,14 +1572,14 @@ class addSvnSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s, revision %s' 
                   % (self.url, self.revision))
-        tmpPath = self.recipe.cfg.tmpDir = tempfile.mkdtemp()
+        tmpPath = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
         util.execute("svn --quiet export --revision '%s' '%s' '%s' && cd '%s' && "
                   "tar cjf '%s' '%s'" %
                         (self.revision, lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
-        shutil.rmtree(stagePath)
+        shutil.rmtree(tmpPath)
 
     def __init__(self, recipe, url, project = None, revision = 'HEAD', **kwargs):
         self.url = url % recipe.macros

@@ -22,6 +22,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/poll.h>
 #include <unistd.h>
 
 /* debugging aid */
@@ -41,6 +42,7 @@ static PyObject * py_pread(PyObject *self, PyObject *args);
 static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
 static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
+static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -62,6 +64,7 @@ static PyMethodDef MiscMethods[] = {
     { "massCloseFileDescriptors", py_massCloseFDs, METH_VARARGS },
     { "sendmsg", py_sendmsg, METH_VARARGS },
     { "recvmsg", py_recvmsg, METH_VARARGS },
+    { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -722,6 +725,44 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
     free(vector.iov_base);
 
     return rc;
+}
+
+static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
+{
+    int vfd, i, maxfd, ret;
+    struct pollfd *ufds;
+
+    /* Count the number of open file descriptors */
+
+    maxfd = getdtablesize();
+    /* Don't worry about freeing ufds */
+    ufds = (struct pollfd *)alloca(maxfd * sizeof(struct pollfd));
+
+    for (i = 0; i < maxfd; i++)
+      {
+        ufds[i].fd = i;
+        ufds[i].events = POLLIN | POLLPRI | POLLOUT;
+      }
+
+    /* We need to loop, in case poll is interrupted by a signal */
+    while (1)
+      {
+        ret = poll(ufds, maxfd, 0);
+        if (ret >= 0) /* No error */
+            break;
+        /* ret == -1 */
+        if (errno == EINTR) /* A signal occurred. Retry */
+            continue;
+        /* Real failure */
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+      }
+
+    for (i = 0, vfd = 0; i < maxfd; i++)
+        if (ufds[i].revents != POLLNVAL)
+            vfd++;
+
+    return PyInt_FromLong(vfd);
 }
 
 PyMODINIT_FUNC

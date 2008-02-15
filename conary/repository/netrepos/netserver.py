@@ -1,4 +1,4 @@
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,6 +13,7 @@
 
 import base64
 import itertools
+import fnmatch
 import os
 import re
 import sys
@@ -1095,28 +1096,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if not labelStr:
             cu.execute("""
-            select distinct item
-            from UserGroupInstancesCache as ugi
-            join Instances using (instanceId)
-            join Items using (itemId)
-            where ugi.userGroupId in (%s)
-              and Items.hasTrove = 1
-              %s
+            select Items.item from Items
+            where Items.hasTrove = 1
+              and exists ( select 1
+                  from UserGroupInstancesCache as ugi
+                  join Instances using (instanceId)
+                  where ugi.userGroupId in (%s)
+                    and Instances.itemId = Items.itemId
+                    %s )
             """ % (",".join("%d" % x for x in roleIds),
                    troveTypeClause))
         else:
             cu.execute("""
-            select distinct item
-            from Labels
-            join LabelMap using (labelId)
-            join Nodes using (itemId, branchId)
-            join Instances using (itemId, versionId)
-            join UserGroupInstancesCache using (instanceId)
-            join Items on Items.itemId = LabelMap.itemId
-            where label = ?
-              and userGroupId in (%s)
-              and Items.hasTrove = 1
-              %s
+            select Items.item from Items
+            where Items.hasTrove = 1
+              and exists ( select 1
+                  from Labels
+                  join LabelMap using (labelId)
+                  join Nodes using (itemId, branchId)
+                  join Instances using (itemId, versionId)
+                  join UserGroupInstancesCache as ugi using (instanceId)
+                  where ugi.userGroupId in (%s)
+                    and Labels.label = ?
+                    and LabelMap.itemId = Items.itemId
+                    %s )
             """ % (",".join("%d" % x for x in roleIds), troveTypeClause),
                        labelStr)
         return [ x[0] for x in cu ]
@@ -2017,7 +2020,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 start = fileIdLen * i
                 end = start + fileIdLen
                 yield fileIds[start : end]
-        # fileIds need to unique at for performance reasons
+        # fileIds need to be unique for performance reasons
         fileIds = set(splitFileIds(fileIds))
         self.log(2, sourceName, branch, filePrefixes, fileIds)
         cu = self.db.cursor()
@@ -3120,6 +3123,32 @@ class HiddenException(Exception):
         self.forLog = forLog
         self.forReturn = forReturn
 
+class GlobListType(list):
+
+    def __delitem__(self, key):
+        raise NotImplementedError
+
+    def __init__(self, *args):
+        list.__init__(self, *args)
+        self.matchCache = set()
+
+    def __getstate__(self):
+        return list(self)
+
+    def __setstate__(self, state):
+        self += state
+
+    def __contains__(self, item):
+        if item in self.matchCache:
+            return True
+
+        for glob in self:
+            if fnmatch.fnmatch(item, glob):
+                self.matchCache.add(item)
+                return True
+
+        return False
+
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
     bugsToEmail             = CfgString
@@ -3144,7 +3173,7 @@ class ServerConfig(ConfigFile):
     repositoryDB            = dbstore.CfgDriver
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
-    serverName              = CfgLineList(CfgString)
+    serverName              = CfgLineList(CfgString, listType = GlobListType)
     staticPath              = (CfgPath, '/conary-static')
     serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')

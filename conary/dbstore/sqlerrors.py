@@ -14,6 +14,10 @@
 
 class DatabaseError(Exception):
     def __init__(self, msg, *args, **kw):
+        """
+        A database error occurred.  A possible causes is incorrect SQL
+        statement input.
+        """
         self.msg = str(msg)
         self.args = args
         self.kw = kw
@@ -30,6 +34,9 @@ class InvalidBackend(DatabaseError):
     pass
 
 class DatabaseLocked(DatabaseError):
+    """
+    Database is locked and cannot be accessed by the current process.
+    """
     pass
 
 class ReadOnlyDatabase(DatabaseError):

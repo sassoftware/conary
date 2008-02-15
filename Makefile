@@ -14,7 +14,7 @@
 
 all: subdirs
 
-export VERSION = 2.0.3
+export VERSION = 2.0.7
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -36,6 +36,7 @@ SUBDIRS = commands conary config man scripts extra
 
 extra_files = \
 	LICENSE			\
+	EULA_Conary.txt		\
 	Make.rules 		\
 	Makefile		\
 	NEWS			\
@@ -82,7 +83,7 @@ smoketest: archive
 forcedist: $(dist_files) smoketest
 
 tag:
-	hg tag conary-$(VERSION)
+	hg tag -f conary-$(VERSION)
 
 clean: clean-subdirs default-clean
 

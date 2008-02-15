@@ -259,6 +259,10 @@ class Policy(action.RecipeAction):
             if expression in seen:
                 # only put each expression on the list once
                 continue
+            if isinstance(expression, action.Glob):
+                expression = expression()
+            elif isinstance(expression, action.Regexp):
+                expression = expression.pattern
             seen.append(expression)
             args, kwargs = self.filterExpArgs(expression)
             filterList.append(filter.Filter(*args, **kwargs))

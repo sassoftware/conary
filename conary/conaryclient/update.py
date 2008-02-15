@@ -22,7 +22,7 @@ from conary import conarycfg, constants
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import cmdline, resolve
 from conary.deps import deps
-from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError
+from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError, DecodingError
 from conary.lib import log, util
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
@@ -617,7 +617,8 @@ class ClientUpdate:
                                                job[2][0] is not None)
         primaryLocalUpdates = set((job[0], job[2][0], job[2][1]) 
                                   for job in primaryLocalUpdates)
-
+        localErases = set((job[0], job[1][0], job[1][1]) 
+                           for job in localUpdates if job[2][0] is None)
         # Troves which were locally updated to version on the same branch
         # no longer need to be listed as referenced. The trove which replaced
         # it is always a better match for the new items (installed is better
@@ -858,10 +859,19 @@ followLocalChanges: %s
                         # that trove instead.  If not, we just install this 
                         # trove as a fresh update. 
                         log.lowlevel('replaced trove is not installed')
-                        if (not ((parentInstalled
-                                 and not parentReplacedWasPinned)
-                                 or followLocalChanges
-                                 or installMissingRefs)):
+                        if followLocalChanges:
+                            skipLocal = False
+                        elif installMissingRefs:
+                            skipLocal = False
+                        elif (parentInstalled and not parentReplacedWasPinned):
+                            skipLocal = False
+                        elif replacedInfo not in localErases and not parentReplacedWasPinned:
+                            skipLocal = False
+                        else:
+                            skipLocal = True
+
+
+                        if skipLocal:
                             # followLocalChanges states that, even though
                             # the given trove is not a primary, we still want
                             # replace a localUpdate if available instead of 
@@ -877,6 +887,7 @@ followLocalChanges: %s
                         freshInstallOkay = (isPrimary or
                                             (parentInstalled
                                              and not parentReplacedWasPinned)
+                                            or byDefault
                                             or installMissingRefs)
                         # we always want to install the trove even if there's
                         # no local update to match to if it's a primary, or
@@ -2248,6 +2259,8 @@ conary erase '%s=%s[%s]'
 
             for job in exists.diff(refd)[2]:
                 if not job[2][0]:
+                    #oldInfo = troves[troveIdsByInfo[job[0], job[1][0], job[1][1]]]
+                    #allJobs.append(job)
                     continue
                 newInfo = troves[troveIdsByInfo[job[0], job[2][0], job[2][1]]]
                 if not job[1][0] and newInfo[HASPARENT]:
@@ -2291,14 +2304,19 @@ conary erase '%s=%s[%s]'
         installed where a child of b is, and assert that that update is
         from childa -> childb.
         """
-        localUpdates = [ x for x in localUpdates 
-                         if x[1][0] and not x[1][0].isOnLocalHost() ]
-        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates ]
-        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates ]
+        localUpdates = [ x for x in localUpdates
+                         if not (x[1][0] and x[1][0].isOnLocalHost()) ]
+        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates]
+        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates]
+
+        toGet = [ x for x in oldTroveTups if x[1]]
 
         oldTroveSource = trovesource.stack(searchSource, self.repos)
-        oldTroves = oldTroveSource.getTroves(oldTroveTups, withFiles=False)
-        newTroves = self.db.getTroves(newTroveTups, withFiles=False)
+        oldTroves = oldTroveSource.getTroves(toGet, withFiles=False)
+        troveDict = dict(zip(toGet, oldTroves))
+        toGet = [ x for x in newTroveTups if x[1]]
+        newTroves = self.db.getTroves(toGet, withFiles=False)
+        troveDict.update(zip(toGet, newTroves))
 
         if installedTroves is None:
             assert(missingTroves is None)
@@ -2325,38 +2343,69 @@ conary erase '%s=%s[%s]'
             installedTroves = installedTroves.copy()
             missingTroves = missingTroves.copy()
 
+        erases = set()
         allJobs = []
-        for oldTrove, newTrove in itertools.izip(oldTroves, newTroves):
+        for oldTroveTup, newTroveTup in itertools.izip(oldTroveTups, newTroveTups):
+            erases.discard(oldTroveTup)
             # find the relevant local updates by performing a 
             # diff between oldTrove and a trove based on newTrove
             # that contains only those parts of newTrove that are actually
             # installed.
+            if oldTroveTup[1]:
+                oldTrove = troveDict[oldTroveTup]
+            else:
+                oldTrove = None
+            if newTroveTup[1]:
+                newTrove = troveDict[newTroveTup]
+            else:
+                newTrove = None
 
             notExistsOldTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
             existsNewTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
 
             # only create local updates between old troves that
             # don't exist and new troves that do.
-            for tup, _, isStrong in oldTrove.iterTroveListInfo():
-                if (tup in missingTroves and tup not in oldTroveTups
-                    and not newTrove.hasTrove(*tup)):
-                    notExistsOldTrove.addTrove(*tup)
-            for tup, _, isStrong in newTrove.iterTroveListInfo():
-                if (tup in installedTroves and tup not in newTroveTups
-                    and not oldTrove.hasTrove(*tup)):
-                    existsNewTrove.addTrove( *tup)
+            if oldTrove:
+                for tup, byDefault, isStrong in oldTrove.iterTroveListInfo():
+                    if (tup in missingTroves and tup not in oldTroveTups
+                        and not newTrove.hasTrove(*tup)):
+                        notExistsOldTrove.addTrove(*tup)
+                for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
+                    if (tup in installedTroves and tup not in newTroveTups
+                        and not oldTrove.hasTrove(*tup)):
+                        existsNewTrove.addTrove( *tup)
+                    elif not byDefault and tup in installedTroves:
+                        existsNewTrove.addTrove(*tup)
+                    if byDefault and tup in missingTroves:
+                        notExistsOldTrove.addTrove(*tup)
+            else:
+                for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
+                    if byDefault:
+                        if tup in missingTroves:
+                            notExistsOldTrove.addTrove(*tup)
+                    else:
+                        if tup in installedTroves:
+                            existsNewTrove.addTrove(*tup)
 
             newUpdateJobs = existsNewTrove.diff(notExistsOldTrove)[2]
 
             for newJob in newUpdateJobs:
-                if not newJob[1][0] or not newJob[2][0]:
+                oldInfo = (newJob[0], newJob[1][0], newJob[1][1])
+                if not newJob[1][0]:
+                    continue
+                if not newJob[2][0]:
+                    erases.add(oldInfo)
+                else:
+                    erases.discard(oldInfo)
+                    allJobs.append(newJob)
+                if not oldTrove:
                     continue
 
                 # no trove should be part of more than one update.
-                installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
+                if newJob[2][0]:
+                    installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
                 missingTroves.remove((newJob[0], newJob[1][0], newJob[1][1]))
-                allJobs.append(newJob)
-        return allJobs
+        return allJobs + [(x[0], (x[1], x[2]), (None, None), False) for x in erases]
 
     def _replaceIncomplete(self, cs, localSource, db, repos):
         jobSet = [ (x.getName(), (x.getOldVersion(), x.getOldFlavor()),
@@ -2382,10 +2431,10 @@ conary erase '%s=%s[%s]'
 
             cs.merge(newCs)
 
-    def loadRestartInfo(self, restartInfo):
+    def loadRestartInfo(self, restartInfo, updJob):
         """Load the restart information (generally happening after installing
         a critical update), generated with L{saveRestartInfo}"""
-        return _loadRestartInfo(restartInfo, self.lzCache)
+        return _loadRestartInfo(restartInfo, updJob)
 
     def saveRestartInfo(self, updJob, remainingJobs):
         """Save the restart information after applying a critical update, in
@@ -2545,7 +2594,8 @@ conary erase '%s=%s[%s]'
         restartChangeSets = []
         if restartInfo:
             # ignore itemList passed in, we load it from the restart info
-            itemList, restartChangeSets = self.loadRestartInfo(restartInfo)
+            itemList, restartChangeSets = self.loadRestartInfo(restartInfo,
+                                                               updJob)
             recurse = False
             syncChildren = False    # we don't recalculate update info anyway
                                     # so we'll just revert to regular update.
@@ -2669,26 +2719,37 @@ conary erase '%s=%s[%s]'
         if localRollbacks is None:
             localRollbacks = self.cfg.localRollbacks
 
+        if updJob.getRestartedFlag():
+            # If we're applying the second part of a job (after the critical
+            # update has been applied), grab the commit flags from the main
+            # invocation
+            commitFlags = updJob.getCommitChangesetFlags()
+        else:
+            commitFlags = database.CommitChangeSetFlags()
+
         # In migrate mode we replace modified and unmanaged files (CNY-1868)
         # This can be overridden with arguments
         if updJob.getKeywordArguments().get('migrate', False):
-            replaceModifiedFiles = True
-            replaceUnmanagedFiles = True
+            commitFlags.replaceModifiedFiles = replaceModifiedFiles = True
+            commitFlags.replaceUnmanagedFiles = replaceUnmanagedFiles = True
 
-        if replaceFiles is not None:
-            replaceManagedFiles = replaceFiles
-            replaceUnmanagedFiles = replaceFiles
-            replaceModifiedFiles = replaceFiles
-            replaceModifiedConfigFiles = replaceFiles
+        if not updJob.getRestartedFlag():
+            # Don't allow for the flags to be modified if this job came from a
+            # restart
+            if replaceFiles is not None:
+                replaceManagedFiles = replaceFiles
+                replaceUnmanagedFiles = replaceFiles
+                replaceModifiedFiles = replaceFiles
+                replaceModifiedConfigFiles = replaceFiles
 
-        commitFlags = database.CommitChangeSetFlags(
-            replaceManagedFiles = replaceManagedFiles,
-            replaceUnmanagedFiles = replaceUnmanagedFiles,
-            replaceModifiedFiles = replaceModifiedFiles,
-            replaceModifiedConfigFiles = replaceModifiedConfigFiles,
-            justDatabase = justDatabase,
-            localRollbacks = localRollbacks,
-            test = test, keepJournal = keepJournal)
+            commitFlags.replaceManagedFiles = replaceManagedFiles
+            commitFlags.replaceUnmanagedFiles = replaceUnmanagedFiles
+            commitFlags.replaceModifiedFiles = replaceModifiedFiles
+            commitFlags.replaceModifiedConfigFiles = replaceModifiedConfigFiles
+            commitFlags.justDatabase = justDatabase
+            commitFlags.localRollbacks = localRollbacks
+            commitFlags.test = test
+            commitFlags.keepJournal = keepJournal
 
         if autoPinList is None:
             autoPinList = self.cfg.pinTroves
@@ -2716,6 +2777,7 @@ conary erase '%s=%s[%s]'
             # (ignore ordering).
             # do depresolution on that job set to compare contents and warn
             # if contents have changed.
+            updJob.setCommitChangesetFlags(commitFlags)
             restartDir = self.saveRestartInfo(updJob, remainingJobs)
             return restartDir
 
@@ -3098,8 +3160,12 @@ conary erase '%s=%s[%s]'
             exactFlavors = False)
         # Make sure we store them as booleans
         kwargs = dict( (k, bool(v)) for k, v in kwargs.iteritems())
+        if not uJob.getRestartedFlag():
+            # If we were already a restart, don't bother to change the keyword
+            # arguments, they should be the same as for the original set
+            uJob.setKeywordArguments(kwargs)
+
         uJob.setItemList(itemList)
-        uJob.setKeywordArguments(kwargs)
         uJob.setFromChangesets(fromChangesets)
 
         return (uJob, suggMap)
@@ -3741,7 +3807,8 @@ def _storeJobInfo(remainingJobs, updJob):
 
     return restartDir
 
-def _loadRestartInfo(restartDir, lazyFileCache):
+def _loadRestartInfo(restartDir, updJob):
+    lazyFileCache = updJob.lzCache
     changeSetList = []
     # Skip files that are not changesets (.ccs).
     # This was the first attempt to fix CNY-1034, but it would break
@@ -3779,5 +3846,13 @@ def _loadRestartInfo(restartDir, lazyFileCache):
     # If there was something to be done with the version information, it would
     # be performed by now. Clean up the misc directory
     util.rmtree(restartDir + "misc", ignore_errors=True)
+
+    # Load the invocation information, if available
+    invInfoFile = util.joinPaths(restartDir, 'job-invocation')
+    if os.path.exists(invInfoFile):
+        try:
+            updJob.loadInvocationInfo(invInfoFile)
+        except DecodingError:
+            pass
     return finalJobSet, changeSetList
 

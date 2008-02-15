@@ -594,6 +594,8 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     newState.changeChangeLog(cl)
     newState.invalidateDigests()
     newState.computeDigests()
+    if srcPkg:
+        newState.copyMetadata(srcPkg)
     signatureKey = selectSignatureKey(cfg,
                                       newState.getBranch().label().asString())
     if signatureKey is not None:
@@ -601,7 +603,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
         # new sha1 with all our changes accounted for
         newState.addDigitalSignature(signatureKey,
                                      skipIntegrityChecks=True)
-
     if not srcPkg:
         troveCs = newState.diff(None, absolute = True)[0]
     else:

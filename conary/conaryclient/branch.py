@@ -168,6 +168,8 @@ cannot shadow earlier trove
 		branchedTrove.changeVersion(branchedVersion)
                 #this clears the digital signatures from the shadow
                 branchedTrove.troveInfo.sigs.reset()
+                # this flattens the old metadata and removes signatures
+                branchedTrove.copyMetadata(trove)
                 # FIXME we should add a new digital signature in cases
                 # where we can (aka user is at kb and can provide secret key
 

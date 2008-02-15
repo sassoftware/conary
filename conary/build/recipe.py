@@ -17,7 +17,7 @@ from conary import files
 from conary.errors import ParseError
 from conary.build import action, source
 from conary.build.errors import RecipeFileError
-from conary.lib import log
+from conary.lib import log, util
 
 import os
 
@@ -76,6 +76,7 @@ class Recipe(object):
         self._sources = []
         self.loadSourceActions()
         self.buildinfo = None
+        self.metadataSkipSet = []
         self.laReposCache = laReposCache
         self.srcdirs = srcdirs
         self.sourcePathMap = {}
@@ -84,6 +85,7 @@ class Recipe(object):
         self.methodsCalled = []
         self.unusedMethods = set()
         self.methodDepth = 0
+        self._pathTranslations = []
 
         superClasses = self.__class__.__mro__
 
@@ -357,3 +359,42 @@ class Recipe(object):
 
     def isCrossCompileTool(self):
         return False
+
+    def recordMove(self, src, dest):
+        destdir = util.normpath(self.macros.destdir)
+        def _removeDestDir(p):
+            p = util.normpath(p)
+            if p[:len(destdir)] == destdir:
+                return p[len(destdir):]
+            else:
+                return p
+        if os.path.isdir(src):
+            # assume move is about to happen
+            baseDir = src
+            postRename = False
+        elif os.path.isdir(dest):
+            # assume move just happened
+            baseDir = dest
+            postRename = True
+        else:
+            # don't walk directories
+            baseDir = None
+        src = _removeDestDir(src)
+        dest = _removeDestDir(dest)
+        self._pathTranslations.append((src, dest))
+        if baseDir:
+            for base, dirs, files in os.walk(baseDir):
+                for path in dirs + files:
+                    if not postRename:
+                        fSrc = os.path.join(base, path)
+                        fSrc = fSrc.replace(self.macros.destdir, '')
+                        fDest = fSrc.replace(src, dest)
+                    else:
+                        fDest = os.path.join(base, path)
+                        fDest = fDest.replace(self.macros.destdir, '')
+                        fSrc = fDest.replace(dest, src)
+                    self._pathTranslations.append((fSrc, fDest))
+
+    def move(self, src, dest):
+        self.recordMove(src, dest)
+        util.move(src, dest)
