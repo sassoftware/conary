@@ -714,7 +714,6 @@ class SendableFileSet:
                 fd = dependsOn
             elif dependsOn is not None:
                 assert(type(dependsOn) == list)
-                assert(len(dependsOn) == 1)
 
                 notHandled = list(set(dependsOn) - set(handled))
                 if notHandled:
@@ -756,7 +755,11 @@ class SendableFileSet:
         q = IterableQueue()
         s = recvmsg(sock, 4)
         fdCount = struct.unpack("@I", s)[0]
-        s, fds = recvmsg(sock, 8, fdCount)
+        if fdCount:
+            s, fds = recvmsg(sock, 8, fdCount)
+        else:
+            s = recvmsg(sock, 8, 0)
+
         objCount, fileCount = struct.unpack("@II", s)
 
         fileList = []
@@ -766,7 +769,11 @@ class SendableFileSet:
             s = recvmsg(sock, hdrSize)
             tagLen, fdIndex, dataLen, depLen, thisId = struct.unpack("@BIIIP", s)
             tag = recvmsg(sock, tagLen)
-            s = recvmsg(sock, dataLen)
+            if dataLen:
+                s = recvmsg(sock, dataLen)
+            else:
+                s = ''
+
             if not depLen:
                 depList = []
             else:
