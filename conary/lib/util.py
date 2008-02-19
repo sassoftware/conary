@@ -832,6 +832,9 @@ class ExtendedFdopen:
     def read(self, bytes = -1):
         return os.read(self.fd, bytes)
 
+    def truncate(self, offset=0):
+        return os.ftruncate(self.fd, offset)
+
     def write(self, s):
         return os.write(self.fd, s)
 
