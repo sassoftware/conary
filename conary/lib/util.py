@@ -853,7 +853,7 @@ SendableFileSet._register(ExtendedFdopen)
 
 class ExtendedFile(ExtendedFdopen):
 
-    __slots__ = [ 'fObj', 'path' ]
+    __slots__ = [ 'fObj', 'name' ]
 
     def close(self):
         self.fObj.close()
@@ -868,7 +868,7 @@ class ExtendedFile(ExtendedFdopen):
         # as to get the right exceptions on open. we have to keep the file
         # object around to keep it from getting garbage collected though
         self.fObj = file(path, mode)
-        self.path = path
+        self.name = path
         fd = self.fObj.fileno()
         ExtendedFdopen.__init__(self, fd)
 
