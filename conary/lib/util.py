@@ -852,13 +852,19 @@ SendableFileSet._register(ExtendedFdopen)
 
 class ExtendedFile(ExtendedFdopen):
 
+    def close(self):
+        self.fObj.close()
+        self.fd = None
+        self.fObj = None
+
     def __init__(self, path, mode = "r", buffering = True):
         self.fd = None
         assert(not buffering)
-        # we use a file object here to avoid parsing the mode ourself
-        fObj = file(path, mode)
-        fd = os.dup(fObj.fileno())
-        fObj.close()
+        # we use a file object here to avoid parsing the mode ourself, as well
+        # as to get the right exceptions on open. we have to keep the file
+        # object around to keep it from getting garbage collected though
+        self.fObj = file(path, mode)
+        fd = self.fObj.fileno()
         ExtendedFdopen.__init__(self, fd)
 
 class ExtendedStringIO(StringIO.StringIO):
