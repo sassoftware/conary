@@ -798,9 +798,10 @@ class SendableFileSet:
 
         return files
 
-class ExtendedFdopen:
+class ExtendedFdopen(object):
 
     _tag = 'efd'
+    __slots__ = [ 'fd' ]
 
     def __init__(self, fd):
         self.fd = fd
@@ -852,6 +853,8 @@ SendableFileSet._register(ExtendedFdopen)
 
 class ExtendedFile(ExtendedFdopen):
 
+    __slots__ = [ 'fObj', 'path' ]
+
     def close(self):
         self.fObj.close()
         self.fd = None
@@ -859,11 +862,13 @@ class ExtendedFile(ExtendedFdopen):
 
     def __init__(self, path, mode = "r", buffering = True):
         self.fd = None
+
         assert(not buffering)
         # we use a file object here to avoid parsing the mode ourself, as well
         # as to get the right exceptions on open. we have to keep the file
         # object around to keep it from getting garbage collected though
         self.fObj = file(path, mode)
+        self.path = path
         fd = self.fObj.fileno()
         ExtendedFdopen.__init__(self, fd)
 
