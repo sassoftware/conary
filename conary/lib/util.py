@@ -828,7 +828,10 @@ class ExtendedFdopen(object):
 
     def __del__(self):
         if self.fd is not None:
-            self.close()
+            try:
+                self.close()
+            except OSError:
+                self.fd = None
 
     def read(self, bytes = -1):
         return os.read(self.fd, bytes)

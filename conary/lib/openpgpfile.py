@@ -478,10 +478,7 @@ def addPackets(pkts, fpath, pktIdFunc, messageFactory, streamIterFunc):
 
     tmpfd, tmpfname = tempfile.mkstemp(prefix=os.path.basename(fpath),
                                        dir=os.path.dirname(fpath))
-    # XXX This is disgusting. Ideally we should be able to fdopen directly
-    # into an ExtendedFile.
-    tempf = util.ExtendedFile(tmpfname, mode = "w+", buffering = False)
-    os.close(tmpfd)
+    tempf = util.ExtendedFdopen(tmpfd)
 
     pktIds = []
 
@@ -726,20 +723,25 @@ class PGP_Message(object):
     PacketDispatcherClass = PacketTypeDispatcher
 
     def __init__(self, message, start = -1):
+        self._f = self._openStream(message)
+        self.pos = start
+
+    @classmethod
+    def _openStream(cls, message):
+        if hasattr(message, "pread"):
+            return message
         if isinstance(message, str):
             # Assume a path
-            self._f = util.ExtendedFile(message, buffering = False)
-        else:
-            # Be tolerant, accept non-Extended objects
-            if isinstance(message, file) and not hasattr(message, "pread"):
-                # Try to reopen as an ExtendedFile
-                f = util.ExtendedFile(message.name, buffering = False)
-                f.seek(message.tell())
-                message = f
-            if not hasattr(message, "pread"):
-                raise MalformedKeyRing("Not an ExtendedFile object")
-            self._f = message
-        self.pos = start
+            return util.ExtendedFile(message, buffering = False)
+        # Be tolerant, accept non-Extended objects
+        if hasattr(message, 'fileno') and not hasattr(message, "pread"):
+            # Try to reopen as an ExtendedFile. We have to dup the file
+            # descriptor, otherwise it gets closed unexpectedly when the
+            # original message object gets out of scope
+            f = util.ExtendedFdopen(os.dup(message.fileno()))
+            f.seek(message.tell())
+            return f
+        raise MalformedKeyRing("Not an ExtendedFile object")
 
     def _getPacket(self):
         pkt = self.newPacketFromStream(self._f, start = self.pos)
@@ -806,11 +808,7 @@ class PGP_Message(object):
 
     @classmethod
     def newPacketFromStream(cls, stream, start = -1):
-        if isinstance(stream, file) and not hasattr(stream, "pread"):
-            # Try to reopen as an ExtendedFile
-            f = util.ExtendedFile(stream.name, buffering = False)
-            f.seek(stream.tell())
-            stream = f
+        stream = cls._openStream(stream)
         return PGP_PacketFromStream(cls).read(stream, start = start)
 
     @classmethod
