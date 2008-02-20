@@ -1,3 +1,20 @@
+Changes in @NEW@:
+  o Build Changes:
+    * Group policy has been created. Policies deriving from
+      GroupEnforcementPolicy and ImageGroupEnforcementPolicy will be
+      run on groups at the end of the cook process. (CNY-2378)
+    * VersionConflicts group policy now exists. This policy ensures
+      two different versions of a trove won't be included in one
+      install image. (CNY-2371)
+    * ImageGroup is now an attribute tracked in a groups's troveInfo.
+      This attribute denotes that a particular group is meant to
+      define a complete functional system and that group policies
+      germaine to a distinct system were executed separately with
+      respect to that group. (CNY-2520)
+    * TroveFilters now exist. Trove filters allow a packager to
+      reference particular troves within a group for group policy
+      inclusions/exceptions. (CNY-2477)
+
 Changes in 1.2.18:
   o Build Changes:
     * Handling pkg-config dependencies has been moved to conary-policy.
