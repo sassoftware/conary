@@ -92,6 +92,29 @@ class TroveNotFound(ConaryError):
     No trove was found or the match parameters were incorrectly specified.
     """
 
+class LatestRequired(TroveNotFound):
+    """Returned from findTrove when flavor filtering results in an old trove"""
+    def __init__(self, requireData):
+        self.requireData = requireData
+        self.message = None
+
+    def _genMessage(self):
+        message = ""
+        for troveNVF, flavors, newVersion in self.requireData:
+            message += "%s=%s[%s] was found, but newer troves exist:\n" % \
+                    troveNVF
+            for flv in flavors:
+                message += "%s=%s[%s]\n" % (troveNVF[0], newVersion,
+                                          flv.difference(troveNVF[2]))
+            message += '\n'
+        message += "This error indicates that conary selected older versions of the troves mentioned above due to flavor preference. You should probably select one of the current flavors listed. If you meant to select an older trove, you can pass requireLatest=False as a parameter to r.add, r.replace or related calls. To disable requireLatest checking entirely, declare requireLatest=False as a recipe attribute."
+        self.message = message
+
+    def __str__(self):
+        if not self.message:
+            self._genMessage()
+        return self.message
+
 class LabelPathNeeded(TroveNotFound):
     """Returned from findTrove when a label path is required but wasn't given"""
 
