@@ -3821,7 +3821,7 @@ class reportMissingBuildRequires(policy.Policy):
                       str(sorted(list(self.errors))))
 
 
-class reportErrors(policy.Policy):
+class reportErrors(policy.Policy, policy.GroupPolicy):
     """
     This policy is used to report together all package errors.
     Do not call it directly; it is for internal use only.
@@ -3829,6 +3829,7 @@ class reportErrors(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    groupError = False
 
     def __init__(self, *args, **keywords):
 	self.errors = []
@@ -3839,7 +3840,12 @@ class reportErrors(policy.Policy):
 	Called once, with printf-style arguments, for each warning.
 	"""
 	self.errors.append(args[0] %tuple(args[1:]))
+        groupError = keywords.pop('groupError', None)
+        if groupError is not None:
+            self.groupError = groupError
 
     def do(self):
 	if self.errors:
-	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.errors)
+            msg = self.groupError and 'Group' or 'Package'
+            raise policy.PolicyError, ('%s Policy errors found:\n%%s' % msg) \
+                    % "\n".join(self.errors)
