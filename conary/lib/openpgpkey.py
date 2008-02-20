@@ -289,6 +289,9 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         # exception if one is raised. If not, store the key in the first
         # keyring
         keyData = self.callback.getPublicKey(keyId, label, warn=warn)
+        if not keyData:
+            # Callback returned False; no key
+            raise _KeyNotFound(keyId)
         kr = self.getPublicKeyring()
         kr.addKeysAsStrings([keyData])
 

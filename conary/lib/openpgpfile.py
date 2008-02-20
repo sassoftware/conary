@@ -3259,20 +3259,22 @@ class PublicKeyring(object):
     def __init__(self, keyringPath, tsDbPath):
         self._keyringPath = keyringPath
         self._tsDbPath = tsDbPath
-        # Create the files if they don't exist
-        for f in [self._keyringPath, self._tsDbPath]:
-            try:
-                util.mkdirChain(os.path.dirname(f))
-                file(f, "a+")
-            except (IOError, OSError), e:
-                raise KeyringError(e.errno, e.strerror, e.filename)
         self._tsDbTimestamp = None
         self._cache = {}
 
         # For debugging purposes only
         self._timeIncrement = 1
 
+    @staticmethod
+    def _createFile(fileName):
+        try:
+            util.mkdirChain(os.path.dirname(fileName))
+            file(fileName, "a+")
+        except (IOError, OSError), e:
+            raise KeyringError(e.errno, e.strerror, e.filename)
+
     def addKeys(self, keys, timestamp = None):
+        self._createFile(self._keyringPath)
         # Expand generators
         if hasattr(keys, 'next'):
             keys = list(keys)
@@ -3299,6 +3301,7 @@ class PublicKeyring(object):
         return self.addKeys(msg.iterMainKeys(), timestamp = timestamp)
 
     def updateTimestamps(self, keyIds, timestamp = None):
+        self._createFile(self._tsDbPath)
         # Expand generators
         if hasattr(keyIds, 'next'):
             keyIds = list(keyIds)
@@ -3366,9 +3369,8 @@ class PublicKeyring(object):
         @return: a key with the specified key ID
         @raise KeyNotFound: if the key was not found
         """
-        stream = file(self._keyringPath)
         # exportKey will return a fresh file object
-        retStream = exportKey(keyId, stream)
+        retStream = exportKey(keyId, self._keyringPath)
         # Note that exportKey will export both the main key and the subkeys.
         # Because of this, we can't blindly grab the first key in the new
         # keyring.
@@ -3379,8 +3381,11 @@ class PublicKeyring(object):
         # Return all keys and subkeys
         # We need them in order to handle subkeys too
         ret = {}
-        stream = file(self._keyringPath)
-        msg = PGP_Message(stream)
+        try:
+            msg = PGP_Message(self._keyringPath)
+        except (OSError, IOError):
+            # We could not read the keyring - no keys found
+            return ret
         for pk in msg.iterMainKeys():
             fp = pk.getKeyId()
             ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
