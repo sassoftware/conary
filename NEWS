@@ -14,6 +14,8 @@ Changes in @NEW@:
     * TroveFilters now exist. Trove filters allow a packager to
       reference particular troves within a group for group policy
       inclusions/exceptions. (CNY-2477)
+    * Conary policy to fix trailing newlines in config files has been
+      corrected to handle non-wriateable config files. (CNY-2559)
 
 Changes in 1.2.18:
   o Build Changes:
