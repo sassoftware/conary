@@ -23,7 +23,8 @@ from conary.build import filesetrecipe, grouprecipe, inforecipe
 
 DELETE_CHAR = chr(8)
 
-blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'setModes', 'User', 'Group', 'SupplementalGroup')}
+blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'setModes', 'User', 'Group', 'SupplementalGroup'),
+        'GroupRecipe' : ('reportErrors',)}
 
 class DummyRepos:
     def __getattr__(self, what):
@@ -48,7 +49,7 @@ class DummyGroupRecipe(grouprecipe.GroupRecipe):
         grouprecipe.GroupRecipe.__init__(self, repos, cfg,
                                          versions.Label('a@b:c'), None,
                                          None)
-        self._policyMap = {}
+        self.loadPolicy()
 
 class DummyFilesetRecipe(filesetrecipe.FilesetRecipe):
     def __init__(self, cfg):
