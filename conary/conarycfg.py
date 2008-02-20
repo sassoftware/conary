@@ -583,6 +583,23 @@ class ConaryConfiguration(SectionedConfigFile):
 
     def __init__(self, readConfigFiles = False, ignoreErrors = False,
                  readProxyValuesFirst=True):
+        """
+        Initialize a ConaryConfiguration object
+
+        @param readConfigFiles: If True, read /etc/conaryrc and entitlements 
+        files
+        @type readConfigFiles: bool
+
+        @param ignoreErrors: If True, ParseError exceptions will not be raised
+        @type ignoreErrors: bool
+
+        @param readProxyValuesFirst: If True, parse local config files for 
+        proxy settings and apply them before further configuration.
+        @type readProxyValuesFirst: bool  
+
+        @raises ParseError: Raised if configuration syntax is invalid and
+        ignoreErrors is False.
+        """
 	SectionedConfigFile.__init__(self)
         self._ignoreErrors = ignoreErrors
 
@@ -681,6 +698,15 @@ class ConaryConfiguration(SectionedConfigFile):
         self.resetToDefault('signatureKeyMap')
 
     def initializeFlavors(self):
+        """
+        Initialize flavor preferences based on files typically
+        found in /etc/conary/arch (archDirs) and /etc/conary/use
+
+        @raises RuntimeError: Raised if use flags conflict in
+        a way which cannot be reconciled 
+        (see L{deps.DependencyClass.MergeFlags})
+
+        """
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
                                                    self.archDirs)
         if self.flavor == []:

@@ -212,6 +212,9 @@ class ChangeSet(streams.StreamSet):
         self.oldTroves.remove((name, version, flavor))
 
     def iterNewTroveList(self):
+        """
+        @return: dictionary-valueiterator object
+        """
 	return self.newTroves.itervalues()
 
     def iterNewPackageList(self):

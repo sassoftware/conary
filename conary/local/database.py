@@ -77,6 +77,16 @@ class Rollback:
         open("%s/count" % self.dir, "w").write("%d\n" % self.count)
 
     def iterChangeSets(self):
+        """
+        Iterate through the list of rollback changesets
+        @raises errors.ConaryError: raised if there's an I/O Error opening a
+        changeset file
+        @raises repository.filecontainer.BadContainer: raised if the changeset
+        file is malformed
+        @raises AssertionError: could be raised if the changeset is malformed
+        @raises IOError: raised if there's a I/O Error reading compressed files
+        within a changeset
+        """
         for i in range(self.count):
             csList = self._getChangeSets(i)
             yield csList[0]
@@ -121,6 +131,10 @@ class UpdateJob:
         self.rollback = rollback
 
     def getTroveSource(self):
+        """
+        @return: the TroveSource for this UpdateJob
+        @rtype: L{repository.trovesource.ChangeSetFilesTroveSource} 
+        """
         return self.troveSource
 
     def setSearchSource(self, *troveSources):
@@ -138,6 +152,10 @@ class UpdateJob:
         self.jobs.append(job)
 
     def getJobs(self):
+        """
+        @return: a list of jobs
+        @rtype: dict
+        """
         return self.jobs
 
     def setJobs(self, jobs):
@@ -182,12 +200,20 @@ class UpdateJob:
         self._kwargs = kwargs
 
     def freeze(self, frzdir, withChangesetReferences=True):
-        """If withChangesetReferences is False, instances of ChangeSetFromFile
+        """
+        If withChangesetReferences is False, instances of ChangeSetFromFile
         that are part of this update job will be re-frozen as changeset files
         in the freeze directory.
         If withChangesetReferences is True, only references to files (file
         paths) that were used to create the ChangeSetFromFile will be stored.
-        Any other type of changeset will be frozen to a changeset file."""
+        Any other type of changeset will be frozen to a changeset file.
+
+        @raises AssertionError: raised if frzdir is non-existent or non-empty
+        @raises IOError: raised if there's an I/O Error writing the frozen job
+        to jobfile
+        @raises OSError: raised if there is another type of error opening the
+        jobfile for writing
+        """
 
         # Require clean directory
         assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
@@ -266,6 +292,14 @@ class UpdateJob:
         return drep
 
     def thaw(self, frzdir):
+        """
+        @raises DecodingError: raised if there's a error parsing the frozen
+        data
+        @raises errors.InternalConaryError: raised if the frozen data is a
+        newer than this conary version understands
+        @raises IOError: raised if there's an I/O Error opening the jobfile
+        @raises OSError: raised if there are other errors opening the jobfile 
+        """
         jobfile = os.path.join(frzdir, "jobfile")
         drep = self._loadFrozenRepr(jobfile)
 
@@ -461,6 +495,10 @@ class UpdateJob:
         self._invalidateRollbackStack = bool(flag)
 
     def updateInvalidatesRollbacks(self):
+        """
+        @return: Does applying this update invalidate the rollback stack?
+        @rtype: bool
+        """
         return self._invalidateRollbackStack
 
     def addJobPreScript(self, job, script, oldCompatClass, newCompatClass):
@@ -586,6 +624,12 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def getTrove(self, name, version, flavor, pristine = True,
                  withFiles = True, withDeps = True):
+        """
+        @raises TroveMissing:
+        @note:
+            As this calls database functions, it could also raise any type of
+        DatabaseError defined in L{dbstore.sqlerrors}
+        """
         l = self.getTroves([ (name, version, flavor) ], pristine = pristine,
                            withDeps = withDeps, withFiles = withFiles)
         if l[0] is None:
@@ -717,6 +761,11 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 	return self.db.iterFiles(l)
 
     def getTransactionCounter(self):
+        """
+        @raises ConaryError: if the self._db is somehow not initialized and
+        there's a DatabaseError on intialization, it is re-raised as
+        L{errors.ConaryError}
+        """
         return self.db.getTransactionCounter()
 
     def findUnreferencedTroves(self):
@@ -761,6 +810,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         self.commit()
 
     def trovesArePinned(self, troveList):
+        """
+        See L{local.sqldb.Database.trovesArePinned} and others for DB-specific
+        implementation
+        """
         return self.db.trovesArePinned(troveList)
 
     def commit(self):
@@ -1715,6 +1768,22 @@ class Database(SqlDbRepository):
         os.unlink(opJournalPath)
 
     def __init__(self, root, path, timeout = None):
+        """
+        Instantiate a database object
+        @param root: the path to '/' for this operation
+        @type root: string
+        @param path: the path to the database relative to 'root'
+        @type path: string
+        @return: None
+        @raises ExistingJournalError: Raised when a journal file exists,
+        signifying a failed operation.
+        @raises OpenError: raised when directory creation fails, usually due to
+        a nonexistent directory in the path
+        @raises OSError: raised when directory creation fails for reasons other
+        than those caught by OpenError
+        @raises IOError: raised when an I/O error occurs in readRollbackStatus
+        """
+
 	self.root = root
 
         if path == ":memory:": # memory-only db

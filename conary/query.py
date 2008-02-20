@@ -158,7 +158,13 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
         @type pathList: list of strings
         @param whatProvidesList: deps to search for providers of
         @type whatProvidesList: list of strings
+      
+        @raises TroveSpecError: Raised if one of the troveSpecs is of an 
+                                invalid format
 
+        @note: This function calls database routines which could raise any
+               errors defined in L{dbstore.sqlerrors}
+ 
         @rtype: troveTupleList (list of (name, version, flavor) tuples), 
                 and a boolean that stats whether the troves returned should
                 be considered primary (and therefore not compressed ever).

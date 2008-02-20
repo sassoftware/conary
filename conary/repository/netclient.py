@@ -2457,6 +2457,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         C{(name, version, flavor)} tuples that match that key's trove spec.
         If C{allowMissing} is C{True}, trove specs passed in that do not match
         any trove in the repository will not be listed in the return value.
+        @raises repository.errors.TroveMissing: raised if a troveSpec could 
+        not be matched in the repository and allowMissing is False
         """
         troveFinder = findtrove.TroveFinder(self, labelPath, 
                                             defaultFlavor, acrossLabels,

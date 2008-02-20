@@ -326,6 +326,18 @@ class ConfigFile(_Config):
 
 
     def read(self, path, exception=True):
+        """
+        read a config file or config file section
+
+        @param path: the OS path to the file
+        @type path: string
+
+        @param exception: if True, raise exceptions
+        @type exception: bool
+
+        @raises CfgEnvironmentError: raised if file read fails
+        """
+
         f = self._openPath(path, exception=exception)
         if f: self.readObject(path, f)
 
