@@ -262,7 +262,7 @@ class QueryOptions(object):
     def __init__(self, troveSource, labelPath, defaultFlavorPath, acrossLabels,
                  acrossFlavors, affinityDatabase, getLeaves=True,
                  bestFlavor=True, allowNoLabel=False, troveTypes=None,
-                 exactFlavors=False):
+                 exactFlavors=False, requireLatest=False):
         self.troveSource = troveSource
         if isinstance(labelPath, versions.Label):
             labelPath = [labelPath]
@@ -290,6 +290,7 @@ class QueryOptions(object):
             troveTypes = netclient.TROVE_QUERY_PRESENT
         self.troveTypes = troveTypes
         self.affinityDatabase = affinityDatabase
+        self.requireLatest = requireLatest
 
 class TroveFinder(object):
     def __init__(self, *args, **kw):
@@ -299,7 +300,8 @@ class TroveFinder(object):
     def setQueryOptions(self, troveSource, labelPath, defaultFlavorPath, 
                         acrossLabels, acrossFlavors, affinityDatabase, 
                         getLeaves=True, bestFlavor=True, allowNoLabel=False, 
-                        troveTypes=None, exactFlavors=False):
+                        troveTypes=None, exactFlavors=False,
+                        requireLatest=False):
         self.queryOptions = QueryOptions(troveSource=troveSource,
                                          labelPath=labelPath,
                                          defaultFlavorPath=defaultFlavorPath,
@@ -310,7 +312,8 @@ class TroveFinder(object):
                                          bestFlavor=bestFlavor,
                                          allowNoLabel=allowNoLabel,
                                          troveTypes=troveTypes,
-                                         exactFlavors=exactFlavors)
+                                         exactFlavors=exactFlavors,
+                                         requireLatest=requireLatest)
 
     def findTroves(self, troveSpecs, allowMissing=False):
         """
@@ -381,19 +384,20 @@ class TroveFinder(object):
                     searchSpecs.extend(querySearchSpecs)
             if not searchSpecs:
                 return
-            if queryClass.useFilter or queryOptions.exactFlavors:
+            elif queryClass.useFilter or queryOptions.exactFlavors or \
+                    queryOptions.requireLatest:
                 newSearchSpecs = [ (x[0], x[1], None) for x in searchSpecs ]
                 kw = dict(bestFlavor=False, troveTypes=queryOptions.troveTypes)
-                results, errors = method(newSearchSpecs, **kw)
-                results, errors = self._filterQueryResults(queueIds,
-                                                           searchSpecs, results,
-                                                           queryOptions)
+                results, errorList = method(newSearchSpecs, **kw)
+                results, errorList = \
+                        self._filterQueryResults( \
+                        queueIds, searchSpecs, results, queryOptions)
             else:
                 kw = dict(bestFlavor=queryOptions.bestFlavor,
                           troveTypes=queryOptions.troveTypes)
-                results, errors = method(searchSpecs, **kw)
+                results, errorList = method(searchSpecs, **kw)
 
-            allInfo = itertools.izip(results, errors, queueIds)
+            allInfo = itertools.izip(results, errorList, queueIds)
 
             for (troveList, errorList, (query, queueIdx)) in allInfo:
                 if troveList:
@@ -427,18 +431,33 @@ class TroveFinder(object):
                               if x not in newTroveList2 ]
                 newTroveList = newTroveList2
             newTroveLists.append(newTroveList)
-
+        if queryOptions.requireLatest:
+            savedTroveLists = newTroveLists[:]
         flavorQueries = [ x[2] for x in searchSpecs ]
         bestFlavor = queryOptions.bestFlavor
         getLeaves = queryOptions.getLeaves
         troveTypes = queryOptions.troveTypes
-        results, errors = queryOptions.troveSource.filterByFlavors(
+        results, errorList = queryOptions.troveSource.filterByFlavors(
                                            flavorQueries,
                                            newTroveLists,
                                            getLeaves=getLeaves,
                                            bestFlavor=bestFlavor,
                                            troveTypes=troveTypes)
-        return results, errors
+        if queryOptions.requireLatest:
+            latestRequired = []
+            for origRes, newRes in itertools.izip(savedTroveLists, results):
+                # empty newRes is a TroveNotFound. we can ignore it for
+                # requireLatest tests
+                if newRes and (origRes != newRes):
+                    maxVersion = max(x[1] for x in origRes)
+                    if maxVersion != max(x[1] for x in newRes):
+                        trvName = newRes[0][0]
+                        flavors = sorted([x[2] for x in origRes \
+                                if x[1] == maxVersion])
+                        latestRequired.append((newRes[0], flavors, maxVersion))
+            if latestRequired:
+                raise errors.LatestRequired(latestRequired)
+        return results, errorList
 
     def getFactory(self, troveSpec, affinityTroves):
         """
