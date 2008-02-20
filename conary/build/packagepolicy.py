@@ -262,10 +262,20 @@ class Config(policy.Policy):
                 else:
                     self.warn("adding trailing newline to config file '%s'" % \
                             filename)
+                    mode = os.lstat(fullpath)[stat.ST_MODE]
+                    oldMode = None
+                    if mode & 0600 != 0600:
+                        # need to be able to read and write the file to fix it
+                        oldmode = mode
+                        os.chmod(fullpath, mode|0600)
+
                     f = open(fullpath, "a")
                     f.seek(0, 2)
                     f.write('\n')
                     f.close()
+                    if oldmode is not None:
+                        os.chmod(fullpath, oldmode)
+
         f.close()
         self.recipe.ComponentSpec(_config=filename)
 
