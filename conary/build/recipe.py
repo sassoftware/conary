@@ -15,11 +15,12 @@ import inspect
 
 from conary import files
 from conary.errors import ParseError
-from conary.build import action, source
+from conary.build import action, source, policy
 from conary.build.errors import RecipeFileError
 from conary.lib import log, util
 
 import os
+import sys
 
 """
 Contains the base Recipe class
@@ -30,6 +31,12 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
+
+class _policyUpdater:
+    def __init__(self, theobject):
+        self.theobject = theobject
+    def __call__(self, *args, **keywords):
+        self.theobject.updateArgs(*args, **keywords)
 
 def _ignoreCall(*args, **kw):
     pass
@@ -398,3 +405,37 @@ class Recipe(object):
     def move(self, src, dest):
         self.recordMove(src, dest)
         util.move(src, dest)
+
+    def loadPolicy(self, policySet = None, internalPolicyModules = None):
+        #from conary.build import policy
+        if internalPolicyModules is None:
+            internalPolicyModules = self.internalPolicyModules
+        (self._policyPathMap, self._policies) = \
+                policy.loadPolicy(self, policySet = policySet,
+                              internalPolicyModules = internalPolicyModules,
+                              basePolicy = self.basePolicyClass)
+        # create bucketless name->policy map for getattr
+        policyList = []
+        for bucket in self._policies.keys():
+            policyList.extend(self._policies[bucket])
+        self._policyMap = dict((x.__class__.__name__, x) for x in policyList)
+        # Some policy needs to pass arguments to other policy at init
+        # time, but that can't happen until after all policy has been
+        # initialized
+        for name, policyObj in self._policyMap.iteritems():
+            self.externalMethods[name] = _policyUpdater(policyObj)
+        # must be a second loop so that arbitrary policy cross-reference
+        # works; otherwise it is dependent on sort order whether or
+        # not it works
+        for name, policyObj in self._policyMap.iteritems():
+            policyObj.postInit()
+
+        # returns list of policy files loaded
+        return self._policyPathMap.keys()
+
+    def doProcess(self, policyBucket):
+        for post in self._policies[policyBucket]:
+            sys.stdout.write('Running policy: %s\r' % post.__class__.__name__)
+            sys.stdout.flush()
+            post.doProcess(self)
+
