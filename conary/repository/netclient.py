@@ -2550,7 +2550,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
                   getLeaves = True, bestFlavor = True,
-                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False):
+                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
+                  requireLatest = False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
@@ -2611,7 +2612,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             acrossFlavors, affinityDatabase,
                                             getLeaves, bestFlavor,
                                             troveTypes=troveTypes,
-                                            exactFlavors=exactFlavors)
+                                            exactFlavors=exactFlavors,
+                                            requireLatest=requireLatest)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
