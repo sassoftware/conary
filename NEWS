@@ -1,3 +1,12 @@
+Changes in @NEW@:
+  o Build Changes:
+    * requireLatest is now implemented for group recipes. It can be passed
+      as a keyword parameter to r.add, r.replace, r.addAll, and r.addCopy.
+      This flag defaults to True. (CNY-1611)
+    * requireLatest has also been implemented as a recipe level attribute.
+      Setting requireLatest=False for a recipe will affect the default for
+      all calls to r.add, r.replace, r.addAll, and r.addCopy. (CNY-1707)
+
 Changes in 2.0.7:
   o Build Changes:
     * Handling pkg-config dependencies has been moved to conary-policy.
