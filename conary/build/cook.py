@@ -772,7 +772,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
                 troveScripts.script.set(recipeScripts[0])
 
-            for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+            for (troveTup, explicit, byDefault, comps, requireLatest) \
+                    in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,
                                 weakRef=not explicit, *troveTup)
 
