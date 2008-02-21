@@ -166,7 +166,7 @@ class SourceState(trove.Trove):
         f.write("branch %s\n" % self.getBranch().freeze())
         if self.getLastMerged() is not None:
             f.write("lastmerged %s\n" % self.getLastMerged().freeze())
-        if self.getSourceType() is not None:
+        if self.getSourceType():
             f.write("sourcetype %s\n" % self.getSourceType())
 
         rc = []
@@ -310,9 +310,10 @@ class SourceStateFromLines(SourceState):
 
     # name : (isVersion, required)
     fields = { 'name'       : (False, True ),
-               'version'    : (True,  True ),
                'branch'     : (True,  True ),
-               'lastmerged' : (True,  False) }
+               'lastmerged' : (True,  False),
+               'sourcetype' : (False, False),
+               'version'    : (True,  True ) }
 
     def _readFileList(self, lines, stateVersion, repos):
 	fileCount = int(lines[0][:-1])

@@ -324,11 +324,9 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     try:
         use.allowUnknownFlags(True)
-        #loader = loadrecipe.getRecipeLoader(trv)
-        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                         cfg=cfg, repos=repos,
-                                         branch=state.getBranch(),
-                                         ignoreInstalled=True)
+        recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
+                                                branch = state.getBranch(),
+                                                ignoreInstalled = True)
     finally:
         use.allowUnknownFlags(False)
 
@@ -337,6 +335,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     # fetch all the sources
     recipeClass = loader.getRecipe()
+
     # setting the _trove to the last version of the source component
     # allows us to search that source component for files that are
     # not in the current directory or lookaside cache.
@@ -1381,11 +1380,9 @@ def merge(cfg, repos, versionSpec=None, callback=None):
 
     if os.path.exists(state.getRecipeFileName()):
         use.allowUnknownFlags(True)
-        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                         cfg=cfg, repos=repos,
-                                         branch=state.getBranch(),
-                                         ignoreInstalled=True)
-        recipeClass = loader.getRecipe()
+        recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
+                                                branch = state.getBranch(),
+                                                ignoreInstalled = True)
     else:
         recipeClass = None.__class__
 
@@ -1986,13 +1983,12 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
 
     use.allowUnknownFlags(True)
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                     cfg=cfg, repos=repos,
-                                     branch=state.getBranch(),
-                                     ignoreInstalled=True)
+    recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
+                                            branch = state.getBranch(),
+                                            ignoreInstalled = True)
 
     # fetch all the sources
-    recipeClass = loader.getRecipe()
+
     # setting the _trove to the last version of the source component
     # allows us to search that source component for files that are
     # not in the current directory or lookaside cache.

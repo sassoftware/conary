@@ -534,7 +534,6 @@ def loadSuperClass(troveSpec, label=None):
     C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
     """
     callerGlobals = inspect.stack()[1][0].f_globals
-    ignoreInstalled = True
     _loadRecipe(troveSpec, label, callerGlobals, False)
 
 def loadInstalled(troveSpec, label=None):
@@ -835,3 +834,17 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
                     flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
                     log.info('Loaded %s from %s=%s%s' % (recipeClassName, nvf[0][0], nvf[0][1], flvSuffix))
     return loader, oldBuildFlavor
+
+def getRecipeClass(trv, branch = None, cfg = None, repos = None,
+                   ignoreInstalled = None):
+    if trv.getSourceType():
+        # create the recipe through a factory
+        loader = RecipeLoader(trv.getSourceType(), cfg=cfg, repos=repos,
+                              branch=branch, ignoreInstalled = ignoreInstalled)
+    else:
+        # load the recipe directly
+        loader = RecipeLoader(trv.getRecipeFileName(), cfg=cfg, repos=repos,
+                              branch=branch, ignoreInstalled = ignoreInstalled)
+        recipe = loader.getRecipe()
+
+    return recipe
