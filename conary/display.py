@@ -656,6 +656,10 @@ class TroveFormatter(TroveTupFormatter):
 
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
 
+        imageGroup = trove.troveInfo.imageGroup()
+        if imageGroup is not None:
+            yield 'Image Group: %s' % bool(imageGroup)
+
         for ln in self.formatMetadata(trove):
             yield ln
         if sourceTrove:

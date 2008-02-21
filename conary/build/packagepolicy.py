@@ -262,10 +262,20 @@ class Config(policy.Policy):
                 else:
                     self.warn("adding trailing newline to config file '%s'" % \
                             filename)
+                    mode = os.lstat(fullpath)[stat.ST_MODE]
+                    oldMode = None
+                    if mode & 0600 != 0600:
+                        # need to be able to read and write the file to fix it
+                        oldmode = mode
+                        os.chmod(fullpath, mode|0600)
+
                     f = open(fullpath, "a")
                     f.seek(0, 2)
                     f.write('\n')
                     f.close()
+                    if oldmode is not None:
+                        os.chmod(fullpath, oldmode)
+
         f.close()
         self.recipe.ComponentSpec(_config=filename)
 
@@ -2999,8 +3009,6 @@ class Requires(_addInfo, _dependency):
                 if x.startswith('/'))
         self.rpathFixup = [(filter.Filter(x, macros), y % macros)
                            for x, y in self.rpathFixup]
-        self.PkgConfigRe = re.compile(
-            r'(%(libdir)s|%(datadir)s)/pkgconfig/.*\.pc$' %macros)
         exceptDeps = []
         for fE, rE in self.exceptDeps:
             try:
@@ -3084,9 +3092,6 @@ class Requires(_addInfo, _dependency):
         elif self.CILPolicyRE.match(path):
             name, ver = self._CILPolicyProvides[path]
             self._addRequirement(path, name, [ver], pkg, deps.CILDependencies)
-
-        if self.PkgConfigRe.match(path):
-            self._addPkgConfigRequirements(path, fullpath, pkg, macros)
 
         if self._isJava(m, 'requires'):
             self._addJavaRequirements(path, m, pkg)
@@ -3585,129 +3590,6 @@ class Requires(_addInfo, _dependency):
 
         return reqlist
 
-    def _addPkgConfigRequirements(self, path, fullpath, pkg, macros):
-        # parse pkgconfig file
-        variables = {}
-        requirements = set()
-        libDirs = []
-        libraries = set()
-        variableLineRe = re.compile('^[a-zA-Z0-9]+=')
-        filesRequired = []
-
-        pcContents = [x.strip() for x in file(fullpath).readlines()]
-        for pcLine in pcContents:
-            # interpolate variables: assume variables are interpreted
-            # line-by-line while processing
-            pcLineIter = pcLine
-            while True:
-                for var in variables:
-                    pcLineIter = pcLineIter.replace(var, variables[var])
-                if pcLine == pcLineIter:
-                    break
-                pcLine = pcLineIter
-            pcLine = pcLineIter
-
-            if variableLineRe.match(pcLine):
-                key, val = pcLine.split('=', 1)
-                variables['${%s}' %key] = val
-            else:
-                if (pcLine.startswith('Requires') or
-                    pcLine.startswith('Lib')) and ':' in pcLine:
-                    keyWord, args = pcLine.split(':', 1)
-                    # split on ',' and ' '
-                    argList = itertools.chain(*[x.split(',')
-                                                for x in args.split()])
-                    argList = [x for x in argList if x]
-                    if keyWord.startswith('Requires'):
-                        versionNext = False
-                        for req in argList:
-                            if [x for x in '<=>' if x in req]:
-                                versionNext = True
-                                continue
-                            if versionNext:
-                                versionNext = False
-                                continue
-                            requirements.add(req)
-                    elif keyWord.startswith('Lib'):
-                        for lib in argList:
-                            if lib.startswith('-L'):
-                                libDirs.append(lib[2:])
-                            elif lib.startswith('-l'):
-                                libraries.add(lib[2:])
-                            else:
-                                pass
-
-        # find referenced pkgconfig files and add requirements
-        for req in requirements:
-            candidateFileNames = [
-                '%(destdir)s%(libdir)s/pkgconfig/'+req+'.pc',
-                '%(destdir)s%(datadir)s/pkgconfig/'+req+'.pc',
-                '%(libdir)s/pkgconfig/'+req+'.pc',
-                '%(datadir)s/pkgconfig/'+req+'.pc',
-            ]
-            candidateFileNames = [ x % macros for x in candidateFileNames ]
-            candidateFiles = [ util.exists(x) for x in candidateFileNames ]
-            if True in candidateFiles:
-                filesRequired.append(
-                    (candidateFileNames[candidateFiles.index(True)], 'pkg-config'))
-            else:
-                self.warn('pkg-config file %s.pc not found', req)
-                continue
-
-        # find referenced library files and add requirements
-        libraryPaths = sorted(list(self.systemLibPaths))
-        for libDir in libDirs:
-            if libDir not in libraryPaths:
-                libraryPaths.append(libDir)
-        for library in libraries:
-            found = False
-            for libDir in libraryPaths:
-                candidateFileNames = [
-                    macros.destdir+libDir+'/lib'+library+'.so',
-                    macros.destdir+libDir+'/lib'+library+'.a',
-                    libDir+'/lib'+library+'.so',
-                    libDir+'/lib'+library+'.a',
-                ]
-                candidateFiles = [ util.exists(x) for x in candidateFileNames ]
-                if True in candidateFiles:
-                    filesRequired.append(
-                        (candidateFileNames[candidateFiles.index(True)], 'library'))
-                    found = True
-                    break
-
-            if not found:
-                self.warn('library file lib%s not found', library)
-                continue
-
-
-        for fileRequired, fileType in filesRequired:
-            if fileRequired.startswith(macros.destdir):
-                # find requirement in packaging
-                fileRequired = util.normpath(fileRequired)
-                fileRequired = fileRequired[len(util.normpath(macros.destdir)):]
-                autopkg = self.recipe.autopkg
-                troveName = autopkg.componentMap[fileRequired].name
-                package, component = troveName.split(':', 1)
-                if component in ('devellib', 'lib'):
-                    for preferredComponent in ('devel', 'devellib'):
-                        develTroveName = ':'.join((package, preferredComponent))
-                        if develTroveName in autopkg.components and autopkg.components[develTroveName]:
-                            # found a non-empty :devel compoment
-                            troveName = develTroveName
-                            break
-                self._addRequirement(path, troveName, [], pkg,
-                                     deps.TroveDependencies)
-            else:
-                troveName = self._enforceProvidedPath(fileRequired,
-                                                      fileType=fileType,
-                                                      unmanagedError=True)
-                if troveName:
-                    self._addRequirement(path, troveName, [], pkg,
-                                         deps.TroveDependencies)
-
-
-
-
     def _markManualRequirement(self, info, path, pkg, m):
         flags = []
         if self._checkInclusion(info, path):
@@ -3777,6 +3659,44 @@ class Requires(_addInfo, _dependency):
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
+class _basePluggableRequires(Requires):
+    """
+    Base class for pluggable Requires policies.
+    """
+
+    # This set of policies get executed before the Requires policy,
+    # and inherits the Requires' ordering constraints
+    requires = list(Requires.requires) + [
+        ('Requires', policy.REQUIRED_SUBSEQUENT),
+    ]
+
+    def preProcess(self):
+        # We want to inherit the exceptions from the Requires class, so we
+        # need to peek into the Required policy object. We can still pass
+        # explicit exceptions into the pluggable sub-policies, and they will
+        # only apply to the sub-policy.
+        exceptions = self.recipe._policyMap['Requires'].exceptions
+        if exceptions:
+            Requires.updateArgs(self, exceptions=exceptions)
+        Requires.preProcess(self)
+
+    def doFile(self, path):
+        componentMap = self.recipe.autopkg.componentMap
+        if path not in componentMap:
+            return
+        pkg = componentMap[path]
+        f = pkg.getFile(path)
+        macros = self.recipe.macros
+        fullpath = macros.destdir + path
+
+        self.addPluggableRequirements(path, fullpath, pkg, macros)
+
+        self.whiteOut(path, pkg)
+        self.unionDeps(path, pkg, f)
+
+    def addPluggableRequirements(self, path, fullpath, pkg, macros):
+        """Override in subclasses"""
+        pass
 
 class Flavor(policy.Policy):
     """
@@ -3911,7 +3831,7 @@ class reportMissingBuildRequires(policy.Policy):
                       str(sorted(list(self.errors))))
 
 
-class reportErrors(policy.Policy):
+class reportErrors(policy.Policy, policy.GroupPolicy):
     """
     This policy is used to report together all package errors.
     Do not call it directly; it is for internal use only.
@@ -3919,6 +3839,7 @@ class reportErrors(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    groupError = False
 
     def __init__(self, *args, **keywords):
 	self.errors = []
@@ -3929,7 +3850,12 @@ class reportErrors(policy.Policy):
 	Called once, with printf-style arguments, for each warning.
 	"""
 	self.errors.append(args[0] %tuple(args[1:]))
+        groupError = keywords.pop('groupError', None)
+        if groupError is not None:
+            self.groupError = groupError
 
     def do(self):
 	if self.errors:
-	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.errors)
+            msg = self.groupError and 'Group' or 'Package'
+            raise policy.PolicyError, ('%s Policy errors found:\n%%s' % msg) \
+                    % "\n".join(self.errors)

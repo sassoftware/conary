@@ -1,12 +1,39 @@
 Changes in @NEW@:
-    * When using the tagScript argument with the client's applyUpdateJob
-      call, the paths to group scripts to be executed are stored relative
-      to the root of the installation, instead of absolute. The tag
-      script is always supposed to be executed under chroot. (CNY-2523)
+  o Build Changes:
+    * Group policy has been created. Policies deriving from
+      GroupEnforcementPolicy and ImageGroupEnforcementPolicy will be
+      run on groups at the end of the cook process. (CNY-2378)
+    * VersionConflicts group policy now exists. This policy ensures
+      two different versions of a trove won't be included in one
+      install image. (CNY-2371)
+    * ImageGroup is now an attribute tracked in a groups's troveInfo.
+      This attribute denotes that a particular group is meant to
+      define a complete functional system and that group policies
+      germaine to a distinct system were executed separately with
+      respect to that group. (CNY-2520)
+    * TroveFilters now exist. Trove filters allow a packager to
+      reference particular troves within a group for group policy
+      inclusions/exceptions. (CNY-2477)
+    * Conary policy to fix trailing newlines in config files has been
+      corrected to handle non-writeable config files. (CNY-2559)
+    * cvc derive now creates a reference directory named _OLD_ROOT_
+      alongside _ROOT_ when honoring the --extract flag. (CNY-2530)
+
+Changes in 1.2.18:
+  o Build Changes:
+    * Handling pkg-config dependencies has been moved to conary-policy.
+      (CNP-93)
+
+  o Bug Fixes:
     * When resuming the update after the execution of a critical update,
       Conary will now use the original file replacement flags. This
       corrects file conflict errors in a migrate when a critical update
       was present. (CNY-2513)
+    * The lazy file cache was using /proc/self/fd as a method of
+      determining the number of open file descriptors for the current
+      process. However, under certain circumstances the directory is not
+      readable. The lazy file cache now uses a poll(2)-based technique.
+      (CNY-2536)
 
 Changes in 1.2.17:
   o Build Changes:
@@ -21,10 +48,6 @@ Changes in 1.2.17:
       TroveFiles table and TroveTroves table have been rewritten to
       make some queries faster with repositories implemented with a
       sqlite database. (CNY-2515)
-    * When using the tagScript argument with the client's applyUpdateJob
-      call, the paths to group scripts to be executed are stored relative
-      to the root of the installation, instead of absolute. The tag
-      script is always supposed to be executed under chroot. (CNY-2523)
     * When using the tagScript argument with the client's applyUpdateJob
       call, the paths to group scripts to be executed are stored relative
       to the root of the installation, instead of absolute. The tag

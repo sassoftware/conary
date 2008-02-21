@@ -14,6 +14,7 @@
 import copy
 from itertools import chain, izip
 
+from conary.build import policy
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
 from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
@@ -21,6 +22,7 @@ from conary.build.errors import GroupAddAllError, GroupImplicitReplaceError
 from conary.build.errors import GroupUnmatchedReplaces, GroupUnmatchedRemoves
 from conary.build.errors import GroupUnmatchedGlobalReplaces
 from conary.build import macros
+from conary.build import trovefilter
 from conary.build import use
 from conary import conaryclient
 from conary import callbacks
@@ -53,6 +55,9 @@ class _BaseGroupRecipe(Recipe):
         operations on those groups.
     """
     internalAbstractBaseClass = 1
+    internalPolicyModules = ('grouppolicy',)
+    basePolicyClass = policy.GroupPolicy
+
     def __init__(self, laReposCache = None, srcdirs = None,
                  lightInstance = None):
         Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs,
@@ -89,6 +94,9 @@ class _BaseGroupRecipe(Recipe):
         if not self.defaultGroup:
             return self.groups.get(self.name, None)
         return self.defaultGroup
+
+    def troveFilter(self, *args, **kwargs):
+        return trovefilter.TroveFilter(self, *args, **kwargs)
 
     def getGroupDict(self):
         return self.groups.copy()
@@ -158,6 +166,8 @@ class GroupRecipe(_BaseGroupRecipe):
     group, but also the default value for all newly created groups. For
     example, if B{autoResolve} is set to C{True} in the base group, all other
     groups created will have autoResolve set to C{True} by default.
+    B{imageGroup} is an exception to this rule; it will not propogate to
+    sub groups.
 
     The following parameters are accepted by C{r.GroupRecipe} with default
     values indicated in parentheses when applicable:
@@ -178,6 +188,14 @@ class GroupRecipe(_BaseGroupRecipe):
     B{checkPathConflicts} : (True) Conary checks for path conflicts in each
     group by default to ensure that the group can be installed without path
     conflicts.  Setting this parameter to C{False} will disable the check.
+
+    B{imageGroup} | (True) Indicates that this group defines a complete,
+    functioning system, as opposed to a group representing a system
+    component or a collection of multiple groups that might or might not
+    collectively define a complete, functioning system.
+    Image group policies will be executed separately for each image group.
+    This setting is recorded in the troveInfo for the group. This setting
+    does not propogate to subgroups.
 
     USER COMMANDS
     =============
@@ -229,6 +247,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
     depCheck = False
     autoResolve = False
+    imageGroup = True
     checkOnlyByDefaultDeps = True
     checkPathConflicts = True
 
@@ -263,7 +282,7 @@ class GroupRecipe(_BaseGroupRecipe):
                          autoResolve = self.autoResolve,
                          checkOnlyByDefaultDeps = self.checkOnlyByDefaultDeps,
                          checkPathConflicts = self.checkPathConflicts,
-                         byDefault = True)
+                         byDefault = True, imageGroup = self.imageGroup)
         self._setDefaultGroup(group)
 
     def _findSources(self, repos, callback=None):
@@ -1357,14 +1376,14 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
                     byDefault = None, checkOnlyByDefaultDeps = None,
-                    checkPathConflicts = None):
+                    checkPathConflicts = None, imageGroup = False):
         """
         B{C{r.createGroup()}} - Creates a new group
 
         SYNOPSIS
         ========
 
-        C{r.createGroup(I{groupName}, [I{autoResolve},] [I{byDefault},] [I{checkOnlyByDefaultDeps},] [I{checkPathConflicts},] [I{depCheck}])}
+        C{r.createGroup(I{groupName}, [I{autoResolve},] [I{byDefault},] [I{checkOnlyByDefaultDeps},] [I{checkPathConflicts},] [I{depCheck},] [I{imageGroup}])}
 
         DESCRIPTION
         ===========
@@ -1395,6 +1414,9 @@ class GroupRecipe(_BaseGroupRecipe):
         B{groupName} : (None) The name of the group to be created. Must start
         with 'group-'.
 
+        B{imageGroup} : (False) Designate that this group is a image group.
+        Image Group policies will be executed separately on this group.
+
         EXAMPLES
         ========
 
@@ -1424,14 +1446,15 @@ class GroupRecipe(_BaseGroupRecipe):
 
         newGroup = SingleGroup(groupName, depCheck, autoResolve,
                                 checkOnlyByDefaultDeps,
-                                checkPathConflicts, byDefault)
+                                checkPathConflicts, byDefault, imageGroup)
         self._addGroup(groupName, newGroup)
         return newGroup
 
 
 class SingleGroup(object):
     def __init__(self, name, depCheck, autoResolve, checkOnlyByDefaultDeps,
-                 checkPathConflicts, byDefault = True, cache = None):
+                 checkPathConflicts, byDefault = True, imageGroup = False,
+                 cache = None):
         assert(isinstance(byDefault, bool))
         self.name = name
         self.depCheck = depCheck
@@ -1440,7 +1463,7 @@ class SingleGroup(object):
         self.checkPathConflicts = checkPathConflicts
         self.byDefault = byDefault
         self.cache = cache
-
+        self.imageGroup = imageGroup
 
         self.addTroveList = []
         self.removeTroveList = []

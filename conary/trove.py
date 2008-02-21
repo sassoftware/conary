@@ -187,6 +187,9 @@ class LoadedTroves(TroveTupleList):
 class TroveCopiedFrom(TroveTupleList):
     pass
 
+class ImageGroup(streams.ByteStream):
+    pass
+
 class PathHashes(set, streams.InfoStream):
 
     """
@@ -715,7 +718,8 @@ _TROVEINFO_TAG_COMPAT_CLASS   = 19
 # handling
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_COPIED_FROM    = 21
-_TROVEINFO_TAG_LAST           = 21
+_TROVEINFO_TAG_IMAGE_GROUP   = 22
+_TROVEINFO_TAG_LAST           = 22
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -798,7 +802,8 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
-        _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,      'troveCopiedFrom' )
+        _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,    'troveCopiedFrom' ),
+        _TROVEINFO_TAG_IMAGE_GROUP   : (DYNAMIC, ImageGroup,         'imageGroup' )
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1013,7 +1018,7 @@ class Trove(streams.StreamSet):
 
     def addPrecomputedDigitalSignature(self, newSigs):
         """
-        Adds a previously computed signatures, allowing signatures to be
+        Adds a previously computed signature, allowing signatures to be
         added to troves. All digests must have already been computed.
 
         @param newSigs: Signature to add

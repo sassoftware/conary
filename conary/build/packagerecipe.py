@@ -17,7 +17,6 @@ import os
 import imp
 import inspect
 import itertools
-import sys
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
 from conary.build.loadrecipe import _addRecipeToCopy
@@ -71,12 +70,6 @@ class _recipeHelper:
 	self.recipe = recipe
     def __call__(self, *args, **keywords):
         self.list.append(self.theclass(self.recipe, *args, **keywords))
-
-class _policyUpdater:
-    def __init__(self, theobject):
-        self.theobject = theobject
-    def __call__(self, *args, **keywords):
-	self.theobject.updateArgs(*args, **keywords)
 
 def clearBuildRequires(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
@@ -180,6 +173,8 @@ class AbstractPackageRecipe(Recipe):
     explicitMainDir = False
 
     _recipeType = RECIPE_TYPE_PACKAGE
+    internalPolicyModules = ( 'destdirpolicy', 'packagepolicy')
+    basePolicyClass = policy.Policy
 
     def validate(self):
         # wait to check build requires until the object is instantiated
@@ -484,39 +479,8 @@ class AbstractPackageRecipe(Recipe):
     def loadSourceActions(self):
         self._loadSourceActions(lambda item: item._packageAction is True)
 
-    def loadPolicy(self, policySet = None,
-                   internalPolicyModules =
-                            ( 'destdirpolicy', 'packagepolicy') ):
-        (self._policyPathMap, self._policies) = \
-                policy.loadPolicy(self, policySet = policySet,
-                                  internalPolicyModules = internalPolicyModules)
-        # create bucketless name->policy map for getattr
-        policyList = []
-        for bucket in self._policies.keys():
-            policyList.extend(self._policies[bucket])
-        self._policyMap = dict((x.__class__.__name__, x) for x in policyList)
-        # Some policy needs to pass arguments to other policy at init
-        # time, but that can't happen until after all policy has been
-        # initialized
-        for name, policyObj in self._policyMap.iteritems():
-            self.externalMethods[name] = _policyUpdater(policyObj)
-        # must be a second loop so that arbitrary policy cross-reference
-        # works; otherwise it is dependent on sort order whether or
-        # not it works
-        for name, policyObj in self._policyMap.iteritems():
-            policyObj.postInit()
-
-        # returns list of policy files loaded
-        return self._policyPathMap.keys()
-
     def _addBuildAction(self, name, item):
         self.externalMethods[name] = _recipeHelper(self._build, self, item)
-
-    def doProcess(self, policyBucket):
-	for post in self._policies[policyBucket]:
-            sys.stdout.write('Running policy: %s\r' %post.__class__.__name__)
-            sys.stdout.flush()
-            post.doProcess(self)
 
     def getPackages(self):
         return self.autopkg.getComponents()
