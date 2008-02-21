@@ -26,7 +26,6 @@ from conary import conaryclient
 from conary import state
 from conary import updatecmd
 from conary import versions
-from conary.build import loadrecipe
 from conary.lib import log, util
 
 class DeriveCallback(checkin.CheckinCallback):
@@ -67,7 +66,6 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
                              cfg.flavor)
     # findTrove shouldn't return multiple items for one package anymore
     # when a flavor is specified.
-    assert(len(result) == 1)
     troveToDerive, = result
     # displaying output along the screen allows there to be a record
     # of what operations were performed.  Since this command is
@@ -96,26 +94,21 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
                      callback=callback)
     os.chdir(checkoutDir)
     recipeName = troveName + '.recipe'
-    recipePath = os.getcwd() + '/' + troveName + '.recipe'
     shadowBranch = shadowedVersion.branch()
 
     log.info('Rewriting recipe file')
-    loader = loadrecipe.RecipeLoader(recipePath, cfg=cfg,
-                                     repos=repos,
-                                     branch=shadowBranch,
-                                     buildFlavor=cfg.buildFlavor)
-    recipeClass = loader.getRecipe()
+    className = ''.join([ x.capitalize() for x in troveName.split('-') ])
     derivedRecipe = """
-class %(className)s(DerivedPackageRecipe):
+class %(className)sRecipe(DerivedPackageRecipe):
     name = '%(name)s'
     version = '%(version)s'
 
     def setup(r):
         pass
 
-""" % dict(className=recipeClass.__name__,
-           name=recipeClass.name,
-           version=recipeClass.version)
+""" % dict(className=className,
+           name=troveName,
+           version=shadowedVersion.trailingRevision().getVersion())
     open(recipeName, 'w').write(derivedRecipe)
 
     log.info('Removing extra files from checkout')
