@@ -1590,3 +1590,6 @@ def nullifyFileDescriptor(fdesc):
     if fd != fdesc:
         os.dup2(fd, fdesc)
         os.close(fd)
+
+def convertPackageNameToClassName(pkgname):
+    return ''.join([ x.capitalize() for x in pkgname.split('-') ])
