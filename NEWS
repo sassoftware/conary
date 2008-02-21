@@ -18,6 +18,9 @@ Changes in @NEW@:
       corrected to handle non-writeable config files. (CNY-2559)
     * cvc derive now creates a reference directory named _OLD_ROOT_
       alongside _ROOT_ when honoring the --extract flag. (CNY-2530)
+    * Group recipes now have the startGroup command, which calls
+      createGroup, addNewGroup and setDefaultGroup in one step.
+      (CNY-2197)
 
 Changes in 1.2.18:
   o Build Changes:
