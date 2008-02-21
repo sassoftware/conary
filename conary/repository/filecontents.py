@@ -17,7 +17,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from conary.lib import sha1helper
+from conary.lib import sha1helper, util
 
 SEEK_SET=-1
 SEEK_CUR=1
@@ -102,6 +102,14 @@ class FromChangeSet(FileContents):
 class FromString(FileContents):
 
     __slots__ = "str"
+    _tag = 'fc-fs'
+
+    def _sendInfo(self):
+        return ([], self.str)
+
+    @staticmethod
+    def _fromInfo(fileList, s):
+        return FromString(s)
 
     def copy(self):
         return self.__class__(self.str)
@@ -118,6 +126,7 @@ class FromString(FileContents):
 
     def __init__(self, str):
 	self.str = str
+util.SendableFileSet._register(FromString)
 
 class FromFile(FileContents):
 

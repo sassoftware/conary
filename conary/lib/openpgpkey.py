@@ -19,18 +19,20 @@ import tempfile
 import subprocess
 from time import time
 
-from conary import callbacks
+from conary import callbacks, versions
 from conary.lib.util import log
-from conary.lib import graph
+from conary.lib import graph, util
 
+import openpgpfile
 from Crypto.PublicKey import DSA
 from openpgpfile import BadPassPhrase
-from openpgpfile import PGP_Signature
-from openpgpfile import getKeyTrust
 from openpgpfile import KeyNotFound
 from openpgpfile import num_getRelPrime
 from openpgpfile import seekKeyById
+from openpgpfile import parseAsciiArmorKey
+from openpgpfile import PublicKeyring
 from openpgpfile import SEEK_SET, SEEK_END
+from openpgpfile import TRUST_UNTRUSTED, TRUST_TRUSTED
 
 #-----#
 #OpenPGPKey structure:
@@ -161,7 +163,7 @@ class OpenPGPKeySignature(object):
             return self._verifies
         # We need to get the signer's crypto alg
         sigKey = keyRetrievalCallback(self.signer)
-        self._verifies = PGP_Signature.verifySignature(self.sigId,
+        self._verifies = openpgpfile.PGP_Signature.verifySignature(self.sigId,
                 sigKey.cryptoKey, self.signature, self.pubKeyAlg, self.hashAlg)
         return self._verifies
 
@@ -183,8 +185,18 @@ class OpenPGPKeyCache:
         raise NotImplementedError
 
     def reset(self):
+        "Remove all keys from the key cache"
         self.publicDict = {}
         self.privateDict = {}
+
+    def remove(self, keyId):
+        """Remove a key from the cache
+
+        @param keyId: the key ID
+        @type keyId: str
+        """
+        self.publicDict.pop(keyId, None)
+        self.privateDict.pop(keyId, None)
 
 class OpenPGPKeyFileCache(OpenPGPKeyCache):
     """
@@ -198,13 +210,10 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         self.callback = callback
         if 'HOME' not in os.environ:
             self.publicPaths  = [ '/etc/conary/pubring.gpg' ]
-            self.trustDbPaths = [ '/etc/conary/trustdb.gpg' ]
             self.privatePath  = None
         else:
             self.publicPaths  = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
                                   '/etc/conary/pubring.gpg' ]
-            self.trustDbPaths = [ os.environ['HOME'] + '/.gnupg/trustdb.gpg',
-                                  '/etc/conary/trustdb.gpg' ]
             self.privatePath  = os.environ['HOME'] + '/.gnupg/secring.gpg'
 
     def setPublicPath(self, path):
@@ -214,7 +223,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             self.publicPaths = [ path ]
 
     def setTrustDbPath(self, path):
-        self.trustDbPaths = [ path ]
+        import warnings
+        warnings.warn("setTrustDbPath is deprecated", DeprecationWarning)
 
     def addPublicPath(self, path):
         if isinstance(path, list):
@@ -227,48 +237,100 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
     def setCallback(self, callback):
         self.callback = callback
-        pubRing = callback.pubRing
-        if pubRing not in self.publicPaths:
-            self.addPublicPath(pubRing)
-            trustDbPath = '/'.join(pubRing.split('/')[:-1]) + '/trustdb.gpg'
-            self.trustDbPaths.append(trustDbPath)
 
-    def getPublicKey(self, keyId, serverName = None, warn=True):
+    def getPublicKey(self, keyId, label = None, warn = True):
+        """
+        Retrieve a public key.
+
+        @param keyId: the key ID
+        @type keyId: str
+        @param label: a label to retrieve the key from
+        @type label: versions.Label or string
+        @param warn: (True by default) warn if key is not available
+        @type warn: bool
+        @rtype: bool
+        @return: True if the key was found
+        """
         # if we have this key cached, return it immediately
         if keyId in self.publicDict:
             return self.publicDict[keyId]
 
         # otherwise search for it
+        key = self._getPublicKey(keyId, label = label, warn = warn)
+        # Everything is trusted for now
+        if self.callback.cfg and self.callback.cfg.trustThreshold > 0:
+            krc = lambda x: self._getPublicKey(x, label=label, warn=warn)
+            trustComputer = Trust(self.callback.cfg.trustedKeys)
+            trustComputer.computeTrust(key.id, keyRetrievalCallback=krc)
+            ret = trustComputer.getTrust(key.id)
+            if ret:
+                _, _, trustLevel = ret
+            else:
+                trustLevel = TRUST_UNTRUSTED
+        else:
+            trustLevel = TRUST_TRUSTED
+        key.trustLevel = trustLevel
+        self.publicDict[keyId] = key
+        return self.publicDict[keyId]
+
+
+    def _getPublicKey(self, keyId, label = None, warn = True):
         for i in range(len(self.publicPaths)):
             try:
                 publicPath = self.publicPaths[i]
-                try:
-                    trustDbPath = self.trustDbPaths[i]
-                except:
-                    pass
 
-                # translate the keyId to a full fingerprint for consistency
                 key = seekKeyById(keyId, publicPath)
-                if not key:
-                    continue
-                trustLevel = getKeyTrust(trustDbPath, key.getKeyFingerprint())
-                self.publicDict[keyId] = OpenPGPKey(key, key.getCryptoKey(),
-                                                    trustLevel)
-                return self.publicDict[keyId]
+                if key:
+                    return OpenPGPKey(key, key.getCryptoKey(), 0)
             except (KeyNotFound, IOError):
                 pass
-        # callback should only return True if it found the key.
-        if serverName and self.callback.getPublicKey(keyId, serverName,
-                                                     warn=warn):
-            return self.getPublicKey(keyId, warn=warn)
-        raise KeyNotFound(keyId)
+
+        # Key was not found; call the callback to fetch it and pass the
+        # exception if one is raised. If not, store the key in the first
+        # keyring
+        keyData = self.callback.getPublicKey(keyId, label, warn=warn)
+        if not keyData:
+            # Callback returned False; no key
+            raise _KeyNotFound(keyId)
+        kr = self.getPublicKeyring()
+        kr.addKeysAsStrings([keyData])
+
+        key = kr.getKey(keyId)
+        assert key is not None, "Failure retrieving the newly-added key"
+        return OpenPGPKey(key, key.getCryptoKey(), 0)
+
+    def getPublicKeyring(self):
+        pubRing = self.publicPaths[0]
+        # XXX
+        tsDbPath = os.path.join(os.path.dirname(pubRing), 'tsdb')
+        try:
+            kr = PublicKeyring(pubRing, tsDbPath)
+        except openpgpfile.PGPError, e:
+            # Mark the error as uncatchable, so it can pass through and stop
+            # the update
+            e.errorIsUncatchable = True
+            raise
+        return kr
 
     def getPrivateKey(self, keyId, passphrase=None):
+        """
+        Retrieve the private key.
+
+        @param keyId: the key ID
+        @type keyId: str
+        @param passphrase: an optional passphrase. If not specified, one will
+        be read from the terminal if it is needed.
+        @type passphrase: str
+
+        @raise BadPassPrhase: if the passphrase was incorrect
+        @raise KeyNotFound: if the key was not found
+        """
         if keyId in self.privateDict:
             return self.privateDict[keyId]
 
-        # translate the keyId to a full fingerprint for consistency
         key = seekKeyById(keyId, self.privatePath)
+        if not key:
+            raise KeyNotFound(keyId)
 
         # if we were supplied a password, use it.  The caller will need
         # to deal with handling BadPassPhrase exceptions
@@ -307,110 +369,52 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 #OpenPGPKeyFinder: download missing keys from conary servers.
 #-----#
 class KeyCacheCallback(callbacks.KeyCacheCallback):
-    gpgBin = 'gpg'
-    def _getGPGCommonArgs(self, homeDir):
-        return [self.gpgBin, '-q', '--no-tty',
-                '--homedir', homeDir,
-                '--no-greeting', '--no-secmem-warning',
-                '--no-verbose', '--no-mdc-warning',
-                '--no-default-keyring',
-                '--keyring', os.path.basename(self.pubRing),
-                '--batch', '--no-permission-warning',
-                ]
-    def _getGPGExtraArgs(self, source, keyId, warn=True):
-        """Returns extra arguments to pass to GPG, and an optional stream to
-        be used as standard input"""
-        return [
-                '--keyserver', '%sgetOpenPGPKey?search=%s' %(source, keyId),
-                '--keyserver-options', 'timeout=3',
-                '--recv-key', keyId,
-        ], None
+    def findOpenPGPKey(self, source, keyId):
+        """
+        Look up the key in the specified source.
 
-    def _normalizeKeySource(self, source):
-        """Munge the source before passing it to GPG"""
-        server = source
-        # don't depend on repoMap entries ending with /
-        if server[-1] != '/':
-            server += '/'
-        # rewrite (and hope) that a URL that uses https:// can
-        # use http:// just as well.  GPG doesn't ship with a key getter
-        # that can access https:// servers.
-        if server.startswith('https://'):
-            server = server.replace('https://', 'http://')
-        return server
+        @param source: a label to retrieve the key from
+        @type source: versions.Label
+        @param keyId: the key ID
+        @type keyId: str
 
-    def findOpenPGPKey(self, source, keyId, warn=True):
-        # if we can't exec gpg, go ahead and bail
-        if not self.hasGPG:
-            return
-
-        pubRingPath = os.path.dirname(self.pubRing)
-
-        source = self._normalizeKeySource(source)
-
-        # check to see if there's an existing secret key.  If it was
-        # already there, don't remove it.  Otherwise we should clean
-        # it up.
-        secringExists = os.path.exists(os.path.join(pubRingPath, 'secring.gpg'))
-
-        # we don't care about any of the possible output from this process.
-        # gpg is pretty cavalier about dumping random garbage to stdout/err
-        # regardless of the command line options admonishing it not to.
-        devnull = open(os.devnull, "w")
-        gpgArgs = self._getGPGCommonArgs(pubRingPath)
-        extraArgs, stdin = self._getGPGExtraArgs(source, keyId, warn=warn)
-        gpgArgs.extend(extraArgs)
+        @raise KeyNotFound: if key is not found
+        @rtype: str
+        @return: the unarmored key
+        """
+        if source is None:
+            raise _KeyNotFound(keyId)
         try:
-            p = subprocess.Popen(gpgArgs,
-                                 stdin=stdin, stdout=devnull, stderr=devnull)
-            p.communicate()
-            # One should check p.returncode here
-        except OSError, e:
-            if e.errno == 2: # No such file or directory
-                self.hasGPG = False
-                if warn:
-                    log.warning('gpg does not appear to be installed.  gpg '
-                                'is required to import keys into the '
-                                'conary public keyring.  Use "conary '
-                                'update gnupg" to install gpg.')
-            else:
-                # Raise everything else
-                raise
+            key = self.repos.getAsciiOpenPGPKey(source, keyId)
+        except KeyNotFound:
+            exc = sys.exc_info()
+            raise _KeyNotFound, _KeyNotFound(keyId), exc[2]
+        return key
 
-        if not secringExists:
-            try:
-                os.remove(pubRingPath + '/secring.gpg')
-            except:
-                pass
-
-    def _formatSource(self, serverName):
+    def _formatSource(self, source):
         """Network-aware source formatter"""
-        server = None
-        if serverName not in (self.repositoryMap or []):
-            server = "http://%s/conary/" % serverName
-        else:
-            server = self.repositoryMap[serverName]
-        return server
+        assert(source is None or isinstance(source, versions.Label))
+        return source
 
-    def getPublicKey(self, keyId, serverName, warn=True):
-        keySource = self._formatSource(serverName)
-        if keySource == None:
-            return False
+    def getPublicKey(self, keyId, label, warn=True):
+        """
+        Retrieve a public key.
+
+        @param keyId: the key ID
+        @type keyId: str
+        @param label: a label to retrieve the key from
+        @type label: versions.Label
+        @param warn: (True by default) warn if key is not available
+        @type warn: bool
+        @rtype: str
+        @return: the string that represents the key
+        @raise KeyNotFound: if the key was not found
+        """
+        keySource = self._formatSource(label)
 
         # findOpenPGPKey can be smart enough to raise exceptions if the key
         # cannot be found
-        try:
-            self.findOpenPGPKey(keySource, keyId, warn=warn)
-        except _KeyNotFound:
-            return False
-
-        # decide if we found the key or not.
-        pkt = seekKeyById(keyId, self.pubRing)
-        return (pkt is not None)
-
-    def __init__(self, *args, **kw):
-        callbacks.KeyCacheCallback.__init__(self, *args, **kw)
-        self.hasGPG = True
+        return self.findOpenPGPKey(keySource, keyId)
 
 class DiskKeyCacheCallback(KeyCacheCallback):
     """Retrieve keys from a directory - keys are saved as <keyid>.asc"""
@@ -418,18 +422,19 @@ class DiskKeyCacheCallback(KeyCacheCallback):
         """For the disk case, this is a no-op"""
         return source
 
-    def _normalizeKeySource(self, source):
-        """For the disk case, this is a no-op"""
-        return source
-
-    def _getGPGExtraArgs(self, source, keyId, warn=True):
+    def findOpenPGPKey(self, source, keyId):
+        "@see: KeyCacheCallback.findOpenPGPKey"
         keyFile = os.path.join(self.dirSource, "%s.asc" % keyId.lower())
-        if not os.access(keyFile, os.R_OK):
-            raise _KeyNotFound(keyId)
-        return ["--import", keyFile], None
+        try:
+            return file(keyFile).read()
+        except IOError, e:
+            if e.errno in (2, 13):
+                # No such file, permission denied
+                raise _KeyNotFound(keyId)
+            raise _KeyNotFound(keyId, str(e))
 
-    def __init__(self, dirSource, pubRing=''):
-        KeyCacheCallback.__init__(self, pubRing=pubRing)
+    def __init__(self, dirSource, cfg = None):
+        KeyCacheCallback.__init__(self, cfg = cfg)
         self.dirSource = dirSource
 
 class KeyringCacheCallback(KeyCacheCallback):
@@ -438,57 +443,23 @@ class KeyringCacheCallback(KeyCacheCallback):
         """For the keyring case, this is a no-op"""
         return source
 
-    def _normalizeKeySource(self, source):
-        """For the keyring case, this is a no-op"""
-        return source
-
-    def _getGPGExtraArgs(self, source, keyId, warn=True):
-        # Use gpg to fetch the key from a keyring
-
+    def findOpenPGPKey(self, source, keyId):
+        "@see: KeyCacheCallback.findOpenPGPKey"
         if not os.access(self.srcKeyring, os.R_OK):
             # Keyring doesn't exist
             raise _KeyNotFound(keyId)
 
-        cmd = [self.gpgBin,
-               "--no-default-keyring",
-               "--keyring", self.srcKeyring,
-               "--armor",
-               "--export", keyId]
-        # Redirect stderr to /dev/null
-        devnull = open(os.devnull, "w")
         try:
-            p = subprocess.Popen(cmd, stdout = subprocess.PIPE, 
-                                 stderr = devnull)
-        except OSError, e:
-            if e.errno == 2: # No such file or directory
-                if warn:
-                    log.warning('gpg does not appear to be installed.  gpg '
-                                'is required to import keys into the '
-                                'conary public keyring.  Use "conary '
-                                'update gnupg" to install gpg.')
-            raise _KeyNotFound(keyId)
-        except Exception, e:
-            if warn:
-                log.warning('Error while executing gpg: %s' % e)
-            raise _KeyNotFound(keyId)
-        stdout, stderr = p.communicate()
-        if p.returncode != 0:
-            raise _KeyNotFound(keyId)
+            sio = openpgpfile.exportKey(keyId, self.srcKeyring)
+        except KeyNotFound:
+            exc = sys.exc_info()
+            raise _KeyNotFound, _KeyNotFound(keyId), exc[2]
 
-        if not stdout.startswith('-' * 5 + "BEGIN"):
-            raise _KeyNotFound(keyId)
-
-        # Redirect stdout to a temporary file
-        fd, tempf = tempfile.mkstemp()
-        os.unlink(tempf)
-        sio = os.fdopen(fd, "w")
-        sio.write(stdout)
         sio.seek(0)
+        return sio.read()
 
-        return [ "--import" ], sio
-
-    def __init__(self, keyring, pubRing=''):
-        KeyCacheCallback.__init__(self, pubRing=pubRing)
+    def __init__(self, keyring, cfg=None):
+        KeyCacheCallback.__init__(self, cfg=cfg)
         self.srcKeyring = keyring
 
 _keyCache = OpenPGPKeyFileCache()
@@ -509,9 +480,8 @@ class Trust(object):
     depthLimit = 10
     marginals = 3
 
-    def __init__(self, topLevelKeys, keyCache):
+    def __init__(self, topLevelKeys):
         self.topLevelKeys = topLevelKeys
-        self.keyCache = keyCache
         self._graph = None
         # self._trust is a dictionary, keyed on the node index, and with 3
         # values: (node trust level, node trust amount, actual trust)
@@ -526,9 +496,9 @@ class Trust(object):
         # Requesting keys by the short name will populate _idMap
         self._idMap = {}
 
-    def _getKey(self, keyId):
+    def _getKey(self, keyId, keyRetrievalCallback):
         try:
-            key = self.keyCache.getPublicKey(keyId)
+            key = keyRetrievalCallback(keyId)
             realKeyId = key.getKeyId()
             if key != realKeyId:
                 self._idMap[keyId] = realKeyId
@@ -536,21 +506,22 @@ class Trust(object):
         except KeyNotFound:
             return None
 
-    def computeTrust(self, keyId):
+    def computeTrust(self, keyId, keyRetrievalCallback):
         self._graph = graph.DirectedGraph()
         g = self._graph
         self._trust.clear()
         self._depth.clear()
 
         # Normalize the key
-        key = self._getKey(keyId)
+        key = self._getKey(keyId, keyRetrievalCallback)
         if key is None:
             return {}, {}
         keyId = key.getKeyId()
         g.addNode(keyId)
+        cb = lambda x: self.getChildrenCallback(x, keyRetrievalCallback)
         starts, finishes, trees, pred, depth = g.doBFS(
             start = keyId,
-            getChildrenCallback = self.getChildrenCallback,
+            getChildrenCallback = cb,
             depthLimit = self.depthLimit)
 
         # Start walking the tree in reverse order, validating the trust of
@@ -558,16 +529,17 @@ class Trust(object):
         gt = g.transpose()
         self._graph = gt
 
-        topLevelKeyIds = [ self._getKey(x) for x in self.topLevelKeys ]
+        topLevelKeyIds = [ self._getKey(x, keyRetrievalCallback)
+                             for x in self.topLevelKeys ]
         topLevelKeyIds = [ x.getKeyId() for x in topLevelKeyIds if x is not None ]
         # Top-level keys are fully trusted
         topLevelKeyIds = [ x for x in topLevelKeyIds if x in g ]
-        self._trust = dict((x, (self.depthLimit, 120, 120))
+        self._trust = dict((x, (self.depthLimit, TRUST_TRUSTED, TRUST_TRUSTED))
                             for x in topLevelKeyIds)
 
+        cb = lambda x: self.trustComputationCallback(x, keyRetrievalCallback)
         tstart, tfinishes, ttrees, tpred, tdepth = gt.doBFS(
-            start = topLevelKeyIds,
-            getChildrenCallback = self.trustComputationCallback)
+            start = topLevelKeyIds, getChildrenCallback = cb)
         self._depth = dict((g.get(x), y) for x, y in tdepth.items())
         return self._trust, self._depth
 
@@ -579,10 +551,10 @@ class Trust(object):
         keyId = self._idMap.get(keyId, keyId)
         return self._depth.get(keyId, None)
 
-    def getChildrenCallback(self, nodeIdx):
+    def getChildrenCallback(self, nodeIdx, keyRetrievalCallback):
         nodeId = self._graph.get(nodeIdx)
         try:
-            node = self.keyCache.getPublicKey(nodeId)
+            node = keyRetrievalCallback(nodeId)
         except KeyNotFound:
             return []
 
@@ -590,32 +562,32 @@ class Trust(object):
             self._graph.addEdge(nodeId, sig.getSignerKeyId())
         return self._graph.edges[nodeIdx]
 
-    def trustComputationCallback(self, nodeIdx):
+    def trustComputationCallback(self, nodeIdx, keyRetrievalCallback):
         gt = self._graph
         trust = self._trust
-        classicTrust = int(120 / self.marginals)
-        if 120 % self.marginals:
+        classicTrust = int(TRUST_TRUSTED / self.marginals)
+        if TRUST_TRUSTED % self.marginals:
             classicTrust += 1
 
         nodeId = gt.get(nodeIdx)
         if nodeId not in trust:
             return []
         nodeSigLevel, nodeSigTrust, nodeTrust = trust[nodeId]
-        if nodeSigLevel == 0 or nodeTrust < 120:
+        if nodeSigLevel == 0 or nodeTrust < TRUST_TRUSTED:
             # This node is not trusted, don't propagate its trust to children
             return []
 
         for snIdx in gt.edges[nodeIdx]:
             node = gt.get(snIdx)
             ntlev, ntamt, tramt = trust.setdefault(node,
-                    (nodeSigLevel - 1, 120, 0))
+                    (nodeSigLevel - 1, TRUST_TRUSTED, TRUST_UNTRUSTED))
             # Get the signature
-            n = self.keyCache.getPublicKey(node)
+            n = keyRetrievalCallback(node)
             sig = [ x for x in n.signatures if x.getSignerKeyId() == nodeId ]
             assert(sig)
             sig = sig[0]
 
-            if not sig.verifies(self.keyCache.getPublicKey):
+            if not sig.verifies(keyRetrievalCallback):
                 continue
 
             if sig.trustLevel is not None:

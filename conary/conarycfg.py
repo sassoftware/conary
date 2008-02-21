@@ -550,7 +550,8 @@ class ConaryContext(ConfigSection):
     threaded              =  (CfgBool, True)
     tmpDir                =  (CfgPath, '/var/tmp')
     trustThreshold        =  (CfgInt, 0)
-    updateThreshold       =  (CfgInt, 10)
+    trustedKeys           =  (CfgList(CfgString), [])
+    updateThreshold       =  (CfgInt, 15)
     useDirs               =  (CfgPathList, ('/etc/conary/use',
                                             '/etc/conary/distro/use',
                                             '~/.conary/use'))
@@ -738,9 +739,9 @@ class ConaryConfiguration(SectionedConfigFile):
         # buildFlavor is installFlavor + overrides
         self.buildFlavor = deps.overrideFlavor(self.flavor[0], 
                                                     self.buildFlavor)
-        # disable flavorPreferences for now
-        #if self.isDefault('flavorPreferences'):
-        #    self.flavorPreferences = arch.getFlavorPreferences()
+        if self.isDefault('flavorPreferences'):
+            self.flavorPreferences = arch.getFlavorPreferencesFromFlavor(
+                                                                self.flavor[0])
 	self.flavorConfig.populateBuildFlags()
 
 def selectSignatureKey(cfg, label):
