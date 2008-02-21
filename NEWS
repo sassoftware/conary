@@ -22,6 +22,8 @@ Changes in @NEW@:
       inclusions/exceptions. (CNY-2477)
     * Conary policy to fix trailing newlines in config files has been
       corrected to handle non-writeable config files. (CNY-2559)
+    * Conary will now warn if the PGP keyring is not writable and 
+      continue, instead of stopping with an error. (CNY-2555)
 
 Changes in 2.0.7:
   o Build Changes:

@@ -92,6 +92,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         # Set up the callbacks for the PGP key cache
         keyCache = openpgpkey.getKeyCache()
+        keyCache.setPublicPath(cfg.pubRing)
         keyCacheCallback = openpgpkey.KeyCacheCallback(self.repos,
                                                        cfg)
         keyCache.setCallback(keyCacheCallback)
