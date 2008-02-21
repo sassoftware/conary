@@ -836,22 +836,26 @@ class NewPkgCommand(CvcCommand):
     help = 'Set a directory for creating a new package'
     commandGroup = 'Setup Commands'
     docs = {'dir' : 'create new package in DIR',
-            'template' : 'set recipe template to use'}
+            'template' : 'set recipe template to use',
+            'type' : 'recipe factory to load'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef['dir'] = ONE_PARAM
         argDef['template'] = ONE_PARAM
+        argDef['type'] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         dir = argSet.pop('dir', None)
         template = argSet.pop('template', None)
+        sourceType = argSet.pop('type', None)
 
         if len(args) != 2 or argSet: return self.usage()
 
-        checkin.newTrove(repos, cfg, args[1], dir = dir, template = template)
+        checkin.newTrove(repos, cfg, args[1], dir = dir, template = template,
+                         sourceType = sourceType)
 _register(NewPkgCommand)
 
 class MergeCommand(CvcCommand):

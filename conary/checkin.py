@@ -291,10 +291,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     troveName = state.getName()
     conflicts = []
 
-    if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
-        log.error("recipe not in CONARY state file, please run cvc add")
-        return
-
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
         # Don't add TROVE_QUERY_ALL here, removed packages could exist
@@ -319,11 +315,16 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
                       "from the head of the branch; use update")
             return
 
-    use.allowUnknownFlags(True)
     # turn off loadInstalled for committing - it ties you too closely
     # to actually being able to build what you are developing locally - often
     # not the case.
+    if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
+        log.error("recipe not in CONARY state file, please run cvc add")
+        return
+
     try:
+        use.allowUnknownFlags(True)
+        #loader = loadrecipe.getRecipeLoader(trv)
         loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
                                          cfg=cfg, repos=repos,
                                          branch=state.getBranch(),
@@ -1687,8 +1688,8 @@ def removeFile(filename, repos=None):
 
     conaryState.write("CONARY")
 
-def newTrove(repos, cfg, name, dir = None, template = None,
-             buildBranch=None):
+def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
+             sourceType = None):
     parts = name.split('=', 1)
     if len(parts) == 1:
         label = cfg.buildLabel
@@ -1711,6 +1712,7 @@ def newTrove(repos, cfg, name, dir = None, template = None,
     else:
         branch = buildBranch
     sourceState = SourceState(component, versions.NewVersion(), branch)
+    sourceState.setSourceType(sourceType)
     conaryState = ConaryState(cfg.context, sourceState)
 
     # see if this package exists on our build label
