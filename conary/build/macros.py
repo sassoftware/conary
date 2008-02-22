@@ -78,6 +78,7 @@ class Macros(dict):
      
     def _override(self, key, value):
 	self.__overrides[key] = value
+        self[key] = value
 
     def __setattr__(self, name, value):
 	self.__setitem__(name, value)
