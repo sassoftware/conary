@@ -394,10 +394,13 @@ class RedirectRecipe(Recipe):
         self.redirections = _Redirections()
         self.flavor = flavor
         self.macros = macros.Macros()
-        self.macros.binarybranch = str(branch)
-        self.macros.update(extraMacros)
-        # this allows override of binarybranch externally (used by rMake)
-        self.branch = versions.VersionFromString(self.macros.binarybranch)
+        if branch is not None:
+            self.macros.binarybranch = str(branch)
+            self.macros.update(extraMacros)
+            # this allows override of binarybranch externally (used by rMake)
+            self.branch = versions.VersionFromString(self.macros.binarybranch)
+        else:
+            self.branch = None
         self.rules = {}
 
 
