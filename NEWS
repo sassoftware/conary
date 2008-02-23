@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o Client Changes:
+    * A close() method has been added to UpdateJob objects. It is
+      recommended to call the method explicitly instead of relying
+      on the object to be collected when going out of scope.
+      (CNY-2489)
+
   o Build Changes:
     * Group policy has been created. Policies deriving from
       GroupEnforcementPolicy and ImageGroupEnforcementPolicy will be
