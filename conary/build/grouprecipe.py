@@ -1374,6 +1374,83 @@ class GroupRecipe(_BaseGroupRecipe):
     def getGroupMap(self):
         return self.groups
 
+    def startGroup(self, name, depCheck = False, autoResolve = False,
+                    byDefault = None, checkOnlyByDefaultDeps = None,
+                    checkPathConflicts = None, imageGroup = False,
+                    groupName = None):
+        """
+        B{C{r.startGroup()}} - Creates a new group, and sets it as the
+        default group.
+
+        SYNOPSIS
+        ========
+
+        C{r.startGroup(I{name}, [I{autoResolve},] [I{byDefault},] [I{checkOnlyByDefaultDeps},] [I{checkPathConflicts},] [I{depCheck},] [I{groupName},] [I{imageGroup}])}
+
+        DESCRIPTION
+        ===========
+
+        The C{r.startGroup} command starts a new group. This command
+        aggregates createNewGroup, addNewGroup and setDefaultGroup.
+
+        PARAMETERS
+        ==========
+
+        The C{r.startGroup()} command accepts the following parameters, with
+        default values shown in parentheses:
+
+        B{name} : (None) The name of the group to be created. Must start
+        with 'group-'.
+
+        B{autoResolve} : (False) Whether to resolve
+        dependencies for this group.
+
+        B{byDefault} : (Current group setting) Whether to add troves to this
+        group byDefault C{True}, or byDefault C{False} by default.
+
+        B{checkOnlyByDefaultDeps} :  (Current group setting) Whether to
+        include byDefault C{False} troves in this group.
+
+        B{checkPathConflicts} :  (Current group setting) Whether to check path
+        conflicts for this group.
+
+        B{depCheck} : (False) Whether to check for dependency
+        closure for this group.
+
+        B{groupName} : (None) The name of the parent group to add the newly
+        created group to.
+
+        B{imageGroup} : (False) Designate that this group is a image group.
+        Image Group policies will be executed separately on this group.
+
+        EXAMPLES
+        ========
+
+        C{r.startGroup('group-ftools')}
+
+        Creates the group C{group-ftools}.
+
+        C{r.startGroup('group-multiplay', autoResolve=False)}
+
+        Creates the group C{group-multiplay} and specifies no dependencies are
+        resolved automatically for this group.
+        """
+
+        if groupName is None:
+            groupName = self._getDefaultGroup().name
+
+        origGroup = self._getGroup(groupName)
+        if byDefault is None:
+            byDefault = origGroup.byDefault
+
+        self.createGroup(name, depCheck = depCheck, autoResolve = autoResolve,
+                byDefault = byDefault,
+                checkOnlyByDefaultDeps = checkOnlyByDefaultDeps,
+                checkPathConflicts = checkPathConflicts,
+                imageGroup = imageGroup)
+        self.addNewGroup(name, byDefault = byDefault, groupName = groupName)
+        self.setDefaultGroup(name)
+
     def createGroup(self, groupName, depCheck = False, autoResolve = False,
                     byDefault = None, checkOnlyByDefaultDeps = None,
                     checkPathConflicts = None, imageGroup = False):

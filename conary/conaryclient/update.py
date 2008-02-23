@@ -53,6 +53,10 @@ class CriticalUpdateInfo(object):
         self.finalTroveRegexps = regexpList
 
     def setCriticalTroveRegexps(self, regexpList):
+        """
+        Define the list of regular expressions that determine which trove
+        updates are considered critical
+        """
         self.criticalTroveRegexps = regexpList
 
     def findFinalJobs(self, jobList):
@@ -107,6 +111,11 @@ class ClientUpdate:
         return self.updateCallback
 
     def setUpdateCallback(self, callback):
+        """
+        set the callback function for an update
+        @raises AssertionError: raised if the callback is None or is an 
+        inappropriate object type
+        """
         assert(callback is None or isinstance(callback, UpdateCallback))
         self.updateCallback = callback
         return self

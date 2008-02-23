@@ -14,6 +14,13 @@ Changes in @NEW@:
     * TroveFilters now exist. Trove filters allow a packager to
       reference particular troves within a group for group policy
       inclusions/exceptions. (CNY-2477)
+    * Conary policy to fix trailing newlines in config files has been
+      corrected to handle non-writeable config files. (CNY-2559)
+    * cvc derive now creates a reference directory named _OLD_ROOT_
+      alongside _ROOT_ when honoring the --extract flag. (CNY-2530)
+    * Group recipes now have the startGroup command, which calls
+      createGroup, addNewGroup and setDefaultGroup in one step.
+      (CNY-2197)
 
 Changes in 1.2.18:
   o Build Changes:

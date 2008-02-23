@@ -19,6 +19,7 @@ resulting packages to the repository.
 
 import os
 import stat
+import shutil
 
 from conary import branch
 from conary import checkin
@@ -138,9 +139,12 @@ class %(className)s(DerivedPackageRecipe):
     conaryState.write('CONARY')
 
     if extract:
-        extractDir = os.getcwd() + '/_ROOT_'
+        extractDir = os.path.join(os.getcwd(), '_ROOT_')
         log.info('extracting files from %s=%s[%s]' % (troveToDerive))
         cfg.root = os.path.abspath(extractDir)
         cfg.interactive = False
         updatecmd.doUpdate(cfg, troveSpec,
                            callback=callback, depCheck=False)
+        secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
+        shutil.copytree(extractDir, secondDir)
+

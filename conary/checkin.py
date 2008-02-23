@@ -1743,8 +1743,7 @@ def newTrove(repos, cfg, name, dir = None, template = None,
             return
 
         macros = Macros()
-        if '-' in name: className = ''.join([ x.capitalize() for x in name.split('-') ])
-        else: className = name.capitalize()
+        className = util.convertPackageNameToClassName(name)
         macros.update({'contactName': cfg.name,
                        'contact': cfg.contact,
                        'year': str(time.localtime()[0]),
