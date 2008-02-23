@@ -97,6 +97,14 @@ class Rollback:
 
 class UpdateJob:
     def __del__(self):
+        try:
+            self.close()
+        except:
+            pass
+
+    def close(self):
+        """Release resources associated with this update job"""
+
         # When the update job goes out of scope, we close the file descriptors
         # in the lazy cache. In the future we probably need a way to
         # track exactly which files were opened by this update job, and only
@@ -107,6 +115,9 @@ class UpdateJob:
         if self.troveSource.db:
             self.troveSource.db.close()
             self.troveSource.db = None
+        if hasattr(self.searchSource, 'db') and self.troveSource.db:
+            self.searchSource.db.close()
+            self.searchSource.db = None
 
     def addPinMapping(self, name, pinnedVersion, neededVersion):
         self.pinMapping.add((name, pinnedVersion, neededVersion))
