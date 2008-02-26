@@ -186,6 +186,43 @@ class RecipeLoader:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
+    @staticmethod
+    def _validateRecipe(recipeClass, packageName, fileName):
+        if recipeClass.name[0] not in string.ascii_letters + string.digits:
+            raise RecipeFileError(
+                'Error in recipe file "%s": package name must start '
+                'with an ascii letter or digit.' % fileName)
+
+        if '-' in recipeClass.version:
+            raise RecipeFileError(
+                "Version string %s has illegal '-' character" % recipeClass.version)
+
+        if recipeClass.name != packageName:
+            raise RecipeFileError(
+                        "Recipe object name '%s' does not match "
+                        "file/component name '%s'"
+                        % (recipeClass.name, packageName))
+
+        packageType = recipeClass.getType()
+
+        prefixes = {recipe.RECIPE_TYPE_INFO: 'info-',
+                    recipe.RECIPE_TYPE_GROUP: 'group-',
+                    recipe.RECIPE_TYPE_FILESET: 'fileset-'}
+
+        if packageType in prefixes:
+            if not recipeClass.name.startswith(prefixes[packageType]):
+                raise builderrors.BadRecipeNameError(
+                        'recipe name must start with "%s"' % prefixes[packageType])
+        elif packageType == recipe.RECIPE_TYPE_REDIRECT:
+            # redirects are allowed to have any format
+            pass
+        else:
+            for prefix in prefixes.itervalues():
+                if recipeClass.name.startswith(prefix):
+                    raise builderrors.BadRecipeNameError(
+                                    'recipe name cannot start with "%s"' % prefix)
+        recipeClass.validateClass()
+
     def _load(self, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
               buildFlavor=None, db=None, overrides=None):
@@ -294,7 +331,7 @@ class RecipeLoader:
             self.recipes[name] = obj
             obj.filename = filename
             if hasattr(obj, 'name') and hasattr(obj, 'version'):
-                validateRecipe(obj, pkgname, basename)
+                self._validateRecipe(obj, pkgname, basename)
 
                 if found:
                     raise builderrors.RecipeFileError(
@@ -798,41 +835,3 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
                     flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
                     log.info('Loaded %s from %s=%s%s' % (recipeClassName, nvf[0][0], nvf[0][1], flvSuffix))
     return loader, oldBuildFlavor
-
-
-def validateRecipe(recipeClass, packageName, fileName):
-    if recipeClass.name[0] not in string.ascii_letters + string.digits:
-        raise RecipeFileError(
-            'Error in recipe file "%s": package name must start '
-            'with an ascii letter or digit.' % fileName)
-
-    if '-' in recipeClass.version:
-        raise RecipeFileError(
-            "Version string %s has illegal '-' character" % recipeClass.version)
-
-    if recipeClass.name != packageName:
-        raise RecipeFileError(
-                    "Recipe object name '%s' does not match "
-                    "file/component name '%s'"
-                    % (recipeClass.name, packageName))
-
-    packageType = recipeClass.getType()
-
-    prefixes = {recipe.RECIPE_TYPE_INFO: 'info-',
-                recipe.RECIPE_TYPE_GROUP: 'group-',
-                recipe.RECIPE_TYPE_FILESET: 'fileset-'}
-
-    if packageType in prefixes:
-        if not recipeClass.name.startswith(prefixes[packageType]):
-            raise builderrors.BadRecipeNameError(
-                    'recipe name must start with "%s"' % prefixes[packageType])
-    elif packageType == recipe.RECIPE_TYPE_REDIRECT:
-        # redirects are allowed to have any format
-        pass
-    else:
-        for prefix in prefixes.itervalues():
-            if recipeClass.name.startswith(prefix):
-                raise builderrors.BadRecipeNameError(
-                                'recipe name cannot start with "%s"' % prefix)
-    recipeClass.validateClass()
-
