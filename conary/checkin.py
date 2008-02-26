@@ -1239,10 +1239,10 @@ def updateSrc(repos, versionList = None, callback = None):
 
         localVer = state.getVersion().createShadow(versions.LocalLabel())
         fsJob = update.FilesystemJob(repos, changeSet,
-                                     { (state.getName(), localVer) : state },
-                                     root = targetDir,
-                                     flags = update.UpdateFlags(ignoreUGids = True,
-                                                                merge = True))
+                     { (state.getName(), localVer, state.getFlavor()) : state },
+                     root = targetDir,
+                     flags = update.UpdateFlags(ignoreUGids = True,
+                                                merge = True))
         errList = fsJob.getErrorList()
         if errList:
             for err in errList: log.error(err)
@@ -1430,7 +1430,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
 
     localVer = parentRootVersion.createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet,
-                                 { (state.getName(), localVer) : state },
+                                 { (state.getName(), localVer, 
+                                    state.getFlavor()) : state },
                                  os.getcwd(),
                                  flags = update.UpdateFlags(ignoreUGids = True,
                                                             merge = True) )
