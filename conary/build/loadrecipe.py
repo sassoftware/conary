@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -22,9 +22,10 @@ import tempfile
 import traceback
 
 from conary.repository import errors
-from conary.build import recipe,use
+from conary.build import recipe, use
 from conary.build import errors as builderrors
 from conary.build.errors import RecipeFileError
+from conary.build.factory import Factory as FactoryRecipe
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log, util
@@ -71,7 +72,7 @@ def localImport(d, package, modules=()):
     l = d.setdefault('__localImportModules', [])
     l.append(m)
 
-def setupRecipeDict(d, filename, directory=None):
+def setupRecipeDict(d, filename, directory=None, factory=False):
     localImport(d, 'conary.build', ('build', 'action'))
     localImport(d, 'conary.build.loadrecipe', 
                                    ('loadSuperClass', 'loadInstalled',
@@ -98,6 +99,10 @@ def setupRecipeDict(d, filename, directory=None):
         localImport(d, x)
     localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
                                         'PackageFlags'))
+
+    if factory:
+        localImport(d, 'conary.build.factory', 'Factory')
+
     d['filename'] = filename
     if not directory:
         directory = os.path.dirname(filename)
@@ -175,13 +180,13 @@ class RecipeLoader:
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
-                 buildFlavor=None, db=None,
-                 overrides = None):
+                 buildFlavor=None, db=None, overrides = None,
+                 factory = False):
         try:
             self._load(filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
                        buildFlavor=buildFlavor, db=db,
-                       overrides=overrides)
+                       overrides=overrides, factory = factory)
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
@@ -225,7 +230,7 @@ class RecipeLoader:
 
     def _load(self, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
-              buildFlavor=None, db=None, overrides=None):
+              buildFlavor=None, db=None, overrides=None, factory=False):
         self.recipes = {}
 
         if filename[0] != "/":
@@ -249,7 +254,8 @@ class RecipeLoader:
         self.module.__dict__['db'] = db
         self.module.__dict__['buildFlavor'] = buildFlavor
 
-        setupRecipeDict(self.module.__dict__, filename, directory)
+        setupRecipeDict(self.module.__dict__, filename, directory,
+                        factory = factory)
 
         self.module.__dict__['component'] = component
         self.module.__dict__['branch'] = branch
@@ -316,7 +322,7 @@ class RecipeLoader:
 
         found = False
         for (name, obj) in self.module.__dict__.items():
-            if not inspect.isclass(obj) or not issubclass(obj, recipe.Recipe):
+            if not inspect.isclass(obj):
                 continue
             # if a recipe has been marked to be ignored (for example, if
             # it was loaded from another recipe by loadRecipe()
@@ -324,8 +330,9 @@ class RecipeLoader:
             # class itself, not any parent class
             if 'internalAbstractBaseClass' in obj.__dict__:
                 continue
-            # make sure the class is derived from Recipe
-            if not issubclass(obj, recipe.Recipe):
+            # make sure the class is derived from either Recipe or Factory
+            if ((    factory and not issubclass(obj, FactoryRecipe)) or
+                (not factory and not issubclass(obj, recipe.Recipe  ))):
                 continue
 
             self.recipes[name] = obj
@@ -431,7 +438,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     parentDir=None, 
                                     defaultToLatest = False,
                                     buildFlavor = None, 
-                                    db = None, overrides = None):
+                                    db = None, overrides = None,
+                                    factory = False):
     # FIXME parentDir specifies the directory to look for 
     # local copies of recipes called with loadRecipe.  If 
     # empty, we'll look in the tmp directory where we create the recipe
@@ -439,7 +447,6 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
 
     name = name.split(':')[0]
     component = name + ":source"
-    filename = name + '.recipe'
     if not labelPath:
         if not cfg.buildLabel:
              raise builderrors.LoadRecipeError(
@@ -478,36 +485,61 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
 
     sourceComponent = repos.getTrove(*pkgs[0])
 
-    (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
-				        dir=cfg.tmpDir)
-    outF = os.fdopen(fd, "w")
+    if sourceComponent.getSourceType():
+        loader = recipeLoaderFromSourceComponent(
+                                sourceComponent.getSourceType(), cfg, repos,
+                                versionStr=versionStr, labelPath=labelPath,
+                                ignoreInstalled=ignoreInstalled,
+                                filterVersions=filterVersions,
+                                parentDir=parentDir,
+                                defaultToLatest = defaultToLatest,
+                                buildFlavor = buildFlavor,
+                                db = db, overrides = overrides,
+                                factory = True)[0]
+        factoryClass = loader.getRecipe()
+        factory = factoryClass()
+        actualRecipe = factory.getRecipeClass()
 
-    inF = None
-    for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
-	if filePath == filename:
-	    inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
-	    break
-    
-    if not inF:
-	raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
-		  (sourceComponent.getName(), 
-                   sourceComponent.getVersion().asString(),
-	 	   filename))
+        class FakeLoader:
 
-    util.copyfileobj(inF, outF)
+            def getRecipe(self):
+                return actualRecipe
 
-    del inF
-    outF.close()
-    del outF
+        fl = FakeLoader()
+        loader = fl
+    else:
+        (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
+                                            dir=cfg.tmpDir)
+        outF = os.fdopen(fd, "w")
 
-    try:
-        loader = RecipeLoader(recipeFile, cfg, repos, component, 
-                              sourceComponent.getVersion().branch(),
-                              ignoreInstalled=ignoreInstalled,
-                              directory=parentDir, buildFlavor=buildFlavor,
-                              db=db, overrides=overrides)
-    finally:
-        os.unlink(recipeFile)
+        inF = None
+        filename = name + '.recipe'
+        for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
+            if filePath == filename:
+                inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
+                break
+        
+        if not inF:
+            raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
+                      (sourceComponent.getName(), 
+                       sourceComponent.getVersion().asString(),
+                       filename))
+
+        util.copyfileobj(inF, outF)
+
+        del inF
+        outF.close()
+        del outF
+
+        try:
+            loader = RecipeLoader(recipeFile, cfg, repos, component, 
+                                  sourceComponent.getVersion().branch(),
+                                  ignoreInstalled=ignoreInstalled,
+                                  directory=parentDir, buildFlavor=buildFlavor,
+                                  db=db, overrides=overrides, factory=factory)
+        finally:
+            os.unlink(recipeFile)
+
     recipe = loader.getRecipe()
     recipe._trove = sourceComponent.copy()
     return (loader, sourceComponent.getVersion())
@@ -836,15 +868,27 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
     return loader, oldBuildFlavor
 
 def getRecipeClass(trv, branch = None, cfg = None, repos = None,
-                   ignoreInstalled = None):
+                   ignoreInstalled = None, buildFlavor = None, db = None,
+                   overrides = None, directory = None):
     if trv.getSourceType():
         # create the recipe through a factory
-        loader = RecipeLoader(trv.getSourceType(), cfg=cfg, repos=repos,
-                              branch=branch, ignoreInstalled = ignoreInstalled)
+        loader = recipeLoaderFromSourceComponent(trv.getSourceType(), cfg,
+                                        repos, versionStr=str(branch),
+                                        ignoreInstalled=ignoreInstalled,
+                                        parentDir=directory,
+                                        buildFlavor = buildFlavor,
+                                        db = db, overrides = overrides,
+                                        factory = True)
+        factoryClass = loader.getRecipe()
+        factory = factoryClass()
+        recipe = factory.getRecipeClass()
     else:
         # load the recipe directly
         loader = RecipeLoader(trv.getRecipeFileName(), cfg=cfg, repos=repos,
-                              branch=branch, ignoreInstalled = ignoreInstalled)
+                              branch=branch, ignoreInstalled = ignoreInstalled,
+                              component = trv.getName(),
+                              buildFlavor = buildFlavor, db = db,
+                              direoverrides = overrides, directory = directory)
         recipe = loader.getRecipe()
 
     return recipe
