@@ -28,6 +28,11 @@ Changes in @NEW@:
       createGroup, addNewGroup and setDefaultGroup in one step.
       (CNY-2197)
 
+  o Bug Fixes:
+    * Conary no longer loses ownership of changed files when updating
+      multiple flavors of the same version of the same package at the same
+      time. (CNY-2553)
+
 Changes in 1.2.18:
   o Build Changes:
     * Handling pkg-config dependencies has been moved to conary-policy.

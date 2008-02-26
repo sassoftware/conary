@@ -1574,7 +1574,7 @@ class FilesystemJob:
                     localVer = oldVer.createShadow(versions.RollbackLabel())
                 else:
                     localVer = oldVer.createShadow(versions.LocalLabel())
-                fileExists = fsTroveDict[oldName, localVer].hasFile(oldPathId)
+                fileExists = fsTroveDict[oldName, localVer, troveCs.getOldFlavor()].hasFile(oldPathId)
 
                 # NOTE: if the file doesn't exist we could 
                 # avoid this thawing and diffing.  But that is the odd case.
@@ -1661,7 +1661,7 @@ class FilesystemJob:
             old = troveCs.getOldVersion()
 	    if old:
 		localVer = old.createShadow(versions.LocalLabel())
-                newFsTrove = fsTroveDict[(troveCs.getName(), localVer)].copy()
+                newFsTrove = fsTroveDict[(troveCs.getName(), localVer, troveCs.getOldFlavor())].copy()
                 baseTrove = db.getTrove(troveCs.getName(), old, 
                                          troveCs.getOldFlavor())
             else:

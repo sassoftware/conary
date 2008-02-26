@@ -1091,9 +1091,9 @@ class Database(SqlDbRepository):
         localRollback = changeset.ReadOnlyChangeSet()
         localRollback.merge(result[0])
 
-	fsTroveDict = {}
-	for (changed, fsTrove) in retList:
-	    fsTroveDict[(fsTrove.getName(), fsTrove.getVersion())] = fsTrove
+        fsTroveDict = {}
+        for (changed, fsTrove) in retList:
+            fsTroveDict[fsTrove.getNameVersionFlavor()] = fsTrove
 
 	if rollbackPhase is None:
             reposRollback = cs.makeRollback(dbCache, configFiles = True,
