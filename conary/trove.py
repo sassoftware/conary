@@ -774,6 +774,9 @@ _TROVESCRIPTS_PREUPDATE    = 0
 _TROVESCRIPTS_POSTINSTALL  = 1
 _TROVESCRIPTS_POSTUPDATE   = 2
 _TROVESCRIPTS_POSTROLLBACK = 3
+_TROVESCRIPTS_PREINSTALL   = 4
+_TROVESCRIPTS_PREERASE     = 5
+_TROVESCRIPTS_POSTERASE    = 6
 
 class TroveScripts(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -782,6 +785,9 @@ class TroveScripts(streams.StreamSet):
         _TROVESCRIPTS_POSTINSTALL   : (DYNAMIC, TroveScript, 'postInstall' ),
         _TROVESCRIPTS_POSTUPDATE    : (DYNAMIC, TroveScript, 'postUpdate' ),
         _TROVESCRIPTS_POSTROLLBACK  : (DYNAMIC, TroveScript, 'postRollback' ),
+        _TROVESCRIPTS_PREINSTALL    : (DYNAMIC, TroveScript, 'preInstall' ),
+        _TROVESCRIPTS_PREERASE      : (DYNAMIC, TroveScript, 'preErase' ),
+        _TROVESCRIPTS_POSTERASE     : (DYNAMIC, TroveScript, 'postErase' ),
     }
 
 class TroveInfo(streams.StreamSet):
@@ -2837,6 +2843,16 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getPostRollbackScript(self):
         return self._getScript(_TROVESCRIPTS_POSTROLLBACK)
+
+    # Not intended for general use
+    def _getPreInstallScript(self):
+        return self._getScript(_TROVESCRIPTS_PREINSTALL)
+
+    def _getPreEraseScript(self):
+        return self._getScript(_TROVESCRIPTS_PREERASE)
+
+    def _getPostEraseScript(self):
+        return self._getScript(_TROVESCRIPTS_POSTERASE)
 
     def getNewCompatibilityClass(self):
         troveInfo = self.absoluteTroveInfo()
