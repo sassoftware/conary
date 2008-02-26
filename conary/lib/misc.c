@@ -640,7 +640,6 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
         }
 
         sendFds[i] = PyInt_AS_LONG(intObj);
-        Py_DECREF(intObj);
     }
 
     if ((bytes = sendmsg(fd, &msg, 0)) < 0) {
