@@ -16,6 +16,7 @@
 # list of tables we migrate, in order
 TableList = [
     'LatestMirror',
+    'CommitLock',
     'Branches',
     'Items',
     'Versions',
@@ -31,7 +32,6 @@ TableList = [
     'Entitlements',
     'EntitlementOwners',
     'EntitlementAccessMap',
-    'Caps',
     'Permissions',
     'FileStreams',
     'Nodes',
@@ -39,7 +39,6 @@ TableList = [
     'Instances',
     'TroveInfo',
     'Dependencies',
-    'Latest',
     'Metadata',
     'MetadataItems',
     'PGPKeys',
@@ -48,5 +47,12 @@ TableList = [
     'Requires',
     'TroveRedirects',
     'TroveTroves',
+    'FilePaths',
     'TroveFiles',
+    'CheckTroveCache',
+    'UserGroupTroves',
+    'UserGroupInstancesCache',
+    'UserGroupAllPermissions',
+    'UserGroupAllTroves',
+    'LatestCache'
     ]
