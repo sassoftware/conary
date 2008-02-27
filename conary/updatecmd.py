@@ -604,9 +604,11 @@ def _updateTroves(cfg, applyList, **kwargs):
     if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
 
-    restartDir = client.applyUpdateJob(updJob, **applyKwargs)
-    updJob.close()
-    client.close()
+    try:
+        restartDir = client.applyUpdateJob(updJob, **applyKwargs)
+    finally:
+        updJob.close()
+        client.close()
 
     if restartDir:
         params = sys.argv
