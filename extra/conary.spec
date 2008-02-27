@@ -9,7 +9,7 @@
 
 Summary: Conary is a distributed software management system for Linux distributions.
 Name: conary
-Version: 1.2.18
+Version: 2.0.7
 Release: 1%{?dist}
 License: CPL
 Group: System Environment/Base

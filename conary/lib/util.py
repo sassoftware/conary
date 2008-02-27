@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,6 +17,7 @@ import bz2
 import debugger
 import fcntl
 import errno
+import itertools
 import log
 import misc
 import os
@@ -28,6 +29,7 @@ import stat
 import string
 import StringIO
 import subprocess
+import struct
 import sys
 import tempfile
 import time
@@ -37,7 +39,7 @@ import weakref
 import xmlrpclib
 import zlib
 
-from conary.lib import fixedglob, log
+from conary.lib import fixedglob, graph, log
 
 # Simple ease-of-use extensions to python libraries
 
@@ -60,22 +62,20 @@ def isregular(path):
     return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
 
 def mkdirChain(*paths):
+    _ignoredErrors = set([errno.ENOENT, errno.ENOTDIR, errno.EACCES])
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
         normpath = os.path.normpath(path)
 
-        # don't die in case the dir already exists
         try:
-            os.makedirs(normpath)
+            misc.mkdirIfMissing(normpath)
+            return
         except OSError, exc:
-            if exc.errno == errno.EEXIST:
-                if os.path.isdir(normpath):
-                    continue
-                else:
-                    raise
-            else:
+            if exc.errno not in _ignoredErrors:
                 raise
+
+        os.makedirs(normpath)
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]
@@ -671,17 +671,226 @@ def verFormat(cfg, version):
         return version.trailingRevision().asString()
     return version.asString()
 
-class ExtendedFile(file):
+class SendableFileSet:
 
-    def __init__(self, path, mode = "r", buffering = True):
-        assert(not buffering)
-        file.__init__(self, path, mode, buffering)
-        fcntl.fcntl(self.fileno(), fcntl.F_SETFD, 1)
+    tags = {}
+    ptrSize = len(struct.pack("@P", 0))
+
+    @staticmethod
+    def _register(klass):
+        SendableFileSet.tags[klass._tag] = klass
+
+    def __init__(self):
+        self.l = []
+
+    @staticmethod
+    def sendObjIds(sock, l):
+        sendmsg(sock, [ struct.pack("@" + ("P" * len(l)),
+                                   *[ id(x) for x in l] ) ])
+
+    @staticmethod
+    def recvObjIds(sock, count):
+        s = recvmsg(sock, SendableFileSet.ptrSize * count)
+        idList = struct.unpack("@" + ("P" * count), s)
+        return idList
+
+    def add(self, f):
+        self.l.append(f)
+
+    def send(self, sock):
+        stack = self.l[:]
+        allFds = []
+        toSend = []
+        handled = set()
+
+        while stack:
+            f = stack.pop()
+
+            if f in handled:
+                continue
+
+            fd = None
+            objDepList = []
+
+            dependsOn, s = f._sendInfo()
+
+            if type(dependsOn) == int:
+                fd = dependsOn
+            elif dependsOn is not None:
+                assert(type(dependsOn) == list)
+
+                notHandled = list(set(dependsOn) - set(handled))
+                if notHandled:
+                    stack.append(f)
+                    stack.extend(notHandled)
+                    continue
+
+                # we depend on something we know about
+                objDepList = dependsOn
+
+            toSend.append((f, fd, objDepList, s))
+            handled.add(f)
+
+        fds = list(set([ x[1] for x in toSend if x[1] is not None]))
+        objsById = dict( (id(x[2]), x[2]) for x in toSend )
+
+        sendmsg(sock, [ struct.pack("@I", len(fds)) ] )
+        sendmsg(sock, [ struct.pack("@II", len(self.l), len(toSend)) ], fds)
+
+        for f, fd, objDepList, s in toSend:
+            if fd is None:
+                fdIndex = 0xffffffff
+            else:
+                fdIndex = fds.index(fd)
+
+            depList = objDepList
+
+            sendmsg(sock, [ struct.pack("@BIIIP", len(f._tag), fdIndex,
+                                        len(s), len(depList), id(f)),
+                            f._tag, s ])
+            self.sendObjIds(sock, depList)
+
+        self.sendObjIds(sock, self.l)
+
+    @staticmethod
+    def recv(sock):
+        hdrSize = len(struct.pack("@BIIPP", 0, 0, 0, 0, 0))
+
+        q = IterableQueue()
+        s = recvmsg(sock, 4)
+        fdCount = struct.unpack("@I", s)[0]
+        if fdCount:
+            s, fds = recvmsg(sock, 8, fdCount)
+        else:
+            s = recvmsg(sock, 8, 0)
+
+        objCount, fileCount = struct.unpack("@II", s)
+
+        fileList = []
+        objById = {}
+
+        for i in range(fileCount):
+            s = recvmsg(sock, hdrSize)
+            tagLen, fdIndex, dataLen, depLen, thisId = struct.unpack("@BIIIP", s)
+            tag = recvmsg(sock, tagLen)
+            if dataLen:
+                s = recvmsg(sock, dataLen)
+            else:
+                s = ''
+
+            if not depLen:
+                depList = []
+            else:
+                depList = SendableFileSet.recvObjIds(sock, depLen)
+
+            if fdIndex != 0xffffffff:
+                assert(not depList)
+                dep = fds[fdIndex]
+            elif depList:
+                assert(fdIndex == 0xffffffff)
+                dep = [ objById[x] for x in depList ]
+            else:
+                dep = None
+
+            f = SendableFileSet.tags[tag]._fromInfo(dep, s)
+            objById[thisId] = f
+
+            fileList.append(f)
+
+        fileIds = SendableFileSet.recvObjIds(sock, objCount)
+        files = [ objById[x] for x in fileIds]
+
+        return files
+
+class ExtendedFdopen(object):
+
+    _tag = 'efd'
+    __slots__ = [ 'fd' ]
+
+    def __init__(self, fd):
+        self.fd = fd
+        # set close-on-exec flag
+        fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
+
+    @staticmethod
+    def _fromInfo(fd, s):
+        assert(s == '-')
+        return ExtendedFdopen(fd)
+
+    def _sendInfo(self):
+        return (self.fd, '-')
+
+    def fileno(self):
+        return self.fd
 
     def pread(self, bytes, offset):
-        return misc.pread(self.fileno(), bytes, offset)
+        return misc.pread(self.fd, bytes, offset)
+
+    def close(self):
+        os.close(self.fd)
+        self.fd = None
+
+    def __del__(self):
+        if self.fd is not None:
+            try:
+                self.close()
+            except OSError:
+                self.fd = None
+
+    def read(self, bytes = -1):
+        return os.read(self.fd, bytes)
+
+    def truncate(self, offset=0):
+        return os.ftruncate(self.fd, offset)
+
+    def write(self, s):
+        return os.write(self.fd, s)
+
+    def pread(self, bytes, offset):
+        return misc.pread(self.fd, bytes, offset)
+
+    def seek(self, offset, whence = 0):
+        return os.lseek(self.fd, offset, whence)
+
+    def tell(self):
+        # 1 is SEEK_CUR
+        return os.lseek(self.fd, 0, 1)
+
+SendableFileSet._register(ExtendedFdopen)
+
+class ExtendedFile(ExtendedFdopen):
+
+    __slots__ = [ 'fObj', 'name' ]
+
+    def close(self):
+        self.fObj.close()
+        self.fd = None
+        self.fObj = None
+
+    def __init__(self, path, mode = "r", buffering = True):
+        self.fd = None
+
+        assert(not buffering)
+        # we use a file object here to avoid parsing the mode ourself, as well
+        # as to get the right exceptions on open. we have to keep the file
+        # object around to keep it from getting garbage collected though
+        self.fObj = file(path, mode)
+        self.name = path
+        fd = self.fObj.fileno()
+        ExtendedFdopen.__init__(self, fd)
 
 class ExtendedStringIO(StringIO.StringIO):
+
+    _tag = 'efs'
+
+    @staticmethod
+    def _fromInfo(ef, s):
+        assert(ef is None)
+        return ExtendedStringIO(s)
+
+    def _sendInfo(self):
+        return (None, self.getvalue())
+
     def pread(self, bytes, offset):
         pos = self.tell()
         self.seek(offset, 0)
@@ -689,38 +898,11 @@ class ExtendedStringIO(StringIO.StringIO):
         self.seek(pos, 0)
         return data
 
-class PreadWrapper(object):
-    # DEPRECATED. Will be removed in 1.1.23.
-    __slots__ = ('f', 'path')
-
-    def __init__(self, f):
-        self.path = None
-        if not hasattr(f, 'mode'):
-            if hasattr(f, 'path'):
-                # this is an rMake LazyFile
-                self.path = f.path
-            else:
-                raise ValueError('PreadWrapper does not know how to handle this file object')
-        elif f.mode != 'r':
-            raise ValueError('PreadWrapper.__init__() requires a read-only file object')
-        self.f = f
-
-    def __getattr__(self, attr):
-        if attr != 'pread':
-            return getattr(self.f, attr)
-        else:
-            return self.pread
-
-    def pread(self, bytes, offset):
-        if self.path:
-            # hack for rMake compatibility
-            f = open(self.path, 'r')
-            buf = misc.pread(f.fileno(), bytes, offset)
-            f.close()
-            return buf
-        return misc.pread(self.fileno(), bytes, offset)
+SendableFileSet._register(ExtendedStringIO)
 
 class SeekableNestedFile:
+
+    _tag = "snf"
 
     def __init__(self, file, size, start = -1):
         self.file = file
@@ -732,6 +914,15 @@ class SeekableNestedFile:
             self.start = file.tell()
         else:
             self.start = start
+
+    @staticmethod
+    def _fromInfo(efList, s):
+        assert(len(efList) == 1)
+        size, start = struct.unpack("!II", s)
+        return SeekableNestedFile(efList[0], size, start = start)
+
+    def _sendInfo(self):
+        return ([ self.file ], struct.pack("!II", self.size, self.start))
 
     def close(self):
         pass
@@ -775,6 +966,7 @@ class SeekableNestedFile:
 
     def tell(self):
         return self.pos
+SendableFileSet._register(SeekableNestedFile)
 
 class BZ2File:
     def __init__(self, fobj):
@@ -1609,6 +1801,59 @@ def nullifyFileDescriptor(fdesc):
     if fd != fdesc:
         os.dup2(fd, fdesc)
         os.close(fd)
+
+def sendmsg(sock, dataList, fdList = []):
+    """
+    Sends multiple strings and an optional list of file descriptors through
+    a unix domain socket.
+
+    @param sock: Unix domain socket to send message through
+    @type sock: socket
+    @param dataList: List of strings to send
+    @type dataList: list of str
+    @param fdList: File descriptors to send
+    @type fdList: list of int
+    @rtype: None
+    """
+    return misc.sendmsg(sock.fileno(), dataList, fdList)
+
+def recvmsg(sock, dataSize, fdCount = 0):
+    """
+    Receives data and optional file descriptors from a unix domain socket.
+    Returns a (data, fdList) tuple.
+
+    @param sock: Unix domain socket to send message through
+    @type sock: socket
+    @param dataSize: Number of bytes to try to read from the socket.
+    @type dataSize: int
+    @param fdCount: Exact number of file descriptors to read from the socket
+    @type fdCount: int
+    @rtype: tuple
+    """
+    return misc.recvmsg(sock.fileno(), dataSize, fdCount)
+
+class Timer:
+
+    def start(self):
+        self.started = time.time()
+
+    def stop(self):
+        self.total += (time.time() - self.started)
+        self.started = None
+
+    def get(self):
+        if self.started:
+            running = time.time() - self.started
+        else:
+            running = 0
+
+        return self.total + running
+
+    def __init__(self, start = False):
+        self.started = None
+        self.total = 0
+        if start:
+            self.start()
 
 def countOpenFileDescriptors():
     """Return the number of open file descriptors for this process."""
