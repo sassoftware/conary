@@ -869,13 +869,17 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
                     oldBuildFlavor = buildFlavor
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+
             loader = RecipeLoader(recipeFile, cfg, repos = repos,
                                   ignoreInstalled = True,
                                   buildFlavor = buildFlavor, db = db)
-            if loader:
-                for recipeClassName in loader.recipes.keys():
-                    flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
-                    log.info('Loaded %s from %s=%s%s' % (recipeClassName, nvf[0][0], nvf[0][1], flvSuffix))
+
+            for recipeClassName in loader.recipes.keys():
+                flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
+                log.info('Loaded %s from %s=%s%s' % (recipeClassName,
+                                                     nvf[0][0], nvf[0][1],
+                                                     flvSuffix))
+
     return loader, oldBuildFlavor
 
 def getRecipeClass(trv, branch = None, cfg = None, repos = None,
