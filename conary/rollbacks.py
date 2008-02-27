@@ -18,7 +18,7 @@ from conary.lib import log, util
 from conary.local import database
 
 def listRollbacks(db, cfg):
-    return formatRollbacks(cfg, db.iterRollbacksList(), stream=sys.stdout)
+    return formatRollbacks(cfg, db.getRollbackStack().iter(), stream=sys.stdout)
 
 def versionFormat(cfg, version, defaultLabel = None):
     """Format the version according to the options in the cfg object"""
@@ -167,11 +167,12 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
     log.syslog.command()
 
     defaults = dict(replaceFiles = False,
-                    transactionCounter = transactionCounter)
+                    transactionCounter = transactionCounter,
+                    lazyCache = client.lzCache)
     defaults.update(kwargs)
 
-    client.db.readRollbackStatus()
-    rollbackList = client.db.getRollbackList()
+    rollbackStack = client.db.getRollbackStack()
+    rollbackList = rollbackStack.getList()
 
     if rollbackSpec.startswith('r.'):
         try:
@@ -218,5 +219,40 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
         raise
 
     log.syslog.commandComplete()
+
+    return 0
+
+def removeRollbacks(db, rollbackSpec):
+    rollbackStack = db.getRollbackStack()
+    rollbackList = rollbackStack.getList()
+
+    if rollbackSpec.startswith('r.'):
+        try:
+            i = rollbackList.index(rollbackSpec)
+        except:
+            log.error("rollback '%s' not present" % rollbackSpec)
+            return 1
+
+        rollbacks = rollbackList[:i + 1]
+    else:
+        try:
+            rollbackCount = int(rollbackSpec)
+        except:
+            log.error("integer rollback count expected instead of '%s'" %
+                    rollbackSpec)
+            return 1
+
+        if rollbackCount < 1:
+            log.error("rollback count must be positive")
+            return 1
+        elif rollbackCount > len(rollbackList):
+            log.error("rollback count higher then number of rollbacks "
+                      "available")
+            return 1
+
+        rollbacks = rollbackList[:rollbackCount]
+
+    for rb in rollbacks:
+        rollbackStack.remove(rb)
 
     return 0
