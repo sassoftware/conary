@@ -27,6 +27,8 @@ Changes in @NEW@:
     * Group recipes now have the startGroup command, which calls
       createGroup, addNewGroup and setDefaultGroup in one step.
       (CNY-2197)
+    * addCvsSnapshot no longer caches the HEAD of the repository,
+      since cvs export will not use it anyway. (CNY-2568)
 
   o Bug Fixes:
     * Conary no longer loses ownership of changed files when updating
