@@ -1015,7 +1015,15 @@ class LazyFileCache:
         return fd
 
     def _getFdCount(self):
-        return countOpenFileDescriptors()
+        try:
+            return countOpenFileDescriptors()
+        except OSError, e:
+            # We may be hitting a kernel bug (CNY-2571)
+            if e.errno != errno.EINVAL:
+                raise
+            # Count the open file descriptors this instance has
+            return len([ x for x in self._fdMap.values()
+                           if x._realFd is not None])
 
     def _getCounter(self):
         ret = self._fdCounter;

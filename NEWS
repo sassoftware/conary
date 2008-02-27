@@ -34,6 +34,9 @@ Changes in @NEW@:
     * Conary no longer loses ownership of changed files when updating
       multiple flavors of the same version of the same package at the same
       time. (CNY-2553)
+    * If Conary is running on kernels which, under certain circumstances,
+      return EINVAL when calling poll(), the lazy file cache will only
+      count the file descriptors it has open itself. (CNY-2571)
 
 Changes in 1.2.18:
   o Build Changes:
