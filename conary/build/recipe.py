@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -19,6 +19,8 @@ from conary.build import action, source, policy
 from conary.build.errors import RecipeFileError
 from conary.lib import log, util
 
+import glob
+import imp
 import os
 import sys
 
@@ -55,6 +57,31 @@ def isInfoRecipe(recipeClass):
 
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
+
+def loadMacros(paths):
+    '''
+    Load default macros from a series of I{paths}.
+
+    @rtype: dict
+    @return: A dictionary of default macros
+    '''
+
+    baseMacros = {}
+    loadPaths = []
+    for path in paths:
+        globPaths = sorted(list(glob.glob(path)))
+        loadPaths.extend(globPaths)
+
+    for path in loadPaths:
+        compiledPath = path+'c'
+        deleteCompiled = not util.exists(compiledPath)
+        macroModule = imp.load_source('tmpmodule', path)
+        if deleteCompiled:
+            util.removeIfExists(compiledPath)
+        baseMacros.update(x for x in macroModule.__dict__.iteritems()
+                          if not x[0].startswith('__'))
+
+    return baseMacros
 
 class _sourceHelper:
     def __init__(self, theclass, recipe):

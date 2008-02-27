@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,7 +15,7 @@ import copy
 from itertools import chain, izip
 
 from conary.build import policy
-from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
+from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP, loadMacros
 from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
 from conary.build.errors import GroupAddAllError, GroupImplicitReplaceError
@@ -263,7 +263,6 @@ class GroupRecipe(_BaseGroupRecipe):
         self.flavor = flavor
         self.keyFlavor = None
         self.macros = macros.Macros(ignoreUnknown=lightInstance)
-        self.macros.update(extraMacros)
         self.defaultSource = None
         if not lightInstance:
             self.searchSource = self._getSearchSource()
@@ -277,6 +276,19 @@ class GroupRecipe(_BaseGroupRecipe):
         self.postInstallScripts = {}
         self.postRollbackScripts = {}
         self.postUpdateScripts = {}
+
+        baseMacros = loadMacros(cfg.defaultMacros)
+        self.macros.update(baseMacros)
+        for key in cfg.macros:
+            self.macros._override(key, cfg['macros'][key])
+        self.macros.name = self.name
+        self.macros.version = self.version
+        if '.' in self.version:
+            self.macros.major_version = '.'.join(self.version.split('.')[0:2])
+        else:
+            self.macros.major_version = self.version
+        if extraMacros:
+            self.macros.update(extraMacros)
 
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,

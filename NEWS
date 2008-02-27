@@ -29,6 +29,8 @@ Changes in @NEW@:
       (CNY-2197)
     * addCvsSnapshot no longer caches the HEAD of the repository,
       since cvs export will not use it anyway. (CNY-2568)
+    * Macros from config files and from the command line are now
+      available to group recipes. (CNY-2574)
 
   o Bug Fixes:
     * Conary no longer loses ownership of changed files when updating
