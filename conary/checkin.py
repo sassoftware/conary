@@ -333,9 +333,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     srcMap = {}
     cwd = os.getcwd()
 
-    # fetch all the sources
-    recipeClass = loader.getRecipe()
-
     # setting the _trove to the last version of the source component
     # allows us to search that source component for files that are
     # not in the current directory or lookaside cache.

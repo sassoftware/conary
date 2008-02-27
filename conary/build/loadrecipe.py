@@ -381,6 +381,113 @@ class RecipeLoader:
         except:
             pass
 
+class RecipeLoaderFromSourceComponent(RecipeLoader):
+
+    def __init__(self, name, cfg, repos, versionStr=None, labelPath=None,
+                 ignoreInstalled=False, filterVersions=False,
+                 parentDir=None, defaultToLatest = False,
+                 buildFlavor = None, db = None, overrides = None,
+                 factory = False):
+        # FIXME parentDir specifies the directory to look for 
+        # local copies of recipes called with loadRecipe.  If 
+        # empty, we'll look in the tmp directory where we create the recipe
+        # file for this source component - probably not intended behavior.
+
+        name = name.split(':')[0]
+        component = name + ":source"
+        if not labelPath:
+            if not cfg.buildLabel:
+                 raise builderrors.LoadRecipeError(
+                'no build label set -  cannot find source component %s' % component)
+            labelPath = [cfg.buildLabel]
+        if repos is None:
+            raise builderrors.LoadRecipeError(
+                                    'cannot find source component %s: No repository access' % (component, ))
+        try:
+            pkgs = repos.findTrove(labelPath,
+                                   (component, versionStr, deps.Flavor()))
+        except (errors.TroveNotFound, errors.OpenError), err:
+            raise builderrors.LoadRecipeError(
+                                    'cannot find source component %s: %s' %
+                                    (component, err))
+        if filterVersions:
+            pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
+        if len(pkgs) > 1:
+            pkgs = sorted(pkgs, reverse=True)
+            if defaultToLatest:
+                log.warning("source component %s has multiple versions "
+                             "on labelPath %s\n\n"
+                             "Picking latest: \n       %s\n\n"
+                             "Not using:\n      %s"
+                              %(component,
+                               ', '.join(x.asString() for x in labelPath),
+                                '%s=%s' % pkgs[0][:2],
+                                '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
+            else:
+                raise builderrors.LoadRecipeError(
+                    "source component %s has multiple versions "
+                    "on labelPath %s: %s"
+                     %(component,
+                       ', '.join(x.asString() for x in labelPath),
+                       ', '.join('%s=%s' % x[:2] for x in pkgs)))
+
+        sourceComponent = repos.getTrove(*pkgs[0])
+
+        if sourceComponent.getSourceType():
+            loader = RecipeLoaderFromSourceComponent(
+                                    sourceComponent.getSourceType(), cfg, repos,
+                                    versionStr=versionStr, labelPath=labelPath,
+                                    ignoreInstalled=ignoreInstalled,
+                                    filterVersions=filterVersions,
+                                    parentDir=parentDir,
+                                    defaultToLatest = defaultToLatest,
+                                    buildFlavor = buildFlavor,
+                                    db = db, overrides = overrides,
+                                    factory = True)
+            factoryClass = loader.getRecipe()
+            factory = factoryClass()
+            self.recipe = factory.getRecipeClass()
+
+            self.recipes = loader.recipes
+            self.recipes[self.recipe.name] = self.recipe
+        else:
+            (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
+                                                dir=cfg.tmpDir)
+            outF = os.fdopen(fd, "w")
+
+            inF = None
+            filename = name + '.recipe'
+            for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
+                if filePath == filename:
+                    inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
+                    break
+            
+            if not inF:
+                raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
+                          (sourceComponent.getName(), 
+                           sourceComponent.getVersion().asString(),
+                           filename))
+
+            util.copyfileobj(inF, outF)
+
+            del inF
+            outF.close()
+            del outF
+
+            try:
+                RecipeLoader.__init__(self, recipeFile, cfg, repos, component,
+                                      sourceComponent.getVersion().branch(),
+                                      ignoreInstalled=ignoreInstalled,
+                                      directory=parentDir, buildFlavor=buildFlavor,
+                                      db=db, overrides=overrides, factory=factory)
+            finally:
+                os.unlink(recipeFile)
+
+        self.recipe._trove = sourceComponent.copy()
+
+    def getSourceComponentVersion(self):
+        return self.recipe._trove.getVersion()
+
 def _scoreLoadRecipeChoice(labelPath, version):
     # FIXME I'm quite sure this heuristic will get replaced with
     # something smarter/more sane as time progresses
@@ -433,117 +540,21 @@ def getBestLoadRecipeChoices(labelPath, troveTups):
 
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
-                                    ignoreInstalled=False, 
-                                    filterVersions=False, 
-                                    parentDir=None, 
+                                    ignoreInstalled=False,
+                                    filterVersions=False,
+                                    parentDir=None,
                                     defaultToLatest = False,
-                                    buildFlavor = None, 
-                                    db = None, overrides = None,
-                                    factory = False):
-    # FIXME parentDir specifies the directory to look for 
-    # local copies of recipes called with loadRecipe.  If 
-    # empty, we'll look in the tmp directory where we create the recipe
-    # file for this source component - probably not intended behavior.
-
-    name = name.split(':')[0]
-    component = name + ":source"
-    if not labelPath:
-        if not cfg.buildLabel:
-             raise builderrors.LoadRecipeError(
-            'no build label set -  cannot find source component %s' % component)
-	labelPath = [cfg.buildLabel]
-    if repos is None:
-        raise builderrors.LoadRecipeError(
-                                'cannot find source component %s: No repository access' % (component, ))
-    try:
-	pkgs = repos.findTrove(labelPath,
-                               (component, versionStr, deps.Flavor()))
-    except (errors.TroveNotFound, errors.OpenError), err:
-        raise builderrors.LoadRecipeError(
-                                'cannot find source component %s: %s' %
-                                (component, err))
-    if filterVersions:
-        pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
-    if len(pkgs) > 1:
-        pkgs = sorted(pkgs, reverse=True)
-        if defaultToLatest:
-            log.warning("source component %s has multiple versions "
-                         "on labelPath %s\n\n"
-                         "Picking latest: \n       %s\n\n"
-                         "Not using:\n      %s"
-                          %(component,
-                           ', '.join(x.asString() for x in labelPath),
-                            '%s=%s' % pkgs[0][:2],
-                            '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
-        else:
-            raise builderrors.LoadRecipeError(
-                "source component %s has multiple versions "
-                "on labelPath %s: %s"
-                 %(component,
-                   ', '.join(x.asString() for x in labelPath),
-                   ', '.join('%s=%s' % x[:2] for x in pkgs)))
-
-    sourceComponent = repos.getTrove(*pkgs[0])
-
-    if sourceComponent.getSourceType():
-        loader = recipeLoaderFromSourceComponent(
-                                sourceComponent.getSourceType(), cfg, repos,
-                                versionStr=versionStr, labelPath=labelPath,
-                                ignoreInstalled=ignoreInstalled,
-                                filterVersions=filterVersions,
-                                parentDir=parentDir,
-                                defaultToLatest = defaultToLatest,
-                                buildFlavor = buildFlavor,
-                                db = db, overrides = overrides,
-                                factory = True)[0]
-        factoryClass = loader.getRecipe()
-        factory = factoryClass()
-        actualRecipe = factory.getRecipeClass()
-
-        class FakeLoader:
-
-            def getRecipe(self):
-                return actualRecipe
-
-        fl = FakeLoader()
-        loader = fl
-    else:
-        (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
-                                            dir=cfg.tmpDir)
-        outF = os.fdopen(fd, "w")
-
-        inF = None
-        filename = name + '.recipe'
-        for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
-            if filePath == filename:
-                inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
-                break
-        
-        if not inF:
-            raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
-                      (sourceComponent.getName(), 
-                       sourceComponent.getVersion().asString(),
-                       filename))
-
-        util.copyfileobj(inF, outF)
-
-        del inF
-        outF.close()
-        del outF
-
-        try:
-            loader = RecipeLoader(recipeFile, cfg, repos, component, 
-                                  sourceComponent.getVersion().branch(),
-                                  ignoreInstalled=ignoreInstalled,
-                                  directory=parentDir, buildFlavor=buildFlavor,
-                                  db=db, overrides=overrides, factory=factory)
-        finally:
-            os.unlink(recipeFile)
-
-    recipe = loader.getRecipe()
-    recipe._trove = sourceComponent.copy()
-    return (loader, sourceComponent.getVersion())
-
+                                    buildFlavor = None,
+                                    db = None, overrides = None):
+    l = RecipeLoaderFromSourceComponent(name, cfg, repos, versionStr=versionStr,
+                                        labelPath=labelPath,
+                                        ignoreInstalled=ignoreInstalled,
+                                        filterVersions=filterVersions,
+                                        parentDir=parentDir,
+                                        defaultToLatest=defaultToLatest,
+                                        buildFlavor=buildFlavor, db=db,
+                                        overrides=overrides)
+    return l, l.getSourceComponentVersion()
 
 def loadSuperClass(troveSpec, label=None):
     """
@@ -888,7 +899,7 @@ def getRecipeClass(trv, branch = None, cfg = None, repos = None,
                               branch=branch, ignoreInstalled = ignoreInstalled,
                               component = trv.getName(),
                               buildFlavor = buildFlavor, db = db,
-                              direoverrides = overrides, directory = directory)
+                              overrides = overrides, directory = directory)
         recipe = loader.getRecipe()
 
     return recipe
