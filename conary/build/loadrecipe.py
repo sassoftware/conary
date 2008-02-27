@@ -191,6 +191,42 @@ class RecipeLoader:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
+    def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
+        result = None
+        for (name, obj) in objDict.iteritems():
+            if not inspect.isclass(obj):
+                continue
+            # if a recipe has been marked to be ignored (for example, if
+            # it was loaded from another recipe by loadRecipe()
+            # (don't use hasattr here, we want to check only the recipe
+            # class itself, not any parent class
+            if 'internalAbstractBaseClass' in obj.__dict__:
+                continue
+            # make sure the class is derived from either Recipe or Factory
+            if ((    factory and not issubclass(obj, FactoryRecipe)) or
+                (not factory and not issubclass(obj, recipe.Recipe  ))):
+                continue
+
+            if hasattr(obj, 'name') and hasattr(obj, 'version'):
+                self._validateRecipe(obj, pkgname, basename)
+
+                if result:
+                    raise builderrors.RecipeFileError(
+                        'Error in recipe file "%s": multiple recipe classes '
+                        'with both name and version exist' % basename)
+
+                result = (name, obj)
+            else:
+                raise builderrors.RecipeFileError(
+                    "Recipe in file/component '%s' did not contain both a name"
+                    " and a version attribute." % pkgname)
+
+        if not result:
+            raise builderrors.RecipeFileError(
+                "file/component '%s' did not contain a valid recipe" % pkgname)
+
+        return result
+
     @staticmethod
     def _validateRecipe(recipeClass, packageName, fileName):
         if recipeClass.name[0] not in string.ascii_letters + string.digits:
@@ -320,54 +356,25 @@ class RecipeLoader:
         del self.module.__dict__['buildFlavor']
         del self.module.__dict__['overrides']
 
-        found = False
-        for (name, obj) in self.module.__dict__.items():
-            if not inspect.isclass(obj):
-                continue
-            # if a recipe has been marked to be ignored (for example, if
-            # it was loaded from another recipe by loadRecipe()
-            # (don't use hasattr here, we want to check only the recipe
-            # class itself, not any parent class
-            if 'internalAbstractBaseClass' in obj.__dict__:
-                continue
-            # make sure the class is derived from either Recipe or Factory
-            if ((    factory and not issubclass(obj, FactoryRecipe)) or
-                (not factory and not issubclass(obj, recipe.Recipe  ))):
-                continue
+        (name, obj) = self._findRecipeClass(pkgname, basename,
+                                            self.module.__dict__,
+                                            factory = factory)
+        self.recipes[name] = obj
+        obj.filename = filename
+        self.recipe = obj
 
-            self.recipes[name] = obj
-            obj.filename = filename
-            if hasattr(obj, 'name') and hasattr(obj, 'version'):
-                self._validateRecipe(obj, pkgname, basename)
+        # inherit any tracked flags that we found while loading parent
+        # classes.  Also inherit the list of recipes classes needed to load
+        # this recipe.
+        self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
+        self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
 
-                if found:
-                    raise builderrors.RecipeFileError(
-                        'Error in recipe file "%s": multiple recipe classes '
-                        'with both name and version exist' % basename)
-                self.recipe = obj
-                
-                found = True
-            else:
-                raise builderrors.RecipeFileError(
-                    "Recipe in file/component '%s' did not contain both a name"
-                    " and a version attribute." % pkgname)
-        if found:
-            # inherit any tracked flags that we found while loading parent
-            # classes.  Also inherit the list of recipes classes needed to load
-            # this recipe.
-            self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
-            self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
-
-            if self.recipe._trackedFlags is not None:
-                use.setUsed(self.recipe._trackedFlags)
-            self.recipe._trackedFlags = use.getUsed()
-            if buildFlavor is not None:
-                self.recipe._buildFlavor = buildFlavor
-            self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
-        else:
-            # we'll get this if the recipe file is empty 
-            raise builderrors.RecipeFileError(
-                "file/component '%s' did not contain a valid recipe" % pkgname)
+        if self.recipe._trackedFlags is not None:
+            use.setUsed(self.recipe._trackedFlags)
+        self.recipe._trackedFlags = use.getUsed()
+        if buildFlavor is not None:
+            self.recipe._buildFlavor = buildFlavor
+        self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
 
     def allRecipes(self):
         return self.recipes
