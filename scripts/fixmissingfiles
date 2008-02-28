@@ -21,8 +21,9 @@ to match what is in the repository only if those files are regular files,
 symbolic links, or transient files.  This is useful mainly for fixing
 systems with errors caused by CNY-2553.
 If the --repair-path=path option is provided, the file specified by path
-will be updated to the repository contents, regardless of type.
-FIXME: --repair-path not yet implemented
+will be updated to the repository contents, regardless of type.  You can
+specify a maximum of 1000 --repair-path=path options on a single command
+line; to do more, run the script more than once.
 """
 
 import os
@@ -54,6 +55,32 @@ class countDict(dict):
             self[key] = self[key] + 1
         else:
             self[key] = 1
+
+def restoreSymlink(f, path, cfg):
+    fullpath = os.path.join(cfg.root, path)
+    c = os.readlink(fullpath)
+    if c != f.target():
+        print 'symlink %s contains %s changing to %s' %(
+            path, c, f.target())
+        os.remove(fullpath)
+        os.symlink(f.target(), fullpath)
+
+
+def restoreRegularFiles(neededFiles, neededFileData, neededPaths, repos, cfg):
+    contents = repos.getFileContents(neededFileData)
+    for fileObj, f, path in zip(contents, neededFiles, neededPaths):
+        print 'fixing ', path
+        f.restore(fileObj, cfg.root, path)
+
+def storeNeededData(f, path, db, versionId, neededFileData, neededFiles, neededPaths):
+    fileVersion = db.db.versionTable.getBareId(versionId)
+    if fileVersion.isOnLocalHost():
+        print 'cannot restore locally-cooked file %s\n' % path
+        return
+    neededFileData.append((f.fileId(), fileVersion))
+    neededFiles.append(f)
+    neededPaths.append(path)
+    
 
 def main(argv):
     sys.excepthook = util.genExcepthook()
@@ -118,30 +145,16 @@ def main(argv):
                             continue
                     except:
                         pass
-                    fileVersion = db.db.versionTable.getBareId(versionId)
-                    if fileVersion.isOnLocalHost():
-                        print 'cannot restore locally-cooked file %s\n' % path
-                        continue
-                    neededFileData.append((f.fileId(), fileVersion))
-                    neededFiles.append(f)
-                    neededPaths.append(path)
+                    storeNeededData(f, path, db, versionId,
+                                    neededFileData, neededFiles, neededPaths)
                 elif isinstance(f, files.SymbolicLink):
-                    fullpath = os.path.join(cfg.root, path)
-                    c = os.readlink(fullpath)
-                    if c != f.target():
-                        print 'symlink %s contains %s changing to %s' %(
-                            path, c, f.target())
-                        os.remove(fullpath)
-                        os.symlink(f.target(), fullpath)
+                    restoreSymlink(f, path, cfg)
                 else:
                     print 'not attempting to restore special file %s\n' % path
             
             if neededFiles:
-                # FIXME: add a journal?
-                contents = repos.getFileContents(neededFileData)
-                for fileObj, f, path in zip(contents, neededFiles, neededPaths):
-                    print 'fixing ', path
-                    f.restore(fileObj, cfg.root, path)
+                restoreRegularFiles(neededFiles, neededFileData, neededPaths,
+                                    repos, cfg)
 
             for path in missingPaths:
                 cu.execute('update DBTroveFiles set isPresent=1'
@@ -150,8 +163,27 @@ def main(argv):
 
 
     if repairPathList:
-        print 'ERROR: --repair-path not yet implemented'
-        return 1
-                
+        neededFileData = []
+        neededFiles = []
+        neededPaths = []
+        assert len(repairPathList) < 1000
+        cu.execute('SELECT pathId, path, versionId, stream '
+                   'FROM DBTroveFiles where isPresent=1 and path in (%s)'
+                   %','.join(['?']*len(repairPathList)), repairPathList)
+        for pathId, path, versionId, stream in cu:
+            f = files.ThawFile(stream, pathId)
+            if (isinstance(f, files.RegularFile)):
+                storeNeededData(f, path, db, versionId,
+                                neededFileData, neededFiles, neededPaths)
+            elif isinstance(f, files.SymbolicLink):
+                restoreSymlink(f, path, cfg)
+            else:
+                print 'not attempting to restore special file %s\n' % path
+
+        if neededFiles:
+            restoreRegularFiles(neededFiles, neededFileData, neededPaths,
+                                repos, cfg)
+
+
 if __name__ == '__main__':
     main(sys.argv)
