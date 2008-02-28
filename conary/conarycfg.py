@@ -465,6 +465,13 @@ class CfgSearchPathItem(CfgType):
         return item
 CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
+def _getDefaultPublicKeyrings():
+    publicKeyrings = []
+    if 'HOME' in os.environ:
+        publicKeyrings.append('~/.gnupg/pubring.gpg')
+    publicKeyrings.append('/etc/conary/pubring.gpg')
+    return publicKeyrings
+
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
         be set based on a keyword that can be set at the command line.
@@ -526,9 +533,10 @@ class ConaryContext(ConfigSection):
     conaryProxy           =  CfgProxy
     # HTTP proxy
     proxy                 =  CfgProxy
-    pubRing               =  (CfgPathList, [ \
-        ('/etc/conary/pubring.gpg',
-         '~/.gnupg/pubring.gpg')[int(bool(os.getuid()))]])
+    # The first keyring in the list is writable, and is used for storing the
+    # keys that are not present on the system-wide keyring. Always expect
+    # Conary to write to the first keyring.
+    pubRing               =  (CfgPathList, _getDefaultPublicKeyrings())
     uploadRateLimit       =  (CfgInt, 0)
     downloadRateLimit     =  (CfgInt, 0)
 
@@ -584,6 +592,23 @@ class ConaryConfiguration(SectionedConfigFile):
 
     def __init__(self, readConfigFiles = False, ignoreErrors = False,
                  readProxyValuesFirst=True):
+        """
+        Initialize a ConaryConfiguration object
+
+        @param readConfigFiles: If True, read /etc/conaryrc and entitlements 
+        files
+        @type readConfigFiles: bool
+
+        @param ignoreErrors: If True, ParseError exceptions will not be raised
+        @type ignoreErrors: bool
+
+        @param readProxyValuesFirst: If True, parse local config files for 
+        proxy settings and apply them before further configuration.
+        @type readProxyValuesFirst: bool  
+
+        @raises ParseError: Raised if configuration syntax is invalid and
+        ignoreErrors is False.
+        """
 	SectionedConfigFile.__init__(self)
         self._ignoreErrors = ignoreErrors
 
@@ -682,6 +707,15 @@ class ConaryConfiguration(SectionedConfigFile):
         self.resetToDefault('signatureKeyMap')
 
     def initializeFlavors(self):
+        """
+        Initialize flavor preferences based on files typically
+        found in /etc/conary/arch (archDirs) and /etc/conary/use
+
+        @raises RuntimeError: Raised if use flags conflict in
+        a way which cannot be reconciled 
+        (see L{deps.DependencyClass.MergeFlags})
+
+        """
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
                                                    self.archDirs)
         if self.flavor == []:

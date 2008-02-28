@@ -318,7 +318,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     # turn off loadInstalled for committing - it ties you too closely
     # to actually being able to build what you are developing locally - often
     # not the case.
-    if state.getSourceType() is None or state.getSourceType() == 'factory':
+    if (not state.getSourceType()) or state.getSourceType() == 'factory':
         if not [ x[1] for x in state.iterFileList()
                                         if x[1].endswith('.recipe') ]:
             log.error("recipe not in CONARY state file, please run cvc add")
@@ -1241,10 +1241,10 @@ def updateSrc(repos, versionList = None, callback = None):
 
         localVer = state.getVersion().createShadow(versions.LocalLabel())
         fsJob = update.FilesystemJob(repos, changeSet,
-                                     { (state.getName(), localVer) : state },
-                                     root = targetDir,
-                                     flags = update.UpdateFlags(ignoreUGids = True,
-                                                                merge = True))
+                     { (state.getName(), localVer, state.getFlavor()) : state },
+                     root = targetDir,
+                     flags = update.UpdateFlags(ignoreUGids = True,
+                                                merge = True))
         errList = fsJob.getErrorList()
         if errList:
             for err in errList: log.error(err)
@@ -1430,7 +1430,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
 
     localVer = parentRootVersion.createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet,
-                                 { (state.getName(), localVer) : state },
+                                 { (state.getName(), localVer, 
+                                    state.getFlavor()) : state },
                                  os.getcwd(),
                                  flags = update.UpdateFlags(ignoreUGids = True,
                                                             merge = True) )
@@ -1744,8 +1745,7 @@ def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
             return
 
         macros = Macros()
-        if '-' in name: className = ''.join([ x.capitalize() for x in name.split('-') ])
-        else: className = name.capitalize()
+        className = util.convertPackageNameToClassName(name)
         macros.update({'contactName': cfg.name,
                        'contact': cfg.contact,
                        'year': str(time.localtime()[0]),

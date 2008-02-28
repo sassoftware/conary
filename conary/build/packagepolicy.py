@@ -262,10 +262,20 @@ class Config(policy.Policy):
                 else:
                     self.warn("adding trailing newline to config file '%s'" % \
                             filename)
+                    mode = os.lstat(fullpath)[stat.ST_MODE]
+                    oldMode = None
+                    if mode & 0600 != 0600:
+                        # need to be able to read and write the file to fix it
+                        oldmode = mode
+                        os.chmod(fullpath, mode|0600)
+
                     f = open(fullpath, "a")
                     f.seek(0, 2)
                     f.write('\n')
                     f.close()
+                    if oldmode is not None:
+                        os.chmod(fullpath, oldmode)
+
         f.close()
         self.recipe.ComponentSpec(_config=filename)
 
@@ -3846,7 +3856,7 @@ class reportMissingBuildRequires(policy.Policy):
                       str(sorted(list(self.errors))))
 
 
-class reportErrors(policy.Policy):
+class reportErrors(policy.Policy, policy.GroupPolicy):
     """
     This policy is used to report together all package errors.
     Do not call it directly; it is for internal use only.
@@ -3854,6 +3864,7 @@ class reportErrors(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    groupError = False
 
     def __init__(self, *args, **keywords):
 	self.errors = []
@@ -3864,7 +3875,12 @@ class reportErrors(policy.Policy):
 	Called once, with printf-style arguments, for each warning.
 	"""
 	self.errors.append(args[0] %tuple(args[1:]))
+        groupError = keywords.pop('groupError', None)
+        if groupError is not None:
+            self.groupError = groupError
 
     def do(self):
 	if self.errors:
-	    raise policy.PolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.errors)
+            msg = self.groupError and 'Group' or 'Package'
+            raise policy.PolicyError, ('%s Policy errors found:\n%%s' % msg) \
+                    % "\n".join(self.errors)

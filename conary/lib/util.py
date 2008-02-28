@@ -316,6 +316,10 @@ def braceExpand(path):
 	h = h + 1
 
 def braceGlob(paths):
+    """
+    @raises ValueError: raised if paths has unbalanced braces
+    @raises OSError: raised in some cases where lstat on a path fails
+    """
     pathlist = []
     for path in braceExpand(paths):
 	pathlist.extend(fixedglob.glob(path))
@@ -1192,6 +1196,10 @@ class LazyFileCache:
         self._fdMap = {}
     
     def open(self, path, mode="r"):
+        """
+        @raises IOError: raised if there's an I/O error opening the fd
+        @raises OSError: raised on other errors opening the fd
+        """
         fd = _LazyFile(self, path, mode=mode)
         self._fdMap[fd._hash] = fd
         # Try to open the fd, to push the errors up early
@@ -1199,7 +1207,15 @@ class LazyFileCache:
         return fd
 
     def _getFdCount(self):
-        return countOpenFileDescriptors()
+        try:
+            return countOpenFileDescriptors()
+        except OSError, e:
+            # We may be hitting a kernel bug (CNY-2571)
+            if e.errno != errno.EINVAL:
+                raise
+            # Count the open file descriptors this instance has
+            return len([ x for x in self._fdMap.values()
+                           if x._realFd is not None])
 
     def _getCounter(self):
         ret = self._fdCounter;
@@ -1233,6 +1249,9 @@ class LazyFileCache:
         del self._fdMap[fd._hash]
 
     def close(self):
+        """
+        @raises IOError: could be raised if tell() fails prior to close()
+        """
         # No need to call fd's close(), we're destroying this object
         for fd in self._fdMap.values():
             fd._close()
@@ -1839,3 +1858,6 @@ class Timer:
 def countOpenFileDescriptors():
     """Return the number of open file descriptors for this process."""
     return misc.countOpenFileDescriptors()
+
+def convertPackageNameToClassName(pkgname):
+    return ''.join([ x.capitalize() for x in pkgname.split('-') ])

@@ -135,6 +135,11 @@ class AbstractTroveSource:
                    bestFlavor=None, getLeaves=None, 
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
                    **kw):
+        """
+        @raises conary.errors.TroveNotFound:
+        @raises conary.errors.LabelPathNeeded: raised if installLabelPath is
+        not set and no label is specified in a trove's version string
+        """
 
         if bestFlavor is None:
             bestFlavor = self._bestFlavor
@@ -156,6 +161,9 @@ class AbstractTroveSource:
                   acrossFlavors = False, affinityDatabase = None,
                   bestFlavor = None, getLeaves = None, 
                   troveTypes=TROVE_QUERY_PRESENT, **kw):
+        """
+        See L{repository.trovesource.AbstractTroveSource.findTroves}
+        """
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
                               defaultFlavor, acrossLabels, acrossFlavors,
                               affinityDatabase, bestFlavor=bestFlavor,

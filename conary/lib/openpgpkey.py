@@ -208,13 +208,14 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             callback = callbacks.KeyCacheCallback()
         OpenPGPKeyCache.__init__(self)
         self.callback = callback
-        if 'HOME' not in os.environ:
-            self.publicPaths  = [ '/etc/conary/pubring.gpg' ]
-            self.privatePath  = None
-        else:
-            self.publicPaths  = [ os.environ['HOME'] + '/.gnupg/pubring.gpg',
-                                  '/etc/conary/pubring.gpg' ]
-            self.privatePath  = os.environ['HOME'] + '/.gnupg/secring.gpg'
+        self.publicPaths = []
+        self._setPrivateKeyringPath()
+
+    def _setPrivateKeyringPath(self, privatePath = None):
+        if privatePath is None and 'HOME' in os.environ:
+            privatePath = util.joinPaths(os.environ['HOME'],
+                                         '/.gnupg/secring.gpg')
+        self.setPrivatePath(privatePath)
 
     def setPublicPath(self, path):
         if isinstance(path, list):
@@ -275,10 +276,8 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
 
 
     def _getPublicKey(self, keyId, label = None, warn = True):
-        for i in range(len(self.publicPaths)):
+        for publicPath in self.publicPaths:
             try:
-                publicPath = self.publicPaths[i]
-
                 key = seekKeyById(keyId, publicPath)
                 if key:
                     return OpenPGPKey(key, key.getCryptoKey(), 0)
@@ -293,15 +292,34 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             # Callback returned False; no key
             raise _KeyNotFound(keyId)
         kr = self.getPublicKeyring()
-        kr.addKeysAsStrings([keyData])
-
-        key = kr.getKey(keyId)
+        try:
+            kr.addKeysAsStrings([keyData])
+        except openpgpfile.KeyringError, e:
+            # Mark the error as uncatchable, so it can pass through and stop
+            # the update
+            # XXX When RMK-791 (related to CNY-2555) gets fixed, we
+            # should treat this as an error. Until then, we warn and move on,
+            # at the expense of repeatedly asking the server the same question
+            #e.errorIsUncatchable = True
+            #raise
+            log.error("While caching PGP key: %s: %s" % (e.args[1], e.args[2]))
+            sio = util.ExtendedStringIO()
+            if not openpgpfile.parseAsciiArmor(keyData, sio):
+                # Unable to parse
+                raise _KeyNotFound(keyId)
+            msg = openpgpfile.PGP_Message(sio, start = 0)
+            key = msg.getKeyByKeyId(keyId)
+        else:
+            key = kr.getKey(keyId)
         assert key is not None, "Failure retrieving the newly-added key"
         return OpenPGPKey(key, key.getCryptoKey(), 0)
 
     def getPublicKeyring(self):
+        # The writable pubring is the first in the list (this way we get
+        # faster to the keys we're caching)
         pubRing = self.publicPaths[0]
-        # XXX
+        # XXX this may have to be a configuration option. For now, use the
+        # writable pubring's directory
         tsDbPath = os.path.join(os.path.dirname(pubRing), 'tsdb')
         try:
             kr = PublicKeyring(pubRing, tsDbPath)
@@ -465,6 +483,10 @@ class KeyringCacheCallback(KeyCacheCallback):
 _keyCache = OpenPGPKeyFileCache()
 
 def getKeyCache():
+    """
+    @return: the OpenPGP key cache
+    @rtype: L{lib.openpgpkey.OpenPGPKeyFileCache}
+    """
     global _keyCache
     return _keyCache
 

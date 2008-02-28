@@ -537,6 +537,18 @@ class Database:
         """ % flavorClause, pin, name, version.asString())
 
     def trovesArePinned(self, troveList):
+        """
+        Get a list of which troves in troveList are pinned
+        
+        @param troveList: a list of troves in (name, version, flavor) form
+        @type troveList: list
+
+        @note:
+            This function makes database calls and may raise any exceptions
+        defined in L{conary.dbstore.sqlerrors}
+
+        @raises AssertionError:
+        """ 
         cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE tlList(

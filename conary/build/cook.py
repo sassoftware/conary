@@ -642,6 +642,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
     """
+    enforceManagedPolicy = (cfg.enforceManagedPolicy
+                            and targetLabel != versions.CookLabel())
     if groupOptions is None:
         groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
@@ -679,6 +681,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
         use.track(True)
+        policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
+
         _callSetup(cfg, recipeObj)
         use.track(False)
         log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -737,6 +741,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setConaryVersion(constants.version)
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
+            grpTrv.troveInfo.imageGroup.set(group.imageGroup)
             compatClass = group.compatibilityClass
             if compatClass is not None:
                 grpTrv.setCompatibilityClass(compatClass)
@@ -772,7 +777,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
                 troveScripts.script.set(recipeScripts[0])
 
-            for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+            for (troveTup, explicit, byDefault, comps, requireLatest) \
+                    in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,
                                 weakRef=not explicit, *troveTup)
 
@@ -782,6 +788,10 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                                 byDefault = byDefault, 
                                 weakRef = not explicit)
             troveList.append(grpTrv)
+        recipeObj.troveMap = dict((x.getNameVersionFlavor(), x) \
+                for x in troveList)
+        recipeObj.doProcess(policy.GROUP_ENFORCEMENT)
+        recipeObj.doProcess(policy.ERROR_REPORTING)
 
         for primaryName in recipeObj.getPrimaryGroupNames():
             changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
@@ -1027,26 +1037,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     use.track(True)
     if recipeObj._trackedFlags is not None:
         use.setUsed(recipeObj._trackedFlags)
-
-    policyFiles = recipeObj.loadPolicy()
-    db = database.Database(cfg.root, cfg.dbPath)
-    policyTroves = set()
-    unmanagedPolicyFiles = []
-    for policyPath in policyFiles:
-        troveList = list(db.iterTrovesByPath(policyPath))
-        if troveList:
-            for trove in troveList:
-                policyTroves.add((trove.getName(), trove.getVersion(),
-                                  trove.getFlavor()))
-        else:
-            unmanagedPolicyFiles.append(policyPath)
-            ver = versions.VersionFromString('/local@local:LOCAL/0-0').copy()
-            ver.resetTimeStamps()
-            policyTroves.add((policyPath, ver, deps.Flavor()))
-    del db
-    if unmanagedPolicyFiles and enforceManagedPolicy:
-        raise CookError, ('Cannot cook into repository with'
-            ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
+    policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
     _callSetup(cfg, recipeObj)
 
@@ -1327,6 +1318,28 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         changeSet.newTrove(grpDiff)
 
     return changeSet, built
+
+def _loadPolicy(recipeObj, cfg, enforceManagedPolicy):
+    policyFiles = recipeObj.loadPolicy()
+    db = database.Database(cfg.root, cfg.dbPath)
+    policyTroves = set()
+    unmanagedPolicyFiles = []
+    for policyPath in policyFiles:
+        troveList = list(db.iterTrovesByPath(policyPath))
+        if troveList:
+            for trove in troveList:
+                policyTroves.add((trove.getName(), trove.getVersion(),
+                                  trove.getFlavor()))
+        else:
+            unmanagedPolicyFiles.append(policyPath)
+            ver = versions.VersionFromString('/local@local:LOCAL/0-0').copy()
+            ver.resetTimeStamps()
+            policyTroves.add((policyPath, ver, deps.Flavor()))
+    del db
+    if unmanagedPolicyFiles and enforceManagedPolicy:
+        raise CookError, ('Cannot cook into repository with'
+            ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
+    return policyTroves
 
 def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
                   fileIdsPathMap):

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,11 +15,14 @@ import inspect
 
 from conary import files
 from conary.errors import ParseError
-from conary.build import action, source
+from conary.build import action, source, policy
 from conary.build.errors import RecipeFileError
 from conary.lib import log, util
 
+import glob
+import imp
 import os
+import sys
 
 """
 Contains the base Recipe class
@@ -31,6 +34,12 @@ RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
 RECIPE_TYPE_FACTORY   = 6
+
+class _policyUpdater:
+    def __init__(self, theobject):
+        self.theobject = theobject
+    def __call__(self, *args, **keywords):
+        self.theobject.updateArgs(*args, **keywords)
 
 def _ignoreCall(*args, **kw):
     pass
@@ -52,6 +61,31 @@ def isRedirectRecipe(recipeClass):
 
 def isFactoryRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_FACTORY
+
+def loadMacros(paths):
+    '''
+    Load default macros from a series of I{paths}.
+
+    @rtype: dict
+    @return: A dictionary of default macros
+    '''
+
+    baseMacros = {}
+    loadPaths = []
+    for path in paths:
+        globPaths = sorted(list(glob.glob(path)))
+        loadPaths.extend(globPaths)
+
+    for path in loadPaths:
+        compiledPath = path+'c'
+        deleteCompiled = not util.exists(compiledPath)
+        macroModule = imp.load_source('tmpmodule', path)
+        if deleteCompiled:
+            util.removeIfExists(compiledPath)
+        baseMacros.update(x for x in macroModule.__dict__.iteritems()
+                          if not x[0].startswith('__'))
+
+    return baseMacros
 
 class _sourceHelper:
     def __init__(self, theclass, recipe):
@@ -402,3 +436,37 @@ class Recipe(object):
     def move(self, src, dest):
         self.recordMove(src, dest)
         util.move(src, dest)
+
+    def loadPolicy(self, policySet = None, internalPolicyModules = None):
+        #from conary.build import policy
+        if internalPolicyModules is None:
+            internalPolicyModules = self.internalPolicyModules
+        (self._policyPathMap, self._policies) = \
+                policy.loadPolicy(self, policySet = policySet,
+                              internalPolicyModules = internalPolicyModules,
+                              basePolicy = self.basePolicyClass)
+        # create bucketless name->policy map for getattr
+        policyList = []
+        for bucket in self._policies.keys():
+            policyList.extend(self._policies[bucket])
+        self._policyMap = dict((x.__class__.__name__, x) for x in policyList)
+        # Some policy needs to pass arguments to other policy at init
+        # time, but that can't happen until after all policy has been
+        # initialized
+        for name, policyObj in self._policyMap.iteritems():
+            self.externalMethods[name] = _policyUpdater(policyObj)
+        # must be a second loop so that arbitrary policy cross-reference
+        # works; otherwise it is dependent on sort order whether or
+        # not it works
+        for name, policyObj in self._policyMap.iteritems():
+            policyObj.postInit()
+
+        # returns list of policy files loaded
+        return self._policyPathMap.keys()
+
+    def doProcess(self, policyBucket):
+        for post in self._policies[policyBucket]:
+            sys.stdout.write('Running policy: %s\r' % post.__class__.__name__)
+            sys.stdout.flush()
+            post.doProcess(self)
+

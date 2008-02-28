@@ -27,6 +27,7 @@ python_files = __init__.py	\
 	filter.py 		\
 	filesetrecipe.py	\
 	grouprecipe.py		\
+	grouppolicy.py		\
 	inforecipe.py		\
 	loadrecipe.py		\
 	lookaside.py		\
@@ -42,6 +43,7 @@ python_files = __init__.py	\
 	signtrove.py		\
 	source.py		\
 	tags.py			\
+	trovefilter.py			\
 	use.py                  \
         usergroup.py
 

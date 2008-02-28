@@ -720,8 +720,9 @@ _TROVEINFO_TAG_COMPAT_CLASS   = 19
 # handling
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_COPIED_FROM    = 21
-_TROVEINFO_TAG_SOURCE_TYPE    = 22
-_TROVEINFO_TAG_LAST           = 22
+_TROVEINFO_TAG_IMAGE_GROUP    = 22
+_TROVEINFO_TAG_SOURCE_TYPE    = 23
+_TROVEINFO_TAG_LAST           = 23
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -771,6 +772,9 @@ _TROVESCRIPTS_PREUPDATE    = 0
 _TROVESCRIPTS_POSTINSTALL  = 1
 _TROVESCRIPTS_POSTUPDATE   = 2
 _TROVESCRIPTS_POSTROLLBACK = 3
+_TROVESCRIPTS_PREINSTALL   = 4
+_TROVESCRIPTS_PREERASE     = 5
+_TROVESCRIPTS_POSTERASE    = 6
 
 class TroveScripts(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -779,6 +783,9 @@ class TroveScripts(streams.StreamSet):
         _TROVESCRIPTS_POSTINSTALL   : (DYNAMIC, TroveScript, 'postInstall' ),
         _TROVESCRIPTS_POSTUPDATE    : (DYNAMIC, TroveScript, 'postUpdate' ),
         _TROVESCRIPTS_POSTROLLBACK  : (DYNAMIC, TroveScript, 'postRollback' ),
+        _TROVESCRIPTS_PREINSTALL    : (DYNAMIC, TroveScript, 'preInstall' ),
+        _TROVESCRIPTS_PREERASE      : (DYNAMIC, TroveScript, 'preErase' ),
+        _TROVESCRIPTS_POSTERASE     : (DYNAMIC, TroveScript, 'postErase' ),
     }
 
 class TroveInfo(streams.StreamSet):
@@ -805,7 +812,8 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
         _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,    'troveCopiedFrom' ),
-        _TROVEINFO_TAG_SOURCE_TYPE   : (DYNAMIC, streams.StringStream, 'sourceType' )
+        _TROVEINFO_TAG_IMAGE_GROUP   : (DYNAMIC, streams.ByteStream, 'imageGroup' ),
+        _TROVEINFO_TAG_SOURCE_TYPE   : (DYNAMIC, streams.StringStream, 'sourceType' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1020,7 +1028,7 @@ class Trove(streams.StreamSet):
 
     def addPrecomputedDigitalSignature(self, newSigs):
         """
-        Adds a previously computed signatures, allowing signatures to be
+        Adds a previously computed signature, allowing signatures to be
         added to troves. All digests must have already been computed.
 
         @param newSigs: Signature to add
@@ -2840,6 +2848,16 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getPostRollbackScript(self):
         return self._getScript(_TROVESCRIPTS_POSTROLLBACK)
+
+    # Not intended for general use
+    def _getPreInstallScript(self):
+        return self._getScript(_TROVESCRIPTS_PREINSTALL)
+
+    def _getPreEraseScript(self):
+        return self._getScript(_TROVESCRIPTS_PREERASE)
+
+    def _getPostEraseScript(self):
+        return self._getScript(_TROVESCRIPTS_POSTERASE)
 
     def getNewCompatibilityClass(self):
         troveInfo = self.absoluteTroveInfo()

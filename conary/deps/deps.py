@@ -1036,6 +1036,13 @@ def ThawDependencySet(frz):
     return _Thaw(DependencySet(), frz)
 
 def ThawFlavor(frz):
+    """
+    @param frz: the frozen representation of a flavor
+    @return: a thawed Flavor object
+    @rtype: L{deps.deps.Flavor}
+    @raises TypeError: could be raised if frozen object is malformed
+    @raises ValueError: could be raised if frozen object is malformed
+    """
     return _Thaw(Flavor(), frz)
 
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):

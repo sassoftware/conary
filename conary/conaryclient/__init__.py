@@ -92,6 +92,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         # Set up the callbacks for the PGP key cache
         keyCache = openpgpkey.getKeyCache()
+        keyCache.setPublicPath(cfg.pubRing)
         keyCacheCallback = openpgpkey.KeyCacheCallback(self.repos,
                                                        cfg)
         keyCache.setCallback(keyCacheCallback)
@@ -126,6 +127,10 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         return repos
 
     def getRepos(self):
+        """
+        @return: a repository client object
+        @rtype: conary.repository.netclient.NetworkRepositoryClient
+        """
         return self.repos
 
     def setRepos(self, repos):
@@ -347,6 +352,18 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
                 "Write permission denied on conary database %s" % self.db.dbpath
 
     def pinTroves(self, troveList, pin = True):
+        """
+        Calls L{conary.local.database.Database.pintroves}
+
+        @param troveList: a list of troves to pin
+        @type troveList: list of troves
+
+        @note:
+            As this call makes database updates, any of the errors
+        documented in L{conary.dbstore.sqlerrors} may be raised.
+
+        @rtype: None
+        """
         self.db.pinTroves(troveList, pin = pin)
 
     def getConaryUrl(self, version, flavor):
@@ -366,10 +383,17 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         """
         Iterate over rollback list.
         Yield (rollbackName, rollback)
+        @raises ConaryError: raised when the rollbacks directory cannot be read
         """
         return self.db.getRollbackStack().iter()
 
     def getSearchSource(self, flavor=0, troveSource=None, installLabelPath=0):
+        """
+        @return: a searchSourceStack
+        @rtype: conary.repository.searchsource.NetworkSearchSource
+        @raises ConaryError: raised if SearchSourceStack creation fails
+        @raises ParseError: raised if an element in the search path is malformed.
+        """
         # a flavor of None is common in some cases so we use 0
         # as our "unset" case.
         if flavor is 0:
@@ -431,14 +455,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
 
         @raise UpdateError: Generic update error. Can occur if the root is not
         writeable by the user running the command.
-
-        @raise RollbackError: Generic rollback error. Finer grained rollback
-        errors are L{RollbackDoesNotExist} (raised if the rollback specifier
-        was invalid) and L{RollbackOrderError} (if the rollback was attempted not
-        following the rollback stack order). It can also be raised if the database
-        state has changed between the moment the rollback was computed and the
-        moment of performing the rollback. See also the description for
-        C{transactionCounter}.
 
         @raise RollbackError: Generic rollback error. Finer grained rollback
         errors are L{RollbackDoesNotExist<database.RollbackDoesNotExist>}

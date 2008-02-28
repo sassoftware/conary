@@ -191,6 +191,7 @@ def main(argv):
     try:
         updatecmd.doUpdate(cfg, [ path ], depCheck = False,
                            recurse = False, justDatabase = True,
+                           replaceFiles = True,
                            noRestart = True)
     finally:
         os.unlink(path)

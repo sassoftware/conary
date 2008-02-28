@@ -286,7 +286,7 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         return res[troveSpec]
 
     def findTroves(self, troveSpecs, useAffinity=False, allowMissing=False,
-                    **kw):
+            requireLatest=False, **kw):
         """
             Finds the trove matching the given list of
             (name, versionSpec, flavor) troveSpecs.  If useAffinity is True,
@@ -300,7 +300,8 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
             if isinstance(source, NetworkSearchSource):
                 networkSource = source
             newTroveSpecs, specsToUse = source._filterSpecsForSource(troveSpecs)
-            foundTroves = source.findTroves(specsToUse, allowMissing=True)
+            foundTroves = source.findTroves(specsToUse, allowMissing=True,
+                    requireLatest = requireLatest)
             for troveSpec in specsToUse:
                 for origSpec in specsToUse[troveSpec]:
                     if troveSpec in foundTroves:

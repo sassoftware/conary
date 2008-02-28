@@ -53,6 +53,10 @@ class CriticalUpdateInfo(object):
         self.finalTroveRegexps = regexpList
 
     def setCriticalTroveRegexps(self, regexpList):
+        """
+        Define the list of regular expressions that determine which trove
+        updates are considered critical
+        """
         self.criticalTroveRegexps = regexpList
 
     def findFinalJobs(self, jobList):
@@ -107,6 +111,11 @@ class ClientUpdate:
         return self.updateCallback
 
     def setUpdateCallback(self, callback):
+        """
+        set the callback function for an update
+        @raises AssertionError: raised if the callback is None or is an 
+        inappropriate object type
+        """
         assert(callback is None or isinstance(callback, UpdateCallback))
         self.updateCallback = callback
         return self
@@ -1764,40 +1773,9 @@ conary erase '%s=%s[%s]'
         if not newJob:
             raise NoNewTrovesError
 
-        removedTroves = list()
-        missingTroves = list()
-        rollbackFence = False
-        ts = uJob.getTroveSource()
-        for job in newJob:
-            if job[2][0] is None:
-                continue
-
-            cs = ts.getChangeSet(job)
-            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
-            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
-                ti = trove.TroveInfo(troveCs.troveInfoDiff.freeze())
-                if ti.flags.isMissing():
-                    missingTroves.append(job)
-                else:
-                    removedTroves.append(job)
-
-            if job[1][0] is not None:
-                oldCompatClass = self.db.getTroveCompatibilityClass(
-                        job[0], job[1][0], job[1][1])
-                # it's an update; check for preupdate scripts
-                preScript = troveCs.getPreUpdateScript()
-                if preScript:
-                    uJob.addJobPreScript(job, preScript, oldCompatClass,
-                                         troveCs.getNewCompatibilityClass())
-            else:
-                oldCompatClass = None
-
-            rollbackFence = rollbackFence or \
-                troveCs.isRollbackFence(update = (job[1][0] is not None),
-                                        oldCompatibilityClass = oldCompatClass)
-
-        uJob.setInvalidateRollbacksFlag(rollbackFence)
-
+        troveSource = uJob.getTroveSource()
+        missingTroves, removedTroves = self._processJobList(newJob, uJob,
+                                                troveSource.getChangeSet)
         if removedTroves or missingTroves:
             removed = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
             removed.sort()
@@ -1808,6 +1786,62 @@ conary erase '%s=%s[%s]'
         uJob.setPrimaryJobs(jobSet)
 
         return newJob
+
+    def _addJobPreEraseScript(self, job, updJob):
+        # check for the old trove's erase scripts
+        oldTrv = self.db.getTrove(job[0], job[1][0], job[1][1])
+        oldTrvCs = oldTrv.diff(None)[0]
+        preScript = oldTrvCs._getPreEraseScript()
+        if preScript:
+            updJob.addJobPreScript(job, preScript,
+                                   oldTrv.getCompatibilityClass(), None,
+                                   action = "preerase")
+
+    def _processJobList(self, jobList, updJob, troveSourceCallback):
+        missingTroves = list()
+        removedTroves = list()
+        rollbackFence = False
+
+        for job in jobList:
+            if job[2][0] is None:
+                # Removal
+                self._addJobPreEraseScript(job, updJob)
+                continue
+
+            cs = troveSourceCallback(job)
+            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                ti = trove.TroveInfo(troveCs.troveInfoDiff.freeze())
+                if ti.flags.isMissing():
+                    missingTroves.append(job)
+                else:
+                    removedTroves.append(job)
+
+            if job[1][0] is not None:
+                # it's an update
+                # check for preupdate scripts
+                oldCompatClass = self.db.getTroveCompatibilityClass(
+                        job[0], job[1][0], job[1][1])
+                preScript = troveCs.getPreUpdateScript()
+                if preScript:
+                    updJob.addJobPreScript(job, preScript, oldCompatClass,
+                                           troveCs.getNewCompatibilityClass(),
+                                           action = "preupdate")
+                self._addJobPreEraseScript(job, updJob)
+            else:
+                oldCompatClass = None
+                preScript = troveCs._getPreInstallScript()
+                if preScript:
+                    updJob.addJobPreScript(job, preScript, oldCompatClass,
+                                         troveCs.getNewCompatibilityClass(),
+                                         action = "preinstall")
+
+            rollbackFence = rollbackFence or \
+                troveCs.isRollbackFence(update = (job[1][0] is not None),
+                                        oldCompatibilityClass = oldCompatClass)
+        updJob.setInvalidateRollbacksFlag(rollbackFence)
+        return missingTroves, removedTroves
+
 
     def _fullMigrate(self, itemList, uJob, recurse=True):
         def _convertRedirects(searchSource, newTroves):
@@ -2062,31 +2096,13 @@ conary erase '%s=%s[%s]'
         # XXX this is horrible; we probablt have everything we need already,
         # I just don't know how to find it
         infoCs = troveSource.createChangeSet(finalJobs, withFiles = False)
+
         assert(not infoCs[1])
         infoCs = infoCs[0]
-        for job in finalJobs:
-            if job[2][0] is None:
-                continue
 
-            troveCs = infoCs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+        troveSourceCallback = lambda x: infoCs
 
-            if job[1][0] is not None:
-                # it's an update; check for preupdate scripts
-                oldCompatClass = self.db.getTroveCompatibilityClass(
-                        job[0], job[1][0], job[1][1])
-                preScript = troveCs.getPreUpdateScript()
-                if preScript:
-                    uJob.addJobPreScript(job, preScript, oldCompatClass,
-                                         troveCs.getNewCompatibilityClass())
-            else:
-                oldCompatClass = None
-
-            rollbackFence = rollbackFence or \
-                troveCs.isRollbackFence(update = (job[1][0] is not None),
-                                        oldCompatibilityClass = oldCompatClass)
-
-        uJob.setInvalidateRollbacksFlag(rollbackFence)
-
+        self._processJobList(finalJobs, uJob, troveSourceCallback)
         return finalJobs
 
     def getUpdateItemList(self):

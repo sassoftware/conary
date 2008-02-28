@@ -234,11 +234,11 @@ class _Source(_AnySource):
             toFetch = self.rpm
         else:
             toFetch = self.sourcename
-            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                                  toFetch, self.recipe.name,
-                                  self.recipe.srcdirs, localOnly=True,
-                                  allowNone=True)
-            return f
+        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                              toFetch, self.recipe.name,
+                              self.recipe.srcdirs, localOnly=True,
+                              allowNone=True)
+        return f
 
     def getPath(self):
         if self.rpm:
@@ -1462,16 +1462,12 @@ class addCvsSnapshot(_RevisionControl):
         return s
 
     def createArchive(self, lookasideDir):
-        os.mkdir(lookasideDir)
-        log.info('Checking out project %s from %s', self.project, self.root)
-        # don't use cvs co -d <dir> as it is fragile
-        util.mkdirChain(lookasideDir)
-        util.execute('cd %s && cvs -Q -d \'%s\' checkout \'%s\'' %
-                  (lookasideDir, self.root, self.project))
+        # cvs export always downloads from the repository, no need to cache
+        return
 
     def updateArchive(self, lookasideDir):
-        log.info('Updating repository %s', self.project)
-        util.execute("cd '%s' && cvs -Q -d '%s' update" % (lookasideDir, self.root))
+        # cvs export always downloads from the repository, no need to cache
+        return
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.project,
@@ -1479,7 +1475,6 @@ class addCvsSnapshot(_RevisionControl):
         tmpPath = tempfile.mkdtemp()
         dirName = self.project + '--' + self.tag
         stagePath = tmpPath + os.path.sep + dirName
-        os.mkdir(stagePath)
         # don't use cvs export -d <dir> as it is fragile
         util.mkdirChain(stagePath)
         util.execute("cd %s && cvs -Q -d '%s' export -r '%s' '%s' && cd '%s/%s' && "
@@ -1697,6 +1692,17 @@ class TroveScript(_AnySource):
                 raise RecipeFileError('file "%s" not found for group script' %
                                       self.sourcename)
             self.contents = open(f).read()
+
+    def fetchLocal(self):
+        # Used by rMake to find files that are not autosourced.
+        if self.contents is None:
+            toFetch = self.sourcename
+            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                                  toFetch, self.recipe.name,
+                                  self.recipe.srcdirs, localOnly=True,
+                                  allowNone=True)
+            return f
+
 
     def getPath(self):
         return self.sourcename

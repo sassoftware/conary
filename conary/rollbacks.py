@@ -167,7 +167,8 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
     log.syslog.command()
 
     defaults = dict(replaceFiles = False,
-                    transactionCounter = transactionCounter)
+                    transactionCounter = transactionCounter,
+                    lazyCache = client.lzCache)
     defaults.update(kwargs)
 
     rollbackStack = client.db.getRollbackStack()

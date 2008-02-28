@@ -3067,6 +3067,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def checkVersion(self, authToken, clientVersion):
+        """
+        Check the repository's protocol version to see that it's compatible with 
+        the client
+
+        @raises errors.InvalidClientVersion: raised if the client is either too
+                                             old or too new.
+        @raises errors.InsufficientPermission: raised if the authToken is 
+                                               invalid
+        """
         if clientVersion > 50:
             raise errors.InvalidClientVersion(
                     'checkVersion call only supports protocol versions 50 '

@@ -524,6 +524,7 @@ def _updateTroves(cfg, applyList, **kwargs):
         print ('Migrate must be run with --interactive'
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
+        client.close()
         return
 
     updJob = client.newUpdateJob()
@@ -548,6 +549,8 @@ def _updateTroves(cfg, applyList, **kwargs):
                 print 'NOTE: after critical updates were applied, the contents of the update were recalculated:'
                 print
                 displayChangedJobs(addedJobs, removedJobs, cfg)
+        updJob.close()
+        client.close()
         return
 
     if suggMap:
@@ -594,12 +597,18 @@ def _updateTroves(cfg, applyList, **kwargs):
             default = True
         okay = cmdline.askYn('continue with %s? %s' % values, default=default)
         if not okay:
+            updJob.close()
+            client.close()
             return
 
     if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
 
-    restartDir = client.applyUpdateJob(updJob, **applyKwargs)
+    try:
+        restartDir = client.applyUpdateJob(updJob, **applyKwargs)
+    finally:
+        updJob.close()
+        client.close()
 
     if restartDir:
         params = sys.argv

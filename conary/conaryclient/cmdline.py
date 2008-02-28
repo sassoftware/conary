@@ -23,6 +23,21 @@ from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
 def parseTroveSpec(specStr, allowEmptyName = True):
+    """
+    Parse a TroveSpec string
+
+    @param specStr: the input string
+    @type specStr: string
+
+    @param allowEmptyName: if set, will accept an empty string and some other 
+    variations.
+    @type allowEmptyName: bool 
+
+    @rtype: list
+    @return: (name, version, flavor)
+
+    @raise TroveSpecError: Raised if the input string is not a valid TroveSpec
+    """
     origSpecStr = specStr
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
@@ -109,6 +124,33 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     Takes input specifying changeSpecs, such as C{foo=1.1--1.2},
     and turns it into C{(name, (oldVersionSpec, oldFlavorSpec),
     (newVersionSpec, newFlavorSpec), isAbsolute)} tuples.
+
+    @note:
+        If a filename is passed as a changeSpec, and the file does not contain
+    a valid conary changeset, a sys.exit() will be called.
+    
+    @param changeSpecList: a changeSpec, such as C{foo=1.1--1.2}
+    @type changeSpecList: string
+
+    @param keepExisting: specifies whether an installed trove should be
+    kept in addition to an updated version.
+    @type keepExisting: bool
+    
+    @param updateByDefault:
+    @type updateByDefault: bool
+   
+    @param allowChangeSets: specifies whether file-based changesets are
+    allowed.
+    @type allowChangeSets: bool
+
+    @raise TroveSpecError: Raised if an invalid TroveSpec is passed within the
+    ChangeSpec list.
+
+    @rtype: list
+    @return: a list of changes to apply, of the form
+    (name, (oldVersion, oldFlavor), (newVersion, newFlavor), replaceExisting)
+    where either the old or new version/flavor (but not both) may be 
+    (None, None)
     """
     applyList = []
 
@@ -171,6 +213,22 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     return finalList
 
 def toTroveSpec(name, versionStr, flavor):
+    """
+    Construct a TroveSpec string from name + version + flavor
+
+    @param name: trove name
+    @type name: string
+
+    @param versionStr: trove version string
+    @type versionStr: string
+
+    @param flavor: trove flavor
+    @type flavor: L{deps.deps.Flavor}
+
+    @rtype: string
+    @return: a TroveSpec of the form name=version[flavor]
+    """
+
     disp = [name]
     if versionStr:
         disp.extend(('=', versionStr))
