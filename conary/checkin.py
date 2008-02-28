@@ -318,15 +318,20 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     # turn off loadInstalled for committing - it ties you too closely
     # to actually being able to build what you are developing locally - often
     # not the case.
-    if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
-        log.error("recipe not in CONARY state file, please run cvc add")
-        return
+    if state.getSourceType() is None or state.getSourceType() == 'factory':
+        if not [ x[1] for x in state.iterFileList()
+                                        if x[1].endswith('.recipe') ]:
+            log.error("recipe not in CONARY state file, please run cvc add")
+            return
+
+    allPaths = [ x[1] for x in state.iterFileList() ]
 
     try:
         use.allowUnknownFlags(True)
         recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
                                                 branch = state.getBranch(),
-                                                ignoreInstalled = True)
+                                                ignoreInstalled = True,
+                                                sourceFiles = allPaths)
     finally:
         use.allowUnknownFlags(False)
 
@@ -343,7 +348,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
             recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
         lcache = lookaside.RepositoryCache(repos)
-        srcdirs = [ os.path.dirname(recipeClass.filename),
+        srcdirs = [ cwd,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
