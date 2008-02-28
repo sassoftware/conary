@@ -388,13 +388,94 @@ class RecipeLoader:
         except:
             pass
 
-class RecipeLoaderFromSourceComponent(RecipeLoader):
+class RecipeLoaderFromSourceTrove(RecipeLoader):
+
+    def __init__(self, sourceTrove, repos, cfg, versionStr=None, labelPath=None,
+                 ignoreInstalled=False, filterVersions=False,
+                 parentDir=None, defaultToLatest = False,
+                 buildFlavor = None, db = None, overrides = None,
+                 getFileFunction = None):
+
+        if getFileFunction is None:
+            getFileFunction = lambda repos, fileId, fileVersion, filePath: \
+                    repos.getFileContents([ (fileId, fileVersion) ])[0].get()
+
+        name = sourceTrove.getName().split(':')[0]
+
+        if (sourceTrove.getSourceType() and
+                    sourceTrove.getSourceType() != 'factory'):
+            loader = RecipeLoaderFromRepository(
+                                    sourceTrove.getSourceType(), cfg, repos,
+                                    versionStr=versionStr, labelPath=labelPath,
+                                    ignoreInstalled=ignoreInstalled,
+                                    filterVersions=filterVersions,
+                                    parentDir=parentDir,
+                                    defaultToLatest = defaultToLatest,
+                                    buildFlavor = buildFlavor,
+                                    db = db, overrides = overrides)
+            # XXX name + '.recipe' sucks, but there isn't a filename that
+            # actually exists
+            self.recipe = self.recipeFromFactory(sourceTrove,
+                                                 loader.getRecipe(),
+                                                 name, name + '.recipe')
+
+            self.recipes = loader.recipes
+            self.recipes[self.recipe.name] = self.recipe
+        else:
+            (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
+                                                dir=cfg.tmpDir)
+            outF = os.fdopen(fd, "w")
+
+            inF = None
+            filename = name + '.recipe'
+            for (pathId, filePath, fileId, fileVersion) in sourceTrove.iterFileList():
+                if filePath == filename:
+                    inF = getFileFunction(repos, fileId, fileVersion, filePath)
+                    break
+            
+            if not inF:
+                raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
+                          (sourceTrove.getName(),
+                           sourceTrove.getVersion().asString(),
+                           filename))
+
+            util.copyfileobj(inF, outF)
+
+            del inF
+            outF.close()
+            del outF
+
+            try:
+                RecipeLoader.__init__(self, recipeFile, cfg, repos,
+                          sourceTrove.getName(),
+                          sourceTrove.getVersion().branch(),
+                          ignoreInstalled=ignoreInstalled,
+                          directory=parentDir, buildFlavor=buildFlavor,
+                          db=db, overrides=overrides,
+                          factory = (sourceTrove.getSourceType() == 'factory'))
+            finally:
+                os.unlink(recipeFile)
+
+        self.recipe._trove = sourceTrove.copy()
+
+    def recipeFromFactory(self, sourceTrv, factoryClass, pkgname,
+                          recipeFileName):
+        files = [ x[1] for x in sourceTrv.iterFileList() ]
+        factory = factoryClass(pkgname, sourceFiles = files)
+        recipe = factory.getRecipeClass()
+        # this validates the class is well-formed as a recipe
+        self._findRecipeClass(pkgname, recipeFileName, { recipe.name : recipe })
+        return recipe
+
+    def getSourceComponentVersion(self):
+        return self.recipe._trove.getVersion()
+
+class RecipeLoaderFromRepository(RecipeLoaderFromSourceTrove):
 
     def __init__(self, name, cfg, repos, versionStr=None, labelPath=None,
                  ignoreInstalled=False, filterVersions=False,
                  parentDir=None, defaultToLatest = False,
-                 buildFlavor = None, db = None, overrides = None,
-                 factory = False):
+                 buildFlavor = None, db = None, overrides = None):
         # FIXME parentDir specifies the directory to look for 
         # local copies of recipes called with loadRecipe.  If 
         # empty, we'll look in the tmp directory where we create the recipe
@@ -440,60 +521,11 @@ class RecipeLoaderFromSourceComponent(RecipeLoader):
 
         sourceComponent = repos.getTrove(*pkgs[0])
 
-        if sourceComponent.getSourceType():
-            loader = RecipeLoaderFromSourceComponent(
-                                    sourceComponent.getSourceType(), cfg, repos,
-                                    versionStr=versionStr, labelPath=labelPath,
-                                    ignoreInstalled=ignoreInstalled,
-                                    filterVersions=filterVersions,
-                                    parentDir=parentDir,
-                                    defaultToLatest = defaultToLatest,
-                                    buildFlavor = buildFlavor,
-                                    db = db, overrides = overrides,
-                                    factory = True)
-            factoryClass = loader.getRecipe()
-            factory = factoryClass()
-            self.recipe = factory.getRecipeClass()
-
-            self.recipes = loader.recipes
-            self.recipes[self.recipe.name] = self.recipe
-        else:
-            (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
-                                                dir=cfg.tmpDir)
-            outF = os.fdopen(fd, "w")
-
-            inF = None
-            filename = name + '.recipe'
-            for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
-                if filePath == filename:
-                    inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
-                    break
-            
-            if not inF:
-                raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
-                          (sourceComponent.getName(), 
-                           sourceComponent.getVersion().asString(),
-                           filename))
-
-            util.copyfileobj(inF, outF)
-
-            del inF
-            outF.close()
-            del outF
-
-            try:
-                RecipeLoader.__init__(self, recipeFile, cfg, repos, component,
-                                      sourceComponent.getVersion().branch(),
-                                      ignoreInstalled=ignoreInstalled,
-                                      directory=parentDir, buildFlavor=buildFlavor,
-                                      db=db, overrides=overrides, factory=factory)
-            finally:
-                os.unlink(recipeFile)
-
-        self.recipe._trove = sourceComponent.copy()
-
-    def getSourceComponentVersion(self):
-        return self.recipe._trove.getVersion()
+        RecipeLoaderFromSourceTrove.__init__(self, sourceComponent, repos, cfg,
+                 versionStr=versionStr, labelPath=labelPath,
+                 ignoreInstalled=ignoreInstalled, filterVersions=filterVersions,
+                 parentDir=parentDir, defaultToLatest = defaultToLatest,
+                 buildFlavor = buildFlavor, db = db, overrides = overrides)
 
 def _scoreLoadRecipeChoice(labelPath, version):
     # FIXME I'm quite sure this heuristic will get replaced with
@@ -553,14 +585,14 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     defaultToLatest = False,
                                     buildFlavor = None,
                                     db = None, overrides = None):
-    l = RecipeLoaderFromSourceComponent(name, cfg, repos, versionStr=versionStr,
-                                        labelPath=labelPath,
-                                        ignoreInstalled=ignoreInstalled,
-                                        filterVersions=filterVersions,
-                                        parentDir=parentDir,
-                                        defaultToLatest=defaultToLatest,
-                                        buildFlavor=buildFlavor, db=db,
-                                        overrides=overrides)
+    l = RecipeLoaderFromRepository(name, cfg, repos, versionStr=versionStr,
+                                   labelPath=labelPath,
+                                   ignoreInstalled=ignoreInstalled,
+                                   filterVersions=filterVersions,
+                                   parentDir=parentDir,
+                                   defaultToLatest=defaultToLatest,
+                                   buildFlavor=buildFlavor, db=db,
+                                   overrides=overrides)
     return l, l.getSourceComponentVersion()
 
 def loadSuperClass(troveSpec, label=None):
@@ -891,26 +923,17 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
 
 def getRecipeClass(trv, branch = None, cfg = None, repos = None,
                    ignoreInstalled = None, buildFlavor = None, db = None,
-                   overrides = None, directory = None):
-    if trv.getSourceType():
-        # create the recipe through a factory
-        loader = recipeLoaderFromSourceComponent(trv.getSourceType(), cfg,
-                                        repos, versionStr=str(branch),
-                                        ignoreInstalled=ignoreInstalled,
-                                        parentDir=directory,
-                                        buildFlavor = buildFlavor,
-                                        db = db, overrides = overrides,
-                                        factory = True)
-        factoryClass = loader.getRecipe()
-        factory = factoryClass()
-        recipe = factory.getRecipeClass()
-    else:
-        # load the recipe directly
-        loader = RecipeLoader(trv.getRecipeFileName(), cfg=cfg, repos=repos,
-                              branch=branch, ignoreInstalled = ignoreInstalled,
-                              component = trv.getName(),
-                              buildFlavor = buildFlavor, db = db,
-                              overrides = overrides, directory = directory)
-        recipe = loader.getRecipe()
+                   overrides = None, directory = None,
+                   sourceFiles = None):
+    def getFile(repos, fileId, fileVersion, filePath):
+        return open(filePath)
 
-    return recipe
+    loader = RecipeLoaderFromSourceTrove(trv,
+                                    repos, cfg, versionStr=str(branch),
+                                    ignoreInstalled=ignoreInstalled,
+                                    parentDir=directory,
+                                    buildFlavor = buildFlavor,
+                                    db = db, overrides = overrides,
+                                    getFileFunction = getFile)
+
+    return loader.getRecipe()
