@@ -84,16 +84,23 @@ def main(argv):
 
     if repairMissingFiles:
         pathCounter = countDict()
-        pathMap = {}
-        cu.execute('SELECT pathId, path, versionId, stream '
-                   'FROM DBTroveFiles where isPresent=0')
-        for pathId, path, versionId, stream in cu:
+        pathMissingSet = set()
+        cu.execute('SELECT path, isPresent FROM DBTroveFiles')
+        for path, isPresent in cu:
             pathCounter.add(path)
-            pathMap.setdefault(path, (pathId, versionId, stream))
-        missingPaths = set(x for x in pathCounter.iterkeys()
-                           if pathCounter[x] == 1)
+            if not isPresent:
+                pathMissingSet.add(path)
+        missingPaths = set(x for x in pathMissingSet if pathCounter[x] == 1)
+        pathCounter = None
+        pathMissingSet = None
 
         if missingPaths:
+            pathMap = {}
+            cu.execute('SELECT pathId, path, versionId, stream '
+                       'FROM DBTroveFiles where isPresent=0')
+            for pathId, path, versionId, stream in cu:
+                pathMap.setdefault(path, (pathId, versionId, stream))
+
             neededFileData = []
             neededFiles = []
             neededPaths = []
