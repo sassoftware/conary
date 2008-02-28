@@ -1,0 +1,150 @@
+#!/usr/bin/env python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2005-2008 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+"""
+If the --repair-missing-files flag is given, files marked as not present
+but without path conflicts will be marked as present, and contents made
+to match what is in the repository only if those files are regular files,
+symbolic links, or transient files.  This is useful mainly for fixing
+systems with errors caused by CNY-2553.
+If the --repair-path=path option is provided, the file specified by path
+will be updated to the repository contents, regardless of type.
+FIXME: --repair-path not yet implemented
+"""
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg, deps, files
+from conary.repository import datastore
+from conary.lib import options, sha1helper, util
+from conary import conaryclient
+from conary import sqlite3
+from conary.local import database
+
+def usage():
+    print 'usage: %s [--root rootpath] [--repair-missing-files] [--repair-path=path]+' %sys.argv[0]
+
+class countDict(dict):
+    def add(self, key):
+        if key in self:
+            self[key] = self[key] + 1
+        else:
+            self[key] = 1
+
+def main(argv):
+    sys.excepthook = util.genExcepthook()
+    client = conaryclient.getClient()
+    repos = client.getRepos()
+    cfg = client.cfg
+
+    argDef = {}
+    argDef['repair-missing-files'] = options.NO_PARAM
+    argDef['repair-path'] = options.MULT_PARAM
+
+    cfgMap = {'root': 'root'}
+    try:
+        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+                                                argv=argv)
+    except options.OptionError, s:
+        print s
+        sys.exit(1)
+    
+    repairMissingFiles = argSet.has_key('repair-missing-files')
+    repairPathList = []
+    if argSet.has_key('repair-path'):
+        repairPathList = argSet['repair-path']
+
+    dbPath = os.sep.join((cfg.root, cfg.dbPath, 'conarydb'))
+    db = database.Database(cfg.root, cfg.dbPath)
+    cu = db.db.db.cursor()
+
+    if repairMissingFiles:
+        pathCounter = countDict()
+        pathMap = {}
+        cu.execute('SELECT pathId, path, versionId, stream '
+                   'FROM DBTroveFiles where isPresent=0')
+        for pathId, path, versionId, stream in cu:
+            pathCounter.add(path)
+            pathMap.setdefault(path, (pathId, versionId, stream))
+        missingPaths = set(x for x in pathCounter.iterkeys()
+                           if pathCounter[x] == 1)
+
+        if missingPaths:
+            neededFileData = []
+            neededFiles = []
+            neededPaths = []
+            for path in missingPaths:
+                pathId, versionId, stream = pathMap[path]
+                f = files.ThawFile(stream, pathId)
+                if (isinstance(f, files.RegularFile) and not
+                    (f.flags.isConfig() or f.flags.isInitialContents())):
+                    troveSha1 = f.contents.sha1()
+                    try:
+                        systemSha1 = sha1helper.sha1FileBin(os.path.join(
+                            cfg.root, path))
+                        if troveSha1 == systemSha1:
+                            # no need to update this file
+                            continue
+                    except:
+                        pass
+                    fileVersion = db.db.versionTable.getBareId(versionId)
+                    if fileVersion.isOnLocalHost():
+                        print 'cannot restore locally-cooked file %s\n' % path
+                        continue
+                    neededFileData.append((f.fileId(), fileVersion))
+                    neededFiles.append(f)
+                    neededPaths.append(path)
+                elif isinstance(f, files.SymbolicLink):
+                    fullpath = os.path.join(cfg.root, path)
+                    c = os.readlink(fullpath)
+                    if c != f.target():
+                        print 'symlink %s contains %s changing to %s' %(
+                            path, c, f.target())
+                        os.remove(fullpath)
+                        os.symlink(f.target(), fullpath)
+                else:
+                    print 'not attempting to restore special file %s\n' % path
+            
+            if neededFiles:
+                # FIXME: add a journal?
+                contents = repos.getFileContents(neededFileData)
+                for fileObj, f, path in zip(contents, neededFiles, neededPaths):
+                    print 'fixing ', path
+                    f.restore(fileObj, cfg.root, path)
+
+            for path in missingPaths:
+                cu.execute('update DBTroveFiles set isPresent=1'
+                           ' where path=?', path)
+            db.commit()
+
+
+    if repairPathList:
+        print 'ERROR: --repair-path not yet implemented'
+        return 1
+                
+if __name__ == '__main__':
+    main(sys.argv)
