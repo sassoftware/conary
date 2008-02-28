@@ -873,6 +873,8 @@ class ExtendedFile(ExtendedFdopen):
     __slots__ = [ 'fObj', 'name' ]
 
     def close(self):
+        if not self.fObj:
+            return
         self.fObj.close()
         self.fd = None
         self.fObj = None
