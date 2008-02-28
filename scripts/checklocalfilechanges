@@ -18,7 +18,8 @@
 Intended to be a fast, cheap subset of conary verify --all that
 checks some files that it can do easily and quickly.
 The output format is NOT fixed, and is likely to change from
-time to time.
+time to time.  transient file contents are ignored unless
+the --transient-contents argument is provided.
 """
 
 import os
@@ -40,7 +41,7 @@ from conary import conaryclient
 from conary.local import database
 
 def usage():
-    print 'usage: %s [--root rootpath]' %sys.argv[0]
+    print 'usage: %s [--root rootpath] [--transient-contents]' %sys.argv[0]
 
 def main(argv):
     sys.excepthook = util.genExcepthook()
@@ -49,6 +50,7 @@ def main(argv):
     cfg = client.cfg
 
     argDef = {}
+    argDef['transient-contents'] = options.NO_PARAM
 
     cfgMap = {'root': 'root'}
     try:
@@ -57,6 +59,8 @@ def main(argv):
     except options.OptionError, s:
         print s
         sys.exit(1)
+
+    transientContents = argSet.has_key('transient-contents')
     
     dbPath = os.sep.join((cfg.root, cfg.dbPath, 'conarydb'))
     db = database.Database(cfg.root, cfg.dbPath)
@@ -80,7 +84,10 @@ def main(argv):
                 if not (f.flags.isConfig() or f.flags.isInitialContents()):
                     filetype = 'regular'
                     if f.flags.isTransient():
-                        filetype = 'transient'
+                        if transientContents:
+                            filetype = 'transient'
+                        else:
+                            continue
                     try:
                         troveSha1 = f.contents.sha1()
                         if s.st_size == f.contents.size():
