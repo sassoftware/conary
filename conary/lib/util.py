@@ -838,6 +838,16 @@ class ExtendedFdopen(object):
                 self.fd = None
 
     def read(self, bytes = -1):
+        # -1 is not a valid argument for os.read(); we have to
+        # implement "read all data available" ourselves
+        if bytes == -1:
+            bufSize = 8 * 1024
+            l = []
+            while 1:
+                s = os.read(self.fd, bufSize)
+                if not s:
+                    return ''.join(l)
+                l.append(s)
         return os.read(self.fd, bytes)
 
     def truncate(self, offset=0):
