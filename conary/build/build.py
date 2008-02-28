@@ -662,10 +662,10 @@ class CMake(Configure):
             if not self.recipe.isatty():
                 # When conary is being scripted, logs might be
                 # redirected to a file, and it might be easier to
-                # see config.log output in that logfile than by
+                # see CMakeCache.txt output in that logfile than by
                 # inspecting the build directory
                 # Each file line will have the filename prepended
-                # The "|| :" makes it OK if there is no config.log
+                # The "|| :" makes it OK if there is no CMakeCache.txt
                 util.execute('cd %(actionDir)s; %(cdObjdir)s'
                              'find . -name CMakeCache.txt | xargs grep -H . || :'
                              %macros)
