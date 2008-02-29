@@ -3884,3 +3884,55 @@ class reportErrors(policy.Policy, policy.GroupPolicy):
             msg = self.groupError and 'Group' or 'Package'
             raise policy.PolicyError, ('%s Policy errors found:\n%%s' % msg) \
                     % "\n".join(self.errors)
+
+class _TroveScript(policy.PackagePolicy):
+    processUnmodified = False
+    keywords = { 'contents' : None }
+
+    _troveScriptName = None
+
+    def __init__(self, *args, **keywords):
+        policy.PackagePolicy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+        if args:
+            troveNames = args
+        else:
+            troveNames = [ self.recipe.name ]
+        self.troveNames = troveNames
+        policy.PackagePolicy.updateArgs(self, **keywords)
+
+    def do(self):
+        if not self.contents:
+            return
+
+        # Build component map
+        availTroveNames = dict((x.name, None) for x in
+                                self.recipe.autopkg.getComponents())
+        availTroveNames.update(self.recipe.packages)
+        troveNames = set(self.troveNames) & set(availTroveNames)
+
+        # We don't support compatibility classes for troves (yet)
+        self.recipe._addTroveScript(troveNames, self.contents,
+            self._troveScriptName, None)
+
+class ScriptPreUpdate(_TroveScript):
+    _troveScriptName = 'preUpdate'
+
+class ScriptPostUpdate(_TroveScript):
+    _troveScriptName = 'postUpdate'
+
+class ScriptPreInstall(_TroveScript):
+    _troveScriptName = 'preInstall'
+
+class ScriptPostInstall(_TroveScript):
+    _troveScriptName = 'postInstall'
+
+class ScriptPreErase(_TroveScript):
+    _troveScriptName = 'preErase'
+
+class ScriptPostErase(_TroveScript):
+    _troveScriptName = 'postErase'
+
+class ScriptPostRollback(_TroveScript):
+    _troveScriptName = 'postRollback'
