@@ -1190,6 +1190,17 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
     return bldList, recipeObj, builddir, destdir, policyTroves
 
+def _copyScripts(trv, scriptsMap):
+    trvName = trv.getName()
+    trvScripts = scriptsMap.get(trvName, None)
+    if not trvScripts:
+        return
+    # Copy scripts
+    for scriptType, (scriptContents, compatClass) in trvScripts.items():
+        if not scriptContents:
+            continue
+        getattr(trv.troveInfo.scripts, scriptType).script.set(scriptContents)
+
 def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                             targetLabel=None, alwaysBumpCount=False,
                             policyTroves=None, signatureKey = None):
@@ -1237,6 +1248,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
+            _copyScripts(grpMap[main], recipeObj._scriptsMap)
 
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')
@@ -1267,6 +1279,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         # Add build flavor
         p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
+        _copyScripts(p, recipeObj._scriptsMap)
 
         _signTrove(p, signatureKey)
 

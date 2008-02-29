@@ -274,10 +274,13 @@ class GroupRecipe(_BaseGroupRecipe):
         self.replaceSpecs = []
         self.resolveTroveSpecs = []
 
-        self.preUpdateScripts = {}
+        self.postEraseScripts = {}
         self.postInstallScripts = {}
         self.postRollbackScripts = {}
         self.postUpdateScripts = {}
+        self.preEraseScripts = {}
+        self.preInstallScripts = {}
+        self.preUpdateScripts = {}
 
         baseMacros = loadMacros(cfg.defaultMacros)
         self.macros.update(baseMacros)
@@ -1593,10 +1596,13 @@ class SingleGroup(object):
         self.childTroves = {}
         self.size = None
 
+        self.preInstallScripts = None
         self.postInstallScripts = None
-        self.postRollbackScripts = None
-        self.postUpdateScripts = None
         self.preUpdateScripts = None
+        self.postUpdateScripts = None
+        self.preEraseScripts = None
+        self.postEraseScripts = None
+        self.postRollbackScripts = None
 
     def __repr__(self):
         return "<%s '%s'>" % (self.__class__.__name__, self.name)
@@ -2423,8 +2429,9 @@ def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
             parentGroup.setCompatibilityClass(trv.getCompatibilityClass())
 
         if flags.copyScripts:
-            for script in ('postInstall', 'preUpdate', 'postUpdate',
-                           'postRollback'):
+            scriptTypes = sorted(x[2] for x in
+                                    trove.TroveScripts.streamDict.values())
+            for script in scriptTypes:
                 contents = getattr(trv.troveInfo.scripts, script).script()
                 if not contents: continue
 
