@@ -414,7 +414,8 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                     versionStr = sourceTrove.getVersion().branch()
 
             loader = RecipeLoaderFromRepository(
-                                    sourceTrove.getSourceType(), cfg, repos,
+                                    'factory-' + sourceTrove.getSourceType(),
+                                    cfg, repos,
                                     versionStr=versionStr, labelPath=labelPath,
                                     ignoreInstalled=ignoreInstalled,
                                     filterVersions=filterVersions,

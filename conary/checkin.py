@@ -1705,6 +1705,13 @@ def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
         raise errors.CvcError('%s is not a valid package name', name)
     component = "%s:source" % name
 
+    if sourceType == 'factory' and not name.startswith('factory-'):
+        raise errors.CvcError('The name of factory troves must begin with '
+                              '"factory-"')
+    elif sourceType != 'factory' and name.startswith('factory-'):
+        raise errors.CvcError('Only factory troves may use "factory-" in '
+                              'their name')
+
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
     if not buildBranch:
