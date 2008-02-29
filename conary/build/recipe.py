@@ -33,6 +33,7 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
+RECIPE_TYPE_FACTORY   = 6
 
 class _policyUpdater:
     def __init__(self, theobject):
@@ -57,6 +58,9 @@ def isInfoRecipe(recipeClass):
 
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
+
+def isFactoryRecipe(recipeClass):
+    return recipeClass.getType() == RECIPE_TYPE_FACTORY
 
 def loadMacros(paths):
     '''

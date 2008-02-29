@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1748,7 +1748,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.allowUnknownFlags(allowUnknownFlags)
     recipeClassDict = {}
-    loaders = []
     for flavor in flavorList:
         use.clearLocalFlags()
         if flavor is not None:
@@ -1801,7 +1800,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 raise CookError(str(msg))
 
             recipeClass = loader.getRecipe()
-        loaders.append(loader)
+
         recipeClassDict.setdefault(sourceVersion, []).append(recipeClass)
 
         if showBuildReqs:

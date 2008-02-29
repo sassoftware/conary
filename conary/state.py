@@ -149,6 +149,7 @@ class SourceState(trove.Trove):
         version <version>
         branch <branch>
         (lastmerged <version>)?
+        (sourceType <version>)?
 	<file count>
 	PATHID1 PATH1 FILEID1 ISCONFIG1 REFRESH1 VERSION1
 	PATHID2 PATH2 FILEID2 ISCONFIG2 REFRESH2 VERSION2
@@ -165,6 +166,8 @@ class SourceState(trove.Trove):
         f.write("branch %s\n" % self.getBranch().freeze())
         if self.getLastMerged() is not None:
             f.write("lastmerged %s\n" % self.getLastMerged().freeze())
+        if self.getSourceType():
+            f.write("sourceType %s\n" % self.getSourceType())
 
         rc = []
         rc.append("%d\n" % (len(self.idMap)))
@@ -248,8 +251,13 @@ class SourceState(trove.Trove):
         assert(not changeLog)
         assert(troveType == trove.TROVE_TYPE_NORMAL)
 
+        sourceType = kw.pop('sourceType', None)
+
 	trove.Trove.__init__(self, name, version, deps.Flavor(),
                              None, **kw)
+        if sourceType:
+            self.setSourceType(sourceType)
+
         self.branch = branch
         self.pathMap = {}
         self.lastMerged = lastmerged
@@ -307,9 +315,10 @@ class SourceStateFromLines(SourceState):
 
     # name : (isVersion, required)
     fields = { 'name'       : (False, True ),
-               'version'    : (True,  True ),
                'branch'     : (True,  True ),
-               'lastmerged' : (True,  False) }
+               'lastmerged' : (True,  False),
+               'sourceType' : (False, False),
+               'version'    : (True,  True ) }
 
     def _readFileList(self, lines, stateVersion, repos):
 	fileCount = int(lines[0][:-1])
