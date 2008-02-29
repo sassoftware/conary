@@ -258,8 +258,20 @@ class UpdateJob:
         return drep
 
     def _loadFrozenRepr(self, jobfile):
+        # CNY-2580: putting null chars in an XML dump was a bad idea
+        tmpfd, tmpfile = util.tempfile.mkstemp()
+        os.unlink(tmpfile)
+        jobf = os.fdopen(tmpfd, "w")
+        # replace null chars with None
+        oldjobf = open(jobfile)
+        while 1:
+            buf = oldjobf.read(4096)
+            if not buf:
+                break
+            jobf.write(buf.replace('\0', 'None'))
+        jobf.seek(0, 0)
         try:
-            ((drep, ), _) = util.xmlrpcLoad(open(jobfile))
+            ((drep, ), _) = util.xmlrpcLoad(jobf)
         except util.xmlrpclib.ResponseError:
             raise DecodingError("Error loading marshaled data")
 
@@ -457,7 +469,7 @@ class UpdateJob:
             ver = [ver.__class__.__name__, ver.asString()]
         flv = tup[1]
         if flv is None:
-            flv = '\0'
+            flv = 'None'
         else:
             flv = str(flv)
         return (ver, flv)
@@ -473,7 +485,7 @@ class UpdateJob:
                 # This is not really something we know how to thaw.
                 ver = ver[1]
         flv = tup[1]
-        if flv == '\0':
+        if flv == 'None':
             flv = None
         else:
             flv = deps.ThawFlavor(flv)

@@ -41,6 +41,8 @@ Changes in @NEW@:
     * If Conary is running on kernels which, under certain circumstances,
       return EINVAL when calling poll(), the lazy file cache will only
       count the file descriptors it has open itself. (CNY-2571)
+    * Job invocation information is no longer using null characters,
+      which are not allowed in an XML document. (CNY-2580)
 
 Changes in 1.2.18:
   o Build Changes:
