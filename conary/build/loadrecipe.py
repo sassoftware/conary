@@ -413,9 +413,8 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                 else:
                     versionStr = sourceTrove.getVersion().branch()
 
-            loader = RecipeLoaderFromRepository(
-                                    'factory-' + sourceTrove.getSourceType(),
-                                    cfg, repos,
+            factoryName = 'factory-' + sourceTrove.getSourceType()
+            loader = RecipeLoaderFromRepository(factoryName, cfg, repos,
                                     versionStr=versionStr, labelPath=labelPath,
                                     ignoreInstalled=ignoreInstalled,
                                     filterVersions=filterVersions,
@@ -425,9 +424,16 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                                     db = db, overrides = overrides)
             # XXX name + '.recipe' sucks, but there isn't a filename that
             # actually exists
-            self.recipe = self.recipeFromFactory(sourceTrove,
-                                                 loader.getRecipe(),
+            factoryRecipe = loader.getRecipe()
+            self.recipe = self.recipeFromFactory(sourceTrove, factoryRecipe,
                                                  name, name + '.recipe')
+
+            self.recipe.addLoadedTroves(
+                            [ factoryRecipe._trove.getNameVersionFlavor() ])
+            self.recipe.addLoadedSpecs(
+                    { factoryName :
+                        (factoryRecipe._trove.getNameVersionFlavor(),
+                         factoryRecipe) } )
 
             self.recipes = loader.recipes
             self.recipes[self.recipe.name] = self.recipe
@@ -478,6 +484,10 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
         recipe = factory.getRecipeClass()
         # this validates the class is well-formed as a recipe
         self._findRecipeClass(pkgname, recipeFileName, { recipe.name : recipe })
+
+        recipe.addLoadedTroves(factoryClass._loadedTroves)
+        recipe.addLoadedSpecs(factoryClass._loadedSpecs)
+
         return recipe
 
     def getSourceComponentVersion(self):
