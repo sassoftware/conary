@@ -2002,7 +2002,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter)
-    srcdirs = [ os.path.dirname(recipeClass.filename),
+    srcdirs = [ os.getcwd(),
                 cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
     try:
