@@ -397,7 +397,7 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                  ignoreInstalled=False, filterVersions=False,
                  parentDir=None, defaultToLatest = False,
                  buildFlavor = None, db = None, overrides = None,
-                 getFileFunction = None):
+                 getFileFunction = None, branch = None):
 
         if getFileFunction is None:
             getFileFunction = lambda repos, fileId, fileVersion, filePath: \
@@ -407,6 +407,12 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
 
         if (sourceTrove.getSourceType() and
                     sourceTrove.getSourceType() != 'factory'):
+            if not versionStr:
+                if branch:
+                    versionStr = str(branch)
+                else:
+                    versionStr = sourceTrove.getVersion().branch()
+
             loader = RecipeLoaderFromRepository(
                                     sourceTrove.getSourceType(), cfg, repos,
                                     versionStr=versionStr, labelPath=labelPath,
@@ -448,10 +454,13 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
             outF.close()
             del outF
 
+            if branch is None:
+                branch = sourceTrove.getVersion().branch()
+
             try:
                 RecipeLoader.__init__(self, recipeFile, cfg, repos,
                           sourceTrove.getName(),
-                          sourceTrove.getVersion().branch(),
+                          branch = branch,
                           ignoreInstalled=ignoreInstalled,
                           directory=parentDir, buildFlavor=buildFlavor,
                           db=db, overrides=overrides,
@@ -937,6 +946,7 @@ def getRecipeClass(trv, branch = None, cfg = None, repos = None,
                                     parentDir=directory,
                                     buildFlavor = buildFlavor,
                                     db = db, overrides = overrides,
-                                    getFileFunction = getFile)
+                                    getFileFunction = getFile,
+                                    branch = branch)
 
     return loader.getRecipe()
