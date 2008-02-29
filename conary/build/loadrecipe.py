@@ -364,7 +364,7 @@ class RecipeLoader:
         self.recipe = obj
         # create a reference to this module inside of the recipe to prevent
         # the module from getting unloaded
-        obj.__module__ = self.module
+        obj.__moduleObj__ = self.module
 
         # inherit any tracked flags that we found while loading parent
         # classes.  Also inherit the list of recipes classes needed to load
