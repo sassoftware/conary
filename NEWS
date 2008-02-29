@@ -39,6 +39,7 @@ Changes in @NEW@:
       since cvs export will not use it anyway. (CNY-2568)
     * Macros from config files and from the command line are now
       available to group recipes. (CNY-2574)
+    * Implemented recipe factories (CNY-2549)
 
   o Bug Fixes:
     * Conary no longer loses ownership of changed files when updating

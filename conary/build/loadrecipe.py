@@ -181,12 +181,13 @@ class RecipeLoader:
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
                  buildFlavor=None, db=None, overrides = None,
-                 factory = False):
+                 factory = False, objDict = {}):
         try:
             self._load(filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
                        buildFlavor=buildFlavor, db=db,
-                       overrides=overrides, factory = factory)
+                       overrides=overrides, factory = factory,
+                       objDict = objDict)
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
@@ -266,7 +267,8 @@ class RecipeLoader:
 
     def _load(self, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
-              buildFlavor=None, db=None, overrides=None, factory=False):
+              buildFlavor=None, db=None, overrides=None, factory=False,
+              objDict = None):
         self.recipes = {}
 
         if filename[0] != "/":
@@ -300,7 +302,8 @@ class RecipeLoader:
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
         self.module.__dict__['overrides'] = overrides
-
+        if objDict:
+            self.module.__dict__.update(objDict)
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -393,14 +396,23 @@ class RecipeLoader:
 
 class RecipeLoaderFromSourceTrove(RecipeLoader):
 
+    @staticmethod
+    def findFileByPath(sourceTrove, path):
+        for (pathId, filePath, fileId, fileVersion) in sourceTrove.iterFileList():
+            if filePath == path:
+                return (fileId, fileVersion)
+
+        return None
+
     def __init__(self, sourceTrove, repos, cfg, versionStr=None, labelPath=None,
                  ignoreInstalled=False, filterVersions=False,
                  parentDir=None, defaultToLatest = False,
                  buildFlavor = None, db = None, overrides = None,
                  getFileFunction = None, branch = None):
+        self.recipes = {}
 
         if getFileFunction is None:
-            getFileFunction = lambda repos, fileId, fileVersion, filePath: \
+            getFileFunction = lambda repos, fileId, fileVersion, path: \
                     repos.getFileContents([ (fileId, fileVersion) ])[0].get()
 
         name = sourceTrove.getName().split(':')[0]
@@ -424,57 +436,67 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                                     db = db, overrides = overrides)
             # XXX name + '.recipe' sucks, but there isn't a filename that
             # actually exists
-            factoryRecipe = loader.getRecipe()
-            self.recipe = self.recipeFromFactory(sourceTrove, factoryRecipe,
-                                                 name, name + '.recipe')
+            factoryCreatedRecipe = self.recipeFromFactory(sourceTrove,
+                                                          loader.getRecipe(),
+                                                          name,
+                                                          name + '.recipe')
+            factoryCreatedRecipe._trove = sourceTrove.copy()
 
-            self.recipe.addLoadedTroves(factoryRecipe._loadedTroves)
-            self.recipe.addLoadedTroves(
-                            [ factoryRecipe._trove.getNameVersionFlavor() ])
-            self.recipe.addLoadedSpecs(
-                    { factoryName :
-                        (factoryRecipe._trove.getNameVersionFlavor(),
-                         factoryRecipe) } )
-
-            self.recipes = loader.recipes
-            self.recipes[self.recipe.name] = self.recipe
+            self.recipes.update(loader.recipes)
+            self.recipes[factoryCreatedRecipe.name] = factoryCreatedRecipe
         else:
-            (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
-                                                dir=cfg.tmpDir)
-            outF = os.fdopen(fd, "w")
+            factoryCreatedRecipe = None
 
-            inF = None
-            filename = name + '.recipe'
-            for (pathId, filePath, fileId, fileVersion) in sourceTrove.iterFileList():
-                if filePath == filename:
-                    inF = getFileFunction(repos, fileId, fileVersion, filePath)
-                    break
-            
-            if not inF:
-                raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
-                          (sourceTrove.getName(),
-                           sourceTrove.getVersion().asString(),
-                           filename))
+        recipePath = name + '.recipe'
+        match = self.findFileByPath(sourceTrove, recipePath)
 
-            util.copyfileobj(inF, outF)
+        if not match and factoryCreatedRecipe:
+            # this is a recipeless factory; use the recipe class created
+            # by the factory for this build
+            self.recipe = factoryCreatedRecipe
+            # this validates the class is well-formed as a recipe
+            self._findRecipeClass(name, name + '.recipe',
+                                  { self.recipe.name : self.recipe })
+            return
+        elif not match:
+            # this is just missing the recipe; we need it
+            raise builderrors.RecipeFileError("version %s of %s does not "
+                                              "contain %s" %
+                      (sourceTrove.getName(),
+                       sourceTrove.getVersion().asString(),
+                       filename))
 
-            del inF
-            outF.close()
-            del outF
+        (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
+                                            dir=cfg.tmpDir)
+        outF = os.fdopen(fd, "w")
 
-            if branch is None:
-                branch = sourceTrove.getVersion().branch()
+        inF = getFileFunction(repos, match[0], match[1], recipePath)
 
-            try:
-                RecipeLoader.__init__(self, recipeFile, cfg, repos,
-                          sourceTrove.getName(),
-                          branch = branch,
-                          ignoreInstalled=ignoreInstalled,
-                          directory=parentDir, buildFlavor=buildFlavor,
-                          db=db, overrides=overrides,
-                          factory = (sourceTrove.getSourceType() == 'factory'))
-            finally:
-                os.unlink(recipeFile)
+        util.copyfileobj(inF, outF)
+
+        del inF
+        outF.close()
+        del outF
+
+        if branch is None:
+            branch = sourceTrove.getVersion().branch()
+
+        if factoryCreatedRecipe:
+            objDict = { 'FactoryRecipeClass' : factoryCreatedRecipe }
+        else:
+            objDict = {}
+
+        try:
+            RecipeLoader.__init__(self, recipeFile, cfg, repos,
+                      sourceTrove.getName(),
+                      branch = branch,
+                      ignoreInstalled=ignoreInstalled,
+                      directory=parentDir, buildFlavor=buildFlavor,
+                      db=db, overrides=overrides,
+                      factory = (sourceTrove.getSourceType() == 'factory'),
+                      objDict = objDict)
+        finally:
+            os.unlink(recipeFile)
 
         self.recipe._trove = sourceTrove.copy()
 
@@ -483,11 +505,18 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
         files = [ x[1] for x in sourceTrv.iterFileList() ]
         factory = factoryClass(pkgname, sourceFiles = files)
         recipe = factory.getRecipeClass()
-        # this validates the class is well-formed as a recipe
-        self._findRecipeClass(pkgname, recipeFileName, { recipe.name : recipe })
 
         recipe.addLoadedTroves(factoryClass._loadedTroves)
         recipe.addLoadedSpecs(factoryClass._loadedSpecs)
+
+        recipe.addLoadedTroves(factoryClass._loadedTroves)
+        recipe.addLoadedTroves(
+                        [ factoryClass._trove.getNameVersionFlavor() ])
+        recipe.addLoadedSpecs(
+                        { factoryClass.name :
+                            (factoryClass._trove.getNameVersionFlavor(),
+                             factoryClass) } )
+
 
         return recipe
 
@@ -949,8 +978,8 @@ def getRecipeClass(trv, branch = None, cfg = None, repos = None,
                    ignoreInstalled = None, buildFlavor = None, db = None,
                    overrides = None, directory = None,
                    sourceFiles = None):
-    def getFile(repos, fileId, fileVersion, filePath):
-        return open(filePath)
+    def getFile(repos, fileId, fileVersion, path):
+        return open(path)
 
     loader = RecipeLoaderFromSourceTrove(trv,
                                     repos, cfg, versionStr=str(branch),
