@@ -428,6 +428,7 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
             self.recipe = self.recipeFromFactory(sourceTrove, factoryRecipe,
                                                  name, name + '.recipe')
 
+            self.recipe.addLoadedTroves(factoryRecipe._loadedTroves)
             self.recipe.addLoadedTroves(
                             [ factoryRecipe._trove.getNameVersionFlavor() ])
             self.recipe.addLoadedSpecs(
