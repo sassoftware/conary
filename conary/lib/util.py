@@ -62,7 +62,7 @@ def isregular(path):
     return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
 
 def mkdirChain(*paths):
-    _ignoredErrors = set([errno.ENOENT, errno.ENOTDIR, errno.EACCES])
+    _ignoredErrors = set((errno.ENOENT, errno.ENOTDIR, errno.EACCES))
     for path in paths:
         if path[0] != os.sep:
             path = os.getcwd() + os.sep + path
@@ -70,7 +70,7 @@ def mkdirChain(*paths):
 
         try:
             misc.mkdirIfMissing(normpath)
-            return
+            continue
         except OSError, exc:
             if exc.errno not in _ignoredErrors:
                 raise
