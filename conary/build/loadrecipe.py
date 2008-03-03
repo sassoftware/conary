@@ -194,7 +194,7 @@ class RecipeLoader:
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
-        for (name, obj) in objDict.iteritems():
+        for (name, obj) in objDict.items():
             if not inspect.isclass(obj):
                 continue
             # if a recipe has been marked to be ignored (for example, if
