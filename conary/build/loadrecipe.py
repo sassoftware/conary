@@ -439,7 +439,9 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
             factoryCreatedRecipe = self.recipeFromFactory(sourceTrove,
                                                           loader.getRecipe(),
                                                           name,
-                                                          name + '.recipe')
+                                                          name + '.recipe',
+                                                          repos,
+                                                          getFileFunction)
             factoryCreatedRecipe._trove = sourceTrove.copy()
 
             self.recipes.update(loader.recipes)
@@ -501,9 +503,23 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
         self.recipe._trove = sourceTrove.copy()
 
     def recipeFromFactory(self, sourceTrv, factoryClass, pkgname,
-                          recipeFileName):
+                          recipeFileName, repos, getFileFunction):
+        # (fileId, fileVersion) by path
+        pathDict = dict( (x[1], (x[2], x[3])) for x in
+                                                sourceTrv.iterFileList() )
+        def openSourceFile(path):
+            if path not in pathDict:
+                raise builderrors.LoadRecipeError(
+                        'Path %s not found in %s=%s', path,
+                        sourceTrv.getName(), sourceTrv.getVersion())
+
+            fileId, fileVersion = pathDict[path]
+
+            return getFileFunction(repos, fileId, fileVersion, path)
+
         files = [ x[1] for x in sourceTrv.iterFileList() ]
-        factory = factoryClass(pkgname, sourceFiles = files)
+        factory = factoryClass(pkgname, sourceFiles = files,
+                               openSourceFileFn = openSourceFile)
         recipe = factory.getRecipeClass()
 
         recipe.addLoadedTroves(factoryClass._loadedTroves)
@@ -516,7 +532,6 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                         { factoryClass.name :
                             (factoryClass._trove.getNameVersionFlavor(),
                              factoryClass) } )
-
 
         return recipe
 

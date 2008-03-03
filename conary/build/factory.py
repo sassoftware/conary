@@ -12,19 +12,25 @@
 # full details.
 #
 
-from conary.build import recipe
+from conary.build.recipe import RECIPE_TYPE_FACTORY
+from conary.build.errors import RecipeFileError
+
+class FactoryException(RecipeFileError):
+
+    pass
 
 class Factory:
 
     internalAbstractBaseClass = True
-    _recipeType = recipe.RECIPE_TYPE_FACTORY
+    _recipeType = RECIPE_TYPE_FACTORY
     _loadedTroves = []
     _loadedSpecs = {}
     _trackedFlags = None
 
-    def __init__(self, packageName, sourceFiles = []):
+    def __init__(self, packageName, sourceFiles = [], openSourceFileFn = None):
         self.packageName = packageName
         self.sources = sourceFiles
+        self._openSourceFileFn = openSourceFileFn
 
     @classmethod
     def getType(class_):
@@ -46,3 +52,6 @@ class Factory:
     def addLoadedSpecs(class_, newSpecs):
         class_._loadedSpecs = dict(class_._loadedSpecs)
         class_._loadedSpecs.update(newSpecs)
+
+    def openSourceFile(self, path):
+        return self._openSourceFileFn(path)
