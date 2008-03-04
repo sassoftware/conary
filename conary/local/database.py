@@ -737,6 +737,37 @@ class UpdateJob:
     def getCommitChangesetFlags(self):
         return self._commitFlags
 
+    def _getJobOrder(self):
+        # Return a map from job names to job rank in the list ordered by the
+        # dependency resolution
+        return dict((self._normalizeJob(x), i)
+                    for i, x in enumerate(itertools.chain(*self.jobs)))
+
+    def _normalizeJob(self, job):
+        if job[1][0] is None:
+            # Old version is None, make None the flavor too
+            return (job[0], (None, None), job[2], job[3])
+        if job[2][0] is None:
+            # New version is None, make None the flavor too
+            return (job[0], job[1], (None, None), job[3])
+        return job
+
+    def orderScriptListByBucket(self, scriptList, buckets):
+        jobOrderHash = self._getJobOrder()
+
+        # Sort scripts in some consistent manner
+        # sorted by job within each group
+        bucketLists = []
+        for bucketName in buckets:
+            al = [ x for x in scriptList if x[-1] == bucketName ]
+            al.sort(key = lambda x: jobOrderHash[self._normalizeJob(x[0])])
+            bucketLists.append(al)
+        return list(itertools.chain(*bucketLists))
+
+    def reorderPreScripts(self):
+        self._jobPreScripts = self.orderScriptListByBucket(self._jobPreScripts,
+                                [ 'preinstall', 'preupdate', 'preerase' ])
+
     def __init__(self, db, searchSource = None, lazyCache = None):
         # 20070714: lazyCache can be None for the users of the old API (when
         # an update job was instantiated directly, instead of using the
@@ -1508,6 +1539,7 @@ class Database(SqlDbRepository):
             return fsJob
 
         if not commitFlags.justDatabase:
+            fsJob.orderPostScripts(uJob)
             fsJob.runPostScripts(tagScript)
 
     def runPreScripts(self, uJob, callback, tagScript = None,
@@ -1524,6 +1556,8 @@ class Database(SqlDbRepository):
             al = [ x for x in uJob.iterJobPreScripts() if x[-1] == action ]
             al.sort()
             actionLists.append(al)
+
+        actionLists = [ uJob.iterJobPreScripts() ]
 
         for (job, script, oldCompatClass, newCompatClass, action) in \
                     itertools.chain(*actionLists):
@@ -1719,7 +1753,7 @@ class Database(SqlDbRepository):
                 # changeset from a repository
                 jobList = []
                 for trvCs in reposCs.iterNewTroveList():
-                    if not trvCs.getType() == trove.TROVE_TYPE_REDIRECT: 
+                    if not trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
                         continue
                     jobList.append(trvCs.getJob())
 
@@ -1742,7 +1776,11 @@ class Database(SqlDbRepository):
                 preScripts = self._getChangesetPreScripts(reposCs)
                 updJob = UpdateJob(None, lazyCache = lazyCache)
                 for x in preScripts:
+                    # This is a brand new update job, we need to populate it
+                    # with jobs so we can order the scripts properly
+                    updJob.addJob([ x[0] ])
                     updJob.addJobPreScript(*x)
+
 
                 try:
                     fsJob = None
@@ -1788,6 +1826,7 @@ class Database(SqlDbRepository):
                         # Because of the two phase update for rollbacks, we
                         # run postscripts by hand instead of commitChangeSet
                         # doing it automatically
+                        fsJob.orderPostScripts(updJob)
                         fsJob.runPostScripts(tagScript)
 
                     rb.removeLast()
@@ -1840,7 +1879,10 @@ class Database(SqlDbRepository):
                 trvCs = trv.diff(None)[0]
                 script = trvCs._getPreEraseScript()
                 if script:
-                    preScripts.append((trvCs.getJob(), script,
+                    j = trvCs.getJob()
+                    # Need to reverse the job
+                    j = (j[0], j[2], j[1], False)
+                    preScripts.append((j, script,
                                       trv.getCompatibilityClass(), None,
                                       "preerase"))
         return preScripts

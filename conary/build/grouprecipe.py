@@ -3213,7 +3213,7 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
             toFind.setdefault(flags.ref, set()).add(sourceSpec)
             _addFlavors(flags.ref, sourceSpec, troveSpec[2], flavorMap)
 
-        for (troveSpec, ref), _ in group.iterReplaceSpecs():
+        for (troveSpec, ref, requireLatest), _ in group.iterReplaceSpecs():
             sourceSpec = _sourceSpec(troveSpec)
             flavorMap.setdefault(sourceSpec, []).append(troveSpec[2])
             toFind.setdefault(ref, set()).add(sourceSpec)
