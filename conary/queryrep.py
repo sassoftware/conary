@@ -478,8 +478,6 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
                showEmptyDiffs = False, withBuildReqs = False,
                withFiles = False, withFilesStat = False):
     client = conaryclient.ConaryClient(cfg)
-    repos = client.getRepos()
-
     # Fetch the absolute changeset for the old trove and the relative
     # changeset from the old trove to the new trove
     primaryCsList = cscmd.computeTroveList(client, [ troveSpec ])
@@ -489,8 +487,8 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
         print "Identical troves"
         return
     primaryCsList = [ (trv[0], (None, None), trv[1], True), trv ]
-    cs = repos.createChangeSet(primaryCsList, withFiles=True,
-                               withFileContents=False)
+    cs = client.createChangeSet(primaryCsList, withFiles=True,
+                                withFileContents=False)
     oldTroves = {}
     newTroves = {}
     newTroveCsList = []
