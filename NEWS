@@ -48,6 +48,8 @@ Changes in @NEW@:
     * If Conary is running on kernels which, under certain circumstances,
       return EINVAL when calling poll(), the lazy file cache will only
       count the file descriptors it has open itself. (CNY-2571)
+    * conary rdiff works for groups that include troves from foreign 
+      repositories (CNY-2544)
 
 Changes in 2.0.7:
   o Build Changes:
