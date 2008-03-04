@@ -101,7 +101,7 @@ def setupRecipeDict(d, filename, directory=None, factory=False):
                                         'PackageFlags'))
 
     if factory:
-        localImport(d, 'conary.build.factory', 'Factory')
+        localImport(d, 'conary.build.factory', ('Factory', 'FactoryException' ))
 
     d['filename'] = filename
     if not directory:
