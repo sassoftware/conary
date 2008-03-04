@@ -461,10 +461,6 @@ class ServerConfig(netserver.ServerConfig):
             print >> sys.stderr, ("warning: closed config option is ignored "
                                   "by the standalone server")
 
-        if self.forceSSL:
-            print >> sys.stderr, ("warning: commitAction config option is "
-                                  "ignored by the standalone server")
-
 def usage():
     print "usage: %s" % sys.argv[0]
     print "       %s --add-user <username> [--admin] [--mirror]" % sys.argv[0]
