@@ -764,8 +764,15 @@ class UpdateJob:
             bucketLists.append(al)
         return list(itertools.chain(*bucketLists))
 
-    def reorderPreScripts(self):
-        self._jobPreScripts = self.orderScriptListByBucket(self._jobPreScripts,
+    def reorderPreScripts(self, criticalUpdateInfo):
+        jobPreScripts = self._jobPreScripts
+        if criticalUpdateInfo.criticalOnly:
+            # We need to filter the scripts to only the ones in the critical
+            # set
+            jobOrderHash = self._getJobOrder()
+            jobPreScripts = [ x for x in jobPreScripts
+                              if x[0] in jobOrderHash ]
+        self._jobPreScripts = self.orderScriptListByBucket(jobPreScripts,
                                 [ 'preinstall', 'preupdate', 'preerase' ])
 
     def __init__(self, db, searchSource = None, lazyCache = None):

@@ -3149,7 +3149,7 @@ conary erase '%s=%s[%s]'
             criticalJobs = []
 
         self._combineJobs(uJob, splitJob, criticalJobs)
-        uJob.reorderPreScripts()
+        uJob.reorderPreScripts(criticalUpdateInfo)
 
         uJob.setTransactionCounter(self.db.getTransactionCounter())
 
