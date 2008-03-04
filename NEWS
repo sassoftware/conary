@@ -43,6 +43,9 @@ Changes in @NEW@:
       count the file descriptors it has open itself. (CNY-2571)
     * Job invocation information is no longer using null characters,
       which are not allowed in an XML document. (CNY-2580)
+    * Updating files which point to other files (due to a PTR in the changeset)
+      fails when those other files are not being installed (due to a
+      conary remove on those files, for example (CNY-2595)
 
 Changes in 1.2.18:
   o Build Changes:
