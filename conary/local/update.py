@@ -734,18 +734,13 @@ class FilesystemJob:
             self.callback.runningPostTagHandlers()
 	    tagCommands.run(tagScript, self.root)
 
-    def runPostScripts(self, tagScript):
-        # Sort scripts in some consistent manner: installs, updates, erases
-        # sorted by job within each group
-        actions = [ 'posterase', 'postupdate', 'postinstall', 'postrollback' ]
-        actionLists = []
-        for action in actions:
-            al = [ x for x in self.postScripts if x[-1] == action ]
-            al.sort()
-            actionLists.append(al)
+    def orderPostScripts(self, uJob):
+        self.postScripts = uJob.orderScriptListByBucket(self.postScripts,
+            [ 'posterase', 'postupdate', 'postinstall', 'postrollback' ])
 
+    def runPostScripts(self, tagScript):
         for (job, baseCompatClass, newCompatClass, script, action) in \
-                    itertools.chain(*actionLists):
+                    self.postScripts:
             scriptId = "%s %s" % (job[0], action)
 
             runTroveScript(job, script, tagScript, '/',
@@ -1684,7 +1679,8 @@ class FilesystemJob:
             # Queue up the posterase script
             postEraseScript = oldTroveCs._getPostEraseScript()
             if postEraseScript:
-                self.postScripts.append((oldTroveCs.getJob(),
+                self.postScripts.append(((name, (oldVersion, oldFlavor),
+                                                (None, None), False),
                                          oldTrove.getCompatibilityClass(),
                                          None, postEraseScript, "posterase"))
 
