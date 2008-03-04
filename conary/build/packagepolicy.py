@@ -3110,7 +3110,9 @@ class Requires(_addInfo, _dependency):
         self.unionDeps(path, pkg, f)
 
     def _addJavaRequirements(self, path, m, pkg):
-        fileDeps = self.recipe._internalJavaDepMap[path]
+        if not hasattr(self.recipe, '_internalJavaDepMap'):
+            self.recipe._internalJavaDepMap = {}
+        fileDeps = self.recipe._internalJavaDepMap.get(path, {})
         reqs = set()
         for fpath, (fprov, freq) in fileDeps.items():
             if freq is not None:

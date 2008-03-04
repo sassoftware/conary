@@ -46,6 +46,8 @@ Changes in @NEW@:
     * Updating files which point to other files (due to a PTR in the changeset)
       fails when those other files are not being installed (due to a
       conary remove on those files, for example (CNY-2595)
+    * Filtering all java dependencies no longer produces a stack
+      trace. (CNY-2594)
 
 Changes in 1.2.18:
   o Build Changes:
