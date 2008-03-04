@@ -1773,14 +1773,12 @@ class Database(SqlDbRepository):
                     l.extend(trvCs.getOldFileList())
 
                 # Collect pre scripts
-                preScripts = self._getChangesetPreScripts(reposCs)
                 updJob = UpdateJob(None, lazyCache = lazyCache)
+                # As a side-effect, _getChangesetPreScripts will add the job
+                # sets to the job, ordered alphabetically.
+                preScripts = self._getChangesetPreScripts(reposCs, updJob)
                 for x in preScripts:
-                    # This is a brand new update job, we need to populate it
-                    # with jobs so we can order the scripts properly
-                    updJob.addJob([ x[0] ])
                     updJob.addJobPreScript(*x)
-
 
                 try:
                     fsJob = None
@@ -1795,13 +1793,13 @@ class Database(SqlDbRepository):
                                        isRollback = False,
                                        justDatabase = justDatabase)
 
+                    fsUpdateJob = UpdateJob(None, lazyCache = lazyCache)
                     if not reposCs.isEmpty():
                         itemCount += 1
                         callback.setUpdateHunk(itemCount, totalCount)
                         callback.setUpdateJob(reposCs.getJobSet())
                         fsJob = self.commitChangeSet(
-                                     reposCs,
-                                     UpdateJob(None, lazyCache = lazyCache),
+                                     reposCs, fsUpdateJob,
                                      rollbackPhase =
                                             update.ROLLBACK_PHASE_REPOS,
                                      removeHints = removalHints,
@@ -1814,7 +1812,7 @@ class Database(SqlDbRepository):
                         callback.setUpdateHunk(itemCount, totalCount)
                         callback.setUpdateJob(localCs.getJobSet())
                         self.commitChangeSet(localCs,
-                                     UpdateJob(None, lazyCache = lazyCache),
+                                     fsUpdateJob,
                                      rollbackPhase =
                                             update.ROLLBACK_PHASE_LOCAL,
                                      updateDatabase = False,
@@ -1828,22 +1826,27 @@ class Database(SqlDbRepository):
                         # doing it automatically
                         fsJob.orderPostScripts(updJob)
                         fsJob.runPostScripts(tagScript)
+                    fsUpdateJob.close()
 
                     rb.removeLast()
                 except CommitError, err:
+                    updJob.close()
                     raise RollbackError(name, err)
 
+                updJob.close()
                 (reposCs, localCs) = rb.getLast()
 
             self.rollbackStack.removeLast()
 
-    def _getChangesetPreScripts(self, cs):
+    def _getChangesetPreScripts(self, cs, updJob):
         preScripts = []
         if cs.isEmpty():
             return preScripts
 
+        jobs = []
         for trvCs in cs.iterNewTroveList():
             job = trvCs.getJob()
+            jobs.append(job)
             newCompatClass = trvCs.getNewCompatibilityClass()
             if job[1][0] is None:
                 # This is an install (rolling back an erase)
@@ -1872,19 +1875,27 @@ class Database(SqlDbRepository):
                 preScripts.append((job, script, oldCompatClass, None,
                     "preerase"))
 
+        jobs.sort()
+        updJob.addJob(jobs)
+
+        jobs = []
+
         erasures = cs.getOldTroveList()
         if erasures:
             trvs = self.db.getTroves(erasures, withFiles=False, withDeps=False)
             for trv in trvs:
                 trvCs = trv.diff(None)[0]
+                j = trvCs.getJob()
+                # Need to reverse the job
+                j = (j[0], j[2], j[1], False)
+                jobs.append(j)
                 script = trvCs._getPreEraseScript()
                 if script:
-                    j = trvCs.getJob()
-                    # Need to reverse the job
-                    j = (j[0], j[2], j[1], False)
                     preScripts.append((j, script,
                                       trv.getCompatibilityClass(), None,
                                       "preerase"))
+        jobs.sort()
+        updJob.addJob(jobs)
         return preScripts
 
     def getPathHashesForTroveList(self, troveList):
