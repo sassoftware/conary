@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1551,3 +1551,81 @@ def getNativeChangesetVersion(protocolVersion):
     # Add more changeset versions here as the currently newest client is
     # replaced by a newer one
     return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+
+class ChangesetExploder:
+
+    def __init__(self, cs, destdir):
+        ptrMap = {}
+
+        fileList = []
+        linkGroups = {}
+        linkGroupFirstPath = {}
+        # sort the files by pathId,fileId
+        for trvCs in cs.iterNewTroveList():
+            trv = trove.Trove(trvCs)
+            self.installingTrove(trv)
+            for pathId, path, fileId, version in trv.iterFileList():
+                fileList.append((pathId, fileId, path, trv))
+
+        fileList.sort()
+
+        restoreList = []
+
+        for pathId, fileId, path, trv in fileList:
+            if not self.installPath(path):
+                continue
+
+            fileCs = cs.getFileChange(None, fileId)
+            fileObj = files.ThawFile(fileCs, pathId)
+
+            if fileObj.hasContents:
+                restoreList.append((pathId, fileId, fileObj, path, trv))
+            else:
+                self.restoreFile(trv, fileObj, None, destdir, path)
+
+        delayedRestores = {}
+        for pathId, fileId, fileObj, destPath, trv in restoreList:
+            (contentType, contents) = cs.getFileContents(pathId, fileId)
+            if contentType == ChangedFileTypes.ptr:
+                targetPtrId = contents.get().read()
+                l = delayedRestores.setdefault(targetPtrId, [])
+                l.append((fileObj, destPath))
+                continue
+
+            assert(contentType == ChangedFileTypes.file)
+
+            ptrId = pathId + fileId
+            if pathId in delayedRestores:
+                ptrMap[pathId] = destPath
+            elif ptrId in delayedRestores:
+                ptrMap[ptrId] = destPath
+
+            self.restoreFile(trv, fileObj, contents, destdir, destPath)
+
+            linkGroup = fileObj.linkGroup()
+            if linkGroup:
+                linkGroups[linkGroup] = destPath
+
+            for fileObj, targetPath in delayedRestores.get(ptrId, []):
+                linkGroup = fileObj.linkGroup()
+                if linkGroup in linkGroups:
+                    self.restoreLink(trv, fileObj, destdir,
+                                     linkGroups[linkGroup], targetPath)
+                else:
+                    self.restoreFile(trv, fileObj, contents, destdir,
+                                     targetPath)
+
+                    if linkGroup:
+                        linkGroups[linkGroup] = targetPath
+
+    def installingTrove(self, trv):
+        pass
+
+    def restoreFile(self, trv, fileObj, contents, destdir, path):
+        fileObj.restore(contents, destdir, destdir + path)
+
+    def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
+        util.createLink(destdir + sourcePath, destdir + targetPath)
+
+    def installPath(self, path):
+        return True
