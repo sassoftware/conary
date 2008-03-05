@@ -71,7 +71,7 @@ class Logger:
         if self.path.endswith('.bz2'):
             logFile = bz2.BZ2File(self.path, 'w')
         elif self.path.endswith('.gz'):
-            logFile = gzip.GZipFile(self.path, 'w')
+            logFile = gzip.GzipFile(self.path, 'w')
         else:
             logFile = open(self.path, 'w')
         logger = _ChildLogger(masterFd, logFile, directRd, 

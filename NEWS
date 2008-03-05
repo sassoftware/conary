@@ -40,6 +40,8 @@ Changes in @NEW@:
     * Macros from config files and from the command line are now
       available to group recipes. (CNY-2574)
     * Implemented recipe factories (CNY-2549)
+    * Superclass recipes will be unflavored, regardless of any
+      flavor related references in a recipe. (CNY-2576)
 
   o Bug Fixes:
     * Conary no longer loses ownership of changed files when updating
@@ -50,6 +52,13 @@ Changes in @NEW@:
       count the file descriptors it has open itself. (CNY-2571)
     * conary rdiff works for groups that include troves from foreign 
       repositories (CNY-2544)
+    * Job invocation information is no longer using null characters,
+      which are not allowed in an XML document. (CNY-2580)
+    * Updating files which point to other files (due to a PTR in the changeset)
+      fails when those other files are not being installed (due to a
+      conary remove on those files, for example (CNY-2595)
+    * Filtering all java dependencies no longer produces a stack
+      trace. (CNY-2594)
 
 Changes in 2.0.7:
   o Build Changes:
