@@ -1,4 +1,4 @@
-# Copyright (c) 2006-2007 rPath, Inc.
+# Copyright (c) 2006-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -87,7 +87,7 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                                  fileObj.inode.owner(), fileObj.inode.group(),
                                  fileObj.inode.perms())
             elif fileObj.hasContents:
-                restoreList.append((pathId, fileId, fileObj, destdir, path))
+                restoreList.append((pathId, fileId, fileObj, path))
             else:
                 fileObj.restore(None, destdir, destdir + path)
 
@@ -100,13 +100,13 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                 self._derivedFiles[path] = fileObj.target()
 
         delayedRestores = {}
-        for pathId, fileId, fileObj, root, destPath in restoreList:
+        for pathId, fileId, fileObj, destPath in restoreList:
             (contentType, contents) = \
                             self.cs.getFileContents(pathId, fileId)
             if contentType == changeset.ChangedFileTypes.ptr:
                 targetPtrId = contents.get().read()
                 l = delayedRestores.setdefault(targetPtrId, [])
-                l.append((root, fileObj, destPath))
+                l.append((fileObj, destPath))
                 continue
 
             assert(contentType == changeset.ChangedFileTypes.file)
@@ -117,23 +117,19 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
             elif ptrId in delayedRestores:
                 ptrMap[ptrId] = destPath
 
-            fileObj.restore(contents, root, root + destPath)
+            fileObj.restore(contents, destdir, destdir + destPath)
 
             linkGroup = fileObj.linkGroup()
             if linkGroup:
                 linkGroups[linkGroup] = destPath
 
-        for targetPtrId in delayedRestores:
-            for root, fileObj, targetPath in delayedRestores[targetPtrId]:
+            for fileObj, targetPath in delayedRestores.get(ptrId, []):
                 linkGroup = fileObj.linkGroup()
                 if linkGroup in linkGroups:
                     util.createLink(destdir + linkGroups[linkGroup],
                                     destdir + targetPath)
                 else:
-                    sourcePath = ptrMap[targetPtrId]
-                    fileObj.restore(
-                        filecontents.FromFilesystem(root + sourcePath),
-                        root, root + targetPath)
+                    fileObj.restore(contents, destdir, destdir + targetPath)
 
                     if linkGroup:
                         linkGroups[linkGroup] = targetPath
