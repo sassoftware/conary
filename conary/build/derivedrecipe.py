@@ -24,85 +24,107 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
     _isDerived = True
     parentVersion = None
 
-    def _expandChangeset(self):
+    def installingTrove(self, trv):
+        if self.troveFlavor is None:
+            self.troveFlavor = trv.getFlavor().copy()
+        else:
+            assert(self.troveFlavor == trv.getFlavor())
+
+        name = trv.getName()
+        self._componentReqs[name] = trv.getRequires().copy()
+        self._componentProvs[name] = trv.getProvides().copy()
+
+        if trv.isCollection():
+            # gather up existing byDefault status
+            # from (component, byDefault) tuples
+            self.byDefaultXX.update(dict(
+                [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
+
+    def handleFileAttributes(self, trv, fileObj, path):
+        self.troveFlavor -= fileObj.flavor()
+
+        # Config vs. InitialContents etc. might be change in derived pkg
+        # Set defaults here, and they can be overridden with
+        # "exceptions = " later
+        if fileObj.flags.isConfig():
+            self.Config(path)
+        elif fileObj.flags.isInitialContents():
+            self.InitialContents(path)
+        elif fileObj.flags.isTransient():
+            self.Transient(path)
+
+        # we don't restore setuid/setgid bits into the filesystem
+        if fileObj.inode.perms() & 06000 != 0:
+            self.SetModes(path, fileObj.inode.perms())
+
+        if isinstance(fileObj, files.Directory):
+            # remember to include this directory in the derived package even
+            # if it's empty
+            self.ExcludeDirectories(exceptions = path)
+
+        if isinstance(fileObj, files.SymbolicLink):
+            # mtime for symlinks is meaningless, we have to record the
+            # target of the symlink instead
+            self._derivedFiles[path] = fileObj.target()
+        else:
+            self._derivedFiles[path] = fileObj.inode.mtime()
+
+        self._componentReqs[trv.getName()] -= fileObj.requires()
+        self._componentProvs[trv.getName()] -= fileObj.requires()
+
+    def restoreFile(self, trv, fileObj, contents, destdir, path):
+        self.handleFileAttributes(trv, fileObj, path)
+        if isinstance(fileObj, files.DeviceFile):
+            self.MakeDevices(path, fileObj.lsTag,
+                             fileObj.devt.major(), fileObj.devt.minor(),
+                             fileObj.inode.owner(), fileObj.inode.group(),
+                             fileObj.inode.perms())
+        else:
+            fileObj.restore(contents, destdir, destdir + path)
+
+    def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
+        self.handleFileAttributes(trv, fileObj, targetPath)
+        util.createLink(destdir + sourcePath, destdir + targetPath)
+
+    def installPath(self, path):
+        return path != self.macros.buildlogpath
+
+    def _expandChangeset(self, cs):
         destdir = self.macros.destdir
 
         ptrMap = {}
-        byDefault = {}
 
         fileList = []
         linkGroups = {}
         linkGroupFirstPath = {}
+        self.troveFlavor = None
+        self.byDefaultXX = {}
         # sort the files by pathId,fileId
-        for trvCs in self.cs.iterNewTroveList():
+        for trvCs in cs.iterNewTroveList():
             trv = trove.Trove(trvCs)
-
-            # these should all be the same anyway
-            flavor = trv.getFlavor().copy()
-            name = trv.getName()
-            self._componentReqs[name] = trv.getRequires().copy()
-            self._componentProvs[name] = trv.getProvides().copy()
-
+            self.installingTrove(trv)
             for pathId, path, fileId, version in trv.iterFileList():
-                if path != self.macros.buildlogpath:
-                    fileList.append((pathId, fileId, path, name))
-
-            if trv.isCollection():
-                # gather up existing byDefault status
-                # from (component, byDefault) tuples
-                byDefault.update(dict(
-                    [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
+                fileList.append((pathId, fileId, path, trv))
 
         fileList.sort()
 
         restoreList = []
 
-        for pathId, fileId, path, troveName in fileList:
-            fileCs = self.cs.getFileChange(None, fileId)
+        for pathId, fileId, path, trv in fileList:
+            if not self.installPath(path):
+                continue
+
+            fileCs = cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
-            self._derivedFiles[path] = fileObj.inode.mtime()
 
-            flavor -= fileObj.flavor()
-            self._componentReqs[troveName] -= fileObj.requires()
-            self._componentProvs[troveName] -= fileObj.requires()
-
-            # Config vs. InitialContents etc. might be change in derived pkg
-            # Set defaults here, and they can be overridden with
-            # "exceptions = " later
-            if fileObj.flags.isConfig():
-                self.Config(path)
-            elif fileObj.flags.isInitialContents():
-                self.InitialContents(path)
-            elif fileObj.flags.isTransient():
-                self.Transient(path)
-
-
-            # we don't restore setuid/setgid bits into the filesystem
-            if fileObj.inode.perms() & 06000 != 0:
-                self.SetModes(path, fileObj.inode.perms())
-
-            if isinstance(fileObj, files.DeviceFile):
-                self.MakeDevices(path, fileObj.lsTag,
-                                 fileObj.devt.major(), fileObj.devt.minor(),
-                                 fileObj.inode.owner(), fileObj.inode.group(),
-                                 fileObj.inode.perms())
-            elif fileObj.hasContents:
-                restoreList.append((pathId, fileId, fileObj, path))
+            if fileObj.hasContents:
+                restoreList.append((pathId, fileId, fileObj, path, trv))
             else:
-                fileObj.restore(None, destdir, destdir + path)
-
-            if isinstance(fileObj, files.Directory):
-                # remember to include this directory in the derived package
-                self.ExcludeDirectories(exceptions = path)
-            if isinstance(fileObj, files.SymbolicLink):
-                # mtime for symlinks is meaningless, we have to record the
-                # target of the symlink instead
-                self._derivedFiles[path] = fileObj.target()
+                self.restoreFile(trv, fileObj, None, destdir, path)
 
         delayedRestores = {}
-        for pathId, fileId, fileObj, destPath in restoreList:
-            (contentType, contents) = \
-                            self.cs.getFileContents(pathId, fileId)
+        for pathId, fileId, fileObj, destPath, trv in restoreList:
+            (contentType, contents) = cs.getFileContents(pathId, fileId)
             if contentType == changeset.ChangedFileTypes.ptr:
                 targetPtrId = contents.get().read()
                 l = delayedRestores.setdefault(targetPtrId, [])
@@ -117,7 +139,7 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
             elif ptrId in delayedRestores:
                 ptrMap[ptrId] = destPath
 
-            fileObj.restore(contents, destdir, destdir + destPath)
+            self.restoreFile(trv, fileObj, contents, destdir, destPath)
 
             linkGroup = fileObj.linkGroup()
             if linkGroup:
@@ -126,18 +148,19 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
             for fileObj, targetPath in delayedRestores.get(ptrId, []):
                 linkGroup = fileObj.linkGroup()
                 if linkGroup in linkGroups:
-                    util.createLink(destdir + linkGroups[linkGroup],
-                                    destdir + targetPath)
+                    self.restoreLink(trv, fileObj, destdir,
+                                     linkGroups[linkGroup], targetPath)
                 else:
-                    fileObj.restore(contents, destdir, destdir + targetPath)
+                    self.restoreFile(trv, fileObj, contents, destdir,
+                                     targetPath)
 
                     if linkGroup:
                         linkGroups[linkGroup] = targetPath
 
-        self.useFlags = flavor
+        self.useFlags = self.troveFlavor
 
-        self.setByDefaultOn(set(x for x in byDefault if byDefault[x]))
-        self.setByDefaultOff(set(x for x in byDefault if not byDefault[x]))
+        self.setByDefaultOn(set(x for x in self.byDefaultXX if self.byDefaultXX[x]))
+        self.setByDefaultOff(set(x for x in self.byDefaultXX if not self.byDefaultXX[x]))
 
     def unpackSources(self, resume=None, downloadOnly=False):
 
@@ -224,12 +247,13 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
         troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
                         for x in binaries ]
 
-        self.cs = repos.createChangeSet(troveSpec, recurse = False)
+        cs = repos.createChangeSet(troveSpec, recurse = False)
         self.addLoadedTroves([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
-            in self.cs.iterNewTroveList() ])
+            in cs.iterNewTroveList() ])
 
-        self._expandChangeset()
+        self._expandChangeset(cs)
+        self.cs = cs
 
         AbstractPackageRecipe.unpackSources(self, resume = resume,
                                              downloadOnly = downloadOnly)
