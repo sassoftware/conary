@@ -1552,9 +1552,9 @@ def getNativeChangesetVersion(protocolVersion):
     # replaced by a newer one
     return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
 
-class ChangesetExploder:
+class AbstractChangesetExploder:
 
-    def __init__(self, cs, destdir):
+    def __init__(self, cs):
         ptrMap = {}
 
         fileList = []
@@ -1572,24 +1572,30 @@ class ChangesetExploder:
         restoreList = []
 
         for pathId, fileId, path, trv in fileList:
-            if not self.installPath(path):
+            fileCs = cs.getFileChange(None, fileId)
+            if fileCs is None:
+                self.fileMissing(trv, pathId, fileId, path)
                 continue
 
-            fileCs = cs.getFileChange(None, fileId)
             fileObj = files.ThawFile(fileCs, pathId)
 
+            destDir = self.installFile(trv, path, fileObj)
+            if not destDir:
+                continue
+
             if fileObj.hasContents:
-                restoreList.append((pathId, fileId, fileObj, path, trv))
+                restoreList.append((pathId, fileId, fileObj, destDir, path,
+                                    trv))
             else:
-                self.restoreFile(trv, fileObj, None, destdir, path)
+                self.restoreFile(trv, fileObj, None, destDir, path)
 
         delayedRestores = {}
-        for pathId, fileId, fileObj, destPath, trv in restoreList:
+        for pathId, fileId, fileObj, destDir, destPath, trv in restoreList:
             (contentType, contents) = cs.getFileContents(pathId, fileId)
             if contentType == ChangedFileTypes.ptr:
                 targetPtrId = contents.get().read()
                 l = delayedRestores.setdefault(targetPtrId, [])
-                l.append((fileObj, destPath))
+                l.append((fileObj, destDir, destPath))
                 continue
 
             assert(contentType == ChangedFileTypes.file)
@@ -1600,19 +1606,20 @@ class ChangesetExploder:
             elif ptrId in delayedRestores:
                 ptrMap[ptrId] = destPath
 
-            self.restoreFile(trv, fileObj, contents, destdir, destPath)
+            self.restoreFile(trv, fileObj, contents, destDir, destPath)
 
             linkGroup = fileObj.linkGroup()
             if linkGroup:
                 linkGroups[linkGroup] = destPath
 
-            for fileObj, targetPath in delayedRestores.get(ptrId, []):
+            for fileObj, targetDestDir, targetPath in \
+                                            delayedRestores.get(ptrId, []):
                 linkGroup = fileObj.linkGroup()
                 if linkGroup in linkGroups:
-                    self.restoreLink(trv, fileObj, destdir,
+                    self.restoreLink(trv, fileObj, targetDestDir,
                                      linkGroups[linkGroup], targetPath)
                 else:
-                    self.restoreFile(trv, fileObj, contents, destdir,
+                    self.restoreFile(trv, fileObj, contents, targetDestDir,
                                      targetPath)
 
                     if linkGroup:
@@ -1627,5 +1634,17 @@ class ChangesetExploder:
     def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
         util.createLink(destdir + sourcePath, destdir + targetPath)
 
-    def installPath(self, path):
-        return True
+    def installFile(self, trv, path, fileObj):
+        raise NotImplementedException
+
+    def fileMissing(self, trv, pathId, fileId, path):
+        raise KeyError, pathId + fileId
+
+class ChangesetExploder(AbstractChangesetExploder):
+
+    def __init__(self, cs, destDir):
+        self.destDir = destDir
+        AbstractChangesetExploder.__init__(self, cs)
+
+    def installFile(self, trv, path, fileObj):
+        return self.destDir

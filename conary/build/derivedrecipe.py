@@ -92,8 +92,11 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
         changeset.ChangesetExploder.restoreLink(self, trv, fileObj, destdir,
                                                 sourcePath, targetPath)
 
-    def installPath(self, path):
-        return path != self.recipe.macros.buildlogpath
+    def installFile(self, trv, path, fileObj):
+        if path == self.recipe.macros.buildlogpath:
+            return False
+
+        return changeset.ChangesetExploder.installFile(self, trv, path, fileObj)
 
 class DerivedPackageRecipe(AbstractPackageRecipe):
 
