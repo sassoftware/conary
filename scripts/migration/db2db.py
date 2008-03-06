@@ -40,6 +40,9 @@ class Callback:
         self.start = time.time()
         self.counter = 0
     def display(self, counter, pre = "", post = ""):
+        global options
+        if not options.verbose:
+            return
         sys.stdout.write("\r%s %s: %s %s" % (
             pre, self.table, self.timings(counter), post))
         sys.stdout.flush()
@@ -49,6 +52,9 @@ class Callback:
             self.display(self.counter, pre = self.tag)
     def last(self):
         self.display(self.count, post = " " * (len(self.tag)+1))
+        if options.verbose:
+            sys.stdout.write("\n")
+        sys.stdout.flush()
     def timings(self, current):
         tnow = time.time()
         tpassed = max(tnow-self.start,1)
@@ -127,13 +133,16 @@ if __name__ == '__main__':
                       help = "Verify each table after copy")
     parser.add_option("--batch", "-b", action = "store", dest = "batch", metavar="N", type = int,
                       default = 5000, help = "batch size in (row count) for each copy operation")
+    parser.add_option("--verbose", "-v", action = "store_true", dest = "verbose",
+                      default = False, help = "verbose output")
     (options, args) = parser.parse_args()
     if options.db is None or len(options.db) != 2:
         parser.print_help()
         sys.exit(-1)
     src = getdb(*options.db[0])
     dst = getdb(*options.db[1])
-
+    dst.verbose = options.verbose
+    
     # Sanity checks
     src.checkTablesList()
     dst.createSchema()
@@ -161,7 +170,6 @@ if __name__ == '__main__':
         migrate_table(src, dst, table, options.batch)
         if options.verify:
             verify_table(src, dst, table)
-        sys.stdout.write("\n")
         sys.stdout.flush()
 
     # create the indexes to close the loop
@@ -170,5 +178,5 @@ if __name__ == '__main__':
 
     src.close()
     dst.close()
-
-    print "Done"
+    if options.verbose:
+        print "Done"

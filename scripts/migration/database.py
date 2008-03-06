@@ -79,21 +79,24 @@ class PgSQLLoader(Loader):
             return Loader.insertRows(self, rows, callback)
 
 class Database:
-    def __init__(self, driver, db):
+    def __init__(self, driver, db, verbose=True):
         self.db = dbstore.connect(db, driver)
         self.driver = driver
         self.db.loadSchema()
+        self.verbose = verbose
     def createSchema(self):
         # create the tables, avoid the indexes
         cu = self.db.cursor()
         for stmt in getTables(self.driver):
-            print stmt
+            if self.verbose:
+                print stmt
             cu.execute(stmt)
         self.db.loadSchema()
     def createIndexes(self):
         cu = self.db.cursor()
         for stmt in getIndexes(self.driver):
-            print stmt
+            if self.verbose:
+                print stmt
             cu.execute(stmt)
         self.db.loadSchema()
     # check self.db.tables against the TableList
@@ -146,8 +149,8 @@ class Database:
         self.db.close()
         
 class PgSQLDatabase(Database):
-    def __init__(self, db):
-        Database.__init__(self, "postgresql", db)
+    def __init__(self, db, verbose=True):
+        Database.__init__(self, "postgresql", db, verbose)
     def createIndexes(self):
         Database.createIndexes(self)
         # fix the primary keys
@@ -185,7 +188,8 @@ class PgSQLDatabase(Database):
             cu.execute("select pg_catalog.setval(?, ?, false)", (seqname, seqval))
             ret = cu.fetchone()[0]
             assert (ret == seqval)
-            print "SETVAL %s = %d (%s.%s)" % (seqname, ret, table, col)
+            if self.verbose:
+                print "SETVAL %s = %d (%s.%s)" % (seqname, ret, table, col)
     # functions for when the instance is a target
     def prepareInsert(self, table, fields):
         return PgSQLLoader(self.db, table, fields)
@@ -196,8 +200,8 @@ class PgSQLDatabase(Database):
         cu.execute("VACUUM ANALYZE")
 
 class MySQLDatabase(Database):
-    def __init__(self, db):
-        Database.__init__(self, "mysql", db)
+    def __init__(self, db, verbose=True):
+        Database.__init__(self, "mysql", db, verbose)
     # functions for when the instance is a target
     def finalize(self, version):
         Database.finalize(self, version)
@@ -206,10 +210,10 @@ class MySQLDatabase(Database):
             print "ANALYZE", t
             cu.execute("ANALYZE LOCAL TABLE %s" %(t,))
 
-def getdb(driver, db):
+def getdb(driver, db, verbose=True):
     if driver == "postgresql":
-        return PgSQLDatabase(db)
+        return PgSQLDatabase(db, verbose)
     elif driver == "mysql":
-        return MySQLDatabase(db)
-    return Database(driver, db)
+        return MySQLDatabase(db, verbose)
+    return Database(driver, db, verbose)
 
