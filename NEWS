@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.8:
   o Client Changes:
     * A close() method has been added to UpdateJob objects. It is
       recommended to call the method explicitly instead of relying
