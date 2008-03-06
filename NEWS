@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.19:
   o Client Changes:
     * A close() method has been added to UpdateJob objects. It is
       recommended to call the method explicitly instead of relying
@@ -6,33 +6,35 @@ Changes in @NEW@:
       (CNY-2489)
 
   o Build Changes:
-    * Group policy has been created. Policies deriving from
+    * Conary now has support for group policies. Policies deriving from
       GroupEnforcementPolicy and ImageGroupEnforcementPolicy will be
       run on groups at the end of the cook process. (CNY-2378)
     * ImageGroup is now an attribute tracked in a group's troveInfo.
-      This attribute is set for groups meant to define a complete
+      This attribute is set for groups meant to define a complete,
       functional system, and implies that ImageGroupEnforcementPolicy
-      group policies have been run for that group, recursively. (CNY-2520)
+      group policies have been run for that group, recursively.
+      (CNY-2520)
     * The VersionConflicts group policy has been added. This group
       policy enforces that two different versions of a trove will not
       be accidentally included in one install image. (CNY-2371)
     * TroveFilters now exist. Trove filters allow a packager to
       reference particular troves within a group for group policy
       inclusions/exceptions. (CNY-2477)
-    * Conary policy to fix trailing newlines in config files has been
-      corrected to handle non-writeable config files. (CNY-2559)
+    * The Conary policy to fix trailing newlines in config files has
+      been corrected to handle non-writable config files. (CNY-2559)
     * The "cvc derive" command now creates a reference directory
       named _OLD_ROOT_ alongside _ROOT_ when the --extract argument
       is provided. (CNY-2530)
-    * Group recipes now have the startGroup command, which calls
-      createGroup, addNewGroup and setDefaultGroup in one step.
+    * A new group recipe command, startGroup, has been added, which
+      calls createGroup, addNewGroup and setDefaultGroup in one step.
       (CNY-2197)
     * The addCvsSnapshot source action no longer caches the HEAD of
       the repository, since cvs export will not use it. (CNY-2568)
     * Macros from config files and from the command line are now
       available to group recipes. (CNY-2574)
     * Binary packages built from superclass recipes will be unflavored,
-      regardless of any flavor-related references in a recipe. (CNY-2576)
+      regardless of any flavor-related references in a recipe.
+      (CNY-2576)
 
   o Bug Fixes:
     * Conary no longer loses ownership of changed files when updating
