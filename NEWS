@@ -9,30 +9,30 @@ Changes in @NEW@:
     * Group policy has been created. Policies deriving from
       GroupEnforcementPolicy and ImageGroupEnforcementPolicy will be
       run on groups at the end of the cook process. (CNY-2378)
-    * VersionConflicts group policy now exists. This policy ensures
-      two different versions of a trove won't be included in one
-      install image. (CNY-2371)
-    * ImageGroup is now an attribute tracked in a groups's troveInfo.
-      This attribute denotes that a particular group is meant to
-      define a complete functional system and that group policies
-      germaine to a distinct system were executed separately with
-      respect to that group. (CNY-2520)
+    * ImageGroup is now an attribute tracked in a group's troveInfo.
+      This attribute is set for groups meant to define a complete
+      functional system, and implies that ImageGroupEnforcementPolicy
+      group policies have been run for that group, recursively. (CNY-2520)
+    * The VersionConflicts group policy has been added. This group
+      policy enforces that two different versions of a trove will not
+      be accidentally included in one install image. (CNY-2371)
     * TroveFilters now exist. Trove filters allow a packager to
       reference particular troves within a group for group policy
       inclusions/exceptions. (CNY-2477)
     * Conary policy to fix trailing newlines in config files has been
       corrected to handle non-writeable config files. (CNY-2559)
-    * cvc derive now creates a reference directory named _OLD_ROOT_
-      alongside _ROOT_ when honoring the --extract flag. (CNY-2530)
+    * The "cvc derive" command now creates a reference directory
+      named _OLD_ROOT_ alongside _ROOT_ when the --extract argument
+      is provided. (CNY-2530)
     * Group recipes now have the startGroup command, which calls
       createGroup, addNewGroup and setDefaultGroup in one step.
       (CNY-2197)
-    * addCvsSnapshot no longer caches the HEAD of the repository,
-      since cvs export will not use it anyway. (CNY-2568)
+    * The addCvsSnapshot source action no longer caches the HEAD of
+      the repository, since cvs export will not use it. (CNY-2568)
     * Macros from config files and from the command line are now
       available to group recipes. (CNY-2574)
-    * Superclass recipes will be unflavored, regardless of any
-      flavor related references in a recipe. (CNY-2576)
+    * Binary packages built from superclass recipes will be unflavored,
+      regardless of any flavor-related references in a recipe. (CNY-2576)
 
   o Bug Fixes:
     * Conary no longer loses ownership of changed files when updating
@@ -41,11 +41,12 @@ Changes in @NEW@:
     * If Conary is running on kernels which, under certain circumstances,
       return EINVAL when calling poll(), the lazy file cache will only
       count the file descriptors it has open itself. (CNY-2571)
-    * Job invocation information is no longer using null characters,
+    * Job invocation information no longer uses null characters,
       which are not allowed in an XML document. (CNY-2580)
-    * Updating files which point to other files (due to a PTR in the changeset)
-      fails when those other files are not being installed (due to a
-      conary remove on those files, for example (CNY-2595)
+    * Updating files which point to other files (due to a PTR in the
+      changeset) previously failed when those other files were not
+      being installed at the same time (due to a "conary remove"
+      on those files, for example). (CNY-2595)
     * Filtering all java dependencies no longer produces a stack
       trace. (CNY-2594)
 
