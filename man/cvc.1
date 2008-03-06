@@ -458,7 +458,8 @@ Only one \fI<trove>\fP may be specified if this flag is used.
 .TP
 .B \-\-extract\
 Check the \fI<trove>\fP package out of the repository and put it in _ROOT_.
-\fI<Trove>\fP must be a binary trove if this flag is used.
+Also copy the _ROOT_ to _OLD_ROOT_ to ease patch creation.  \fI<Trove>\fP
+must be a binary trove if this flag is used.
 .TP
 .B \-\-info, \-i
 Determine the packages and groups that would be created by the shadow and display that information, without actually shadowing.
