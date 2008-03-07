@@ -18,5 +18,5 @@ def getPassword(server, userName=None):
     if userName is None:
         return None, None
 
-    s = "Enter the password for %s on %s:" % (server, userName)
+    s = "Enter the password for %s on %s:" % (userName, server)
     return userName, getpass.getpass(s)

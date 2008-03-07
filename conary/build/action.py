@@ -15,7 +15,10 @@
 """
 Provides superclasses for build and policy.
 """
+from conary.lib import fixedfnmatch
+import itertools
 import os
+import re
 import sys
 import string
 import traceback
@@ -306,6 +309,74 @@ def _expandOnePath(path, macros, defaultDir=None, braceGlob=False, error=False):
             raise RuntimeError, "No such file '%s'" % path
     return path
 
+def matchRegexp(baseDir, pattern, regexpFlags):
+    if pattern[-1] != '$':
+        pattern = pattern + '$'
+    results = []
+    for root, dirs, fileNames in os.walk(baseDir):
+        for pathItem in itertools.chain(dirs + fileNames):
+            path = root + '/' + pathItem
+            if re.match(pattern, path):
+                results.append(path)
+    return results
+
+class Regexp(object):
+    def __init__(self, pattern):
+        self.pattern = pattern
+
+    def __hash__(self):
+        return hash(self.pattern)
+
+    def __eq__(self, expr):
+        if isinstance(expr, Glob):
+            return expr() == self.pattern
+        elif isinstance(expr, Regexp):
+            return expr.pattern == self.pattern
+        return expr == self.pattern
+
+    def __repr__(self):
+        return 'Regexp(%r)' % self.pattern
+
+    def __str__(self):
+        return "Regexp(%r)" % self.pattern.replace('%', '%%')
+
+class Glob(object):
+    def __init__(self, recipe, pattern):
+        self.macros = recipe.macros
+        self.pattern = pattern
+
+    def __repr__(self):
+        return "Glob(%r)" % self.pattern
+
+    def __str__(self):
+        return "Glob(%r)" % self.pattern.replace('%', '%%')
+
+    def __eq__(self, expr):
+        if isinstance(expr, Glob):
+            return expr() == self()
+        elif isinstance(expr, Regexp):
+            return expr.pattern == self()
+        return expr == self()
+
+    def __hash__(self):
+        return hash(self())
+
+    def __call__(self):
+        """
+        Translate a shell PATTERN to a regular expression, substituting macros.
+
+        There is no way to quote meta-characters.
+        """
+        # macros must be substituted first, so that they can be properly
+        # escaped
+        try:
+            pat = self.pattern % self.macros
+        except ValueError, msg:
+            log.error('invalid macro substitution in "%s", missing "s"?' % \
+                    self.pattern)
+            raise
+        return '^' + fixedfnmatch.translate(pat)
+
 def _expandPaths(paths, macros, defaultDir=None, braceGlob=True, error=False):
     """
     Expand braces, globs, and macros in path names, and root all path names
@@ -317,7 +388,17 @@ def _expandPaths(paths, macros, defaultDir=None, braceGlob=True, error=False):
     if defaultDir is None:
         defaultDir = macros.builddir
     expPaths = []
-    for path in paths:
+    for item in paths:
+        if isinstance(item, Regexp):
+            isRegexp = True
+            path = item.pattern
+        elif isinstance(item, Glob):
+            isRegexp = False
+            braceGlob = True
+            path = item.pattern
+        else:
+            isRegexp = False
+            path = item
         path = path % macros
         if path[0] == '/':
             if path.startswith(destdir):
@@ -327,9 +408,13 @@ def _expandPaths(paths, macros, defaultDir=None, braceGlob=True, error=False):
                     %path)
             else:
                 path = destdir + path
+            baseDir = destdir
         else:
             path = defaultDir + os.sep + path
-        if braceGlob:
+            baseDir = defaultDir
+        if isRegexp:
+            expPaths.extend(matchRegexp(baseDir, path, item))
+        elif braceGlob:
             expPaths.extend(util.braceGlob(path))
         else:
             expPaths.append(path)

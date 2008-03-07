@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,14 +11,18 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import inspect
 
 from conary import files
 from conary.errors import ParseError
-from conary.build import action, source
+from conary.build import action, source, policy
 from conary.build.errors import RecipeFileError
-from conary.lib import log
+from conary.lib import log, util
 
+import glob
+import imp
 import os
+import sys
 
 """
 Contains the base Recipe class
@@ -29,6 +33,12 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
+
+class _policyUpdater:
+    def __init__(self, theobject):
+        self.theobject = theobject
+    def __call__(self, *args, **keywords):
+        self.theobject.updateArgs(*args, **keywords)
 
 def _ignoreCall(*args, **kw):
     pass
@@ -47,6 +57,31 @@ def isInfoRecipe(recipeClass):
 
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
+
+def loadMacros(paths):
+    '''
+    Load default macros from a series of I{paths}.
+
+    @rtype: dict
+    @return: A dictionary of default macros
+    '''
+
+    baseMacros = {}
+    loadPaths = []
+    for path in paths:
+        globPaths = sorted(list(glob.glob(path)))
+        loadPaths.extend(globPaths)
+
+    for path in loadPaths:
+        compiledPath = path+'c'
+        deleteCompiled = not util.exists(compiledPath)
+        macroModule = imp.load_source('tmpmodule', path)
+        if deleteCompiled:
+            util.removeIfExists(compiledPath)
+        baseMacros.update(x for x in macroModule.__dict__.iteritems()
+                          if not x[0].startswith('__'))
+
+    return baseMacros
 
 class _sourceHelper:
     def __init__(self, theclass, recipe):
@@ -75,14 +110,68 @@ class Recipe(object):
         self._sources = []
         self.loadSourceActions()
         self.buildinfo = None
+        self.metadataSkipSet = []
         self.laReposCache = laReposCache
         self.srcdirs = srcdirs
         self.sourcePathMap = {}
         self.pathConflicts = {}
+        self._recordMethodCalls = False
+        self.methodsCalled = []
+        self.unusedMethods = set()
+        self.methodDepth = 0
+        self._pathTranslations = []
+
+        superClasses = self.__class__.__mro__
+
+        for itemName in dir(self):
+            if itemName[0] == '_':
+                continue
+            item = getattr(self, itemName)
+            if inspect.ismethod(item):
+                if item.im_class == type:
+                    # classmethod
+                    continue
+                className = self.__class__.__name__
+                for class_ in superClasses:
+                    classItem = getattr(class_, itemName, None)
+                    if classItem is None:
+                        continue
+                    if classItem.im_func == item.im_func:
+                        className = class_.__name__
+                if className in ['Recipe', 'AbstractPackageRecipe',
+                                 'GroupRecipe', 'RedirectRecipe', 
+                                 'DerivedPackageRecipe', 'FilesetRecipe',
+                                 '_BaseGroupRecipe']:
+                    continue
+                setattr(self, itemName, self._wrapMethod(className, item))
+                self.unusedMethods.add((className, item.__name__))
 
     @classmethod
     def getType(class_):
         return class_._recipeType
+
+    def _wrapMethod(self, className, method):
+        def _callWrapper(*args, **kw):
+            return self._recordMethod(className, method, *args, **kw)
+        return _callWrapper
+
+    def _recordMethod(self, className, method, *args, **kw):
+        if self._recordMethodCalls:
+            self.methodDepth += 1
+            self.methodsCalled.append((self.methodDepth, className,
+                                       method.__name__))
+        rv = method(*args, **kw)
+        if self._recordMethodCalls:
+            self.unusedMethods.discard((className, method.__name__))
+            self.methodDepth -= 1
+        return rv
+
+    def recordCalls(self, method, *args, **kw):
+        self._recordMethodCalls = True
+        try:
+            return method(*args, **kw)
+        finally:
+            self._recordMethodCalls = False
 
     @classmethod
     def getLoadedTroves(class_):
@@ -159,7 +248,7 @@ class Recipe(object):
             Useful for determining where used in the recipe are located.
         """
         files = []
-        for src in self._sources:
+        for src in self.getSourcePathList():
             f = src.fetchLocal()
             if f:
                 if type(f) in (tuple, list):
@@ -197,7 +286,8 @@ class Recipe(object):
         return files
 
     def getSourcePathList(self):
-        return [ x for x in self._sources if isinstance(x, source._AnySource) ]
+        return [ x for x in self._sources if isinstance(x, source._AnySource)
+                and x.__dict__.get('sourceDir') is None]
 
     def extraSource(self, action):
         """
@@ -303,3 +393,76 @@ class Recipe(object):
 
     def isCrossCompileTool(self):
         return False
+
+    def recordMove(self, src, dest):
+        destdir = util.normpath(self.macros.destdir)
+        def _removeDestDir(p):
+            p = util.normpath(p)
+            if p[:len(destdir)] == destdir:
+                return p[len(destdir):]
+            else:
+                return p
+        if os.path.isdir(src):
+            # assume move is about to happen
+            baseDir = src
+            postRename = False
+        elif os.path.isdir(dest):
+            # assume move just happened
+            baseDir = dest
+            postRename = True
+        else:
+            # don't walk directories
+            baseDir = None
+        src = _removeDestDir(src)
+        dest = _removeDestDir(dest)
+        self._pathTranslations.append((src, dest))
+        if baseDir:
+            for base, dirs, files in os.walk(baseDir):
+                for path in dirs + files:
+                    if not postRename:
+                        fSrc = os.path.join(base, path)
+                        fSrc = fSrc.replace(self.macros.destdir, '')
+                        fDest = fSrc.replace(src, dest)
+                    else:
+                        fDest = os.path.join(base, path)
+                        fDest = fDest.replace(self.macros.destdir, '')
+                        fSrc = fDest.replace(dest, src)
+                    self._pathTranslations.append((fSrc, fDest))
+
+    def move(self, src, dest):
+        self.recordMove(src, dest)
+        util.move(src, dest)
+
+    def loadPolicy(self, policySet = None, internalPolicyModules = None):
+        #from conary.build import policy
+        if internalPolicyModules is None:
+            internalPolicyModules = self.internalPolicyModules
+        (self._policyPathMap, self._policies) = \
+                policy.loadPolicy(self, policySet = policySet,
+                              internalPolicyModules = internalPolicyModules,
+                              basePolicy = self.basePolicyClass)
+        # create bucketless name->policy map for getattr
+        policyList = []
+        for bucket in self._policies.keys():
+            policyList.extend(self._policies[bucket])
+        self._policyMap = dict((x.__class__.__name__, x) for x in policyList)
+        # Some policy needs to pass arguments to other policy at init
+        # time, but that can't happen until after all policy has been
+        # initialized
+        for name, policyObj in self._policyMap.iteritems():
+            self.externalMethods[name] = _policyUpdater(policyObj)
+        # must be a second loop so that arbitrary policy cross-reference
+        # works; otherwise it is dependent on sort order whether or
+        # not it works
+        for name, policyObj in self._policyMap.iteritems():
+            policyObj.postInit()
+
+        # returns list of policy files loaded
+        return self._policyPathMap.keys()
+
+    def doProcess(self, policyBucket):
+        for post in self._policies[policyBucket]:
+            sys.stdout.write('Running policy: %s\r' % post.__class__.__name__)
+            sys.stdout.flush()
+            post.doProcess(self)
+

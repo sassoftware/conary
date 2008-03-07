@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -212,6 +212,9 @@ class ChangeSet(streams.StreamSet):
         self.oldTroves.remove((name, version, flavor))
 
     def iterNewTroveList(self):
+        """
+        @return: dictionary-valueiterator object
+        """
 	return self.newTroves.itervalues()
 
     def iterNewPackageList(self):
@@ -436,6 +439,10 @@ class ChangeSet(streams.StreamSet):
                             invertedTrove.newTroveVersion(name, version, flavor,
                                trv.includeTroveByDefault(name, version, flavor),
                                weakRef = weak)
+                        elif oper == "~":
+                            # invert byDefault flag
+                            invertedTrove.changedTrove(name, version, flavor, not byDef,
+                                                       weakRef = weak)
 
 	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
 		invertedTrove.oldFile(pathId)
@@ -604,6 +611,14 @@ class ChangeSet(streams.StreamSet):
 		if fileObj.hasContents:
 		    fullPath = db.root + path
 
+                    if fileObj.flags.isConfig():
+                        cont = filecontents.FromDataStore(db.contentsStore,
+                                    fileObj.contents.sha1())
+                        rollback.addFileContents(pathId, fileId,
+                                                 ChangedFileTypes.file, cont,
+                                                 fileObj.flags.isConfig())
+                        continue
+
 		    if os.path.exists(fullPath):
 			fsFile = files.FileFromFilesystem(fullPath, pathId,
 				    possibleMatch = fileObj)
@@ -636,8 +651,8 @@ class ChangeSet(streams.StreamSet):
 
 	@param repos: repository which will be committed to
 	@type repos: repository.Repository
-	@param targetBranchLabel: label of the branch to commit to
-	@type targetBranchLabel: versions.Label
+	@param targetShadowLabel: label of the branch to commit to
+	@type targetShadowLabel: versions.Label
 	"""
 	assert(not targetShadowLabel == versions.LocalLabel())
         # if it's local, Version.parentVersion() has to work everywhere
@@ -1125,8 +1140,8 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         allContents = {}
         for key in keyList:
             (tag, contents, compressed) = self.configCache[key]
-            if tag == ChangedFileTypes.file:
-                allContents[key] = (ChangedFileTypes.file, contents, False)
+            if tag != ChangedFileTypes.diff:
+                allContents[key] = (tag, contents, False)
 
         wrapper = DictAsCsf({})
         wrapper.addConfigs(allContents)
@@ -1426,6 +1441,7 @@ def CreateFromFilesystem(troveList):
     return cs
 
 class DictAsCsf:
+    maxMemSize = 16384
 
     def getNextFile(self):
         if self.next >= len(self.items):
@@ -1435,27 +1451,18 @@ class DictAsCsf:
         self.next += 1
 
         f = contObj.get()
-        contents = f.read(16384)
-        if len(contents) == 16384:
-            # too big; compress using a temporary file
-            (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
-            os.unlink(path)
-            gzf = gzip.GzipFile('', "wb", fileobj = os.fdopen(os.dup(fd), "w"))
-            gzf.write(contents)
-            util.copyfileobj(f, gzf)
-            # don't close the result of contObj.get(); we may need it again
-            # but do close gzf, so we're sure that any buffers are flushed
-            # to disk
-            gzf.close()
-            os.lseek(fd, 0, 0)
-            f = os.fdopen(fd, "r")
-            return (name, contType, f)
-        else:
-            compressedFile = StringIO()
-            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-            gzf.write(contents)
-            gzf.close()
-            compressedFile.seek(0)
+        compressedFile = util.BoundedStringIO(maxMemorySize = self.maxMemSize)
+        bufSize = 16384
+
+        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+        while 1:
+            buf = f.read(bufSize)
+            if not buf:
+                break
+            gzf.write(buf)
+        gzf.close()
+
+        compressedFile.seek(0)
 
         return (name, contType, compressedFile)
 
@@ -1526,7 +1533,15 @@ def _convertChangeSetV2V1(inPath, outPath):
 
 def getNativeChangesetVersion(protocolVersion):
     """Return the native changeset version supported by a client speaking the
-    supplied protocol version"""
+    supplied protocol version
+    
+    @param protocolVersion: Protocol version that the client negotiated with
+    the server
+    @type protocolVersion: int
+    @rtype: int
+    @return: native changeset version for a client speaking the protocol
+    version
+    """
     # Add more versions as necessary, but do remember to add them to
     # netclient's FILE_CONTAINER_* constants
     if protocolVersion < 38:
@@ -1536,3 +1551,100 @@ def getNativeChangesetVersion(protocolVersion):
     # Add more changeset versions here as the currently newest client is
     # replaced by a newer one
     return filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX
+
+class AbstractChangesetExploder:
+
+    def __init__(self, cs):
+        ptrMap = {}
+
+        fileList = []
+        linkGroups = {}
+        linkGroupFirstPath = {}
+        # sort the files by pathId,fileId
+        for trvCs in cs.iterNewTroveList():
+            trv = trove.Trove(trvCs)
+            self.installingTrove(trv)
+            for pathId, path, fileId, version in trv.iterFileList():
+                fileList.append((pathId, fileId, path, trv))
+
+        fileList.sort()
+
+        restoreList = []
+
+        for pathId, fileId, path, trv in fileList:
+            fileCs = cs.getFileChange(None, fileId)
+            if fileCs is None:
+                self.fileMissing(trv, pathId, fileId, path)
+                continue
+
+            fileObj = files.ThawFile(fileCs, pathId)
+
+            destDir = self.installFile(trv, path, fileObj)
+            if not destDir:
+                continue
+
+            if fileObj.hasContents:
+                restoreList.append((pathId, fileId, fileObj, destDir, path,
+                                    trv))
+            else:
+                self.restoreFile(trv, fileObj, None, destDir, path)
+
+        delayedRestores = {}
+        for pathId, fileId, fileObj, destDir, destPath, trv in restoreList:
+            (contentType, contents) = cs.getFileContents(pathId, fileId)
+            if contentType == ChangedFileTypes.ptr:
+                targetPtrId = contents.get().read()
+                l = delayedRestores.setdefault(targetPtrId, [])
+                l.append((fileObj, destDir, destPath))
+                continue
+
+            assert(contentType == ChangedFileTypes.file)
+
+            ptrId = pathId + fileId
+            if pathId in delayedRestores:
+                ptrMap[pathId] = destPath
+            elif ptrId in delayedRestores:
+                ptrMap[ptrId] = destPath
+
+            self.restoreFile(trv, fileObj, contents, destDir, destPath)
+
+            linkGroup = fileObj.linkGroup()
+            if linkGroup:
+                linkGroups[linkGroup] = destPath
+
+            for fileObj, targetDestDir, targetPath in \
+                                            delayedRestores.get(ptrId, []):
+                linkGroup = fileObj.linkGroup()
+                if linkGroup in linkGroups:
+                    self.restoreLink(trv, fileObj, targetDestDir,
+                                     linkGroups[linkGroup], targetPath)
+                else:
+                    self.restoreFile(trv, fileObj, contents, targetDestDir,
+                                     targetPath)
+
+                    if linkGroup:
+                        linkGroups[linkGroup] = targetPath
+
+    def installingTrove(self, trv):
+        pass
+
+    def restoreFile(self, trv, fileObj, contents, destdir, path):
+        fileObj.restore(contents, destdir, destdir + path)
+
+    def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
+        util.createLink(destdir + sourcePath, destdir + targetPath)
+
+    def installFile(self, trv, path, fileObj):
+        raise NotImplementedException
+
+    def fileMissing(self, trv, pathId, fileId, path):
+        raise KeyError, pathId + fileId
+
+class ChangesetExploder(AbstractChangesetExploder):
+
+    def __init__(self, cs, destDir):
+        self.destDir = destDir
+        AbstractChangesetExploder.__init__(self, cs)
+
+    def installFile(self, trv, path, fileObj):
+        return self.destDir

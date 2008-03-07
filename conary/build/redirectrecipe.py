@@ -17,6 +17,7 @@ from conary.build import errors as builderrors
 from conary.build import macros
 from conary.build import use
 from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
+from conary.lib import log
 
 class _Redirect(object):
 
@@ -66,18 +67,15 @@ class _RedirectRule(object):
                     "Redirects must specify branches or labels, " \
                     "not versions"
 
+            log.info('redirecting to branches is deprecated; redirects must '
+                     'be to labels')
+
             matches = repos.getTroveLeavesByBranch(
                             { self.destName : { branch : None } })
         else:
             label = versions.Label(self.branchStr)
-            matches = repos.getTroveLeavesByLabel(
+            matches = repos.getTroveLatestByLabel(
                             { self.destName : { label : None } })
-            # check for label multiplicity
-            if matches:
-                branches = set(x.branch() for x in matches[self.destName])
-                if len(branches) > 1:
-                    raise builderrors.RecipeFileError, \
-                        "Label %s matched multiple branches." % str(label)
 
         targetFlavors = set()
         # Get the flavors and branch available on the target
@@ -394,10 +392,15 @@ class RedirectRecipe(Recipe):
         self.repos = repos
         self.cfg = cfg
         self.redirections = _Redirections()
-        self.branch = branch
         self.flavor = flavor
         self.macros = macros.Macros()
-        self.macros.update(extraMacros)
+        if branch is not None:
+            self.macros.binarybranch = str(branch)
+            self.macros.update(extraMacros)
+            # this allows override of binarybranch externally (used by rMake)
+            self.branch = versions.VersionFromString(self.macros.binarybranch)
+        else:
+            self.branch = None
         self.rules = {}
 
 

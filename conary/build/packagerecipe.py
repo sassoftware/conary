@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,15 +12,14 @@
 # full details.
 #
 
-import glob
 import os
-import imp
 import inspect
-import sys
+import itertools
 
-from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
+from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
 from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
+from conary import trove
 
 from conary.build import action
 from conary.build import build
@@ -33,6 +32,8 @@ from conary.deps import deps
 from conary.lib import log, magic, util
 from conary.local import database
 
+from conary.repository import errors as repoerrors
+
 
 
 crossMacros = {
@@ -42,23 +43,6 @@ crossMacros = {
     'headerpath'	: '%(sysroot)s%(includedir)s'
 }
 
-def loadMacros(paths):
-    baseMacros = {}
-    loadPaths = []
-    for path in paths:
-        globPaths = sorted(list(glob.glob(path)))
-        loadPaths.extend(globPaths)
-
-    for path in loadPaths:
-        compiledPath = path+'c'
-        deleteCompiled = not util.exists(compiledPath)
-        macroModule = imp.load_source('tmpmodule', path)
-        if deleteCompiled and util.exists(compiledPath):
-            os.unlink(compiledPath)
-        baseMacros.update(x for x in macroModule.__dict__.iteritems()
-                          if not x[0].startswith('__'))
-
-    return baseMacros
 
 class _recipeHelper:
     def __init__(self, list, recipe, theclass):
@@ -68,44 +52,73 @@ class _recipeHelper:
     def __call__(self, *args, **keywords):
         self.list.append(self.theclass(self.recipe, *args, **keywords))
 
-class _policyUpdater:
-    def __init__(self, theobject):
-        self.theobject = theobject
-    def __call__(self, *args, **keywords):
-	self.theobject.updateArgs(*args, **keywords)
-
-def clearBuildReqs(*buildReqs):
+def clearBuildRequires(*buildReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
     _clearReqs('buildRequires', buildReqs)
 
-def clearCrossReqs(*crossReqs):
+def clearBuildReqs(*buildReqs):
+    #log.warning('clearBuildReqs() is deprecated.  Use clearBuildRequires()')
+    clearBuildRequires(*buildReqs)
+
+def clearCrossRequires(*crossReqs):
     """ Clears inherited build requirement lists of a given set of packages,
         or all packages if none listed.
     """
     _clearReqs('crossRequires', crossReqs)
 
-def _clearReqs(attrName, reqs):
-    def _removePackages(class_, pkgs):
-        if not pkgs:
-            setattr(class_, attrName, [])
-        else:
-            for pkg in pkgs:
-                if pkg in getattr(class_, attrName):
-                    getattr(class_, attrName).remove(pkg)
+def clearCrossReqs(*crossReqs):
+    #log.warning('clearCrossReqs() is deprecated.  Use clearCrossRequires()')
+    clearCrossRequires(*crossReqs)
 
-    callerGlobals = inspect.stack()[2][0].f_globals
+def _clearReqs(attrName, reqs):
+    # walk the stack backwards until we find the frame
+    # that looks like a recipe frame.  loadrecipe sets up
+    # a __localImportModules dictionary in the global space
+    # of the module that is created for the recipe.  PackageRecipe
+    # should also be a global in the frame.
+    # First get the stack
+    stack = inspect.stack()
+    # now get the innermost frame, which is the first element of
+    # the stack list.
+    frame = stack.pop(0)[0]
+    while stack:
+        callerGlobals = frame.f_globals
+        if ('PackageRecipe' in callerGlobals
+            and '__localImportModules' in callerGlobals):
+            # if we have PackageRecipe and __localImportModules, we
+            # found the most likely candidate for the recipe frame
+            break
+        # try the next frame up
+        frame = stack.pop(0)[0]
+    if not stack:
+        raise RuntimeError('unable to determine the frame that is '
+                           'creating the recipe class')
+    # get a list of all classes that are derived from AbstractPackageRecipe
     classes = []
     for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, _AbstractPackageRecipe):
+        if inspect.isclass(value) and issubclass(value, AbstractPackageRecipe):
             classes.append(value)
+
+    # define a convenience function for removing buildReqs from a list
+    # or clearing them.
+    def _removePackages(class_, pkgs):
+        # if no specific buildReqs were mentioned to remove, remove them all
+        if not pkgs:
+            setattr(class_, attrName, [])
+            return
+        # get the set of packages to remove
+        buildReqs = set(getattr(class_, attrName))
+        remove = set(pkgs)
+        buildReqs = buildReqs - remove
+        setattr(class_, attrName, list(buildReqs))
 
     for class_ in classes:
         _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
-            if issubclass(base, _AbstractPackageRecipe):
+            if issubclass(base, AbstractPackageRecipe) and base not in classes:
                 _removePackages(base, reqs)
 
 crossFlavor = deps.parseFlavor('cross')
@@ -120,7 +133,7 @@ def getCrossCompileSettings(flavor):
     isCrossTool = flavor.stronglySatisfies(crossFlavor)
     return None, targetFlavor, isCrossTool
 
-class _AbstractPackageRecipe(Recipe):
+class AbstractPackageRecipe(Recipe):
     buildRequires = [
         'filesystem:runtime',
         'setup:runtime',
@@ -134,11 +147,15 @@ class _AbstractPackageRecipe(Recipe):
         'sqlite:lib',
     ]
     crossRequires = []
+    buildRequirementsOverride = None
+    crossRequirementsOverride = None
 
     Flags = use.LocalFlags
     explicitMainDir = False
 
     _recipeType = RECIPE_TYPE_PACKAGE
+    internalPolicyModules = ( 'destdirpolicy', 'packagepolicy')
+    basePolicyClass = policy.Policy
 
     def validate(self):
         # wait to check build requires until the object is instantiated
@@ -175,7 +192,6 @@ class _AbstractPackageRecipe(Recipe):
         """ Checks to see if the build requirements for the recipe
             are installed
         """
-
         def _filterBuildReqsByVersionStr(versionStr, troves):
             if not versionStr:
                 return troves
@@ -208,8 +224,9 @@ class _AbstractPackageRecipe(Recipe):
             return versionMatches
 
         def _filterBuildReqsByFlavor(flavor, troves):
-            troves.sort(key = lambda x: x.getVersion(), reverse=True)
+            troves.sort(key = lambda x: x.getVersion())
             if flavor is None:
+                # get latest
                 return troves[-1]
             for trove in troves:
                 troveFlavor = trove.getFlavor()
@@ -223,12 +240,8 @@ class _AbstractPackageRecipe(Recipe):
                 (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
                 # XXX move this to use more of db.findTrove's features, instead
                 # of hand parsing
-                try:
-                    troves = db.trovesByName(name)
-                    troves = db.getTroves(troves)
-                except errors.TroveNotFound:
-                    missingReqs.append(buildReq)
-                    continue
+                troves = db.trovesByName(name)
+                troves = db.getTroves(troves)
 
                 versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
 
@@ -246,7 +259,7 @@ class _AbstractPackageRecipe(Recipe):
 	db = database.Database(cfg.root, cfg.dbPath)
 
 
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             if not self.macros.sysroot:
                 err = ("cross requirements needed but %(sysroot)s undefined")
                 if raiseError:
@@ -277,7 +290,7 @@ class _AbstractPackageRecipe(Recipe):
         time = sourceVersion.timeStamps()[-1]
 
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
-        if self.crossRequires:
+        if self.needsCrossFlags() and self.crossRequires:
             crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
                                                        crossDb)
         else:
@@ -314,15 +327,78 @@ class _AbstractPackageRecipe(Recipe):
 
 	db = database.Database(self.cfg.root, self.cfg.dbPath)
         self.transitiveBuildRequiresNames = set(
-            req.getName() for req in self.buildReqMap.itervalues())
+            req.getName() for req in self.getBuildRequirementTroves(db))
         depSetList = [ req.getRequires()
-                       for req in self.buildReqMap.itervalues() ]
+                       for req in self.getBuildRequirementTroves(db) ]
         d = db.getTransitiveProvidesClosure(depSetList)
         for depSet in d:
             self.transitiveBuildRequiresNames.update(
                 set(troveTup[0] for troveTup in d[depSet]))
 
         return self.transitiveBuildRequiresNames
+
+    def getBuildRequirementTroves(self, db):
+        if self.buildRequirementsOverride is not None:
+            return db.getTroves(self.buildRequirementsOverride,
+                                withFiles=False)
+        return self.buildReqMap.values()
+
+    def getCrossRequirementTroves(self):
+        if self.crossRequirementsOverride:
+            db = database.Database(self.cfg.root, self.cfg.dbPath)
+            return db.getTroves(self.crossRequirementsOverride,
+                                     withFiles=False)
+        return self.crossRequires.values()
+
+    def getRecursiveBuildRequirements(self, db, cfg):
+        if self.buildRequirementsOverride is not None:
+            return self.buildRequirementsOverride
+        buildReqs = self.getBuildRequirementTroves(db)
+        buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
+                        for x in buildReqs)
+        packageReqs = [ x for x in self.buildReqMap.itervalues() 
+                        if trove.troveIsCollection(x.getName()) ]
+        for package in packageReqs:
+            childPackages = [ x for x in package.iterTroveList(strongRefs=True,
+                                                               weakRefs=True) ]
+            hasTroves = db.hasTroves(childPackages)
+            buildReqs.update(x[0] for x in itertools.izip(childPackages,
+                                                          hasTroves) if x[1])
+        buildReqs = self._getRecursiveRequirements(db, buildReqs, cfg.flavor)
+        return buildReqs
+
+    def _getRecursiveRequirements(self, db, troveList, flavorPath):
+        # gets the recursive requirements for the listed packages
+        seen = set()
+        while troveList:
+            depSetList = []
+            for trv in db.getTroves(list(troveList), withFiles=False):
+                required = deps.DependencySet()
+                oldRequired = trv.getRequires()
+                [ required.addDep(*x) for x in oldRequired.iterDeps() 
+                  if x[0] != deps.AbiDependency ]
+                depSetList.append(required)
+            seen.update(troveList)
+            sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
+            troveList = set()
+            for depSetSols in sols.itervalues():
+                for depSols in depSetSols:
+                    bestChoices = []
+                    # if any solution for a dep is satisfied by the installFlavor
+                    # path, then choose the solutions that are satisfied as 
+                    # early as possible on the flavor path.  Otherwise return
+                    # all solutions.
+                    for flavor in flavorPath:
+                        bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
+                        if bestChoices:
+                            break
+                    if bestChoices:
+                        depSols = set(bestChoices)
+                    else:
+                        depSols = set(depSols)
+                    depSols.difference_update(seen)
+                    troveList.update(depSols)
+        return seen
 
     def processResumeList(self, resume):
 	resumelist = []
@@ -384,39 +460,8 @@ class _AbstractPackageRecipe(Recipe):
     def loadSourceActions(self):
         self._loadSourceActions(lambda item: item._packageAction is True)
 
-    def loadPolicy(self, policySet = None,
-                   internalPolicyModules =
-                            ( 'destdirpolicy', 'packagepolicy') ):
-        (self._policyPathMap, self._policies) = \
-                policy.loadPolicy(self, policySet = policySet,
-                                  internalPolicyModules = internalPolicyModules)
-        # create bucketless name->policy map for getattr
-        policyList = []
-        for bucket in self._policies.keys():
-            policyList.extend(self._policies[bucket])
-        self._policyMap = dict((x.__class__.__name__, x) for x in policyList)
-        # Some policy needs to pass arguments to other policy at init
-        # time, but that can't happen until after all policy has been
-        # initialized
-        for name, policyObj in self._policyMap.iteritems():
-            self.externalMethods[name] = _policyUpdater(policyObj)
-        # must be a second loop so that arbitrary policy cross-reference
-        # works; otherwise it is dependent on sort order whether or
-        # not it works
-        for name, policyObj in self._policyMap.iteritems():
-            policyObj.postInit()
-
-        # returns list of policy files loaded
-        return self._policyPathMap.keys()
-
     def _addBuildAction(self, name, item):
         self.externalMethods[name] = _recipeHelper(self._build, self, item)
-
-    def doProcess(self, policyBucket):
-	for post in self._policies[policyBucket]:
-            sys.stdout.write('Running policy: %s\r' %post.__class__.__name__)
-            sys.stdout.flush()
-            post.doProcess(self)
 
     def getPackages(self):
         return self.autopkg.getComponents()
@@ -541,7 +586,7 @@ class _AbstractPackageRecipe(Recipe):
             # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
                 flag._set(False)
-            use.setBuildFlagsFromFlavor(self.name, flavor)
+            use.setBuildFlagsFromFlavor(self.name, flavor, error=False)
 
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
@@ -700,6 +745,12 @@ class _AbstractPackageRecipe(Recipe):
     def isCrossCompileTool(self):
         return self._isCrossCompileTool
 
+    def glob(self, expression):
+        return action.Glob(self, expression)
+
+    def regexp(self, expression):
+        return action.Regexp(expression)
+
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance,
@@ -722,7 +773,7 @@ class _AbstractPackageRecipe(Recipe):
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
-	self.macros = macros.Macros()
+	self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()
@@ -779,8 +830,11 @@ class _AbstractPackageRecipe(Recipe):
         self.mainDir(self.nameVer(), explicit=False)
         self._autoCreatedFileCount = 0
 
+# For compatibility with older modules. epydoc doesn't document classes
+# starting with _, see CNY-1848
+_AbstractPackageRecipe = AbstractPackageRecipe
 
-class PackageRecipe(_AbstractPackageRecipe):
+class PackageRecipe(AbstractPackageRecipe):
     """
     NAME
     ====
@@ -803,8 +857,17 @@ class PackageRecipe(_AbstractPackageRecipe):
 
     EXAMPLE
     =======
+    A sample class that uses PackageRecipe to download source code from
+    a web site, unpack it, run "make", then run "make install"::
 
-    FIXME example
+        class ExamplePackage(PackageRecipe):
+            name = 'example'
+            version = '1.0'
+
+            def setup(r):
+                r.addArchive('http://code.example.com/example/')
+                r.Make()
+                r.MakeInstall()
     """
     internalAbstractBaseClass = 1
     # these initial buildRequires need to be cleared where they would
@@ -812,7 +875,7 @@ class PackageRecipe(_AbstractPackageRecipe):
     # of :lib in here is only for runtime, not to link against.
     # Any package that needs to link should still specify the :devel
     # component
-    buildRequires = _AbstractPackageRecipe.buildRequires + [
+    buildRequires = AbstractPackageRecipe.buildRequires + [
         'bzip2:runtime',
         'gzip:runtime',
         'tar:runtime',
@@ -821,10 +884,13 @@ class PackageRecipe(_AbstractPackageRecipe):
     ]
 
     def __init__(self, *args, **kwargs):
-        _AbstractPackageRecipe.__init__(self, *args, **kwargs)
+        AbstractPackageRecipe.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
+
+    def setupAbstractBaseClass(r):
+        r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
 
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)

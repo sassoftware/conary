@@ -1,4 +1,4 @@
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -71,7 +71,7 @@ class Logger:
         if self.path.endswith('.bz2'):
             logFile = bz2.BZ2File(self.path, 'w')
         elif self.path.endswith('.gz'):
-            logFile = gzip.GZipFile(self.path, 'w')
+            logFile = gzip.GzipFile(self.path, 'w')
         else:
             logFile = open(self.path, 'w')
         logger = _ChildLogger(masterFd, logFile, directRd, 
@@ -197,10 +197,12 @@ class _ChildLogger:
 
         stdout = sys.stdout.fileno()
 
-        fdList = [directRd, ptyFd]
+        pollObj = select.poll()
+        pollObj.register(directRd, select.POLLIN)
+        pollObj.register(ptyFd, select.POLLIN)
         if self.withStdin and os.isatty(stdin):
-            fdList.append(stdin)
-        
+            pollObj.register(stdin, select.POLLIN)
+
         # sigwinch is called when the window size is changed
         sigwinch = []
         def sigwinch_handler(s, f):
@@ -210,8 +212,7 @@ class _ChildLogger:
 
         while True:
             try:
-                # XXX is poll more efficient here?
-                read, write, error = select.select(fdList, [], [])
+                read = [ x[0] for x in pollObj.poll() ]
             except select.error, msg:
                 if msg.args[0] != 4:
                     raise
