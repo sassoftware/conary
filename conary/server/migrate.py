@@ -397,18 +397,12 @@ class MigrateTo_15(SchemaMigration):
         self.db.dropIndex("Nodes", "NodesItemVersionIdx")
         self.db.dropIndex("Latest", "LatestIdx")
         self.db.loadSchema()
-        # fake this index since we don't have the column yet
-        self.db.tables["TroveFiles"].append("TroveFilesFilePathId_fk")
-        schema.createSchema(self.db)
         return True
     # conary 1.1.22 went out with a busted definition of LabelMap - we need to fix it
     def migrate4(self):
         return True
     # 15.5
     def migrate5(self):
-        self.db.loadSchema()
-        self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
-                            'itemId, branchId')
         return True
     # 15.6 - fix for the wrong values of clonedFromId and sourceItemId
     def migrate6(self):
@@ -467,7 +461,6 @@ class MigrateTo_15(SchemaMigration):
         return True
     # 15.8 - add an index on TroveInfo
     def migrate8(self):
-        self.db.createIndex("TroveInfo", "TroveInfoChangedIdx", "changed")
         return True
     # 15.9 - rebuild Latest
     def migrate9(self):
