@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A bug that occasionally caused a thread deadlock when multiple
+      threads access the local system Conary database concurrently has
+      been fixed. (CNY-2586)
+
 Changes in 1.1.31.12:
   o Bug Fixes:
     * A bug that could cause incorrect SQLite database error messages

@@ -1100,7 +1100,9 @@ _con_prepare(pysqlc* self, PyObject *args)
 		}
 	}
 
+	MY_BEGIN_ALLOW_THREADS(self->tstate);
 	ret = sqlite3_prepare(self->p_db, sql, sql_len, &stmt, &query_tail);
+	MY_END_ALLOW_THREADS(self->tstate);
 
 	if (ret != SQLITE_OK) {
 		PyErr_SetString(_sqlite_DatabaseError,
