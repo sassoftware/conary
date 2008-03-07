@@ -397,6 +397,8 @@ class MigrateTo_15(SchemaMigration):
         self.db.dropIndex("Nodes", "NodesItemVersionIdx")
         self.db.dropIndex("Latest", "LatestIdx")
         self.db.loadSchema()
+        # fake this index since we don't have the column yet
+        self.db.tables["TroveFiles"].append("TroveFilesFilePathId_fk")
         schema.createSchema(self.db)
         return True
     # conary 1.1.22 went out with a busted definition of LabelMap - we need to fix it
@@ -521,6 +523,10 @@ class MigrateTo_16(SchemaMigration):
         if "OldPermissions" in self.db.tables:
             cu.execute("drop table OldPermissions")
         cu.execute("create table OldPermissions as select * from Permissions")
+        addFK = False
+        if "UserGroupAllPermissions" in self.db.tables:
+            self.db.dropForeignKey("UserGroupAllPermissions", name="UGAP_permissionId_fk")
+            addFK = True
         cu.execute("drop table Permissions")
         self.db.loadSchema()
         schema.createUsers(self.db)
@@ -535,6 +541,9 @@ class MigrateTo_16(SchemaMigration):
         cu.execute("insert into Permissions(%s) "
                    "select distinct %s from OldPermissions " %(fields, fields))
         cu.execute("drop table OldPermissions")
+        if addFK:
+            self.db.addForeignKey("UserGroupAllPermissions", "permissionId",
+                                  "Permissions", "permissionId")
         self.db.loadSchema()
         return True
         
