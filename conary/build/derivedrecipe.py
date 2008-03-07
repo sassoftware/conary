@@ -151,6 +151,35 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                 raise builderrors.RecipeFileError(
                         'Version %s of %s not found'
                                     % (parentVersion, self.name) )
+        elif self.sourceVersion:
+            sourceRevision = self.sourceVersion.trailingRevision()
+            d = repos.getTroveVersionsByLabel(
+                    { self.name : { parentBranch.label() : [ None ] } } )
+
+            if not d[self.name]:
+                raise builderrors.RecipeFileError(
+                    'No versions of %s found on label %s' %
+                            (self.name, parentBranch.label()))
+
+            versionList = reversed(sorted(d[self.name]))
+            match = False
+            for version in versionList:
+                # This is a really complicated way of checking that
+                # version is an ancestor of sourceRevision
+                sr = sourceRevision.copy()
+                sr.getSourceCount().truncateShadowCount(
+                        version.trailingRevision().shadowCount())
+
+                if (version.getSourceVersion().trailingRevision() == sr):
+                    match = True
+                    break
+
+            if not match:
+                raise builderrors.RecipeFileError(
+                    'No packages of %s of source revision %s found on label %s'
+                        % (self.name, sourceRevision, parentBranch.label()))
+
+            parentVersion = version
         else:
             d = repos.getTroveLeavesByBranch(
                     { self.name : { parentBranch : [ None ] } } )
