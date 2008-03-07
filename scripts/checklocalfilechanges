@@ -1,0 +1,120 @@
+#!/usr/bin/env python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2005-2008 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+"""
+Intended to be a fast, cheap subset of conary verify --all that
+checks some files that it can do easily and quickly.
+The output format is NOT fixed, and is likely to change from
+time to time.  transient file contents are ignored unless
+the --transient-contents argument is provided.
+"""
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg, files
+from conary.lib import options, sha1helper, util
+from conary import conaryclient
+from conary.local import database
+
+def usage():
+    print 'usage: %s [--root rootpath] [--transient-contents]' %sys.argv[0]
+
+def main(argv):
+    sys.excepthook = util.genExcepthook()
+    client = conaryclient.getClient()
+    repos = client.getRepos()
+    cfg = client.cfg
+
+    argDef = {}
+    argDef['transient-contents'] = options.NO_PARAM
+
+    cfgMap = {'root': 'root'}
+    try:
+        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+                                                argv=argv)
+    except options.OptionError, s:
+        print s
+        sys.exit(1)
+
+    transientContents = argSet.has_key('transient-contents')
+    
+    dbPath = os.sep.join((cfg.root, cfg.dbPath, 'conarydb'))
+    db = database.Database(cfg.root, cfg.dbPath)
+    cu = db.db.db.cursor()
+
+    cu.execute('SELECT pathId, path, versionId, stream '
+               'FROM DBTroveFiles where isPresent=1')
+    for pathId, path, versionId, stream in cu:
+        f = files.ThawFile(stream, pathId)
+        fullpath = os.path.join(cfg.root, path)
+        existsOnFilesystem = False
+        if util.exists(fullpath):
+            s = os.lstat(fullpath)
+            perms = s.st_mode & 07777
+            if f.inode.perms() != perms:
+                print 'perms mismatch for %s: %o should be %o' %(
+                    path, perms, f.inode.perms())
+            existsOnFilesystem = True
+        if (isinstance(f, files.RegularFile)):
+            if existsOnFilesystem == True:
+                if not (f.flags.isConfig() or f.flags.isInitialContents()):
+                    filetype = 'regular'
+                    if f.flags.isTransient():
+                        if transientContents:
+                            filetype = 'transient'
+                        else:
+                            continue
+                    try:
+                        troveSha1 = f.contents.sha1()
+                        if s.st_size == f.contents.size():
+                            systemSha1 = sha1helper.sha1FileBin(fullpath)
+                            if troveSha1 != systemSha1:
+                                print 'sha1 mismatch for %s file %s' %(
+                                    filetype, path)
+                        else:
+                            print 'size mismatch for %s: %d should be %d' %(
+                                path, s.st_size, f.contents.size())
+                    except OSError, s:
+                        print s
+            else:
+                print '%s missing from filesystem' %path
+        elif isinstance(f, files.SymbolicLink):
+            fullpath = os.path.join(cfg.root, path)
+            c = os.readlink(fullpath)
+            if c != f.target():
+                print 'symlink %s contains %s instead of %s' %(
+                    path, c, f.target())
+        elif isinstance(f, (files.Directory, files.Socket, files.NamedPipe,
+                            files.DeviceFile)):
+            # no further checking than permissions for these types
+            pass
+        else:
+            print 'not checking special file %s' % path
+
+
+if __name__ == '__main__':
+    main(sys.argv)

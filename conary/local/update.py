@@ -441,7 +441,7 @@ class FilesystemJob:
                 (otherId, fileObj, target, msg, ptrId, otherFileId) = match[1]
 
                 contType, contents = self.changeSet.getFileContents(
-                                            pathId, otherFileId)
+                                            pathId, fileId)
                 assert(contType == changeset.ChangedFileTypes.file)
 		restoreFile(fileObj, contents, self.root, target, journal,
                             opJournal)
