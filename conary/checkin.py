@@ -193,6 +193,34 @@ def checkout(repos, cfg, workDir, nameList, callback=None):
 
     _checkout(repos, cfg, workDir, fullList, callback)
 
+class CheckoutExploder(changeset.AbstractChangesetExploder):
+
+    def __init__(self, cs, pathMap, sourceState):
+        self.pathMap = pathMap
+        self.sourceState = sourceState
+        changeset.AbstractChangesetExploder.__init__(self, cs)
+
+    def installFile(self, trv, path, fileObj):
+        (destDir, pathId, fileId, version) = \
+                    self.pathMap[(trv.getNameVersionFlavor(), path)]
+
+        trv.iterFileList()
+        self.sourceState.addFile(pathId, path, version, fileId,
+                                 isConfig = fileObj.flags.isConfig(),
+                                 isAutoSource = fileObj.flags.isAutoSource())
+
+        if fileObj.flags.isAutoSource():
+            return False
+
+        return destDir
+
+    def restoreFile(self, trv, fileObj, contents, destdir, path):
+        fileObj.restore(contents, destdir, destdir + '/' + path,
+                        nameLookup = False)
+
+    def fileMissing(self, trv, pathId, fileId, path):
+        pass
+
 def _checkout(repos, cfg, workDirArg, trvList, callback):
     assert(len(trvList) == 1 or workDirArg is None)
     jobList = []
@@ -231,48 +259,16 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
 
     verifyAbsoluteChangesetSignatures(cs, callback)
 
-    earlyRestore = []
-    lateRestore = []
+    pathMap = {}
 
     for trvInfo, spec in itertools.izip(trvList, checkoutSpecs):
         sourceState = spec.conaryState.getSourceState()
         troveCs = cs.getNewTroveVersion(*trvInfo)
 
         for (pathId, path, fileId, version) in troveCs.getNewFileList():
-            fullPath = spec.targetDir + "/" + path
+            pathMap[(trvInfo, path)] = (spec.targetDir, pathId, fileId, version)
 
-            fileStream = cs.getFileChange(None, fileId)
-            if fileStream is None:
-                # File is missing
-                continue
-
-            fileObj = files.ThawFile(fileStream, pathId)
-            sourceState.addFile(pathId, path, version, fileId,
-                                isConfig = fileObj.flags.isConfig(),
-                                isAutoSource = fileObj.flags.isAutoSource())
-
-            if fileObj.flags.isAutoSource():
-                continue
-
-            if not fileObj.hasContents:
-                fileObj.restore(None, '/', fullPath, nameLookup=False)
-            else:
-                # tracking the pathId separately from the fileObj lets
-                # us sort the list of files by pathId,fileId (which is how
-                # changesets are ordered)
-                assert(fileObj.pathId() == pathId)
-                if fileObj.flags.isConfig():
-                    earlyRestore.append((pathId, fileId, fileObj, '/', fullPath))
-                else:
-                    lateRestore.append((pathId, fileId, fileObj, '/', fullPath))
-
-    earlyRestore.sort()
-    lateRestore.sort()
-
-    for pathId, fileId, fileObj, root, target in \
-                            itertools.chain(earlyRestore, lateRestore):
-	contents = cs.getFileContents(pathId, fileId)[1]
-	fileObj.restore(contents, root, target, nameLookup=False)
+    CheckoutExploder(cs, pathMap, sourceState)
 
     for spec in checkoutSpecs:
         spec.conaryState.write(spec.targetDir + "/CONARY")

@@ -263,7 +263,7 @@ class Config(policy.Policy):
                     self.warn("adding trailing newline to config file '%s'" % \
                             filename)
                     mode = os.lstat(fullpath)[stat.ST_MODE]
-                    oldMode = None
+                    oldmode = None
                     if mode & 0600 != 0600:
                         # need to be able to read and write the file to fix it
                         oldmode = mode

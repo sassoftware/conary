@@ -1,3 +1,11 @@
+Changes in @NEW@:
+
+  o Bug Fixes:
+    * Checking out sources unpacks duplicate binary files (CNY-2543)
+    * Derived packages use the revision which was shadowed from to find
+      the version to derive from instead of the latest on the branch
+      (CNY-2577)
+
 Changes in 1.2.19:
   o Client Changes:
     * A close() method has been added to UpdateJob objects. It is
