@@ -15,7 +15,7 @@ import inspect
 
 from conary import files
 from conary.errors import ParseError
-from conary.build import action, source, policy
+from conary.build import action, lookaside, source, policy
 from conary.build.errors import RecipeFileError
 from conary.lib import log, util
 
@@ -33,6 +33,7 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
+RECIPE_TYPE_FACTORY   = 6
 
 class _policyUpdater:
     def __init__(self, theobject):
@@ -57,6 +58,9 @@ def isInfoRecipe(recipeClass):
 
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
+
+def isFactoryRecipe(recipeClass):
+    return recipeClass.getType() == RECIPE_TYPE_FACTORY
 
 def loadMacros(paths):
     '''
@@ -465,4 +469,11 @@ class Recipe(object):
             sys.stdout.write('Running policy: %s\r' % post.__class__.__name__)
             sys.stdout.flush()
             post.doProcess(self)
+
+    def _fetchFile(self, sourceName, refreshFilter = None, localOnly = False):
+        f = lookaside.findAll(self.cfg, self.laReposCache,
+            sourceName, self.name, self.srcdirs,
+            refreshFilter = refreshFilter, localOnly = localOnly,
+            allowNone = True)
+        return f
 

@@ -751,6 +751,15 @@ class AbstractPackageRecipe(Recipe):
     def regexp(self, expression):
         return action.Regexp(expression)
 
+    def _addTroveScript(self, troveNames, scriptContents, scriptType,
+                        fromClass = None):
+        scriptTypeMap = dict((y[2], x) for (x, y) in
+                             trove.TroveScripts.streamDict.items())
+        assert(scriptType in scriptTypeMap)
+        for troveName in troveNames:
+            self._scriptsMap.setdefault(troveName, {})[scriptType] = \
+                (scriptContents, fromClass)
+
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance,
@@ -779,6 +788,8 @@ class AbstractPackageRecipe(Recipe):
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
+        # Mapping from trove name to scripts
+        self._scriptsMap = {}
 
         # allow for architecture not to be set -- this could happen
         # when storing the recipe e.g.

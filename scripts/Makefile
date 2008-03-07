@@ -25,7 +25,7 @@ SUBDIRS	= migration
 
 all: default-subdirs default-all
 
-install:
+install: install-subdirs
 	# see conary-wrapper symlink in ../Makefile to make scripts
 	# available in $(bindir)
 	install -m 755 $(bin_scripts) $(DESTDIR)$(bindir)
