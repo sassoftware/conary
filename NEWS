@@ -1,3 +1,6 @@
+Changes in @NEW@:
+    * Checking out sources unpacks duplicate binary files (CNY-2543)
+
 Changes in 1.2.19:
   o Client Changes:
     * A close() method has been added to UpdateJob objects. It is
