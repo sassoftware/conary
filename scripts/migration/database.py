@@ -103,7 +103,7 @@ class Database:
     def checkTablesList(self, isSrc=True):
         #  check that we are migrating all the tables in the source
         self.db.loadSchema()
-        skip = ['databaseversion', 'instructionsets']
+        skip = ['databaseversion', 'instructionsets', 'commitlock']
         knowns = [x.lower() for x in TableList]
         haves = [x.lower() for x in self.db.tables]
         if isSrc:
