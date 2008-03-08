@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Derived packages use the revision which was shadowed from to find
       the version to derive from instead of the latest on the branch
       (CNY-2577)
+    * A bug that occurred when rMake recursed through a group recipe
+      that made use of the replace command has been fixed. (CNY-2606)
 
 Changes in 2.0.8:
   o Client Changes:
