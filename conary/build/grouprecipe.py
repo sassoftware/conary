@@ -3151,8 +3151,6 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
     for group in groupList:
         for (troveSpec, source, byDefault,
              refSource, components) in group.iterAddSpecs():
-            flavorMap.setdefault(refSource, {})
-
             sourceSpec = _sourceSpec(troveSpec, source)
             toFind.setdefault(refSource, set()).add(sourceSpec)
             _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)
@@ -3164,8 +3162,8 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
 
         for (troveSpec, ref), _ in group.iterReplaceSpecs():
             sourceSpec = _sourceSpec(troveSpec)
-            flavorMap.setdefault(sourceSpec, []).append(troveSpec[2])
             toFind.setdefault(ref, set()).add(sourceSpec)
+            _addFlavors(ref, sourceSpec, troveSpec[2], flavorMap)
 
     results = {}
 
