@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2006-2007 rPath, Inc.
+# Copyright (c) 2006-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -698,7 +698,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
 
     hidden = len(targets) > 1 or cfg.useHiddenCommits
     if hidden:
-        log.debug("will use hidden commits to syncronize target mirrors")
+        log.debug("will use hidden commits to synchronize target mirrors")
 
     if sync:
         currentMark = -1
