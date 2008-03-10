@@ -88,6 +88,8 @@ def seekToData(f):
     f.seek(size + entries * 16, 1)
 
 class RpmHeader:
+    _tagListValues = set([
+        DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME])
 
     def has_key(self, tag):
         return self.entries.has_key(tag)
@@ -127,6 +129,10 @@ class RpmHeader:
                 paths.append(dirs[dirIndex] + baseName)
 
             return paths
+
+        if tag in self._tagListValues and tag not in self.entries:
+            # Lists that are not present are empty
+            return []
 
         (dataType, offset, count) = self.entries[tag]
 
