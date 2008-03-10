@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.20:
   o Bug Fixes:
     * A bug that occasionally caused a thread deadlock when multiple
       threads access the local system Conary database concurrently has
