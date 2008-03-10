@@ -57,14 +57,29 @@ def locked(method):
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     def done(self):
+        """
+        @see: callbacks.UpdateCallback.done
+        """
         self._message('')
 
     def _message(self, text):
+        """
+        Called when this callback object needs to output progress information.
+        The information is written to stdout.
+
+        @return: None
+        """
         callbacks.LineOutput._message(self, text)
 
     def update(self):
-        # This method is not thread safe - you have to call it when you hold
-        # the lock
+        """
+        Called by this callback object to update the status.  This method
+        sanitizes text.  This method is not thread safe - obtain a lock before
+        calling.
+
+        @return: None
+        """
+
         t = ""
 
         if self.updateText:
@@ -92,27 +107,68 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     @locked
     def updateMsg(self, text):
+        """
+        Called when the update thread has status updates.
+
+        @param text: new status text
+        @type text: string
+
+        @return: None
+        """
         self.updateText = text
         self.update()
 
     @locked
     def csMsg(self, text):
+        """
+        Called when the download thread has status updates.
+
+        @param text: new status text
+        @type text: string
+
+        @return: None
+        """
+
         self.csText = text
         self.update()
 
     def preparingChangeSet(self):
+        """
+        @see: callbacks.ChangesetCallback.preparingChangeSet
+        """
         self.updateMsg("Preparing changeset request")
 
     def resolvingDependencies(self):
+        """
+        @see: callbacks.UpdateCallback.resolvingDependencies
+        """
         self.updateMsg("Resolving dependencies")
 
     @locked
     def updateDone(self):
+        """
+        @see: callbacks.UpdateCallback.updateDone
+        """
         self._message('')
         self.updateText = None
 
     @locked
     def _downloading(self, msg, got, rate, need):
+        """
+        Called by this callback object to handle different kinds of
+        download-related progress information.  This method puts together
+        download rate information.
+
+        @param msg: status message
+        @type msg: string
+        @param got: number of bytes retrieved so far
+        @type got: integer
+        @param rate: bytes per second
+        @type rate: integer
+        @param need: number of bytes total to be retrieved
+        @type need: integer
+        @return: None
+        """
         # This function acquires a lock just because it looks at self.csHunk
         # and self.updateText directly. Otherwise, self.csMsg will acquire the
         # lock (which is now reentrant)
@@ -130,32 +186,53 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             self.csMsg("%s (got %dKB at %dKB/s so far)" % (msg, got/1024, rate/1024))
 
     def downloadingFileContents(self, got, need):
+        """
+        @see: callbacks.ChangesetCallback.downloadingFileContents
+        """
         self._downloading('Downloading files for changeset', got, self.rate, need)
 
     def downloadingChangeSet(self, got, need):
+        """
+        @see: callbacks.ChangesetCallback.downloadingChangeSet
+        """
         self._downloading('Downloading', got, self.rate, need)
 
     def requestingFileContents(self):
+        """
+        @see: callbacks.ChangesetCallback.requestingFileContents
+        """
         if self.csHunk[1] < 2:
             self.csMsg("Requesting file contents")
         else:
             self.csMsg("Requesting file contents for changeset %d of %d" % self.csHunk)
 
     def requestingChangeSet(self):
+        """
+        @see: callbacks.ChangesetCallback.requestingChangeSet
+        """
         if self.csHunk[1] < 2:
             self.csMsg("Requesting changeset")
         else:
             self.csMsg("Requesting changeset %d of %d" % self.csHunk)
 
     def creatingRollback(self):
+        """
+        @see: callbacks.UpdateCallback.creatingRollback
+        """
         self.updateMsg("Creating rollback")
 
     def preparingUpdate(self, troveNum, troveCount):
+        """
+        @see: callbacks.UpdateCallback.preparingUpdate
+        """
         self.updateMsg("Preparing update (%d of %d)" % 
 		      (troveNum, troveCount))
 
     @locked
     def restoreFiles(self, size, totalSize):
+        """
+        @see: callbacks.UpdateCallback.restoreFiles
+        """
         # Locked, because we modify self.restored
         if totalSize != 0:
             self.restored += size
@@ -164,34 +241,58 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                            (self.restored * 100) / totalSize))
 
     def removeFiles(self, fileNum, total):
+        """
+        @see: callbacks.UpdateCallback.removeFiles
+        """
         if total != 0:
             self.updateMsg("Removing %d of %d (%d%%)"
                         % (fileNum , total, (fileNum * 100) / total))
 
     def creatingDatabaseTransaction(self, troveNum, troveCount):
+        """
+        @see: callbacks.UpdateCallback.creatingDatabaseTransaction
+        """
         self.updateMsg("Creating database transaction (%d of %d)" %
 		      (troveNum, troveCount))
 
     def runningPreTagHandlers(self):
+        """
+        @see: callbacks.UpdateCallback.runningPreTagHandlers
+        """
         self.updateMsg("Running tag prescripts")
 
     def runningPostTagHandlers(self):
+        """
+        @see: callbacks.UpdateCallback.runningPostTagHandlers
+        """
         self.updateMsg("Running tag post-scripts")
 
     def committingTransaction(self):
+        """
+        @see: callbacks.UpdateCallback.committingTransaction
+        """
         self.updateMsg("Committing database transaction")
 
     @locked
     def setChangesetHunk(self, num, total):
+        """
+        @see: callbacks.ChangesetCallback.setChangesetHunk
+        """
         self.csHunk = (num, total)
 
     @locked
     def setUpdateHunk(self, num, total):
+        """
+        @see: callbacks.UpdateCallback.setUpdateHunk
+        """
         self.restored = 0
         self.updateHunk = (num, total)
 
     @locked
     def setUpdateJob(self, jobs):
+        """
+        @see: callbacks.UpdateCallback.setUpdateJob
+        """
         self._message('')
         if self.updateHunk[1] < 2:
             self.out.write('Applying update job:\n')
@@ -205,20 +306,35 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     @locked
     def tagHandlerOutput(self, tag, msg, stderr = False):
+        """
+        @see: callbacks.UpdateCallback.tagHandlerOutput
+        """
         self._message('')
         self.out.write('[%s] %s\n' % (tag, msg))
 
     @locked
     def troveScriptOutput(self, typ, msg):
+        """
+        @see: callbacks.UpdateCallback.troveScriptOutput
+        """
         self._message('')
         self.out.write("[%s] %s" % (typ, msg))
 
     @locked
     def troveScriptFailure(self, typ, errcode):
+        """
+        @see: callbacks.UpdateCallback.troveScriptFailure
+        """
         self._message('')
         self.out.write("[%s] %s" % (typ, errcode))
 
     def __init__(self, cfg=None):
+        """
+        Initialize this callback object.
+        @param cfg: Conary configuration
+        @type cfg: A ConaryConfiguration object.
+        @return: None
+        """
         callbacks.UpdateCallback.__init__(self)
         if cfg:
             self.setTrustThreshold(cfg.trustThreshold)
@@ -363,6 +479,10 @@ def _updateTroves(cfg, applyList, **kwargs):
     # Take out the apply-related keyword arguments
     applyDefaults = dict(
                         replaceFiles = False,
+                        replaceManagedFiles = False,
+                        replaceUnmanagedFiles = False,
+                        replaceModifiedFiles = False,
+                        replaceModifiedConfigFiles = False,
                         tagScript = None,
                         justDatabase = False,
                         info = False,
@@ -373,6 +493,7 @@ def _updateTroves(cfg, applyList, **kwargs):
     for k in applyDefaults:
         if k in kwargs:
             applyKwargs[k] = kwargs.pop(k)
+
     callback = kwargs.pop('callback')
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
@@ -403,6 +524,7 @@ def _updateTroves(cfg, applyList, **kwargs):
         print ('Migrate must be run with --interactive'
                ' because it now has the potential to damage your'
                ' system irreparably if used incorrectly.')
+        client.close()
         return
 
     updJob = client.newUpdateJob()
@@ -427,6 +549,8 @@ def _updateTroves(cfg, applyList, **kwargs):
                 print 'NOTE: after critical updates were applied, the contents of the update were recalculated:'
                 print
                 displayChangedJobs(addedJobs, removedJobs, cfg)
+        updJob.close()
+        client.close()
         return
 
     if suggMap:
@@ -473,12 +597,18 @@ def _updateTroves(cfg, applyList, **kwargs):
             default = True
         okay = cmdline.askYn('continue with %s? %s' % values, default=default)
         if not okay:
+            updJob.close()
+            client.close()
             return
 
     if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
 
-    restartDir = client.applyUpdateJob(updJob, **applyKwargs)
+    try:
+        restartDir = client.applyUpdateJob(updJob, **applyKwargs)
+    finally:
+        updJob.close()
+        client.close()
 
     if restartDir:
         params = sys.argv

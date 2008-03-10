@@ -204,7 +204,7 @@ def rebuildLatest(db, recreate=False):
     return True
     
 class MigrateTo_15(SchemaMigration):
-    Version = (15, 9)
+    Version = (15, 10)
     def updateLatest(self):
         return rebuildLatest(self.db, recreate=True)
 
@@ -397,9 +397,12 @@ class MigrateTo_15(SchemaMigration):
     # 15.5
     def migrate5(self):
         # drop the index in case a user created it by hand (CNY-1704)
+        self.db.loadSchema()
         self.db.dropIndex('LabelMap', 'LabelMapItemIdBranchIdIdx')
-        self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx', 'itemId, branchId')
+        self.db.createIndex('LabelMap', 'LabelMapItemIdBranchIdIdx',
+                            'itemId, branchId')
         return True
+
     # 15.6 - fix for the wrong values of clonedFromId and sourceItemId
     def migrate6(self):
         # because Troveinfo.data is treated as a blob, we have to do
@@ -462,6 +465,11 @@ class MigrateTo_15(SchemaMigration):
     # 15.9 - rebuild the Latest table to eliminate entries for branches that end in redirects
     def migrate9(self):
         return rebuildLatest(self.db)
+    # 15.10 - create the lock table(s)
+    def migrate10(self):
+        self.db.loadSchema()
+        schema.createLockTables(self.db)
+        return True
     
 # looks like this LabelMap has to be recreated multiple times by
 # different stages of migraton :-(
@@ -477,12 +485,6 @@ def createLabelMap(db):
     db.loadSchema()
     return True
     
-class MigrateTo_16(SchemaMigration):
-    Version = (16.0)
-    # create a primary key for labelmap
-    def migrate(self):
-        return createLabelMap(self.db)
-
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]

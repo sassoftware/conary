@@ -12,9 +12,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-
+import os
 import sys
 import re
+
+if 'JIRANEMO_PATH' in os.environ:
+    sys.path.insert(0, os.environ['JIRANEMO_PATH'])
 # use jiranemo to crib off the configuration files, etc.
 from jiranemo import main
 from conary.lib import options
@@ -22,14 +25,23 @@ from conary.lib import options
 class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
     commands = ['check']
 
+    def addParameters(self, argDef):
+        d = {}
+        d["project"] = options.ONE_PARAM
+        argDef.update(d)
+        main.JiraNemoCommand.addParameters(self, argDef)
+
     def runCommand(self, client, cfg, argSet, args):
         keyre = re.compile('[A-Z]+-[0-9]+')
+        project = argSet.pop('project', 'CNY')
         if len(args) != 3:
             sys.exit(1)
         news = args[2]
         f = open(news)
         started = False
         fixVer = None
+        closedStates = [ 'Closed', 'Document', 'Resolved' ]
+        notClosed = []
         for line in f:
             if line.startswith('Changes in'):
                 if started:
@@ -43,29 +55,37 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                     print 'change @NEW@ first'
                     sys.exit(1)
             if not fixVer:
-                versions = client.getVersions('CNY')
+                versions = client.getVersions(project)
                 v = [ x for x in versions if x.name == version ]
                 if not v:
-                    print 'no such version', version, 'in CNY project'
+                    print 'no such version', version, 'in %s project' % project
+                    break
                 fixVer = v[0]
                 versionToId = dict((x.name, x.id) for x in versions)
             match = keyre.search(line)
             if match:
                 key = match.group()
-                if not key.startswith('CNY'):
+                if not key.startswith(project):
                     print 'not checking', key
                     continue
                 print 'getting', key
                 issue = client.getIssue(key)
                 fixVers = [ x for x in issue.fixVersions if x.name == version ]
+                if issue.status not in closedStates:
+                    notClosed.append(key)
                 if not fixVers:
-                    print key, 'does not have fix version set to', version
+                    print key, 'does not have fix version set to', version, 'setting...',
                     fixVersions = issue.fixVersions[:]
                     fixVersions.append(fixVer)
                     newVersions = [ versionToId[x.name] for x in fixVersions ]
                     d = { 'id': 'fixVersions',
                           'values': newVersions }
                     client.client.updateIssue(key, [ d ])
+                    print 'ok.'
+        if notClosed:
+            print "Issues that are not in a closed state (%s):" % \
+                ", ".join(closedStates)
+            print " ".join(notClosed)
 
 class CheckerMain(main.JiraNemoMain, options.MainHandler):
     commandList = [ CheckNewsCommand ]

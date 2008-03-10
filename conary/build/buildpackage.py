@@ -49,6 +49,10 @@ def _getUseFlavor(recipe):
     Returns a deps.Flavor instance that represents the Use flags
     that have been used.
     """
+    if 'abstractBaseClass' in recipe.__class__.__dict__ \
+            and recipe.abstractBaseClass:
+        # abstract base classes shouldn't be flavored
+        return deps.Flavor()
     f = use.createFlavor(recipe.name, use.Use._iterUsed(),
                          recipe.Flags._iterUsed(),
                          use.Arch._iterUsed(), 

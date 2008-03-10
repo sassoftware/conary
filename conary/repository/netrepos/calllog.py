@@ -86,6 +86,8 @@ class CallLogger:
     def __iter__(self):
         fd = os.open(self.path, os.O_RDONLY)
         size = os.fstat(fd).st_size
+        if size == 0:
+            raise StopIteration
         map = mmap.mmap(fd, size, access = mmap.ACCESS_READ)
         i = 0
         while i < size:

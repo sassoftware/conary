@@ -99,20 +99,6 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
         print 'The following %s will be created:' % branchOps
         displayBranchJob(cs, shadow=makeShadow)
 
-    labelConflicts = client._checkChangeSetForLabelConflicts(cs)
-    if labelConflicts and not ignoreConflicts:
-        print
-        print 'WARNING: performing these %s will create label conflicts:' % branchOps
-        for troveTups in labelConflicts:
-            print 
-            print '%s=%s[%s]' % (troveTups[0])
-            print '  conflicts with %s=%s[%s]' % (troveTups[1])
-
-        if not cfg.interactive and not info:
-            print
-            print 'error: Interactive mode is required when creating label conflicts'
-            return
-
     if cfg.interactive:
         print
         if hasBinary and branchType & client.BRANCH_BINARY:

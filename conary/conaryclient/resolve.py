@@ -107,7 +107,7 @@ class DependencySolver(object):
                 continue
 
             changedJob = self.addUpdates(newTroves, uJob, jobSet, ineligible,
-                                         keepList, troveSource)
+                                         keepList, troveSource, resolveSource)
             if not changedJob:
                 continue
 
@@ -129,7 +129,7 @@ class DependencySolver(object):
                 criticalUpdates)
 
     def addUpdates(self, troves, uJob, jobSet, ineligible, keepList, 
-                    troveSource):
+                   troveSource, resolveSource):
         """
         Add the given dep resolution solutions to the current jobSet.
         """
@@ -156,7 +156,8 @@ class DependencySolver(object):
                                               ineligible = beingRemoved,
                                               checkPrimaryPins = True)
         assert(not (newJob & jobSet))
-        newJob = self.filterCrossBranchResolutions(newJob, troveSource)
+        newJob = resolveSource.filterResolutionsPostUpdate(self.db, newJob,
+                                                           troveSource)
         if not newJob:
             # we had potential solutions, but they would have
             # required implicitly switching the branch of a trove
@@ -454,23 +455,4 @@ class DependencySolver(object):
         packageJobs = [x[1] for x in packages.iteritems() if hasTroves[x[0]]]
         return packageJobs
 
-    def filterCrossBranchResolutions(self, jobSet, troveSource):
-        # We can't resolve deps in a way that would cause conary to
-        # switch the branch of a trove.
-        crossBranchJobs = [ x for x in jobSet
-                            if (x[1][0] and
-                                x[1][0].branch() != x[2][0].branch()) ]
-        if crossBranchJobs:
-            jobSet.difference_update(crossBranchJobs)
-            oldTroves = self.db.getTroves(
-                  [ (x[0], x[1][0], x[1][1]) for x in crossBranchJobs ],
-                  withFiles = False)
-            newTroves = troveSource.getTroves(
-                  [ (x[0], x[2][0], x[2][1]) for x in crossBranchJobs ],
-                  withFiles = False)
-            for job, oldTrv, newTrv in itertools.izip(crossBranchJobs,
-                                                      oldTroves,
-                                                      newTroves):
-                if oldTrv.compatibleWith(newTrv):
-                    jobSet.add((job[0], (None, None), job[2], False))
-        return jobSet
+

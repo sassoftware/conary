@@ -160,10 +160,17 @@ class UseFlagConfig(ConfigFile):
         return (self.name, self.sense)
 
     def addUseFlag(self):
-        use.Use._addFlag(self.name, required=self.buildRequired,
+        if '.' in self.name:
+            packageName, flagName = self.name.split('.', 1)
+            use.PackageFlags
+            flagLoc = use.PackageFlags[packageName]
+        else:
+            flagName = self.name
+            flagLoc = use.Use
+        flagLoc._addFlag(flagName, required=self.buildRequired,
                          path=self.path, platform=self.platform)
         if self.buildName and self.buildName != self.name:
-            use.Use._addAlias(self.name, self.buildName)
+            flagLoc._addAlias(self.name, self.buildName)
 
 class FlavorConfig:
     """

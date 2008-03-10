@@ -37,8 +37,11 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
     def preparingChangeSet(self):
         self.updateMsg("Preparing changeset request")
 
-    def requestingFileContents(self):
-        self._message("Requesting file...")
+    def requestingFileContents(self, count=0):
+        if not count:
+            self._message("Requesting file...")
+        else:
+            self._message("Requesting %s files...")
 
     def downloadingFileContents(self, got, need):
         if need == 0:
@@ -132,14 +135,60 @@ class CloneCallback(ChangesetCallback, callbacks.CloneCallback):
             return None
         return cl
 
-    def determiningCloneTroves(self):
-        self._message('Determining items to clone...')
+    def determiningCloneTroves(self, current=0, total=0):
+        if total:
+            self._message('Step 1/5: Determining items to clone...(%s/%s)' % (current, total))
+        else:
+            self._message('Step 1/5: Determining items to clone...')
 
     def determiningTargets(self):
-        self._message('Determining target versions...')
+        self._message('Step 2/5: Determining target versions...')
 
-    def rewritingFileVersions(self):
-        self._message('Rewriting file versions...')
+    def targetSources(self, current=0, total=0):
+        self.prefix = 'Step 2/5: '
+        if total:
+            self._message('Targeting Sources (%s/%s)' % (current, total))
+        else:
+            self._message('Targeting Sources' % (current, total))
+
+    def targetBinaries(self, current=0, total=0):
+        self.prefix = 'Step 2/5: '
+        if total:
+            self._message('Targeting Binaries (%s/%s)' % (current,
+                                                                    total))
+        else:
+            self._message('Targeting Binaries')
+
+    def checkNeedsFulfilled(self, current=0, total=0):
+        self.prefix = 'Step 3/5: '
+        if total:
+            self._message('Making sure clone is complete (%s/%s)' % (
+                                                                    current,
+                                                                    total))
+        else:
+            self._message('Making sure clone is complete ')
+
+    def rewriteTrove(self, current=0, total=0):
+        self.prefix = 'Step 4/5:'
+        if total:
+            self._message('Rewriting trove information (%s/%s)' % (current, total))
+        else:
+            self._message('Rewriting trove information')
+
+    def rewritingFileVersions(self, current=0, total=0):
+        if total:
+            percent = (current * 1000 / total) / 10.0
+            self.prefix = 'Step 5/5 (%s%%): ' % (percent)
+            self._message('Rewriting file versions')
+        else:
+            self.prefix = 'Step 5/5: '
+            self._message('Rewriting file versions ')
+
+    def requestingFiles(self, number):
+        self._message('Requesting file info for %s files...' % (number))
+
+    def requestingFileContentsWithCount(self, count):
+        self._message("Requesting file contents %s files..." % count)
 
     def gettingCloneData(self):
         self._message('Getting file contents for clone...')

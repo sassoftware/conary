@@ -48,6 +48,10 @@ def troveIsPackage(troveName):
 def troveIsComponent(troveName):
     return ":" in troveName
 
+def troveIsFileSet(troveName):
+    return (troveName.startswith('fileset-')
+            and not troveName.endswith(':source'))
+
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
@@ -178,6 +182,12 @@ class PolicyProviders(TroveTupleList):
     pass
 
 class LoadedTroves(TroveTupleList):
+    pass
+
+class TroveCopiedFrom(TroveTupleList):
+    pass
+
+class ImageGroup(streams.ByteStream):
     pass
 
 class PathHashes(set, streams.InfoStream):
@@ -535,6 +545,7 @@ _METADATA_ITEM_TAG_CATEGORIES = 6
 _METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
 _METADATA_ITEM_TAG_SIGNATURES = 8
 _METADATA_ITEM_TAG_NOTES = 9
+_METADATA_ITEM_TAG_LANGUAGE = 10
 
 _METADATA_ITEM_SIG_VER_ALL = [ 0 ]
 
@@ -553,6 +564,8 @@ class MetadataItem(streams.StreamSet):
                 (DYNAMIC, OBSS,                   'crypto'       ),
         _METADATA_ITEM_TAG_URL:
                 (DYNAMIC, streams.StringStream,   'url'          ),
+        _METADATA_ITEM_TAG_LANGUAGE:
+                (DYNAMIC, streams.StringStream,   'language'     ),
         _METADATA_ITEM_TAG_CATEGORIES:
                 (DYNAMIC, OBSS,                   'categories'   ),
         _METADATA_ITEM_TAG_BIBLIOGRAPHY:
@@ -635,11 +648,36 @@ class Metadata(streams.OrderedStreamCollection):
         for item in self.getStreams(1):
             yield item
 
-    def get(self, lang):
+    def get(self, language=None):
         d = dict.fromkeys(MetadataItem._keys)
         for item in self.getStreams(1):
-            d.update(item)
+            if not item.language():
+                d.update(item)
+        if language is not None:
+            for item in self.getStreams(1):
+                if item.language() == language:
+                    d.update(item)
         return d
+
+    def flatten(self, skipSet=None):
+        if skipSet is None:
+            skipSet = []
+        items = {}
+        keys = MetadataItem._keys
+        for item in self.getStreams(1):
+            language = item.language()
+            if language not in items:
+                items[language] = MetadataItem()
+            newItem = items[language]
+            for key in item.keys():
+                if key in skipSet:
+                    continue
+                values = getattr(item, key)()
+                if not isinstance(values, (list, tuple)):
+                    values = [values]
+                for value in values:
+                    getattr(newItem, key).set(value)
+        return items.values()
 
     def verifyDigitalSignatures(self, serverName=None):
         missingKeys = []
@@ -676,10 +714,12 @@ _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through
                                     # the client, and left out of frozen forms
                                     # normally (since it should always be None)
 _TROVEINFO_TAG_COMPAT_CLASS   = 19
-_TROVEINFO_TAG_BUILD_FLAVOR   = 20
 # items added below this point must be DYNAMIC for proper unknown troveinfo
 # handling
-_TROVEINFO_TAG_LAST           = 20
+_TROVEINFO_TAG_BUILD_FLAVOR   = 20
+_TROVEINFO_TAG_COPIED_FROM    = 21
+_TROVEINFO_TAG_IMAGE_GROUP   = 22
+_TROVEINFO_TAG_LAST           = 22
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -761,8 +801,9 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_METADATA      : (DYNAMIC, Metadata,           'metadata'    ),
         _TROVEINFO_TAG_COMPLETEFIXUP : (SMALL, streams.ByteStream,   'completeFixup'    ),
         _TROVEINFO_TAG_COMPAT_CLASS  : (SMALL, streams.ShortStream,  'compatibilityClass'    ),
-        # for compatibility with 1.1.9x and later
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
+        _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,    'troveCopiedFrom' ),
+        _TROVEINFO_TAG_IMAGE_GROUP   : (DYNAMIC, ImageGroup,         'imageGroup' )
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -785,14 +826,14 @@ class TroveRefsTrovesStream(dict, streams.InfoStream):
     def freeze(self, skipSet = {}):
         """
         Frozen form is a sequence of:
-            total entry size, excluding these two bytes (2 bytes)
-            troveName length (2 bytes)
-            troveName
-            version string length (2 bytes)
-            version string
-            flavor string length (2 bytes)
-            flavor string
-            byDefault value (1 byte, 0 or 1)
+          - total entry size, excluding these two bytes (2 bytes)
+          - troveName length (2 bytes)
+          - troveName
+          - version string length (2 bytes)
+          - version string
+          - flavor string length (2 bytes)
+          - flavor string
+          - byDefault value (1 byte, 0 or 1)
 
         This whole thing is sorted by the string value of each entry. Sorting
         this way is a bit odd, but it's simple and well-defined.
@@ -835,13 +876,13 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
     def freeze(self, skipSet = {}):
         """
         Frozen form is a sequence of:
-            total entry size, excluding these two bytes (2 bytes)
-            pathId (16 bytes)
-            fileId (20 bytes)
-            pathLen (2 bytes)
-            path
-            versionLen (2 bytes)
-            version string
+          - total entry size, excluding these two bytes (2 bytes)
+          - pathId (16 bytes)
+          - fileId (20 bytes)
+          - pathLen (2 bytes)
+          - path
+          - versionLen (2 bytes)
+          - version string
 
         This whole thing is sorted by the string value of each entry. Sorting
         this way is a bit odd, but it's simple and well-defined.
@@ -941,7 +982,8 @@ class Trove(streams.StreamSet):
                   "idMap", "type", "redirects" ]
 
     def __repr__(self):
-        return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
+        return "trove.Trove(%r, %r, %r)" % (self.name(), self.version(),
+                                            self.flavor())
 
     def _sigString(self, version):
         if version == _TROVESIG_VER_CLASSIC:
@@ -976,11 +1018,11 @@ class Trove(streams.StreamSet):
 
     def addPrecomputedDigitalSignature(self, newSigs):
         """
-        Adds a previously computed signatures, allowing signatures to be
+        Adds a previously computed signature, allowing signatures to be
         added to troves. All digests must have already been computed.
 
-        @param sig: Signature to add
-        @type sig: VersionedDigitalSignatureSet
+        @param newSigs: Signature to add
+        @type newSigs: VersionedDigitalSignatureSet
         """
         assert(self.verifyDigests())
 
@@ -1165,8 +1207,17 @@ class Trove(streams.StreamSet):
     def getNameVersionFlavor(self):
         return self.name(), self.version(), self.flavor()
 
-    def getMetadata(self, lang=None):
-        return self.troveInfo.metadata.get(lang)
+    def getMetadata(self, language=None):
+        return self.troveInfo.metadata.get(language)
+
+    def getAllMetadataItems(self):
+        return self.troveInfo.metadata.flatten()
+
+    def copyMetadata(self, trv, skipSet=None):
+        items = trv.troveInfo.metadata.flatten(skipSet=skipSet)
+        self.troveInfo.metadata = Metadata()
+        for item in items:
+            self.troveInfo.metadata.addItem(item)
 
     def changeVersion(self, version):
         self.version.set(version)
@@ -1472,16 +1523,20 @@ class Trove(streams.StreamSet):
 
 	return fileMap
 
-    def mergeTroveListChanges(self, strongChangeList, weakChangeList, 
+    def mergeTroveListChanges(self, strongChangeList, weakChangeList,
                               redundantOkay = False):
         """
         Merges a set of changes to the included trove list into this
         trove.
 
-        @param changeList: A list or generator specifying a set of
-        trove changes; this is the same as returned by
-        TroveChangeSet.iterChangedTroves()
-        @type changeList: (name, list) tuple
+        @param strongChangeList: A list or generator specifying a set of trove
+        changes; this is the same as returned by
+        TroveChangeSet.iterChangedTroves(strongRefs=True, weakRefs=False)
+        @type strongChangeList: (name, list) tuple
+        @param weakChangeList: A list or generator specifying a set of trove
+        changes; this is the same as returned by
+        TroveChangeSet.iterChangedTroves(strongRefs=False, weakRefs=True)
+        @type weakChangeList: (name, list) tuple
         @param redundantOkay: Redundant changes are normally considered 
         errors
         @type redundantOkay: boolean
@@ -1729,7 +1784,7 @@ class Trove(streams.StreamSet):
         """
             Matches up the list of troves that have been added to those
             that were removed.  Matches are done by name first,
-            then by heuristics based on branches, flavors, and path hashes.
+            then by heuristics based on labels, flavors, and path hashes.
         """
         # NOTE: the matches are actually created by _makeMatch.
         # Most functions deal with lists that are (version, flavor)
@@ -2003,24 +2058,24 @@ class Trove(streams.StreamSet):
 
         def _versionMatch(oldInfoSet, newInfoSet):
             # Match by version; use the closeness measure for items on
-            # different branches and the timestamps for the same branch. If the
+            # different labels and the timestamps for the same label. If the
             # same version exists twice here, it means the flavors are
             # incompatible or tied; in either case the flavor won't help us
             # much.
             matches = []
-            byBranch = {}
+            byLabel = {}
             # we need copies we can update
             oldInfoSet = set(oldInfoSet)
             newInfoSet = set(newInfoSet)
 
             for newInfo in newInfoSet:
                 for oldInfo in oldInfoSet:
-                    if newInfo[0].branch() == oldInfo[0].branch():
-                        l = byBranch.setdefault(newInfo, [])
+                    if newInfo[0].trailingLabel() == oldInfo[0].trailingLabel():
+                        l = byLabel.setdefault(newInfo, [])
                         l.append(((oldInfo[0].trailingRevision(), oldInfo)))
 
             # pass 1, find things on the same branch
-            for newInfo, oldInfoList in sorted(byBranch.items(), reverse=True):
+            for newInfo, oldInfoList in sorted(byLabel.items(), reverse=True):
                 # take the newest (by timestamp) item from oldInfoList which
                 # hasn't been matched to anything else 
                 oldInfoList.sort(reverse=True)
@@ -2032,10 +2087,10 @@ class Trove(streams.StreamSet):
                     newInfoSet.remove(newInfo)
                     break
 
-            del byBranch
+            del byLabel
 
-            # pass 2, match across branches -- we know there is nothing left
-            # on the same branch anymore
+            # pass 2, match across labels -- we know there is nothing left
+            # on the same label anymore
             scored = []
             for newInfo in newInfoSet:
                 for oldInfo in oldInfoSet:
@@ -2251,42 +2306,42 @@ class Trove(streams.StreamSet):
                 overlaps = {}
 
 
-            addedByBranch = {}
-            removedByBranch = {}
+            addedByLabel = {}
+            removedByLabel = {}
             for version, flavor in addedDict[name]:
-                addedByBranch.setdefault(version.branch(), []).append(
+                addedByLabel.setdefault(version.trailingLabel(), []).append(
                                                             (version, flavor))
             for version, flavor in removedDict[name]:
-                removedByBranch.setdefault(version.branch(), []).append(
+                removedByLabel.setdefault(version.trailingLabel(), []).append(
                                                             (version, flavor))
-            for branch, branchAdded in addedByBranch.iteritems():
-                branchRemoved = removedByBranch.get(branch, [])
-                if not branchRemoved:
+            for label, labelAdded in addedByLabel.iteritems():
+                labelRemoved = removedByLabel.get(label, [])
+                if not labelRemoved:
                     continue
-                # 1. match troves on the same branch with compatible flavors.
-                _matchList(name, branchAdded, branchRemoved, trvList,
+                # 1. match troves on the same label with compatible flavors.
+                _matchList(name, labelAdded, labelRemoved, trvList,
                            overlaps, scoreCache, requireCompatible=True)
 
             # 2. match troves with compatible flavors on different
-            #    branches
+            #    labels
             _matchList(name, addedDict[name], removedDict[name], trvList,
                        overlaps, scoreCache, requireCompatible=True)
 
-            addedByBranch = {}
-            removedByBranch = {}
+            addedByLabel = {}
+            removedByLabel = {}
             for version, flavor in addedDict[name]:
-                addedByBranch.setdefault(version.branch(), []).append(
+                addedByLabel.setdefault(version.trailingLabel(), []).append(
                                                             (version, flavor))
             for version, flavor in removedDict[name]:
-                removedByBranch.setdefault(version.branch(), []).append(
+                removedByLabel.setdefault(version.trailingLabel(), []).append(
                                                (version, flavor))
 
-            for branch, branchAdded in addedByBranch.iteritems():
-                branchRemoved = removedByBranch.get(branch, [])
-                if not branchRemoved:
+            for label, labelAdded in addedByLabel.iteritems():
+                labelRemoved = removedByLabel.get(label, [])
+                if not labelRemoved:
                     continue
-                # 3. match troves on the same branch without compatible flavors.
-                _matchList(name, branchAdded, branchRemoved, trvList,
+                # 3. match troves on the same label without compatible flavors.
+                _matchList(name, labelAdded, labelRemoved, trvList,
                            overlaps, scoreCache, requireCompatible=False)
 
             # 4. match remaining troves.
@@ -2341,6 +2396,12 @@ class Trove(streams.StreamSet):
             return 0
 
         return c
+
+    def setBuildFlavor(self, flavor):
+        return self.troveInfo.buildFlavor.set(flavor)
+
+    def getBuildFlavor(self):
+        return self.troveInfo.buildFlavor()
 
     def getSourceName(self):
         return self.troveInfo.sourceName()
@@ -2421,6 +2482,20 @@ class Trove(streams.StreamSet):
 
     def getPathHashes(self):
         return self.troveInfo.pathHashes
+
+    def setTroveCopiedFrom(self, itemList):
+        for (name, ver, flavor) in itemList:
+            self.troveInfo.troveCopiedFrom.add(name, ver, flavor)
+
+    def getTroveCopiedFrom(self):
+        """For groups, return the list of troves that were used when
+        a statement like addAll or addCopy was used.
+
+        @rtype: list
+        @return: list of (name, version, flavor) tuples.
+        """
+        return [ (x[1].name(), x[1].version(), x[1].flavor())
+                 for x in self.troveInfo.troveCopiedFrom.iterAll() ]
 
     def __init__(self, name, version = None, flavor = None, changeLog = None, 
                  type = TROVE_TYPE_NORMAL, skipIntegrityChecks = False,
@@ -2679,6 +2754,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	return self.oldFiles
 
     def getName(self):
+        """
+        Get the name of the trove.
+        @return: name of the trove.
+        @rtype: string
+        """
 	return self.name()
 
     def getTroveInfoDiff(self):
@@ -2758,9 +2838,23 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def isRollbackFence(self, oldCompatibilityClass = None, update = False):
         """
-        oldCompatibilityClass of None means we don't use compatibility
-        class checks to restruct rollbacks.
+        Determine whether an update from the given oldCompatibilityClass to the
+        version represented by this changeset would cross a rollback fence.  If
+        an update crosses a rollback fence, then it is not allowed to be rolled
+        back.
+        @param oldCompatibilityClass: the old compatibility class.  If this is
+        None, then compatibility class checks isn't used to restrict rollbacks,
+        so this will return False.
+        @type oldCompatibilityClass: integer or None
+        @param update: unused
+        @type update: any
+        @return: whether applying this changeset would cross a rollback fence.
+        @rtype: boolean
+        @raises AssertionError: if the input oldCompatibilityClass is neither
+        an integer nor None.
         """
+        # FIXME: why is the update parameter unused?  Is this for
+        # backwards-compatibility?
         if oldCompatibilityClass is None:
             return False
         assert(type(oldCompatibilityClass) == int)
@@ -2772,6 +2866,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if oldCompatibilityClass == thisCompatClass:
             return False
 
+        # FIXME: the rollbackScript variable below is never used.
         rollbackScript = self.getPostRollbackScript()
         postRollback = self._getScriptObj(_TROVESCRIPTS_POSTROLLBACK)
 
@@ -2803,12 +2898,24 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	self.changeLog.thaw(cl.freeze())
 
     def getOldVersion(self):
+        """
+        Get the old version of the trove this changeset applies to.  For an
+        absolute changeset, this is None
+        @return: old version
+        @rtype: conary.versions.Version object or None
+        """
 	return self.oldVersion()
 
     def getOldNameVersionFlavor(self):
         return self.name(), self.oldVersion(), self.oldFlavor()
 
     def getNewVersion(self):
+        """
+        Get the new version of the trove that'd be installed after applying
+        this changeset.
+        @return: new version
+        @rtype: conary.versions.Version object
+        """
 	return self.newVersion()
 
     def getNewNameVersionFlavor(self):
@@ -2925,6 +3032,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def formatToFile(self, changeSet, f):
 	f.write("%s " % self.getName())
 
+        if self.troveType() == TROVE_TYPE_REDIRECT:
+            if not [ x for x in self.redirects.iter() ]:
+                f.write("remove redirect ")
+            else:
+                f.write("redirect ")
+
 	if self.isAbsolute():
 	    f.write("absolute ")
 	elif self.getOldVersion():
@@ -2946,6 +3059,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
             depformat('Old Flavor', self.getOldFlavor(), f)
         if not self.getNewFlavor().isEmpty():
             depformat('New Flavor', self.getNewFlavor(), f)
+
+        for redirect in self.redirects.iter():
+            print '\t-> %s=%s' % (redirect.name(), redirect.branch())
 
 	for (pathId, path, fileId, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (pathId[:6], pathId[-6:]))

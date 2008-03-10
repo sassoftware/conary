@@ -205,39 +205,6 @@ def signAbsoluteChangesetByConfig(cs, cfg):
     return cs
 
 
-def getRecursiveRequirements(db, troveList, flavorPath):
-    # gets the recursive requirements for the listed packages
-    seen = set()
-    while troveList:
-        depSetList = []
-        for trv in db.getTroves(list(troveList), withFiles=False):
-            required = deps.DependencySet()
-            oldRequired = trv.getRequires()
-            [ required.addDep(*x) for x in oldRequired.iterDeps() 
-              if x[0] != deps.AbiDependency ]
-            depSetList.append(required)
-        seen.update(troveList)
-        sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
-        troveList = set()
-        for depSetSols in sols.itervalues():
-            for depSols in depSetSols:
-                bestChoices = []
-                # if any solution for a dep is satisfied by the installFlavor
-                # path, then choose the solutions that are satisfied as 
-                # early as possible on the flavor path.  Otherwise return
-                # all solutions.
-                for flavor in flavorPath:
-                    bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
-                    if bestChoices:
-                        break
-                if bestChoices:
-                    depSols = set(bestChoices)
-                else:
-                    depSols = set(depSols)
-                depSols.difference_update(seen)
-                troveList.update(depSols)
-    return seen
-
 class GroupCookOptions(object):
 
     def __init__(self, alwaysBumpCount=False, errorOnFlavorChange=False,
@@ -401,7 +368,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @type logBuild: bool
     @param logBuild: if True, log the build to a file that will be included
     in the changeset
-    @param allowChangeSet: allow build of this trove when the source version
+    @param allowMissingSource: allow build of this trove when the source version
     specified does not point to an existing source trove.  Warning -- this
     can lead to strange trove setups
     @type allowMissingSource: bool
@@ -583,8 +550,6 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
-    @param redirect: if True, a redirect trove is built instead of a
-    normal trove.
     """
 
     fullName = recipeClass.name
@@ -617,6 +582,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 
     redirList = []
     childList = []
+    troveList = []
     for (fromName, fromFlavor), redirSpecList in redirects.iteritems():
         redir = trove.Trove(fromName, targetVersion, fromFlavor, 
                             None, type = trove.TROVE_TYPE_REDIRECT)
@@ -637,11 +603,13 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
         redir.setSourceName(fullName + ':source')
         redir.setConaryVersion(constants.version)
         redir.setIsCollection(False)
-
-        trvDiff = redir.diff(None, absolute = 1)[0]
-        changeSet.newTrove(trvDiff)
         built.append((redir.getName(), redir.getVersion().asString(), 
                       redir.getFlavor()) )
+        troveList.append(redir)
+    _copyForwardTroveMetadata(repos, troveList, recipeObj)
+    for redir in troveList:
+        trvDiff = redir.diff(None, absolute = 1)[0]
+        changeSet.newTrove(trvDiff)
 
     changeSet.setPrimaryTroveList(set(redirList) - set(childList))
 
@@ -660,8 +628,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
+    @param recipeClasses: classes which will be instantiated into recipes
+    @type recipeClasses: recipe.Recipe
     @param macros: set of macros for the build
     @type macros: dict
     @rtype: tuple
@@ -673,9 +641,9 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
-    @param redirect: if True, a redirect trove is built instead of a
-    normal trove.
     """
+    enforceManagedPolicy = (cfg.enforceManagedPolicy
+                            and targetLabel != versions.CookLabel())
     if groupOptions is None:
         groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
@@ -692,7 +660,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         use.resetUsed()
         use.clearLocalFlags()
-        use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor)
+        use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor, error=False)
         if hasattr(recipeClass, '_localFlavor'):
             # this will only be set if loadRecipe is used.  Allow for some
             # other way (like our testsuite) to be used to load the recipe
@@ -712,6 +680,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
         use.track(True)
+        policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
+
         _callSetup(cfg, recipeObj)
         use.track(False)
         log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -752,6 +722,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
     built = []
     for recipeObj, grpFlavor in builtGroups:
+        troveList = []
         for group in recipeObj.iterGroupList():
             groupName = group.name
             grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
@@ -761,6 +732,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
             grpTrv.setProvides(provides)
 
+            grpTrv.setTroveCopiedFrom(group.iterCopiedFrom())
 
             grpTrv.setBuildTime(buildTime)
             grpTrv.setSourceName(fullName + ':source')
@@ -768,9 +740,12 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setConaryVersion(constants.version)
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
+            grpTrv.troveInfo.imageGroup.set(group.imageGroup)
             compatClass = group.compatibilityClass
             if compatClass is not None:
                 grpTrv.setCompatibilityClass(compatClass)
+            # Add build flavor
+            grpTrv.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (group.postInstallScripts, False,
@@ -810,15 +785,23 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                 grpTrv.addTrove(name, targetVersion, grpFlavor, 
                                 byDefault = byDefault, 
                                 weakRef = not explicit)
+            troveList.append(grpTrv)
+        recipeObj.troveMap = dict((x.getNameVersionFlavor(), x) \
+                for x in troveList)
+        recipeObj.doProcess(policy.GROUP_ENFORCEMENT)
+        recipeObj.doProcess(policy.ERROR_REPORTING)
 
+        for primaryName in recipeObj.getPrimaryGroupNames():
+            changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
+
+        _copyForwardTroveMetadata(repos, troveList, recipeObj)
+        for grpTrv in troveList:
             grpDiff = grpTrv.diff(None, absolute = 1)[0]
             changeSet.newTrove(grpDiff)
 
             built.append((grpTrv.getName(), str(grpTrv.getVersion()),
                                             grpTrv.getFlavor()))
 
-        for primaryName in recipeObj.getPrimaryGroupNames():
-            changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
 
     return (changeSet, built, None)
 
@@ -901,8 +884,10 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
     fileset.setIsCollection(False)
+    fileset.setBuildFlavor(use.allFlagsToFlavor(fullName))
     fileset.computePathHashes()
     
+    _copyForwardTroveMetadata(repos, [fileset], recipeObj)
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newTrove(filesetDiff)
     changeSet.addPrimaryTrove(fullName, targetVersion, flavor)
@@ -992,13 +977,14 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
 def _cookPackageObjWrap(*args, **kwargs):
+    logBuild = kwargs.get('logBuild', True)
     targetLabel = kwargs.pop('targetLabel', None)
     isOnLocalHost = isinstance(targetLabel,
                             (versions.CookLabel, versions.EmergeLabel,
                             versions.RollbackLabel, versions.LocalLabel))
 
-    if not isOnLocalHost or not (hasattr(sys.stdin, "isatty") and 
-                                 sys.stdin.isatty()):
+    if logBuild and (not isOnLocalHost or not (hasattr(sys.stdin, "isatty") and 
+                     sys.stdin.isatty())):
         # For repository cooks, or for recipe cooks that had stdin not a tty,
         # redirect stdin from /dev/null
         redirectStdin = True
@@ -1049,26 +1035,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     use.track(True)
     if recipeObj._trackedFlags is not None:
         use.setUsed(recipeObj._trackedFlags)
-
-    policyFiles = recipeObj.loadPolicy()
-    db = database.Database(cfg.root, cfg.dbPath)
-    policyTroves = set()
-    unmanagedPolicyFiles = []
-    for policyPath in policyFiles:
-        troveList = list(db.iterTrovesByPath(policyPath))
-        if troveList:
-            for trove in troveList:
-                policyTroves.add((trove.getName(), trove.getVersion(),
-                                  trove.getFlavor()))
-        else:
-            unmanagedPolicyFiles.append(policyPath)
-            ver = versions.VersionFromString('/local@local:LOCAL/0-0').copy()
-            ver.resetTimeStamps()
-            policyTroves.add((policyPath, ver, deps.Flavor()))
-    del db
-    if unmanagedPolicyFiles and enforceManagedPolicy:
-        raise CookError, ('Cannot cook into repository with'
-            ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
+    policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
     _callSetup(cfg, recipeObj)
 
@@ -1240,22 +1207,18 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
     buildTime = time.time()
     sourceName = recipeObj.__class__.name + ':source'
 
-    buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
-                    for x in recipeObj.buildReqMap.itervalues())
-    buildReqs = getRecursiveRequirements(db, buildReqs, cfg.flavor)
+    buildReqs = recipeObj.getRecursiveBuildRequirements(db, cfg)
 
     # create all of the package troves we need, and let each package provide
     # itself
     grpMap = {}
-    filePrefixes = set()
-    fileIds = set()
+    fileIdsPathMap = {}
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
         # Extract file prefixes and file ids
         for (path, (realPath, f)) in buildPkg.iteritems():
-            filePrefixes.add(os.path.dirname(path))
-            fileIds.add(f.fileId())
+            fileIdsPathMap[path] = f.fileId()
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
@@ -1266,57 +1229,17 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                 grpMap[main].setPolicyProviders(policyTroves)
             grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
             grpMap[main].setBuildRequirements(buildReqs)
+            grpMap[main].setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
 
-
-    filePrefixes = list(filePrefixes)
-    filePrefixes.sort()
-    # Now eliminate prefixes of prefixes
-    ret = []
-    oldp = None
-    for p in filePrefixes:
-        if oldp and p.startswith(oldp):
-            continue
-        ret.append(p)
-        oldp = p
-    filePrefixes = ret
-
-    # Sort the file ids to make sure we get consistent behavior
-    fileIds = sorted(fileIds)
-
     # look up the pathids used by our immediate predecessor troves.
-    ident = _IdGen()
-
-    searchBranch = targetVersion.branch()
-    if targetLabel:
-        # this keeps cook and emerge branchs from showing up
-        searchBranch = searchBranch.parentBranch()
-
-    if repos and not searchBranch.getHost() == 'local':
-        versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
-        versionDict = repos.getTroveLeavesByBranch(versionDict)
-        if not versionDict and searchBranch.hasParentBranch():
-            # there was no match on this branch; look uphill
-            searchBranch = searchBranch.parentBranch()
-            versionDict = dict((x, { searchBranch : None } ) for x in grpMap )
-            versionDict = repos.getTroveLeavesByBranch(versionDict)
-
-        log.info('looking up pathids from repository history')
-        # look up the pathids for every file that has been built by
-        # this source component, following our branch ancestry
-        while True:
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                                              filePrefixes, fileIds)
-            ident.merge(d)
-
-            if not searchBranch.hasParentBranch():
-                break
-            searchBranch = searchBranch.parentBranch()
-
+    log.info('looking up pathids from repository history')
+    idgen = _getPathIdGen(repos, sourceName, targetVersion, targetLabel,
+                          grpMap.keys(), fileIdsPathMap)
     log.info('pathId lookup complete')
 
     built = []
@@ -1329,7 +1252,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         assert(comp)
         grp = grpMap[main]
 
-	(p, fileMap) = _createComponent(repos, buildPkg, targetVersion, ident)
+	(p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen)
 
 	built.append((compName, p.getVersion().asString(), p.getFlavor()))
 
@@ -1339,6 +1262,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
         p.setIsDerived(recipeObj._isDerived)
+
+        # Add build flavor
+        p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 
         _signTrove(p, signatureKey)
 
@@ -1377,6 +1303,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         packageList = relativePackageList
 
+    _copyForwardTroveMetadata(repos,
+                              [x[1] for x in packageList] + grpMap.values(), 
+                              recipeObj)
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:
         changeSet.addPrimaryTrove(packageName, targetVersion, flavor)
@@ -1387,6 +1316,132 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         changeSet.newTrove(grpDiff)
 
     return changeSet, built
+
+def _loadPolicy(recipeObj, cfg, enforceManagedPolicy):
+    policyFiles = recipeObj.loadPolicy()
+    db = database.Database(cfg.root, cfg.dbPath)
+    policyTroves = set()
+    unmanagedPolicyFiles = []
+    for policyPath in policyFiles:
+        troveList = list(db.iterTrovesByPath(policyPath))
+        if troveList:
+            for trove in troveList:
+                policyTroves.add((trove.getName(), trove.getVersion(),
+                                  trove.getFlavor()))
+        else:
+            unmanagedPolicyFiles.append(policyPath)
+            ver = versions.VersionFromString('/local@local:LOCAL/0-0').copy()
+            ver.resetTimeStamps()
+            policyTroves.add((policyPath, ver, deps.Flavor()))
+    del db
+    if unmanagedPolicyFiles and enforceManagedPolicy:
+        raise CookError, ('Cannot cook into repository with'
+            ' unmanaged policy files: %s' %', '.join(unmanagedPolicyFiles))
+    return policyTroves
+
+def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
+                  fileIdsPathMap):
+    ident = _IdGen()
+    searchBranch = targetVersion.branch()
+    if targetLabel:
+        # this keeps cook and emerge branchs from showing up
+        searchBranch = searchBranch.parentBranch()
+
+    if not repos or searchBranch.getHost() == 'local':
+        # we're building locally, no need to look up pathids
+        return ident
+
+    versionDict = dict( [ (x, { searchBranch: None }) for x in pkgNames ] )
+    versionDict = repos.getTroveLeavesByBranch(versionDict)
+    if not versionDict and searchBranch.hasParentBranch():
+        # there was no match on this branch; look uphill
+        searchBranch = searchBranch.parentBranch()
+        versionDict = dict((x, { searchBranch: None }) for x in pkgNames )
+        versionDict = repos.getTroveLeavesByBranch(versionDict)
+
+    # We've got all of the latest packages for each flavor.
+    # Now we'll search their components for matching pathIds.
+    # We do this manually for these latest packages to avoid having
+    # to make the getPackageBranchPathIds repository call unnecessarily
+    # because it is very heavy weight.
+    trovesToGet = []
+    for n, versionFlavorDict in versionDict.iteritems():
+        # use n,v,f to avoid overlapping with name,version,flavor used by
+        # surrounding code
+        for v, flavorList in versionFlavorDict.iteritems():
+            for f in flavorList:
+                trovesToGet.append((n, v, f))
+    # get packages
+    latestTroves = repos.getTroves(trovesToGet, withFiles=False)
+    trovesToGet = list(itertools.chain(*[ x.iterTroveList(strongRefs=True)
+                                       for x in latestTroves ]))
+    # get components
+    try:
+        latestTroves = repos.getTroves(trovesToGet, withFiles=True)
+        d = {}
+        for trv in sorted(latestTroves):
+            for pathId, path, fileId, fileVersion in trv.iterFileList():
+                if path in fileIdsPathMap:
+                    newFileId = fileIdsPathMap[path]
+                    if path in d and newFileId != fileId:
+                        # if the fileId already exists and we're not
+                        # a perfect match, don't override what already exists
+                        # there.
+                        continue
+                    d[path] = pathId, fileVersion, fileId
+        for path in d:
+            fileIdsPathMap.pop(path)
+        ident.merge(d)
+    except errors.TroveMissing:
+        # a component is missing from the repository.  The repos can
+        # likely do a better job by falling back to getPackageBranchPathIds
+        # (CNY-2250)
+        pass
+
+    # Any path in fileIdsPathMap beyond this point is a file that did not
+    # exist in the latest version(s) of this package, so fall back to
+    # getPackageBranchPathIds
+
+    # look up the pathids for every file that has been built by
+    # this source component, following our branch ancestry
+    while True:
+        # Generate the file prefixes
+        filePrefixes = _computeCommonPrefixes(fileIdsPathMap.keys())
+        fileIds = sorted(set(fileIdsPathMap.values()))
+        if not fileIds:
+            break
+        try:
+            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                                              filePrefixes, fileIds)
+        except errors.InsufficientPermission:
+            # No permissions to search on this branch. Keep going
+            d = {}
+            #raise
+        # Remove the paths we've found already from fileIdsPathMap, so we
+        # don't ask the next server the same questions
+        for k in d.iterkeys():
+            fileIdsPathMap.pop(k, None)
+
+        ident.merge(d)
+
+        if not searchBranch.hasParentBranch():
+            break
+        searchBranch = searchBranch.parentBranch()
+    return ident
+
+def _computeCommonPrefixes(filePaths):
+    # Eliminate prefixes of prefixes
+    ret = []
+    oldp = None
+    filePaths = sorted(filePaths)
+    for p in filePaths:
+        # Get the dirname
+        p = os.path.dirname(p)
+        if oldp and p.startswith(oldp):
+            continue
+        ret.append(p)
+        oldp = p
+    return ret
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write
@@ -1525,7 +1580,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         @param searchBuiltTroves: if True, search for binary troves  
         that match the desired trove's name, versionStr and label. 
         @type searchBuiltTroves: bool
-        @return (version, upstreamTrove): upstreamTrove is an instance of the
+        @rtype: tuple
+        @return: (version, upstreamTrove). upstreamTrove is an instance of the
         trove if it was previously built on the same branch.
     """
     srcName = name + ':source'
@@ -1546,8 +1602,12 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     # although the recipe we are cooking from may not be in any
     # repository
     if repos and buildLabel:
-        versionDict = repos.getTroveLeavesByLabel(
-                                    { srcName : { buildLabel : None } })
+        try:
+            versionDict = repos.getTroveLeavesByLabel(
+                                        { srcName : { buildLabel : None } })
+        except errors.OpenError:
+            repos = None
+            versionDict = {}
     else:
         versionDict = {}
 
@@ -1645,7 +1705,7 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     return loader, recipeClass, sourceVersion
 
 
-def cookItem(repos, cfg, item, prep=0, macros={}, 
+def cookItem(repos, cfg, item, prep=0, macros={},
 	     emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,
@@ -1969,9 +2029,31 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             # stdin might not even have an isatty method
             pass
 
-def _callSetup(cfg, recipeObj):
+def _callSetup(cfg, recipeObj, recordCalls=True):
     try:
-        return recipeObj.setup()
+        if 'abstractBaseClass' in recipeObj.__class__.__dict__ and \
+                recipeObj.abstractBaseClass:
+            setupMethod = recipeObj.setupAbstractBaseClass
+        else:
+            setupMethod = recipeObj.setup
+        rv = recipeObj.recordCalls(setupMethod)
+        functionNames = []
+        if recordCalls:
+            for (depth, className, fnName) in recipeObj.methodsCalled:
+                methodName = className + '.' + fnName
+                line = '  ' * depth + methodName
+                functionNames.append(line)
+            log.info('Methods called:\n%s' % '\n'.join(functionNames))
+            unusedMethods = []
+            for (className, fnName) in recipeObj.unusedMethods:
+                methodName = className + '.' + fnName
+                line = '  ' + methodName
+                # blacklist abstract setup. there's never a good reason to
+                # override it
+                if methodName != 'PackageRecipe.setupAbstractBaseClass':
+                    unusedMethods.append(line)
+            if unusedMethods:
+                log.info('Unused methods:\n%s' % '\n'.join(unusedMethods))
     except Exception, err:
         if cfg.debugRecipeExceptions:
             traceback.print_exception(*sys.exc_info())
@@ -1997,3 +2079,180 @@ def _callSetup(cfg, recipeObj):
 	linenum = lastRecipeFrame.tb_frame.f_lineno
         del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))
+
+def _copyForwardTroveMetadata(repos, troveList, recipeObj):
+    """
+        Copies forward metadata from a previous build of this package
+        if possible.  Searches on the current label then one level up
+        (to make sure shadowed sources get metadata from their parent).
+
+        Tries to match the flavor if possible but if it can't, it will use
+        the most recent cook with a different flavor.  If necessary,
+        it will search for metadata for components separately from the package.
+    """
+    log.info('Copying forward metadata to newly built items...')
+    buildBranch = versions.VersionFromString(recipeObj.macros.buildbranch)
+    childrenByTrove = {}
+    allMatches = []
+    troveDict = {}
+    toMatch = []
+    for trv in troveList:
+        troveDict[trv.getNameVersionFlavor()] = trv
+        if ':' in trv.getName():
+            packageName = trv.getName().split(':')[0]
+            packageTup = (packageName, trv.getVersion(), trv.getFlavor())
+            childrenByTrove.setdefault(packageTup, []).append(trv)
+        else:
+            toMatch.append(trv.getNameVersionFlavor())
+    if not toMatch:
+        toMatch = [ x.getNameVersionFlavor() for x in troveList ]
+
+    # step one: find metadata for all collections
+    metadataMatches = _getMetadataMatches(repos, toMatch, buildBranch)
+
+    oldTroveTups = metadataMatches.values()
+    oldTroves = repos.getTroves(oldTroveTups, withFiles=False)
+    troveDict.update(dict(zip(oldTroveTups, oldTroves)))
+
+    unmatchedComponents = []
+    for newTup in toMatch:
+        newTrove = troveDict[newTup]
+        if newTup not in metadataMatches:
+            # couldn't find a match for this package anywhere.
+            continue
+        oldTup = metadataMatches[newTup]
+        oldTrove = troveDict[oldTup]
+        allMatches.append((newTrove, oldTrove, True))
+
+        # next, see if the new collection and the old collection share
+        # components.
+        newTroveComponents = [ x[0] for x in
+                              newTrove.iterTroveList(strongRefs=True)
+                              if ((x[0].split(':')[0], x[1], x[2]) == newTup) ]
+        oldTroveComponents = [ x[0] for x in
+                              oldTrove.iterTroveList(strongRefs=True)
+                              if ((x[0].split(':')[0], x[1], x[2]) == oldTup) ]
+        # unmatched are those components that did not exist in the old
+        # version that we're getting metadata from.
+        unmatched = set(newTroveComponents) - set(oldTroveComponents)
+        unmatchedComponents.extend((x, newTup[1], newTup[2]) for x in unmatched)
+
+        # match up those components that existed both in the old collection
+        # and the new one.
+        componentMatches = set(newTroveComponents) & set(oldTroveComponents)
+        componentMatches = [ (x, oldTup[1], oldTup[2])
+                                for x in componentMatches ]
+        componentMatches = repos.getTroves(componentMatches, withFiles=False)
+        componentMatches = dict((x.getName(), x) for x in componentMatches)
+        for childTrv in childrenByTrove.get(
+                                    newTrove.getNameVersionFlavor(), []):
+            match = componentMatches.get(childTrv.getName(), None)
+            if match:
+                allMatches.append((childTrv, match, False))
+
+    if unmatchedComponents:
+        # some components must have been added in this build from the
+        # previous build.
+        metadataMatches = _getMetadataMatches(repos, unmatchedComponents,
+                                              buildBranch)
+        oldTroveTups = metadataMatches.values()
+        oldTroves = repos.getTroves(oldTroveTups, withFiles=False)
+        troveDict.update(dict(zip(oldTroveTups, oldTroves)))
+        for troveTup, matchTup in metadataMatches.items():
+            allMatches.append((troveDict[troveTup], troveDict[matchTup], True))
+
+    for newTrove, oldTrove, logCopy in allMatches:
+        # any metadata that's already been added to this trove
+        # will override any copied metadata
+        items = newTrove.getAllMetadataItems()
+        newTrove.copyMetadata(oldTrove,
+                              skipSet=recipeObj.metadataSkipSet)
+        if logCopy and newTrove.getAllMetadataItems():
+            # if getAllMetadataItems is empty, we didn't copy anything
+            # forward, so dont log:
+            log.info('Copied metadata forward for %s[%s] from version %s[%s]',
+                     newTrove.getName(), newTrove.getFlavor(),
+                     oldTrove.getVersion(), oldTrove.getFlavor())
+
+        # add back any metadata added during the cook, that takes precedence.
+        for item in items:
+            newTrove.troveInfo.metadata.addItem(item)
+    return dict((x[0].getNameVersionFlavor(), x[1].getNameVersionFlavor())
+                 for x in allMatches)
+
+def _getMetadataMatches(repos, troveList, buildBranch):
+    toFind = {}
+    metadataMatches = {}
+
+    # first search on the trailing label, and search up the labelPath.
+    # This should cause metadata to be copied in the case of
+    # source shadow + rebuild.
+    labelPath = list(reversed(list(buildBranch.iterLabels())))
+
+    for n,v,f in troveList:
+        toFind.setdefault((n, None, None), []).append((n,v,f))
+
+    results = repos.findTroves(labelPath, toFind, None, allowMissing=True)
+    for troveSpec, troveTupList in results.iteritems():
+        flavorsByVersion = {}
+        for troveTup in troveTupList:
+            flavorsByVersion.setdefault(troveTup[1], []).append(troveTup[2])
+        # look at the latest troves first
+        matchingVersions = sorted(flavorsByVersion, reverse=True)
+
+        for (name,myVersion,myFlavor) in toFind[troveSpec]:
+            # algorithm to determine which trove to copy metadata from:
+            # If we're rebuilding something that was just built,
+            # then copy the metadata from that package.  Otherwise,
+            # if there's a (very) recent package with a compatible flavor,
+            # then copy from that.  Otherwise, just pick a random (but
+            # well-sorted) random recent package to copy metadata from.
+
+            flavorToUse = None
+            versionToUse = None
+            if matchingVersions[0] == myVersion:
+                # this is a build of a new flavor for this version.
+                # check for exact matches at the previous version as well
+                exactMatchChecks = matchingVersions[1:2]
+                relatedChecks = matchingVersions[0:2]
+            else:
+                exactMatchChecks = matchingVersions[0:1]
+                relatedChecks = matchingVersions[0:1]
+
+            for version in exactMatchChecks:
+                matchingFlavors = flavorsByVersion[version]
+                exactMatch = [ x for x in matchingFlavors if x == myFlavor]
+                if exactMatch:
+                    flavorToUse = exactMatch[0]
+                    versionToUse = version
+                    break
+            if versionToUse:
+                metadataMatches[(name, myVersion, myFlavor)] = (name,
+                                                                versionToUse,
+                                                                flavorToUse)
+                continue
+            for version in relatedChecks:
+                matchingFlavors = flavorsByVersion[version]
+                scoredFlavors = [ (x.score(myFlavor), myFlavor.score(x), x)
+                                        for x in matchingFlavors ]
+                scoredFlavors = [ (max(x[0], x[1]), x[2]) for x in scoredFlavors
+                                    if x[0] is not False or x[1] is not False ]
+                if scoredFlavors:
+                    flavorToUse = scoredFlavors[-1][1]
+                    versionToUse = version
+                    break
+
+            if not versionToUse:
+                # couldn't find recent, flavor related version.  Fall back to
+                # recent version w/ no related flavor.
+                versionToUse = matchingVersions[0]
+                # make sure we're consistent even if we don't
+                # have a good way to pick by sorting the flavors
+                flavorToUse = sorted(flavorsByVersion[version])[0]
+
+            metadataMatches[name, myVersion, myFlavor] = (name,
+                                                          versionToUse,
+                                                          flavorToUse)
+    return metadataMatches
+
+

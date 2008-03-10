@@ -41,6 +41,9 @@ class ELF(Magic):
             self.contents['RPATH'] = elf.getRPATH(fullpath)
             self.contents['Type'] = elf.getType(fullpath)
 	requires, provides = elf.inspect(fullpath)
+        # Filter None abi flags
+        requires = [ x for x in requires
+                     if x[0] != 'abi' or x[2][0] is not None ]
         self.contents['requires'] = requires
         self.contents['provides'] = provides
         for req in requires:
@@ -50,7 +53,6 @@ class ELF(Magic):
         for prov in provides:
             if prov[0] == 'soname':
                 self.contents['soname'] = prov[1]
-
 
 class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):
@@ -87,23 +89,28 @@ class changeset(Magic):
 class jar(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
-        fullpath = basedir+path
-        jar = zipfile.ZipFile(fullpath)
-        namelist = [ i.filename for i in jar.infolist()
-                     if not i.filename.endswith('/') and i.file_size > 0 ]
-        self.contents['files'] = set()
+        self.contents['files'] = filesMap = {}
         self.contents['provides'] = set()
         self.contents['requires'] = set()
-        for name in namelist:
-            contents = jar.read(name)
-            if not _javaMagic(contents):
-                continue
-            prov, req = javadeps.getDeps(contents)
-            self.contents['files'].add(name)
-            if prov:
-                self.contents['provides'].add(prov)
-            if req:
-                self.contents['requires'].update(req)
+
+        fullpath = basedir+path
+        try:
+            jar = zipfile.ZipFile(fullpath)
+            namelist = [ i.filename for i in jar.infolist()
+                         if not i.filename.endswith('/') and i.file_size > 0 ]
+            for name in namelist:
+                contents = jar.read(name)
+                if not _javaMagic(contents):
+                    continue
+                prov, req = javadeps.getDeps(contents)
+                filesMap[name] = (prov, req)
+                if prov:
+                    self.contents['provides'].add(prov)
+                if req:
+                    self.contents['requires'].update(req)
+        except (IOError, zipfile.BadZipfile):
+            # zipfile raises IOError on some malformed zip files
+            pass
 
 
 class ZIP(Magic):
@@ -120,6 +127,7 @@ class java(Magic):
             self.contents['provides'] = set([prov])
         if req:
             self.contents['requires'] = req
+        self.contents['files'] = { path : (prov, req) }
 
 
 class script(Magic):

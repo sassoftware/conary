@@ -42,7 +42,7 @@ import textwrap
 from conary.build import action
 from conary.lib import fixedglob, log, util
 from conary.build.use import Use
-from conary.build.manifest import Manifest
+from conary.build.manifest import Manifest, ExplicitManifest
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -64,6 +64,7 @@ class BuildAction(action.RecipeAction):
     passes macros to the C{do()} method.
     """
     keywords = {'package': None}
+    useExplicitManifest = False
     def __init__(self, recipe, *args, **keywords):
 	"""
 	@keyword use: Optional argument; Use flag(s) telling whether
@@ -91,7 +92,11 @@ class BuildAction(action.RecipeAction):
 
     def initManifest(self, recipe):
         if self.package:
-            self.manifest = Manifest(package=self.package, recipe=recipe)
+            if self.useExplicitManifest:
+                self.manifest = ExplicitManifest(package = self.package,
+                        recipe = recipe)
+            else:
+                self.manifest = Manifest(package=self.package, recipe=recipe)
 
     def doAction(self):
 	if self.debug:
@@ -122,6 +127,19 @@ class BuildAction(action.RecipeAction):
         @type macros: macros.Macros
         """
         raise AssertionError, "do method not implemented"
+
+    def missingFiles(self, files, warn = False):
+        if len(files) == 1:
+            fileMsg = "'" + files[0] + "'"
+        else:
+            fileMsg = "('" + "', '".join(x for x in files) + "')"
+        message = "%s: No files matched: %s" % \
+                (self.__class__.__name__, fileMsg)
+        if warn:
+            log.warning(message)
+        else:
+            raise RuntimeError("%s: No files matched: %s" % \
+                    (self.__class__.__name__, fileMsg))
 
 
 class BuildCommand(BuildAction, action.ShellCommand):
@@ -448,6 +466,8 @@ class Configure(BuildCommand):
                 'local': False,
                }
 
+    _configLog = "config.log"
+
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword configureName: The name of the configure command. Normally,
@@ -465,6 +485,12 @@ class Configure(BuildCommand):
         """
         BuildCommand.__init__(self, recipe, *args, **keywords)
 
+    def _setupMacros(self, macros):
+        if self.objDir:
+            macros.configure = '../%s' % self.configureName
+        else:
+            macros.configure = './%s' % self.configureName
+
     def do(self, macros):
         macros = macros.copy(False)
         if self.local:
@@ -478,14 +504,14 @@ class Configure(BuildCommand):
             return
 
         if self.objDir:
-	    objDir = self.objDir %macros
+            objDir = self.objDir %macros
             macros.mkObjdir = 'mkdir -p \'%s\'; cd \'%s\';' %(objDir, objDir)
             macros.cdObjdir = 'cd \'%s\';' %objDir
-	    macros.configure = '../%s' % self.configureName
         else:
             macros.mkObjdir = ''
             macros.cdObjdir = ''
-            macros.configure = './%s' % self.configureName
+
+        self._setupMacros(macros)
 
         if self.local:
             oldPath = os.environ['PATH']
@@ -508,14 +534,143 @@ class Configure(BuildCommand):
                     # inspecting the build directory
                     # Each file line will have the filename prepended
                     # The "|| :" makes it OK if there is no config.log
-                    util.execute('cd \'%(actionDir)s\'; %(cdObjdir)s'
-                                 'find . -name config.log | xargs grep -H . || :'
+                    util.execute(('cd \'%(actionDir)s\'; %(cdObjdir)s'
+                                  'find . -name ' + self._configLog + 
+                                  ' | xargs grep -H . || :')
                                  %macros)
                 raise
         finally:
             if self.local:
                 os.environ['PATH'] = oldPath
                 os.environ['CONFIG_SITE'] = oldSite
+
+class CMake(Configure):
+    """
+    NAME
+    ====
+
+    B{C{r.CMake()}} - Runs cmake configure script
+
+    SYNOPSIS
+    ========
+
+    C{r.CMake(I{extra args}, [I{objDir},] [I{preCMake},] [I{skipMissingDir},] [I{dir}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.CMake()} class is called from within a Conary recipe to run an
+    cmake configure script, giving it the default paths as defined by the
+    macro set: C{r.CMake(extra args)}.
+
+    KEYWORDS
+    ========
+
+    The C{r.CMake()} class accepts the following keywords, with default
+    values shown in parentheses when applicable:
+
+    B{objDir} : (None) Make an object directory before running C{cmake}.
+    This is used for out of source build (srcdir != objdir). It can contain
+    macro references.
+
+    B{preCMake} : (None) Extra shell script which is inserted in front of
+    the C{cmake} command.
+
+    B{skipMissingDir} : (False) Raise an error if C{dir} does not exist,
+    (by default) and if set to C{True} skip the action when C{dir} does not
+    exist.
+
+    B{dir} : (None) Directory in which to run C{cmake}
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command.
+    Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
+    override the package specification, since all package and component
+    specifications are considered in strict order as provided by the recipe.
+
+    EXAMPLES
+    ========
+
+    C{r.CMake('-DUSE_KDE3=NO')}
+
+    Demonstrates calling C{r.CMake()} and specifying C{NO} value for
+    C{USE_KDE3} variable.
+    """
+    # note that template is NOT a tuple, () is used merely to group strings
+    # to avoid trailing \ characters on every line
+    template = (
+        'cd %%(actionDir)s; '
+        '%%(mkObjdir)s '
+        ' CC=%%(cc)s CXX=%%(cxx)s'
+        ' %(preCMake)s cmake'
+        ' -DCMAKE_C_FLAGS:STRING="%%(cflags)s"'
+        ' -DCMAKE_CXX_FLAGS:STRING="%%(cflags)s %%(cxxflags)s"'
+        ' -DCMAKE_EXE_LINKER_FLAGS:STRING="%%(ldflags)s"'
+        ' -DCMAKE_MODULE_LINKER_FLAGS:STRING="%%(ldflags)s"'
+        ' -DCMAKE_SHARED_LINKER_FLAGS:STRING="%%(ldflags)s"'
+        ' -DCMAKE_INSTALL_PREFIX:PATH="%%(prefix)s"'
+        ' %(args)s'
+        ' %%(actionDir)s')
+    keywords = {
+        'preCMake': '',
+        'objDir': '',
+        'dir': '',
+        'subDir': '',
+        'skipMissingDir': False,
+        'skipMissingSubDir': False }
+
+    _configLog = 'CMakeCache.txt'
+
+    def __init__(self, recipe, *args, **keywords):
+        """
+        @keyword objDir: Make an object directory before running C{cmake}.
+            This is useful for applications which do not support running
+            cmake from the same directory as the sources
+            (srcdir != objdir). It can contain macro references.
+        @keyword preCMake: Extra shell script which is inserted in front
+            of the C{cmake} command.
+        @keyword skipMissingDir: Raise an error if C{dir} does not
+            exist, (by default) and if set to C{True} skip the action when
+            C{dir} does not exist.
+        @keyword dir: Directory in which to run C{cmake}
+        """
+        BuildCommand.__init__(self, recipe, *args, **keywords)
+
+    def _setupMacros(self, macros):
+        pass
+
+    def do(self, macros):
+        macros = macros.copy()
+        macros.actionDir = action._expandOnePath(self.dir, macros,
+             macros.builddir, error=not self.skipMissingDir)
+        if not os.path.exists(macros.actionDir):
+            assert(self.skipMissingDir)
+            return
+
+        macros.cdObjdir = ''
+        macros.mkObjdir = ''
+        if self.objDir:
+            objDir = self.objDir %macros
+            macros.cdObjdir = 'cd %s;' %objDir
+            macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
+
+        try:
+            util.execute(self.command %macros)
+        except RuntimeError, info:
+            if not self.recipe.isatty():
+                # When conary is being scripted, logs might be
+                # redirected to a file, and it might be easier to
+                # see CMakeCache.txt output in that logfile than by
+                # inspecting the build directory
+                # Each file line will have the filename prepended
+                # The "|| :" makes it OK if there is no CMakeCache.txt
+                util.execute('cd %(actionDir)s; %(cdObjdir)s'
+                             'find . -name CMakeCache.txt | xargs grep -H . || :'
+                             %macros)
+            raise
+
 
 class ManualConfigure(Configure):
     """
@@ -1048,7 +1203,7 @@ class PythonSetup(BuildCommand):
     SYNOPSIS
     ========
 
-    C{r.PythonSetup(I{extra args}, [I{action},] [I{purePython},] [I{allowNonPure},] [I{bootstrap},] [I{dir},] [I{rootDir},] [I{purelib},] [I{platlib},] [I{data},] )}
+    C{r.PythonSetup(I{extra args}, [I{setupName}],[I{action},] [I{purePython},] [I{allowNonPure},] [I{bootstrap},] [I{dir},] [I{rootDir},] [I{purelib},] [I{platlib},] [I{data},] )}
 
     DESCRIPTION
     ===========
@@ -1271,6 +1426,7 @@ class Ldconfig(BuildCommand):
 
 class _FileAction(BuildAction):
     keywords = {'component': None}
+    useExplicitManifest = True
 
     def __init__(self, recipe, *args, **keywords):
         BuildAction.__init__(self, recipe, *args, **keywords)
@@ -1285,10 +1441,6 @@ class _FileAction(BuildAction):
             package = self.component.split(':')[0]
             if package:
                 recipe.packages[package] = True
-
-    def initManifest(self, recipe):
-        # _FileAction does not need Manifest to do package= kwarg
-        pass
 
     def chmod(self, destdir, path, mode=None):
         isDestFile =  path.startswith(destdir)
@@ -1419,7 +1571,7 @@ class Desktopfile(BuildCommand, _FileAction):
 		' %(args)s')
     keywords = {'vendor': 'net',
 		'category': None}
-
+    useExplicitManifest = False
 
     def do(self, macros):
 	if not Use.desktop:
@@ -1587,10 +1739,13 @@ class SetModes(_FileAction):
 	for f in files:
 	    log.info('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros.destdir, f)
+            if self.manifest:
+                self.manifest.recordPaths(f)
 	    self.setComponents(macros.destdir, f)
 
 class _PutFiles(_FileAction):
-    keywords = { 'mode': -1, 'preserveSymlinks' : False }
+    keywords = { 'mode': -1, 'preserveSymlinks' : False, 'allowNoMatch' : False}
+    useExplicitManifest = False
 
     def do(self, macros):
         dest = action._expandOnePath(self.toFile, macros)
@@ -1599,6 +1754,8 @@ class _PutFiles(_FileAction):
         fromFiles = action._expandPaths(self.fromFiles, macros)
         if not os.path.isdir(dest) and len(fromFiles) > 1:
             raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
+        elif len(fromFiles) == 0:
+            self.missingFiles(self.fromFiles, warn = self.allowNoMatch)
         for source in fromFiles:
             self._do_one(source, dest, macros.destdir)
 
@@ -1869,7 +2026,7 @@ class Symlink(_FileAction):
     # This keyword is preserved only for compatibility for existing
     # recipes; DanglingSymlinks policy should enforce non-dangling
     # status when it matters.
-    keywords = { 'allowDangling': True }
+    keywords = { 'allowDangling': True , 'allowNoMatch': False}
 
     def do(self, macros):
 	dest = action._expandOnePath(self.toFile, macros)
@@ -1915,6 +2072,8 @@ class Symlink(_FileAction):
 
         if len(sources) > 1 and not targetIsDir:
             raise TypeError, 'creating multiple symlinks, but destination is not a directory'
+        elif len(sources) == 0:
+            self.missingFiles(self.fromFiles, warn = self.allowNoMatch)
 
         for source in sources:
             if targetIsDir:
@@ -1928,6 +2087,8 @@ class Symlink(_FileAction):
 	    if source[0] == '.':
 		log.warning('back-referenced symlink %s should probably be replaced by absolute symlink (start with "/" not "..")', source)
 	    os.symlink(util.normpath(source), to)
+            if self.manifest:
+                self.manifest.recordPaths(to)
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -1995,9 +2156,11 @@ class Link(_FileAction):
     Demonstrates calling C{r.Link()} to create a hard link from the file
     C{%(bindir)s/passwd} to the file C{%(bindir)s/mumble}.
     """
+
     def do(self, macros):
 	d = macros['destdir']
         self.existingpath = self.existingpath % macros
+        self.basedir = self.basedir % macros
         if self.existingpath and self.existingpath[0] != '/':
             self.init_error(TypeError,
                 'hardlink %s must be located in destdir' %self.existingpath)
@@ -2005,12 +2168,15 @@ class Link(_FileAction):
 	if not os.path.exists(e):
 	    raise TypeError, 'hardlink target %s does not exist' %self.existingpath
 	for name in self.newnames:
+            name = name % macros
 	    newpath = util.joinPaths(self.basedir, name)
 	    n = util.joinPaths(d, newpath)
 	    self.setComponents(d, n)
 	    if os.path.exists(n) or os.path.islink(n):
 		os.remove(n)
 	    os.link(e, n)
+            if self.manifest:
+                self.manifest.recordPaths(n)
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -2068,18 +2234,29 @@ class Remove(BuildAction):
     C{r.Remove('/lib/modules/%(kver)s/modules.*')}
 
     Calls C{r.Remove()} to remove the C{modules.*} files from the
-    C{/lib/modules/%(kver)s/} directory.
+    C{/lib/modules/%(kver)s/} directory. Note that this class, like all other
+    build actions, takes globs and not regular expressions. Thus, modules.*
+    would match modules.a, but not modules_a.
+
+    C{r.Remove('%(bindir)s/foo{bar,baz}')}
+
+    Calls C{r.Remove()} to remove %(bindir)s/foobar and %(bindir)s/foobaz. This
+    illustrates that build actions accept bash-style expansion.
     
     C{r.Remove('/etc/widget', recursive=True)}
 
     Calls C{r.Remove()} to remove both the content in the C{/etc/widget}
     directory, and the C{/etc/widget} directory.
     """
-    keywords = { 'recursive': False }
+    keywords = { 'recursive': False , 'allowNoMatch': False}
 
     def do(self, macros):
-	for path in action._expandPaths(self.filespecs,
-                                        macros, braceGlob=False):
+        # expand braceglobs only for match checking
+        paths = action._expandPaths(self.filespecs, macros, braceGlob = True)
+        if not paths:
+            self.missingFiles(self.filespecs, warn = self.allowNoMatch)
+        paths = action._expandPaths(self.filespecs, macros, braceGlob = False)
+        for path in paths:
 	    if self.recursive:
 		util.rmtree(path, ignore_errors=True)
 	    else:
@@ -2124,9 +2301,9 @@ class Replace(BuildAction):
     Lines may consist of a tuple *(begin, end)* or a single integer *line* or a
     regular expression of lines to match.  Lines are indexed starting with 1.
 
-    Remember that python will interpret C{\1}-C{\7} as octal characters.
-    You must either escape the backslash: C{\\1} or make the string raw by
-    prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
+    Remember that python will interpret C{\\1}-C{\\7} as octal characters.
+    You must either escape the backslash: C{\\\\1} or make the string raw by
+    prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\\1bc'))}
 
     KEYWORDS
     ========
@@ -2214,6 +2391,8 @@ class Replace(BuildAction):
 
     def do(self, macros):
         paths = action._expandPaths(self.paths, macros, error=False)
+        if self.manifest:
+            self.manifest.recordPaths(paths)
         log.info("Replacing '%s' in %s",
                   "', '".join(["' -> '".join(x) for x in self.regexps ] ),
                   ' '.join(paths))
@@ -2343,6 +2522,7 @@ class Doc(_FileAction):
                 'dir': '',
 		'mode': 0644,
 		'dirmode': 0755}
+    useExplicitManifest = False
 
     def do(self, macros):
 	macros = macros.copy()
@@ -2500,6 +2680,8 @@ class Create(_FileAction):
 		f = file(fullpath, 'w')
 		f.write(contents)
 		f.close()
+                if self.manifest:
+                    self.manifest.recordPaths(fullpath)
 		self.setComponents(macros.destdir, fullpath)
 		self.chmod(macros.destdir, fullpath)
 
@@ -2569,8 +2751,12 @@ class MakeDirs(_FileAction):
 
     def do(self, macros):
         for path in action._expandPaths(self.paths, macros, braceGlob=False):
+            if self.manifest:
+                self.manifest.recordPaths(path)
             dirs = util.braceExpand(path)
             for d in dirs:
+                if d.endswith('/'):
+                    d = d[:-1]
                 log.info('creating directory %s', d)
 		self.setComponents(macros.destdir, d.replace('%', '%%'))
                 util.mkdirChain(d)
@@ -2667,6 +2853,7 @@ exit $failed
 		'recursive' : False,
 		'autoBuildMakeDependencies' : True,
 		'subdirs'   : [] }
+    useExplicitManifest = False
 
 
     def __init__(self, recipe, *args, **keywords):
@@ -3146,6 +3333,8 @@ class XInetdService(_FileAction):
                     macros.sysconfdir, 'xinetd.d', self.serviceName))
 
         dest = macros.destdir+self.filename
+        if self.manifest:
+            self.manifest.recordPaths(dest)
 	util.mkdirChain(os.path.dirname(dest))
         f = file(dest, 'w')
         f.write('\n'.join(c) %self.__dict__ %macros)
@@ -3527,6 +3716,8 @@ class MakeFIFO(_FileAction):
             log.info('creating fifo %s' % fullpath)
             util.mkdirChain(os.path.dirname(fullpath))
             os.mkfifo(fullpath)
+            if self.manifest:
+                self.manifest.recordPaths(fullpath)
             self.setComponents(macros.destdir, fullpath)
             self.chmod(macros.destdir, fullpath)
 

@@ -18,13 +18,16 @@ python_files = __init__.py	\
 	buildinfo.py		\
 	buildpackage.py		\
 	cook.py			\
+	derive.py		\
 	derivedpolicy.py	\
 	derivedrecipe.py	\
 	destdirpolicy.py	\
 	errors.py	        \
+	explain.py	        \
 	filter.py 		\
 	filesetrecipe.py	\
 	grouprecipe.py		\
+	grouppolicy.py		\
 	inforecipe.py		\
 	loadrecipe.py		\
 	lookaside.py		\
@@ -40,6 +43,7 @@ python_files = __init__.py	\
 	signtrove.py		\
 	source.py		\
 	tags.py			\
+	trovefilter.py			\
 	use.py                  \
         usergroup.py
 

@@ -21,6 +21,7 @@
 #include <malloc.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
+#include <sys/poll.h>
 #include <unistd.h>
 
 /* debugging aid */
@@ -37,6 +38,7 @@ static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
 static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
+static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -53,6 +55,7 @@ static PyMethodDef MiscMethods[] = {
     { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
     { "massCloseFileDescriptors", py_massCloseFDs, METH_VARARGS },
+    { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -188,7 +191,7 @@ static PyObject * exists(PyObject *self, PyObject *args) {
         return NULL;
 
     if (lstat(fn, &sb)) {
-        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG) {
+        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG || errno == EACCES) {
             Py_INCREF(Py_False);
             return Py_False;
         }
@@ -546,6 +549,44 @@ static PyObject * py_massCloseFDs(PyObject *self, PyObject *args) {
 
     Py_INCREF(Py_None);
     return Py_None;
+}
+
+static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
+{
+    int vfd, i, maxfd, ret;
+    struct pollfd *ufds;
+
+    /* Count the number of open file descriptors */
+
+    maxfd = getdtablesize();
+    /* Don't worry about freeing ufds */
+    ufds = (struct pollfd *)alloca(maxfd * sizeof(struct pollfd));
+
+    for (i = 0; i < maxfd; i++)
+      {
+        ufds[i].fd = i;
+        ufds[i].events = POLLIN | POLLPRI | POLLOUT;
+      }
+
+    /* We need to loop, in case poll is interrupted by a signal */
+    while (1)
+      {
+        ret = poll(ufds, maxfd, 0);
+        if (ret >= 0) /* No error */
+            break;
+        /* ret == -1 */
+        if (errno == EINTR) /* A signal occurred. Retry */
+            continue;
+        /* Real failure */
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+      }
+
+    for (i = 0, vfd = 0; i < maxfd; i++)
+        if (ufds[i].revents != POLLNVAL)
+            vfd++;
+
+    return PyInt_FromLong(vfd);
 }
 
 

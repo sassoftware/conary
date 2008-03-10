@@ -346,14 +346,10 @@ class Database(BaseDatabase):
         return BaseDatabase.createTrigger(self, table, when, onAction, sql)
 
     # MySQL uses its own "special" syntax for dropping indexes....
-    def dropIndex(self, table, name):
-        if name not in self.tables[table]:
-            return False
+    def _dropIndexSql(self, table, name):
         sql = "ALTER TABLE %s DROP INDEX %s" % (table, name)
         cu = self.dbh.cursor()
         cu.execute(sql)
-        self.tables[table].remove(name)
-        return True
 
     # MySQL requires us to redefine a column even if all we need is to
     # rename it...

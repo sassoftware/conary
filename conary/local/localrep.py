@@ -38,7 +38,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         assert(not hidden), "This code pathway does not accept hidden trove commits"
         info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
-	return (info, self.repos.addTrove(trove, pin = pin))
+	return (info, self.repos.addTrove(trove, pin = pin,
+                                          oldTroveSpec = oldTroveSpec))
 
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, 
                        newVersion, fileStream = None):

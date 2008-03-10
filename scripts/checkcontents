@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,7 +17,7 @@
 """
 checkcontents examines the database and data store on a system to see
 if there are missing contents.  If the --repair flag is given, the contents
-will be downloaded from the appropriate repositories and restored
+will be downloaded from the appropriate repositories and restored.
 """
 
 import os
@@ -36,7 +36,7 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary import conarycfg, deps, files
 from conary.repository import datastore
 from conary.lib import options, sha1helper, util
-from conary.repository import netclient
+from conary import conaryclient
 from conary import sqlite3
 from conary.local import database
 
@@ -57,7 +57,9 @@ def getTroveInfo(db, instanceId):
 
 def main(argv):
     sys.excepthook = util.genExcepthook()
-    cfg = conarycfg.ConaryConfiguration()
+    client = conaryclient.getClient()
+    repos = client.getRepos()
+    cfg = client.cfg
 
     argDef = {}
     argDef['repair'] = options.NO_PARAM
@@ -83,9 +85,9 @@ def main(argv):
 
     # loop over all the files in the database
     cu = db.db.db.cursor()
-    cu.execute('SELECT streamId, pathId, path, versionId, instanceId, stream '
+    cu.execute('SELECT pathId, path, versionId, instanceId, stream '
                'FROM DBTroveFiles')
-    for streamId, pathId, path, versionId, instanceId, stream in cu:
+    for pathId, path, versionId, instanceId, stream in cu:
         f = files.ThawFile(stream, pathId)
         # if it's a config file, check to make sure that it is in the
         # data store
@@ -122,9 +124,6 @@ def main(argv):
             print
 
     if repair:
-        # set up a network client using the repositoryMap - hopefully
-        # it has servers for any version string that's in the database
-        repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
         # request the contents we're missing
         contents = repos.getFileContents(neededFiles)
         # loop over the contents we got back and the list of sha1s
@@ -137,7 +136,6 @@ def main(argv):
             h2 = sha1helper.sha1ToString(h2)
             assert(h == h2)
         db.commit()
-                
+
 if __name__ == '__main__':
     main(sys.argv)
-

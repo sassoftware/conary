@@ -1,15 +1,94 @@
-Changes in @NEW@:
+Changes in 1.2.20:
   o Bug Fixes:
     * A bug that occasionally caused a thread deadlock when multiple
       threads access the local system Conary database concurrently has
       been fixed. (CNY-2586)
+    * Checking out sources unpacks duplicate binary files (CNY-2543)
+    * Derived packages use the revision which was shadowed from to find
+      the version to derive from instead of the latest on the branch
+      (CNY-2577)
+    * A bug that occurred when rMake recursed through a group recipe
+      that made use of the replace command has been fixed. (CNY-2606)
 
-Changes in 1.1.31.12:
+Changes in 1.2.19:
+  o Client Changes:
+    * A close() method has been added to UpdateJob objects. It is
+      recommended to call the method explicitly instead of relying
+      on the object to be collected when going out of scope.
+      (CNY-2489)
+
+  o Build Changes:
+    * Conary now has support for group policies. Policies deriving from
+      GroupEnforcementPolicy and ImageGroupEnforcementPolicy will be
+      run on groups at the end of the cook process. (CNY-2378)
+    * ImageGroup is now an attribute tracked in a group's troveInfo.
+      This attribute is set for groups meant to define a complete,
+      functional system, and implies that ImageGroupEnforcementPolicy
+      group policies have been run for that group, recursively.
+      (CNY-2520)
+    * The VersionConflicts group policy has been added. This group
+      policy enforces that two different versions of a trove will not
+      be accidentally included in one install image. (CNY-2371)
+    * TroveFilters now exist. Trove filters allow a packager to
+      reference particular troves within a group for group policy
+      inclusions/exceptions. (CNY-2477)
+    * The Conary policy to fix trailing newlines in config files has
+      been corrected to handle non-writable config files. (CNY-2559)
+    * The "cvc derive" command now creates a reference directory
+      named _OLD_ROOT_ alongside _ROOT_ when the --extract argument
+      is provided. (CNY-2530)
+    * A new group recipe command, startGroup, has been added, which
+      calls createGroup, addNewGroup and setDefaultGroup in one step.
+      (CNY-2197)
+    * The addCvsSnapshot source action no longer caches the HEAD of
+      the repository, since cvs export will not use it. (CNY-2568)
+    * Macros from config files and from the command line are now
+      available to group recipes. (CNY-2574)
+    * Binary packages built from superclass recipes will be unflavored,
+      regardless of any flavor-related references in a recipe.
+      (CNY-2576)
+
   o Bug Fixes:
-    * A bug that could cause incorrect SQLite database error messages
-      has been fixed. (CNY-1840)
-    * A bug that was preventing users with colons in their passwords
-      to use the web interface has been fixed. (CNY-2374)
+    * Conary no longer loses ownership of changed files when updating
+      multiple flavors of the same version of the same package at the same
+      time. (CNY-2553)
+    * If Conary is running on kernels which, under certain circumstances,
+      return EINVAL when calling poll(), the lazy file cache will only
+      count the file descriptors it has open itself. (CNY-2571)
+    * Job invocation information no longer uses null characters,
+      which are not allowed in an XML document. (CNY-2580)
+    * Updating files which point to other files (due to a PTR in the
+      changeset) previously failed when those other files were not
+      being installed at the same time (due to a "conary remove"
+      on those files, for example). (CNY-2595)
+    * Filtering all java dependencies no longer produces a stack
+      trace. (CNY-2594)
+
+Changes in 1.2.18:
+  o Build Changes:
+    * Handling pkg-config dependencies has been moved to conary-policy.
+      (CNP-93)
+
+  o Bug Fixes:
+    * When resuming the update after the execution of a critical update,
+      Conary will now use the original file replacement flags. This
+      corrects file conflict errors in a migrate when a critical update
+      was present. (CNY-2513)
+    * The lazy file cache was using /proc/self/fd as a method of
+      determining the number of open file descriptors for the current
+      process. However, under certain circumstances the directory is not
+      readable. The lazy file cache now uses a poll(2)-based technique.
+      (CNY-2536)
+
+Changes in 1.2.17:
+  o Build Changes:
+    * Java dependencies for classes that are not dependency-complete
+      are now automatically disabled. To re-enable them, the missing
+      dependencies should be added as buildRequires. (CNY-2175)
+
+  o Bug Fixes:
+    * A minor bug in the display of the password prompt has been fixed.
+      (CNY-2497)
     * Slow SQL queries used to remove unused entries from the
       TroveFiles table and TroveTroves table have been rewritten to
       make some queries faster with repositories implemented with a
@@ -24,59 +103,496 @@ Changes in 1.1.31.12:
       is available under two licenses, and to state the conditions
       under which the two licenses apply.
 
-Changes in 1.1.31.11:
-  o Bug Fixes:
-    * A bug that caused internal server errors when retrieving
-      changeset that contained compressed file data over 4 GiB in size
-      has been fixed. (CNY-2170, CNY-2173)
-    * When talking to a repository, Conary proxies will now automatically
-      switch the protocol to HTTPS whenever authentication information
-      is injected on behalf of the client. (CNY-2184)
-
-Changes in 1.1.31.10:
+Changes in 1.2.16:
   o Client Changes:
-    * Unknown trove info types in the database are stored in extracted
-      trove info properly (CNY-2059)
+    * The rollback API now raises a RollbackError instead of returning
+      non-zero on errors. (CNY-1643)
+
+  o Build Changes:
+    * When file conflicts occur while cooking groups, the deps that
+      caused a package to be pulled in are listed. (CNY-2308)
+    * Config policy will automatically append a newline to non-binary files.
+      Files that are marked as Config and appear to be binary will
+      continue to trigger an error as they have previously. (CNY-2422)
+    * Perl requirements that are not present on the system or provided by
+      the package being built are dropped. (CNY-2180)
+    * Two expansion functions have been introduced to package recipes:
+      r.glob and r.regexp. These functions return an object that can be
+      substituted for any API parameter that calls for a string based
+      regexp or glob. (CNY-2222)
+    * Group recipe actions like "r.addAll" and "r.addCopy" now record
+      the version of the group that is being copied from into the newly
+      created group. (CNY-2359)
+    * Add code to display new-style metadata through rq, q, and showchangeset,
+      as well as propagate that metadata via cooking, promoting, shadowing,
+      and committing source packages.  Entering this metadata must still 
+      be done through scripts.  (CNY-1808)
+    * Added a hook that allows build requirements to be overridden by
+      rMake. (CNY-2427)
+    * Build actions that don't match anything (r.Move, r.Copy etc) will
+      now log exactly what they were trying to do. (CNY-2216)
 
   o Bug Fixes:
-    * Tag scripts are now closing file descriptors larger than stderr
-      before calling exec(). (CNY-2114)
+    * Conary no longer tracebacks when building a package that contains 
+      a pkgconfig reference to a file in the current package that is in a
+      symlinked directory. (CNY-2455)
+    * The order in which configuration files are read when a glob was
+      passed to includeConfigFile is now deterministic. (CNY-2483)
+
+Changes in 1.2.15:
+  o Bug Fixes:
+    * Moving an unmodified shadow to tip via cvc promote no longer causes
+      an error. (CNY-2441)
+    * Recipes using addSvnSnapshot no longer modify the conary
+      configuration object's tmpDir setting (CNY-2401)
+    * Fixed a rare bug in which dependency resolution would fail when
+      a dependency that used to be provided by one installed package
+      is now provided by two new packages. (CNY-2459)
+
+  o Client Changes:
+    * Conary will now use the proxy settings stored in its local
+      configuration when loading remote configuration files. (CNY-2363)
+
+  o Build Changes:
+    * Policies that move files in destdir now track path changes they
+      make so that files will end up in the correct package or component
+      after being moved, when "package=" or "component=" has been used
+      in a build action. (CNY-1679)
+
+Changes in 1.2.14:
+  o Client Changes:
+    * The /etc/ld.so.conf.d/*.conf handling added to Conary 1.2.13
+      introduced a bug that could erase necessary entries from
+      ld.so.conf in some circumstances.  This bug has been
+      resolved. (CNY-2440)
+
+Changes in 1.2.13:
+  o Client Changes:
+    * Conary will not downgrade packages if no version is specified by
+      the user, but, due to an out of date mirror or other reasons, the
+      update available for a package is older than the currently
+      installed package. (CNY-2402)
+    * Conary now recognizes /etc/ld.so.conf.d/*.conf files, adding an
+      include line to /etc/ld.so.conf if they exist, and does not add
+      new duplicate entries to /etc/ld.so.conf for directories already
+      specified in /etc/ld.so.conf.d/*.conf files. (CNY-2432)
+
+  o Build Changes:
+    * Superclasses are now loaded from the filesystem. Superclasses
+      can now be cooked. Doing so will make a changeset that installs
+      the recipe itself on the filesystem. (CNY-983)
+    * When building packages, Conary now reads /etc/ld.so.conf.d/*.conf
+      files to determine whether to include the path in the dependency.
+      (CNY-2433)
+
+Changes in 1.2.12:
+  o Client Changes:
+    * A getDatabase() method has been added to the ConaryClient class.
+      This method returns the local system database object. Code that
+      needs to query the local system database should use this method
+      to obtain the database object. (CNY-2316)
+
+  o Build Changes:
+    * Spaces in URLs are now automatically escaped. (CNY-2389)
+    * The Requires() policy now inspects Lib: and Lib.private:
+      pkg-config keywords in .pc files to find library files, and
+      where it finds them, it adds appropriate Conary trove
+      requirements to the .pc files. (CNY-2370)
+
+  o Bug Fixes:
+    * The PackageSpec documentation incorrectly stated that you could
+      pass both package and component information to it; this has
+      been corrected to properly redirect to ComponentSpec for this
+      usage. (CNY-2387)
+    * An update bug that could result in a trove integrity error has
+      been fixed. The issue would occur when updating packages where,
+      for some files, the only changes are to file versions. (CNY-2403)
+
+Changes in 1.2.11:
+  o Client Changes:
+    * The error message printed when Conary encounters an unhandled
+      exception has been changed to reflect the fact that the common
+      case is merely poor handling of the error condition, rather than
+      another bug.  It has also been reformatted to display better in
+      rITS. (CNY-2265)
+    * The "conary-debug" script that collects information to help
+      debug a crash has been enhanced to include the recently-added
+      manifest file. (CNY-2338)
+
+  o Build Changes:
+    * PythonSetup synopsis now mentions the setupName keyword
+      argument. (CNY-2360)
+    * The conary.1 manual page now documents the purpose of the
+      /etc/conary/components directory. (CNY-2361)
+    * The clearBuildReqs() function now has a synonym called
+      clearBuildRequires() and the clearCrossReqs() function now has a
+      synonym called clearCrossRequires().  The old function names
+      will be deprecated in the future. (CNY-834)
+
+  o Bug Fixes:
+    * When building groups, r.addCopy() now respects the groupName
+      flag. (CNY-2345)
+    * The searchPath parameter in group methods now works when it
+      contains packages (before it worked only with labels). (CNY-2372)
+    * A bug that was preventing users with colons in their passwords
+      to use the web interface has been fixed. (CNY-2374)
+    * Attempting to add entitlements for unknown entitlement classes
+      now raises an UnknownEntitlementGroup exception. (CNY-2377)
+    * Committing source packages that use shell-style brace and
+      glob expansion in addPatch() can now be committed to a
+      repository. (CNY-1152)
+
+Changes in 1.2.10:
+  o Client Changes:
+    * The "conary verify" command no longer complains about files which
+      have been removed with "conary remove". (CNY-950)
+    * Local rollbacks for removals now store the original contents for
+      modified config files. (CNY-2350)
+    * Permission errors now list both the URL and the repository
+      hostname. (CNY-2211)
+
+  o Server Changes:
+    * A new boolean server configuration option, serializeCommits,
+      has been added to explicitly limit contention in certain cases.
+      Successfully enabling it requires a minor schema update. (CNY-2285)
+    * Servers in maintenance mode no longer return Internal Server
+      Errors to GET requests from clients. (CNY-2229)
+
+  o Build Changes:
+    * The addPatch() source action honors shell-style brace and glob
+      expansion when sourceDir is defined. (CNY-1152)
+    * A new command, "cvc explain", has been added. "cvc explain"
+      displays the documentation for recipe methods.  For example,
+      "cvc explain addSource" shows the on-line documentation for the
+      addSource() source action. (CNY-2242)
+    * The command line interface to cvc derive (added in Conary 1.2.8)
+      has been changed.  It now derives onto your buildLabel by default,
+      with a --target option to derive onto a different label.
+      The cvc derive interface is subject to further change.
+
+  o Bug Fixes:
+    * A bug that caused an exception when inspecting ELF files with a
+      standalone ABI has been fixed. (CNY-2333)
+    * A bug that caused updates with group scripts to fail when run
+      with the '--root' option with a trailing slash in the path has
+      been fixed. (CNY-2348)
+    * An issue related to file placeholders potentially being lost while
+      rewriting rollback changesets has been fixed.
+
+Changes in 1.2.9:
+  o Documentation Changes:
+    * The documentation strings for the update code have been revised
+      to include the most common exceptions raised as part of
+      prepareChangeSet and updateChangeSet. (CNY-1732)
+
+  o Build Changes:
+    * File level requirements provided by the same file are dropped.
+      (CNY-2177)
+    * Java dependencies that do not start with a valid TLD are now
+      excluded. (CNY-2176)
+    * The exceptDeps keyword parameter is now allowed for r.Provides(),
+      analogously to r.Requires(). (CNY-1485)
+    * The new sourceDir keyword parameter is now available for
+      r.addSource(), r.addPatch(), and r.addArchive() to specify that
+      the source is found within the maindir. (CNY-1439)
+    * LD_LIBRARY_PATH is now set when calling bootstrapped python, in
+      order to load the correct python libraries. (CNY-2319)
+    * The :config component is built by file location, rather than
+      from files marked as config files by the Config policy.
+      This means that the configComponent configuration item no
+      longer operates. (CNY-2256)
+
+  o Client Changes:
+    * A keepRequired config option has been added. This has the same
+      effect as always setting the --keep-required flag on update.
+      (CNY-569)
+    * The error message for erased dependencies is now more explicit
+      about what happened to the package that is no longer providing
+      dependencies, and where the package with the missing dependencies
+      came from. (CNY-2248)
+    * We now record the current state of the database to a flat file
+      after updates as an extreme recovery mechanism.  (CNY-1801)
+
+  o Bug Fixes:
+    * The "logcat" script no longer errors out if the log file is empty
+      or contains None for entitlements. (CNY-2252)
+    * Repositories running under Apache are now correctly displaying
+      the real error when trying to generate the verbose traceback
+      emails. (CNY-2320)
+    * An update job that includes a critical update and an update to a
+      group that includes a pre-update script will no longer run the
+      script twice. (CNY-2325)
+    * A bug that could cause incorrect SQLite database error messages
+      has been fixed. (CNY-1840)
+
+Changes in 1.2.8:
+  o Client Changes:
+    * Added the cvc derive command. (CNY-2237)
+    * A new method, conary.conaryclient.getClient(), has been added to
+      allow the creation of a conaryclient with configuration to match
+      that would be used with a conary command line client. (CNY-1745)
+    * Unhandled exceptions that are raised inside a progress callback
+      no longer terminate the update process.  A warning is emitted
+      and the update continues. (CNY-2304)
+
+  o Internal Changes:
+    * The Conary library now has a parallel implementation to gpg
+      for the trust algorithm. (CNY-1988)
+
+  o Bug Fixes:
+    * A problem occurring when updating troves sharing a large
+      number of identical files has been fixed. (CNY-2273)
+    * Repository traceback emails are now more verbose. (CNY-2287)
+    * Methods starting with two underscore characters are considered
+      internal and are no longer passed to the XML-RPC library for
+      marshaling. (CNY-2289)
+    * It is now possible to clone a group that contains references to
+      both a cloned package and the version that the cloned package
+      originated from. (CNY-2302)
+    * When data from stdin is provided to a taghandler, but the
+      taghandler is missing or fails to read some or all of the data,
+      it will no longer result in a database locked error. (CNY-2257)
+    * Conary no longer exits with an unhandled exception if /tmp does
+      not exist when attempting to run a trove script (e.g., group
+      pre/post scripts). (CNY-2303)
+
+Changes in 1.2.7:
+  o Build Changes:
+    * The cvc command now prints out the most recent log message from
+      the underlying source code control system when creating new
+      snapshot archives. (CNY-1778)
+    * Conary now has support for cmake, using the r.CMake() build
+      action in recipes. (CNY-1321)
+
+  o Bug Fixes:
+    * Fixed a traceback that would occur when a component doesn't exist
+      even though its containing package does. (CNY-2213)
+    * Cloning with --default-only no longer removes references to
+      components of packages that are not being cloned. (CNY-2226)
+    * A bug that prevented "cvc cook" from being able to look up path
+      IDs if a component of the package being built was missing from
+      the repository has been fixed. (CNY-2250)
+    * PGP keys using unknown string-to-key specifiers (as generated by
+      "gpg --export-secret-subkeys" for the corresponding secret key)
+      are no longer producing an error when iterating through the
+      keyring. (CNY-2258)
+    * Embedded signatures in secret subkeys now use the public key's
+      cryptographic key, which does not require a passphrase to
+      be decoded. (CNY-2224)
+
+Changes in 1.2.6:
+  o Build Changes:
+    * When cooking packages or groups, conary now displays the methods
+      that are called. It also displays the methods that are unused,
+      making it easier to see if a function from a superclass has been
+      left out. (CNY-2193)
+
+  o Bug Fixes:
+    * Use of macros in the r.Link() build action worked only in limited
+      cases. (CNY-2209)
+
+  o Client Changes:
+    * Mirror mode now includes full file streams in changesets, instead
+      of differential streams. (CNY-2210)
+
+Changes in 1.2.5:
+  o Client Changes:
+    * The OpenPGP implementation now merges PGP keys properly.
+      (CNY-1987)
+    * The OpenPGP implementation is capable of generating trust
+      signatures. (CNY-1990)
+    * A bug which could cause troves containing *identical* files to
+      become corruped in a system database has been fixed. Note that
+      repository databases were not affected. (CNY-2191)
+
+  o Build Changes:
+    * MakeDirs now handles trailing '/' characters in directory names.
+      (CNY-1526)
+    * Using the new provideGroup keyword argument to the r.User()
+      method in a UserGroupRecipe, you can now specify that the user's
+      primary group needs to be already on the system, rather than be
+      added while creating the user. (CNY-2096)
+
+  o Bug Fixes:
+    * A bug that resulted in a KeyError when removing a trove from a
+      group that has 3 levels of subgroups has been fixed. (CNY-1372)
+    * A bug that could result in a decremented source count when
+      promoting a package to a sibling of a parent branch has been
+      fixed. (CNY-2108)
+    * A problem resulting in derived packages corrupting files with the
+      same content was fixed. (CNY-2157)
+    * A bug that caused internal server errors when retrieving
+      changesets that contained compressed file data over 4 GiB in size
+      has been fixed. (CNY-2170, CNY-2173)
+    * HTTP error codes generated by HTTP proxies are now properly
+      interpreted by Conary clients. (CNY-2181)
+    * When talking to a repository, Conary proxies will now
+      automatically switch the protocol to HTTPS whenever authentication
+      information is injected on behalf of the client. (CNY-2184)
+    * addSvnSnapshot no longer generates conflicts in the paths for
+      temporary checkouts. (CNY-2196)
+
+Changes in 1.2.4:
+  o Bug Fixes:
+    * A file that was mistakenly ommitted from packaging has been
+      added to the build. (CNY-2155)
+
+Changes in 1.2.3:
+  o Build Changes:
+    * The addSvnSnapshot() source action now has the ability to add
+      specific SVN revisions via the 'revision' argument. (CNY-2156)
+  o Bug Fixes:
+    * An update failure that would occur when two versions of a package
+      have been installed, one local, one from a repository, has been
+      fixed. (CNY-2127)
+    * A regression introduced in 1.2.1 affecting patch files that apply
+      multiple changes to the same file has been fixed. (CNY-2142)
     * Group scripts now have file descriptor 0 (stdin) connected to
       /dev/null. Previously, stdin was closed, a potential problem
       for scripts that open file descriptors and then disconnect from
       the terminal. (CNY-2143)
 
-Changes in 1.1.31.9:
+  o Client Changes:
+    * Added listkeys, addkey, and getkey commands to cvc for basic
+      command line PGP key management. (CNY-2150)
+
+Changes in 1.2.2:
+  o Build Changes:
+    * Python and Ruby dependencies with lib-specific flags now cause
+      the package to be architecture-flavored. (CNY-2110)
+    * Groups using setSearchPath now prefer packages on the labels and
+      troves listed explicitly in the searchPath over other labels,
+      even if the label is specified in the add() command. For example,
+      if your searchPath includes foo=conary.rpath.com@rpl:1/1-1-1, then
+      r.add('foo', 'conary.rpath.com@rpl:1') in a group recipe will now
+      find version 1-1-1 over later versions. Before, it would find the
+      latest version in the repository if you specified the label in the
+      r.add() command. (CNY-1993)
+
+  o Client Changes:
+    * The conary command line now accepts 'rb' as an alias for
+      'rollback'.
+    * The output of 'rblist' now combines packages and their components
+      in a single line (similar to the output of 'update'). (CNY-2134)
+
   o Bug Fixes:
+    * When parsing the GPG keyring, PGP version 2 keys are now ignored.
+      (CNY-2115)
+    * Direct key signatures for PGP keys are now accepted. (CNY-2120)
+    * Source control recipe actions such as addMercurialSnapshot()
+      no longer produce directory names that can collide with
+      a trove with the same name on a different label, producing
+      a snapshot of a different source control repository. (CNY-2124)
+    * Tag scripts are now closing file descriptors larger than 2
+      before calling a function from the exec family. (CNY-2114)
+    * A bug in determining the correct version for packages when
+      multiple branches of that package exist on the same label has
+      been fixed. (CNY-2128)
     * Multiple entitlements to the same host name are now properly
       handled. (CNY-2105)
-    * The URL sent via prepareChangeSet now matches the one used by
-      commitChangeSet.
     * The URL sent back to the client when connecting through an
-      HTTP proxy was corrected. (CNY-2117)
+      HTTP proxy is now correctly computed by repositories. (CNY-2117)
+    * setSearchPath now searches the leaves for every source in the
+      search path before falling back and searching the rest of the
+      repository. Before, it would search the leaves for each label,
+      then the rest of the labels, and finally groups. (CNY-2131)
 
-Changes in 1.1.31.8:
+Changes in 1.2.1:
+  o Build Changes:
+    * The addGitSnapshot() source action is now available. (CNY-1965)
+    * Cooking derived packages no longer warns about their
+      experimental state. (CNY-2092)
+    * loadInstalled does not search the local database for a matching
+      package on checkin, but instead searches the repository. This
+      makes it easier to develop packages that are correct, with the
+      potential of not building on the current machine. (CNY-2027)
+
+  o Client Changes:
+    * The Conary client is now less aggressive in sending keepalive
+      packets with long-running requests. (CNY-2104)
+    * Promote and clone callbacks are more verbose. (CNY-2063)
+
   o Bug Fixes:
     * Schema migration for the Latest table now correctly handles
       branches that end in redirects. (CNY-2081)
-    * The client is now properly computing the downloaded file's
-      digest if a size limit was specified. (CNY-2072)
     * Adding a large number of user maps is now more efficient
       if the new addServerGlobs method is used. (CNY-2083)
+    * Redirects between branches on the same label, which were
+      necessary before Conary 1.2.0, are again handled correctly.
+      (CNY-2103)
+    * The 'conary updateall' command again properly handles the
+      --replace-files command-line argument. (CNY-2112)
+    * Patches are no longer partially applied when building. A
+      partially applying patch results now in a failure. (CNY-2017)
+    * A bug which caused Conary to incorrectly determine the flags
+      for python dependencies on 64-bit systems has been fixed.
+      (CNY-2091)
+    * Ruby dependencies now function properly in a bootstrap build
+      of the ruby package. (CNY-2109)
 
-Changes in 1.1.31.7:
-  o Bug Fixes:
-    * Related to CNY-2034, Conary proxies are now properly computing
-      the return URL. (CNY-2069)
-    * includeConfigFile now sorts files that are matched in globs
+Changes in 1.2.0:
+  o Build Changes:
+    * A bug which caused Conary to compute python dependencies
+      incorrectly when using an external version of python (such
+      as when building python itself) has been fixed. (CNY-2087)
 
-Changes in 1.1.31.6:
+Changes in 1.1.96:
+  o Server Changes
+    * External entitlement servers can now specify per-entitlement
+      timeouts and automatic retry values (CNY-2060)
+
+  o Client Changes:
+    * Update journal did not have an entry for hard links which were
+      made to targets which already existed on the system, causing
+      system corruption if the journal had to be rolled back. (CNY-1671)
+    * The critical update information now includes enough data to
+      re-create the original update job. (CNY-1608)
+    * Unknown trove info types in the database are properly stored in
+      extracted trove info. (CNY-2059)
+    * diff and patch now support files without trailing newlines.
+      (CNY-1979)
+
+  o Build Changes:
+    * More paths (/usr/lib/.*-sharp.*/) have been added to :cil
+      components. (CNY-2080)
+    * Path ID lookups now ignore permission errors; in such a case, a
+      new path ID is computed. (CNY-1911)
+    * Conary now handles python files that specify a python interpreter
+      that is not available on the system or in the builddir.  It will
+      print a warning and not attempt to compute dependency information
+      for those files. (CNY-2050)
+    * loadSuperClass and loadInstalled now print out name, version
+      flavor of the package that was used when loading. (CNY-1967)
+
   o Bug Fixes:
+    * When running in threaded mode, don't install signal handlers,
+      since that is not supported. (CNY-2040)
+    * URLs returned by prepareChangeSet, getChangeSet, and
+      getFileContents are all based on the URL the client used to call
+      the repository instead of built internally by the repository.
+      (CNY-2034)
+    * An issue that was preventing the repository server, under certain
+      circumstances, to determine the proper URL to use has been fixed.
+      (CNY-2056, CNY-2058)
+    * A regression from Conary 1.1.34 related to self-signature
+      verification on private PGP keys has been fixed. (CNY-2047)
     * An issue related to Conary proxies running in non-SSL mode,
       talking to SSL-enabled repository servers has been fixed.
       (CNY-2067)
+    * Related to CNY-2034, Conary proxies are now properly computing
+      the return URL. (CNY-2069)
+    * The client is now properly computing the downloaded file's
+      digest if a size limit was specified. (CNY-2072)
+    * A regression from Conary 1.1.94 that caused some local cooks to
+      fail to be installable due to incorrect primary trove information
+      has been fixed (CNY-2078)
 
-Changes in 1.1.31.5:
+  o Other Changes
+    * InodeStreams and FileStreams now preserve unknown elements,
+      allowing future additions to those without breaking fileId
+      computation. (CNY-1971)
+
+Changes in 1.1.95:
   o Server Changes
     * A bug which triggered an exception while migrating postgresql
       repositories has been fixed. (CNY-1912)
@@ -87,21 +603,258 @@ Changes in 1.1.31.5:
       (CNY-2005)
     * An issue that was affecting cooking performance when looking
       up path IDs has been fixed. (CNY-1996)
-    * URLs returned by prepareChangeSet, getChangeSet, and
-      getFileContents are all based on the URL the client used to call
-      the repository instead of built internally by the repository.
-      (CNY-2034)
-    * An issue that was preventing the repository server, under certain
-      circumstances, to determine the proper URL to use has been fixed.
-      (CNY-2056, CNY-2058)
-    * External entitlement servers can now specify per-entitlement
-      timeouts and automatic retry values. (CNY-2060)
 
   o Client Changes:
     * A bug which prevented the mirror client from using hidden commits
       when mirroring to a single target has been fixed. (CNY-1981)
-    * diff and patch now support files without trailing newlines.
-      (CNY-1979)
+    * Clone/promote no longer complains when a buildreq is not also
+      being cloned to the new location. (CNY-1844)
+    * Turned off flavorPreferences for 1.2 release, as they are not
+      quite ready. (CNY-2023)
+
+  o Bug Fixes:
+    * Bootstrapping python can now find system conary when using the
+      bootstrapped python to determine python dependencies. (CNY-2001)
+    * A bug in findTroves when using partial labels, introduced as
+      part of 1.1.90, has been fixed. (CNY-2011)
+    * cvc operations no longer trace back when the current working
+      directory can no longer be accessed. (CNY-2014)
+    * Redirects to nothing are now displayed when using --trove-flags.
+      (CNY-2025)
+    * Stack frames now wrap long lines to make them easier to read.
+      (CNY-2016)
+    * Comparison of VersionSequence objects is now more robust.
+      (CNY-2020)
+    * Autosourced files added to both a shadow and its parent now merge
+      properly. (CNY-1856)
+
+Changes in 1.1.94:
+  o Bug Fixes:
+    * Python extension modules installed at the top level of the Python
+      search path no longer produce a traceback when computing
+      dependencies. (CNY-1995)
+
+Changes in 1.1.93:
+  o Build Changes:
+    * Filesets now accept macros. (CNY-148)
+    * crossRequires are now ignored when not cross compiling. (CNY-1950)
+    * Malformed .jar files are now ignored when computing Java
+      dependencies. Previously, Conary exited with an error while
+      attempting to process them. (CNY-1983)
+    * Conary dependencies are no longer attempted when cross-compiling,
+      and when bootstrapping python, modules are now sought in system
+      python directories as well as in the destdir. (CNY-1986)
+    * Python extension modules (.so files) now expose the proper
+      dependencies by providing, for example, itertools (the true
+      name) as well as itertoolsmodule (as it has previously), but
+      requiring the shorter name if it is available on the system.
+      (CNY-1077)
+
+  o Client Changes:
+    * The cvc promote and clone commands are now more efficient and do
+      not download unnecessary packages. This also makes it possible
+      to clone packages where access to some of the included troves
+      is unavailable at the time of the promote or clone operation.
+      (CNY-1913)
+    * A bug which prevented the mirror client from using hidden commits
+      when mirroring to a single target has been fixed. (CNY-1981)
+    * Filesets are now cloneable. (CNY-1297)
+
+  o Server Changes
+    * A bug which triggered an exception while migrating postgresql
+      repositories has been fixed. (CNY-1912)
+
+  o Bug Fixes:
+    * The clone and promote commands now work when cloning over removed
+      packages. (CNY-1955)
+    * searchPath will now provide only the best flavor match when
+      matching against groups with more than one version of a package
+      available. Previously, it would return all matches. (CNY-1881)
+
+Changes in 1.1.92:
+  o Bug Fixes:
+    * ccs2tar correctly handles changesets with duplicate contents and
+      hard links. (CNY-1953)
+    * An error in the way attributes of ServerProxy classes get
+      marshaled has been fixed. (CNY-1956)
+    * If local flags (e.g. kernel.smp) are defined in /etc/conary/use,
+      cooking no longer produces a traceback. (CNY-1963)
+    * The last trove source in a trove source stack is now properly
+      passed flavor information. (CNY-1969)
+    * Derived packages properly handle files that were not flavored due
+      to an exception in the upstream packages. (CNY-1954)
+    * The transport layer is automatically encoding non-ASCII strings
+      into XMLRPC Binary objects. (CNY-1932)
+    * An error that was causing warnings to be printed while cooking
+      groups has been fixed. (CNY-1957)
+
+  o Server Changes
+    * A bug which triggered an exception while migrating postgresql
+      repositories has been fixed. (CNY-1912)
+
+  o Build Changes:
+    * Mono (CIL) files are now placed in :cil components by default.
+      (CNY-1821)
+
+  o Other Changes
+    * The transport layer is using BoundedStringIO objects for
+      compression, decompression and XMLRPC encoding/decoding, to
+      avoid excessive memory consumption. (CNY-1968)
+
+Changes in 1.1.91:
+  o Client Changes:
+    * A new configuration option, "flavorPreferences", has been added.
+      The client uses this list of flavors in trove selection.
+      (CNY-1710)
+    * Large files are now compressed on disk instead of in memory when
+      creating rollbacks. (CNY-1896)
+    * The Conary client API is now more careful with releasing open
+      file descriptors. (CNY-1834)
+    * The "migrate" mode has changed to overwrite changes made to
+      files that are not yet owned by Conary, but already exist on the
+      system, as well managed, non-configuration files that have
+      changed. (CNY-1868)
+    * When signals are received during updates, the journal is now
+      rolled back before conary terminates. (CNY-1393)
+    * A 'cvc checkout' of multiple projects uses far fewer repository
+      calls now, and uses a single changeset.
+    * The 'cvc update' and 'cvc diff' commands now accept a source
+      version argument without a source count. (CNY-1921)
+
+  o Server Changes:
+    * Setting "forceSSL" once again requires a HTTPS connection be
+      used when authentication data is passed to an Apache based
+      Conary Repository. (CNY-1880)
+    * A bug that caused incorrect values for sourceItemId and
+      clonedFromId to be used when groups and components were
+      committed as part of one changeset has been fixed. (CNY-1903)
+    * A bug that caused the Latest table to be rebuilt incorrectly
+      when migrating to schema version 15.0 has been fixed.
+      (CNY-1909)
+
+  o Build Changes:
+    * Redirects will now be followed in group recipes. Previously,
+      including redirects would result in an error. (CNY-1693)
+    * Derived recipes can now be based on troves which have files
+      that have the same content (SHA1) as each other but are
+      members of different link groups (are not intended to be
+      installed as hard links to each other). (CNY-1733)
+    * Derived packages now work properly if the troves they are based
+      on contain dangling symlinks. (CNY-1914)
+    * Symbolic links that have not changed in a derived package are
+      now correctly ignored by policies that are not interested in
+      unmodified files. (CNY-1879)
+    * The build flavor string used for building a trove is now stored
+      as part of that trove's troveInfo field. (CNY-1678)
+    * Looking up path IDs now stops when all files have been found,
+      instead of always walking the shadow hierarchy. (CNY-1911)
+    * multilib cooks set only Arch.x86_64. (CNY-1711)
+
+  o Bug Fixes:
+    * The new OpenPGP parsing code now accepts Version 3 keys and
+      signatures, without verifying them. (CNY-1931)
+    * A file descriptor leak in the getFileContents method has been
+      fixed.
+    * If ignoreErrors is set for a configuration file, that setting is
+      now honored for contexts as well.
+    * Troves with large numbers of identical files now erase faster,
+      thanks to a SQL fix in sqldb.iterFiles. (CNY-1937)
+    * Python dependency determination now properly ignores filenames
+      like "python.so" when looking for version flags. (CNY-1940)
+    * Conary now correctly avoids assuming that standard I/O files
+      are objects with fileno() methods. Previously, calling
+      Conary interfaces with non-file objects associated with
+      standard input, output, or error could trace back. (CNY-1946)
+    * The --buildreqs option for 'conary q' now functions when
+      multiple build requirements have the same name.
+    * An issue related to the flavor preferences list not being
+      properly populated when a group was cooked has been fixed.
+      (CNY-1951)
+
+  o Other Changes:
+    * Conary tracebacks now report values for each variable in the
+      local namespace in each frame. (CNY-1922)
+    * select() calls have been replaced with poll() for higher
+      efficiency. (CNY-1933)
+
+Changes in 1.1.35:
+  o Client Changes:
+    * Unknown trove info types in the database are stored in extracted
+      trove info properly (CNY-2059)
+    * diff and patch now support files without trailing newlines (CNY-1979)
+
+Changes in 1.1.34:
+  o Build Changes:
+    * The default settings from r.add() will now override the default
+      settings from an r.addAll() (CNY-1882)
+    * Looking up path IDs is now stop when all files have been found,
+      instead of always walking the shadow hierarchy. (CNY-1911)
+
+  o Bug Fixes:
+    * A bug that caused an error message in the rPath Appliance
+      Platform Agent (rAPA) when using an entitlement generator has
+      been fixed. (CNY-1946)
+
+Changes in 1.1.33:
+  o Build Changes:
+    * The addArchive() source action now handles xpi archives. (CNY-1793)
+    * Unknown flags are now ignored when calling loadRecipe with a
+      flavor, instead of printing a traceback.
+
+  o Update Changes:
+    * Updates to groups are now allowed to be merged with other groups
+      in update jobs, reducing the number of jobs that are used for
+      updates.
+
+  o Client Changes:
+    * Cloning now always increments group version counts, mimicing
+      the behavior of group cooking. (CNY-1724)
+    * When promoting, --all-flavors is now on by default.  However, if
+      a flavor to promote or clone is specified, promotes will be
+      limited by that flavor. (CNY-1535)
+    * Several commands, such as promote, update and rq, now take an
+      --exact-flavors flag.  If specified, the flavors for each trove
+      must match exactly - no system flavor or heuristic is used to
+      find the trove you want. (CNY-1829)
+    * If there is a problem with domain name resolution, conary will
+      retry 5 times. However, if the connection fails after those
+      attempts, future connection requests will now fail after one try.
+      (CNY-1814)
+
+  o Bug Fixes:
+    * The SQLite "ANALYZE" command is no longer run on local SQLite
+      databases. Any data stored by the "ANALYZE" command will be
+      removed from the local database unless it is being accessed
+      read-only. Database performance is poor on databases with
+      "ANALYZE" data in them. (CNY-778)
+    * Some bugs related to installing relative changesets were fixed.
+      These bugs would manifest themselves by making relative changesets
+      not installable when the network was down. (CNY-1814)
+
+Changes in 1.1.32:
+  o Client Changes:
+    * A getDownloadSizes() method has been added to the ConaryClient
+      object to determine the over-the-wire transfer size of the jobs
+      in an UpdateJob object.  Call requires a single repository be
+      the source of the entire update. (CNY-1757)
+    * cvc reports a more accurate error message when the CONARY file in
+      the current directory is not a regular file
+
+  o Server Changes:
+    * A "infoOnly" parameter to has been added to the getChangeSet()
+      repository method in protocol version 51. (CNY-1757)
+    * The list of repository methods is now automatically generated
+      instead of statically listed. (CNY-1781)
+  
+  o Bug Fixes:
+    * The addSvnSnapshot() source action now uses the lookaside directory
+      for generating the snapshot, instead of using the remote repository.
+      (CNY-1777)
+    * A bug that prevented unused entries in the Versions table of the
+      system Conary database from being cleaned up after erasures has
+      been fixed.
+    * A bug that caused changes in the byDefault status of a trove to
+      be omitted from local rollbacks has been fixed. (CNY-1796)
 
 Changes in 1.1.31.4:
   o Server changes:
@@ -118,6 +871,94 @@ Changes in 1.1.31.4:
   o Client changes:
     * Large files are now compressed on disk instead of in memory when
       creating rollbacks. (CNY-1896)
+
+Changes in 1.1.90:
+  o Major Changes:
+    * Label multiplicity, in which a trove on the same label
+      appearing on multiple branches was understood as meaning that
+      all the trove can be installed at once, is being generally
+      deprecated.  Instead, a newer trove on a different branch that
+      ends with the same label as an older trove will be considered
+      together with and generally preferred to the older trove.
+      Branch affinity, in which Conary keeps packages from the same
+      branch during an update, is therefore replaced with label
+      affinity, in which Conary keeps packages from the same label
+      during an update.  Many of the individual changes in this
+      version are parts of implementing this general change in
+      behavior.
+
+  o Client Changes:
+    * Added getTroveLatestByLabel as a client-side call.
+    * Label lookups pick the latest version which matches instead of
+      the latest version on each branch.
+    * Replaced branch affinity with label affinity.
+    * getAllTroveLeavesByLabel() filters results by server names to
+      eliminate spurious results from repositories which host multiple
+      server names. (CNY-1771)
+    * The cvc and conary commands now ignore broken pipes on standard
+      output instead of producing a traceback. (CNY-1853)
+    * Redirects follow the label of the branch they were built with
+      instead of the branch itself.
+    * Building redirects to a branch is now deprecated; redirects should
+      point to labels instead. (CNY-1857)
+    * The --replace-files option has been split into
+      --replace-managed-files, --replace-unmanaged-files,
+      --replace-modified-files, and --replace-config-files. The original
+      option is still accepted, and is equivalent to specifying all four
+      of the new options simultaneously (CNY-1270)
+    * When updating, conary will never automatically drop an architecture
+      from an installed trove (unless you specify the flavor to update to 
+      explicitly).  (CNY-1714)
+    * Dependency resolution now allows updates to go across branches if the
+      branches are on the same label.
+    * Dependency resolution now follows the same "never drop an architecture"
+      rule as other update code. (CNY-1713).
+    * Added --show-files parameter to "conary config" to display where
+      configuration items came from.
+    * Newly installed transient files now silently replace files which are
+      otherwise unowned. (CNY-1841)
+
+  o Build Changes:
+    * The cvc update command can now update multiple directories
+      simultaneously.
+    * Java files are now put in a :java component by default. (CNY-527)
+    * Python dependencies now include flags designating the major version
+      of python involved, as well as a flag distinguishing the target
+      architecture library directory (normally "lib" or "lib64") to
+      enhance update reliability.  When building a bootstrap python
+      or using a different python executable than Conary is running
+      with, Conary will use an external python process to determine
+      python dependencies. (CNY-1517)
+    * Ruby dependencies are now generated, and Ruby modules are placed
+      in a :ruby component by default.  Flags are included in the
+      dependencies similar to the Python flags, except that they are
+      not conditional. (CNY-612)
+    * Ensure that two binaries with the same source count but different
+      build counts end up with the same build count after cloning. (CNY-1871)
+
+  o Scripts Changes:
+    * Repository database migration scripts have been integrated into a 
+      common unit.
+
+  o Bug Fixes:
+    * Fix a bug in commit code that made r.macros.buildlabel unusable because
+      you could not commit recipes that used it.  (CNY-1752)
+    * An internal class, _AbstractPackageRecipe, has been renamed to
+      AbstractPackageRecipe, in order to allow the inclusion of its
+      methods in its subclasses' documentation pages.  The old name is
+      still available for compatibility with older modules.  (CNY-1848)
+    * Multiple entitlements can be stored for a single hostname or glob
+      (previously only the last hostname for a particular hostname/glob
+      would be used). (CNY-1825)
+    * Cloning the source component for filesets is now allowed.
+    * includeConfigFile now sorts files that are matched in globs
+    * The default settings from r.add() will now override the default
+      settings from an r.addAll() (CNY-1882)
+    * Cloning no longer downloads components that won't be cloned (CNY-1891)
+
+  o Other changes:
+    * The showchangeset script now displays information on redirect
+      troves.
 
 Changes in 1.1.31.3:
   o Server changes:

@@ -1,4 +1,4 @@
-# Copyright (c) 2006-2007 rPath, Inc.
+# Copyright (c) 2006-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,130 +14,105 @@ from conary import files, trove, versions
 from conary import errors as conaryerrors
 from conary.build import build, source
 from conary.build import errors as builderrors
-from conary.build.packagerecipe import _AbstractPackageRecipe
+from conary.build.packagerecipe import AbstractPackageRecipe
 from conary.lib import log, util
 from conary.repository import changeset, filecontents
 
-class DerivedPackageRecipe(_AbstractPackageRecipe):
+class DerivedChangesetExploder(changeset.ChangesetExploder):
+
+    def __init__(self, recipe, cs, destDir):
+        self.byDefault = {}
+        self.troveFlavor = None
+        self.recipe = recipe
+        changeset.ChangesetExploder.__init__(self, cs, destDir)
+
+    def installingTrove(self, trv):
+        if self.troveFlavor is None:
+            self.troveFlavor = trv.getFlavor().copy()
+        else:
+            assert(self.troveFlavor == trv.getFlavor())
+
+        name = trv.getName()
+        self.recipe._componentReqs[name] = trv.getRequires().copy()
+        self.recipe._componentProvs[name] = trv.getProvides().copy()
+
+        if trv.isCollection():
+            # gather up existing byDefault status
+            # from (component, byDefault) tuples
+            self.byDefault.update(dict(
+                [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
+
+        changeset.ChangesetExploder.installingTrove(self, trv)
+
+    def handleFileAttributes(self, trv, fileObj, path):
+        self.troveFlavor -= fileObj.flavor()
+
+        # Config vs. InitialContents etc. might be change in derived pkg
+        # Set defaults here, and they can be overridden with
+        # "exceptions = " later
+        if fileObj.flags.isConfig():
+            self.recipe.Config(path)
+        elif fileObj.flags.isInitialContents():
+            self.recipe.InitialContents(path)
+        elif fileObj.flags.isTransient():
+            self.recipe.Transient(path)
+
+        # we don't restore setuid/setgid bits into the filesystem
+        if fileObj.inode.perms() & 06000 != 0:
+            self.recipe.SetModes(path, fileObj.inode.perms())
+
+        if isinstance(fileObj, files.Directory):
+            # remember to include this directory in the derived package even
+            # if it's empty
+            self.recipe.ExcludeDirectories(exceptions = path)
+
+        if isinstance(fileObj, files.SymbolicLink):
+            # mtime for symlinks is meaningless, we have to record the
+            # target of the symlink instead
+            self.recipe._derivedFiles[path] = fileObj.target()
+        else:
+            self.recipe._derivedFiles[path] = fileObj.inode.mtime()
+
+        self.recipe._componentReqs[trv.getName()] -= fileObj.requires()
+        self.recipe._componentProvs[trv.getName()] -= fileObj.requires()
+
+    def restoreFile(self, trv, fileObj, contents, destdir, path):
+        self.handleFileAttributes(trv, fileObj, path)
+        if isinstance(fileObj, files.DeviceFile):
+            self.recipe.MakeDevices(path, fileObj.lsTag,
+                               fileObj.devt.major(), fileObj.devt.minor(),
+                               fileObj.inode.owner(), fileObj.inode.group(),
+                               fileObj.inode.perms())
+        else:
+            changeset.ChangesetExploder.restoreFile(self, trv, fileObj,
+                                                    contents, destdir, path)
+
+    def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
+        self.handleFileAttributes(trv, fileObj, targetPath)
+        changeset.ChangesetExploder.restoreLink(self, trv, fileObj, destdir,
+                                                sourcePath, targetPath)
+
+    def installFile(self, trv, path, fileObj):
+        if path == self.recipe.macros.buildlogpath:
+            return False
+
+        return changeset.ChangesetExploder.installFile(self, trv, path, fileObj)
+
+class DerivedPackageRecipe(AbstractPackageRecipe):
 
     internalAbstractBaseClass = 1
     _isDerived = True
     parentVersion = None
 
-    def _expandChangeset(self):
-        destdir = self.macros.destdir
+    def _expandChangeset(self, cs):
+        exploder = DerivedChangesetExploder(self, cs, self.macros.destdir)
 
-        delayedRestores = {}
-        ptrMap = {}
-        byDefault = {}
+        self.useFlags = exploder.troveFlavor
 
-        fileList = []
-        linkGroups = {}
-        linkGroupFirstPath = {}
-        # sort the files by pathId,fileId
-        for trvCs in self.cs.iterNewTroveList():
-            trv = trove.Trove(trvCs)
-
-            # these should all be the same anyway
-            flavor = trv.getFlavor().copy()
-            name = trv.getName()
-            self._componentReqs[name] = trv.getRequires().copy()
-            self._componentProvs[name] = trv.getProvides().copy()
-
-            for pathId, path, fileId, version in trv.iterFileList():
-                if path != self.macros.buildlogpath:
-                    fileList.append((pathId, fileId, path, name))
-
-            if trv.isCollection():
-                # gather up existing byDefault status
-                # from (component, byDefault) tuples
-                byDefault.update(dict(
-                    [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
-
-        fileList.sort()
-
-        for pathId, fileId, path, troveName in fileList:
-            fileCs = self.cs.getFileChange(None, fileId)
-            fileObj = files.ThawFile(fileCs, pathId)
-            self._derivedFiles[path] = fileObj.inode.mtime()
-
-            flavor -= fileObj.flavor()
-            self._componentReqs[troveName] -= fileObj.requires()
-            self._componentProvs[troveName] -= fileObj.requires()
-
-            # Config vs. InitialContents etc. might be change in derived pkg
-            # Set defaults here, and they can be overridden with
-            # "exceptions = " later
-            if fileObj.flags.isConfig():
-                self.Config(path)
-            elif fileObj.flags.isInitialContents():
-                self.InitialContents(path)
-            elif fileObj.flags.isTransient():
-                self.Transient(path)
-
-
-            # we don't restore setuid/setgid bits into the filesystem
-            if fileObj.inode.perms() & 06000 != 0:
-                self.SetModes(path, fileObj.inode.perms())
-
-            if isinstance(fileObj, files.DeviceFile):
-                self.MakeDevices(path, fileObj.lsTag,
-                                 fileObj.devt.major(), fileObj.devt.minor(),
-                                 fileObj.inode.owner(), fileObj.inode.group(),
-                                 fileObj.inode.perms())
-            else:
-                if fileObj.hasContents:
-                    linkGroup = fileObj.linkGroup()
-                    if linkGroup:
-                        l = linkGroups.setdefault(linkGroup, [])
-                        l.append(path)
-
-                    (contentType, contents) = \
-                                    self.cs.getFileContents(pathId, fileId)
-                    if contentType == changeset.ChangedFileTypes.ptr:
-                        targetPtrId = contents.get().read()
-                        l = delayedRestores.setdefault(targetPtrId, [])
-                        l.append((fileObj, path))
-                        continue
-                    elif linkGroup and not linkGroup in linkGroupFirstPath:
-                        # only non-delayed restores can be initial target
-                        linkGroupFirstPath[linkGroup] = path
-
-                    assert(contentType == changeset.ChangedFileTypes.file)
-                else:
-                    contents = None
-
-                ptrId = pathId + fileId
-                if pathId in delayedRestores:
-                    ptrMap[pathId] = path
-                elif ptrId in delayedRestores:
-                    ptrMap[ptrId] = path
-
-                fileObj.restore(contents, destdir, destdir + path)
-
-            if isinstance(fileObj, files.Directory):
-                # remember to include this directory in the derived package
-                self.ExcludeDirectories(exceptions = path)
-
-        for targetPtrId in delayedRestores:
-            for fileObj, targetPath in delayedRestores[targetPtrId]:
-                sourcePath = ptrMap[targetPtrId]
-                fileObj.restore(
-                    filecontents.FromFilesystem(destdir + sourcePath),
-                    destdir, destdir + targetPath)
-
-        # we do not have to worry about cross-device hardlinks in destdir
-        for linkGroup in linkGroups:
-            for path in linkGroups[linkGroup]:
-                initialPath = linkGroupFirstPath[linkGroup]
-                if path == initialPath:
-                    continue
-                util.createLink(destdir + initialPath, destdir + path)
-
-        self.useFlags = flavor
-
-        self.setByDefaultOn(set(x for x in byDefault if byDefault[x]))
-        self.setByDefaultOff(set(x for x in byDefault if not byDefault[x]))
+        self.setByDefaultOn(set(x for x in exploder.byDefault
+                                                if exploder.byDefault[x]))
+        self.setByDefaultOff(set(x for x in exploder.byDefault
+                                                if not exploder.byDefault[x]))
 
     def unpackSources(self, resume=None, downloadOnly=False):
 
@@ -152,7 +127,8 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         else:
             parentRevision = None
 
-        if not self.sourceVersion.isShadow():
+        sourceBranch = versions.VersionFromString(self.macros.buildbranch)
+        if not sourceBranch.isShadow():
             raise builderrors.RecipeFileError(
                     "only shadowed sources can be derived packages")
 
@@ -164,7 +140,7 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                     "derived package recipe")
 
         # find all the flavors of the parent
-        parentBranch = self.sourceVersion.branch().parentBranch()
+        parentBranch = sourceBranch.parentBranch()
 
         if parentRevision:
             parentVersion = parentBranch.createVersion(parentRevision)
@@ -175,6 +151,35 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
                 raise builderrors.RecipeFileError(
                         'Version %s of %s not found'
                                     % (parentVersion, self.name) )
+        elif self.sourceVersion:
+            sourceRevision = self.sourceVersion.trailingRevision()
+            d = repos.getTroveVersionsByLabel(
+                    { self.name : { parentBranch.label() : [ None ] } } )
+
+            if not d[self.name]:
+                raise builderrors.RecipeFileError(
+                    'No versions of %s found on label %s' %
+                            (self.name, parentBranch.label()))
+
+            versionList = reversed(sorted(d[self.name]))
+            match = False
+            for version in versionList:
+                # This is a really complicated way of checking that
+                # version is an ancestor of sourceRevision
+                sr = sourceRevision.copy()
+                sr.getSourceCount().truncateShadowCount(
+                        version.trailingRevision().shadowCount())
+
+                if (version.getSourceVersion().trailingRevision() == sr):
+                    match = True
+                    break
+
+            if not match:
+                raise builderrors.RecipeFileError(
+                    'No packages of %s of source revision %s found on label %s'
+                        % (self.name, sourceRevision, parentBranch.label()))
+
+            parentVersion = version
         else:
             d = repos.getTroveLeavesByBranch(
                     { self.name : { parentBranch : [ None ] } } )
@@ -223,28 +228,27 @@ class DerivedPackageRecipe(_AbstractPackageRecipe):
         troveSpec = [ (x[0], (None, None), (x[1], x[2]), True)
                         for x in binaries ]
 
-        self.cs = repos.createChangeSet(troveSpec, recurse = False)
+        cs = repos.createChangeSet(troveSpec, recurse = False)
         self.addLoadedTroves([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
-            in self.cs.iterNewTroveList() ])
+            in cs.iterNewTroveList() ])
 
-        self._expandChangeset()
+        self._expandChangeset(cs)
+        self.cs = cs
 
-        _AbstractPackageRecipe.unpackSources(self, resume = resume,
+        AbstractPackageRecipe.unpackSources(self, resume = resume,
                                              downloadOnly = downloadOnly)
 
     def loadPolicy(self):
-        return _AbstractPackageRecipe.loadPolicy(self,
+        return AbstractPackageRecipe.loadPolicy(self,
                                 internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        _AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
+        AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
-
-        log.info('Warning: Derived packages are experimental and subject to change')
 
         self._addBuildAction('Ant', build.Ant)
         self._addBuildAction('Automake', build.Automake)
