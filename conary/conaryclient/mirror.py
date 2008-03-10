@@ -683,7 +683,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
 
     hidden = len(targets) > 1 or cfg.useHiddenCommits
     if hidden:
-        log.debug("will use hidden commits to syncronize target mirrors")
+        log.debug("will use hidden commits to synchronize target mirrors")
 
     if sync:
         currentMark = -1
