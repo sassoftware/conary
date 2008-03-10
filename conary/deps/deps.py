@@ -1507,7 +1507,6 @@ def getMinimalFlagChanges(dep, depToMatch):
 
 
 def getMinimalCompatibleChanges(flavor, flavorToMatch, keepArch=False):
-    getInstructionSetFlavor
     useFlags = list(flavorToMatch.iterDepsByClass(UseDependency))
     insDeps = list(flavorToMatch.iterDepsByClass(InstructionSetDependency))
     targetDeps = list(flavorToMatch.iterDepsByClass(
