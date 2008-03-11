@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -89,6 +89,7 @@ class SearchSource(AbstractSearchSource):
             if hasattr(source, method):
                 setattr(self, method, getattr(source, method))
 
+
     def getTroveSource(self):
         """
             Returns the source that this stack is wrapping, if there is one.
@@ -121,8 +122,11 @@ class SearchSource(AbstractSearchSource):
         """
         m = resolvemethod.BasicResolutionMethod(None, self.db, self.flavor)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
+    def getFlavorPreferenceList(self):
+        return self.source.getFlavorPreferenceList()
 
 class NetworkSearchSource(SearchSource):
     """
@@ -207,6 +211,7 @@ class NetworkSearchSource(SearchSource):
                                                     self.flavor,
                                                     searchMethod=searchMethod)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 class TroveSearchSource(SearchSource):
@@ -223,9 +228,12 @@ class TroveSearchSource(SearchSource):
             troveList = troveSource.getTroves(troveList, withFiles=False)
         else:
             troveTups = [ x.getNameVersionFlavor() for x in troveList ]
-        troveSource = trovesource.TroveListTroveSource(troveSource, troveTups)
-        troveSource.searchWithFlavor()
-        SearchSource.__init__(self, troveSource, flavor, db)
+        newTroveSource = trovesource.TroveListTroveSource(troveSource, troveTups)
+        newTroveSource.searchWithFlavor()
+        newTroveSource.setFlavorPreferenceList(
+                                    troveSource.getFlavorPreferenceList())
+        newTroveSource.searchLeavesOnly()
+        SearchSource.__init__(self, newTroveSource, flavor, db)
         self.troveList = troveList
 
     def getResolveMethod(self):
@@ -237,6 +245,7 @@ class TroveSearchSource(SearchSource):
                                                    self.troveList,
                                                    self.flavor)
         m.setTroveSource(self.source)
+        m.setFlavorPreferences(self.source.getFlavorPreferenceList())
         return m
 
 class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
@@ -254,6 +263,12 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         self.resolveSearchMethod =  kw.pop('resolveSearchMethod',
                                            resolvemethod.RESOLVE_ALL)
 
+    def getFlavorPreferenceList(self):
+        return self.sources[0].getFlavorPreferenceList()
+
+    def setFlavorPreferenceList(self, flavorList):
+        for source in self.sources:
+            source.setFlavorPreferenceList(self, flavorList)
 
     def getTroveSource(self):
         if len(self.sources) == 1:
@@ -271,7 +286,7 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         return res[troveSpec]
 
     def findTroves(self, troveSpecs, useAffinity=False, allowMissing=False,
-                    **kw):
+            requireLatest=False, **kw):
         """
             Finds the trove matching the given list of
             (name, versionSpec, flavor) troveSpecs.  If useAffinity is True,
@@ -285,7 +300,8 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
             if isinstance(source, NetworkSearchSource):
                 networkSource = source
             newTroveSpecs, specsToUse = source._filterSpecsForSource(troveSpecs)
-            foundTroves = source.findTroves(specsToUse, allowMissing=True)
+            foundTroves = source.findTroves(specsToUse, allowMissing=True,
+                    requireLatest = requireLatest)
             for troveSpec in specsToUse:
                 for origSpec in specsToUse[troveSpec]:
                     if troveSpec in foundTroves:

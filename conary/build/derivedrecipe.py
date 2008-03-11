@@ -181,36 +181,18 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
 
             parentVersion = version
         else:
-            d = repos.getTroveLeavesByBranch(
-                    { self.name : { parentBranch : [ None ] } } )
-
-            if not d[self.name]:
-                raise builderrors.RecipeFileError(
-                    'No versions of %s found on branch %s' % 
-                            (self.name, parentBranch))
-
-            parentVersion = sorted(d[self.name].keys())[-1]
-
-        bestFlavor = (-1, [])
-        # choose which flavor to derive from
-        for flavor in d[self.name][parentVersion]:
-            score = self.cfg.buildFlavor.score(flavor)
-            if score is False: continue
-            if bestFlavor[0] < score:
-                bestFlavor = (score, [ flavor ])
-            elif bestFlavor[0] == score:
-                bestFlavor[1].append(flavor)
-
-        if bestFlavor[0] == -1:
+            parentVersion = parentBranch
+        try:
+            troveList = repos.findTrove(None, 
+                                   (self.name, parentVersion, self._buildFlavor))
+        except conaryerrors.TroveNotFound, err:
+            raise builderrors.RecipeFileError('Could not find package to derive from for this flavor: ' + str(err))
+        if len(troveList) > 1:
             raise builderrors.RecipeFileError(
-                    'No flavors of %s=%s found for build flavor %s' %
-                    (self.name, parentVersion, self.cfg.buildFlavor))
-        elif len(bestFlavor[1]) > 1:
-            raise builderrors.RecipeFileError(
-                    'Multiple flavors of %s=%s match build flavor %s',
-                    self.name, parentVersion, self.cfg.buildFlavor)
-
-        parentFlavor = bestFlavor[1][0]
+                    'Multiple flavors of %s=%s match build flavor %s' \
+                    % (self.name, parentVersion, self.cfg.buildFlavor))
+        parentFlavor = troveList[0][2]
+        parentVersion = troveList[0][1]
 
         log.info('deriving from %s=%s[%s]', self.name, parentVersion,
                  parentFlavor)

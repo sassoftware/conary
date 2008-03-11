@@ -54,10 +54,20 @@ class Rollback:
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 
-    def _getChangeSets(self, item):
-        repos = changeset.ChangeSetFromFile(self.reposName % (self.dir, item))
-        local = changeset.ChangeSetFromFile(self.localName % (self.dir, item))
-        return (repos, local)
+    def _getChangeSets(self, item, repos = True, local = True):
+        if repos:
+            reposCs = changeset.ChangeSetFromFile(
+                                        self.reposName % (self.dir, item))
+        else:
+            reposCs = False
+
+        if local:
+            localCs = changeset.ChangeSetFromFile(
+                                        self.localName % (self.dir, item))
+        else:
+            localCs = False
+
+        return (reposCs, localCs)
 
     def getLast(self):
         if not self.count:
@@ -67,6 +77,20 @@ class Rollback:
     def getLocalChangeset(self, i):
         local = changeset.ChangeSetFromFile(self.localName % (self.dir, i))
         return local
+
+    def isLocal(self):
+        """
+        Return True if every element of the rollback is locally available,
+        False otherwise.
+        """
+        for i in range(self.count):
+            (reposCs, localCs) = self._getChangeSets(i, repos = True,
+                                                     local = False)
+            for trvCs in reposCs.iterNewTroveList():
+                if trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
+                    return False
+
+        return True
 
     def removeLast(self):
         if self.count == 0:
@@ -104,6 +128,144 @@ class Rollback:
         else:
             self.stored = False
             self.count = 0
+
+class RollbackStack:
+
+    def _readStatus(self):
+        if not os.path.exists(self.statusPath):
+            self.first = 0
+            self.last = -1
+            return
+
+        try:
+            f = open(self.statusPath)
+            (first, last) = f.read()[:-1].split()
+            self.first = int(first)
+            self.last = int(last)
+            f.close()
+        except IOError, e:
+            if e.errno == errno.EACCES:
+                self.first = None
+                self.last = None
+            else:
+                raise
+
+    def _ensureReadableRollbackStack(self):
+        if (self.first, self.last) == (None, None):
+            raise ConaryError("Unable to open rollback directory")
+
+    def writeStatus(self):
+        newStatus = self.statusPath + ".new"
+
+        fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
+        os.write(fd, "%s %d\n" % (self.first, self.last))
+        os.close(fd)
+
+        os.rename(newStatus, self.statusPath)
+
+    def new(self):
+        rbDir = "/%s/%d" % (self.dir, self.last + 1)
+        if os.path.exists(rbDir):
+            shutil.rmtree(rbDir)
+        os.mkdir(rbDir, 0700)
+        self.last += 1
+        self.writeStatus()
+        return Rollback(rbDir)
+
+    def hasRollback(self, name):
+        try:
+            num = int(name[2:])
+        except ValueError:
+            return False
+
+        self._ensureReadableRollbackStack()
+
+        if (num >= self.first and num <= self.last):
+            return True
+
+        return False
+
+    def getRollback(self, name):
+        if not self.hasRollback(name): return None
+
+        num = int(name[2:])
+        dir = self.dir + "/" + "%d" % num
+        return Rollback(dir, load = True)
+
+    def removeFirst(self):
+        name = 'r.%d' % self.first
+        self.remove(name)
+
+    def removeLast(self):
+        name = 'r.%d' % self.last
+        self.remove(name)
+
+    def getList(self):
+        self._ensureReadableRollbackStack()
+        list = []
+        for i in range(self.first, self.last + 1):
+            list.append("r.%d" % i)
+
+        return list
+
+    # name looks like "r.%d"
+    def remove(self, name):
+        rollback = int(name[2:])
+        assert(rollback == self.first or rollback == self.last)
+
+        try:
+            shutil.rmtree(self.dir + "/%d" % rollback)
+        except OSError, e:
+            if e.errno == 2:
+                pass
+        if rollback == self.last:
+            self.last -= 1
+        elif rollback == self.first:
+            self.first += 1
+        else:
+            assert(0)
+
+        self.writeStatus()
+
+    def invalidate(self):
+        """
+        Invalidate the rollback stack. It doesn't remove the rollbacks
+        though.
+        """
+        # Works nicely for the very beginning
+        # (when rollbackStack.first, rollbackStack.last) = (0, -1)
+        self.first = self.last + 1
+        self.writeStatus()
+
+    def iter(self):
+        """Generator for rollback data.
+        Returns a list of (rollbackName, rollback)
+        """
+        for rollbackName in reversed(self.getList()):
+            rb = self.getRollback(rollbackName)
+            yield (rollbackName, rb)
+
+    def __init__(self, rbDir):
+        self.dir = rbDir
+        self.statusPath = self.dir + '/status'
+
+        if not os.path.exists(self.dir):
+            try:
+                util.mkdirChain(os.path.dirname(self.dir))
+                os.mkdir(self.dir, 0700)
+            except OSError, e:
+                if e.errno == errno.ENOTDIR:
+                    # when making a directory, the parent
+                    # was not a directory
+                    d = os.path.dirname(e.filename)
+                    raise OpenError(self.dir, '%s is not a directory' %d)
+                elif e.errno == errno.EACCES:
+                    raise OpenError(self.dir, 'cannot create directory %s' %
+                                               e.filename)
+                else:
+                    raise
+
+        self._readStatus()
 
 class UpdateJob:
     def __del__(self):
@@ -399,11 +561,17 @@ class UpdateJob:
     def _freezeJobPreScripts(self):
         # Freeze the job and the string together
         for item in self._jobPreScripts:
-            yield (self._freezeJob(item[0]), item[1], item[2], item[3])
+            yield (self._freezeJob(item[0]), item[1], item[2], item[3], item[4])
 
     def _thawJobPreScripts(self, frzrepr):
+        # We might be thawing an update job generated by an older Conary, that
+        # did not have support for preinstall scripts.
         for item in frzrepr:
-            yield (self._thawJob(item[0]), item[1], item[2], item[3])
+            if len(item) == 4:
+                action = "preupdate"
+            else:
+                action = item[4]
+            yield (self._thawJob(item[0]), item[1], item[2], item[3], action)
 
     def _freezeChangesetFilesTroveSource(self, troveSource, frzdir,
                                         withChangesetReferences=True):
@@ -524,9 +692,12 @@ class UpdateJob:
         """
         return self._invalidateRollbackStack
 
-    def addJobPreScript(self, job, script, oldCompatClass, newCompatClass):
+    def addJobPreScript(self, job, script, oldCompatClass, newCompatClass,
+                        action = None):
+        if action is None:
+            action = "preupdate"
         self._jobPreScripts.append((job, script, oldCompatClass,
-                                    newCompatClass))
+                                    newCompatClass, action))
 
     def iterJobPreScripts(self):
             for i in self._jobPreScripts:
@@ -577,6 +748,44 @@ class UpdateJob:
 
     def getCommitChangesetFlags(self):
         return self._commitFlags
+
+    def _getJobOrder(self):
+        # Return a map from job names to job rank in the list ordered by the
+        # dependency resolution
+        return dict((self._normalizeJob(x), i)
+                    for i, x in enumerate(itertools.chain(*self.jobs)))
+
+    def _normalizeJob(self, job):
+        if job[1][0] is None:
+            # Old version is None, make None the flavor too
+            return (job[0], (None, None), job[2], job[3])
+        if job[2][0] is None:
+            # New version is None, make None the flavor too
+            return (job[0], job[1], (None, None), job[3])
+        return job
+
+    def orderScriptListByBucket(self, scriptList, buckets):
+        jobOrderHash = self._getJobOrder()
+
+        # Sort scripts in some consistent manner
+        # sorted by job within each group
+        bucketLists = []
+        for bucketName in buckets:
+            al = [ x for x in scriptList if x[-1] == bucketName ]
+            al.sort(key = lambda x: jobOrderHash[self._normalizeJob(x[0])])
+            bucketLists.append(al)
+        return list(itertools.chain(*bucketLists))
+
+    def reorderPreScripts(self, criticalUpdateInfo):
+        jobPreScripts = self._jobPreScripts
+        if criticalUpdateInfo.criticalOnly:
+            # We need to filter the scripts to only the ones in the critical
+            # set
+            jobOrderHash = self._getJobOrder()
+            jobPreScripts = [ x for x in jobPreScripts
+                              if x[0] in jobOrderHash ]
+        self._jobPreScripts = self.orderScriptListByBucket(jobPreScripts,
+                                [ 'preinstall', 'preupdate', 'preerase' ])
 
     def __init__(self, db, searchSource = None, lazyCache = None):
         # 20070714: lazyCache can be None for the users of the old API (when
@@ -1201,7 +1410,7 @@ class Database(SqlDbRepository):
 	if (rollbackPhase is None) and not commitFlags.test:
             rollback = uJob.getRollback()
             if rollback is None:
-                rollback = self.createRollback()
+                rollback = self.rollbackStack.new()
                 uJob.setRollback(rollback)
             rollback.add(reposRollback, localRollback)
             del rollback
@@ -1343,23 +1552,38 @@ class Database(SqlDbRepository):
 
         if rollbackPhase is None and updateDatabase and \
                 csJob.invalidateRollbacks():
-            self.invalidateRollbacks()
+            self.rollbackStack.invalidate()
 
         if rollbackPhase is not None:
             return fsJob
 
         if not commitFlags.justDatabase:
-            fsJob.runPostScripts(tagScript, rollbackPhase)
+            fsJob.orderPostScripts(uJob)
+            fsJob.runPostScripts(tagScript)
 
     def runPreScripts(self, uJob, callback, tagScript = None,
                       isRollback = False, justDatabase = False,
                       tmpDir = '/'):
-        if isRollback or justDatabase:
+        if justDatabase:
            return True
 
-        for (job, script, oldCompatClass, newCompatClass) in \
-                                                uJob.iterJobPreScripts():
-            scriptId = "%s preupdate" % job[0]
+        # Sort scripts in some consistent manner: installs, updates, erases
+        # sorted by job within each group
+        actions = [ 'preinstall', 'preupdate', 'preerase' ]
+        actionLists = []
+        for action in actions:
+            al = [ x for x in uJob.iterJobPreScripts() if x[-1] == action ]
+            al.sort()
+            actionLists.append(al)
+
+        actionLists = [ uJob.iterJobPreScripts() ]
+
+        for (job, script, oldCompatClass, newCompatClass, action) in \
+                    itertools.chain(*actionLists):
+
+            if isRollback and action != 'preerase':
+                continue
+            scriptId = "%s %s" % (job[0], action)
             rc = update.runTroveScript(job, script, tagScript, tmpDir,
                                        self.root, callback, isPre = True,
                                        scriptId = scriptId,
@@ -1438,11 +1662,11 @@ class Database(SqlDbRepository):
 
             rb.add(reposCs, localCs)
 
-        rb = self.createRollback()
+        rb = self.rollbackStack.new()
         try:
             _doRemove(self, rb, pathList)
         except Exception, e:
-            self.removeRollback("r." + rb.dir.split("/")[-1])
+            self.rollbackStack.removeLast()
             raise
 
         self._updateTransactionCounter = True
@@ -1486,100 +1710,8 @@ class Database(SqlDbRepository):
 
             self.lockFileObj = os.fdopen(lockFd)
 
-    def createRollback(self):
-	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
-        if os.path.exists(rbDir):
-            shutil.rmtree(rbDir)
-        os.mkdir(rbDir, 0700)
-	self.lastRollback += 1
-        self.writeRollbackStatus()
-        return Rollback(rbDir)
-
-    # name looks like "r.%d"
-    def removeRollback(self, name):
-	rollback = int(name[2:])
-        try:
-            shutil.rmtree(self.rollbackCache + "/%d" % rollback)
-        except OSError, e:
-            if e.errno == 2:
-                pass
-	if rollback == self.lastRollback:
-	    self.lastRollback -= 1
-	    self.writeRollbackStatus()
-
-    def removeLastRollback(self):
-        name = 'r.%d' %self.lastRollback
-        self.removeRollback(name)
-
-    def writeRollbackStatus(self):
-	newStatus = self.rollbackCache + ".new"
-
-        fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
-        os.write(fd, "%s %d\n" % (self.firstRollback, self.lastRollback))
-        os.close(fd)
-
-	os.rename(newStatus, self.rollbackStatus)
-
-    def getRollbackList(self):
-        self._ensureReadableRollbackStack()
-	list = []
-	for i in range(self.firstRollback, self.lastRollback + 1):
-	    list.append("r.%d" % i)
-
-	return list
-
-    def iterRollbacksList(self):
-        """Generator for rollback data.
-        Returns a list of (rollbackName, rollback)
-        """
-        for rollbackName in reversed(self.getRollbackList()):
-            rb = self.getRollback(rollbackName)
-            yield (rollbackName, rb)
-
-    def invalidateRollbacks(self):
-        """Invalidate the rollback stack."""
-        # Works nicely for the very beginning
-        # (when firstRollback, lastRollback) = (0, -1)
-        self.firstRollback = self.lastRollback + 1
-        self.writeRollbackStatus()
-
-    def readRollbackStatus(self):
-        try:
-            f = open(self.rollbackStatus)
-            (first, last) = f.read()[:-1].split()
-            self.firstRollback = int(first)
-            self.lastRollback = int(last)
-            f.close()
-        except IOError, e:
-            if e.errno == errno.EACCES:
-                self.firstRollback = None
-                self.lastRollback = None
-            else:
-                raise
-
-    def _ensureReadableRollbackStack(self):
-        if (self.firstRollback, self.lastRollback) == (None, None):
-            raise ConaryError("Unable to open rollback directory")
-
-    def hasRollback(self, name):
-	try:
-	    num = int(name[2:])
-	except ValueError:
-	    return False
-
-        self._ensureReadableRollbackStack()
-
-	if (num >= self.firstRollback and num <= self.lastRollback):
-	    return True
-	
-	return False
-
-    def getRollback(self, name):
-	if not self.hasRollback(name): return None
-
-	num = int(name[2:])
-        dir = self.rollbackCache + "/" + "%d" % num
-        return Rollback(dir, load = True)
+    def getRollbackStack(self):
+        return self.rollbackStack
 
     def applyRollbackList(self, *args, **kwargs):
         try:
@@ -1591,16 +1723,17 @@ class Database(SqlDbRepository):
 
     def _applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
-                          justDatabase = False, transactionCounter = None):
+                          justDatabase = False, transactionCounter = None,
+                          lazyCache = None):
         assert transactionCounter is not None, ("The transactionCounter "
             "argument is mandatory")
         if transactionCounter != self.getTransactionCounter():
             raise RollbackError(names, "Database state has changed, please "
                 "run the rollback command again")
 
-	last = self.lastRollback
+	last = self.rollbackStack.last
 	for name in names:
-	    if not self.hasRollback(name):
+	    if not self.rollbackStack.hasRollback(name):
 		raise RollbackDoesNotExist(name)
 
 	    num = int(name[2:])
@@ -1614,7 +1747,7 @@ class Database(SqlDbRepository):
         # in the work count though.
         totalCount = 0
         for name in names:
-            rb = self.getRollback(name)
+            rb = self.rollbackStack.getRollback(name)
             totalCount += 0
 
             for i in xrange(rb.getCount()):
@@ -1626,7 +1759,7 @@ class Database(SqlDbRepository):
 
         itemCount = 0
         for i, name in enumerate(names):
-	    rb = self.getRollback(name)
+	    rb = self.rollbackStack.getRollback(name)
 
             # we don't want the primary troves from reposCs to win, so get
             # rid of them (otherwise we're left with redirects!). primaries
@@ -1639,12 +1772,9 @@ class Database(SqlDbRepository):
                 # changeset from a repository
                 jobList = []
                 for trvCs in reposCs.iterNewTroveList():
-                    if not trvCs.getType() == trove.TROVE_TYPE_REDIRECT: 
+                    if not trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
                         continue
-                    jobList.append((trvCs.getName(),
-                                (trvCs.getOldVersion(), trvCs.getOldFlavor()),
-                                (trvCs.getNewVersion(), trvCs.getNewFlavor()),
-                                False))
+                    jobList.append(trvCs.getJob())
 
                 newCs = repos.createChangeSet(jobList, recurse = False)
                 newCs.setPrimaryTroveList([])
@@ -1661,6 +1791,14 @@ class Database(SqlDbRepository):
                     l = removalHints.setdefault(info, [])
                     l.extend(trvCs.getOldFileList())
 
+                # Collect pre scripts
+                updJob = UpdateJob(None, lazyCache = lazyCache)
+                # As a side-effect, _getChangesetPreScripts will add the job
+                # sets to the job, ordered alphabetically.
+                preScripts = self._getChangesetPreScripts(reposCs, updJob)
+                for x in preScripts:
+                    updJob.addJobPreScript(*x)
+
                 try:
                     fsJob = None
                     commitFlags = CommitChangeSetFlags(
@@ -1669,24 +1807,31 @@ class Database(SqlDbRepository):
                         replaceModifiedFiles = replaceFiles,
                         justDatabase = justDatabase)
 
+                    self.runPreScripts(updJob, callback = callback,
+                                       tagScript = tagScript,
+                                       isRollback = False,
+                                       justDatabase = justDatabase)
+
+                    fsUpdateJob = UpdateJob(None, lazyCache = lazyCache)
                     if not reposCs.isEmpty():
                         itemCount += 1
                         callback.setUpdateHunk(itemCount, totalCount)
                         callback.setUpdateJob(reposCs.getJobSet())
                         fsJob = self.commitChangeSet(
-                                             reposCs, UpdateJob(None),
-                                             rollbackPhase =
-                                                update.ROLLBACK_PHASE_REPOS,
-                                             removeHints = removalHints,
-                                             callback = callback,
-                                             tagScript = tagScript,
-                                             commitFlags = commitFlags)
+                                     reposCs, fsUpdateJob,
+                                     rollbackPhase =
+                                            update.ROLLBACK_PHASE_REPOS,
+                                     removeHints = removalHints,
+                                     callback = callback,
+                                     tagScript = tagScript,
+                                     commitFlags = commitFlags)
 
                     if not localCs.isEmpty():
                         itemCount += 1
                         callback.setUpdateHunk(itemCount, totalCount)
                         callback.setUpdateJob(localCs.getJobSet())
-                        self.commitChangeSet(localCs, UpdateJob(None),
+                        self.commitChangeSet(localCs,
+                                     fsUpdateJob,
                                      rollbackPhase =
                                             update.ROLLBACK_PHASE_LOCAL,
                                      updateDatabase = False,
@@ -1698,15 +1843,79 @@ class Database(SqlDbRepository):
                         # Because of the two phase update for rollbacks, we
                         # run postscripts by hand instead of commitChangeSet
                         # doing it automatically
-                        fsJob.runPostScripts(tagScript, True)
+                        fsJob.orderPostScripts(updJob)
+                        fsJob.runPostScripts(tagScript)
+                    fsUpdateJob.close()
 
                     rb.removeLast()
                 except CommitError, err:
+                    updJob.close()
                     raise RollbackError(name, err)
 
+                updJob.close()
                 (reposCs, localCs) = rb.getLast()
 
-            self.removeRollback(name)
+            self.rollbackStack.removeLast()
+
+    def _getChangesetPreScripts(self, cs, updJob):
+        preScripts = []
+        if cs.isEmpty():
+            return preScripts
+
+        jobs = []
+        for trvCs in cs.iterNewTroveList():
+            job = trvCs.getJob()
+            jobs.append(job)
+            newCompatClass = trvCs.getNewCompatibilityClass()
+            if job[1][0] is None:
+                # This is an install (rolling back an erase)
+                script = trvCs._getPreInstallScript()
+                if not script:
+                    continue
+                preScripts.append((job, script, None, newCompatClass,
+                                   "preinstall"))
+                continue
+
+            # This is an update
+            # Get the old trove
+            oldTrv = self.db.getTroves([(job[0], job[1][0], job[1][1])],
+                withFiles=False, withDeps=False)[0]
+            oldCompatClass = oldTrv.getCompatibilityClass()
+
+            script = trvCs.getPreUpdateScript()
+            if script:
+                preScripts.append((job, script, oldCompatClass, newCompatClass,
+                    "preupdate"))
+
+            # Grab the preerase script for the old trove
+            oldTrvCs = oldTrv.diff(None)[0]
+            script = oldTrvCs._getPreEraseScript()
+            if script:
+                preScripts.append((job, script, oldCompatClass, None,
+                    "preerase"))
+
+        jobs.sort()
+        updJob.addJob(jobs)
+
+        jobs = []
+
+        erasures = cs.getOldTroveList()
+        if erasures:
+            trvs = self.db.getTroves(erasures, withFiles=False, withDeps=False)
+            for trv in trvs:
+                trvCs = trv.diff(None)[0]
+                j = trvCs.getJob()
+                # Need to reverse the job
+                j = (j[0], j[2], j[1], False)
+                jobs.append(j)
+                script = trvCs._getPreEraseScript()
+                if script:
+                    preScripts.append((j, script,
+                                      trv.getCompatibilityClass(), None,
+                                      "preerase"))
+        jobs.sort()
+        updJob.addJob(jobs)
+        return preScripts
 
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
@@ -1814,6 +2023,7 @@ class Database(SqlDbRepository):
             # use :memory: as a marker not to bother with locking
             self.lockFile = path 
         else:
+            SqlDbRepository.__init__(self, root + path, timeout = timeout)
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
@@ -1826,28 +2036,10 @@ class Database(SqlDbRepository):
             self.lockFileObj = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
-            if not os.path.exists(self.rollbackCache):
-                try:
-                    util.mkdirChain(top)
-                    os.mkdir(self.rollbackCache, 0700)
-                except OSError, e:
-                    if e.errno == errno.ENOTDIR:
-                        # when making a directory, the partent
-                        # wat not a directory
-                        d = os.path.dirname(e.filename)
-                        raise OpenError(top, '%s is not a directory' %d)
-                    elif e.errno == errno.EACCES:
-                        d = os.path.dirname(e.filename)
-                        raise OpenError(top, 'cannot create directory %s' %d)
-                    else:
-                        raise
-
-            if not os.path.exists(self.rollbackStatus):
-                self.firstRollback = 0
-                self.lastRollback = -1
-            else:
-                self.readRollbackStatus()
-            SqlDbRepository.__init__(self, root + path, timeout = timeout)
+            try:
+                self.rollbackStack = RollbackStack(self.rollbackCache)
+            except OpenError, e:
+                raise OpenError(top, e.msg)
 
 class DatabaseCacheWrapper:
 

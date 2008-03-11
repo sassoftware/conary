@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.4
 #
-# Copyright (c) 2007 rPath, Inc.
+# Copyright (c) 2007-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,6 +16,7 @@
 # list of tables we migrate, in order
 TableList = [
     'LatestMirror',
+    'CommitLock',
     'Branches',
     'Items',
     'Versions',
@@ -31,7 +32,6 @@ TableList = [
     'Entitlements',
     'EntitlementOwners',
     'EntitlementAccessMap',
-    'Caps',
     'Permissions',
     'FileStreams',
     'Nodes',
@@ -39,7 +39,6 @@ TableList = [
     'Instances',
     'TroveInfo',
     'Dependencies',
-    'Latest',
     'Metadata',
     'MetadataItems',
     'PGPKeys',
@@ -48,5 +47,12 @@ TableList = [
     'Requires',
     'TroveRedirects',
     'TroveTroves',
+    'FilePaths',
     'TroveFiles',
+    'CheckTroveCache',
+    'UserGroupTroves',
+    'UserGroupInstancesCache',
+    'UserGroupAllPermissions',
+    'UserGroupAllTroves',
+    'LatestCache'
     ]

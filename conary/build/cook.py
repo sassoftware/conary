@@ -660,6 +660,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         use.resetUsed()
         use.clearLocalFlags()
+        repos.setFlavorPreferencesByFlavor(buildFlavor)
         use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor, error=False)
         if hasattr(recipeClass, '_localFlavor'):
             # this will only be set if loadRecipe is used.  Allow for some
@@ -776,7 +777,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
                 troveScripts.script.set(recipeScripts[0])
 
-            for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+            for (troveTup, explicit, byDefault, comps, requireLatest) \
+                    in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,
                                 weakRef=not explicit, *troveTup)
 
@@ -1188,6 +1190,17 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
     return bldList, recipeObj, builddir, destdir, policyTroves
 
+def _copyScripts(trv, scriptsMap):
+    trvName = trv.getName()
+    trvScripts = scriptsMap.get(trvName, None)
+    if not trvScripts:
+        return
+    # Copy scripts
+    for scriptType, (scriptContents, compatClass) in trvScripts.items():
+        if not scriptContents:
+            continue
+        getattr(trv.troveInfo.scripts, scriptType).script.set(scriptContents)
+
 def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                             targetLabel=None, alwaysBumpCount=False,
                             policyTroves=None, signatureKey = None):
@@ -1235,6 +1248,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
+            _copyScripts(grpMap[main], recipeObj._scriptsMap)
 
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')
@@ -1265,6 +1279,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         # Add build flavor
         p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
+        _copyScripts(p, recipeObj._scriptsMap)
 
         _signTrove(p, signatureKey)
 
@@ -1746,7 +1761,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.allowUnknownFlags(allowUnknownFlags)
     recipeClassDict = {}
-    loaders = []
     for flavor in flavorList:
         use.clearLocalFlags()
         if flavor is not None:
@@ -1782,6 +1796,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 labelPath = None
 
             try:
+                repos.setFlavorPreferencesByFlavor(buildFlavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
             except AttributeError, msg:
                 log.error('Error setting build flag values: %s' % msg)
@@ -1798,7 +1813,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 raise CookError(str(msg))
 
             recipeClass = loader.getRecipe()
-        loaders.append(loader)
+
         recipeClassDict.setdefault(sourceVersion, []).append(recipeClass)
 
         if showBuildReqs:
