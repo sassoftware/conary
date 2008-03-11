@@ -1,9 +1,14 @@
 Changes in @NEW@:
   o Build Changes:
-    An xml formatted log has been added to :debuginfo. This is in
-    addition to the human readable log. The xml log contains the same
-    information as the human readable log, plus additional contextual
-    information useful for formatting the log data. (CNY-2487)
+    * An xml formatted log has been added to :debuginfo. This is in
+      addition to the human readable log. The xml log contains the same
+      information as the human readable log, plus additional contextual
+      information useful for formatting the log data. (CNY-2487)
+
+  o Bug Fixes:
+    * Rollbacks could restore files from local rollbacks by overwriting
+      existing contents rather than replacing the file. In addition,
+      the operation was not journaled properly. (CNY-2596)
 
 Changes in 1.2.20:
   o Bug Fixes:
@@ -16,9 +21,6 @@ Changes in 1.2.20:
       (CNY-2577)
     * A bug that occurred when rMake recursed through a group recipe
       that made use of the replace command has been fixed. (CNY-2606)
-    * Rollbacks could restore files from local rollbacks by overwriting
-      existing contents rather than replacing the file. In addition,
-      the operation was not journaled properly. (CNY-2596)
 
 Changes in 1.2.19:
   o Client Changes:
