@@ -943,15 +943,6 @@ class FilesystemJob:
         if removalList is None:
             removalList = []
 
-        if baseTrove:
-            baseTroveCs = baseTrove.diff(None)[0]
-            postEraseScript = baseTroveCs._getPostEraseScript()
-            # Queue up the posterase script
-            if postEraseScript:
-                self.postScripts.append((troveCs.getJob(),
-                                         baseTrove.getCompatibilityClass(),
-                                         None, postEraseScript, "posterase"))
-
         scriptList = []
         # queue up postinstall scripts
         baseCompatClass = None
