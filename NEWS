@@ -9,6 +9,9 @@ Changes in 1.2.20:
       (CNY-2577)
     * A bug that occurred when rMake recursed through a group recipe
       that made use of the replace command has been fixed. (CNY-2606)
+    * Rollbacks could restore files from local rollbacks by overwriting
+      existing contents rather than replacing the file. In addition,
+      the operation was not journaled properly. (CNY-2596)
 
 Changes in 1.2.19:
   o Client Changes:
