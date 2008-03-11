@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -38,7 +38,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         assert(not hidden), "This code pathway does not accept hidden trove commits"
         info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
-	return (info, self.repos.addTrove(trove, pin = pin))
+	return (info, self.repos.addTrove(trove, pin = pin,
+                                          oldTroveSpec = oldTroveSpec))
 
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, 
                        newVersion, fileStream = None):

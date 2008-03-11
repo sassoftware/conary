@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -133,6 +133,7 @@ class InodeStream(streams.StreamSet):
     Stores basic inode information on a file: perms, owner, group.
     """
 
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = { INODE_STREAM_PERMS : (SMALL, streams.ShortStream,  "perms"),
                    INODE_STREAM_MTIME : (SMALL, streams.MtimeStream,  "mtime"),
                    INODE_STREAM_OWNER : (SMALL, streams.StringStream, "owner"),
@@ -230,6 +231,7 @@ class File(streams.StreamSet):
     lsTag = None
     hasContents = False
     skipChmod = False
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         FILE_STREAM_INODE    : (SMALL, InodeStream, "inode"),
         FILE_STREAM_FLAGS    : (SMALL, FlagsStream, "flags"),

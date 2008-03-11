@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -133,11 +133,11 @@ class _ShimMethod(netclient._Method):
     def __repr__(self):
         return "<server._ShimMethod(%r)>" % (self._name)
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
         usedAnonymous, isException, result = self._server.callWrapper(
             self._protocol, self._port,
-            self._name, self._authToken, args)
+            self._name, self._authToken, args, kwargs)
 
         if not isException:
             return result
@@ -151,8 +151,6 @@ class ShimServerProxy(netclient.ServerProxy):
         self._server = server
         self._protocol = protocol
         self._port = port
-        if len(self._authToken) == 3:
-            import epdb;epdb.st()
 
     def setAbortCheck(self, *args):
         pass

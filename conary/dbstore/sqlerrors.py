@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,6 +14,10 @@
 
 class DatabaseError(Exception):
     def __init__(self, msg, *args, **kw):
+        """
+        A database error occurred.  A possible causes is incorrect SQL
+        statement input.
+        """
         self.msg = str(msg)
         self.args = args
         self.kw = kw
@@ -30,6 +34,9 @@ class InvalidBackend(DatabaseError):
     pass
 
 class DatabaseLocked(DatabaseError):
+    """
+    Database is locked and cannot be accessed by the current process.
+    """
     pass
 
 class ReadOnlyDatabase(DatabaseError):

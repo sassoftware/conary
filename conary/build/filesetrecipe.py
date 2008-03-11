@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -81,6 +81,15 @@ class FilesetRecipe(Recipe):
 
     def addFile(self, pattern, component, versionStr = None, recurse = True,
 		remap = []):
+        pattern = pattern % self.macros
+        component = component % self.macros
+        if versionStr:
+            versionStr = versionStr % self.macros
+        if remap:
+            if isinstance(remap, tuple):
+                remap = [ remap ]
+            remap = [ (old % self.macros, new % self.macros)
+                      for (old,new) in remap ]
         self.requestedFiles.setdefault(
             (component, versionStr), []).append((pattern, recurse, remap))
 
@@ -96,9 +105,6 @@ class FilesetRecipe(Recipe):
 	"""
 
         for (pattern, recurse, remap) in itemList:
-            if type(remap) == tuple:
-                remap = [ remap ]
-
             foundIt = False
             for sub in self.repos.walkTroveSet(pkg):
                 foundIt = foundIt or self.addFileFromPackage(

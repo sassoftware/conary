@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -25,7 +25,7 @@ class User(build.BuildAction):
 
     SYNOPSIS
     ========
-    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}'})}
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}'}, reprovideGroup=True)}
 
     DESCRIPTION
     ===========
@@ -63,6 +63,10 @@ class User(build.BuildAction):
 
     B{comment} : (None) Add a comment to the account record
 
+    B{provideGroup} : (True) Provide the primary group for the user.  If
+    set to False, then the user's primary group will be required instead
+    of provided.
+
     B{saltedPassword} : (None) Specify a salted password for the account
  
     B{shell} : (C{'/sbin/nologin'}) Specify the user account shell
@@ -83,11 +87,12 @@ class User(build.BuildAction):
         if recipe.type != 'user':
             raise UserGroupError, 'User() allowed only in UserInfoRecipe'
         args=list(args)
-        args.extend([None] * (9 - len(args)))
+        args.extend([None] * (10 - len(args)))
 	(self.infoname, self.preferred_uid, self.group,
          self.groupid, self.homedir, self.comment, self.shell,
-         self.supplemental, self.saltedPassword) = args
+         self.supplemental, self.saltedPassword, self.provideGroup) = args
         if self.shell is None: self.shell = '/sbin/nologin'
+        if self.provideGroup is None: self.provideGroup=True
 	build.BuildAction.__init__(self, recipe, [], **keywords)
 
     def do(self, macros):
@@ -98,6 +103,7 @@ class User(build.BuildAction):
         self.recipe.infoname = self.infoname
         if self.recipe.name != 'info-%s' %self.infoname:
             raise UserGroupError, 'User name must be the same as package name'
+        self.recipe.provideGroup = self.provideGroup
         d = '%(destdir)s%(userinfodir)s/' %macros
         util.mkdirChain(d)
         self.recipe.infofilename='%s/%s' %(macros.userinfodir, self.infoname)
@@ -111,6 +117,8 @@ class User(build.BuildAction):
             self.recipe.groupname = self.group
         else:
             self.recipe.groupname = self.infoname
+        if not self.provideGroup:
+            self.recipe.requiresGroup(self.group)
         if self.groupid:
             f.write('GROUPID=%d\n' %self.groupid)
         if self.homedir:

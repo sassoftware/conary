@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,13 +14,30 @@
 #
 import os
 
+from conary import conarycfg
 from conary import errors
+from conary import state
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, cfgtypes
 from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
 def parseTroveSpec(specStr, allowEmptyName = True):
+    """
+    Parse a TroveSpec string
+
+    @param specStr: the input string
+    @type specStr: string
+
+    @param allowEmptyName: if set, will accept an empty string and some other 
+    variations.
+    @type allowEmptyName: bool 
+
+    @rtype: list
+    @return: (name, version, flavor)
+
+    @raise TroveSpecError: Raised if the input string is not a valid TroveSpec
+    """
     origSpecStr = specStr
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
@@ -101,10 +118,39 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
 
 def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
                     allowChangeSets=True):
-    """ Takes input specifying changeSpecs, such as foo=1.1--1.2,
-        and turns it into (name, (oldVersionSpec, oldFlavorSpec),
-                                 (newVersionSpec, newFlavorSpec), isAbsolute)
-        tuples.
+    """
+    Parse a change specification list, as presented on the command line.
+
+    Takes input specifying changeSpecs, such as C{foo=1.1--1.2},
+    and turns it into C{(name, (oldVersionSpec, oldFlavorSpec),
+    (newVersionSpec, newFlavorSpec), isAbsolute)} tuples.
+
+    @note:
+        If a filename is passed as a changeSpec, and the file does not contain
+    a valid conary changeset, a sys.exit() will be called.
+    
+    @param changeSpecList: a changeSpec, such as C{foo=1.1--1.2}
+    @type changeSpecList: string
+
+    @param keepExisting: specifies whether an installed trove should be
+    kept in addition to an updated version.
+    @type keepExisting: bool
+    
+    @param updateByDefault:
+    @type updateByDefault: bool
+   
+    @param allowChangeSets: specifies whether file-based changesets are
+    allowed.
+    @type allowChangeSets: bool
+
+    @raise TroveSpecError: Raised if an invalid TroveSpec is passed within the
+    ChangeSpec list.
+
+    @rtype: list
+    @return: a list of changes to apply, of the form
+    (name, (oldVersion, oldFlavor), (newVersion, newFlavor), replaceExisting)
+    where either the old or new version/flavor (but not both) may be 
+    (None, None)
     """
     applyList = []
 
@@ -167,6 +213,22 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     return finalList
 
 def toTroveSpec(name, versionStr, flavor):
+    """
+    Construct a TroveSpec string from name + version + flavor
+
+    @param name: trove name
+    @type name: string
+
+    @param versionStr: trove version string
+    @type versionStr: string
+
+    @param flavor: trove flavor
+    @type flavor: L{deps.deps.Flavor}
+
+    @rtype: string
+    @return: a TroveSpec of the form name=version[flavor]
+    """
+
     disp = [name]
     if versionStr:
         disp.extend(('=', versionStr))
@@ -195,3 +257,28 @@ class TroveSpecError(errors.ParseError):
     def __init__(self, spec, error):
         self.spec = spec
         errors.ParseError.__init__(self, 'Error with spec "%s": %s' % (spec, error))
+
+def setContext(cfg, context=None, environ=None, searchCurrentDir=False):
+    if environ is None:
+        environ = os.environ
+    if context is not None:
+        where = 'given manually'
+    else:
+        context = cfg.context
+        where = 'specified as the default context in the conary configuration'
+        if searchCurrentDir and os.access('CONARY', os.R_OK):
+            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
+            if conaryState.hasContext():
+                context = conaryState.getContext()
+                where = 'specified in the CONARY state file'
+
+        if 'CONARY_CONTEXT' in environ:
+            context = environ['CONARY_CONTEXT']
+            where = 'specified in the CONARY_CONTEXT environment variable'
+    if context:
+        if not cfg.getContext(context):
+            raise cfgtypes.CfgError('context "%s" (%s) does not exist' % (context, where))
+        cfg.setContext(context)
+    return cfg
+
+

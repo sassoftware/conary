@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -35,6 +35,8 @@ def usage():
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg,
+                     # selection options
+                     exactFlavors = False,
                      # trove options
                      info = False, digSigs = False, deps = False,
                      showBuildReqs = False, all = False,
@@ -76,8 +78,9 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                 troveTups = [(x.getName(), x.getNewVersion(), x.getNewFlavor())\
                                             for x in cs.iterNewTroveList()]
         else:
-            troveTups, primary  = query.getTrovesToDisplay(changeSetSource, 
-                                                           troveSpecs)
+            troveTups, primary  = query.getTrovesToDisplay(changeSetSource,
+                                                           troveSpecs,
+                                                     exactFlavors=exactFlavors)
         if recurseRepos:
             querySource = trovesource.stack(changeSetSource, client.getRepos())
         else:

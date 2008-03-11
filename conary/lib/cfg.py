@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rpath, Inc.
+# Copyright (c) 2004-2008 rpath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -26,6 +26,7 @@ import urllib2
 
 from conary.lib import cfgtypes,util
 from conary import constants, errors
+from conary.repository import transport
 
 configVersion = 1
 
@@ -253,10 +254,21 @@ class ConfigFile(_Config):
     """ _Config class + ability to read in files """
 
     def __init__(self):
+        self._ignoreErrors = False
+        self._ignoreUrlIncludes = False
+        self._keyLimiters = set()
+        self._configFileStack = set()
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
-        self._configFileStack = set()
-        self._ignoreErrors = False
+
+    def limitToKeys(self, *keys):
+        if keys == (False,):
+            self._keyLimiters = None
+        else:
+            self._keyLimiters = set(keys)
+
+    def ignoreUrlIncludes(self, value=True):
+        self._ignoreUrlIncludes = value
 
     def setIgnoreErrors(self, val=True):
         self._ignoreErrors = val
@@ -314,12 +326,32 @@ class ConfigFile(_Config):
 
 
     def read(self, path, exception=True):
+        """
+        read a config file or config file section
+
+        @param path: the OS path to the file
+        @type path: string
+
+        @param exception: if True, raise exceptions
+        @type exception: bool
+
+        @raises CfgEnvironmentError: raised if file read fails
+        """
+
         f = self._openPath(path, exception=exception)
         if f: self.readObject(path, f)
 
     def readUrl(self, url):
-        f = self._openUrl(url)
-        self.readObject(url, f)
+        if self._ignoreUrlIncludes:
+            return
+        try:
+            f = self._openUrl(url)
+            self.readObject(url, f)
+        except CfgEnvironmentError, err:
+            if not self._ignoreErrors:
+                raise
+
+
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
         origLine = line
@@ -352,7 +384,10 @@ class ConfigFile(_Config):
     def configKey(self, key, val, fileName = "override", lineno = '<No line>'):
         try:
             key = self._lowerCaseMap[key.lower()]
-            self[key] = self._options[key].parseString(self[key], val)
+            if self._keyLimiters and key not in self._keyLimiters:
+                return
+            self[key] = self._options[key].parseString(self[key], val,
+                                                       fileName, lineno)
             if hasattr(self._options[key].valueType, 'overrides'):
                 overrides = self._options[key].valueType.overrides
                 if overrides and hasattr(self, overrides):
@@ -369,6 +404,9 @@ class ConfigFile(_Config):
                                                             % (fileName,
                                                                lineno, msg, key)
 
+    def _getProxies(self):
+        return {}
+
     def _openUrl(self, url):
         oldTimeout = socket.getdefaulttimeout()
         timeout = 2
@@ -378,15 +416,18 @@ class ConfigFile(_Config):
             'X-Conary-Version' : constants.version or "UNRELEASED",
             'X-Conary-Config-Version' : int(configVersion),
         }
-        req = urllib2.Request(url, headers = headers)
+        opener = transport.URLOpener(proxies=self._getProxies())
+        for key, value in headers.items():
+            opener.addheader(key, value)
         try:
             for i in range(4):
                 try:
-                    return urllib2.urlopen(req)
+                    return opener.open(url)
                 except urllib2.HTTPError, err:
                     raise CfgEnvironmentError(err.filename, err.msg)
-                except urllib2.URLError, err:
-                    if err.args and isinstance(err.args[0], socket.timeout):
+                except IOError, err:
+                    if (err.strerror and isinstance(err.strerror,
+                                                    socket.timeout)):
                         # CNY-1161
                         # We double the socket time out after each run; this
                         # should allow very slow links to catch up while
@@ -397,7 +438,7 @@ class ConfigFile(_Config):
                         timeout *= 2
                         socket.setdefaulttimeout(timeout)
                         continue
-                    raise CfgEnvironmentError(url, err.reason.args[1])
+                    raise CfgEnvironmentError(url, err.strerror.args[1])
                 except EnvironmentError, err:
                     raise CfgEnvironmentError(err.filename, err.msg)
             else: # for
@@ -494,6 +535,7 @@ class SectionedConfigFile(ConfigFile):
 
     def _addSection(self, sectionName, sectionObject):
         self._sections[sectionName] = sectionObject
+        sectionObject._ignoreErrors = self._ignoreErrors
 
     def configLine(self, line, file = "override", lineno = '<No line>'):
 	line = line.strip()
@@ -522,7 +564,7 @@ class SectionedConfigFile(ConfigFile):
         if self.isUrl(val):
             self.readUrl(val, resetSection = False)
         else:
-            for cfgfile in util.braceGlob(val):
+            for cfgfile in sorted(util.braceGlob(val)):
                 self.read(cfgfile, resetSection = False)
 
     def read(self, *args, **kw):
@@ -566,10 +608,11 @@ class ConfigOption:
         self.default = valueType.getDefault(default)
         self.__doc__ = doc
         self._isDefault = True
-        
         self.listeners = []
+        self.origins = []
 
-    def parseString(self, curVal, str):
+    def parseString(self, curVal, str,
+                    path=None, lineNum=None):
         """ 
         Takes the current value for this option, and a string to update that
         value, and returns an updated value (which may either overwrite the 
@@ -578,8 +621,10 @@ class ConfigOption:
         self._callListeners()
 
         if curVal == self.default and self._isDefault:
+            self.origins = [(path, lineNum)]
             return self.valueType.setFromString(curVal, str)
         else:
+            self.origins.append((path, lineNum))
             return self.valueType.updateFromString(curVal, str)
 
     def set(self, curVal, newVal):
@@ -596,6 +641,7 @@ class ConfigOption:
         new = self.__class__(self.name, valueType, default)
         listeners = list(self.listeners)
         new._isDefault = self._isDefault
+        new.origins = list(self.origins)
         new.listeners = listeners
         return new
 
@@ -629,8 +675,17 @@ class ConfigOption:
         if self.isDefault() and value is None:
             return
 
-        # note that the value for a config item may only be reproducable
-        # by multiple lines in a config file.
+        if displayOptions.get('showLineOrigins', False):
+            lineStrs = []
+            curPath = None
+            for path, lineNum in self.origins:
+                if path == curPath:
+                    continue
+                else:
+                    lineStrs.append('%s' % (path,))
+                    curPath = path
+            if lineStrs:
+                out.write('# %s: %s\n' % (self.name, ' '.join(lineStrs)))
         for line in self.valueType.toStrings(value, displayOptions):
             out.write('%-25s %s\n' % (self.name, line))
 

@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -82,7 +82,9 @@ class FilesystemError(ConaryError):
         ConaryError.__init__(self, *args, **kwargs)
 
 class TroveNotFound(ConaryError):
-    """Returned from findTrove when no trove is matched"""
+    """
+    No trove was found or the match parameters were incorrectly specified.
+    """
 
 class LabelPathNeeded(TroveNotFound):
     """Returned from findTrove when a label path is required but wasn't given"""
@@ -155,6 +157,17 @@ class ReexecRequired(ConaryError):
         self.execParams = params
         self.data = data
         ConaryError.__init__(self, msg)
+
+class DecodingError(ConaryError):
+    """
+    An error occurred while loading the frozen representation of a data
+    structure
+    """
+
+class CancelOperationException(Exception):
+    """Inherit from this class and throw exceptions of this type if you
+    want a callback to stop an update at the end of the job"""
+    cancelOperation = True
 
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 

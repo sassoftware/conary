@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -47,10 +47,35 @@ class RepositoryMismatch(RepositoryError):
 
 class InsufficientPermission(ConaryError):
 
-    def __init__(self, server = None):
-        self.server = server
+    def __init__(self, server = None, repoName = None, url = None):
+        """
+        Initialize an InsufficientPermission exception object.  This exception
+        is raised when privileged methods are called without the correct
+        authorization token.
+
+        @param server: Name of the host where access is denied.
+        @type server: string
+
+        @param repoName: Name of the repository where access is denied.
+        @type repoName: string
+
+        @param url: URL of the call where access is denied.
+        @type url: string
+        """
+        self.server = self.repoName = self.url = None
+        serverMsg = repoMsg = urlMsg = ""
         if server:
-            msg = ("Insufficient permission to access server %s" % self.server)
+            self.server = server
+            serverMsg = ("server %s" % server)
+        if repoName:
+            self.repoName = repoName
+            repoMsg = ("repository %s" % repoName)
+        if url:
+            self.url = url
+            urlMsg = ("via %s" % url)
+        if server or repoName or url:
+            msg = "Insufficient permission to access %s %s %s" %(
+                repoMsg, serverMsg, urlMsg)
         else:
             msg = "Insufficient permission"
         ConaryError.__init__(self, msg)
@@ -66,7 +91,11 @@ class RepositoryLocked(RepositoryError):
         return 'The repository is currently busy.  Try again in a few moments.'
 
 class OpenError(RepositoryError):
-    """Error occurred opening the repository"""
+    """
+    Error occurred opening the repository.
+    This is can be due to network error, repository map configuration error, or
+    other problems.
+    """
 
 class CommitError(RepositoryError):
     """Error occurred commiting a trove"""
@@ -266,6 +295,9 @@ configured incorrectly or the request you sent to the server was invalid.
 ''' % (err,))
 
 class ReadOnlyRepositoryError(RepositoryError):
+    pass
+
+class CannotCalculateDownloadSize(RepositoryError):
     pass
 
 # This is a list of simple exception classes and the text string

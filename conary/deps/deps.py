@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -123,7 +123,7 @@ class BaseDependency(object):
 
 class Dependency(BaseDependency):
 
-    __slots__ = ( 'name', 'flags' )
+    __slots__ = ( 'name', 'flags', )
 
     def __hash__(self):
 	val = hash(self.name)
@@ -1036,6 +1036,13 @@ def ThawDependencySet(frz):
     return _Thaw(DependencySet(), frz)
 
 def ThawFlavor(frz):
+    """
+    @param frz: the frozen representation of a flavor
+    @return: a thawed Flavor object
+    @rtype: L{deps.deps.Flavor}
+    @raises TypeError: could be raised if frozen object is malformed
+    @raises ValueError: could be raised if frozen object is malformed
+    """
     return _Thaw(Flavor(), frz)
 
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
@@ -1219,6 +1226,24 @@ def _filterDeps(depClass, dep, filterDeps):
     if not depClass.depNameSignificant and not finalFlags:
         return None
     return Dependency(dep.name, finalFlags)
+
+def getInstructionSetFlavor(flavor):
+    if flavor is None:
+        return None
+    newFlavor = Flavor()
+    targetISD = TargetInstructionSetDependency
+    ISD = InstructionSetDependency
+
+    # get just the arches, not any arch flags like mmx
+    newFlavor.addDeps(ISD,
+                      [Dependency(x[1].name) for x in flavor.iterDeps() 
+                       if x[0] is ISD])
+    targetDeps = [ Dependency(x[1].name) for x in flavor.iterDeps() 
+                  if x[0] is targetISD ]
+
+    if targetDeps:
+        newFlavor.addDeps(targetISD, targetDeps)
+    return newFlavor
 
 def formatFlavor(flavor):
     """

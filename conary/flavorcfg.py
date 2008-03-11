@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -160,10 +160,17 @@ class UseFlagConfig(ConfigFile):
         return (self.name, self.sense)
 
     def addUseFlag(self):
-        use.Use._addFlag(self.name, required=self.buildRequired,
+        if '.' in self.name:
+            packageName, flagName = self.name.split('.', 1)
+            use.PackageFlags
+            flagLoc = use.PackageFlags[packageName]
+        else:
+            flagName = self.name
+            flagLoc = use.Use
+        flagLoc._addFlag(flagName, required=self.buildRequired,
                          path=self.path, platform=self.platform)
         if self.buildName and self.buildName != self.name:
-            use.Use._addAlias(self.name, self.buildName)
+            flagLoc._addAlias(self.name, self.buildName)
 
 class FlavorConfig:
     """

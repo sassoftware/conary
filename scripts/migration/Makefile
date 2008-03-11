@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2006 rPath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,9 +12,7 @@
 # full details.
 #
 
-python_files = schema.py  \
-               sqlite2mysql.py  sqlite2pgsql.py sqlite2sqlite.py \
-	       mysql2pgsql.py
+python_files = schema.py db2db.py database.py tablelist.py
 
 extra_dist = Makefile
 

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -122,7 +122,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)
 
-    def addTrove(self, pkg, hidden = False):
+    def addTrove(self, pkg, hidden = False, oldTroveSpec = None):
 	return self.troveStore.addTrove(pkg, hidden = hidden)
 
     def addTroveDone(self, pkg, mirror=False):
@@ -158,7 +158,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def commitChangeSet(self, cs, mirror=False, hidden=False):
+    def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -166,7 +166,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 label = v.branch().label()
 		raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
-        self.troveStore.begin()
+        self.troveStore.begin(serialize)
         if self.requireSigs:
             threshold = openpgpfile.TRUST_FULL
         else:
@@ -388,9 +388,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		#newFile = idIdx[(pathId, newFileId)]
 		newFile = files.ThawFile(streams[newFileId], pathId)
 
-		(filecs, contentsHash) = changeset.fileChangeSet(pathId,
-                                                                 oldFile,
-                                                                 newFile)
+                if mirrorMode:
+                    (filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                     None,
+                                                                     newFile)
+                else:
+                    (filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                     oldFile,
+                                                                     newFile)
 
 		cs.addFile(oldFileId, newFileId, filecs)
 

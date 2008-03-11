@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,6 +16,7 @@ Provides output methods for displaying troves
 """
 
 import itertools
+import textwrap
 import time
 
 #conary
@@ -617,6 +618,8 @@ class TroveFormatter(TroveTupFormatter):
                 # on failed getTrove calls 
             except errors.TroveMissing:
                 pass
+            except errors.InsufficientPermission:
+                pass
 
         elif n.endswith(':source'):
             sourceTrove = trove
@@ -653,14 +656,15 @@ class TroveFormatter(TroveTupFormatter):
 
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
 
+        imageGroup = trove.troveInfo.imageGroup()
+        if imageGroup is not None:
+            yield 'Image Group: %s' % bool(imageGroup)
+
+        for ln in self.formatMetadata(trove):
+            yield ln
         if sourceTrove:
             if not n.endswith(':source'):
                 yield 'Source    : %s' % trove.getSourceName()
-            if hasattr(troveSource, 'getMetadata'):
-                for ln in metadata.formatDetails(troveSource, None, n, 
-                                                 v.branch(), sourceTrove):
-                    yield ln
-
             cl = sourceTrove.getChangeLog()
             if cl:
                 yield "Change log: %s (%s)" % (cl.getName(), cl.getContact())
@@ -674,7 +678,31 @@ class TroveFormatter(TroveTupFormatter):
                                 ("TroveVer  : %s" %
                                             trove.troveInfo.troveVersion()))
             yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
+            yield "%-30s" % (("Conary version : %s" % trove.troveInfo.conaryVersion()))
 
+    def formatMetadata(self, trove):
+        metadata = trove.getMetadata()
+        if metadata['licenses']:
+            for l in metadata['licenses']:
+                yield "License   : %s" % l
+        if metadata['crypto']:
+            for l in metadata['crypto']:
+                yield "Crypto    : %s" % l
+        if metadata['categories']:
+            for c in metadata['categories']:
+                yield "Category  : %s" % c
+        if metadata['shortDesc']:
+            yield "Summary   : %s" % metadata['shortDesc']
+        if metadata['url']:
+            yield "Url       : %s" % metadata['url']
+        if metadata['longDesc']:
+            wrapper = textwrap.TextWrapper(initial_indent='    ',
+                                           subsequent_indent='    ')
+            wrapped = wrapper.wrap(metadata['longDesc'])
+
+            yield "Description: "
+            for line in wrapped:
+                yield line
 
     def formatTroveHeader(self, trove, n, v, f, flags, indent):
         """ Print information about this trove """
@@ -692,13 +720,17 @@ class TroveFormatter(TroveTupFormatter):
                 if not flags & TROVE_STRONGREF:
                     fmtFlags.append('Weak')
                 if trove and trove.isRedirect():
+                    redirectFlags = []
                     for rName, rBranch, rFlavor in trove.iterRedirects():
                         if rFlavor is None:
                             flag = 'Redirect -> %s=%s' % (rName, rBranch)
                         else:
                             flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch, 
                                                               rFlavor)
-                        fmtFlags.append(flag)
+                        redirectFlags.append(flag)
+                    if not redirectFlags:
+                        redirectFlags.append('Redirect -> Nothing')
+                    fmtFlags.extend(redirectFlags)
                 if trove and trove.isRemoved():
                     fmtFlags.append('Removed')
                 if fmtFlags:
@@ -719,7 +751,8 @@ class TroveFormatter(TroveTupFormatter):
             for line in self.formatDigSigs(trove, indent):
                 yield line
         if dcfg.printBuildReqs():
-            for buildReq in sorted(trove.getBuildRequirements()):
+            for buildReq in sorted(trove.getBuildRequirements(),
+                                   key=lambda x:x[0]):
                 yield '  ' * (indent) + self.formatNVF(*buildReq)
         elif dcfg.printDeps():
             for line in self.formatDeps(trove.getProvides(), 

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,5 +18,5 @@ def getPassword(server, userName=None):
     if userName is None:
         return None, None
 
-    s = "Enter the password for %s on %s:" % (server, userName)
+    s = "Enter the password for %s on %s:" % (userName, server)
     return userName, getpass.getpass(s)

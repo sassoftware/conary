@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -35,7 +35,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   # collection options
                   showTroves = False, recurse = None, showAllTroves = False,
                   weakRefs = False, showTroveFlags = False,
-                  pristine = True, alwaysDisplayHeaders = False):
+                  pristine = True, alwaysDisplayHeaders = False,
+                  exactFlavors = False):
     """Displays troves after finding them on the local system
 
        @param db: Database instance to search for troves in
@@ -46,8 +47,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @type troveSpecs: list of troveSpecs (n[=v][[f]])
        @param pathList: paths to match up to troves
        @type pathList: list of strings
-       @param whatRequiresList: list of dependencies to find reqs for
-       @type whatRequiresList: list of strings
+       @param whatProvidesList: list of dependencies to find provides for
+       @type whatProvidesList: list of strings
        @param info: If true, display general information about the trove
        @type info: bool
        @param digSigs: If true, display digital signatures for a trove.
@@ -96,7 +97,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     whatProvidesList = [ deps.parseDep(x) for x in whatProvidesList ]
 
     troveTups, primary = getTrovesToDisplay(db, troveSpecs, pathList,
-                                            whatProvidesList)
+                                            whatProvidesList,
+                                            exactFlavors=exactFlavors)
 
     dcfg = LocalDisplayConfig(db, affinityDb=db)
     # it might seem weird to use the same source we're querying as
@@ -143,7 +145,8 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
+def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
+                       exactFlavors=False):
     """ Finds the given trove and path specifiers, and returns matching
         (n,v,f) tuples.
         @param db: database to search
@@ -155,7 +158,13 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
         @type pathList: list of strings
         @param whatProvidesList: deps to search for providers of
         @type whatProvidesList: list of strings
+      
+        @raises TroveSpecError: Raised if one of the troveSpecs is of an 
+                                invalid format
 
+        @note: This function calls database routines which could raise any
+               errors defined in L{dbstore.sqlerrors}
+ 
         @rtype: troveTupleList (list of (name, version, flavor) tuples), 
                 and a boolean that stats whether the troves returned should
                 be considered primary (and therefore not compressed ever).
@@ -186,7 +195,7 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[]):
         troveTups = sorted(db.iterAllTroves())
         primary = False
     else:
-        results = db.findTroves(None, troveSpecs)
+        results = db.findTroves(None, troveSpecs, exactFlavors=exactFlavors)
 
         for troveSpec in troveSpecs:
             troveTups.extend(results.get(troveSpec, []))

@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2006-2007 rPath, Inc.
+# Copyright (c) 2006-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -47,6 +47,9 @@ def parseArgs(argv):
                       default = False,
                       help = "ignore the last-mirrored timestamp in the "
                              "target repository")
+    parser.add_option("--check-sync", dest = "checkSync", action = "store_true",
+                      default = False,
+                      help = "only check if the source and target(s) are in sync")
     parser.add_option("--test", dest = "test", action = "store_true",
                       default = False,
                       help = "skip commiting changes to the target repository")
@@ -77,6 +80,7 @@ class ChangesetCallback(callbacks.ChangesetCallback):
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
     user                  =  conarycfg.CfgUserInfo
+    entitlement           =  conarycfg.CfgEntitlement
 
 class MirrorFileConfiguration(cfg.SectionedConfigFile):
     host                  =  cfg.CfgString
@@ -102,12 +106,64 @@ class MirrorConfiguration(MirrorFileConfiguration):
 def checkConfig(cfg):
     if not cfg.host:
         log.error("ERROR: cfg.host is not defined")
-        sys.exit(-1)
+        raise RuntimeError("cfg.host is not defined")
     # make sure that each label belongs to the host we're mirroring
     for label in cfg.labels:
         if label.getHost() != cfg.host:
             log.error("ERROR: label %s is not on host %s", label, cfg.host)
-            sys.exit(-1)
+            raise RuntimeError("label %s is not on host %s", label, cfg.host)
+
+def mainWorkflow(cfg = None, callback=ChangesetCallback(), test=False, sync=False,
+                 infoSync=False, checkSync = False):
+    if cfg.lockFile:
+        try:
+            log.debug('checking for lock file')
+            lock = open(cfg.lockFile, 'w')
+            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except IOError:
+            log.warn('lock held by another process, exiting')
+            return
+
+    # need to make sure we have a 'source' section
+    if not cfg.hasSection('source'):
+        log.debug("ERROR: mirror configuration file is missing a [source] section")
+        raise RuntimeError("Mirror configuration file is missing a [source] section")
+    srcCfg = cfg.getSection('source')
+    sourceRepos = netclient.NetworkRepositoryClient(
+        srcCfg.repositoryMap, srcCfg.user,
+        uploadRateLimit = cfg.uploadRateLimit,
+        downloadRateLimit = cfg.downloadRateLimit,
+        entitlementDir = cfg.entitlementDirectory,
+        entitlements=srcCfg.entitlement)
+    # we need to build a target repo client for each of the "target*"
+    # sections in the config file
+    targets = []
+    for name in cfg.iterSectionNames():
+        if not name.startswith("target"):
+            continue
+        secCfg = cfg.getSection(name)
+        target = netclient.NetworkRepositoryClient(
+            secCfg.repositoryMap, secCfg.user,
+            uploadRateLimit = cfg.uploadRateLimit,
+            downloadRateLimit = cfg.downloadRateLimit,
+            entitlementDir = cfg.entitlementDirectory,
+            entitlements=secCfg.entitlement)
+        target = TargetRepository(target, cfg, name, test=test)
+        targets.append(target)
+    # checkSync is a special operation...
+    if checkSync:
+        return checkSyncRepos(cfg, sourceRepos, targets)        
+    # we pass in the sync flag only the first time around, because after
+    # that we need the targetRepos mark to advance accordingly after being
+    # reset to -1
+    callAgain = mirrorRepository(sourceRepos, targets, cfg,
+                                 test = test, sync = sync,
+                                 syncSigs = infoSync,
+                                 callback = callback)
+    while callAgain:
+        callAgain = mirrorRepository(sourceRepos, targets, cfg,
+                                     test = test, callback = callback)
+
 
 def Main(argv=sys.argv[1:]):
     try:
@@ -125,50 +181,8 @@ def Main(argv=sys.argv[1:]):
         log.setVerbosity(log.DEBUG)
         callback = VerboseChangesetCallback()
 
-    if cfg.lockFile:
-        try:
-            log.debug('checking for lock file')
-            lock = open(cfg.lockFile, 'w')
-            fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except IOError:
-            log.debug('lock held by another process, exiting')
-            sys.exit(0)
-
-    # need to make sure we have a 'source' section
-    if not cfg.hasSection('source'):
-        log.debug("ERROR: mirror configuration file is missing a [source] section")
-        sys,exit(-1)
-    srcCfg = cfg.getSection('source')
-    sourceRepos = netclient.NetworkRepositoryClient(
-        srcCfg.repositoryMap, srcCfg.user,
-        uploadRateLimit = cfg.uploadRateLimit,
-        downloadRateLimit = cfg.downloadRateLimit,
-        entitlementDir = cfg.entitlementDirectory)
-    # we need to build a target repo client for each of the "target*"
-    # sections in the config file
-    targets = []
-    for name in cfg.iterSectionNames():
-        if not name.startswith("target"):
-            continue
-        secCfg = cfg.getSection(name)
-        target = netclient.NetworkRepositoryClient(
-            secCfg.repositoryMap, secCfg.user,
-            uploadRateLimit = cfg.uploadRateLimit,
-            downloadRateLimit = cfg.downloadRateLimit,
-            entitlementDir = cfg.entitlementDirectory)
-        target = TargetRepository(target, cfg, name, test=options.test)
-        targets.append(target)
-    # we pass in the sync flag only the first time around, because after
-    # that we need the targetRepos mark to advance accordingly after being
-    # reset to -1
-    callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                 test = options.test, sync = options.sync,
-                                 syncSigs = options.infoSync,
-                                 callback = callback)
-    while callAgain:
-        callAgain = mirrorRepository(sourceRepos, targets, cfg,
-                                     test = options.test, callback = callback)
-
+    mainWorkflow(cfg, callback, options.test, options.sync, options.infoSync,
+                 options.checkSync)
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
@@ -645,12 +659,7 @@ def getTroveList(src, cfg, mark):
     # since we're returning at least on trove, the caller will make the next mark decision
     return (mark, troveList)
 
-# syncSigs really means "resync all info", but we keep the parameter
-# name for compatibility reasons
-def mirrorRepository(sourceRepos, targetRepos, cfg,
-                     test = False, sync = False, syncSigs = False,
-                     callback = ChangesetCallback()):
-    checkConfig(cfg)
+def _makeTargets(cfg, targetRepos, test = False):
     if not hasattr(targetRepos, '__iter__'):
         targetRepos = [ targetRepos ]
     targets = []
@@ -661,11 +670,20 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             targets.append(t)
         else:
             raise RuntimeError("Can not handle unknown target repository type", t)
+    return targets
+
+# syncSigs really means "resync all info", but we keep the parameter
+# name for compatibility reasons
+def mirrorRepository(sourceRepos, targetRepos, cfg,
+                     test = False, sync = False, syncSigs = False,
+                     callback = ChangesetCallback()):
+    checkConfig(cfg)
+    targets = _makeTargets(cfg, targetRepos, test)
     log.debug("-" * 20 + " start loop " + "-" * 20)
 
     hidden = len(targets) > 1 or cfg.useHiddenCommits
     if hidden:
-        log.debug("will use hidden commits to syncronize target mirrors")
+        log.debug("will use hidden commits to synchronize target mirrors")
 
     if sync:
         currentMark = -1
@@ -825,3 +843,51 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             target.setMirrorMark(crtMaxMark)
         return -1
     return updateCount
+
+# check if the sourceRepos is in sync with targetRepos
+def checkSyncRepos(config, sourceRepos, targetRepos):
+    checkConfig(config)
+    targets = _makeTargets(config, targetRepos)
+    log.setVerbosity(log.DEBUG)
+        
+    # retrieve the set of troves from a give repository
+    def _getTroveSet(config, repo):
+        def _flatten(troveSpec):
+            l = []
+            for name, versionD in troveSpec.iteritems():
+                for version, flavorList in versionD.iteritems():
+                    l += [ (name, version, flavor) for flavor in flavorList ]
+            return set(l)
+        troveSpecs = {}
+        if config.labels:
+            d = troveSpecs.setdefault(None, {})
+            for l in config.labels:
+                d[l] = ''
+            t = repo.getTroveVersionsByLabel(troveSpecs, troveTypes = netclient.TROVE_QUERY_ALL)
+        else:
+            troveSpecs = {None : None}
+            t = repo.getTroveVersionList(config.host, troveSpecs,
+                                         troveTypes = netclient.TROVE_QUERY_ALL)
+        return _flatten(t)
+    # compare source with each target
+    def _compare(src, dst):
+        srcName, srcSet = src
+        dstName, dstSet = dst
+        counter = 0
+        for x in srcSet.difference(dstSet):
+            log.debug(" - %s %s " % (srcName, x))
+            counter += 1
+        for x in dstSet.difference(srcSet):
+            log.debug(" + %s %s" % (dstName, x))
+            counter += 1
+        return counter
+    log.debug("Retrieving list of troves from source %s" % str(sourceRepos.c.map))
+    sourceSet = _getTroveSet(config, sourceRepos)
+    hasDiff = 0
+    for target in targets:
+        log.debug("Retrieving list of troves from %s %s" % (target.name, str(target.repo.c.map)))
+        targetSet = _getTroveSet(config, target.repo)
+        log.debug("Diffing source and %s" % target.name)
+        hasDiff += _compare( ("source", sourceSet), (target.name, targetSet) )
+    log.debug("Done")
+    return hasDiff

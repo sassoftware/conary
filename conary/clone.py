@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -39,7 +39,8 @@ def displayCloneJob(cs):
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
                info = False, cloneSources = False, message = None, 
-               test = False, fullRecurse = False, ignoreConflicts = False):
+               test = False, fullRecurse = False, ignoreConflicts = False,
+               exactFlavors = False):
     client = ConaryClient(cfg)
     repos = client.getRepos()
 
@@ -56,7 +57,8 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
 
     trovesToClone = repos.findTroves(cfg.installLabelPath, 
-                                    troveSpecs, cfg.flavor)
+                                    troveSpecs, cfg.flavor,
+                                    exactFlavors = exactFlavors)
     trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
 
     if not client.cfg.quiet:
@@ -105,7 +107,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
                   cloneSources = False, allFlavors = False, client=None, 
-                  targetFile = None):
+                  targetFile = None, exactFlavors = None):
     targetMap = {}
     for fromLoc, toLoc in targetList:
         context = cfg.buildLabel
@@ -119,22 +121,39 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
         targetMap[fromLoc] = toLoc
 
     troveSpecs = [ cmdline.parseTroveSpec(x, False) for x in troveSpecs ]
-
-    if allFlavors:
+    if exactFlavors:
+        allFlavors = False
+    elif allFlavors:
         cfg.flavor = []
+        troveSpecFlavors =  {}
+        for troveSpec in troveSpecs:
+            troveSpecFlavors.setdefault(
+                        (troveSpec[0], troveSpec[1], None),
+                            []).append(troveSpec[2])
+        troveSpecs = list(troveSpecFlavors)
+
+
     client = ConaryClient(cfg)
     searchSource = client.getSearchSource()
     results = searchSource.findTroves(troveSpecs,
-                                      bestFlavor=not allFlavors)
+                                      bestFlavor=not allFlavors,
+                                      exactFlavors=exactFlavors)
     if allFlavors:
         trovesToClone = []
-        # we only clone the latest version for all troves.
-        # bestFlavor=False resturns the leaves for all flavors, so 
-        # we may need to cut some out.
         for troveSpec, troveTups in results.items():
-            latest = max([x[1] for x in troveTups])
-            troveTups = [ x for x in troveTups if x[1] == latest ]
-            trovesToClone.extend(troveTups)
+            specFlavors = troveSpecFlavors[troveSpec]
+            for specFlavor in specFlavors:
+                if specFlavor is None:
+                    matchingTups = troveTups
+                else:
+                    matchingTups = [ x for x in troveTups
+                                     if x[2].stronglySatisfies(specFlavor)]
+                # we only clone the latest version for all troves.
+                # bestFlavor=False resturns the leaves for all flavors, so
+                # we may need to cut some out.
+                latest = max([x[1] for x in matchingTups])
+                matchingTups = [ x for x in matchingTups if x[1] == latest ]
+                trovesToClone.extend(matchingTups)
     else:
         trovesToClone = itertools.chain(*results.itervalues())
     trovesToClone = list(set(trovesToClone))
@@ -162,20 +181,6 @@ def _finishClone(client, cfg, cs, callback, info=False, test=False,
     if cfg.interactive or info:
         print 'The following clones will be created:'
         displayCloneJob(cs)
-
-    labelConflicts = client._checkChangeSetForLabelConflicts(cs)
-    if labelConflicts and not ignoreConflicts:
-        print
-        print 'WARNING: performing this clone will create label conflicts:'
-        for troveTups in labelConflicts:
-            print
-            print '%s=%s[%s]' % (troveTups[0])
-            print '  conflicts with %s=%s[%s]' % (troveTups[1])
-
-        if not cfg.interactive and not info:
-            print
-            print 'error: interactive mode is required for when creating label conflicts'
-            return
 
     if info:
         return

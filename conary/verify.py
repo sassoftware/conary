@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -63,7 +63,7 @@ def verifyTrove(trove, db, cfg):
     for trove in db.walkTroveSet(trove):
         ver = trove.getVersion()
         origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
-                              pristine = True)
+                                pristine = False)
         ver = ver.createShadow(versions.LocalLabel())
         l.append((trove, origTrove, ver, update.UpdateFlags()))
 

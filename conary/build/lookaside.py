@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -48,7 +48,8 @@ def _truncateName(name):
 def createCacheName(cfg, name, location, negative=''):
     name = _truncateName(name)
     cachedname = os.sep.join((cfg.lookaside, negative + location, name))
-    return cachedname
+    normcachedname = os.path.normpath(cachedname)
+    return normcachedname
 
 def _createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
@@ -163,6 +164,8 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     retries = 0
     url = None
 
+    # Save users from themselves - encode some characters automatically
+    name = name.replace(' ', '%20')
     # check for negative cache entries to avoid spamming servers
     negativeName = _createNegativeCacheName(cfg, name, location)
     if os.path.exists(negativeName):

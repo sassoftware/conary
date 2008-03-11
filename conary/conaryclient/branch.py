@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -164,6 +164,8 @@ cannot shadow earlier trove
 		branchedTrove.changeVersion(branchedVersion)
                 #this clears the digital signatures from the shadow
                 branchedTrove.troveInfo.sigs.reset()
+                # this flattens the old metadata and removes signatures
+                branchedTrove.copyMetadata(trove)
                 # FIXME we should add a new digital signature in cases
                 # where we can (aka user is at kb and can provide secret key
 

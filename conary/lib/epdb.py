@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2006 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the MIT License as found 
 # in a file called LICENSE. If it is not present, the license
@@ -698,7 +698,7 @@ class Epdb(pdb.Pdb):
         isatty = False
         try:
             fileno = sys.stdout.fileno()
-            isatty = os.isatty(fileno)
+            isatty = isinstance(sys.stdout, file) and os.isatty(fileno)
         except AttributeError:
             pass
             # sys.stdout is not a regular file,
@@ -719,7 +719,7 @@ class Epdb(pdb.Pdb):
         isatty = False
         try:
             fileno = sys.stdin.fileno()
-            isatty = os.isatty(fileno)
+            isatty = isinstance(sys.stdout, file) and os.isatty(fileno)
         except AttributeError:
             pass
             # sys.stdout is not a regular file,
