@@ -52,7 +52,6 @@ class FilesystemChangeSetJob(ChangeSetJob):
                 raise errors.TroveIntegrityError(error=err, *nvf)
 
     def checkTroveSignatures(self, trv, callback):
-        return
         assert(hasattr(callback, 'verifyTroveSignatures'))
         if callback.keyCache is None:
             callback.keyCache = openpgpkey.getKeyCache()
