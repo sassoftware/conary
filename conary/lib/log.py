@@ -32,10 +32,13 @@ import time
 from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOWLEVEL=DEBUG - 5
 from conary import constants
+from conary.lib import xmllog
 
 syslog = None
 
-LOGGER_CONARY = 'conary'
+LOGGER_CONARY           = 'conary'
+# don't delimit with a dot (.) we don't want to mix output for these loggers
+LOGGER_CONARY_FORMATTED = 'conary_formatted'
 
 class SysLog:
     # class responsible for /var/log/conary
@@ -111,27 +114,37 @@ def error(msg, *args):
     "Log an error"
     m = "error: %s" % msg
     logger.error(m, *args)
+    if fmtLogger.handlers:
+        fmtLogger.error(m, *args)
     hdlr.error = True
 
 def warning(msg, *args):
     "Log a warning"
     m = "warning: %s" % msg
     logger.warning(m, *args)
+    if fmtLogger.handlers:
+        fmtLogger.warning(m, *args)
 
 def info(msg, *args):
     "Log an informative message"
     m = "+ %s" % msg
     logger.info(m, *args)
+    if fmtLogger.handlers:
+        fmtLogger.info(m, *args)
 
 def debug(msg, *args):
     "Log a debugging message"
     m = "+ %s" % msg
     logger.debug(m, *args)
+    if fmtLogger.handlers:
+        fmtLogger.debug(m, *args)
 
 def lowlevel(msg, *args):
     "Log a low-level debugging message"
     m = "+ %s" % msg
     logger.lowlevel(m, *args)
+    if fmtLogger.handlers:
+        fmtLogger.lowlevel(m, *args)
 
 def errorOccurred():
     return hdlr.error
@@ -171,6 +184,32 @@ class ConaryLogger(logging.Logger):
         if LOWLEVEL >= self.getEffectiveLevel():
             apply(self._log, (LOWLEVEL, msg, args), kwargs)
 
+def openFormattedLog(path):
+    fmtHdlr = xmllog.XmlHandler(path)
+    fmtLogger.addHandler(fmtHdlr)
+
+def closeFormattedLog(path):
+    for fmtHdlr in fmtLogger.handlers:
+        if fmtHdlr.path == path:
+            fmtHdlr.close()
+            fmtLogger.handlers.remove(fmtHdlr)
+
+def pushLogDescriptor(desc):
+    for fmtHdlr in fmtLogger.handlers:
+        fmtHdlr.pushDescriptor(desc)
+
+def popLogDescriptor():
+    for fmtHdlr in fmtLogger.handlers:
+        fmtHdlr.popDescriptor()
+
+def addLogRecordData(key, val):
+    for fmtHdlr in fmtLogger.handlers:
+        fmtHdlr.addRecordData(key, val)
+
+def delLogRecordData(key):
+    for fmtHdlr in fmtLogger.handlers:
+        fmtHdlr.delRecordData(key)
+
 if not globals().has_key("logger"):
     # override the default logger class with one that has a more low-level
     # level
@@ -181,3 +220,8 @@ if not globals().has_key("logger"):
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.WARNING)
+
+if not globals().has_key('fmtLogger'):
+    fmtLogger = logging.getLogger(LOGGER_CONARY_FORMATTED)
+    # all messages should be emitted by the formatted logger.
+    fmtLogger.setLevel(1)
