@@ -36,7 +36,7 @@ class UserGroupInfoRecipe(AbstractPackageRecipe):
 
     def getPackages(self):
         # we do not package up build logs for info-* packages
-        self._autoCreatedFileCount -= 1
+        self._autoCreatedFileCount -= 2
         comp = buildpackage.BuildComponent(
             'info-%s:%s' %(self.infoname, self.type), self)
         f = comp.addFile(self.infofilename, self.realfilename)
@@ -50,7 +50,7 @@ class UserGroupInfoRecipe(AbstractPackageRecipe):
     def loadPolicy(self):
         return []
 
-    def doProcess(self, bucket):
+    def doProcess(self, bucket, logFile = None):
         pass
 
     def addProvides(self, f):

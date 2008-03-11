@@ -460,9 +460,22 @@ class Recipe(object):
         # returns list of policy files loaded
         return self._policyPathMap.keys()
 
-    def doProcess(self, policyBucket):
-        for post in self._policies[policyBucket]:
-            sys.stdout.write('Running policy: %s\r' % post.__class__.__name__)
-            sys.stdout.flush()
-            post.doProcess(self)
+    def doProcess(self, bucketName, logFile = sys.stdout):
+        policyBucket = policy.__dict__[bucketName]
+        formattedLog = False
+        if hasattr(logFile, 'pushDescriptor'):
+            formattedLog = True
+            logFile.pushDescriptor(bucketName)
+        try:
+            for post in self._policies[policyBucket]:
+                if formattedLog:
+                    logFile.pushDescriptor(post.__class__.__name__)
+                logFile.write('Running policy: %s\r' % post.__class__.__name__)
+                logFile.flush()
+                post.doProcess(self)
+                if formattedLog:
+                    logFile.popDescriptor(post.__class__.__name__)
+        finally:
+            if formattedLog:
+                logFile.popDescriptor(bucketName)
 

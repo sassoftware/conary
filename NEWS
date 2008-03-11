@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o Build Changes:
+    An xml formatted log has been added to :debuginfo. This is in
+    addition to the human readable log. The xml log contains the same
+    information as the human readable log, plus additional contextual
+    information useful for formatting the log data. (CNY-2487)
+
 Changes in 1.2.20:
   o Bug Fixes:
     * A bug that occasionally caused a thread deadlock when multiple

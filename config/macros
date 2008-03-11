@@ -39,6 +39,7 @@ debugsrcdir         = '/usr/src/debug' # no %(prefix)s!
 userinfodir         = '%(sysconfdir)s/conary/userinfo'
 groupinfodir        = '%(sysconfdir)s/conary/groupinfo'
 buildlogpath        = '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2'
+buildxmlpath        = '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-xml.bz2'
 ## Java Macros
 # Root directory where all Java VMs/SDK/JREs are installed.
 jvmdir              = '%(libdir)s/jvm'
