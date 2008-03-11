@@ -788,8 +788,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             troveList.append(grpTrv)
         recipeObj.troveMap = dict((x.getNameVersionFlavor(), x) \
                 for x in troveList)
-        recipeObj.doProcess(policy.GROUP_ENFORCEMENT)
-        recipeObj.doProcess(policy.ERROR_REPORTING)
+        recipeObj.doProcess('GROUP_ENFORCEMENT')
+        recipeObj.doProcess('ERROR_REPORTING')
 
         for primaryName in recipeObj.getPrimaryGroupNames():
             changeSet.addPrimaryTrove(primaryName, targetVersion, grpFlavor)
@@ -1082,18 +1082,23 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         # turn on logging of this trove.  Log is packaged as part
         # of :debug component
         logPath = destdir + recipeObj.macros.buildlogpath
+        xmlLogPath = destdir + recipeObj.macros.buildxmlpath
         # during the build, keep the log file in the same dir as buildinfo.
         # that will make it more accessible for debugging.  At the end of 
         # the build, copy to the correct location
         tmpLogPath = builddir + '/' + os.path.basename(logPath)
-        # this file alone is not enough to make us build a package
-        recipeObj._autoCreatedFileCount += 1
+
+        tmpXmlLogPath = builddir + '/' + os.path.basename(xmlLogPath)
+        # these files alone is not enough to make us build a package
+        recipeObj._autoCreatedFileCount += 2
         util.mkdirChain(os.path.dirname(logPath))
-        # touch the logPath file so that the build process expects
-        # a file there for packaging
+        # touch the logPath files so that the build process expects
+        # files to be there for packaging
         open(logPath, 'w')
+        open(xmlLogPath, 'w')
         try:
-            logFile = logger.startLog(tmpLogPath, withStdin = not redirectStdin)
+            logFile = logger.startLog(tmpLogPath, tmpXmlLogPath,
+                    withStdin = not redirectStdin)
         except OSError, err:
             if err.args[0] == 'out of pty devices':
                 log.warning('*** No ptys found -- not logging build ***')
@@ -1103,10 +1108,13 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        if logBuild:
-            logBuildEnvironment(logFile, sourceVersion, policyTroves,
+        logFile.pushDescriptor('cook')
+        logFile.pushDescriptor('environment')
+        logBuildEnvironment(logFile, sourceVersion, policyTroves,
                                 recipeObj.macros, cfg)
+        logFile.popDescriptor('environment')
     try:
+        logBuild and logFile.pushDescriptor('build')
         bldInfo.begin()
         bldInfo.destdir = destdir
         if maindir:
@@ -1117,7 +1125,9 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.macros.builddir = builddir
         recipeObj.macros.destdir = destdir
 
+        logBuild and logFile.pushDescriptor('unpackSources')
         recipeObj.unpackSources(resume, downloadOnly=downloadOnly)
+        logBuild and logFile.popDescriptor('unpackSources')
 
         # if we're only extracting or downloading, continue to the next recipe class.
         if prep or downloadOnly:
@@ -1126,30 +1136,35 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         cwd = os.getcwd()
         try:
             os.chdir(builddir + '/' + recipeObj.mainDir())
+            logBuild and logFile.pushDescriptor('doBuild')
             recipeObj.doBuild(builddir, resume=resume)
+            logBuild and logFile.popDescriptor('doBuild')
             if resume and resume != "policy" and \
                           recipeObj.resumeList[-1][1] != False:
                 log.info('Finished Building %s Lines %s, Not Running Policy', 
                                                        recipeClass.name, resume)
                 return
             log.info('Processing %s', recipeClass.name)
+            logBuild and logFile.pushDescriptor('policy')
+            output = logBuild and logFile or sys.stdout
             if not resume:
                 # test suite policy does not work well with restart, and
                 # is generally useful mainly when cooking into repo, where
                 # restart is not allowed
-                recipeObj.doProcess(policy.TESTSUITE)
-            recipeObj.doProcess(policy.DESTDIR_PREPARATION)
-            recipeObj.doProcess(policy.DESTDIR_MODIFICATION)
+                recipeObj.doProcess('TESTSUITE', logFile = output)
+            recipeObj.doProcess('DESTDIR_PREPARATION', logFile = output)
+            recipeObj.doProcess('DESTDIR_MODIFICATION', logFile = output)
             # cannot restart after the beginning of policy.PACKAGE_CREATION
             bldInfo.stop()
             use.track(False)
-            recipeObj.doProcess(policy.PACKAGE_CREATION)
-            recipeObj.doProcess(policy.PACKAGE_MODIFICATION)
-            recipeObj.doProcess(policy.ENFORCEMENT)
-            recipeObj.doProcess(policy.ERROR_REPORTING)
+            recipeObj.doProcess('PACKAGE_CREATION', logFile = output)
+            recipeObj.doProcess('PACKAGE_MODIFICATION', logFile = output)
+            recipeObj.doProcess('ENFORCEMENT', logFile = output)
+            recipeObj.doProcess('ERROR_REPORTING', logFile = output)
+            logBuild and logFile.popDescriptor('policy')
         finally:
             os.chdir(cwd)
-    
+
         grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
@@ -1162,9 +1177,11 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     except Exception, msg:
         if logBuild:
+            logFile.pushDescriptor('EXCEPTION')
             logFile.write('%s\n' % msg)
             logFile.write(''.join(traceback.format_exception(*sys.exc_info())))
             logFile.write('\n')
+            logFile.popDescriptor('EXCEPTION')
             logFile.close()
         if cfg.debugRecipeExceptions:
             traceback.print_exception(*sys.exc_info())
@@ -1172,20 +1189,30 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         raise
 
     if logBuild and recipeObj._autoCreatedFileCount:
+        logBuild and logFile.popDescriptor('build')
+        logFile.popDescriptor('cook')
         logFile.close()
         if os.path.exists(logPath):
             os.unlink(logPath)
+        if os.path.exists(xmlLogPath):
+            os.unlink(xmlLogPath)
         if not cfg.cleanAfterCook:
             # leave the easily accessible copy in place in 
             # builddir
             shutil.copy2(tmpLogPath, logPath)
+            shutil.copy2(tmpXmlLogPath, xmlLogPath)
         else:
             os.rename(tmpLogPath, logPath)
+            os.rename(tmpXmlLogPath, xmlLogPath)
         # update contents on the buildlog, since they changed
         buildlogpath = recipeObj.macros.buildlogpath
+        buildxmlpath = recipeObj.macros.buildxmlpath
         recipeObj.autopkg.updateFileContents(
             recipeObj.macros.buildlogpath, logPath)
+        recipeObj.autopkg.updateFileContents(
+            recipeObj.macros.buildxmlpath, xmlLogPath)
         recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
+        recipeObj.autopkg.pathMap[buildxmlpath].tags.set("xmlbuildlog")
     return bldList, recipeObj, builddir, destdir, policyTroves
 
 def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
