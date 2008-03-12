@@ -82,7 +82,7 @@ class RoleTroves(RoleTable):
         """)
         if checkMissing:
             # granting permissions to a !present trove has a fuzzy meaning
-            for i, n, v, v in cu.fetchall():
+            for i, n, v, f in cu.fetchall():
                 raise errors.TroveMissing(n,v)
         return True
 
