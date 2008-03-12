@@ -470,11 +470,14 @@ class Recipe(object):
             for post in self._policies[policyBucket]:
                 if formattedLog:
                     logFile.pushDescriptor(post.__class__.__name__)
-                logFile.write('Running policy: %s\r' % post.__class__.__name__)
-                logFile.flush()
-                post.doProcess(self)
-                if formattedLog:
-                    logFile.popDescriptor(post.__class__.__name__)
+                try:
+                    logFile.write('Running policy: %s\r' % \
+                            post.__class__.__name__)
+                    logFile.flush()
+                    post.doProcess(self)
+                finally:
+                    if formattedLog:
+                        logFile.popDescriptor(post.__class__.__name__)
         finally:
             if formattedLog:
                 logFile.popDescriptor(bucketName)
