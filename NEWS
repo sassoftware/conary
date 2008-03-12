@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * An error in the repository that caused a malformed exception to
+      be returned to the client when a trove was missing has been
+      corrected. (CNY-2624)
+
 Changes in 2.0.9:
   o Bug Fixes:
     * A bug that occasionally caused a thread deadlock when multiple
