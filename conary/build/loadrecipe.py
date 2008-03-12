@@ -517,7 +517,7 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
 
             return getFileFunction(repos, fileId, fileVersion, path)
 
-        files = [ x[1] for x in sourceTrv.iterFileList() ]
+        files = sorted([ x[1] for x in sourceTrv.iterFileList() ])
         factory = factoryClass(pkgname, sourceFiles = files,
                                openSourceFileFn = openSourceFile)
         recipe = factory.getRecipeClass()

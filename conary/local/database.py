@@ -1887,13 +1887,6 @@ class Database(SqlDbRepository):
                 preScripts.append((job, script, oldCompatClass, newCompatClass,
                     "preupdate"))
 
-            # Grab the preerase script for the old trove
-            oldTrvCs = oldTrv.diff(None)[0]
-            script = oldTrvCs._getPreEraseScript()
-            if script:
-                preScripts.append((job, script, oldCompatClass, None,
-                    "preerase"))
-
         jobs.sort()
         updJob.addJob(jobs)
 

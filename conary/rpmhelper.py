@@ -23,6 +23,7 @@ NAME            = 1000
 VERSION         = 1001
 RELEASE         = 1002
 EPOCH           = 1003
+ARCH            = 1022
 PREIN           = 1023
 POSTIN          = 1024
 PREUN           = 1025

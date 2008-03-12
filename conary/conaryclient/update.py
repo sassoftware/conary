@@ -1827,7 +1827,6 @@ conary erase '%s=%s[%s]'
                     updJob.addJobPreScript(job, preScript, oldCompatClass,
                                            troveCs.getNewCompatibilityClass(),
                                            action = "preupdate")
-                self._addJobPreEraseScript(job, updJob)
             else:
                 oldCompatClass = None
                 preScript = troveCs._getPreInstallScript()

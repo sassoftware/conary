@@ -562,6 +562,7 @@ class addArchive(_Source):
                     self.recipe.mainDir(oldMainDir)
             else:
                 self.recipe.mainDir(oldMainDir)
+        return f
 Archive = addArchive
 
 class addPatch(_Source):
