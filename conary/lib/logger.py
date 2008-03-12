@@ -91,7 +91,7 @@ class Lexer(object):
         self.emit((CARRIAGE_RETURN, None))
 
     def command(self, text):
-        self.emit((COMMAND, text.split()))
+        self.emit((COMMAND, text.split(None, 1)))
 
     def close(self):
         # newline is the only state that can be left half flushed
@@ -170,7 +170,7 @@ class Lexer(object):
                             self.state = FREETEXT
             elif self.state == COMMAND:
                 if char == '\n':
-                    self.command(self.stream)
+                    self.command(self.stream.lstrip())
                     self.stream = ''
                     self.state = FREETEXT
                 else:
@@ -318,7 +318,13 @@ class XmlLogWriter(LogWriter):
         return desc
 
     @callable
-    def addRecordData(self, key, val):
+    def addRecordData(self, *args):
+        if len(args) < 2:
+            # called via lexer
+            key, val = args[0].split(None, 1)
+        else:
+            # called via xmllog:addRecordData
+            key, val = args
         if key[0].isdigit() or \
                 not re.match('^\w[a-zA-Z0-9_.-]*$', key,
                     flags = re.LOCALE | re.UNICODE):
