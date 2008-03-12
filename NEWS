@@ -1,5 +1,17 @@
 Changes in @NEW@:
+  o Build Changes:
+    * An xml formatted log has been added to :debuginfo. This is in
+      addition to the human readable log. The xml log contains the same
+      information as the human readable log, plus additional contextual
+      information useful for formatting the log data. (CNY-2487)
+
   o Bug Fixes:
+    * Rollbacks could restore files from local rollbacks by overwriting
+      existing contents rather than replacing the file. In addition,
+      the operation was not journaled properly. (CNY-2596)
+    * A bug in finding the sources required to build all the packages for
+      a group that omitted replace() packages has been fixed.  This mainly
+      affected rmake builds of group recipes. (CNY-2605)
     * An error in the repository that caused a malformed exception to
       be returned to the client when a trove was missing has been
       corrected. (CNY-2624)

@@ -526,8 +526,13 @@ class FilesystemJob:
                         # XXX we need to create this or conary thinks it
                         # was removed by the user if it doesn't already
                         # exist, when that's not what we mean here
-                        util.mkdirChain(os.path.dirname(target))
-                        open(target, "w")
+                        dirName = os.path.dirname(target)
+                        util.mkdirChain(dirName)
+                        name = os.path.basename(target)
+                        tmpfd, tmpname = tempfile.mkstemp(name, '.ct', dirName)
+                        opJournal.backup(target)
+                        os.rename(tmpname, target)
+
                         continue
 
             updatePtrs(ptrId, pathId, ptrTargets, override, contents, target)

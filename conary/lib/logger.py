@@ -11,31 +11,464 @@
 # full details.
 #
 
+import base64
 import bz2
 import errno
 import fcntl
 import gzip
 import os
 import pty
+import re
 import select
 import signal
 import struct
 import sys
 import termios
+import threading
+import time
+from xml.sax import saxutils
+
 
 BUFFER=1024*4096
 
-def startLog(path, withStdin=True):
+MARKER, FREETEXT, NEWLINE, CARRIAGE_RETURN, COMMAND, CLOSE = range(6)
+
+LINEBREAKS = ('\r', '\n')
+
+def callable(func):
+    func._callable = True
+    return func
+
+def makeRecord(d):
+    res = "<record>"
+    for key, val in sorted(d.iteritems()):
+        res += "<%s>%s</%s>" % (key, val, key)
+    res += "</record>"
+    return res
+
+def getTime():
+    """Return ISO8601 compliant time string.
+
+    Return a formatted time string which is ISO8601 compliant.
+    Time is expressed in UTC"""
+    curTime = time.time()
+    msecs = 1000 * (curTime - long(curTime))
+    fmtStr = "%Y-%m-%dT%H:%M:%S.%%03dZ"
+    return time.strftime(fmtStr, time.gmtime(curTime)) % msecs
+
+def openPath(path):
+    class BZ2File(bz2.BZ2File):
+        def flush(self):
+            pass
+
+    if path.endswith('.bz2'):
+        return BZ2File(path, 'w')
+    if path.endswith('.gz'):
+        return gzip.GzipFile(path, 'w')
+    return open(path, 'w')
+
+
+class Lexer(object):
+    def __init__(self, marker, callbacks = None):
+        self.marker = marker
+        self.callbacks = callbacks or []
+        self.stream = ''
+        self.mark = False
+        self.markMatch = ''
+
+        self.state = FREETEXT
+
+    def registerCallback(self, callback):
+        self.callbacks.append(callback)
+
+    def freetext(self, text):
+        self.emit((FREETEXT, text))
+
+    def newline(self):
+        self.emit((NEWLINE, None))
+
+    def carriageReturn(self):
+        self.emit((CARRIAGE_RETURN, None))
+
+    def command(self, text):
+        self.emit((COMMAND, text.split(None, 1)))
+
+    def close(self):
+        # newline is the only state that can be left half flushed
+        if self.state == NEWLINE:
+            self.newline()
+        self.emit((CLOSE, None))
+
+    def scan(self, sequence):
+        """
+        scan a sequence of characters, tokenizing it on the fly
+
+        This code is implemented as a simple state machine.
+        The general state rules are:
+        Freetext can go to freetext or newline;
+        Newline can go to newline, freetext or marker;
+        Marker can go to marker, freetext, newline or command;
+        Command can go to command or freetext.
+
+        If anything is going to be emitted, it generally happens on
+        state change.
+
+        If the state machine finishes parsing and it is in freetext,
+        it will flush with a freetext token."""
+        for char in sequence:
+            if self.state == FREETEXT:
+                if char in LINEBREAKS:
+                    if self.stream:
+                        self.freetext(self.stream)
+                    self.stream = ''
+                    if char == '\n':
+                        self.state = NEWLINE
+                    else:
+                        # emit a CR token, but leave the state as FREETEXT
+                        self.carriageReturn()
+                else:
+                    self.stream += char
+            elif self.state == NEWLINE:
+                if char in LINEBREAKS:
+                    # this means two linebreaks in a row. emit the newline
+                    self.newline()
+                    self.stream = ''
+                    if char == '\r':
+                        self.carriageReturn()
+                        self.state = FREETEXT
+                else:
+                    if self.marker.startswith(char):
+                        self.stream = char
+                        self.state = MARKER
+                    else:
+                        # emit the newline we were holding
+                        self.newline()
+                        self.stream = char
+                        self.state = FREETEXT
+            elif self.state == MARKER:
+                if char in LINEBREAKS:
+                    # don't forget the newline that was held in abeyance to
+                    # get into the marker state.
+                    self.newline()
+                    if self.stream:
+                        self.freetext(self.stream)
+                    self.stream = ''
+                    if char == '\r':
+                        self.carriageReturn()
+                        self.state = FREETEXT
+                    else:
+                        self.state = NEWLINE
+                else:
+                    candidate = self.stream + char
+                    self.stream += char
+                    if self.stream == self.marker:
+                        self.stream = ''
+                        self.state = COMMAND
+                    else:
+                        if not self.marker.startswith(candidate):
+                            self.newline()
+                            self.state = FREETEXT
+            elif self.state == COMMAND:
+                if char == '\n':
+                    self.command(self.stream.lstrip())
+                    self.stream = ''
+                    self.state = FREETEXT
+                else:
+                    self.stream += char
+        if self.state == FREETEXT:
+            if self.stream:
+                self.freetext(self.stream)
+            self.stream = ''
+
+    def write(self, text):
+        return self.scan(text)
+
+    def flush(self):
+        self.scan('')
+
+    def emit(self, token):
+        for callback in self.callbacks:
+            callback(token)
+
+
+class LogWriter(object):
+    def handleToken(self, token):
+        mode, param = token
+        if mode == FREETEXT:
+            self.freetext(param)
+        elif mode == NEWLINE:
+            self.newline()
+        elif mode == CARRIAGE_RETURN:
+            self.carriageReturn()
+        elif mode == COMMAND:
+            self.command(*param)
+        elif mode == CLOSE:
+            self.close()
+
+    def freetext(self, text):
+        pass
+
+    def write(self, text):
+        # alias to freetext to define a more file-object-like interface
+        return self.freetext(text)
+
+    def flush(self):
+        pass
+
+    def newline(self):
+        pass
+
+    def carriageReturn(self):
+        pass
+
+    def start(self):
+        pass
+
+    def command(self, cmd, *args):
+        func = self.__class__.__dict__.get(cmd)
+        # silently ignore nonsensical calls because the logger loops over each
+        # writer and passes the command separately to all of them
+        if func and func.__dict__.get('_callable', False):
+            return func(self, *args)
+
+    def close(self):
+        pass
+
+class XmlLogWriter(LogWriter):
+    def __init__(self, path):
+        self.data = threading.local()
+        self.data.descriptorStack = []
+        self.data.recordData = {}
+        self.messageId = 0
+        self.path = path
+        self.logging = False
+        self.text = ''
+
+        self.stream = None
+        LogWriter.__init__(self)
+
+    def flush(self):
+        self.stream.flush()
+
+    def start(self):
+        self.stream = openPath(self.path)
+        print >> self.stream, '<?xml version="1.0"?>'
+        print >> self.stream, \
+                "<log xmlns:log='http://www.rpath.com/permanent/log-v1.html'>"
+        self.log('begin log', 'DEBUG')
+        self.stream.flush()
+        self.logging = True
+
+    def close(self):
+        if not self.logging:
+            return
+        self.data = type('Data', (object,), {})
+        self.log('end log', 'DEBUG')
+        print >> self.stream, "</log>"
+        self.stream.flush()
+        self.stream.close()
+
+    def freetext(self, text):
+        self.text += text
+
+    def newline(self):
+        if self.text:
+            self.log(self.text)
+        self.text = ''
+
+    carriageReturn = newline
+
+    def _getDescriptor(self):
+        descriptorStack = self.data.__dict__.get('descriptorStack', [])
+        return '.'.join(descriptorStack)
+
+    def log(self, message, levelname = 'INFO'):
+        # escape xml delimiters and newline characters
+        message = saxutils.escape(message)
+        message = message.replace('\n', '\\n')
+        macros = {}
+        recordData = self.data.__dict__.get('recordData', {})
+        macros.update(recordData)
+        macros['time'] = getTime()
+        macros['message'] = message
+        macros['level'] = levelname
+        macros['pid'] = os.getpid()
+        threadName = threading.currentThread().getName()
+        if threadName != 'MainThread':
+            macros['threadName'] = threadName
+        macros['messageId'] = self.messageId
+        self.messageId += 1
+        descriptor = self._getDescriptor()
+        if descriptor:
+            macros['descriptor'] = descriptor
+        print >> self.stream, makeRecord(macros)
+        self.stream.flush()
+
+    @callable
+    def pushDescriptor(self, descriptor):
+        self.data.__dict__.setdefault('descriptorStack', [])
+        self.data.descriptorStack.append(descriptor)
+
+    @callable
+    def popDescriptor(self, descriptor = None):
+        self.data.__dict__.setdefault('descriptorStack', [])
+        desc = self.data.descriptorStack.pop()
+        if descriptor:
+            assert descriptor == desc
+        return desc
+
+    @callable
+    def addRecordData(self, *args):
+        if len(args) < 2:
+            # called via lexer
+            key, val = args[0].split(None, 1)
+        else:
+            # called via xmllog:addRecordData
+            key, val = args
+        if key[0].isdigit() or \
+                not re.match('^\w[a-zA-Z0-9_.-]*$', key,
+                    flags = re.LOCALE | re.UNICODE):
+            raise RuntimeError("'%s' is not a legal XML name" % key)
+        if isinstance(val, (str, unicode)):
+            val = saxutils.escape(val)
+        self.data.__dict__.setdefault('recordData', {})
+        self.data.recordData[key] = val
+
+    @callable
+    def delRecordData(self, key):
+        self.data.__dict__.setdefault('recordData', {})
+        if key in self.data.recordData:
+            del self.data.recordData[key]
+
+class FileLogWriter(LogWriter):
+    def __init__(self, path):
+        self.path = path
+        self.stream = None
+        LogWriter.__init__(self)
+        self.logging = False
+
+    def start(self):
+        self.stream = openPath(self.path)
+        self.logging = True
+
+    def freetext(self, text):
+        if self.logging:
+            self.stream.write(text)
+            self.stream.flush()
+
+    def newline(self):
+        if self.logging:
+            self.stream.write('\n')
+            self.stream.flush()
+
+    carriageReturn = newline
+
+    def close(self):
+        self.stream.close()
+        self.logging = False
+
+class StreamLogWriter(LogWriter):
+    def __init__(self, stream = None):
+        self.data = threading.local()
+        self.data.hideLog = False
+        self.stream = stream
+        LogWriter.__init__(self)
+        self.index = 0
+        self.close = bool(self.stream)
+
+    def start(self):
+        if not self.stream:
+            self.stream = sys.stdout
+
+    def freetext(self, text):
+        if not self.data.__dict__.get('hideLog'):
+            self.stream.write(text)
+            self.stream.flush()
+            self.index += len(text)
+
+    def newline(self):
+        if not self.data.__dict__.get('hideLog'):
+            self.stream.write('\n')
+            self.stream.flush()
+            self.index = 0
+
+    def carriageReturn(self):
+        if not self.data.__dict__.get('hideLog'):
+            if (self.index % 80):
+                spaces = 78 - (self.index % 80)
+                self.stream.write(spaces * ' ')
+            self.stream.write('\r')
+            self.stream.flush()
+            self.index = 0
+
+    @callable
+    def pushDescriptor(self, descriptor):
+        if descriptor == 'environment':
+            self.data.hideLog = True
+
+    @callable
+    def popDescriptor(self, descriptor = None):
+        if descriptor == 'environment':
+            self.data.hideLog = False
+
+def startLog(path, xmlPath, withStdin = True):
     """ Start the log.  Equivalent to Logger(path).startLog() """
-    return Logger(path, withStdin=withStdin)
+    plainWriter = FileLogWriter(path)
+    xmlWriter = XmlLogWriter(xmlPath)
+    #lgr = Logger(withStdin = withStdin, writers = [plainWriter, xmlWriter])
+    screenWriter = StreamLogWriter()
+    lgr = Logger(withStdin = withStdin, writers = [plainWriter, xmlWriter,
+            screenWriter])
+    lgr.startLog()
+    return lgr
 
 class Logger:
-    def __init__(self, path, withStdin=True):
-        self.path = path
+    def __init__(self, withStdin = True, writers = []):
+        # by using a random string, we ensure that the marker used by the
+        # logger class will never appear in any code, not even conary, thus
+        # making the logger's code robust against tripping itself.
+        # By using 42 octets we ensure that the probability of encountering
+        # the marker string accidentally is negligible with a high degree of
+        # confidence.
+        self.marker = base64.b64encode(os.urandom(42))
+        self.lexer = Lexer(self.marker)
+        for writer in writers:
+            self.lexer.registerCallback(writer.handleToken)
+        self.writers = writers
         self.logging = False
         self.closed = False
         self.withStdin = withStdin
-        self.startLog()
+        self.data = threading.local()
+
+    def registerWriter(self, writer):
+        self.writers.append(writer)
+        self.lexer.registerCallback(writer.handleToken)
+
+    def command(self, cmdStr):
+        self.write("\n%s %s\n" % (self.marker, cmdStr))
+
+    def pushDescriptor(self, descriptor):
+        descriptorStack = self.data.__dict__.setdefault('descriptorStack', [])
+        descriptorStack.append(descriptor)
+        self.command("pushDescriptor %s" % descriptor)
+
+    def popDescriptor(self, descriptor = None):
+        descriptorStack = self.data.__dict__.setdefault('descriptorStack', [])
+        if descriptor and descriptor != descriptorStack[-1]:
+            raise RuntimeError('Log Descriptor does not match expected ' \
+                    'value: stack contained %s but reference value was %s' % \
+                    (descriptorStack[-1], descriptor))
+        if descriptor:
+            self.command("popDescriptor %s" % descriptor)
+        else:
+            self.command("popDescriptor")
+        return descriptorStack.pop()
+
+    def addRecordData(self, key, val):
+        self.command('addRecordData %s %s' % (key, val))
+
+    def delRecordData(self, key):
+        self.command('delRecordData %s %s' % key)
 
     def __del__(self):
         if self.logging and not self.closed:
@@ -54,6 +487,7 @@ class Logger:
         masterFd, slaveFd = pty.openpty()
         directRd, directWr = os.pipe()
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+
         pid = os.fork()
         if pid:
             # make parent process the pty slave - the opposite of 
@@ -66,25 +500,27 @@ class Logger:
             os.close(masterFd)
             self._becomeLogSlave(slaveFd, pid, directWr)
             return
-        os.close(directWr)
-        os.close(slaveFd)
-        if self.path.endswith('.bz2'):
-            logFile = bz2.BZ2File(self.path, 'w')
-        elif self.path.endswith('.gz'):
-            logFile = gzip.GzipFile(self.path, 'w')
-        else:
-            logFile = open(self.path, 'w')
-        logger = _ChildLogger(masterFd, logFile, directRd, 
-                              controlTerminal=self.restoreTerminalControl,
-                              withStdin=self.withStdin)
         try:
-            logger.log()
+            os.close(directWr)
+            os.close(slaveFd)
+            for writer in self.writers:
+                writer.start()
+            logger = _ChildLogger(masterFd, directRd, self.lexer,
+                                  self.restoreTerminalControl, self.withStdin)
+            try:
+                logger.log()
+            finally:
+                self.lexer.close()
         finally:
-            logFile.close()
-        os._exit(0)
+            os._exit(0)
 
     def write(self, data):
         os.write(self.directWr, data)
+
+    def flush(self):
+        # there's no buffer to flush, but we're trying to mimic a file-like
+        # itnerface
+        pass
 
     def _becomeLogSlave(self, slaveFd, loggerPid, directWr):
         """ hand over control of io to logging process, grab info
@@ -116,6 +552,8 @@ class Logger:
             tty, which should cause the logging process to stop.  We wait
             for it to die before continuing
         """
+        if not self.logging:
+            return
         self.closed = True
         # restore old terminal settings before quitting
         if self.oldStdin != 0:
@@ -141,12 +579,12 @@ class Logger:
         os.waitpid(self.loggerPid, 0)
 
 class _ChildLogger:
-    def __init__(self, ptyFd, logFile, directRd, controlTerminal, withStdin):
+    def __init__(self, ptyFd, directRd, lexer, controlTerminal, withStdin):
         # ptyFd is the fd of the pseudo tty master 
         self.ptyFd = ptyFd
-        # logFile is a python file-like object that supports the write
+        # lexer is a python file-like object that supports the write
         # and close methods
-        self.logFile = logFile
+        self.lexer = lexer
         # directRd is for input that goes directly to the log 
         # without being output to screen
         self.directRd = directRd
@@ -190,12 +628,10 @@ class _ChildLogger:
 
         # set some local variables that are reused often within the loop
         ptyFd = self.ptyFd
-        logFile = self.logFile
+        lexer = self.lexer
         directRd = self.directRd
         stdin = sys.stdin.fileno()
         unLogged = ''
-
-        stdout = sys.stdout.fileno()
 
         pollObj = select.poll()
         pollObj.register(directRd, select.POLLIN)
@@ -228,13 +664,13 @@ class _ChildLogger:
                         # shut down logger
                         break
                         if unLogged:
-                            logFile.write(unLogged + '\n')
+                            lexer.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
                         raise
                 else:
-                    logFile.write(output)
+                    lexer.write(output)
 
                 if output:
                     # always read all of directWrite before reading anything else
@@ -251,7 +687,7 @@ class _ChildLogger:
                         # shut down logger
                         break
                         if unLogged:
-                            logFile.write(unLogged + '\n')
+                            lexer.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
@@ -260,12 +696,6 @@ class _ChildLogger:
                     # avoid writing foo\rbar\rblah to log
                     outputList = output.split('\r\n')
 
-                    if outputList[-1].endswith('\r'):
-                        os.write(stdout, output[:-1])
-                        # blank out previous line extra bits
-                        os.write(stdout, ' '*(78-len(outputList[-1])) + '\r')
-                    else:
-                        os.write(stdout, output)
                     if unLogged:
                         outputList[0] = unLogged + outputList[0]
                         unLogged = ''
@@ -276,7 +706,7 @@ class _ChildLogger:
                         unLogged = outputList[-1]
                         if unLogged:
                             outputList[-1] = ''
-                        logFile.write('\n'.join(outputList))
+                        lexer.write('\n'.join(outputList))
             if stdin in read:
                 # read input from stdin, and pass to 
                 # pseudo tty 
@@ -288,7 +718,7 @@ class _ChildLogger:
                         # shut down logger
                         break
                         if unLogged:
-                            logFile.write(unLogged + '\n')
+                            lexer.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
