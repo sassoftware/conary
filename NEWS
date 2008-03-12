@@ -9,6 +9,9 @@ Changes in @NEW@:
     * Rollbacks could restore files from local rollbacks by overwriting
       existing contents rather than replacing the file. In addition,
       the operation was not journaled properly. (CNY-2596)
+    * A bug in finding the sources required to build all the packages for
+      a group that omitted replace() packages has been fixed.  This mainly
+      affected rmake builds of group recipes. (CNY-2605)
 
 Changes in 1.2.20:
   o Bug Fixes:
