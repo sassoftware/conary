@@ -4,6 +4,8 @@ Changes in @NEW@:
       addition to the human readable log. The xml log contains the same
       information as the human readable log, plus additional contextual
       information useful for formatting the log data. (CNY-2487)
+    * A new selective logging facility for policy to use to inspect
+      build output has been added. (CNY-2622)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
