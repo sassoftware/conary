@@ -4,8 +4,9 @@ Changes in @NEW@:
       addition to the human readable log. The xml log contains the same
       information as the human readable log, plus additional contextual
       information useful for formatting the log data. (CNY-2487)
-  o Build Changes:
     * AutoResolve defaults to True for image groups. (CNY-2291)
+    * Exceptions and inclusions to policies that don't match anything
+      will now emit an error. (CNY-2221)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
