@@ -497,7 +497,7 @@ class AbstractPackageRecipe(Recipe):
     def _setSubscribeLogPath(self, path):
         self._subscribeLogPath = path
 
-    def _getSubscribeLogPath(self):
+    def getSubscribeLogPath(self):
         return self._subscribeLogPath
 
     def _setLogFile(self, logFile):
