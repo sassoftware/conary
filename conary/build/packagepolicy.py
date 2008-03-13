@@ -638,7 +638,7 @@ class InitialContents(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
-        self.recipe.Config(exceptions=args)
+        self.recipe.Config(exceptions=args, allowUnusedFilters = True)
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
@@ -1012,7 +1012,8 @@ class setModes(policy.Policy):
 	    mode = self.fixmodes[path]
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(
-                exceptions=re.escape(path.replace('%', '%%')))
+                exceptions=re.escape(path.replace('%', '%%')),
+                allowUnusedFilters = True)
             if mode & 06000:
                 self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
@@ -1101,12 +1102,18 @@ class LinkCount(policy.Policy):
         self.excepts = set()
 
     def updateArgs(self, *args, **keywords):
-        if 'exceptions' in keywords:
-            exceptions = keywords.pop('exceptions')
+        allowUnusedFilters = keywords.pop('allowUnusedFilters', False) or \
+                self.allowUnusedFilters
+        exceptions = keywords.pop('exceptions', None)
+        if exceptions:
             if type(exceptions) is str:
                 self.excepts.add(exceptions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['exceptions'].add(exceptions)
             elif type(exceptions) in (tuple, list):
-                self.excepts.update(set(exceptions))
+                self.excepts.update(exceptions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['exceptions'].update(exceptions)
         # FIXME: we may want to have another keyword argument
         # that passes information down to the buildpackage
         # that causes link groups to be broken for some
@@ -1114,14 +1121,20 @@ class LinkCount(policy.Policy):
         # first whether this is useful; it may not be.
 
     def do(self):
-        filters = [filter.Filter(x, self.macros) for x in self.excepts]
+        filters = [(x, filter.Filter(x, self.macros)) for x in self.excepts]
         for component in self.recipe.autopkg.getComponents():
             for inode in component.linkGroups:
                 # ensure all in same directory, except for directories
                 # matching regexps that have been passed in
-                dirSet = set(os.path.dirname(x) + '/'
-                             for x in component.linkGroups[inode]
-                             if not [y for y in filters if y.match(x)])
+
+                allPaths = [x for x in component.linkGroups[inode]]
+                for path in allPaths[:]:
+                    for regexp, f in filters:
+                        if f.match(path):
+                            self.unusedFilters['exceptions'].discard(regexp)
+                            allPaths.remove(path)
+                dirSet = set(os.path.dirname(x) + '/' for x in allPaths)
+
                 if len(dirSet) > 1:
                     self.error('files %s are hard links across directories %s',
                                ', '.join(sorted(component.linkGroups[inode])),
@@ -1275,6 +1288,8 @@ class ByDefault(policy.Policy):
     filetree = policy.NO_FILES
 
     invariantexceptions = [':test', ':debuginfo']
+
+    allowUnusedFilters = True
 
     def doProcess(self, recipe):
         if not self.inclusions:
@@ -3690,8 +3705,24 @@ class _basePluggableRequires(Requires):
         # only apply to the sub-policy.
         exceptions = self.recipe._policyMap['Requires'].exceptions
         if exceptions:
-            Requires.updateArgs(self, exceptions=exceptions)
+            Requires.updateArgs(self, exceptions=exceptions,
+                    allowUnusedFilters = True)
         Requires.preProcess(self)
+
+    def reportErrors(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].reportErrors(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].error(*args, **kwargs)
+
+    def warn(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].warn(*args, **kwargs)
+
+    def info(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].info(*args, **kwargs)
+
+    def _addClassName(self, *args, **kawrgs):
+        return self.recipe._policyMap['Requires']._addClassName(*args, **kwargs)
 
     def doFile(self, path):
         componentMap = self.recipe.autopkg.componentMap
@@ -3880,6 +3911,8 @@ class reportErrors(policy.Policy, policy.GroupPolicy):
         groupError = keywords.pop('groupError', None)
         if groupError is not None:
             self.groupError = groupError
+        #import epdb
+        #epdb.st()
 
     def do(self):
 	if self.errors:
