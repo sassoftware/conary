@@ -35,7 +35,7 @@ import cookielib
 # location is normally the package name.
 # lookaside:// is used internally only for things that are inserted
 # into the cache but managed by calling code.  It should not be
-# referenced from recipes
+# referenced from recipes. So is multiurl://
 networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://',
                    'lookaside://')
 
@@ -270,7 +270,7 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
-            allowNone=False, refreshFilter=None):
+            allowNone=False, refreshFilter=None, multiurlMap=None):
 
     """
     searches all locations, including populating the cache if the
@@ -332,13 +332,21 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
     # Need to fetch a file that will be auto-added to the repository
     # on commit
-    if name.startswith('mirror://'):
-
+    specialPrefix = None
+    for urlPrefix, mUrl in [('mirror://', None),
+                            ('multiurl://', multiurlMap)]:
+        if name.startswith(urlPrefix):
+            specialPrefix = urlPrefix
+            multiurl = mUrl
+            break
+    if specialPrefix:
+        # either a mirror:// or a multiurl://. We treat them pretty much the
+        # same.
         urls = []
         # mirror://foo/bar -> mirrorType = "foo", trailingName = "bar"
         mirrorType = name.split('//')[1].split('/', 1)[0]
-        mirrorLen = len('mirror://') + len(mirrorType) + 1
-        for mirrorBaseURL in Mirror(cfg, mirrorType):
+        mirrorLen = len(specialPrefix) + len(mirrorType) + 1
+        for mirrorBaseURL in Mirror(cfg, mirrorType, multiurl):
             for name in names:
                 trailingName = name[mirrorLen:]
                 urls.append(('/'.join((mirrorBaseURL, trailingName)), name))

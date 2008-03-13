@@ -6,6 +6,9 @@ Changes in @NEW@:
       information useful for formatting the log data. (CNY-2487)
     * A new selective logging facility for policy to use to inspect
       build output has been added. (CNY-2622)
+    * The ability to pass multiple URLs to addArchive has been added.
+      Conary will try to download the source from each URL, in order,
+      until it succeeds. (CNY-2505)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
