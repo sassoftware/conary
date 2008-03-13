@@ -51,11 +51,11 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
         # Set defaults here, and they can be overridden with
         # "exceptions = " later
         if fileObj.flags.isConfig():
-            self.recipe.Config(path)
+            self.recipe.Config(path, allowUnusedFilters = True)
         elif fileObj.flags.isInitialContents():
-            self.recipe.InitialContents(path)
+            self.recipe.InitialContents(path, allowUnusedFilters = True)
         elif fileObj.flags.isTransient():
-            self.recipe.Transient(path)
+            self.recipe.Transient(path, allowUnusedFilters = True)
 
         # we don't restore setuid/setgid bits into the filesystem
         if fileObj.inode.perms() & 06000 != 0:
@@ -64,7 +64,7 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
         if isinstance(fileObj, files.Directory):
             # remember to include this directory in the derived package even
             # if it's empty
-            self.recipe.ExcludeDirectories(exceptions = path)
+            self.recipe.ExcludeDirectories(exceptions = path, allowUnusedFilters = True)
 
         if isinstance(fileObj, files.SymbolicLink):
             # mtime for symlinks is meaningless, we have to record the
