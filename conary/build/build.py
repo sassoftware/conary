@@ -1479,7 +1479,7 @@ class _FileAction(BuildAction):
                 try:
                     self.recipe.WarnWriteable(
                         exceptions=re.escape(destPath).replace(
-                        '%', '%%'))
+                        '%', '%%'), allowUnusedFilters = True)
                 except AttributeError:
                     pass
             else:
