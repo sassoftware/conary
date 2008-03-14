@@ -417,15 +417,15 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
 
         name = sourceTrove.getName().split(':')[0]
 
-        if (sourceTrove.getSourceType() and
-                    sourceTrove.getSourceType() != 'factory'):
+        if (sourceTrove.getFactory() and
+            sourceTrove.getFactory() != 'factory'):
             if not versionStr:
                 if branch:
                     versionStr = str(branch)
                 else:
                     versionStr = sourceTrove.getVersion().branch()
 
-            factoryName = 'factory-' + sourceTrove.getSourceType()
+            factoryName = 'factory-' + sourceTrove.getFactory()
             loader = RecipeLoaderFromRepository(factoryName, cfg, repos,
                                     versionStr=versionStr, labelPath=labelPath,
                                     ignoreInstalled=ignoreInstalled,
@@ -495,7 +495,7 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                       ignoreInstalled=ignoreInstalled,
                       directory=parentDir, buildFlavor=buildFlavor,
                       db=db, overrides=overrides,
-                      factory = (sourceTrove.getSourceType() == 'factory'),
+                      factory = (sourceTrove.getFactory() == 'factory'),
                       objDict = objDict)
         finally:
             os.unlink(recipeFile)
