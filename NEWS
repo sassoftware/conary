@@ -18,6 +18,9 @@ Changes in @NEW@:
     * An error in the repository that caused a malformed exception to
       be returned to the client when a trove was missing has been
       corrected. (CNY-2624)
+    * If launched with sudo, Conary will no longer change the owner
+      on the user's PGP keyring, and will use the proper system-wide
+      keyring. (CNY-2630)
 
 Changes in 2.0.9:
   o Bug Fixes:

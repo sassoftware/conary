@@ -467,7 +467,9 @@ CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
 def _getDefaultPublicKeyrings():
     publicKeyrings = []
-    if 'HOME' in os.environ:
+    # If we are root, don't use the keyring in $HOME, since a process started
+    # under sudo will have $HOME set to the old user's (CNY-2630)
+    if os.getuid() != 0 and 'HOME' in os.environ:
         publicKeyrings.append('~/.gnupg/pubring.gpg')
     publicKeyrings.append('/etc/conary/pubring.gpg')
     return publicKeyrings
