@@ -31,6 +31,7 @@ from conary.callbacks import UpdateCallback
 from conary.deps import deps
 from conary.lib import log, patch, sha1helper, util, fixedglob
 from conary.local.errors import *
+from conary.local.journal import NoopJobJournal
 from conary.repository import changeset, filecontents
 
 ROLLBACK_PHASE_REPOS = 1
@@ -323,7 +324,7 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
-    def _applyFileChanges(self, opJournal, journal):
+    def apply(self, journal = None, opJournal = None):
 
         def updatePtrs(ptrId, pathId, ptrTargets, override, contents, target):
             # someone is requesting that we use this path as a place 
@@ -361,6 +362,11 @@ class FilesystemJob:
                 opJournal.mkdir(target)
             else:
                 opJournal.create(target)
+
+        assert(not self.errors)
+
+        if not opJournal:
+            opJournal = NoopJobJournal()
 
 	for (oldPath, newPath, msg) in self.renames:
             opJournal.rename(oldPath, newPath)
@@ -597,19 +603,12 @@ class FilesystemJob:
 	    f.close()
 	    self.callback.warning(msg)
 
-    def apply(self, tagSet = {}, tagScript = None, journal = None,
-              opJournal = None):
-
-        assert(not self.errors)
-        assert(opJournal)
-
-	# this is run after the changes are in the database (but before
-	# they are committed
-	tagCommands = TagCommand(callback = self.callback)
-	runLdconfig = False
-	rootLen = len(self.root)
-
-        self._applyFileChanges(opJournal, journal)
+    def runPostTagScripts(self, tagSet = {}, tagScript = None):
+        # this is run after the changes are in the database (but before
+        # they are committed
+        tagCommands = TagCommand(callback = self.callback)
+        runLdconfig = False
+        rootLen = len(self.root)
 
         # FIXME: the next two operations need to be combined into one;
         # groups can depend on users, and vice-versa.  This ordering

@@ -1171,8 +1171,7 @@ class Database(SqlDbRepository):
                 opJournal.tryCleanupDir(path)
 
         if not commitFlags.justDatabase:
-            fsJob.apply(tagSet, tagScript, journal,
-                        opJournal = opJournal)
+            fsJob.apply(journal, opJournal = opJournal)
 
         if updateDatabase:
             for (name, version, flavor) in fsJob.getOldTroveList():
@@ -1404,6 +1403,9 @@ class Database(SqlDbRepository):
         invalidateRollbacks = signalProtectedCommit()
 
         #del opJournal
+
+        if not commitFlags.justDatabase:
+            fsJob.runPostTagScripts(tagSet, tagScript)
 
         if rollbackPhase is None and updateDatabase and invalidateRollbacks:
             self.invalidateRollbacks()
