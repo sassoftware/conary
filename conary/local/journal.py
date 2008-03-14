@@ -32,12 +32,13 @@ _INFO_STREAM_MTIME = 2
 _INFO_STREAM_OWNER = 3
 _INFO_STREAM_GROUP = 4
 
-JOURNAL_ENTRY_RENAME  = 0
-JOURNAL_ENTRY_BACKUP  = 1
-JOURNAL_ENTRY_CREATE  = 2
-JOURNAL_ENTRY_REMOVE  = 3
-JOURNAL_ENTRY_MKDIR   = 4
-JOURNAL_ENTRY_BACKDIR = 5
+JOURNAL_ENTRY_RENAME        = 0
+JOURNAL_ENTRY_BACKUP        = 1
+JOURNAL_ENTRY_CREATE        = 2
+JOURNAL_ENTRY_REMOVE        = 3
+JOURNAL_ENTRY_MKDIR         = 4
+JOURNAL_ENTRY_BACKDIR       = 5
+JOURNAL_ENTRY_TRYCLEANUPDIR = 6
 
 class InodeInfo(StreamSet):
 
@@ -174,6 +175,11 @@ class JobJournal(NoopJobJournal):
         name = self._normpath(name)
         self._record(JOURNAL_ENTRY_REMOVE, '', name)
 
+    def tryCleanupDir(self, name):
+        # on *commit* try to remove this directory
+        name = self._normpath(name)
+        self._record(JOURNAL_ENTRY_TRYCLEANUPDIR, '', name)
+
     def backup(self, target, skipDirs = False):
         target = self._normpath(target)
         try:
@@ -198,6 +204,12 @@ class JobJournal(NoopJobJournal):
         for kind, entry in self:
             if kind == JOURNAL_ENTRY_BACKUP:
                 os.unlink(self.root + entry.new())
+            elif kind == JOURNAL_ENTRY_TRYCLEANUPDIR:
+                # XXX would be nice to avoid the try/except here with some C
+                try:
+                    os.rmdir(self.root + entry.new())
+                except OSError:
+                    pass
         self.close()
 
     def removeJournal(self):
@@ -225,6 +237,8 @@ class JobJournal(NoopJobJournal):
                 elif kind == JOURNAL_ENTRY_REMOVE:
                     pass
                 elif kind == JOURNAL_ENTRY_BACKDIR:
+                    pass
+                elif kind == JOURNAL_ENTRY_TRYCLEANUPDIR:
                     pass
                 else:
                     self.callback.warning('unknown journal entry %d', kind)

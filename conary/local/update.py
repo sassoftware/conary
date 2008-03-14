@@ -29,7 +29,7 @@ from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
-from conary.lib import log, patch, sha1helper, sigprotect, util, fixedglob
+from conary.lib import log, patch, sha1helper, util, fixedglob
 from conary.local.errors import *
 from conary.repository import changeset, filecontents
 
@@ -597,9 +597,8 @@ class FilesystemJob:
 	    f.close()
 	    self.callback.warning(msg)
 
-    @sigprotect.sigprotect()
     def apply(self, tagSet = {}, tagScript = None, journal = None,
-              opJournal = None, keepJournal = False):
+              opJournal = None):
 
         assert(not self.errors)
         assert(opJournal)
@@ -610,22 +609,7 @@ class FilesystemJob:
 	runLdconfig = False
 	rootLen = len(self.root)
 
-        try:
-            self._applyFileChanges(opJournal, journal)
-        except Exception:
-            import epdb;epdb.st()
-            self.callback.error("a critical error occured -- reverting "
-                                "filesystem changes")
-            opJournal.revert()
-            if not keepJournal:
-                opJournal.removeJournal()
-            raise
-
-        log.debug("committing journal")
-        opJournal.commit()
-        if not keepJournal:
-            opJournal.removeJournal()
-        del opJournal
+        self._applyFileChanges(opJournal, journal)
 
         # FIXME: the next two operations need to be combined into one;
         # groups can depend on users, and vice-versa.  This ordering
