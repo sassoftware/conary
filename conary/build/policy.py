@@ -61,6 +61,11 @@ class BasePolicy(action.RecipeAction):
     invariantsubtrees = []
     invariantexceptions = []
     invariantinclusions = []
+    allowUnusedFilters = False
+
+    def __init__(self, *args, **kwargs):
+        self.unusedFilters = {'inclusions' : set(), 'exceptions' : set()}
+        action.RecipeAction.__init__(self, *args, **kwargs)
 
     def postInit(self):
         """
@@ -83,14 +88,21 @@ class BasePolicy(action.RecipeAction):
         Some keyword arguments (at least C{exceptions} and C{subtrees})
         should be appended rather than replaced.
         """
+        allowUnusedFilters = keywords.pop('allowUnusedFilters', False) or \
+                self.allowUnusedFilters
+
         exceptions = keywords.pop('exceptions', None)
         if exceptions:
             if not self.exceptions:
                 self.exceptions = []
             if type(exceptions) in (list, tuple):
                 self.exceptions.extend(exceptions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['exceptions'].update(exceptions)
             else:
                 self.exceptions.append(exceptions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['exceptions'].add(exceptions)
         subtrees = keywords.pop('subtrees', None)
         if subtrees:
             if not self.subtrees:
@@ -107,11 +119,17 @@ class BasePolicy(action.RecipeAction):
         if inclusions:
             if type(inclusions) == list:
                 self.inclusions.extend(inclusions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['inclusions'].update(inclusions)
             else:
                 self.inclusions.append(inclusions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['inclusions'].add(inclusions)
 
         if args:
             self.inclusions.extend(args)
+            if not allowUnusedFilters:
+                self.unusedFilters['inclusions'].update(args)
 
         self.addArgs(**keywords)
 
@@ -120,12 +138,39 @@ class BasePolicy(action.RecipeAction):
             return True
         return False
 
-    def policyException(self, filespec):
-        for f in self.exceptionFilters:
-            if f.match(filespec):
-                return True
-        return False
+    def postPolicy(self):
+        if self.unusedFilters['exceptions']:
+            for filter in self.unusedFilters['exceptions']:
+                self.error('Exception %s for %s was not used' % \
+                        (filter, self.__class__.__name__))
+        if self.unusedFilters['inclusions']:
+            for filter in self.unusedFilters['inclusions']:
+                self.error('Inclusion %s for %s was not used' % \
+                        (filter, self.__class__.__name__))
 
+    # warning and error reporting
+
+    def _addClassName(self, args):
+        args = list(args)
+        args[0] = ': '.join((self.__class__.__name__, args[0]))
+        return args
+
+    def dbg(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.debug(*args, **kwargs)
+
+    def info(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.info(*args, **kwargs)
+
+    def warn(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.warning(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.error(*args, **kwargs)
+        self.recipe.reportErrors(*args, **kwargs)
 
 class Policy(BasePolicy):
     """
@@ -228,7 +273,6 @@ class Policy(BasePolicy):
                 PACKAGE: '',
             }[self.filetree]
 
-
     def filterExpression(self, expression, name=None):
         """
         backwards compatibility
@@ -273,9 +317,10 @@ class Policy(BasePolicy):
             kwargs['unsetmode'] = expression.pop(0)
         return (regex, macros), kwargs
 
-    def compileFilters(self, expressionList, filterList):
+    def compileFilters(self, expressionList, filterList, unusedList=None):
         seen = []
-	for expression in expressionList:
+        newUnused = []
+        for expression in expressionList:
             if expression in seen:
                 # only put each expression on the list once
                 continue
@@ -285,7 +330,13 @@ class Policy(BasePolicy):
                 expression = expression.pattern
             seen.append(expression)
             args, kwargs = self.filterExpArgs(expression)
-            filterList.append(filter.Filter(*args, **kwargs))
+            f = filter.Filter(*args, **kwargs)
+            if unusedList and expression in unusedList:
+                unusedList.discard(expression)
+                newUnused.append(f.regexp)
+            filterList.append(f)
+        if unusedList is not None:
+            unusedList.update(newUnused)
 
     def doProcess(self, recipe):
 	"""
@@ -325,7 +376,7 @@ class Policy(BasePolicy):
 	    if not isinstance(self.exceptions, (tuple, list)):
 		# turn a plain string into a sequence
 		self.exceptions = (self.exceptions,)
-	    self.compileFilters(self.exceptions, self.exceptionFilters)
+	    self.compileFilters(self.exceptions, self.exceptionFilters, self.unusedFilters['exceptions'])
 
 	# compile the inclusions
 	self.inclusionFilters = []
@@ -338,7 +389,7 @@ class Policy(BasePolicy):
 	    if not isinstance(self.inclusions, (tuple, list)):
 		# turn a plain string into a sequence
 		self.inclusions = (self.inclusions,)
-	    self.compileFilters(self.inclusions, self.inclusionFilters)
+	    self.compileFilters(self.inclusions, self.inclusionFilters, self.unusedFilters['inclusions'])
 
 	# dispatch if/as appropriate
 	if self.use:
@@ -409,37 +460,31 @@ class Policy(BasePolicy):
             and not self.mtimeChanged(filespec)):
             # policy has elected not to handle unchanged files
             return False
-	if not self.inclusionFilters:
-	    # empty list is '.*'
-	    return True
-	for f in self.inclusionFilters:
-	    if f.match(filespec):
-		return True
-	return False
+        if not self.inclusionFilters:
+            # empty list is '.*'
+            return True
+        res = False
+        for f in self.inclusionFilters:
+            # we can't short circuit. we must discard all valid inclusions.
+            # it's possible that an invariant inclusion will match before
+            # an explicit inclusion, and we need to distinguish between
+            # "filter was unused because no paths matched", and
+            # "filter was unused because it's redundant". erroring on the
+            # second case is actually more confusing than helpful.
+            if f.match(filespec):
+                self.unusedFilters['inclusions'].discard(f.regexp)
+                res = True
+        return res
 
-    # warning and error reporting
+    def policyException(self, filespec):
+        res = False
+        for f in self.exceptionFilters:
+            # we can't short circuit. we must discard all valid exceptions.
+            if f.match(filespec):
+                self.unusedFilters['exceptions'].discard(f.regexp)
+                res = True
+        return res
 
-    def _addClassName(self, args):
-        args = list(args)
-        args[0] = ': '.join((self.__class__.__name__, args[0]))
-        return args
-
-    def dbg(self, *args, **kwargs):
-        args = self._addClassName(args)
-        log.debug(*args, **kwargs)
-
-    def info(self, *args, **kwargs):
-        args = self._addClassName(args)
-        log.info(*args, **kwargs)
-
-    def warn(self, *args, **kwargs):
-        args = self._addClassName(args)
-        log.warning(*args, **kwargs)
-
-    def error(self, *args, **kwargs):
-        args = self._addClassName(args)
-        log.error(*args, **kwargs)
-        self.recipe.reportErrors(*args, **kwargs)
 
 class GroupPolicy(BasePolicy):
     keywords = {
@@ -470,10 +515,21 @@ class GroupPolicy(BasePolicy):
         if not self.inclusionFilters:
             # empty list is '.*'
             return True
+        res = False
         for f in self.inclusionFilters:
             if f.match(filespec):
-                return True
-        return False
+                self.unusedFilters['inclusions'].discard(f)
+                res = True
+        return res
+
+    def policyException(self, filespec):
+        res = False
+        for f in self.exceptionFilters:
+            # we can't short circuit. we must discard all valid exceptions.
+            if f.match(filespec):
+                self.unusedFilters['exceptions'].discard(f)
+                res = True
+        return res
 
     def formatTrovePath(self, path):
         groupName = [x[0] for x in reversed(path[:-1]) \
@@ -488,8 +544,20 @@ class GroupPolicy(BasePolicy):
             indent += 2
         return res
 
-    def compileFilters(self, expressionList, filterList):
+    def compileFilters(self, expressionList, filterList, unusedList=None):
         seen = []
+        if unusedList is not None:
+            newUnused = []
+            # fix up the unused list, updateArgs is unaware of specific
+            # filter types
+            for expression in list(unusedList)[:]:
+                if isinstance(expression, str):
+                    unusedList.discard(expression)
+                    expression = trovefilter.TroveFilter(self.recipe,
+                            name = expression)
+                newUnused.append(expression)
+            unusedList.update(newUnused)
+
         for expression in expressionList:
             if isinstance(expression, str):
                 expression = trovefilter.TroveFilter(self.recipe,
@@ -530,7 +598,8 @@ class GroupPolicy(BasePolicy):
             if not isinstance(self.exceptions, (tuple, list)):
                 # turn a plain string into a sequence
                 self.exceptions = (self.exceptions,)
-            self.compileFilters(self.exceptions, self.exceptionFilters)
+            self.compileFilters(self.exceptions, self.exceptionFilters,
+                    self.unusedFilters['exceptions'])
 
         # compile the inclusions
         self.inclusionFilters = []
@@ -543,7 +612,8 @@ class GroupPolicy(BasePolicy):
             if not isinstance(self.inclusions, (tuple, list)):
                 # turn a plain string into a sequence
                 self.inclusions = (self.inclusions,)
-            self.compileFilters(self.inclusions, self.inclusionFilters)
+            self.compileFilters(self.inclusions, self.inclusionFilters,
+                    self.unusedFilters['inclusions'])
 
         # dispatch if/as appropriate
         if self.use:

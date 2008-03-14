@@ -479,6 +479,7 @@ class Recipe(object):
                             post.__class__.__name__)
                     logFile.flush()
                     post.doProcess(self)
+                    post.postPolicy()
                 finally:
                     if formattedLog:
                         logFile.popDescriptor(post.__class__.__name__)
