@@ -17,6 +17,7 @@ import errno, fcntl
 import itertools
 import os
 import shutil
+import tempfile
 
 #conary
 from conary import constants, files, trove, versions
@@ -29,6 +30,7 @@ from conary.deps import deps
 from conary.lib import log, util
 from conary.local import localrep, sqldb, schema, update, journal
 from conary.local.errors import DatabasePathConflictError, FileInWayError
+from conary.local.journal import JobJournal, NoopJobJournal
 from conary.repository import changeset, datastore, errors, filecontents
 from conary.repository import repository, trovesource
 
@@ -45,12 +47,27 @@ class Rollback:
     reposName = "%s/repos.%d"
     localName = "%s/local.%d"
 
-    def add(self, repos, local):
-        repos.writeToFile(self.reposName % (self.dir, self.count), mode = 0600)
-        local.writeToFile(self.localName % (self.dir, self.count), mode = 0600)
-        self.count += 1
-        fd = os.open("%s/count" % self.dir, os.O_CREAT | os.O_WRONLY |
-                                            os.O_TRUNC, 0600)
+    def add(self, opJournal, repos, local):
+        reposName = self.reposName % (self.dir, self.count)
+        localName = self.localName % (self.dir, self.count)
+        countName = "%s/count" % self.dir
+
+        opJournal.create(reposName)
+        opJournal.create(localName)
+
+        repos.writeToFile(reposName, mode = 0600)
+        local.writeToFile(localName, mode = 0600)
+
+        if self.count:
+            self.count += 1
+            opJournal.backup(countName)
+        else:
+            self.count = 1
+            opJournal.create(countName)
+
+        fd, tmpname = tempfile.mkstemp('count', '.ct', self.dir)
+        os.rename(tmpname, countName)
+
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 
@@ -1195,6 +1212,12 @@ class Database(SqlDbRepository):
 
 	# -------- database and system are updated below this line ---------
 
+        if self.opJournalPath:
+            opJournal = JobJournal(self.opJournalPath, self.root, create = True,
+                                   callback = callback)
+        else:
+            opJournal = NoopJobJournal()
+
 	# XXX we have to do this before files get removed from the database,
 	# which is a bit unfortunate since this rollback isn't actually
 	# valid until a bit later
@@ -1203,7 +1226,7 @@ class Database(SqlDbRepository):
             if rollback is None:
                 rollback = self.createRollback()
                 uJob.setRollback(rollback)
-            rollback.add(reposRollback, localRollback)
+            rollback.add(opJournal, reposRollback, localRollback)
             del rollback
 
         if not commitFlags.justDatabase:
@@ -1285,7 +1308,8 @@ class Database(SqlDbRepository):
         if not commitFlags.justDatabase:
             fsJob.apply(tagSet, tagScript, journal,
                         keepJournal = commitFlags.keepJournal,
-                        opJournalPath = self.opJournalPath)
+                        opJournal = opJournal)
+        del opJournal
 
         if updateDatabase:
             for (name, version, flavor) in fsJob.getOldTroveList():

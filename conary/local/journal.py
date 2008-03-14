@@ -81,6 +81,9 @@ class NoopJobJournal:
     def commit(self):
         pass
 
+    def removeJournal(self):
+        pass
+
     def revert(self):
         pass
 
@@ -95,6 +98,8 @@ class JobJournal(NoopJobJournal):
     def __init__(self, path, root = '/', create = False, callback = None):
         NoopJobJournal.__init__(self)
         # normpath leaves a leading // (probably for windows?)
+        self.path = path
+
         self.root = self._normpath(root)
         if root:
             self.rootLen = len(self.root)
@@ -194,6 +199,9 @@ class JobJournal(NoopJobJournal):
             if kind == JOURNAL_ENTRY_BACKUP:
                 os.unlink(self.root + entry.new())
         self.close()
+
+    def removeJournal(self):
+        os.unlink(self.path)
 
     def revert(self):
         for kind, entry in self:

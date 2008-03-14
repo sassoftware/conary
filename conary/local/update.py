@@ -32,7 +32,6 @@ from conary.deps import deps
 from conary.lib import log, patch, sha1helper, sigprotect, util, fixedglob
 from conary.local.errors import *
 from conary.repository import changeset, filecontents
-from conary.local.journal import JobJournal, NoopJobJournal
 
 ROLLBACK_PHASE_REPOS = 1
 ROLLBACK_PHASE_LOCAL = 2
@@ -600,9 +599,10 @@ class FilesystemJob:
 
     @sigprotect.sigprotect()
     def apply(self, tagSet = {}, tagScript = None, journal = None,
-              opJournalPath = None, keepJournal = False):
+              opJournal = None, keepJournal = False):
 
         assert(not self.errors)
+        assert(opJournal)
 
 	# this is run after the changes are in the database (but before
 	# they are committed
@@ -610,26 +610,21 @@ class FilesystemJob:
 	runLdconfig = False
 	rootLen = len(self.root)
 
-        if opJournalPath:
-            opJournal = JobJournal(opJournalPath, self.root, create = True,
-                                   callback = self.callback)
-        else:
-            opJournal = NoopJobJournal()
-
         try:
             self._applyFileChanges(opJournal, journal)
         except Exception:
+            import epdb;epdb.st()
             self.callback.error("a critical error occured -- reverting "
                                 "filesystem changes")
             opJournal.revert()
-            if not keepJournal and opJournalPath:
-                os.unlink(opJournalPath)
+            if not keepJournal:
+                opJournal.removeJournal()
             raise
 
         log.debug("committing journal")
         opJournal.commit()
-        if not keepJournal and opJournalPath:
-            os.unlink(opJournalPath)
+        if not keepJournal:
+            opJournal.removeJournal()
         del opJournal
 
         # FIXME: the next two operations need to be combined into one;
