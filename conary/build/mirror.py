@@ -23,7 +23,10 @@ from conary.lib import util
 
 class Mirror(list):
 
-    def __init__(self, cfg, name):
+    def __init__(self, cfg, name, multiurlMap = None):
+        if multiurlMap and name in multiurlMap:
+            self.extend(multiurlMap[name])
+            return
 
         for mirrorDir in cfg.mirrorDirs:
             self._readFile(os.path.join(mirrorDir, name))

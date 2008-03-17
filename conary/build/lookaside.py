@@ -35,7 +35,7 @@ import cookielib
 # location is normally the package name.
 # lookaside:// is used internally only for things that are inserted
 # into the cache but managed by calling code.  It should not be
-# referenced from recipes
+# referenced from recipes. So is multiurl://
 networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://',
                    'lookaside://')
 
@@ -270,7 +270,7 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
-            allowNone=False, refreshFilter=None):
+            allowNone=False, refreshFilter=None, multiurlMap=None):
 
     """
     searches all locations, including populating the cache if the
@@ -283,28 +283,44 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         f = util.searchFile(name, srcdirs)
         if f: return f
 
+    # Multi-url case
+    specialPrefix = "multiurl://"
+    if name.startswith(specialPrefix):
+        mapName, restLen = _splitSpecialURL(specialPrefix, name)
+        possibleNames = multiurlMap[mapName]
+        rest = name[restLen:]
+        if rest:
+            # Append the name of the archive
+            possibleNames = [ "%s/%s" % (x, rest) for x in possibleNames ]
+    else:
+        possibleNames = [ name ]
+
     if not guessName:
         if suffixes:
-            names = [ "%s.%s" % (name, suffix) for suffix in suffixes ]
+            possibleNames = [ ("%s.%s" % (n, s), n)
+                for (n, s) in _carthesianProduct(possibleNames, suffixes) ]
         else:
-            names = (name, )
+            possibleNames = [ (n, n) for n in possibleNames ]
     else:
         suffixes = suffixes or ( 'tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip' )
-        names = [ "%s%s.%s" % (name, guessName, suffix)
-                  for suffix in suffixes ]
+        possibleNames = [ ("%s%s.%s" % (n, guessName, s), n)
+            for (n, s) in _carthesianProduct(possibleNames, suffixes) ]
 
     # This for r.addArchive('%(name)s-%(version)s.tar.gz', keyid='9BB19A22') case
-    if not autoSource and guessName and '/' not in name:
-        for sourcename in names:
-            f = util.searchFile(sourcename, srcdirs)
-            if f: return f
+    if not autoSource and guessName:
+        for sourcename, origname in possibleNames:
+            if '/' not in origname:
+                f = util.searchFile(sourcename, srcdirs)
+                if f: return f
 
     if localOnly and not srcdirs:
         # This is a "local only cook from the repository", so we need
         # to ensure that what we have is the same as what is in the
         # repository, not what is in the cache
-        f = _searchRepository(cfg, repCache, name, location)
-        if f: return f
+        for sourcename, origname in possibleNames:
+            f = _searchRepository(cfg, repCache, origname, location)
+            if f: return f
+
     if localOnly:
         if not allowNone:
             raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
@@ -312,7 +328,7 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             # we do not guess suffixes for local changes
             return None
 
-    for sourcename in names:
+    for sourcename, origname in possibleNames:
 
         # this needs to come as soon as possible to preserve reproducability
         f = _searchRepository(cfg, repCache, sourcename, location)
@@ -325,25 +341,27 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         if f: return f
 
         # finally, look in srcdirs if appropriate
-        if not autoSource and not guessName and '/' not in name:
+        if not autoSource and not guessName and '/' not in origname:
             f = util.searchFile(sourcename, srcdirs)
             if f: return f
 
 
     # Need to fetch a file that will be auto-added to the repository
     # on commit
-    if name.startswith('mirror://'):
 
-        urls = []
+    specialPrefix = 'mirror://'
+    urls = []
+    for sourcename, origname in possibleNames:
+        if not origname.startswith(specialPrefix):
+            urls.append(sourcename)
+            continue
         # mirror://foo/bar -> mirrorType = "foo", trailingName = "bar"
-        mirrorType = name.split('//')[1].split('/', 1)[0]
-        mirrorLen = len('mirror://') + len(mirrorType) + 1
+        mirrorType, mirrorLen = _splitSpecialURL(specialPrefix, origname)
         for mirrorBaseURL in Mirror(cfg, mirrorType):
-            for name in names:
-                trailingName = name[mirrorLen:]
-                urls.append(('/'.join((mirrorBaseURL, trailingName)), name))
+            trailingName = sourcename[mirrorLen:]
+            urls.append(('/'.join((mirrorBaseURL, trailingName)), origname))
 
-        names = urls
+    names = urls
 
     for name in names:
 
@@ -361,6 +379,22 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     if not allowNone:
         raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
 
+def _splitSpecialURL(prefix, url):
+    prefixType = url.split('//')[1].split('/', 1)[0]
+    prefixLen = len(prefix) + len(prefixType) + 1
+    return prefixType, prefixLen
+
+def _carthesianProduct(*iterables):
+    itrcount = len(iterables)
+    value = [ None ] * itrcount
+    for i in range(itrcount):
+        for v in iterables[i]:
+            value[i] = v
+            for j in range(i+1, itrcount):
+                for v in iterables[j]:
+                    value[j] = v
+                    if j == itrcount - 1:
+                        yield value
 
 class RepositoryCache:
 

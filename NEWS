@@ -7,6 +7,11 @@ Changes in @NEW@:
     * AutoResolve defaults to True for image groups. (CNY-2291)
     * Exceptions and inclusions to policies that don't match anything
       will now emit an error. (CNY-2221)
+    * A new selective logging facility for policy to use to inspect
+      build output has been added. (CNY-2622)
+    * The ability to pass multiple URLs to addArchive has been added.
+      Conary will try to download the source from each URL, in order,
+      until it succeeds. (CNY-2505)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
@@ -21,6 +26,16 @@ Changes in @NEW@:
     * If launched with sudo, Conary will no longer change the owner
       on the user's PGP keyring, and will use the proper system-wide
       keyring. (CNY-2630)
+    * When using PostgreSQL as a repository backend, some queries
+      could be executed with poor execution plans (CNY-2639)
+    * A bug that caused a local cook (e.g., "cvc cook pkg.recipe") to
+      fail at "Copying forward metadata to newly built items..." when
+      the Conary repository for that recipe is not available has been
+      fixed. (CNY-2640)
+
+  o Client changes
+    * More of the update logic is now protected by the filesystem journal,
+      and the journal now cleans up rollback state on failure (CNY-2592)
 
 Changes in 2.0.9:
   o Bug Fixes:

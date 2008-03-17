@@ -29,10 +29,10 @@ from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
-from conary.lib import log, patch, sha1helper, sigprotect, util, fixedglob
+from conary.lib import log, patch, sha1helper, util, fixedglob
 from conary.local.errors import *
+from conary.local.journal import NoopJobJournal
 from conary.repository import changeset, filecontents
-from conary.local.journal import JobJournal, NoopJobJournal
 
 ROLLBACK_PHASE_REPOS = 1
 ROLLBACK_PHASE_LOCAL = 2
@@ -324,7 +324,7 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
-    def _applyFileChanges(self, opJournal, journal):
+    def apply(self, journal = None, opJournal = None):
 
         def updatePtrs(ptrId, pathId, ptrTargets, override, contents, target):
             # someone is requesting that we use this path as a place 
@@ -362,6 +362,11 @@ class FilesystemJob:
                 opJournal.mkdir(target)
             else:
                 opJournal.create(target)
+
+        assert(not self.errors)
+
+        if not opJournal:
+            opJournal = NoopJobJournal()
 
 	for (oldPath, newPath, msg) in self.renames:
             opJournal.rename(oldPath, newPath)
@@ -598,39 +603,12 @@ class FilesystemJob:
 	    f.close()
 	    self.callback.warning(msg)
 
-    @sigprotect.sigprotect()
-    def apply(self, tagSet = {}, tagScript = None, journal = None,
-              opJournalPath = None, keepJournal = False):
-
-        assert(not self.errors)
-
-	# this is run after the changes are in the database (but before
-	# they are committed
-	tagCommands = TagCommand(callback = self.callback)
-	runLdconfig = False
-	rootLen = len(self.root)
-
-        if opJournalPath:
-            opJournal = JobJournal(opJournalPath, self.root, create = True,
-                                   callback = self.callback)
-        else:
-            opJournal = NoopJobJournal()
-
-        try:
-            self._applyFileChanges(opJournal, journal)
-        except Exception:
-            self.callback.error("a critical error occured -- reverting "
-                                "filesystem changes")
-            opJournal.revert()
-            if not keepJournal and opJournalPath:
-                os.unlink(opJournalPath)
-            raise
-
-        log.debug("committing journal")
-        opJournal.commit()
-        if not keepJournal and opJournalPath:
-            os.unlink(opJournalPath)
-        del opJournal
+    def runPostTagScripts(self, tagSet = {}, tagScript = None):
+        # this is run after the changes are in the database (but before
+        # they are committed
+        tagCommands = TagCommand(callback = self.callback)
+        runLdconfig = False
+        rootLen = len(self.root)
 
         # FIXME: the next two operations need to be combined into one;
         # groups can depend on users, and vice-versa.  This ordering

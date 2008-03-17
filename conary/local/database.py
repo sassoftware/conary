@@ -17,6 +17,7 @@ import errno, fcntl
 import itertools
 import os
 import shutil
+import tempfile
 
 #conary
 from conary import constants, files, trove, versions
@@ -26,9 +27,10 @@ from conary.errors import DatabaseLockedError, DecodingError
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
-from conary.lib import log, util
-from conary.local import localrep, sqldb, schema, update, journal
+from conary.lib import log, sigprotect, util
+from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
+from conary.local.journal import JobJournal, NoopJobJournal
 from conary.repository import changeset, datastore, errors, filecontents
 from conary.repository import repository, trovesource
 
@@ -45,12 +47,27 @@ class Rollback:
     reposName = "%s/repos.%d"
     localName = "%s/local.%d"
 
-    def add(self, repos, local):
-        repos.writeToFile(self.reposName % (self.dir, self.count), mode = 0600)
-        local.writeToFile(self.localName % (self.dir, self.count), mode = 0600)
-        self.count += 1
-        fd = os.open("%s/count" % self.dir, os.O_CREAT | os.O_WRONLY |
-                                            os.O_TRUNC, 0600)
+    def add(self, opJournal, repos, local):
+        reposName = self.reposName % (self.dir, self.count)
+        localName = self.localName % (self.dir, self.count)
+        countName = "%s/count" % self.dir
+
+        opJournal.create(reposName)
+        opJournal.create(localName)
+
+        repos.writeToFile(reposName, mode = 0600)
+        local.writeToFile(localName, mode = 0600)
+
+        if self.count:
+            self.count += 1
+            opJournal.backup(countName)
+        else:
+            self.count = 1
+            opJournal.create(countName)
+
+        fd, tmpname = tempfile.mkstemp('count', '.ct', self.dir)
+        os.rename(tmpname, countName)
+
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 
@@ -154,22 +171,30 @@ class RollbackStack:
         if (self.first, self.last) == (None, None):
             raise ConaryError("Unable to open rollback directory")
 
-    def writeStatus(self):
+    def writeStatus(self, opJournal = None):
         newStatus = self.statusPath + ".new"
 
         fd = os.open(newStatus, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0600)
         os.write(fd, "%s %d\n" % (self.first, self.last))
         os.close(fd)
 
+        if opJournal:
+            opJournal.backup(self.statusPath)
+
         os.rename(newStatus, self.statusPath)
 
-    def new(self):
+    def new(self, opJournal = None):
+        if not opJournal:
+            opJournal = NoopJobJournal()
         rbDir = "/%s/%d" % (self.dir, self.last + 1)
         if os.path.exists(rbDir):
+            opJournal.backup(rbDir)
             shutil.rmtree(rbDir)
+
+        opJournal.mkdir(rbDir)
         os.mkdir(rbDir, 0700)
         self.last += 1
-        self.writeStatus()
+        self.writeStatus(opJournal = opJournal)
         return Rollback(rbDir)
 
     def hasRollback(self, name):
@@ -1245,6 +1270,158 @@ class Database(SqlDbRepository):
     def dependencyChecker(self, troveSource):
         return self.db.dependencyChecker(troveSource)
 
+
+    def _doCommit(self, uJob, cs, commitFlags, opJournal, tagSet,
+                  reposRollback, localRollback, rollbackPhase, fsJob,
+                  updateDatabase, callback, tagScript, dbCache,
+                  autoPinList, flags, journal, directoryCandidates):
+        # we have to do this before files get removed from the database,
+        # which is a bit unfortunate since this rollback isn't actually
+        # valid until a bit later, but that's why we jounral
+        if (rollbackPhase is None) and not commitFlags.test:
+            rollback = uJob.getRollback()
+            if rollback is None:
+                rollback = self.rollbackStack.new(opJournal)
+                uJob.setRollback(rollback)
+            rollback.add(opJournal, reposRollback, localRollback)
+            del rollback
+
+        if not commitFlags.justDatabase:
+            # run preremove scripts before updating the database, otherwise
+            # the file lists which get sent to them are incorrect. skipping
+            # this makes --test a little inaccurate, but life goes on
+            if not commitFlags.test:
+                callback.runningPreTagHandlers()
+                fsJob.preapply(tagSet, tagScript)
+
+        for (troveName, troveVersion, troveFlavor, fileDict) \
+                                            in fsJob.iterUserRemovals():
+            if sum(fileDict.itervalues()) == 0:
+                # Nothing to do (these are updates for a trove being installed
+                # as part of this job rather than for a trove which is part
+                # of this job)
+                continue
+
+            self.db.removeFilesFromTrove(troveName, troveVersion,
+                                         troveFlavor, fileDict.keys())
+
+        dbConflicts = []
+
+        # Build A->B
+        if updateDatabase:
+            # this updates the database from the changeset; the change
+            # isn't committed until the self.commit below
+            # an object for historical reasons
+            try:
+                csJob = localrep.LocalRepositoryChangeSetJob(
+                    dbCache, cs, callback, autoPinList, 
+                    allowIncomplete = (rollbackPhase is not None),
+                    pathRemovedCheck = fsJob.pathRemoved,
+                    replaceFiles = flags.replaceManagedFiles)
+            except DatabasePathConflicts, e:
+                for (path, (pathId, (troveName, version, flavor)),
+                           newTroveInfo) in e.getConflicts():
+                    dbConflicts.append(DatabasePathConflictError(
+                            util.joinPaths(self.root, path), 
+                            troveName, version, flavor))
+
+            self.db.mapPinnedTroves(uJob.getPinMaps())
+        else:
+            # When updateDatabase is False, we're applying the local part
+            # of changeset. Files which are newly added by local changesets
+            # need to be recorded in the database as being present (since
+            # they were previously erased)
+            localrep.markAddedFiles(self.db, cs)
+            csJob = None
+
+        errList = fsJob.getErrorList()
+
+        # Let DatabasePathConflictError mask FileInWayError (since they
+        # are really very similar)
+        newErrs = []
+        for err in dbConflicts:
+            found = None
+            for i, otherErr in enumerate(errList):
+                if isinstance(otherErr, FileInWayError) and \
+                                   err.path == otherErr.path:
+                    found = i
+                    break
+
+            if found is None:
+                newErrs.append(err)
+            else:
+                errList[found] = err
+
+        errList = newErrs + errList
+        del newErrs, dbConflicts
+        if errList:
+            # make sure we release the lock on the database
+            self.db.rollback()
+            raise CommitError, ('applying update would cause errors:\n' + 
+                                '\n\n'.join(str(x) for x in errList))
+        if commitFlags.test:
+            self.db.rollback()
+            return
+
+        # find which directories we should try to remove right now this has to
+        # be done after the sqldb has been updated (but before the changes are
+        # committted). We let the journal commit remove the actual directories
+        # because the directories could have backup files in them that the
+        # journal will clear out.
+        if not commitFlags.justDatabase:
+            list = directoryCandidates.keys()
+            list.sort()
+            keep = {}
+            for path in list:
+                if keep.has_key(path):
+                    keep[os.path.dirname(path)] = True
+                    continue
+
+                relativePath = path[len(self.root):]
+                if relativePath[0] != '/': relativePath = '/' + relativePath
+
+                if self.db.pathIsOwned(relativePath):
+                    list = [ x for x in self.db.iterFindByPath(path)]
+                    keep[os.path.dirname(path)] = True
+                    continue
+
+                opJournal.tryCleanupDir(path)
+
+        if not commitFlags.justDatabase:
+            fsJob.apply(journal, opJournal = opJournal)
+
+        if updateDatabase:
+            for (name, version, flavor) in fsJob.getOldTroveList():
+                # if to database if false, we're restoring the local
+                # branch of a rollback
+                self.db.eraseTrove(name, version, flavor)
+
+        # log everything
+        for trvCs in cs.iterNewTroveList():
+            if not trvCs.getOldVersion():
+                log.syslog("installed %s=%s[%s]", trvCs.getName(),
+                         trvCs.getNewVersion(), 
+                         deps.formatFlavor(trvCs.getNewFlavor()))
+            else:
+                log.syslog("updated %s=%s[%s]--%s[%s]", trvCs.getName(),
+                         trvCs.getOldVersion(), 
+                         deps.formatFlavor(trvCs.getOldFlavor()),
+                         trvCs.getNewVersion(), 
+                         deps.formatFlavor(trvCs.getNewFlavor()))
+
+        for (name, version, flavor) in cs.getOldTroveList():
+            log.syslog("removed %s=%s[%s]", name, version,
+                       deps.formatFlavor(flavor))
+
+        callback.committingTransaction()
+        self._updateTransactionCounter = True
+        self.commit()
+
+        if csJob:
+            return csJob.invalidateRollbacks()
+        else:
+            return False
+
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
@@ -1320,6 +1497,8 @@ class Database(SqlDbRepository):
             reposRollback = cs.makeRollback(dbCache, configFiles = True,
                        redirectionRollbacks = (not commitFlags.localRollbacks))
             flags.merge = True
+        else:
+            reposRollback = None
 
         fsJob = update.FilesystemJob(dbCache, cs, fsTroveDict, self.root,
                                      flags = flags, callback = callback,
@@ -1404,154 +1583,48 @@ class Database(SqlDbRepository):
 
 	# -------- database and system are updated below this line ---------
 
-	# XXX we have to do this before files get removed from the database,
-	# which is a bit unfortunate since this rollback isn't actually
-	# valid until a bit later
-	if (rollbackPhase is None) and not commitFlags.test:
-            rollback = uJob.getRollback()
-            if rollback is None:
-                rollback = self.rollbackStack.new()
-                uJob.setRollback(rollback)
-            rollback.add(reposRollback, localRollback)
-            del rollback
-
-        if not commitFlags.justDatabase:
-            # run preremove scripts before updating the database, otherwise
-            # the file lists which get sent to them are incorrect. skipping
-            # this makes --test a little inaccurate, but life goes on
-            if not commitFlags.test:
-                callback.runningPreTagHandlers()
-                fsJob.preapply(tagSet, tagScript)
-
-        for (troveName, troveVersion, troveFlavor, fileDict) in fsJob.iterUserRemovals():
-            if sum(fileDict.itervalues()) == 0:
-                # Nothing to do (these are updates for a trove being installed
-                # as part of this job rather than for a trove which is part
-                # of this job)
-                continue
-
-            self.db.removeFilesFromTrove(troveName, troveVersion,
-                                         troveFlavor, fileDict.keys())
-
-        dbConflicts = []
-
-        # Build A->B
-        if updateDatabase:
-            # this updates the database from the changeset; the change
-            # isn't committed until the self.commit below
-            # an object for historical reasons
-            try:
-                csJob = localrep.LocalRepositoryChangeSetJob(
-                    dbCache, cs, callback, autoPinList, 
-                    allowIncomplete = (rollbackPhase is not None),
-                    pathRemovedCheck = fsJob.pathRemoved,
-                    replaceFiles = flags.replaceManagedFiles)
-            except DatabasePathConflicts, e:
-                for (path, (pathId, (troveName, version, flavor)),
-                           newTroveInfo) in e.getConflicts():
-                    dbConflicts.append(DatabasePathConflictError(
-                            util.joinPaths(self.root, path), 
-                            troveName, version, flavor))
-
-            self.db.mapPinnedTroves(uJob.getPinMaps())
+        if self.opJournalPath:
+            opJournal = JobJournal(self.opJournalPath, self.root, create = True,
+                                   callback = callback)
         else:
-            # When updateDatabase is False, we're applying the local part
-            # of changeset. Files which are newly added by local changesets
-            # need to be recorded in the database as being present (since
-            # they were previously erased)
-            localrep.markAddedFiles(self.db, cs)
+            opJournal = NoopJobJournal()
 
-        errList = fsJob.getErrorList()
+        # Gross, but we need to protect against signals for this call.
+        @sigprotect.sigprotect()
+        def signalProtectedCommit():
+            try:
+                invalidateRollbacks = self._doCommit(uJob, cs, commitFlags,
+                            opJournal, tagSet, reposRollback, localRollback,
+                            rollbackPhase, fsJob, updateDatabase, callback,
+                            tagScript, dbCache, autoPinList, flags, journal,
+                            directoryCandidates)
+            except Exception, e:
+                if not issubclass(e.__class__, ConaryError):
+                    callback.error("a critical error occured -- reverting "
+                                   "filesystem changes")
 
-        # Let DatabasePathConflictError mask FileInWayError (since they
-        # are really very similar)
-        newErrs = []
-        for err in dbConflicts:
-            found = None
-            for i, otherErr in enumerate(errList):
-                if isinstance(otherErr, FileInWayError) and \
-                                   err.path == otherErr.path:
-                    found = i
-                    break
+                opJournal.revert()
 
-            if found is None:
-                newErrs.append(err)
-            else:
-                errList[found] = err
+                if not commitFlags.keepJournal:
+                    opJournal.removeJournal()
 
-        errList = newErrs + errList
-        del newErrs, dbConflicts
+                raise
 
-        if errList:
-            # make sure we release the lock on the database
-            self.db.rollback()
-            raise CommitError, ('applying update would cause errors:\n' + 
-                                '\n\n'.join(str(x) for x in errList))
-        if commitFlags.test:
-            self.db.rollback()
-            return
+            log.debug("committing journal")
+            opJournal.commit()
+            if not commitFlags.keepJournal:
+                opJournal.removeJournal()
+
+            return invalidateRollbacks
+
+        invalidateRollbacks = signalProtectedCommit()
+
+        #del opJournal
 
         if not commitFlags.justDatabase:
-            fsJob.apply(tagSet, tagScript, journal,
-                        keepJournal = commitFlags.keepJournal,
-                        opJournalPath = self.opJournalPath)
+            fsJob.runPostTagScripts(tagSet, tagScript)
 
-        if updateDatabase:
-            for (name, version, flavor) in fsJob.getOldTroveList():
-		# if to database if false, we're restoring the local
-		# branch of a rollback
-		self.db.eraseTrove(name, version, flavor)
-
-	# finally, remove old directories. right now this has to be done
-	# after the sqldb has been updated (but before the changes are
-	# committted)
-        if not commitFlags.justDatabase:
-            list = directoryCandidates.keys()
-            list.sort()
-            list.reverse()
-            keep = {}
-            for path in list:
-                if keep.has_key(path):
-                    keep[os.path.dirname(path)] = True
-                    continue
-
-                relativePath = path[len(self.root):]
-                if relativePath[0] != '/': relativePath = '/' + relativePath
-
-                if self.db.pathIsOwned(relativePath):
-                    list = [ x for x in self.db.iterFindByPath(path)]
-                    keep[os.path.dirname(path)] = True
-                    continue
-
-                try:
-                    # it would be nice if this was cheaper
-                    os.rmdir(path)
-                except OSError:
-                    pass
-
-        # log everything
-	for trvCs in cs.iterNewTroveList():
-            if not trvCs.getOldVersion():
-                log.syslog("installed %s=%s[%s]", trvCs.getName(),
-                         trvCs.getNewVersion(), 
-                         deps.formatFlavor(trvCs.getNewFlavor()))
-            else:
-                log.syslog("updated %s=%s[%s]--%s[%s]", trvCs.getName(),
-                         trvCs.getOldVersion(), 
-                         deps.formatFlavor(trvCs.getOldFlavor()),
-                         trvCs.getNewVersion(), 
-                         deps.formatFlavor(trvCs.getNewFlavor()))
-
-	for (name, version, flavor) in cs.getOldTroveList():
-            log.syslog("removed %s=%s[%s]", name, version,
-                       deps.formatFlavor(flavor))
-
-        callback.committingTransaction()
-        self._updateTransactionCounter = True
-	self.commit()
-
-        if rollbackPhase is None and updateDatabase and \
-                csJob.invalidateRollbacks():
+        if rollbackPhase is None and updateDatabase and invalidateRollbacks:
             self.rollbackStack.invalidate()
 
         if rollbackPhase is not None:
@@ -1660,7 +1733,7 @@ class Database(SqlDbRepository):
 
                 localCs.newTrove(newTrv.diff(trv)[0])
 
-            rb.add(reposCs, localCs)
+            rb.add(NoopJobJournal(), reposCs, localCs)
 
         rb = self.rollbackStack.new()
         try:
@@ -1712,6 +1785,79 @@ class Database(SqlDbRepository):
 
     def getRollbackStack(self):
         return self.rollbackStack
+
+    # name looks like "r.%d"
+    def removeRollback(self, name):
+	rollback = int(name[2:])
+        try:
+            shutil.rmtree(self.rollbackCache + "/%d" % rollback)
+        except OSError, e:
+            if e.errno == 2:
+                pass
+	if rollback == self.lastRollback:
+	    self.lastRollback -= 1
+	    self.writeRollbackStatus()
+
+    def getRollbackList(self):
+        self._ensureReadableRollbackStack()
+	list = []
+	for i in range(self.firstRollback, self.lastRollback + 1):
+	    list.append("r.%d" % i)
+
+	return list
+
+    def iterRollbacksList(self):
+        """Generator for rollback data.
+        Returns a list of (rollbackName, rollback)
+        """
+        for rollbackName in reversed(self.getRollbackList()):
+            rb = self.getRollback(rollbackName)
+            yield (rollbackName, rb)
+
+    def invalidateRollbacks(self):
+        """Invalidate the rollback stack."""
+        # Works nicely for the very beginning
+        # (when firstRollback, lastRollback) = (0, -1)
+        self.firstRollback = self.lastRollback + 1
+        self.writeRollbackStatus()
+
+    def readRollbackStatus(self):
+        try:
+            f = open(self.rollbackStatus)
+            (first, last) = f.read()[:-1].split()
+            self.firstRollback = int(first)
+            self.lastRollback = int(last)
+            f.close()
+        except IOError, e:
+            if e.errno == errno.EACCES:
+                self.firstRollback = None
+                self.lastRollback = None
+            else:
+                raise
+
+    def _ensureReadableRollbackStack(self):
+        if (self.firstRollback, self.lastRollback) == (None, None):
+            raise ConaryError("Unable to open rollback directory")
+
+    def hasRollback(self, name):
+	try:
+	    num = int(name[2:])
+	except ValueError:
+	    return False
+
+        self._ensureReadableRollbackStack()
+
+	if (num >= self.firstRollback and num <= self.lastRollback):
+	    return True
+	
+	return False
+
+    def getRollback(self, name):
+	if not self.hasRollback(name): return None
+
+	num = int(name[2:])
+        dir = self.rollbackCache + "/" + "%d" % num
+        return Rollback(dir, load = True)
 
     def applyRollbackList(self, *args, **kwargs):
         try:
@@ -1985,7 +2131,7 @@ class Database(SqlDbRepository):
         top = util.joinPaths(root, path)
         opJournalPath = top + '/journal'
         try:
-            j = journal.JobJournal(opJournalPath, root)
+            j = JobJournal(opJournalPath, root)
         except OSError, e:
             raise OpenError(top, 'journal error: ' + e.strerror)
 

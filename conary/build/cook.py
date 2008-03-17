@@ -1081,26 +1081,33 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     util.mkdirChain(destdir)
 
     if logBuild:
-        # turn on logging of this trove.  Log is packaged as part
-        # of :debug component
+        # turn on logging of this trove.  Logs are packaged as part
+        # of :debuginfo component
         logPath = destdir + recipeObj.macros.buildlogpath
         xmlLogPath = destdir + recipeObj.macros.buildxmlpath
         # during the build, keep the log file in the same dir as buildinfo.
         # that will make it more accessible for debugging.  At the end of 
         # the build, copy to the correct location
         tmpLogPath = builddir + '/' + os.path.basename(logPath)
-
         tmpXmlLogPath = builddir + '/' + os.path.basename(xmlLogPath)
-        # these files alone is not enough to make us build a package
+        # these files alone are not enough to make us build a package
         recipeObj._autoCreatedFileCount += 2
+
+        # subscribeLogPath is never packaged, and is not compressed
+        subscribeLogPath = builddir + '/subscribedLog'
+        recipeObj._setSubscribeLogPath(subscribeLogPath)
+
         util.mkdirChain(os.path.dirname(logPath))
         # touch the logPath files so that the build process expects
         # files to be there for packaging
-        open(logPath, 'w')
-        open(xmlLogPath, 'w')
+        file(logPath, 'w')
+        file(xmlLogPath, 'w')
+        file(subscribeLogPath, 'w')
         try:
             logFile = logger.startLog(tmpLogPath, tmpXmlLogPath,
-                    withStdin = not redirectStdin)
+                                      subscribeLogPath,
+                                      withStdin = not redirectStdin)
+            recipeObj._setLogFile(logFile)
         except OSError, err:
             if err.args[0] == 'out of pty devices':
                 log.warning('*** No ptys found -- not logging build ***')
@@ -1111,10 +1118,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             else:
                 raise
         logFile.pushDescriptor('cook')
-        logFile.pushDescriptor('environment')
         logBuildEnvironment(logFile, sourceVersion, policyTroves,
                                 recipeObj.macros, cfg)
-        logFile.popDescriptor('environment')
     try:
         logBuild and logFile.pushDescriptor('build')
         bldInfo.begin()
@@ -1488,6 +1493,7 @@ def _computeCommonPrefixes(filePaths):
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write
 
+    out.pushDescriptor('environment')
     write('Building %s=%s\n' % (macros.name, sourceVersion))
     write('using conary=%s\n' %constants.version)
     if policyTroves:
@@ -1548,6 +1554,7 @@ def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write("*"*60 + '\n')
 
     write('START OF BUILD:\n\n')
+    out.popDescriptor('environment')
 
 
 def guessUpstreamSourceTrove(repos, srcName, state):
@@ -2132,6 +2139,9 @@ def _copyForwardTroveMetadata(repos, troveList, recipeObj):
         the most recent cook with a different flavor.  If necessary,
         it will search for metadata for components separately from the package.
     """
+    if not repos:
+        log.info('No repository available, not copying forward metadata.')
+        return
     log.info('Copying forward metadata to newly built items...')
     buildBranch = versions.VersionFromString(recipeObj.macros.buildbranch)
     childrenByTrove = {}

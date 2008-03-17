@@ -22,6 +22,7 @@ import gzip
 import os
 import re
 import shutil, subprocess
+import sha
 import sys
 import tempfile
 
@@ -51,7 +52,47 @@ class _Source(_AnySource):
     def __init__(self, recipe, *args, **keywords):
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
-	self.sourcename = sourcename % recipe.macros
+        if isinstance(sourcename, (list, tuple)):
+            # This adds support for multiple URLs in a source.
+            # We stash them in recipe.multiurlMap, keyed on a digest computed
+            # over them. We replace the source with a multiurl:// one that
+            # includes the digest, and we pass that to the lookaside cache.
+            sourcename = [ x % recipe.macros for x in sourcename ]
+            # Create a hash of the URLs in the source
+            archiveName = ''
+            nsources = []
+            for x in sourcename:
+                # Do some of the work _guessName does - if an archive is
+                # provided, use its name
+                if x.endswith('/'):
+                    baseUrl = x[:-1]
+                else:
+                    idx = x.rindex('/')
+                    baseUrl = x[:idx]
+                    fName = x[idx+1:]
+                    if not archiveName:
+                        archiveName = fName
+                    elif archiveName != fName:
+                        raise SourceError("Inconsistent archive names: '%s' "
+                                          "and '%s'" % (archiveName, fName))
+
+                nsources.append(baseUrl)
+            s = sha.new()
+            for src in nsources:
+                s.update(src)
+            multiurlMapName = s.hexdigest()
+
+            if hasattr(recipe, 'multiurlMap'):
+                multiurlMap = recipe.multiurlMap
+            else:
+                multiurlMap = recipe.multiurlMap = {}
+            multiurlMap[multiurlMapName] = sourcename
+            # If archiveName is not set, it's an empty string, so the
+            # source line is well-formed
+            self.sourcename = "multiurl://%s/%s" % (multiurlMapName,
+                                                    archiveName)
+        else:
+            self.sourcename = sourcename % recipe.macros
         self._guessName()
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
@@ -210,9 +251,14 @@ class _Source(_AnySource):
             sourceDir = self.sourceDir or '.'
             return action._expandOnePath(util.joinPaths(sourceDir, self.sourcename), self.recipe.macros, defaultDir = defaultDir, braceGlob = braceGlob)
 
+        if hasattr(self.recipe, 'multiurlMap'):
+            multiurlMap = self.recipe.multiurlMap
+        else:
+            multiurlMap = None
         source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             self.sourcename, self.recipe.name, self.recipe.srcdirs,
-            httpHeaders=httpHeaders, guessName=self.guessname)
+            httpHeaders=httpHeaders, guessName=self.guessname,
+            multiurlMap=multiurlMap)
 
         return source
 
@@ -277,6 +323,11 @@ class addArchive(_Source):
     specified by the C{mirrorDirs} Conary configuration file entry or a set
     of default mirror files located in the C{/etc/conary/mirrors} directory.
     The mirror files are comprised of mirror URLs, listed  one entry per line.
+
+    If the specified I{archivename} is a list of URLs, C{r.addArchive} will
+    attempt to download the files, using the rules described above, from
+    each URL, until one of them succeeds. Note that the archive name has be
+    identical for all URLs.
 
     KEYWORDS
     ========
@@ -913,7 +964,7 @@ class addSource(_Source):
     B{keyid} : Using the C{keyid} keyword indicates the eight-digit
     GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
     source code archive signature should be sought, and checked.
-    If you provide the C{keyid} keyword, C{r.addArchive} will
+    If you provide the C{keyid} keyword, C{r.addSource} will
     search for a file named I{sourcename}C{.{sig,sign,asc}}, and
     ensure it is signed with the appropriate GPG key. A missing signature
     results in a warning; a failed signature check is fatal.
@@ -926,7 +977,7 @@ class addSource(_Source):
 
     B{mode}: If set, provides the mode to set on the file.
 
-    B{rpm} : If the C{rpm} keyword is used, C{addArchive} looks in the file, or
+    B{rpm} : If the C{rpm} keyword is used, C{addSource} looks in the file, or
     URL specified by C{rpm} for an RPM containing I{sourcename}.
 
     B{use} : A Use flag or boolean, or a tuple of Use flags and/or booleans,
