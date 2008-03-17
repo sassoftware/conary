@@ -3911,8 +3911,6 @@ class reportErrors(policy.Policy, policy.GroupPolicy):
         groupError = keywords.pop('groupError', None)
         if groupError is not None:
             self.groupError = groupError
-        #import epdb
-        #epdb.st()
 
     def do(self):
 	if self.errors:
