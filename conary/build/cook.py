@@ -2124,6 +2124,9 @@ def _copyForwardTroveMetadata(repos, troveList, recipeObj):
         the most recent cook with a different flavor.  If necessary,
         it will search for metadata for components separately from the package.
     """
+    if not repos:
+        log.info('No repository available, not copying forward metadata.')
+        return
     log.info('Copying forward metadata to newly built items...')
     buildBranch = versions.VersionFromString(recipeObj.macros.buildbranch)
     childrenByTrove = {}

@@ -17,6 +17,10 @@ Changes in @NEW@:
     * A bug in finding the sources required to build all the packages for
       a group that omitted replace() packages has been fixed.  This mainly
       affected rmake builds of group recipes. (CNY-2605)
+    * A bug that caused a local cook (e.g., "cvc cook pkg.recipe") to
+      fail at "Copying forward metadata to newly built items..." when
+      the Conary repository for that recipe is not available has been
+      fixed. (CNY-2640)
 
 Changes in 1.2.20:
   o Bug Fixes:
