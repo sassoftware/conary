@@ -3132,17 +3132,6 @@ conary erase '%s=%s[%s]'
             self.db.commitChangeSet(cs, uJob, callback=self.updateCallback, 
                                     **kwargs)
         except Exception, e:
-            # an exception happened, clean up
-            rb = uJob.getRollback()
-            if rb:
-                # remove the last entry from this rollback set
-                # (which is the rollback entriy that roll back
-                # applying this changeset)
-                rb.removeLast()
-                # if there aren't any entries left in the rollback,
-                # remove it altogether, unless we're about to try again
-                if (rb.getCount() == 0):
-                    self.db.removeLastRollback()
             # rollback the current transaction
             self.db.db.rollback()
             if isinstance(e, database.CommitError):

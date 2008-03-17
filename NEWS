@@ -18,6 +18,10 @@ Changes in @NEW@:
       a group that omitted replace() packages has been fixed.  This mainly
       affected rmake builds of group recipes. (CNY-2605)
 
+  o Client changes
+    * More of the update logic is now protected by the filesystem journal,
+      and the journal now cleans up rollback state on failure (CNY-2592)
+
 Changes in 1.2.20:
   o Bug Fixes:
     * A bug that occasionally caused a thread deadlock when multiple
