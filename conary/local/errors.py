@@ -14,8 +14,9 @@
 #
 
 from conary.deps import deps
+from conary.errors import ConaryError
 
-class UpdateError:
+class UpdateError(ConaryError):
 
     pass
 

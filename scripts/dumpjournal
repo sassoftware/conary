@@ -41,6 +41,8 @@ for kind, entry in j:
         print "backup",
     elif kind == journal.JOURNAL_ENTRY_MKDIR:
         print "mkdir",
+    elif kind == journal.JOURNAL_ENTRY_TRYCLEANUPDIR:
+        print "trycleanupdir",
     else:
         assert(0)
 
