@@ -279,7 +279,6 @@ class Database(BaseDatabase):
             self.dbh = mysql.connect(**cdb)
         except mysql.MySQLError, e:
             raise sqlerrors.DatabaseError(e.args[1], e.args)
-        self.dbName = cdb['db']
         cu = self.cursor()
         self._setCharSet(cu)
         self._getMaxPacketSize(cu)
@@ -444,6 +443,8 @@ class Database(BaseDatabase):
     def use(self, dbName):
         cu = self.cursor()
         oldDbName = cu.execute("SELECT database()").fetchone()[0]
+        # need to save and restore self.tempTables because mysql
+        # preserves them as we switch from databse to database
         self.tempTableStorage[oldDbName] = self.tempTables
 
         try:
@@ -454,12 +455,13 @@ class Database(BaseDatabase):
             else:
                 raise
         self.dbName = dbName
+        self.database = "/".join([self.database.rsplit("/", 1), dbName])
+        
         self._setCharSet(cu)
         # wipe out the preloaded schema we had (if any), but don't
         # load up the new one - on mysql this is a very expensive operation
         BaseDatabase.loadSchema(self)
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
-        BaseDatabase.use(self, dbName)
 
     # analyze one or all tables in the database
     def analyze(self, table=""):

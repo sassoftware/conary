@@ -216,6 +216,15 @@ class BaseDatabase:
     driver = "base"
     keywords = BaseKeywordDict()
 
+    # schema caching
+    tables = None
+    views = None
+    tempTables = None
+    functions = None
+    sequences = None
+    triggers = None
+    version = 0
+
     def __init__(self, db):
         assert(db)
         self.database = db
@@ -224,6 +233,8 @@ class BaseDatabase:
         self.stderr = sys.stderr
         self.closed = True
         self.tempTables = sqllib.CaselessDict()
+        self.dbName = None
+
     # close the connection when going out of scope
     def __del__(self):
         self.stderr = self.tempTables = None
@@ -245,21 +256,28 @@ class BaseDatabase:
         m = regex.match(self.database.strip())
         assert(m)
         ret = m.groupdict()
-        if ret["port"] is not None:
-            ret["port"] = int(ret["port"])
+        # names[3] == "port" specification
+        if ret[names[3]] is not None:
+            ret[names[3]] = int(ret[names[3]])
+        # names[4] == "dbName"
+        self.dbName = ret[names[4]]
         return ret
 
-    def connect(self):
+    def connect(self, **kwargs):
         assert(self.database)
         raise RuntimeError("This connect function has to be provided by the database driver")
 
     # reopens the database backend, if required. Kind of specific t sqlite-type backends
     def reopen(self):
-        """Returns True if the database backend was reopenedor a
+        """Returns True if the database backend was reopened or a
         reconnection was required"""
         return False
 
     def close(self):
+        # clean up schema structures
+        self.tables = self.views = self.tempTables = None
+        self.functions = self.sequences = self.triggers = None
+        self.version = 0
         if self.dbh:
             self.dbh.close()
         self.dbh = None
@@ -459,5 +477,7 @@ class BaseDatabase:
         import shell
         shell.shell(self)
 
-    def use(self, dbName):
-        pass
+    def use(self, dbName, **kwargs):
+        """ Connects to a new database using the same login credentials and database host.
+        On sqlite, this emulates a straight new connect() """
+        raise RuntimeError("This function has to be provided by the database driver")

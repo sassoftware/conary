@@ -375,3 +375,9 @@ class Database(BaseDatabase):
                 raise sqlerrors.DatabaseLocked(str(e))
             raise
         return cu
+
+    def use(self, dbName, **kwargs):
+        self.close()
+        self.database = dbName
+        return self.connect(**kwargs)
+

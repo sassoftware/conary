@@ -345,3 +345,7 @@ class Database(BaseDatabase):
         assert (isinstance(table, str))
         cu.execute("ANALYZE %s" %table)
         
+    def use(self, dbName, **kwargs):
+        self.close()
+        self.database = "/".join([self.database.rsplit("/", 1), dbName])
+        return self.connect(**kwargs)
