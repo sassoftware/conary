@@ -141,11 +141,11 @@ class BasePolicy(action.RecipeAction):
     def postPolicy(self):
         if self.unusedFilters['exceptions']:
             for filter in self.unusedFilters['exceptions']:
-                self.error('Exception %s for %s was not used' % \
+                self.warn('Exception %s for %s was not used' % \
                         (filter, self.__class__.__name__))
         if self.unusedFilters['inclusions']:
             for filter in self.unusedFilters['inclusions']:
-                self.error('Inclusion %s for %s was not used' % \
+                self.warn('Inclusion %s for %s was not used' % \
                         (filter, self.__class__.__name__))
 
     # warning and error reporting
