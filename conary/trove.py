@@ -721,7 +721,7 @@ _TROVEINFO_TAG_COMPAT_CLASS   = 19
 _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_COPIED_FROM    = 21
 _TROVEINFO_TAG_IMAGE_GROUP    = 22
-_TROVEINFO_TAG_SOURCE_TYPE    = 23
+_TROVEINFO_TAG_FACTORY        = 23
 _TROVEINFO_TAG_LAST           = 23
 
 def _getTroveInfoSigExclusions(streamDict):
@@ -813,7 +813,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_BUILD_FLAVOR  : (LARGE, OptionalFlavorStream, 'buildFlavor'    ),
         _TROVEINFO_TAG_COPIED_FROM   : (DYNAMIC, TroveCopiedFrom,    'troveCopiedFrom' ),
         _TROVEINFO_TAG_IMAGE_GROUP   : (DYNAMIC, streams.ByteStream, 'imageGroup' ),
-        _TROVEINFO_TAG_SOURCE_TYPE   : (DYNAMIC, streams.StringStream, 'sourceType' ),
+        _TROVEINFO_TAG_FACTORY       : (DYNAMIC, streams.StringStream, 'factory' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1248,11 +1248,11 @@ class Trove(streams.StreamSet):
         for item in items:
             self.troveInfo.metadata.addItem(item)
 
-    def getSourceType(self):
-        return self.troveInfo.sourceType()
+    def getFactory(self):
+        return self.troveInfo.factory()
 
-    def setSourceType(self, val):
-        return self.troveInfo.sourceType.set(val)
+    def setFactory(self, val):
+        return self.troveInfo.factory.set(val)
 
     def changeVersion(self, version):
         self.version.set(version)
