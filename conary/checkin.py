@@ -324,10 +324,11 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     try:
         use.allowUnknownFlags(True)
-        recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
-                                                branch = state.getBranch(),
-                                                ignoreInstalled = True,
-                                                sourceFiles = allPaths)
+        recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
+                            cfg = cfg, repos = repos,
+                            branch = state.getBranch(),
+                            ignoreInstalled = True,
+                            sourceFiles = allPaths).getRecipe()
     finally:
         use.allowUnknownFlags(False)
 
@@ -1378,9 +1379,10 @@ def merge(cfg, repos, versionSpec=None, callback=None):
 
     if os.path.exists(state.getRecipeFileName()):
         use.allowUnknownFlags(True)
-        recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
-                                                branch = state.getBranch(),
-                                                ignoreInstalled = True)
+        recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
+                                cfg = cfg, repos = repos,
+                                branch = state.getBranch(),
+                                ignoreInstalled = True).getRecipe()
     else:
         recipeClass = None.__class__
 
@@ -1988,9 +1990,10 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
 
     use.allowUnknownFlags(True)
-    recipeClass = loadrecipe.getRecipeClass(state, cfg = cfg, repos = repos,
-                                            branch = state.getBranch(),
-                                            ignoreInstalled = True)
+    recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
+                                    cfg = cfg, repos = repos,
+                                    branch = state.getBranch(),
+                                    ignoreInstalled = True).getRecipe()
 
     # fetch all the sources
 

@@ -989,20 +989,21 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
 
     return loader, oldBuildFlavor
 
+class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
+
+    def __init__(self, trv, branch = None, cfg = None, repos = None,
+                 ignoreInstalled = None, sourceFiles = None):
+        def getFile(repos, fileId, fileVersion, path):
+            return open(path)
+
+        RecipeLoaderFromSourceTrove.__init__(self, trv, repos, cfg,
+                                             versionStr=str(branch),
+                                             ignoreInstalled=ignoreInstalled,
+                                             getFileFunction = getFile,
+                                             branch = branch)
+
 def getRecipeClass(trv, branch = None, cfg = None, repos = None,
-                   ignoreInstalled = None, buildFlavor = None, db = None,
-                   overrides = None, directory = None,
-                   sourceFiles = None):
-    def getFile(repos, fileId, fileVersion, path):
-        return open(path)
-
-    loader = RecipeLoaderFromSourceTrove(trv,
-                                    repos, cfg, versionStr=str(branch),
-                                    ignoreInstalled=ignoreInstalled,
-                                    parentDir=directory,
-                                    buildFlavor = buildFlavor,
-                                    db = db, overrides = overrides,
-                                    getFileFunction = getFile,
-                                    branch = branch)
-
-    return loader.getRecipe()
+                   ignoreInstalled = None, sourceFiles = None):
+    l = RecipeLoaderFromSourceDirectory(trv, branch, cfg, repos,
+                                           ignoreInstalled, sourceFiles)
+    return l.getRecipe()
