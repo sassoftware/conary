@@ -267,11 +267,14 @@ class BaseDatabase:
         assert(self.database)
         raise RuntimeError("This connect function has to be provided by the database driver")
 
-    # reopens the database backend, if required. Kind of specific t sqlite-type backends
+    # reopens the database backend, if required.
+    # makes most sense for sqlite-type backends; for networked backends it pings/reconnects
     def reopen(self):
-        """Returns True if the database backend was reopened or a
-        reconnection was required"""
-        return False
+        """Returns True if the database backend was reopened or a reconnection
+        was required"""
+        if self.alive():
+            return False
+        return self.connect()
 
     def close(self):
         # clean up schema structures

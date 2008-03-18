@@ -287,14 +287,16 @@ class Database(BaseDatabase):
         self.closed = False
         return True
 
-    def reopen(self):
-        # make sure the connection is still valid by attempting a
-        # ping.  If an exception happens, reconnect.
+    def alive(self):
+        # MySQL can use its own ping() method to check if the backend is still alive
         try:
             self.dbh.ping()
         except mysql.MySQLError:
-            return self.connect()
-        return False
+            return False
+        except:
+            # hmm, unknown errors here need to be signaled
+            raise
+        return True
 
     # Important: MySQL can not report back a list of temporary tables
     # created in the current connection, therefore the self.tempTables
