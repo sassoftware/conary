@@ -19,6 +19,10 @@ Changes in @NEW@:
       affected rmake builds of group recipes. (CNY-2605)
     * When using PostgreSQL as a repository backend, some queries
       could be executed with poor execution plans (CNY-2639)
+    * A bug that caused a local cook (e.g., "cvc cook pkg.recipe") to
+      fail at "Copying forward metadata to newly built items..." when
+      the Conary repository for that recipe is not available has been
+      fixed. (CNY-2640)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
