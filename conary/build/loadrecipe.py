@@ -1001,9 +1001,3 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              ignoreInstalled=ignoreInstalled,
                                              getFileFunction = getFile,
                                              branch = branch)
-
-def getRecipeClass(trv, branch = None, cfg = None, repos = None,
-                   ignoreInstalled = None, sourceFiles = None):
-    l = RecipeLoaderFromSourceDirectory(trv, branch, cfg, repos,
-                                           ignoreInstalled, sourceFiles)
-    return l.getRecipe()
