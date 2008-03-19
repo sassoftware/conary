@@ -992,12 +992,16 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
 class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
 
     def __init__(self, trv, branch = None, cfg = None, repos = None,
-                 ignoreInstalled = None, sourceFiles = None):
+                 ignoreInstalled = None, sourceFiles = None,
+                 buildFlavor = None):
         def getFile(repos, fileId, fileVersion, path):
             return open(path)
+
+        import epdb;epdb.st('f')
 
         RecipeLoaderFromSourceTrove.__init__(self, trv, repos, cfg,
                                              versionStr=str(branch),
                                              ignoreInstalled=ignoreInstalled,
                                              getFileFunction = getFile,
-                                             branch = branch)
+                                             branch = branch,
+                                             buildFlavor = buildFlavor)

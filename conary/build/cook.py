@@ -1646,7 +1646,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 if versionStr and stateVer != versionStr:
                     return state.getVersion().branch().createVersion(
                                 versions.Revision('%s-1' % (versionStr))), trv
-                return state.getVersion(), trv
+                return state.getVersion(), trv, conaryState.getSourceState()
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
@@ -1672,7 +1672,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
             # a sourceCount.  Reset the sourceCount to 1.
             versionList.sort()
             return versionList[-1].branch().createVersion(
-                        versions.Revision('%s-1' % (versionStr))), None
+                        versions.Revision('%s-1' % (versionStr))), None, None
     if searchBuiltTroves:
         # XXX this is generally a bad idea -- search for a matching
         # built trove on the branch that our source version is to be
@@ -1695,8 +1695,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 # a sourceCount.  Reset the sourceCount to 1.
                 versionList.sort()
                 return versionList[-1].branch().createVersion(
-                            versions.Revision('%s-1' % (versionStr))), None
-    return None, None
+                        versions.Revision('%s-1' % (versionStr))), None, None
+    return None, None, None
 
 def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     if buildFlavor is None:
@@ -1716,15 +1716,21 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     try:
         # make a guess on the branch to use since it can be important
         # for loading superclasses.
-        sourceVersion, upstrTrove = guessSourceVersion(repos, pkgname,
+        sourceVersion, upstrTrove, srcTrv = guessSourceVersion(repos, pkgname,
                                                        None, cfg.buildLabel)
         if sourceVersion:
             branch = sourceVersion.branch()
         else:
             branch = None
 
-        loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
-                                         branch=branch, buildFlavor=buildFlavor)
+        if srcTrv is not None:
+            loader = loadrecipe.RecipeLoaderFromSourceDirectory(
+                                    srcTrv, repos = repos, cfg = cfg,
+                                    branch = branch, buildFlavor = buildFlavor)
+        else:
+            loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
+                                             branch=branch,
+                                             buildFlavor=buildFlavor)
         version = None
     except builderrors.RecipeFileError, msg:
         raise CookError(str(msg))
@@ -1732,7 +1738,8 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     recipeClass = loader.getRecipe()
 
     try:
-        sourceVersion, upstrTrove = guessSourceVersion(repos, recipeClass.name,
+        sourceVersion, upstrTrove, srcTrv = guessSourceVersion(repos,
+                                                       recipeClass.name,
                                                        recipeClass.version,
                                                        cfg.buildLabel)
     except errors.OpenError:
