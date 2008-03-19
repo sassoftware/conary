@@ -842,7 +842,6 @@ class TagSpec(_addInfo):
 		for filename in os.listdir(directory):
 		    path = util.joinPaths(directory, filename)
 		    self.tagList.append(tags.TagFile(path, recipe.macros, True))
-        self.db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
         self.fullReqs = self.recipe._getTransitiveBuildRequiresNames()
         _addInfo.doProcess(self, recipe)
 
@@ -860,8 +859,9 @@ class TagSpec(_addInfo):
         if tag not in tags:
             self.info('%s: %s', name, path)
             tags.set(tag)
-            if tagFile and self.db:
-                for trove in self.db.iterTrovesByPath(tagFile.tagFile):
+            db = self._getDb()
+            if tagFile: 
+                for trove in db.iterTrovesByPath(tagFile.tagFile):
                     troveName = trove.getName()
                     if troveName not in self.fullReqs:
                         # XXX should be error, change after bootstrap
@@ -1732,7 +1732,6 @@ class _dependency(policy.Policy):
     """
 
     def preProcess(self):
-        self.db = None
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
         # interpolate macros, using canonical path form with no trailing /
@@ -2000,12 +1999,6 @@ class _dependency(policy.Policy):
             m = self.recipe.magic[contentsPath]
             contentsPath = macros.destdir + contentsPath
         return m, contentsPath[len(macros.destdir):]
-
-    def _getDb(self):
-        if self.db is None:
-            self.db = database.Database(self.recipe.cfg.root,
-                                        self.recipe.cfg.dbPath)
-        return self.db
 
     def _enforceProvidedPath(self, path, fileType='interpreter',
                              unmanagedError=False):
@@ -2320,7 +2313,6 @@ class Provides(_dependency):
         self.pythonSysPathMap = {}
         self.exceptDeps = []
 	policy.Policy.__init__(self, *args, **keywords)
-        self.db = None
         self.depCache = self.dbDepCacheClass(self._getDb())
 
     def updateArgs(self, *args, **keywords):
@@ -2966,7 +2958,6 @@ class Requires(_addInfo, _dependency):
         self.pythonSysPathMap = {}
         self.pythonModuleFinderMap = {}
         policy.Policy.__init__(self, *args, **keywords)
-        self.db = None
         self.depCache = self.dbDepCacheClass(self._getDb())
 
         ISD = deps.InstructionSetDependency
@@ -3043,9 +3034,6 @@ class Requires(_addInfo, _dependency):
         self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
-        if self.db is None:
-            self.db = database.Database(self.recipe.cfg.root,
-                    self.recipe.cfg.dbPath)
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
 	    return
@@ -3122,11 +3110,12 @@ class Requires(_addInfo, _dependency):
         if self._isJava(m, 'requires'):
             self._addJavaRequirements(path, m, pkg)
 
+        db = self._getDb()
         if self._isPerl(path, m, f):
             perlReqs = self._getPerlReqs(path, fullpath)
             for req in perlReqs:
                 thisReq = deps.parseDep('perl: ' + req)
-                if self.db.getTrovesWithProvides([thisReq]) or \
+                if db.getTrovesWithProvides([thisReq]) or \
                         [x for x in self.recipe.autopkg.components.values() \
                             if x.provides.satisfies(thisReq)]:
                     self._addRequirement(path, req, [], pkg,

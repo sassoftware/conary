@@ -499,8 +499,10 @@ class addArchive(_Source):
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
 
             util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
+            self._addActionPathBuildRequires(['unzip'])
 
 	elif f.endswith(".rpm"):
+            self._addActionPathBuildRequires(['/bin/cpio'])
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir)
             if self.preserveOwnership:
@@ -510,6 +512,7 @@ class addArchive(_Source):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
 
+            self._addActionPathBuildRequires(['isoinfo'])
             _extractFilesFromISO(f, directory=destDir)
 
 	else:
@@ -522,12 +525,15 @@ class addArchive(_Source):
             # details
             ownerParser = None
 
+            actionPathBuildRequires = []
             # Question: can magic() ever get these wrong?!
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
                 _uncompress = "bzip2 -d -c"
+                actionPathBuildRequires.append('bzip2')
             elif isinstance(m, magic.gzip) or f.endswith("gz") \
                    or f.endswith(".Z"):
                 _uncompress = "gzip -d -c"
+                actionPathBuildRequires.append('gzip')
 
             # There are things we know we know...
             _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
@@ -540,10 +546,12 @@ class addArchive(_Source):
                     preserve = 'p'
                 _unpack = "tar -C '%s' -xvvS%sf -" % (destDir, preserve)
                 ownerParser = self._tarOwners
+                actionPathBuildRequires.append('tar')
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd '%s' && cpio -iumd --quiet )" % (destDir,)
                 ownerListCmd = "cpio -tv --quiet"
                 ownerParser = self._cpioOwners
+                actionPathBuildRequires.append('cpio')
             elif _uncompress != 'cat':
                 # if we know we've got an archive, we'll default to
                 # assuming it's an archive of a tar for now
@@ -551,9 +559,11 @@ class addArchive(_Source):
                 # archive
                 _unpack = "tar -C '%s' -xvvSpf -" % (destDir,)
                 ownerParser = self._tarOwners
+                actionPathBuildRequires.append('tar')
             else:
                 raise SourceError, "unknown archive format: " + f
 
+            self._addActionPathBuildRequires(actionPathBuildRequires)
             cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
             fObj = os.popen(cmd)
             s = fObj.read()
@@ -719,6 +729,7 @@ class addPatch(_Source):
     stripped, and a C{dir} keyword, instructing C{r.addPatch} to change to the
     C{lib/Xaw3d} directory prior to applying the patch.
     """
+    _actionPathBuildRequires = set(['patch'])
     keywords = {'level': None,
 		'backup': '',
 		'macros': False,
@@ -1296,6 +1307,7 @@ class _RevisionControl(addArchive):
         pass
 
     def doDownload(self):
+        self._addActionPathBuildRequires([self.name])
         return self.fetch()
 
 class addGitSnapshot(_RevisionControl):

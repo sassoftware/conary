@@ -12,6 +12,8 @@ Changes in @NEW@:
     * The ability to pass multiple URLs to addArchive has been added.
       Conary will try to download the source from each URL, in order,
       until it succeeds. (CNY-2505)
+    * Recipe actions have now the ability to suggest build requirements.
+      (CNY-935)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
