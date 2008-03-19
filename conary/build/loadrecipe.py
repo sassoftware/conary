@@ -997,8 +997,6 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
         def getFile(repos, fileId, fileVersion, path):
             return open(path)
 
-        import epdb;epdb.st('f')
-
         RecipeLoaderFromSourceTrove.__init__(self, trv, repos, cfg,
                                              versionStr=str(branch),
                                              ignoreInstalled=ignoreInstalled,
