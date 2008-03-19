@@ -32,6 +32,10 @@ Changes in @NEW@:
       fail at "Copying forward metadata to newly built items..." when
       the Conary repository for that recipe is not available has been
       fixed. (CNY-2640)
+    * Checking out source components which used factories now preserves
+      the factory
+    * Building directly from recipe files which use factories for superclasses
+      now works (CNY-2656)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
