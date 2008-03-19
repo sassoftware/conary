@@ -264,6 +264,9 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
     for trvInfo, spec in itertools.izip(trvList, checkoutSpecs):
         sourceState = spec.conaryState.getSourceState()
         troveCs = cs.getNewTroveVersion(*trvInfo)
+        trv = trove.Trove(troveCs)
+        if trv.getFactory():
+            sourceState.setFactory(trv.getFactory())
 
         for (pathId, path, fileId, version) in troveCs.getNewFileList():
             pathMap[(trvInfo, path)] = (spec.targetDir, pathId, fileId, version)
