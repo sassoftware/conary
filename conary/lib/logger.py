@@ -26,6 +26,7 @@ import sys
 import termios
 import threading
 import time
+import tty
 from xml.sax import saxutils
 from conary.errors import ConaryError
 
@@ -316,12 +317,12 @@ class XmlLogWriter(LogWriter):
 
     @callable
     def pushDescriptor(self, descriptor):
-        descriptorStack = self.data.__dict__.get('descriptorStack', [])
+        descriptorStack = self._getDescriptorStack()
         descriptorStack.append(descriptor)
 
     @callable
     def popDescriptor(self, descriptor = None):
-        descriptorStack = self.data.__dict__.get('descriptorStack', [])
+        descriptorStack = self._getDescriptorStack()
         desc = descriptorStack.pop()
         if descriptor:
             assert descriptor == desc
@@ -660,6 +661,17 @@ class Logger:
             self.oldTermios = termios.tcgetattr(sys.stdin.fileno())
         else:
             self.oldTermios = None
+
+        newTermios = termios.tcgetattr(slaveFd)
+        # Don't wait after receiving a character
+        newTermios[6][termios.VTIME] = '\x00'
+        # Read at least these many characters before returning
+        newTermios[6][termios.VMIN] = '\x01'
+
+        termios.tcsetattr(slaveFd, termios.TCSADRAIN, newTermios)
+        # Raw mode
+        tty.setraw(slaveFd)
+
         self.oldStderr = os.dup(sys.stderr.fileno())
         self.oldStdout = os.dup(sys.stdout.fileno())
         if self.withStdin:
@@ -671,7 +683,6 @@ class Logger:
         os.dup2(slaveFd, 2)
         os.close(slaveFd)
         self.logging = True
-        return
 
     def close(self):
         """ Reassert control of tty.  Closing stdin, stderr, and and stdout
@@ -778,6 +789,7 @@ class _ChildLogger:
             if ptyFd in read:
                 # read output from pseudo terminal stdout/stderr, and pass to
                 # terminal and log
+
                 try:
                     output = os.read(ptyFd, BUFFER)
                 except OSError, msg:
@@ -814,8 +826,6 @@ class _ChildLogger:
                         # input/output error - stdin closed 
                         # shut down logger
                         break
-                        if unLogged:
-                            lexer.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error
