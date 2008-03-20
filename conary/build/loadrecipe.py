@@ -535,12 +535,15 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
         recipe.addLoadedSpecs(factoryClass._loadedSpecs)
 
         recipe.addLoadedTroves(factoryClass._loadedTroves)
-        recipe.addLoadedTroves(
-                        [ factoryClass._trove.getNameVersionFlavor() ])
-        recipe.addLoadedSpecs(
-                        { factoryClass.name :
-                            (factoryClass._trove.getNameVersionFlavor(),
-                             factoryClass) } )
+
+        if factoryClass._trove:
+            # this doesn't happen if you load from the local directory
+            recipe.addLoadedTroves(
+                            [ factoryClass._trove.getNameVersionFlavor() ])
+            recipe.addLoadedSpecs(
+                            { factoryClass.name :
+                                (factoryClass._trove.getNameVersionFlavor(),
+                                 factoryClass) } )
 
         return recipe
 
@@ -844,10 +847,13 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
             log.info('Loading %s from %s' % (name, localfile))
+            # ick
+            factory = name.startswith('factory-')
             loader = RecipeLoader(localfile, cfg, repos=repos,
                                   ignoreInstalled=alwaysIgnoreInstalled,
                                   buildFlavor=buildFlavor,
-                                  db=db)
+                                  db=db, factory=factory)
+            loader.recipe._trove = None
 
     if not loader and not findInstalled:
         # optimization: look on filesystem and local database to determine if
@@ -1032,4 +1038,5 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              ignoreInstalled=ignoreInstalled,
                                              getFileFunction = getFile,
                                              branch = branch,
-                                             buildFlavor = buildFlavor)
+                                             buildFlavor = buildFlavor,
+                                             parentDir = os.getcwd())

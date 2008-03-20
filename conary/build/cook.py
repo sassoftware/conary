@@ -421,7 +421,6 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     if repos:
         try:
-            import epdb;epdb.st('f')
             trove = repos.getTrove(srcName, sourceVersion, deps.Flavor(),
                                    withFiles = False)
             sourceVersion = trove.getVersion()
@@ -1020,11 +1019,11 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     lcache = lookaside.RepositoryCache(repos)
 
-    if requireCleanSources:
-        srcdirs = []
-    else:
-        srcdirs = [ os.path.dirname(recipeClass.filename),
-                    cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
+    srcdirs = []
+    if not requireCleanSources:
+        if 'filename' in recipeClass.__dict__:
+            srcdirs.append(os.path.dirname(recipeClass.filename))
+        srcdirs.append(cfg.sourceSearchDir % {'pkgname': recipeClass.name})
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
 
     for k, v in cfg.environment.items():
@@ -1756,18 +1755,23 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
         sourceVersion = None
 
     if not sourceVersion:
-        # just make up a sourceCount -- there's no version in 
-        # the repository to compare against
-        if not cfg.buildLabel:
-            cfg.buildLabel = versions.LocalLabel()
-        sourceVersion = versions.VersionFromString('/%s/%s-1' % (
-                                               cfg.buildLabel.asString(),
-                                               recipeClass.version))
-        # the source version must have a time stamp
-        sourceVersion.trailingRevision().resetTimeStamp()
+        sourceVersion = newPackageSourceCount(cfg, recipeClass)
+
     recipeClass._trove = upstrTrove
     return loader, recipeClass, sourceVersion
 
+def newPackageSourceCount(cfg, recipeClass):
+    # just make up a sourceCount -- there's no version in 
+    # the repository to compare against
+    if not cfg.buildLabel:
+        cfg.buildLabel = versions.LocalLabel()
+    sourceVersion = versions.VersionFromString('/%s/%s-1' % (
+                                           cfg.buildLabel.asString(),
+                                           recipeClass.version))
+    # the source version must have a time stamp
+    sourceVersion.trailingRevision().resetTimeStamp()
+
+    return sourceVersion
 
 def cookItem(repos, cfg, item, prep=0, macros={},
 	     emerge = False, resume = None, allowUnknownFlags = False,
@@ -1838,6 +1842,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                                                    recipeClass.version,
                                                    cfg.buildLabel,
                                                    conaryState = item)[0]
+                if not sourceVersion:
+                    sourceVersion = newPackageSourceCount(cfg, recipeClass)
             else:
                 loader, recipeClass, sourceVersion = \
                                   getRecipeInfoFromPath(repos, cfg, name,
