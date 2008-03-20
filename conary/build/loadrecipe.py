@@ -437,14 +437,12 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                     versionStr = sourceTrove.getVersion().branch()
 
             factoryName = 'factory-' + sourceTrove.getFactory()
-            loader = RecipeLoaderFromRepository(factoryName, cfg, repos,
-                                    versionStr=versionStr, labelPath=labelPath,
-                                    ignoreInstalled=ignoreInstalled,
-                                    filterVersions=filterVersions,
-                                    parentDir=parentDir,
-                                    defaultToLatest = defaultToLatest,
-                                    buildFlavor = buildFlavor,
-                                    db = db, overrides = overrides)
+
+            loader = ChainedRecipeLoader(factoryName, None, True, cfg,
+                                         repos, branch, name, parentDir,
+                                         buildFlavor, ignoreInstalled,
+                                         overrides, db)
+
             # XXX name + '.recipe' sucks, but there isn't a filename that
             # actually exists
             factoryCreatedRecipe = self.recipeFromFactory(sourceTrove,
@@ -801,6 +799,9 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
     name, versionStr, flavor = cmdline.parseTroveSpec(troveSpec)
     versionSpec, flavorSpec = versionStr, flavor
 
+    if db is None:
+        db = database.Database(cfg.root, cfg.dbPath)
+
     if name.endswith('.recipe'):
         file = name
         name = name[:-len('.recipe')]
@@ -814,7 +815,7 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
         if flavorSpec is not None and not troveSpec.isEmpty():
             troveSpec = '%s[%s]' % (troveSpec, flavorSpec)
 
-    if troveSpec in overrides:
+    if overrides and troveSpec in overrides:
         recipeToLoad, newOverrideDict = overrides[troveSpec]
         if hasattr(newOverrideDict, '_loadedSpecs'):
             # handle case where loadSpec is passed directly back in
@@ -825,7 +826,8 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
     #first check to see if a filename was specified, and if that 
     #recipe actually exists.   
     loader = None
-    if not (recipeToLoad or label or versionStr or (flavor is not None)):
+    if parentDir and not (recipeToLoad or label or versionStr or
+                            (flavor is not None)):
         if name[0] != '/':
             localfile = parentDir + '/' + file
         else:
@@ -934,15 +936,12 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     parentDir = callerGlobals['directory']
     buildFlavor = callerGlobals.get('buildFlavor', None)
     alwaysIgnoreInstalled = callerGlobals.get('ignoreInstalled', False)
+    db = callerGlobals.get('db', None)
 
     # overrides could be None and we want to set it
     overrides = callerGlobals.get('overrides', None)
     if overrides is None:
         overrides = {}
-
-    db = callerGlobals.get('db', None)
-    if db is None:
-        db = database.Database(cfg.root, cfg.dbPath)
 
     loader = ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
                                  repos, branch, parentPackageName,
