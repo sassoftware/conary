@@ -21,7 +21,18 @@ from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions
 
 class RepositoryMismatch(RepositoryError):
+
+    def marshall(self, marshaller):
+        return (self.right, self.wrong), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return tup[0:2], {}
+
     def __init__(self, right = None, wrong = None):
+        if issubclass(right.__class__, list):
+            right = list(right)
+
         self.right = right
         self.wrong = wrong
         if right and wrong:
@@ -43,7 +54,6 @@ class RepositoryMismatch(RepositoryError):
             msg = ('Repository name mismatch.  Check for incorrect '
                    'repositoryMap entries.')
         ConaryError.__init__(self, msg)
-
 
 class InsufficientPermission(ConaryError):
 
@@ -97,6 +107,9 @@ class OpenError(RepositoryError):
     other problems.
     """
 
+class RepositoryClosed(OpenError):
+    """Repository is closed"""
+
 class CommitError(RepositoryError):
     """Error occurred commiting a trove"""
 
@@ -104,11 +117,21 @@ class DuplicateBranch(RepositoryError):
     """Error occurred commiting a trove"""
 
 class InvalidSourceNameError(RepositoryError):
+
+    def marshall(self, marshaller):
+        return (self.name, self.version, self.oldSourceItem,
+                self.newSourceItem), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return tup[0:4], {}
+
     def __init__(self, n, v, oldItem, newItem, *args):
         self.name = n
         self.version = v
         self.oldSourceItem = oldItem
         self.newSourceItem = newItem
+
     def __str__(self):
         return """
 SourceItem conflict detected for node %s=%s: %s cannot change to %s
@@ -118,6 +141,29 @@ Try to update the version number of the troves being comitted and retry.
         
 class TroveMissing(RepositoryError, InternalConaryError):
     troveType = "trove"
+
+    def marshall(self, marshaller):
+        trvName = self.troveName
+        trvVersion = self.version
+        if not trvName:
+            trvName = trvVersion = ""
+        elif not trvVersion:
+            trvVersion = ""
+        else:
+            if not isinstance(self.version, str):
+                trvVersion = marshaller.fromVersion(trvVersion)
+        return (trvName, trvVersion), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        (name, version) = tup[0:2]
+        if not name: name = None
+        if not version:
+            version = None
+        else:
+            version = marshaller.toVersion(version)
+        return (name, version), {}
+
     def __str__(self):
         if type(self.version) == list:
             return ('%s %s does not exist for any of '
@@ -166,13 +212,34 @@ class UnknownException(RepositoryError, InternalConaryError):
 class UserAlreadyExists(RepositoryError):
     pass
 
+# FIXME: deprecated, could be returned by pre-2.0 servers
 class GroupAlreadyExists(RepositoryError):
     pass
 
+# FIXME: deprecated, could be returned by pre-2.0 servers
 class GroupNotFound(RepositoryError):
     pass
 
+class RoleAlreadyExists(RepositoryError):
+    pass
+
+class RoleNotFound(RepositoryError):
+    pass
+
+# FIXME: deprecated, could be returned by pre-2.0 servers
 class UnknownEntitlementGroup(RepositoryError):
+    pass
+
+class UnknownEntitlementClass(RepositoryError):
+    pass
+
+class EntitlementClassAlreadyExists(RepositoryError):
+    pass
+
+class EntitlementKeyAlreadyExists(RepositoryError):
+    pass
+
+class EntitlementClassAlreadyHasRole(RepositoryError):
     pass
 
 class InvalidEntitlement(RepositoryError):
@@ -182,6 +249,13 @@ class TroveChecksumMissing(RepositoryError):
     _error = ('Checksum Missing Error: Trove %s=%s[%s] has no sha1 checksum'
               ' calculated, so it was rejected.  Please upgrade conary.')
 
+    def marshall(self, marshaller):
+        return (str(self), marshaller.fromTroveTup(self.nvf)), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return marshaller.toTroveTup(tup[1]), {}
+
     def __init__(self, name, version, flavor):
         self.nvf = (name, version, flavor)
         RepositoryError.__init__(self, self._error % self.nvf)
@@ -189,6 +263,17 @@ class TroveChecksumMissing(RepositoryError):
 class TroveSchemaError(RepositoryError):
     _error = ("Trove Schema Error: attempted to commit %s=%s[%s] with version"
               " %s, but repository only supports %s")
+
+    def marshall(self, marshaller):
+        return (str(self), marshaller.fromTroveTup(self.nvf), self.troveSchema,
+                self.supportedSchema), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        # value 0 is the full message, for older clients that don't
+        # know about this exception so the text for unknown description is
+        # at least helpful
+        return marshaller.toTroveTup(tup[1]) + tuple(tup[2:4]), {}
 
     def __init__(self, name, version, flavor, troveSchema, supportedSchema):
         self.nvf = (name, version, flavor)
@@ -218,7 +303,16 @@ class InvalidServerVersion(RepositoryError):
 
 class GetFileContentsError(RepositoryError):
     error = 'Base GetFileContentsError: %s %s'
-    def __init__(self, (fileId, fileVer)):
+
+    def marshall(self, marshaller):
+        return (marshaller.fromFileId(self.fileId),
+                marshaller.fromVersion(self.fileVer)), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return (marshaller.toFileId(tup[0]), marshaller.toVersion(tup[1])), {}
+
+    def __init__(self, fileId, fileVer):
         self.fileId = fileId
         self.fileVer = fileVer
         RepositoryError.__init__(self, self.error % 
@@ -249,6 +343,13 @@ class FileStreamMissing(RepositoryError):
     # This, instead of FileStreamNotFound, is returned when no version
     # is available for the file stream the server tried to lookup.
 
+    def marshall(self, marshaller):
+        return (marshaller.fromFileId(self.fileId), ), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return (marshaller.toFileId(tup[0]), ), {}
+
     def __init__(self, fileId):
         self.fileId = fileId
         RepositoryError.__init__(self, '''File Stream Missing
@@ -275,6 +376,13 @@ class ProxyError(RepositoryError):
     pass
 
 class EntitlementTimeout(RepositoryError):
+
+    def marshall(self, marshaller):
+        return tuple(self.entitlements), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return tup, {}
 
     def __str__(self):
         return "EntitlementTimeout for %s" % ",".join(self.entitlements)
@@ -305,24 +413,9 @@ class CannotCalculateDownloadSize(RepositoryError):
 # class back to the client.  The str() value of the exception will
 # be returned as the exception argument.
 simpleExceptions = (
-    (AlreadySignedError,         'AlreadySignedError'),
     (BadSelfSignature,           'BadSelfSignature'),
     (DigitalSignatureVerificationError, 'DigitalSignatureVerificationError'),
-    (GroupAlreadyExists,         'GroupAlreadyExists'),
     (IncompatibleKey,            'IncompatibleKey'),
-    (IntegrityError,             'IntegrityError'),
-    (InvalidClientVersion,       'InvalidClientVersion'),
     (KeyNotFound,                'KeyNotFound'),
-    (UserAlreadyExists,          'UserAlreadyExists'),
-    (UserNotFound,               'UserNotFound'),
-    (GroupNotFound,              'GroupNotFound'),
-    (CommitError,                'CommitError'),
-    (DuplicateBranch,            'DuplicateBranch'),
-    (UnknownEntitlementGroup,    'UnknownEntitlementGroup'),
-    (InvalidEntitlement,         'InvalidEntitlement'),
-    (CannotChangePassword,       'CannotChangePassword'),
     (InvalidRegex,               'InvalidRegex'),
-    (InvalidName,                'InvalidName'),
-    (ReadOnlyRepositoryError,    'ReadOnlyRepositoryError'),
-    (ProxyError,                 'ProxyError'),
     )

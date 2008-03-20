@@ -12,9 +12,9 @@
 # full details.
 #
 
-kid_files =     add_ent.kid             \
-                add_ent_group.kid       \
-                add_group.kid		\
+kid_files =     add_ent_class.kid       \
+                add_ent_key.kid         \
+                add_role.kid		\
 		add_user.kid 		\
 		browse.kid		\
 		change_password.kid	\

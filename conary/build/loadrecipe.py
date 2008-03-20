@@ -22,9 +22,10 @@ import tempfile
 import traceback
 
 from conary.repository import errors
-from conary.build import recipe,use
+from conary.build import recipe, use
 from conary.build import errors as builderrors
 from conary.build.errors import RecipeFileError
+from conary.build.factory import Factory as FactoryRecipe
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log, util
@@ -71,7 +72,7 @@ def localImport(d, package, modules=()):
     l = d.setdefault('__localImportModules', [])
     l.append(m)
 
-def setupRecipeDict(d, filename, directory=None):
+def setupRecipeDict(d, filename, directory=None, factory=False):
     localImport(d, 'conary.build', ('build', 'action'))
     localImport(d, 'conary.build.loadrecipe', 
                                    ('loadSuperClass', 'loadInstalled',
@@ -98,6 +99,10 @@ def setupRecipeDict(d, filename, directory=None):
         localImport(d, x)
     localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
                                         'PackageFlags'))
+
+    if factory:
+        localImport(d, 'conary.build.factory', ('Factory', 'FactoryException' ))
+
     d['filename'] = filename
     if not directory:
         directory = os.path.dirname(filename)
@@ -175,20 +180,95 @@ class RecipeLoader:
 
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
-                 buildFlavor=None, db=None,
-                 overrides = None):
+                 buildFlavor=None, db=None, overrides = None,
+                 factory = False, objDict = {}):
         try:
             self._load(filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
                        buildFlavor=buildFlavor, db=db,
-                       overrides=overrides)
+                       overrides=overrides, factory = factory,
+                       objDict = objDict)
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
+    def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
+        result = None
+        for (name, obj) in objDict.items():
+            if not inspect.isclass(obj):
+                continue
+            # if a recipe has been marked to be ignored (for example, if
+            # it was loaded from another recipe by loadRecipe()
+            # (don't use hasattr here, we want to check only the recipe
+            # class itself, not any parent class
+            if 'internalAbstractBaseClass' in obj.__dict__:
+                continue
+            # make sure the class is derived from either Recipe or Factory
+            if ((    factory and not issubclass(obj, FactoryRecipe)) or
+                (not factory and not issubclass(obj, recipe.Recipe  ))):
+                continue
+
+            if hasattr(obj, 'name') and hasattr(obj, 'version'):
+                self._validateRecipe(obj, pkgname, basename)
+
+                if result:
+                    raise builderrors.RecipeFileError(
+                        'Error in recipe file "%s": multiple recipe classes '
+                        'with both name and version exist' % basename)
+
+                result = (name, obj)
+            else:
+                raise builderrors.RecipeFileError(
+                    "Recipe in file/component '%s' did not contain both a name"
+                    " and a version attribute." % pkgname)
+
+        if not result:
+            raise builderrors.RecipeFileError(
+                "file/component '%s' did not contain a valid recipe" % pkgname)
+
+        return result
+
+    @staticmethod
+    def _validateRecipe(recipeClass, packageName, fileName):
+        if recipeClass.name[0] not in string.ascii_letters + string.digits:
+            raise RecipeFileError(
+                'Error in recipe file "%s": package name must start '
+                'with an ascii letter or digit.' % fileName)
+
+        if '-' in recipeClass.version:
+            raise RecipeFileError(
+                "Version string %s has illegal '-' character" % recipeClass.version)
+
+        if recipeClass.name != packageName:
+            raise RecipeFileError(
+                        "Recipe object name '%s' does not match "
+                        "file/component name '%s'"
+                        % (recipeClass.name, packageName))
+
+        packageType = recipeClass.getType()
+
+        prefixes = {recipe.RECIPE_TYPE_INFO: 'info-',
+                    recipe.RECIPE_TYPE_GROUP: 'group-',
+                    recipe.RECIPE_TYPE_FILESET: 'fileset-'}
+
+        if packageType in prefixes:
+            if not recipeClass.name.startswith(prefixes[packageType]):
+                raise builderrors.BadRecipeNameError(
+                        'recipe name must start with "%s"' % prefixes[packageType])
+        elif packageType == recipe.RECIPE_TYPE_REDIRECT:
+            # redirects are allowed to have any format
+            pass
+        else:
+            for prefix in prefixes.itervalues():
+                if recipeClass.name.startswith(prefix):
+                    raise builderrors.BadRecipeNameError(
+                                    'recipe name cannot start with "%s"' % prefix)
+        recipeClass.validateClass()
+
     def _load(self, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
-              buildFlavor=None, db=None, overrides=None):
+              buildFlavor=None, db=None, overrides=None, factory=False,
+              objDict = None):
         self.recipes = {}
 
         if filename[0] != "/":
@@ -212,7 +292,8 @@ class RecipeLoader:
         self.module.__dict__['db'] = db
         self.module.__dict__['buildFlavor'] = buildFlavor
 
-        setupRecipeDict(self.module.__dict__, filename, directory)
+        setupRecipeDict(self.module.__dict__, filename, directory,
+                        factory = factory)
 
         self.module.__dict__['component'] = component
         self.module.__dict__['branch'] = branch
@@ -221,7 +302,8 @@ class RecipeLoader:
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
         self.module.__dict__['overrides'] = overrides
-
+        if objDict:
+            self.module.__dict__.update(objDict)
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -277,53 +359,28 @@ class RecipeLoader:
         del self.module.__dict__['buildFlavor']
         del self.module.__dict__['overrides']
 
-        found = False
-        for (name, obj) in self.module.__dict__.items():
-            if not inspect.isclass(obj) or not issubclass(obj, recipe.Recipe):
-                continue
-            # if a recipe has been marked to be ignored (for example, if
-            # it was loaded from another recipe by loadRecipe()
-            # (don't use hasattr here, we want to check only the recipe
-            # class itself, not any parent class
-            if 'internalAbstractBaseClass' in obj.__dict__:
-                continue
-            # make sure the class is derived from Recipe
-            if not issubclass(obj, recipe.Recipe):
-                continue
+        (name, obj) = self._findRecipeClass(pkgname, basename,
+                                            self.module.__dict__,
+                                            factory = factory)
+        self.recipes[name] = obj
+        obj.filename = filename
+        self.recipe = obj
+        # create a reference to this module inside of the recipe to prevent
+        # the module from getting unloaded
+        obj.__moduleObj__ = self.module
 
-            self.recipes[name] = obj
-            obj.filename = filename
-            if hasattr(obj, 'name') and hasattr(obj, 'version'):
-                validateRecipe(obj, pkgname, basename)
+        # inherit any tracked flags that we found while loading parent
+        # classes.  Also inherit the list of recipes classes needed to load
+        # this recipe.
+        self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
+        self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
 
-                if found:
-                    raise builderrors.RecipeFileError(
-                        'Error in recipe file "%s": multiple recipe classes '
-                        'with both name and version exist' % basename)
-                self.recipe = obj
-                
-                found = True
-            else:
-                raise builderrors.RecipeFileError(
-                    "Recipe in file/component '%s' did not contain both a name"
-                    " and a version attribute." % pkgname)
-        if found:
-            # inherit any tracked flags that we found while loading parent
-            # classes.  Also inherit the list of recipes classes needed to load
-            # this recipe.
-            self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
-            self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
-
-            if self.recipe._trackedFlags is not None:
-                use.setUsed(self.recipe._trackedFlags)
-            self.recipe._trackedFlags = use.getUsed()
-            if buildFlavor is not None:
-                self.recipe._buildFlavor = buildFlavor
-            self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
-        else:
-            # we'll get this if the recipe file is empty 
-            raise builderrors.RecipeFileError(
-                "file/component '%s' did not contain a valid recipe" % pkgname)
+        if self.recipe._trackedFlags is not None:
+            use.setUsed(self.recipe._trackedFlags)
+        self.recipe._trackedFlags = use.getUsed()
+        if buildFlavor is not None:
+            self.recipe._buildFlavor = buildFlavor
+        self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
 
     def allRecipes(self):
         return self.recipes
@@ -336,6 +393,207 @@ class RecipeLoader:
             del sys.modules[self.file]
         except:
             pass
+
+class RecipeLoaderFromSourceTrove(RecipeLoader):
+
+    @staticmethod
+    def findFileByPath(sourceTrove, path):
+        for (pathId, filePath, fileId, fileVersion) in sourceTrove.iterFileList():
+            if filePath == path:
+                return (fileId, fileVersion)
+
+        return None
+
+    def __init__(self, sourceTrove, repos, cfg, versionStr=None, labelPath=None,
+                 ignoreInstalled=False, filterVersions=False,
+                 parentDir=None, defaultToLatest = False,
+                 buildFlavor = None, db = None, overrides = None,
+                 getFileFunction = None, branch = None):
+        self.recipes = {}
+
+        if getFileFunction is None:
+            getFileFunction = lambda repos, fileId, fileVersion, path: \
+                    repos.getFileContents([ (fileId, fileVersion) ])[0].get()
+
+        name = sourceTrove.getName().split(':')[0]
+
+        if (sourceTrove.getFactory() and
+            sourceTrove.getFactory() != 'factory'):
+            if not versionStr:
+                if branch:
+                    versionStr = str(branch)
+                else:
+                    versionStr = sourceTrove.getVersion().branch()
+
+            factoryName = 'factory-' + sourceTrove.getFactory()
+            loader = RecipeLoaderFromRepository(factoryName, cfg, repos,
+                                    versionStr=versionStr, labelPath=labelPath,
+                                    ignoreInstalled=ignoreInstalled,
+                                    filterVersions=filterVersions,
+                                    parentDir=parentDir,
+                                    defaultToLatest = defaultToLatest,
+                                    buildFlavor = buildFlavor,
+                                    db = db, overrides = overrides)
+            # XXX name + '.recipe' sucks, but there isn't a filename that
+            # actually exists
+            factoryCreatedRecipe = self.recipeFromFactory(sourceTrove,
+                                                          loader.getRecipe(),
+                                                          name,
+                                                          name + '.recipe',
+                                                          repos,
+                                                          getFileFunction)
+            factoryCreatedRecipe._trove = sourceTrove.copy()
+
+            self.recipes.update(loader.recipes)
+            self.recipes[factoryCreatedRecipe.name] = factoryCreatedRecipe
+        else:
+            factoryCreatedRecipe = None
+
+        recipePath = name + '.recipe'
+        match = self.findFileByPath(sourceTrove, recipePath)
+
+        if not match and factoryCreatedRecipe:
+            # this is a recipeless factory; use the recipe class created
+            # by the factory for this build
+            self.recipe = factoryCreatedRecipe
+            # this validates the class is well-formed as a recipe
+            self._findRecipeClass(name, name + '.recipe',
+                                  { self.recipe.name : self.recipe })
+            return
+        elif not match:
+            # this is just missing the recipe; we need it
+            raise builderrors.RecipeFileError("version %s of %s does not "
+                                              "contain %s" %
+                      (sourceTrove.getName(),
+                       sourceTrove.getVersion().asString(),
+                       filename))
+
+        (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
+                                            dir=cfg.tmpDir)
+        outF = os.fdopen(fd, "w")
+
+        inF = getFileFunction(repos, match[0], match[1], recipePath)
+
+        util.copyfileobj(inF, outF)
+
+        del inF
+        outF.close()
+        del outF
+
+        if branch is None:
+            branch = sourceTrove.getVersion().branch()
+
+        if factoryCreatedRecipe:
+            objDict = { 'FactoryRecipeClass' : factoryCreatedRecipe }
+        else:
+            objDict = {}
+
+        try:
+            RecipeLoader.__init__(self, recipeFile, cfg, repos,
+                      sourceTrove.getName(),
+                      branch = branch,
+                      ignoreInstalled=ignoreInstalled,
+                      directory=parentDir, buildFlavor=buildFlavor,
+                      db=db, overrides=overrides,
+                      factory = (sourceTrove.getFactory() == 'factory'),
+                      objDict = objDict)
+        finally:
+            os.unlink(recipeFile)
+
+        self.recipe._trove = sourceTrove.copy()
+
+    def recipeFromFactory(self, sourceTrv, factoryClass, pkgname,
+                          recipeFileName, repos, getFileFunction):
+        # (fileId, fileVersion) by path
+        pathDict = dict( (x[1], (x[2], x[3])) for x in
+                                                sourceTrv.iterFileList() )
+        def openSourceFile(path):
+            if path not in pathDict:
+                raise builderrors.LoadRecipeError(
+                        'Path %s not found in %s=%s', path,
+                        sourceTrv.getName(), sourceTrv.getVersion())
+
+            fileId, fileVersion = pathDict[path]
+
+            return getFileFunction(repos, fileId, fileVersion, path)
+
+        files = sorted([ x[1] for x in sourceTrv.iterFileList() ])
+        factory = factoryClass(pkgname, sourceFiles = files,
+                               openSourceFileFn = openSourceFile)
+        recipe = factory.getRecipeClass()
+
+        recipe.addLoadedTroves(factoryClass._loadedTroves)
+        recipe.addLoadedSpecs(factoryClass._loadedSpecs)
+
+        recipe.addLoadedTroves(factoryClass._loadedTroves)
+        recipe.addLoadedTroves(
+                        [ factoryClass._trove.getNameVersionFlavor() ])
+        recipe.addLoadedSpecs(
+                        { factoryClass.name :
+                            (factoryClass._trove.getNameVersionFlavor(),
+                             factoryClass) } )
+
+        return recipe
+
+    def getSourceComponentVersion(self):
+        return self.recipe._trove.getVersion()
+
+class RecipeLoaderFromRepository(RecipeLoaderFromSourceTrove):
+
+    def __init__(self, name, cfg, repos, versionStr=None, labelPath=None,
+                 ignoreInstalled=False, filterVersions=False,
+                 parentDir=None, defaultToLatest = False,
+                 buildFlavor = None, db = None, overrides = None):
+        # FIXME parentDir specifies the directory to look for 
+        # local copies of recipes called with loadRecipe.  If 
+        # empty, we'll look in the tmp directory where we create the recipe
+        # file for this source component - probably not intended behavior.
+
+        name = name.split(':')[0]
+        component = name + ":source"
+        if not labelPath:
+            if not cfg.buildLabel:
+                 raise builderrors.LoadRecipeError(
+                'no build label set -  cannot find source component %s' % component)
+            labelPath = [cfg.buildLabel]
+        if repos is None:
+            raise builderrors.LoadRecipeError(
+                                    'cannot find source component %s: No repository access' % (component, ))
+        try:
+            pkgs = repos.findTrove(labelPath,
+                                   (component, versionStr, deps.Flavor()))
+        except (errors.TroveNotFound, errors.OpenError), err:
+            raise builderrors.LoadRecipeError(
+                                    'cannot find source component %s: %s' %
+                                    (component, err))
+        if filterVersions:
+            pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
+        if len(pkgs) > 1:
+            pkgs = sorted(pkgs, reverse=True)
+            if defaultToLatest:
+                log.warning("source component %s has multiple versions "
+                             "on labelPath %s\n\n"
+                             "Picking latest: \n       %s\n\n"
+                             "Not using:\n      %s"
+                              %(component,
+                               ', '.join(x.asString() for x in labelPath),
+                                '%s=%s' % pkgs[0][:2],
+                                '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
+            else:
+                raise builderrors.LoadRecipeError(
+                    "source component %s has multiple versions "
+                    "on labelPath %s: %s"
+                     %(component,
+                       ', '.join(x.asString() for x in labelPath),
+                       ', '.join('%s=%s' % x[:2] for x in pkgs)))
+
+        sourceComponent = repos.getTrove(*pkgs[0])
+
+        RecipeLoaderFromSourceTrove.__init__(self, sourceComponent, repos, cfg,
+                 versionStr=versionStr, labelPath=labelPath,
+                 ignoreInstalled=ignoreInstalled, filterVersions=filterVersions,
+                 parentDir=parentDir, defaultToLatest = defaultToLatest,
+                 buildFlavor = buildFlavor, db = db, overrides = overrides)
 
 def _scoreLoadRecipeChoice(labelPath, version):
     # FIXME I'm quite sure this heuristic will get replaced with
@@ -389,92 +647,21 @@ def getBestLoadRecipeChoices(labelPath, troveTups):
 
 def recipeLoaderFromSourceComponent(name, cfg, repos,
                                     versionStr=None, labelPath=None,
-                                    ignoreInstalled=False, 
-                                    filterVersions=False, 
-                                    parentDir=None, 
+                                    ignoreInstalled=False,
+                                    filterVersions=False,
+                                    parentDir=None,
                                     defaultToLatest = False,
-                                    buildFlavor = None, 
+                                    buildFlavor = None,
                                     db = None, overrides = None):
-    # FIXME parentDir specifies the directory to look for 
-    # local copies of recipes called with loadRecipe.  If 
-    # empty, we'll look in the tmp directory where we create the recipe
-    # file for this source component - probably not intended behavior.
-
-    name = name.split(':')[0]
-    component = name + ":source"
-    filename = name + '.recipe'
-    if not labelPath:
-        if not cfg.buildLabel:
-             raise builderrors.LoadRecipeError(
-            'no build label set -  cannot find source component %s' % component)
-	labelPath = [cfg.buildLabel]
-    if repos is None:
-        raise builderrors.LoadRecipeError(
-                                'cannot find source component %s: No repository access' % (component, ))
-    try:
-	pkgs = repos.findTrove(labelPath,
-                               (component, versionStr, deps.Flavor()))
-    except (errors.TroveNotFound, errors.OpenError), err:
-        raise builderrors.LoadRecipeError(
-                                'cannot find source component %s: %s' %
-                                (component, err))
-    if filterVersions:
-        pkgs = getBestLoadRecipeChoices(labelPath, pkgs)
-    if len(pkgs) > 1:
-        pkgs = sorted(pkgs, reverse=True)
-        if defaultToLatest:
-            log.warning("source component %s has multiple versions "
-                         "on labelPath %s\n\n"
-                         "Picking latest: \n       %s\n\n"
-                         "Not using:\n      %s"
-                          %(component,
-                           ', '.join(x.asString() for x in labelPath),
-                            '%s=%s' % pkgs[0][:2],
-                            '\n       '.join('%s=%s' % x[:2] for x in pkgs[1:])))
-        else:
-            raise builderrors.LoadRecipeError(
-                "source component %s has multiple versions "
-                "on labelPath %s: %s"
-                 %(component,
-                   ', '.join(x.asString() for x in labelPath),
-                   ', '.join('%s=%s' % x[:2] for x in pkgs)))
-
-    sourceComponent = repos.getTrove(*pkgs[0])
-
-    (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name, 
-				        dir=cfg.tmpDir)
-    outF = os.fdopen(fd, "w")
-
-    inF = None
-    for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
-	if filePath == filename:
-	    inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
-	    break
-    
-    if not inF:
-	raise builderrors.RecipeFileError("version %s of %s does not contain %s" %
-		  (sourceComponent.getName(), 
-                   sourceComponent.getVersion().asString(),
-	 	   filename))
-
-    util.copyfileobj(inF, outF)
-
-    del inF
-    outF.close()
-    del outF
-
-    try:
-        loader = RecipeLoader(recipeFile, cfg, repos, component, 
-                              sourceComponent.getVersion().branch(),
-                              ignoreInstalled=ignoreInstalled,
-                              directory=parentDir, buildFlavor=buildFlavor,
-                              db=db, overrides=overrides)
-    finally:
-        os.unlink(recipeFile)
-    recipe = loader.getRecipe()
-    recipe._trove = sourceComponent.copy()
-    return (loader, sourceComponent.getVersion())
-
+    l = RecipeLoaderFromRepository(name, cfg, repos, versionStr=versionStr,
+                                   labelPath=labelPath,
+                                   ignoreInstalled=ignoreInstalled,
+                                   filterVersions=filterVersions,
+                                   parentDir=parentDir,
+                                   defaultToLatest=defaultToLatest,
+                                   buildFlavor=buildFlavor, db=db,
+                                   overrides=overrides)
+    return l, l.getSourceComponentVersion()
 
 def loadSuperClass(troveSpec, label=None):
     """
@@ -497,7 +684,6 @@ def loadSuperClass(troveSpec, label=None):
     C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
     """
     callerGlobals = inspect.stack()[1][0].f_globals
-    ignoreInstalled = True
     _loadRecipe(troveSpec, label, callerGlobals, False)
 
 def loadInstalled(troveSpec, label=None):
@@ -790,49 +976,35 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
                     oldBuildFlavor = buildFlavor
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+
             loader = RecipeLoader(recipeFile, cfg, repos = repos,
                                   ignoreInstalled = True,
                                   buildFlavor = buildFlavor, db = db)
-            if loader:
-                for recipeClassName in loader.recipes.keys():
-                    flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
-                    log.info('Loaded %s from %s=%s%s' % (recipeClassName, nvf[0][0], nvf[0][1], flvSuffix))
+
+            for recipeClassName in loader.recipes.keys():
+                flvSuffix = str(nvf[0][2]) and "[%s]" % nvf[0][2] or ""
+                log.info('Loaded %s from %s=%s%s' % (recipeClassName,
+                                                     nvf[0][0], nvf[0][1],
+                                                     flvSuffix))
+
     return loader, oldBuildFlavor
 
+class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
 
-def validateRecipe(recipeClass, packageName, fileName):
-    if recipeClass.name[0] not in string.ascii_letters + string.digits:
-        raise RecipeFileError(
-            'Error in recipe file "%s": package name must start '
-            'with an ascii letter or digit.' % fileName)
+    def __init__(self, trv, branch = None, cfg = None, repos = None,
+                 ignoreInstalled = None, sourceFiles = None,
+                 buildFlavor = None, labelPath = None):
+        def getFile(repos, fileId, fileVersion, path):
+            return open(path)
 
-    if '-' in recipeClass.version:
-        raise RecipeFileError(
-            "Version string %s has illegal '-' character" % recipeClass.version)
+        if branch:
+            versionStr = str(branch)
+        else:
+            versionStr = None
 
-    if recipeClass.name != packageName:
-        raise RecipeFileError(
-                    "Recipe object name '%s' does not match "
-                    "file/component name '%s'"
-                    % (recipeClass.name, packageName))
-
-    packageType = recipeClass.getType()
-
-    prefixes = {recipe.RECIPE_TYPE_INFO: 'info-',
-                recipe.RECIPE_TYPE_GROUP: 'group-',
-                recipe.RECIPE_TYPE_FILESET: 'fileset-'}
-
-    if packageType in prefixes:
-        if not recipeClass.name.startswith(prefixes[packageType]):
-            raise builderrors.BadRecipeNameError(
-                    'recipe name must start with "%s"' % prefixes[packageType])
-    elif packageType == recipe.RECIPE_TYPE_REDIRECT:
-        # redirects are allowed to have any format
-        pass
-    else:
-        for prefix in prefixes.itervalues():
-            if recipeClass.name.startswith(prefix):
-                raise builderrors.BadRecipeNameError(
-                                'recipe name cannot start with "%s"' % prefix)
-    recipeClass.validateClass()
-
+        RecipeLoaderFromSourceTrove.__init__(self, trv, repos, cfg,
+                                             versionStr = versionStr,
+                                             ignoreInstalled=ignoreInstalled,
+                                             getFileFunction = getFile,
+                                             branch = branch,
+                                             buildFlavor = buildFlavor)

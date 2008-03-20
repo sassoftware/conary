@@ -131,6 +131,71 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 	if data:
 	    self.thaw(data)
 
+class ChangeSetFileContentsTuple(tuple):
+
+    """
+    Wrapper class for for the tuples stored in ChangeSet.configCache and
+    ChangeSet.fileContents dicts which allow them to be sent through
+    util.SendableFileSet.
+    """
+
+    _tag = 'ccs-tup'
+
+    def _sendInfo(self):
+        contType, contents, compressed = self
+
+        if compressed:
+            c = '1'
+        else:
+            c = '0'
+
+        return ([ contents ], c + contType)
+
+    @staticmethod
+    def _fromInfo(fileObjList, s):
+        if s[0] == '0':
+            compressed = False
+        else:
+            compressed = True
+
+        return ChangeSetFileContentsTuple((s[1:], fileObjList[0], compressed))
+util.SendableFileSet._register(ChangeSetFileContentsTuple)
+
+class ChangeSetFileContentsDict(dict):
+
+    """
+    Wrapper class for the ChangeSet.configCache and ChangeSet.fileContents
+    dicts which can be sent through a util.SendableFileSet.
+    """
+
+    _tag = 'ccs-cd'
+
+    def __hash__(self):
+        return id(self)
+
+    def _sendInfo(self):
+        s = "".join([ "%s%s" % (struct.pack("B", len(x)), x)
+                        for x in self.iterkeys() ])
+        return (self.values(), s)
+
+    @staticmethod
+    def _fromInfo(fileObjList, s):
+        d = ChangeSetFileContentsDict()
+        if not fileObjList:
+            return d
+
+        i = 0
+        for fileObj in fileObjList:
+            keyLen = struct.unpack("B", s[i])[0]
+            i += 1
+            key = s[i:i + keyLen]
+            i += keyLen
+            d[key] = fileObj
+
+        return d
+
+util.SendableFileSet._register(ChangeSetFileContentsDict)
+
 class ChangeSet(streams.StreamSet):
 
     streamDict = {
@@ -144,6 +209,7 @@ class ChangeSet(streams.StreamSet):
            (LARGE, ChangeSetFileDict,        "files"           ),
     }
     ignoreUnknown = True
+    _tag = 'ccs-rw'
 
     def _resetTroveLists(self):
         # XXX hack
@@ -253,10 +319,18 @@ class ChangeSet(streams.StreamSet):
                 raise ChangeSetKeyConflictError(key)
 
 	if cfgFile:
-            assert(not compressed)
-	    self.configCache[key] = (contType, contents, compressed)
-	else:
-	    self.fileContents[key] = (contType, contents, compressed)
+            if compressed:
+                s = gzip.GzipFile(None, "r", fileobj = contents.get()).read()
+                contents = filecontents.FromString(s)
+                compressed = False
+
+            self.configCache[key] = ChangeSetFileContentsTuple((contType,
+                                                                contents,
+                                                                compressed))
+        else:
+            self.fileContents[key] = ChangeSetFileContentsTuple((contType,
+                                                                 contents,
+                                                                 compressed))
 
     def getFileContents(self, pathId, fileId, compressed = False):
         assert(not compressed)
@@ -760,12 +834,39 @@ class ChangeSet(streams.StreamSet):
         self.newTroves.thaw("")
         self.oldTroves.thaw("")
 
+    def _sendInfo(self):
+        new = self.newTroves.freeze()
+        old = self.oldTroves.freeze()
+
+        s = self.freeze()
+
+        return ([ self.configCache, self.fileContents ], s)
+
+    @staticmethod
+    def _fromInfo(fileObjList, s):
+        cs = ChangeSet(s)
+        cs.configCache, cs.fileContents = fileObjList
+        return cs
+
+    def send(self, sock):
+        """
+        Sends this changeset over a unix-domain socket. This object remains
+        a valid changeset (it is not affected by the send operation).
+
+        @param sock: File descriptor for unix domain socket
+        @type sock: int
+        """
+        fileSet = util.SendableFileSet()
+        fileSet.add(self)
+        fileSet.send(sock)
+
     def __init__(self, data = None):
 	streams.StreamSet.__init__(self, data)
-	self.configCache = {}
-	self.fileContents = {}
+	self.configCache = ChangeSetFileContentsDict()
+	self.fileContents = ChangeSetFileContentsDict()
 	self.absolute = False
 	self.local = 0
+util.SendableFileSet._register(ChangeSet)
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
@@ -893,14 +994,21 @@ class ReadOnlyChangeSet(ChangeSet):
 	if self.configCache.has_key(pathId):
             assert(not compressed)
             name = pathId
-	    (tag, contents, compressed) = self.configCache[pathId]
+	    (tag, contents, alreadyCompressed) = self.configCache[pathId]
             cont = contents
 	elif self.configCache.has_key(key):
-            assert(not compressed)
             name = key
-	    (tag, contents, compressed) = self.configCache[key]
+	    (tag, contents, alreadyCompressed) = self.configCache[key]
 
             cont = contents
+
+            if compressed:
+                f = util.BoundedStringIO()
+                compressor = gzip.GzipFile(None, "w", fileobj = f)
+                util.copyfileobj(cont.get(), compressor)
+                compressor.close()
+                f.seek(0)
+                cont = filecontents.FromFile(f)
 	else:
             self.filesRead = True
 
@@ -1276,15 +1384,43 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.filesRead = False
 
+    _tag = 'ccs-ro'
+
+    def _sendInfo(self):
+        (fileList, hdr) = ChangeSet._sendInfo(self)
+
+        fileList = [ x.file for x in self.fileContainers ] + fileList
+
+        s = struct.pack("!I", len(self.fileContainers)) + hdr
+        return (fileList, s)
+
+    @staticmethod
+    def _fromInfo(fileObjList, s):
+        containerCount = struct.unpack("!I", s[0:4])[0]
+        fileContainers = fileObjList[0:containerCount]
+
+        partialCs = ChangeSet._fromInfo(fileObjList[containerCount:], s[4:])
+        fullCs = ReadOnlyChangeSet()
+        fullCs.merge(partialCs)
+
+        for fObj in fileContainers:
+            csf = filecontainer.FileContainer(fObj)
+            fullCs.fileContainers.append(csf)
+
+        # this sets up fullCs.fileQueue based on the containers we just loaded
+        fullCs.reset()
+
+        return fullCs
+
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
-	self.configCache = {}
         self.filesRead = False
         self.csfWrappers = []
         self.fileContainers = []
 
         self.lastCsf = None
         self.fileQueue = []
+util.SendableFileSet._register(ReadOnlyChangeSet)
 
 class ChangeSetFromFile(ReadOnlyChangeSet):
 
@@ -1305,12 +1441,6 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                                 "File %s is not a valid conary changeset: %s" % (fileName, err))
                 self.fileName = fileName
             else:
-                if not hasattr(fileName, 'pread'):
-                    # FIXME: This code is deprecated and will be removed
-                    # in conary 1.1.23
-                    import warnings
-                    warnings.warn('ChangeSetFromFile() requires open file objects have a pread() method.  Use util.ExtendedFile() to create such a file object')
-                    fileName = util.PreadWrapper(fileName)
                 csf = filecontainer.FileContainer(fileName)
                 if hasattr(fileName, 'path'):
                     self.fileName = fileName.path
@@ -1369,6 +1499,12 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
         if nextFile:
             self.fileQueue.append(nextFile + (csf,))
+
+def ChangeSetFromSocket(sock):
+
+    fileObjs = util.SendableFileSet.recv(sock)
+    assert(len(fileObjs) == 1)
+    return fileObjs[0]
 
 # old may be None
 def fileChangeSet(pathId, old, new):
@@ -1447,29 +1583,33 @@ class DictAsCsf:
         if self.next >= len(self.items):
             return None
 
-        (name, contType, contObj) = self.items[self.next]
+        (name, contType, contObj, compressed) = self.items[self.next]
         self.next += 1
 
-        f = contObj.get()
-        compressedFile = util.BoundedStringIO(maxMemorySize = self.maxMemSize)
-        bufSize = 16384
+        if compressed:
+            compressedFile = contObj.get()
+        else:
+            f = contObj.get()
+            compressedFile = util.BoundedStringIO(maxMemorySize =
+                                                            self.maxMemSize)
+            bufSize = 16384
 
-        gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
-        while 1:
-            buf = f.read(bufSize)
-            if not buf:
-                break
-            gzf.write(buf)
-        gzf.close()
+            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+            while 1:
+                buf = f.read(bufSize)
+                if not buf:
+                    break
+                gzf.write(buf)
+            gzf.close()
 
-        compressedFile.seek(0)
+            compressedFile.seek(0)
 
         return (name, contType, compressedFile)
 
     def addConfigs(self, contents):
         # this is like __init__, but it knows things are config files so
         # it tags them with a "1" and puts them at the front
-        l = [ (x[0], "1 " + x[1][0][4:], x[1][1]) 
+        l = [ (x[0], "1 " + x[1][0][4:], x[1][1], x[1][2])
                         for x in contents.iteritems() ]
         l.sort()
         self.items = l + self.items
@@ -1478,10 +1618,10 @@ class DictAsCsf:
         self.next = 0
 
     def __init__(self, contents):
-        # convert the dict (which is a changeSet.fileContents object) to
-        # a (name, contTag, contObj) list, where contTag is the same kind
-        # of tag we use in csf files "[0|1] [file|diff]"
-        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1]) for x in 
+        # convert the dict (which is a changeSet.fileContents object) to a
+        # (name, contTag, contObj, compressed) list, where contTag is the same
+        # kind of tag we use in csf files "[0|1] [file|diff]"
+        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1], x[1][2]) for x in 
                             contents.iteritems() ]
         self.items.sort()
         self.next = 0

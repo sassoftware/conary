@@ -41,7 +41,7 @@ from conary.lib import debugger, log, logger, sha1helper, util
 from conary.local import database
 from conary.repository import changeset, errors
 from conary.conaryclient.cmdline import parseTroveSpec
-from conary.state import ConaryStateFromFile
+from conary.state import ConaryState, ConaryStateFromFile
 
 CookError = builderrors.CookError
 RecipeFileError = builderrors.RecipeFileError
@@ -420,7 +420,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     srcName = fullName + ':source'
 
     if repos:
-        try: 
+        try:
             trove = repos.getTrove(srcName, sourceVersion, deps.Flavor(),
                                    withFiles = False)
             sourceVersion = trove.getVersion()
@@ -660,6 +660,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         use.resetUsed()
         use.clearLocalFlags()
+        repos.setFlavorPreferencesByFlavor(buildFlavor)
         use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor, error=False)
         if hasattr(recipeClass, '_localFlavor'):
             # this will only be set if loadRecipe is used.  Allow for some
@@ -776,7 +777,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
                 troveScripts.script.set(recipeScripts[0])
 
-            for (troveTup, explicit, byDefault, comps) in group.iterTroveListInfo():
+            for (troveTup, explicit, byDefault, comps, requireLatest) \
+                    in group.iterTroveListInfo():
                 grpTrv.addTrove(byDefault = byDefault,
                                 weakRef=not explicit, *troveTup)
 
@@ -1220,6 +1222,17 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.pathMap[buildxmlpath].tags.set("xmlbuildlog")
     return bldList, recipeObj, builddir, destdir, policyTroves
 
+def _copyScripts(trv, scriptsMap):
+    trvName = trv.getName()
+    trvScripts = scriptsMap.get(trvName, None)
+    if not trvScripts:
+        return
+    # Copy scripts
+    for scriptType, (scriptContents, compatClass) in trvScripts.items():
+        if not scriptContents:
+            continue
+        getattr(trv.troveInfo.scripts, scriptType).script.set(scriptContents)
+
 def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
                             targetLabel=None, alwaysBumpCount=False,
                             policyTroves=None, signatureKey = None):
@@ -1267,6 +1280,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 	    grpMap[main].setProvides(provides)
             grpMap[main].setIsCollection(True)
             grpMap[main].setIsDerived(recipeObj._isDerived)
+            _copyScripts(grpMap[main], recipeObj._scriptsMap)
 
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')
@@ -1297,6 +1311,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         # Add build flavor
         p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
+        _copyScripts(p, recipeObj._scriptsMap)
 
         _signTrove(p, signatureKey)
 
@@ -1596,8 +1611,8 @@ def guessUpstreamSourceTrove(repos, srcName, state):
 
     return trove
 
-def guessSourceVersion(repos, name, versionStr, buildLabel, 
-                                                searchBuiltTroves=False):
+def guessSourceVersion(repos, name, versionStr, buildLabel, conaryState = None,
+                       searchBuiltTroves=False):
     """ Make a reasonable guess at what a sourceVersion should be when 
         you don't have an actual source component from a repository to get 
         the version from.  Searches the repository for troves that are 
@@ -1611,6 +1626,9 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         @type versionStr: str
         @param buildLabel: the label to search for troves matching the 
         @type buildLabel: versions.Label
+        @param conaryState: ConaryState object to us instead of looking for a
+        CONARY file in the current directory
+        @type conaryState: ConaryState
         @param searchBuiltTroves: if True, search for binary troves  
         that match the desired trove's name, versionStr and label. 
         @type searchBuiltTroves: bool
@@ -1620,18 +1638,22 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     """
     srcName = name + ':source'
     sourceVerison = None
-    if os.path.exists('CONARY'):
+
+    if not conaryState and os.path.exists('CONARY'):
         conaryState = ConaryStateFromFile('CONARY', repos)
-        if conaryState.hasSourceState():
-            state = conaryState.getSourceState()
-            if state.getName() == srcName and \
-                            state.getVersion() != versions.NewVersion():
-                stateVer = state.getVersion().trailingRevision().version
-                trv = guessUpstreamSourceTrove(repos, srcName, state)
-                if versionStr and stateVer != versionStr:
-                    return state.getVersion().branch().createVersion(
-                                versions.Revision('%s-1' % (versionStr))), trv
-                return state.getVersion(), trv
+
+    if conaryState and conaryState.hasSourceState():
+        state = conaryState.getSourceState()
+        if state.getName() == srcName and \
+                        state.getVersion() != versions.NewVersion():
+            stateVer = state.getVersion().trailingRevision().version
+            trv = guessUpstreamSourceTrove(repos, srcName, state)
+            if versionStr and stateVer != versionStr:
+                return (state.getVersion().branch().createVersion(
+                            versions.Revision('%s-1' % (versionStr))), trv,
+                            conaryState.getSourceState())
+            return state.getVersion(), trv, conaryState.getSourceState()
+
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
@@ -1651,13 +1673,13 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 if x.trailingRevision().version == versionStr ] 
         if relVersionList:
             relVersionList.sort()
-            return relVersionList[-1], None
+            return relVersionList[-1], None, None
         else:
             # we've got a reasonable branch to build on, but not
             # a sourceCount.  Reset the sourceCount to 1.
             versionList.sort()
             return versionList[-1].branch().createVersion(
-                        versions.Revision('%s-1' % (versionStr))), None
+                        versions.Revision('%s-1' % (versionStr))), None, None
     if searchBuiltTroves:
         # XXX this is generally a bad idea -- search for a matching
         # built trove on the branch that our source version is to be
@@ -1674,14 +1696,14 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 relVersionList.sort()
                 sourceVersion = relVersionList[-1].copy()
                 sourceVersion.trailingRevision().buildCount = None
-                return sourceVersion, None
+                return sourceVersion, None, None
             else:
                 # we've got a reasonable branch to build on, but not
                 # a sourceCount.  Reset the sourceCount to 1.
                 versionList.sort()
                 return versionList[-1].branch().createVersion(
-                            versions.Revision('%s-1' % (versionStr))), None
-    return None, None
+                        versions.Revision('%s-1' % (versionStr))), None, None
+    return None, None, None
 
 def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     if buildFlavor is None:
@@ -1701,15 +1723,21 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     try:
         # make a guess on the branch to use since it can be important
         # for loading superclasses.
-        sourceVersion, upstrTrove = guessSourceVersion(repos, pkgname,
+        sourceVersion, upstrTrove, srcTrv = guessSourceVersion(repos, pkgname,
                                                        None, cfg.buildLabel)
         if sourceVersion:
             branch = sourceVersion.branch()
         else:
             branch = None
 
-        loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
-                                         branch=branch, buildFlavor=buildFlavor)
+        if srcTrv is not None:
+            loader = loadrecipe.RecipeLoaderFromSourceDirectory(
+                                    srcTrv, repos = repos, cfg = cfg,
+                                    branch = branch, buildFlavor = buildFlavor)
+        else:
+            loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
+                                             branch=branch,
+                                             buildFlavor=buildFlavor)
         version = None
     except builderrors.RecipeFileError, msg:
         raise CookError(str(msg))
@@ -1717,7 +1745,8 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
     recipeClass = loader.getRecipe()
 
     try:
-        sourceVersion, upstrTrove = guessSourceVersion(repos, recipeClass.name,
+        sourceVersion, upstrTrove, srcTrv = guessSourceVersion(repos,
+                                                       recipeClass.name,
                                                        recipeClass.version,
                                                        cfg.buildLabel)
     except errors.OpenError:
@@ -1772,7 +1801,12 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.track(True)
 
-    if isinstance(item, tuple):
+    if isinstance(item, ConaryState):
+        name = item.getSourceState().getName()
+        versionStr = None
+        flavor = None
+        flavorList = [flavor]
+    elif isinstance(item, tuple):
         (name, versionStr, flavorList) = item
     else:
         (name, versionStr, flavor) = parseTroveSpec(item)
@@ -1780,7 +1814,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.allowUnknownFlags(allowUnknownFlags)
     recipeClassDict = {}
-    loaders = []
     for flavor in flavorList:
         use.clearLocalFlags()
         if flavor is not None:
@@ -1789,14 +1822,25 @@ def cookItem(repos, cfg, item, prep=0, macros={},
             buildFlavor = cfg.buildFlavor
 
 
-        if name.endswith('.recipe') and os.path.isfile(name):
+        if ((name.endswith('.recipe') and os.path.isfile(name))
+                    or isinstance(item, ConaryState)):
             if versionStr:
                 raise CookError, \
                     ("Must not specify version string when cooking recipe file")
 
-            loader, recipeClass, sourceVersion = \
-                              getRecipeInfoFromPath(repos, cfg, name,
-                                                    buildFlavor=buildFlavor)
+            if isinstance(item, ConaryState):
+                loader = loadrecipe.RecipeLoaderFromSourceDirectory(
+                                        item.getSourceState(), repos = repos,
+                                        cfg = cfg, buildFlavor = buildFlavor)
+                recipeClass = loader.getRecipe()
+                sourceVersion = guessSourceVersion(repos, recipeClass.name,
+                                                   recipeClass.version,
+                                                   cfg.buildLabel,
+                                                   conaryState = item)[0]
+            else:
+                loader, recipeClass, sourceVersion = \
+                                  getRecipeInfoFromPath(repos, cfg, name,
+                                                        buildFlavor=buildFlavor)
 
             targetLabel = versions.CookLabel()
             if requireCleanSources is None:
@@ -1816,6 +1860,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 labelPath = None
 
             try:
+                repos.setFlavorPreferencesByFlavor(buildFlavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
             except AttributeError, msg:
                 log.error('Error setting build flag values: %s' % msg)
@@ -1832,7 +1877,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                 raise CookError(str(msg))
 
             recipeClass = loader.getRecipe()
-        loaders.append(loader)
+
         recipeClassDict.setdefault(sourceVersion, []).append(recipeClass)
 
         if showBuildReqs:
@@ -1902,12 +1947,15 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             raise CookError('Do not cook as root')
 
     items = {}
-    for idx, item in enumerate(args):
-        (name, version, flavor) = parseTroveSpec(item)
-        l = items.setdefault((name, version), (idx, []))
-        if flavor not in l[1]:
-            l[1].append(flavor)
     finalItems = []
+    for idx, item in enumerate(args):
+        if isinstance(item, ConaryState):
+            finalItems.append(item)
+        else:
+            (name, version, flavor) = parseTroveSpec(item)
+            l = items.setdefault((name, version), (idx, []))
+            if flavor not in l[1]:
+                l[1].append(flavor)
     items = sorted(items.iteritems(), key=lambda x: x[1][0])
 
     for (name, version), (idx, flavorList) in items:

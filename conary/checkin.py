@@ -264,6 +264,9 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
     for trvInfo, spec in itertools.izip(trvList, checkoutSpecs):
         sourceState = spec.conaryState.getSourceState()
         troveCs = cs.getNewTroveVersion(*trvInfo)
+        trv = trove.Trove(troveCs)
+        if trv.getFactory():
+            sourceState.setFactory(trv.getFactory())
 
         for (pathId, path, fileId, version) in troveCs.getNewFileList():
             pathMap[(trvInfo, path)] = (spec.targetDir, pathId, fileId, version)
@@ -286,10 +289,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     troveName = state.getName()
     conflicts = []
-
-    if not [ x[1] for x in state.iterFileList() if x[1].endswith('.recipe') ]:
-        log.error("recipe not in CONARY state file, please run cvc add")
-        return
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
@@ -315,23 +314,30 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
                       "from the head of the branch; use update")
             return
 
-    use.allowUnknownFlags(True)
     # turn off loadInstalled for committing - it ties you too closely
     # to actually being able to build what you are developing locally - often
     # not the case.
+    if (not state.getFactory()) or state.getFactory() == 'factory':
+        if not [ x[1] for x in state.iterFileList()
+                                        if x[1].endswith('.recipe') ]:
+            log.error("recipe not in CONARY state file, please run cvc add")
+            return
+
+    allPaths = [ x[1] for x in state.iterFileList() ]
+
     try:
-        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                         cfg=cfg, repos=repos,
-                                         branch=state.getBranch(),
-                                         ignoreInstalled=True)
+        use.allowUnknownFlags(True)
+        recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
+                            cfg = cfg, repos = repos,
+                            branch = state.getBranch(),
+                            ignoreInstalled = True,
+                            sourceFiles = allPaths).getRecipe()
     finally:
         use.allowUnknownFlags(False)
 
     srcMap = {}
     cwd = os.getcwd()
 
-    # fetch all the sources
-    recipeClass = loader.getRecipe()
     # setting the _trove to the last version of the source component
     # allows us to search that source component for files that are
     # not in the current directory or lookaside cache.
@@ -342,7 +348,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
             recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
         lcache = lookaside.RepositoryCache(repos)
-        srcdirs = [ os.path.dirname(recipeClass.filename),
+        srcdirs = [ cwd,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
@@ -645,8 +651,8 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
             #        condition on commit.  Catch and raise a reasonable error.
             log.debug('creating shadow of %s for merging...' % state.getLastMerged())
             shadowCs = client.createShadowChangeSet(str(shadowLabel),
-                                [(troveName, state.getLastMerged(), noDeps)])[1]
-            signAbsoluteChangeset(shadowCs, signatureKey)
+                                [(troveName, state.getLastMerged(), noDeps)],
+                                sigKeyId = signatureKey)[1]
 
             # writable changesets can't do merging, so create a parent
             # readonly one
@@ -1376,11 +1382,10 @@ def merge(cfg, repos, versionSpec=None, callback=None):
 
     if os.path.exists(state.getRecipeFileName()):
         use.allowUnknownFlags(True)
-        loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                         cfg=cfg, repos=repos,
-                                         branch=state.getBranch(),
-                                         ignoreInstalled=True)
-        recipeClass = loader.getRecipe()
+        recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
+                                cfg = cfg, repos = repos,
+                                branch = state.getBranch(),
+                                ignoreInstalled = True).getRecipe()
     else:
         recipeClass = None.__class__
 
@@ -1684,8 +1689,8 @@ def removeFile(filename, repos=None):
 
     conaryState.write("CONARY")
 
-def newTrove(repos, cfg, name, dir = None, template = None,
-             buildBranch=None):
+def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
+             factory = None):
     parts = name.split('=', 1)
     if len(parts) == 1:
         label = cfg.buildLabel
@@ -1701,6 +1706,13 @@ def newTrove(repos, cfg, name, dir = None, template = None,
         raise errors.CvcError('%s is not a valid package name', name)
     component = "%s:source" % name
 
+    if factory == 'factory' and not name.startswith('factory-'):
+        raise errors.CvcError('The name of factory troves must begin with '
+                              '"factory-"')
+    elif factory != 'factory' and name.startswith('factory-'):
+        raise errors.CvcError('Only factory troves may use "factory-" in '
+                              'their name')
+
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
     if not buildBranch:
@@ -1708,6 +1720,7 @@ def newTrove(repos, cfg, name, dir = None, template = None,
     else:
         branch = buildBranch
     sourceState = SourceState(component, versions.NewVersion(), branch)
+    sourceState.setFactory(factory)
     conaryState = ConaryState(cfg.context, sourceState)
 
     # see if this package exists on our build label
@@ -1980,13 +1993,13 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         srcPkg = repos.getTrove(troveName, state.getVersion(), deps.deps.Flavor())
 
     use.allowUnknownFlags(True)
-    loader = loadrecipe.RecipeLoader(state.getRecipeFileName(),
-                                     cfg=cfg, repos=repos,
-                                     branch=state.getBranch(),
-                                     ignoreInstalled=True)
+    recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
+                                    cfg = cfg, repos = repos,
+                                    branch = state.getBranch(),
+                                    ignoreInstalled = True).getRecipe()
 
     # fetch all the sources
-    recipeClass = loader.getRecipe()
+
     # setting the _trove to the last version of the source component
     # allows us to search that source component for files that are
     # not in the current directory or lookaside cache.
@@ -1998,7 +2011,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter)
-    srcdirs = [ os.path.dirname(recipeClass.filename),
+    srcdirs = [ os.getcwd(),
                 cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
     try:

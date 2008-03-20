@@ -29,10 +29,11 @@ import tempfile
 from conary.lib import debugger, log, magic
 from conary.build import lookaside
 from conary import rpmhelper
-from conary.lib import util
+from conary.lib import openpgpfile, util
 from conary.build import action, errors
 from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest
+from conary.repository import transport
 
 class _AnySource(action.RecipeAction):
 
@@ -143,32 +144,83 @@ class _Source(_AnySource):
 	    log.warning('No GPG signature file found for %s', self.sourcename)
 	    del self.localgpgfile
 
+    def _getPublicKey(self):
+        keyringPath = os.path.join(self.recipe.cfg.buildPath, 'pubring.pgp')
+        tsdbPath = os.path.join(self.recipe.cfg.buildPath, 'pubring.tsdb')
+
+        keyring = openpgpfile.PublicKeyring(keyringPath, tsdbPath)
+
+        try:
+            return keyring.getKey(self.keyid)
+        except openpgpfile.KeyNotFound:
+            pass
+
+        # OK, we don't have the key.
+        keyData = self._downloadPublicKey()
+        keyring.addKeysAsStrings([keyData])
+
+        return keyring.getKey(self.keyid)
+
+    def _doDownloadPublicKey(self, keyServer):
+        # Uhm. Proxies are not likely to forward traffic to port 11371, so
+        # avoid using the system-wide proxy setting for now.
+        # proxies = self.recipe.cfg.proxy
+        proxies = {}
+
+        opener = transport.URLOpener(proxies=proxies)
+        url = 'http://%s:11371/pks/lookup?op=get&search=0x%s' % (
+                keyServer, self.keyid)
+        handle = opener.open(url)
+        keyData = openpgpfile.parseAsciiArmorKey(handle)
+        return keyData
+
+    def _downloadPublicKey(self):
+        # Compose URL for downloading the PGP key
+        keyServers = [ 'subkeys.pgp.net', 'pgp.mit.edu', 'wwwkeys.pgp.net' ]
+        keyData = None
+        # Walk the list several times before giving up
+        for ks in itertools.chain(*([ keyServers ] * 3)):
+            try:
+                keyData = self._doDownloadPublicKey(ks)
+                if keyData:
+                    break
+            except transport.TransportError, e:
+                log.info('Error retrieving PGP key %s from key server %s: %s' %
+                    (self.keyid, ks, e))
+                continue
+
+        if keyData is None:
+            raise SourceError, "Failed to retrieve PGP key %s" % self.keyid
+
+        return keyData
+
     def _checkSignature(self, filepath):
         if self.keyid:
             filename = os.path.basename(filepath)
             self._addSignature(filename)
 	if 'localgpgfile' not in self.__dict__:
 	    return
-        if not util.checkPath("gpg"):
-            return
-	# FIXME: our own keyring
-	if not self._checkKeyID(filepath, self.keyid):
-	    # FIXME: only do this if key missing, this is cheap for now
-	    os.system("gpg --no-options --no-secmem-warning --keyserver pgp.mit.edu --recv-keys 0x%s" %self.keyid)
-	    if not self._checkKeyID(filepath, self.keyid):
-		log.error(self.failedtest)
-		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
-        log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
-    def _checkKeyID(self, filepath, keyid):
-	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify '%s' '%s'"
-		      %(self.localgpgfile, filepath))
-	result = p.read()
-	found = result.find("key ID %s" % keyid)
-	if found == -1:
-	    self.failedtest = result
-	    return False
-	return True
+        key = self._getPublicKey()
+
+        doc = open(filepath)
+
+        try:
+            sig = openpgpfile.readSignature(file(self.localgpgfile))
+        except openpgpfile.PGPError:
+            raise SourceError, "Failed to read signature from %s" % self.localgpgfile
+
+        # Does the signature belong to this key?
+        if sig.getSignerKeyId() != key.getKeyId():
+            raise SourceError("Signature file generated with key %s does "
+                "not match supplied key %s" %
+                    (sig.getSignerKeyId(), self.keyid))
+
+        try:
+            sig.verifyDocument(key.getCryptoKey(), doc)
+        except openpgpfile.SignatureError:
+            raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
+        log.info('GPG signature %s is OK', os.path.basename(self.localgpgfile))
 
     def _extractFromRPM(self):
         """
@@ -228,11 +280,7 @@ class _Source(_AnySource):
             toFetch = self.rpm
         else:
             toFetch = self.sourcename
-        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                              toFetch, self.recipe.name,
-                              self.recipe.srcdirs, localOnly=True,
-                              allowNone=True)
-        return f
+        return self.recipe._fetchFile(toFetch, localOnly = True)
 
     def getPath(self):
         if self.rpm:
@@ -451,8 +499,10 @@ class addArchive(_Source):
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
 
             util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
+            self._addActionPathBuildRequires(['unzip'])
 
 	elif f.endswith(".rpm"):
+            self._addActionPathBuildRequires(['/bin/cpio'])
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir)
             if self.preserveOwnership:
@@ -462,6 +512,7 @@ class addArchive(_Source):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
 
+            self._addActionPathBuildRequires(['isoinfo'])
             _extractFilesFromISO(f, directory=destDir)
 
 	else:
@@ -474,12 +525,15 @@ class addArchive(_Source):
             # details
             ownerParser = None
 
+            actionPathBuildRequires = []
             # Question: can magic() ever get these wrong?!
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
                 _uncompress = "bzip2 -d -c"
+                actionPathBuildRequires.append('bzip2')
             elif isinstance(m, magic.gzip) or f.endswith("gz") \
                    or f.endswith(".Z"):
                 _uncompress = "gzip -d -c"
+                actionPathBuildRequires.append('gzip')
 
             # There are things we know we know...
             _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
@@ -492,10 +546,12 @@ class addArchive(_Source):
                     preserve = 'p'
                 _unpack = "tar -C '%s' -xvvS%sf -" % (destDir, preserve)
                 ownerParser = self._tarOwners
+                actionPathBuildRequires.append('tar')
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd '%s' && cpio -iumd --quiet )" % (destDir,)
                 ownerListCmd = "cpio -tv --quiet"
                 ownerParser = self._cpioOwners
+                actionPathBuildRequires.append('cpio')
             elif _uncompress != 'cat':
                 # if we know we've got an archive, we'll default to
                 # assuming it's an archive of a tar for now
@@ -503,9 +559,11 @@ class addArchive(_Source):
                 # archive
                 _unpack = "tar -C '%s' -xvvSpf -" % (destDir,)
                 ownerParser = self._tarOwners
+                actionPathBuildRequires.append('tar')
             else:
                 raise SourceError, "unknown archive format: " + f
 
+            self._addActionPathBuildRequires(actionPathBuildRequires)
             cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
             fObj = os.popen(cmd)
             s = fObj.read()
@@ -565,6 +623,7 @@ class addArchive(_Source):
                     self.recipe.mainDir(oldMainDir)
             else:
                 self.recipe.mainDir(oldMainDir)
+        return f
 Archive = addArchive
 
 class addPatch(_Source):
@@ -670,6 +729,7 @@ class addPatch(_Source):
     stripped, and a C{dir} keyword, instructing C{r.addPatch} to change to the
     C{lib/Xaw3d} directory prior to applying the patch.
     """
+    _actionPathBuildRequires = set(['patch'])
     keywords = {'level': None,
 		'backup': '',
 		'macros': False,
@@ -1247,6 +1307,7 @@ class _RevisionControl(addArchive):
         pass
 
     def doDownload(self):
+        self._addActionPathBuildRequires([self.name])
         return self.fetch()
 
 class addGitSnapshot(_RevisionControl):
@@ -1684,9 +1745,8 @@ class TroveScript(_AnySource):
 
     def fetch(self, refreshFilter=None):
         if self.contents is None:
-            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                self.sourcename, self.recipe.name, self.recipe.srcdirs,
-                refreshFilter=refreshFilter, allowNone = True)
+            f = self.recipe._fetchFile(self.sourcename,
+                refreshFilter=refreshFilter)
             if f is None:
                 raise RecipeFileError('file "%s" not found for group script' %
                                       self.sourcename)
@@ -1695,13 +1755,7 @@ class TroveScript(_AnySource):
     def fetchLocal(self):
         # Used by rMake to find files that are not autosourced.
         if self.contents is None:
-            toFetch = self.sourcename
-            f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                                  toFetch, self.recipe.name,
-                                  self.recipe.srcdirs, localOnly=True,
-                                  allowNone=True)
-            return f
-
+            return self.recipe._fetchFile(self.sourcename, localOnly = True)
 
     def getPath(self):
         return self.sourcename
