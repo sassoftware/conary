@@ -135,7 +135,7 @@ def _loadDefaultPackages(cfg, repos, db = None, flavor = None,
                 defaultPackage + '.recipe')
         if os.path.exists(packagePath):
             loader, oldBuildFlavor = \
-                    _getLoaderFromFilesystem(defaultPackage,
+                    _getLoaderForInstalledRecipe(defaultPackage,
                             '', deps.parseFlavor(''),
                             cfg, repos, db, buildFlavor)
             if not loader:
@@ -385,6 +385,13 @@ class RecipeLoader:
         if buildFlavor is not None:
             self.recipe._buildFlavor = buildFlavor
         self.recipe._localFlavor = use.localFlagsToFlavor(self.recipe.name)
+
+        # _usedFlavor here is a complete hack. Unfortuantely _trackedFlags
+        # can change because it contains global flags, and if we make a copy
+        # of it those copies can't be passed to use.setUsed() somewhere
+        # else because of those same globals. Sweet.
+        self.recipe._usedFlavor = use.createFlavor(self.recipe.name,
+                                                   self.recipe._trackedFlags)
 
     def allRecipes(self):
         return self.recipes
@@ -734,9 +741,13 @@ def _pickLatest(component, troves, labelPath=None):
     log.warning(err)
     return troves[0]
 
+def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
+                        repos, branch, parentPackageName,
+                        parentDir, buildFlavor,
+                        alwaysIgnoreInstalled, overrides, db):
 
-def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
-    """ See docs for loadInstalledPackage and loadSuperClass.  """
+    # This loads a recipe from another recipe. It's used to load factory
+    # recipes as well as superclasses. It returns a child of RecipeLoader
 
     def _findInstalledVersion(db, labelPath, name, versionStr, flavor, repos):
         """ Specialized search of the installed system along a labelPath, 
@@ -785,24 +796,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             return sourceVersion, flavor
         return None
 
-    cfg = callerGlobals['cfg']
-    repos = callerGlobals['repos']
-    db = callerGlobals.get('db', None)
-    branch = callerGlobals['branch']
-    parentPackageName = callerGlobals['name']
-    parentDir = callerGlobals['directory']
-    buildFlavor = callerGlobals.get('buildFlavor', None)
-    overrides = callerGlobals.get('overrides', None)
-    if overrides is None:
-        overrides = {}
-    if db is None:
-        db = database.Database(cfg.root, cfg.dbPath)
-
-    if 'ignoreInstalled' in callerGlobals:
-        alwaysIgnoreInstalled = callerGlobals['ignoreInstalled']
-    else:
-        alwaysIgnoreInstalled = False
-
+    # def ChainedRecipeLoader begins here
     oldUsed = use.getUsed()
     name, versionStr, flavor = cmdline.parseTroveSpec(troveSpec)
     versionSpec, flavorSpec = versionStr, flavor
@@ -856,7 +850,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
     if not loader and not findInstalled:
         # optimization: look on filesystem and local database to determine if
         # we have a local copy of the recipe already.
-        loader, oldBuildFlavor = _getLoaderFromFilesystem(
+        loader, oldBuildFlavor = _getLoaderForInstalledRecipe(
                 os.path.basename(name), versionStr, flavor, cfg, repos, db,
                 buildFlavor)
 
@@ -906,14 +900,54 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                 oldBuildFlavor = buildFlavor
                 buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
-        loader = recipeLoaderFromSourceComponent(name, cfg, repos,
-                                                 labelPath=labelPath, 
-                                                 versionStr=versionStr,
+
+        loader = RecipeLoaderFromRepository(name, cfg, repos,
+                                     labelPath=labelPath,
+                                     versionStr=versionStr,
                                      ignoreInstalled=alwaysIgnoreInstalled,
                                      filterVersions=True,
                                      parentDir=parentDir,
-                                     defaultToLatest=True, 
-                                     db=db, overrides=newOverrideDict)[0]
+                                     defaultToLatest=True,
+                                     db=db, overrides=newOverrideDict)
+
+    if flavor is not None:
+        if buildFlavor is None:
+            buildFlavor = cfg.buildFlavor = oldBuildFlavor
+        else:
+            buildFlavor = oldBuildFlavor
+        # must set this flavor back after the above use.createFlavor()
+        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor, error=False)
+
+    # return the tracked flags to their state before loading this recipe
+    use.resetUsed()
+    use.setUsed(oldUsed)
+
+    return loader
+
+def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
+    """ See docs for loadInstalledPackage and loadSuperClass.  """
+
+    cfg = callerGlobals['cfg']
+    repos = callerGlobals['repos']
+    branch = callerGlobals['branch']
+    parentPackageName = callerGlobals['name']
+    parentDir = callerGlobals['directory']
+    buildFlavor = callerGlobals.get('buildFlavor', None)
+    alwaysIgnoreInstalled = callerGlobals.get('ignoreInstalled', False)
+
+    # overrides could be None and we want to set it
+    overrides = callerGlobals.get('overrides', None)
+    if overrides is None:
+        overrides = {}
+
+    db = callerGlobals.get('db', None)
+    if db is None:
+        db = database.Database(cfg.root, cfg.dbPath)
+
+    loader = ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
+                                 repos, branch, parentPackageName,
+                                 parentDir, buildFlavor,
+                                 alwaysIgnoreInstalled, overrides, db)
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return
@@ -929,33 +963,21 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
             # its flavor is not assumed to be relevant to the resulting 
             # package (otherwise you might have completely irrelevant flavors
             # showing up for any package that loads the python recipe, e.g.)
-            usedFlavor = use.createFlavor(name, recipe._trackedFlags)
             troveTuple = (recipe._trove.getName(), recipe._trove.getVersion(),
-                          usedFlavor)
+                          recipe._usedFlavor)
             log.info('Loaded %s from %s=%s[%s]' % ((name,) + troveTuple))
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
             callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)
-    if flavor is not None:
-        if buildFlavor is None:
-            buildFlavor = cfg.buildFlavor = oldBuildFlavor
-        else:
-            buildFlavor = oldBuildFlavor
-        # must set this flavor back after the above use.createFlavor()
-        use.setBuildFlagsFromFlavor(parentPackageName, buildFlavor, error=False)
 
     # stash a reference to the module in the namespace
     # of the recipe that loaded it, or else it will be destroyed
-    callerGlobals[os.path.basename(file).replace('.', '-')] = loader
+    callerGlobals[loader.recipe.__module__] = loader
 
-    # return the tracked flags to their state before loading this recipe
-    use.resetUsed()
-    use.setUsed(oldUsed)
-
-def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
+def _getLoaderForInstalledRecipe(troveName, versionStr, flavor, cfg, repos, db,
         buildFlavor):
     loader = oldBuildFlavor = None
-    recipeFile = os.path.join(cfg.baseClassDir, name + '.recipe')
+    recipeFile = os.path.join(cfg.baseClassDir, troveName + '.recipe')
     if os.path.exists(recipeFile):
         # existence of recipe path is not enough, verify the trovespec
         recipeTrvs = db.iterTrovesByPath(recipeFile)
@@ -979,7 +1001,7 @@ def _getLoaderFromFilesystem(name, versionStr, flavor, cfg, repos, db,
                 else:
                     oldBuildFlavor = buildFlavor
                     buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
-                use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
+                use.setBuildFlagsFromFlavor(troveName, buildFlavor, error=False)
 
             loader = RecipeLoader(recipeFile, cfg, repos = repos,
                                   ignoreInstalled = True,
