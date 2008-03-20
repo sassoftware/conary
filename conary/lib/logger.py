@@ -238,8 +238,6 @@ class LogWriter(object):
 class XmlLogWriter(LogWriter):
     def __init__(self, path):
         self.data = threading.local()
-        self.data.descriptorStack = []
-        self.data.recordData = {}
         self.messageId = 0
         self.path = path
         self.logging = False
@@ -260,10 +258,21 @@ class XmlLogWriter(LogWriter):
         self.stream.flush()
         self.logging = True
 
+    def _getDescriptorStack(self):
+        if not hasattr(self.data, 'descriptorStack'):
+            self.data.descriptorStack = []
+        return self.data.descriptorStack
+
+    def _getRecordData(self):
+        if not hasattr(self.data, 'recordData'):
+            self.data.recordData = {}
+        return self.data.recordData
+
     def close(self):
         if not self.logging:
             return
-        self.data = type('Data', (object,), {})
+        del self._getDescriptorStack()[:]
+        self._getRecordData().clear()
         self.log('end log', 'DEBUG')
         print >> self.stream, "</log>"
         self.stream.flush()
@@ -280,7 +289,7 @@ class XmlLogWriter(LogWriter):
     carriageReturn = newline
 
     def _getDescriptor(self):
-        descriptorStack = self.data.__dict__.get('descriptorStack', [])
+        descriptorStack = self._getDescriptorStack()
         return '.'.join(descriptorStack)
 
     def log(self, message, levelname = 'INFO'):
@@ -288,7 +297,7 @@ class XmlLogWriter(LogWriter):
         message = saxutils.escape(message)
         message = message.replace('\n', '\\n')
         macros = {}
-        recordData = self.data.__dict__.get('recordData', {})
+        recordData = self._getRecordData()
         macros.update(recordData)
         macros['time'] = getTime()
         macros['message'] = message
@@ -307,13 +316,13 @@ class XmlLogWriter(LogWriter):
 
     @callable
     def pushDescriptor(self, descriptor):
-        self.data.__dict__.setdefault('descriptorStack', [])
-        self.data.descriptorStack.append(descriptor)
+        descriptorStack = self.data.__dict__.get('descriptorStack', [])
+        descriptorStack.append(descriptor)
 
     @callable
     def popDescriptor(self, descriptor = None):
-        self.data.__dict__.setdefault('descriptorStack', [])
-        desc = self.data.descriptorStack.pop()
+        descriptorStack = self.data.__dict__.get('descriptorStack', [])
+        desc = descriptorStack.pop()
         if descriptor:
             assert descriptor == desc
         return desc
@@ -332,14 +341,13 @@ class XmlLogWriter(LogWriter):
             raise RuntimeError("'%s' is not a legal XML name" % key)
         if isinstance(val, (str, unicode)):
             val = saxutils.escape(val)
-        self.data.__dict__.setdefault('recordData', {})
-        self.data.recordData[key] = val
+        recordData = self._getRecordData()
+        recordData[key] = val
 
     @callable
     def delRecordData(self, key):
-        self.data.__dict__.setdefault('recordData', {})
-        if key in self.data.recordData:
-            del self.data.recordData[key]
+        recordData = self._getRecordData()
+        recordData.pop(key, None)
 
 class FileLogWriter(LogWriter):
     def __init__(self, path):
@@ -375,7 +383,7 @@ class StreamLogWriter(LogWriter):
         self.stream = stream
         LogWriter.__init__(self)
         self.index = 0
-        self.close = bool(self.stream)
+        self.closed = bool(self.stream)
 
     def start(self):
         if not self.stream:
@@ -482,6 +490,22 @@ def startLog(path, xmlPath, subscribeLogPath, withStdin = True):
     lgr.startLog()
     return lgr
 
+def escapeMessage(msg):
+    # Replace newline (0x0a) with \n (2 chars)
+    # For this to work, we need to replace \ with \\ first
+    assert('\0' not in msg)
+    msg = msg.replace('\\', '\\\\')
+    msg.replace('\n', '\\n')
+    return msg
+
+def unescapeMessage(msg):
+    # Replace double-backslash with \0
+    msg = msg.replace('\\\\', '\0')
+    # Replace \n with newline and \0 back into \
+    msg = msg.replace('\\n', '\n')
+    msg = msg.replace('\0', '\\')
+    return msg
+
 class Logger:
     def __init__(self, withStdin = True, writers = [], syncPath = None):
         # by using a random string, we ensure that the marker used by the
@@ -501,25 +525,49 @@ class Logger:
         self.withStdin = withStdin
         self.data = threading.local()
 
+    def _getDescriptorStack(self):
+        if not hasattr(self.data, 'descriptorStack'):
+            self.data.descriptorStack = []
+        return self.data.descriptorStack
+
+    def directLog(self, msg):
+        # We need to escape newline chars in msg
+        self.command("directLog %s" % escapeMessage(msg))
+
     def command(self, cmdStr):
-        self.write("\n%s %s\n" % (self.marker, cmdStr))
+        # Writing to standard error will make the output go through the tty,
+        # which is exactly what want
+        sys.stdout.write("\n%s %s\n" % (self.marker, cmdStr))
+
+    def write(self, *msgs):
+        for msg in msgs:
+            sys.stdout.write(msg)
+
+    def flush(self):
+        sys.stdout.flush()
 
     def pushDescriptor(self, descriptor):
-        descriptorStack = self.data.__dict__.setdefault('descriptorStack', [])
+        descriptorStack = self._getDescriptorStack()
         descriptorStack.append(descriptor)
         self.command("pushDescriptor %s" % descriptor)
 
     def popDescriptor(self, descriptor = None):
-        descriptorStack = self.data.__dict__.setdefault('descriptorStack', [])
-        if descriptor and descriptor != descriptorStack[-1]:
-            raise RuntimeError('Log Descriptor does not match expected ' \
-                    'value: stack contained %s but reference value was %s' % \
-                    (descriptorStack[-1], descriptor))
+        descriptorStack = self._getDescriptorStack()
         if descriptor:
+            if not descriptorStack:
+                raise RuntimeError('Log Descriptor does not match expected '
+                        'value: empty stack while expecting %s' %
+                            (descriptor, ))
+            if descriptor != descriptorStack[-1]:
+                raise RuntimeError('Log Descriptor does not match expected '
+                    'value: stack contained %s but reference value was %s' %
+                            (descriptorStack[-1], descriptor))
+
             self.command("popDescriptor %s" % descriptor)
-        else:
-            self.command("popDescriptor")
-        return descriptorStack.pop()
+            return descriptorStack.pop()
+
+        self.command("popDescriptor")
+        return None
 
     def addRecordData(self, key, val):
         self.command('addRecordData %s %s' % (key, val))
@@ -576,7 +624,6 @@ class Logger:
             os.tcgetpgrp(0) == os.getpid())
 
         masterFd, slaveFd = pty.openpty()
-        directRd, directWr = os.pipe()
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
 
         pid = os.fork()
@@ -587,16 +634,14 @@ class Logger:
             # logging.  This makes it simple to kill the logging process
             # when we are done with it and restore the parent process to 
             # normal, unlogged operation.
-            os.close(directRd)
             os.close(masterFd)
-            self._becomeLogSlave(slaveFd, pid, directWr)
+            self._becomeLogSlave(slaveFd, pid)
             return
         try:
-            os.close(directWr)
             os.close(slaveFd)
             for writer in self.writers:
                 writer.start()
-            logger = _ChildLogger(masterFd, directRd, self.lexer,
+            logger = _ChildLogger(masterFd, self.lexer,
                                   self.restoreTerminalControl, self.withStdin)
             try:
                 logger.log()
@@ -605,19 +650,10 @@ class Logger:
         finally:
             os._exit(0)
 
-    def write(self, data):
-        os.write(self.directWr, data)
-
-    def flush(self):
-        # there's no buffer to flush, but we're trying to mimic a file-like
-        # interface
-        pass
-
-    def _becomeLogSlave(self, slaveFd, loggerPid, directWr):
+    def _becomeLogSlave(self, slaveFd, loggerPid):
         """ hand over control of io to logging process, grab info
             from pseudo tty
         """
-        self.directWr = directWr
         self.loggerPid = loggerPid
 
         if self.withStdin and sys.stdin.isatty():
@@ -657,7 +693,6 @@ class Logger:
             os.close(self.oldStdin)
         os.close(self.oldStdout)
         os.close(self.oldStderr)
-        os.close(self.directWr)
         try:
             # control stdin -- if stdin is a tty
             # that can be controlled
@@ -670,15 +705,12 @@ class Logger:
         os.waitpid(self.loggerPid, 0)
 
 class _ChildLogger:
-    def __init__(self, ptyFd, directRd, lexer, controlTerminal, withStdin):
+    def __init__(self, ptyFd, lexer, controlTerminal, withStdin):
         # ptyFd is the fd of the pseudo tty master 
         self.ptyFd = ptyFd
         # lexer is a python file-like object that supports the write
         # and close methods
         self.lexer = lexer
-        # directRd is for input that goes directly to the log 
-        # without being output to screen
-        self.directRd = directRd
         self.shouldControlTerminal = controlTerminal
         self.withStdin = withStdin
 
@@ -720,12 +752,10 @@ class _ChildLogger:
         # set some local variables that are reused often within the loop
         ptyFd = self.ptyFd
         lexer = self.lexer
-        directRd = self.directRd
         stdin = sys.stdin.fileno()
         unLogged = ''
 
         pollObj = select.poll()
-        pollObj.register(directRd, select.POLLIN)
         pollObj.register(ptyFd, select.POLLIN)
         if self.withStdin and os.isatty(stdin):
             pollObj.register(stdin, select.POLLIN)
@@ -744,31 +774,9 @@ class _ChildLogger:
                 if msg.args[0] != 4:
                     raise
                 read = []
-            if directRd in read:
-                # read output from pseudo terminal stdout/stderr, and pass to 
-                # terminal and log
-                try:
-                    output = os.read(directRd, BUFFER)
-                except OSError, msg:
-                    if msg.errno == errno.EIO: 
-                        # input/output error - pipe closed
-                        # shut down logger
-                        break
-                        if unLogged:
-                            lexer.write(unLogged + '\n')
-                    elif msg.errno != errno.EINTR:
-                        # EINTR is due to an interrupted read - that could be
-                        # due to a SIGWINCH signal.  Raise any other error
-                        raise
-                else:
-                    lexer.write(output)
-
-                if output:
-                    # always read all of directWrite before reading anything else
-                    continue
 
             if ptyFd in read:
-                # read output from pseudo terminal stdout/stderr, and pass to 
+                # read output from pseudo terminal stdout/stderr, and pass to
                 # terminal and log
                 try:
                     output = os.read(ptyFd, BUFFER)
@@ -777,8 +785,6 @@ class _ChildLogger:
                         # input/output error - pty closed 
                         # shut down logger
                         break
-                        if unLogged:
-                            lexer.write(unLogged + '\n')
                     elif msg.errno != errno.EINTR:
                         # EINTR is due to an interrupted read - that could be
                         # due to a SIGWINCH signal.  Raise any other error

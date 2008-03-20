@@ -1477,7 +1477,6 @@ def _computeCommonPrefixes(filePaths):
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write
-
     out.pushDescriptor('environment')
     write('Building %s=%s\n' % (macros.name, sourceVersion))
     write('using conary=%s\n' %constants.version)
