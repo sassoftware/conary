@@ -14,6 +14,10 @@ Changes in @NEW@:
       until it succeeds. (CNY-2505)
     * Recipe actions have now the ability to suggest build requirements.
       (CNY-935)
+    * Running "cvc cook" in a directory with a CONARY file now builds the
+      sources specified by that checkout. This is particularly useful for
+      source troves which do not provide recipes thanks to a factory
+      (CNY-2642)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting

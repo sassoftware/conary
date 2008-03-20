@@ -545,8 +545,27 @@ class CookCommand(CvcCommand):
                                  errorOnFlavorChange=not allowFlavorChange,
                                  shortenFlavors=cfg.shortenGroupFlavors)
 
+        # the remainder of the argument list are the things to build.
+        # e.g., foo /path/to/bar.recipe, etc.
+        items = args[1:]
+        if not items:
+            # if nothing was specified, try to build the package in the current
+            # directory
+            name = os.path.basename(os.getcwd())
+
+            if os.path.isfile('%s.recipe' % name):
+                items = [ '%s.recipe' % name ]
+            elif os.path.isfile('CONARY'):
+                conaryState = state.ConaryStateFromFile('CONARY', repos)
+                items = [ conaryState ]
+
+            if not items:
+                # if we still don't have anything to build, throw a usage
+                # message
+                return self.usage()
+
         try:
-            cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
+            cook.cookCommand(cfg, items, prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
                          crossCompile=crossCompile, downloadOnly=downloadOnly,
