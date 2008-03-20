@@ -421,7 +421,6 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     if repos:
         try:
-            import epdb;epdb.st('f')
             trove = repos.getTrove(srcName, sourceVersion, deps.Flavor(),
                                    withFiles = False)
             sourceVersion = trove.getVersion()
