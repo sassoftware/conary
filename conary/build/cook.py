@@ -1644,8 +1644,9 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
                 stateVer = state.getVersion().trailingRevision().version
                 trv = guessUpstreamSourceTrove(repos, srcName, state)
                 if versionStr and stateVer != versionStr:
-                    return state.getVersion().branch().createVersion(
-                                versions.Revision('%s-1' % (versionStr))), trv
+                    return (state.getVersion().branch().createVersion(
+                                versions.Revision('%s-1' % (versionStr))),
+                                trv, conaryState.getSourceState())
                 return state.getVersion(), trv, conaryState.getSourceState()
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
