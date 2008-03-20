@@ -107,45 +107,49 @@ def setupRecipeDict(d, filename, directory=None, factory=False):
     if not directory:
         directory = os.path.dirname(filename)
     d['directory'] = directory
-    _loadDefaultPackages(d)
+    _loadDefaultPackages(d['cfg'], d['repos'], db = d.get('db'),
+                         flavor = d.get('flavor'),
+                         buildFlavor = d.get('buildFlavor'))
     _copyReusedRecipes(d)
 
 global _defaultsLoaded
 _defaultsLoaded = False
-def _loadDefaultPackages(moduleDict):
+def _loadDefaultPackages(cfg, repos, db = None, flavor = None,
+                         buildFlavor = None):
     global _defaultsLoaded
     global _recipesToCopy
-    if not _defaultsLoaded:
-        _defaultsLoaded = True
-        cfg = moduleDict['cfg']
-        db = moduleDict.get('db')
-        if db is None:
-            db = database.Database(cfg.root, cfg.dbPath)
-        oldBuildFlavor = cfg.buildFlavor
-        repos = moduleDict['repos']
-        flavor = moduleDict.get('flavor')
-        buildFlavor = moduleDict.get('buildFlavor')
-        defaultRecipes = {}
-        for defaultPackage in cfg.defaultBasePackages:
-            packagePath = os.path.join(cfg.baseClassDir,
-                    defaultPackage + '.recipe')
-            if os.path.exists(packagePath):
-                loader, oldBuildFlavor = \
-                        _getLoaderFromFilesystem(defaultPackage,
-                                '', deps.parseFlavor(''),
-                                cfg, repos, db, buildFlavor)
-                if not loader:
-                    continue
-                recipe = loader.getRecipe()
-                recipe.internalAbstractBaseClass = True
-                defaultRecipes.update(loader.recipes)
-        _recipesToCopy = [defaultRecipes.get(x.__name__, x) \
-                for x in _recipesToCopy]
-        if flavor is not None:
-            if buildFlavor is None:
-                buildFlavor = cfg.buildFlavor = oldBuildFlavor
-            else:
-                buildFlavor = oldBuildFlavor
+
+    if _defaultsLoaded:
+        # we don't need to load these twice
+        return
+
+    _defaultsLoaded = True
+
+    if db is None:
+        db = database.Database(cfg.root, cfg.dbPath)
+
+    oldBuildFlavor = cfg.buildFlavor
+    defaultRecipes = {}
+    for defaultPackage in cfg.defaultBasePackages:
+        packagePath = os.path.join(cfg.baseClassDir,
+                defaultPackage + '.recipe')
+        if os.path.exists(packagePath):
+            loader, oldBuildFlavor = \
+                    _getLoaderFromFilesystem(defaultPackage,
+                            '', deps.parseFlavor(''),
+                            cfg, repos, db, buildFlavor)
+            if not loader:
+                continue
+            recipe = loader.getRecipe()
+            recipe.internalAbstractBaseClass = True
+            defaultRecipes.update(loader.recipes)
+    _recipesToCopy = [defaultRecipes.get(x.__name__, x) \
+            for x in _recipesToCopy]
+    if flavor is not None:
+        if buildFlavor is None:
+            buildFlavor = cfg.buildFlavor = oldBuildFlavor
+        else:
+            buildFlavor = oldBuildFlavor
 
 
 _recipesToCopy = []
