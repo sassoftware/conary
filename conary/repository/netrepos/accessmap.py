@@ -87,7 +87,7 @@ class RoleTroves(RoleTable):
         return True
 
     # update the RoleAllTroves table
-    def rebuild(self, cu, rtId = None, roleId = None):
+    def rebuild(self, cu = None, rtId = None, roleId = None):
         where = []
         args = {}
         if rtId is not None:
@@ -101,6 +101,8 @@ class RoleTroves(RoleTable):
         if where:
             whereCond = "where " + " and ".join(where)
             andCond   = "and "   + " and ".join(where)
+        if cu is None:
+            cu = self.db.cursor()
         # update the UserGroupAllTroves table
         cu.execute("delete from UserGroupAllTroves %s" % (whereCond,), args)
         cu.execute("""
@@ -204,7 +206,7 @@ class RoleTroves(RoleTable):
 class RolePermissions(RoleTable):
     # adds into the RoleAllPermissions table new entries
     # triggered by one or more recordIds
-    def addId(self, cu, permissionId = None, roleId = None, instanceId = None):
+    def addId(self, cu = None, permissionId = None, roleId = None, instanceId = None):
         where = []
         args = []
         if permissionId is not None:
@@ -219,6 +221,8 @@ class RolePermissions(RoleTable):
         whereStr = ""
         if len(where):
             whereStr = "where %s" % (' and '.join(where),)
+        if cu is None:
+            cu = self.db.cursor()
         cu.execute("""
         insert into UserGroupAllPermissions
             (permissionId, userGroupId, instanceId, canWrite)
@@ -239,15 +243,19 @@ class RolePermissions(RoleTable):
         %s """ % (whereStr,), args)
         return True
 
-    def deleteId(self, cu, permissionId = None, roleId = None,
+    def deleteId(self, cu = None, permissionId = None, roleId = None,
                  instanceId = None):
         where, args = self.getWhereArgs("where", permissionId=permissionId,
             userGroupId=roleId, instanceId=instanceId)
+        if cu is None:
+            cu = self.db.cursor()
         cu.execute("delete from UserGroupAllPermissions %s" % (where,), args)
         return True
 
-    def rebuild(self, cu, permissionId = None, roleId = None,
+    def rebuild(self, cu = None, permissionId = None, roleId = None,
                 instanceId = None):
+        if cu is None:
+            cu = self.db.cursor()
         self.deleteId(cu, permissionId, roleId, instanceId)
         self.addId(cu, permissionId, roleId, instanceId)
         if permissionId is None and roleId is None and instanceId is None:
