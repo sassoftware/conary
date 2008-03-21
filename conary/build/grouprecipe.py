@@ -3205,7 +3205,7 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
     groupList = list(recipeObj.iterGroupList())
 
     for item in recipeObj.iterReplaceSpecs():
-        (troveSpec, refSource, requireLatest), allowNoMatch = item
+        (troveSpec, refSource), allowNoMatch = item
         sourceSpec = _sourceSpec(troveSpec)
         toFind.setdefault(refSource, set()).add(sourceSpec)
         _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)

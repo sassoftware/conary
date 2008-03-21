@@ -45,6 +45,8 @@ Changes in @NEW@:
       the factory
     * Building directly from recipe files which use factories for superclasses
       now works (CNY-2656)
+    * conary rdiff works correctly for groups that include troves from
+      foreign repositories. (CNY-2544)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,

@@ -383,4 +383,7 @@ class Database(BaseDatabase):
     def dropForeignKey(self, *args, **kw):
         return True
 
-    
+    def use(self, dbName, **kwargs):
+        self.close()
+        self.database = dbName
+        return self.connect(**kwargs)
