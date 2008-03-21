@@ -41,7 +41,7 @@ python_files=	    __init__.py		\
 		    sigprotect.py	\
 		    stackutil.py	\
 		    tracelog.py		\
-		    util.py \
+		    util.py		\
 		    xmllog.py
 
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so

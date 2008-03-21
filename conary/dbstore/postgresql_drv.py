@@ -353,3 +353,8 @@ class Database(BaseDatabase):
             self.dbh.execute(self.basic_transaction)
         # now it's safe to do the bulkload
         return self.dbh.bulkload(tableName, rows, columnNames)
+
+    def use(self, dbName, **kwargs):
+        self.close()
+        self.database = "/".join([self.database.rsplit("/", 1), dbName])
+        return self.connect(**kwargs)

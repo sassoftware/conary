@@ -13,7 +13,7 @@
 #
 import inspect
 
-from conary import files
+from conary import files, versions
 from conary.errors import ParseError
 from conary.build import action, lookaside, source, policy
 from conary.build.errors import RecipeFileError
@@ -366,6 +366,10 @@ class Recipe(object):
                 # to enable a build, so we need to find the
                 # sha1 hash of it since that's how it's indexed
                 # in the file store
+                if isinstance(version, versions.NewVersion):
+                    # don't try and look up things on the NewVersion label!
+                    continue
+
                 fileObj = repos.getFileVersion(pathId, fileId, version)
                 if isinstance(fileObj, files.RegularFile):
                     # it only makes sense to fetch regular files, skip

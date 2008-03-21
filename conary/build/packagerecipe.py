@@ -900,6 +900,7 @@ class PackageRecipe(AbstractPackageRecipe):
                 r.MakeInstall()
     """
     internalAbstractBaseClass = 1
+    name = "package-recipe"
     # these initial buildRequires need to be cleared where they would
     # otherwise create a requirement loop.  Also, note that each instance
     # of :lib in here is only for runtime, not to link against.

@@ -14,6 +14,15 @@ Changes in @NEW@:
       until it succeeds. (CNY-2505)
     * Recipe actions have now the ability to suggest build requirements.
       (CNY-935)
+    * Running "cvc cook" in a directory with a CONARY file now builds the
+      sources specified by that checkout. This is particularly useful for
+      source troves which do not provide recipes thanks to a factory
+      (CNY-2642)
+    * Conary looks for factories in the same places it looks for superclasses
+      now, including the current working directory for local cooks
+      (CNY-2641)
+    * Suggesting build requirements produces a warning if the supplied
+      command cannot be found in the search path. (CNY-2663)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
@@ -38,6 +47,10 @@ Changes in @NEW@:
       the factory
     * Building directly from recipe files which use factories for superclasses
       now works (CNY-2656)
+    * conary rdiff works correctly for groups that include troves from
+      foreign repositories. (CNY-2544)
+    * An issue related to the build logger not properly setting the
+      terminal has been fixed. (CNY-2647)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
