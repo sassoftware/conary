@@ -502,10 +502,15 @@ class AbstractPackageRecipe(Recipe):
 
     def _setLogFile(self, logFile):
         self._logFile = logFile
+        for pattern in self._subscribedPatterns:
+            logFile.subscribe(pattern)
+        self._subscribedPatterns = None
 
     def subscribeLogs(self, pattern):
         if self._logFile:
             self._logFile.subscribe(pattern)
+        else:
+            self._subscribedPatterns.append(pattern)
 
     def synchronizeLogs(self):
         if self._logFile:
@@ -797,6 +802,7 @@ class AbstractPackageRecipe(Recipe):
         self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
         self._subscribeLogPath = None
+        self._subscribedPatterns = []
         self._logFile = None
 
         # allow for architecture not to be set -- this could happen

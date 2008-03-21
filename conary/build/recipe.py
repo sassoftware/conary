@@ -434,7 +434,6 @@ class Recipe(object):
         util.move(src, dest)
 
     def loadPolicy(self, policySet = None, internalPolicyModules = None):
-        #from conary.build import policy
         if internalPolicyModules is None:
             internalPolicyModules = self.internalPolicyModules
         (self._policyPathMap, self._policies) = \
