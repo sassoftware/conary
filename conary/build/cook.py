@@ -1115,9 +1115,13 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        logFile.pushDescriptor('cook')
-        logBuildEnvironment(logFile, sourceVersion, policyTroves,
-                                recipeObj.macros, cfg)
+        try:
+            logFile.pushDescriptor('cook')
+            logBuildEnvironment(logFile, sourceVersion, policyTroves,
+                                    recipeObj.macros, cfg)
+        except:
+            logFile.close()
+            raise
     try:
         logBuild and logFile.pushDescriptor('build')
         bldInfo.begin()
@@ -1193,10 +1197,12 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             debugger.post_mortem(sys.exc_info()[2])
         raise
 
-    if logBuild and recipeObj._autoCreatedFileCount:
+    if logBuild:
         logBuild and logFile.popDescriptor('build')
         logFile.popDescriptor('cook')
         logFile.close()
+
+    if logBuild and recipeObj._autoCreatedFileCount:
         if os.path.exists(logPath):
             os.unlink(logPath)
         if os.path.exists(xmlLogPath):
