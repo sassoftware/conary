@@ -536,8 +536,8 @@ class Logger:
         self.command("directLog %s" % escapeMessage(msg))
 
     def command(self, cmdStr):
-        # Writing to standard error will make the output go through the tty,
-        # which is exactly what want
+        # Writing to stdout will make the output go through the tty,
+        # which is exactly what we want
         sys.stdout.write("\n%s %s\n" % (self.marker, cmdStr))
 
     def write(self, *msgs):
