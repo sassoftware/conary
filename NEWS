@@ -4,6 +4,11 @@ Changes in @NEW@:
       addition to the human readable log. The xml log contains the same
       information as the human readable log, plus additional contextual
       information useful for formatting the log data. (CNY-2487)
+    * A new selective logging facility for policy to use to inspect
+      build output has been added. (CNY-2622)
+    * The ability to pass multiple URLs to addArchive has been added.
+      Conary will try to download the source from each URL, in order,
+      until it succeeds. (CNY-2505)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
@@ -12,8 +17,22 @@ Changes in @NEW@:
     * A bug in finding the sources required to build all the packages for
       a group that omitted replace() packages has been fixed.  This mainly
       affected rmake builds of group recipes. (CNY-2605)
+    * When using PostgreSQL as a repository backend, some queries
+      could be executed with poor execution plans (CNY-2639)
+    * A bug that caused a local cook (e.g., "cvc cook pkg.recipe") to
+      fail at "Copying forward metadata to newly built items..." when
+      the Conary repository for that recipe is not available has been
+      fixed. (CNY-2640)
+    * conary rdiff works correctly for groups that include troves from
+      foreign repositories. (CNY-2544)
+    * An issue related to the build logger not properly setting the
+      terminal has been fixed. (CNY-2647)
     * Allow perl dependencies with periods in them to be parsed from
       the command line. (CNY-2667)
+
+  o Client changes
+    * More of the update logic is now protected by the filesystem journal,
+      and the journal now cleans up rollback state on failure (CNY-2592)
 
 Changes in 1.2.20:
   o Bug Fixes:

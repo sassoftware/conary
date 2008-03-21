@@ -494,6 +494,23 @@ class AbstractPackageRecipe(Recipe):
             self._tty = value
         return self._tty
 
+    def _setSubscribeLogPath(self, path):
+        self._subscribeLogPath = path
+
+    def getSubscribeLogPath(self):
+        return self._subscribeLogPath
+
+    def _setLogFile(self, logFile):
+        self._logFile = logFile
+
+    def subscribeLogs(self, pattern):
+        if self._logFile:
+            self._logFile.subscribe(pattern)
+
+    def synchronizeLogs(self):
+        if self._logFile:
+            self._logFile.synchronize()
+
     def __delattr__(self, name):
 	"""
 	Allows us to delete policy items from their respective lists
@@ -779,6 +796,8 @@ class AbstractPackageRecipe(Recipe):
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
+        self._subscribeLogPath = None
+        self._logFile = None
 
         # allow for architecture not to be set -- this could happen
         # when storing the recipe e.g.

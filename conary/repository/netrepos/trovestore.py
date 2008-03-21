@@ -647,15 +647,16 @@ class TroveStore:
 
     def iterTroves(self, troveInfoList, withFiles = True, withFileStreams = False,
                    hidden = False):
-	cu = self.db.cursor()
+        self.log(3, troveInfoList, "withFiles=%s withFileStreams=%s hidden=%s" % (
+                        withFiles, withFileStreams, hidden))
 
+        cu = self.db.cursor()
         schema.resetTable(cu, 'tmpNVF')
         schema.resetTable(cu, 'tmpInstanceId')
 
-        for idx, info in enumerate(troveInfoList):
-            flavorStr = "'%s'" % info[2].freeze()
-            cu.execute("INSERT INTO tmpNVF VALUES (?, ?, ?, %s)" %(flavorStr,),
-                       idx, info[0], info[1].asString(),
+        for idx, (n,v,f) in enumerate(troveInfoList):
+            cu.execute("INSERT INTO tmpNVF VALUES (?, ?, ?, ?)",
+                       (idx, n, v.asString(), f.freeze()),
                        start_transaction = False)
         self.db.analyze("tmpNVF")
         args = [instances.INSTANCE_PRESENT_NORMAL]
@@ -684,6 +685,11 @@ class TroveStore:
         ORDER BY tmpNVF.idx
         """ % d, args)
         troveIdList = [ x for x in cu ]
+        # short-circuit for cases when nothing matches
+        if not troveIdList:
+            for i in xrange(len(troveInfoList)):
+                yield None
+            return
         for singleTroveIds in troveIdList:
             cu.execute("INSERT INTO tmpInstanceId VALUES (?, ?)",
                        singleTroveIds[0], singleTroveIds[1],
