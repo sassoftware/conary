@@ -58,11 +58,16 @@ class countDict(dict):
 
 def restoreSymlink(f, path, cfg):
     fullpath = os.path.join(cfg.root, path)
-    c = os.readlink(fullpath)
+    c = ''
+    try:
+        c = os.readlink(fullpath)
+    except:
+        pass
     if c != f.target():
         print 'symlink %s contains %s changing to %s' %(
             path, c, f.target())
-        os.remove(fullpath)
+        if c:
+            os.remove(fullpath)
         os.symlink(f.target(), fullpath)
 
 
