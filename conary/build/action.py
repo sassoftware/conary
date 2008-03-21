@@ -210,10 +210,11 @@ class RecipeAction(Action):
         paths = []
         for cmd in self._actionPathBuildRequires:
             # Catch the case "python setup.py"
-            cmd = cmd.split(' ', 1)[0]
-            cmd = cmd % self.recipe.macros
-            fullPath = util.checkPath(cmd)
-            assert(fullPath is not None)
+            c = cmd.split(' ', 1)[0]
+            c = c % self.recipe.macros
+            fullPath = util.checkPath(c)
+            if fullPath is None:
+                raise RuntimeError('fullPath is None, cmd was "%s"' %cmd)
             paths.append(fullPath)
         if not hasattr(self.recipe, '_pathLookupCache'):
             pathCache = self.recipe._pathLookupCache = _pathLookupCache()
