@@ -213,8 +213,11 @@ class RecipeAction(Action):
             c = cmd.split(' ', 1)[0]
             c = c % self.recipe.macros
             fullPath = util.checkPath(c)
-            if fullPath is None:
-                raise RuntimeError('fullPath is None, cmd was "%s"' %cmd)
+            if not fullPath:
+                # FIXME: add test case (CNY-2663)
+                log.warning('Unable to find path for command "%s",'
+                            'will not suggest a build requirement for it' %c)
+                continue
             paths.append(fullPath)
         if not hasattr(self.recipe, '_pathLookupCache'):
             pathCache = self.recipe._pathLookupCache = _pathLookupCache()
