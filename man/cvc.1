@@ -503,8 +503,9 @@ All refer to the exact same OpenPGP Key
 .SH SETUP COMMANDS
 Commands used in the creation of new contexts and packages for software creation.
 .TP 4
-.B newpkg [\fI--template <recipeTemplate>\fP] \fI<name\fP[=\fIlabel\fP]>\fP
-Creates a new package.
+.B newpkg [\fI--template <recipeTemplate>\fP] [\fI--factory <factoryName>\fP] \fI<name\fP[=\fIlabel\fP]>\fP
+Sets up a directory on the local filesystem that can be used to create
+the initial recipe for a package.
 .TP 4
 .B context [name] [\-\-show-passwords]\fP
 When not passed a name, displays information about the current context.
@@ -556,5 +557,3 @@ can report undocumented features at http://issues.rpath.com/
 .\"
 .SH "SEE ALSO"
 conary(1)
-.br
-cvcdesc(1)
