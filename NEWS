@@ -18,6 +18,9 @@ Changes in @NEW@:
       sources specified by that checkout. This is particularly useful for
       source troves which do not provide recipes thanks to a factory
       (CNY-2642)
+    * Conary looks for factories in the same places it looks for superclasses
+      now, including the current working directory for local cooks
+      (CNY-2641)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
