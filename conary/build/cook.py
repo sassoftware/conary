@@ -1021,9 +1021,10 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     srcdirs = []
     if not requireCleanSources:
-        if 'filename' in recipeClass.__dict__:
-            srcdirs.append(os.path.dirname(recipeClass.filename))
+        if recipeClass._sourcePath is not None:
+            srcdirs.append(recipeClass._sourcePath)
         srcdirs.append(cfg.sourceSearchDir % {'pkgname': recipeClass.name})
+
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
 
     for k, v in cfg.environment.items():

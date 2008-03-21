@@ -392,6 +392,7 @@ class RecipeLoader:
         # else because of those same globals. Sweet.
         self.recipe._usedFlavor = use.createFlavor(self.recipe.name,
                                                    self.recipe._trackedFlags)
+        self.recipe._sourcePath = directory
 
     def allRecipes(self):
         return self.recipes
@@ -452,6 +453,7 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                                                           repos,
                                                           getFileFunction)
             factoryCreatedRecipe._trove = sourceTrove.copy()
+            factoryCreatedRecipe._sourcePath = parentDir
 
             self.recipes.update(loader.recipes)
             self.recipes[factoryCreatedRecipe.name] = factoryCreatedRecipe
