@@ -210,13 +210,21 @@ class RecipeAction(Action):
         paths = []
         for cmd in self._actionPathBuildRequires:
             # Catch the case "python setup.py"
-            c = cmd.split(' ', 1)[0]
+            cmdarr = cmd.split(' ')
+            # Try to catch the command "ENVVAR=val make": skip all words that
+            # have an equal sign in them
+            c = cmd
+            for x in cmdarr:
+                if '=' not in x:
+                    c = x
+                    break
+            # If the above for loop didn't find anything remotely resembling a
+            # command, use the original one
             c = c % self.recipe.macros
             fullPath = util.checkPath(c)
             if not fullPath:
-                # FIXME: add test case (CNY-2663)
-                log.warning('Unable to find path for command "%s",'
-                            'will not suggest a build requirement for it' %c)
+                log.warning('Unable to find path for command "%s", '
+                            'will not suggest a build requirement for it' % c)
                 continue
             paths.append(fullPath)
         if not hasattr(self.recipe, '_pathLookupCache'):

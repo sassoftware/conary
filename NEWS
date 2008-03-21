@@ -21,6 +21,8 @@ Changes in @NEW@:
     * Conary looks for factories in the same places it looks for superclasses
       now, including the current working directory for local cooks
       (CNY-2641)
+    * Suggesting build requirements produces a warning if the supplied
+      command cannot be found in the search path. (CNY-2663)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting

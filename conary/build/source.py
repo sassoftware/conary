@@ -1307,7 +1307,6 @@ class _RevisionControl(addArchive):
         pass
 
     def doDownload(self):
-        self._addActionPathBuildRequires([self.name])
         return self.fetch()
 
 class addGitSnapshot(_RevisionControl):
