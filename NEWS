@@ -23,6 +23,8 @@ Changes in @NEW@:
       (CNY-2641)
     * Suggesting build requirements produces a warning if the supplied
       command cannot be found in the search path. (CNY-2663)
+    * Checking out multiple sources with a single command line once again
+      creates the CONARY files properly (CNY-2645)
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
