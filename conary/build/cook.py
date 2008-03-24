@@ -1140,6 +1140,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
         # if we're only extracting or downloading, continue to the next recipe class.
         if prep or downloadOnly:
+            logBuild and logFile.close()
             return recipeObj
 
         cwd = os.getcwd()
@@ -1152,6 +1153,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                           recipeObj.resumeList[-1][1] != False:
                 log.info('Finished Building %s Lines %s, Not Running Policy', 
                                                        recipeClass.name, resume)
+                logBuild and logFile.close()
                 return
             log.info('Processing %s', recipeClass.name)
             logBuild and logFile.pushDescriptor('policy')
@@ -1182,6 +1184,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             # no components in packages, or no explicit files in components
             log.error('No files were found to add to package %s'
                       %recipeClass.name)
+            logBuild and logFile.close()
             return
 
     except Exception, msg:
@@ -1198,7 +1201,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         raise
 
     if logBuild:
-        logBuild and logFile.popDescriptor('build')
+        logFile.popDescriptor('build')
         logFile.popDescriptor('cook')
         logFile.close()
 
