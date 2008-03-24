@@ -12,17 +12,19 @@
 # full details.
 #
 
-import elf
 import os
 import re
 import stat
 import string
-import util
-import javadeps
 import zipfile
 
+from conary import rpmhelper
+from conary.lib import elf
+from conary.lib import javadeps
+from conary.lib import util
 
-class Magic:
+class Magic(object):
+    __slots__ = ['path', 'basedir', 'contents', 'name']
     def __init__(self, path, basedir):
 	self.path = path
 	self.basedir = basedir
@@ -150,7 +152,39 @@ class CIL(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 
-
+class RPM(Magic):
+    _tagMap = [
+        ("name",    rpmhelper.NAME, str),
+        ("version", rpmhelper.VERSION, str),
+        ("release", rpmhelper.RELEASE, str),
+        ("epoch",   rpmhelper.EPOCH, int),
+        ("arch",    rpmhelper.ARCH, str),
+        ("summary", rpmhelper.SUMMARY, str),
+        ("description", rpmhelper.DESCRIPTION, str),
+        ("license", rpmhelper.LICENSE, str),
+    ]
+    def __init__(self, path, basedir=''):
+	Magic.__init__(self, path, basedir)
+        try:
+            f = file(path)
+        except:
+            return None
+        # Convert list of objects to simple types
+        hdr = rpmhelper.readHeader(f)
+        for key, tagName, valType in self._tagMap:
+            val = hdr.get(tagName, None)
+            if isinstance(val, list):
+                if not val:
+                    val = None
+                else:
+                    val = val[0]
+            if val is not None:
+                if valType == int:
+                    val = int(val)
+                elif valType == str:
+                    val = str(val)
+            self.contents[key] = val
+        self.contents['isSource'] = hdr.isSource
 
 def _javaMagic(b):
     if len(b) > 4 and b[0:4] == "\xCA\xFE\xBA\xBE":
@@ -215,6 +249,8 @@ def magic(path, basedir=''):
         # will match all PE executables.  See ECMA-335, partition ii,
         # section 25
         return CIL(path, basedir, b)
+    elif (len(b) > 4 and b[:4] == "\xed\xab\xee\xdb"):
+        return RPM(path, basedir)
 
     return None
 

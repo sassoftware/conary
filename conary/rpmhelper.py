@@ -23,6 +23,10 @@ NAME            = 1000
 VERSION         = 1001
 RELEASE         = 1002
 EPOCH           = 1003
+SUMMARY         = 1004
+DESCRIPTION     = 1005
+LICENSE         = 1014
+SOURCE          = 1018
 ARCH            = 1022
 PREIN           = 1023
 POSTIN          = 1024
@@ -88,7 +92,8 @@ def seekToData(f):
 
     f.seek(size + entries * 16, 1)
 
-class RpmHeader:
+class RpmHeader(object):
+    __slots__ = ['entries', 'data', 'isSource']
     _tagListValues = set([
         DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME])
 
@@ -155,8 +160,8 @@ class RpmHeader:
                 # RPM_INT32_TYPE
                 items.append(struct.unpack("!I", self.data[offset:offset+4])[0])
                 offset += 4
-            elif dataType == 6 or dataType == 8:
-                # RPM_STRING_TYPE or RPM_STRING_ARRAY_TYPE
+            elif dataType in (6, 8, 9):
+                # RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18NSTRING_TYPE
                 s = ""
                 while self.data[offset] != '\0':
                     s += self.data[offset]
@@ -172,7 +177,7 @@ class RpmHeader:
 
         return items
 
-    def __init__(self, f, sha1 = None):
+    def __init__(self, f, sha1 = None, isSource = False):
         intro = f.read(16)
         (mag1, mag2, mag3, ver, reserved, entries, size) = \
             struct.unpack("!BBBBiii", intro)
@@ -182,6 +187,7 @@ class RpmHeader:
 
         entryTable = f.read(entries * 16)
 
+        self.isSource = isSource
         self.entries = {}
         self.data = f.read(size)
 
@@ -208,7 +214,9 @@ def readHeader(f):
     if (leadMagic & 0xffffffffl) != 0xedabeedbl: 
 	raise IOError, "file is not an RPM"
 
-    sigs = RpmHeader(f)
+    isSource = (struct.unpack('!H', lead[6:8])[0] == 1)
+
+    sigs = RpmHeader(f, isSource = isSource)
     sha1 = sigs.get(SIG_SHA1, None)
 
     if SIG_SIZE in sigs:
@@ -218,4 +226,4 @@ def readHeader(f):
         if size != (totalSize - pos):
             raise IOError, "file size does not match size specified by header"
 
-    return RpmHeader(f, sha1 = sha1)
+    return RpmHeader(f, sha1 = sha1, isSource = isSource)
