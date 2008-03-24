@@ -53,6 +53,10 @@ Changes in @NEW@:
       terminal has been fixed. (CNY-2647)
     * Allow perl dependencies with periods in them to be parsed from
       the command line. (CNY-2667)
+    * On failure, the proper URL is returned to the Conary client
+      library. This fixes a regression introduced in the Conary 2
+      codebase, where only the selector part of the URL would be
+      returned. (CNY-2517)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
