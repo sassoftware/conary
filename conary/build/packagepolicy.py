@@ -3682,6 +3682,21 @@ class _basePluggableRequires(Requires):
             Requires.updateArgs(self, exceptions=exceptions)
         Requires.preProcess(self)
 
+    def reportErrors(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].reportErrors(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].error(*args, **kwargs)
+
+    def warn(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].warn(*args, **kwargs)
+
+    def info(self, *args, **kwargs):
+        return self.recipe._policyMap['Requires'].info(*args, **kwargs)
+
+    def _addClassName(self, *args, **kawrgs):
+        return self.recipe._policyMap['Requires']._addClassName(*args, **kwargs)
+
     def doFile(self, path):
         componentMap = self.recipe.autopkg.componentMap
         if path not in componentMap:
