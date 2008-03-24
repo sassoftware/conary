@@ -29,6 +29,8 @@ Changes in @NEW@:
       terminal has been fixed. (CNY-2647)
     * Allow perl dependencies with periods in them to be parsed from
       the command line. (CNY-2667)
+    * A source of circular references which could cause unpredictable
+      memory usage has been removed. (CNY-2674)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,

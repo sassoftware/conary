@@ -261,6 +261,8 @@ def fetchFreshmeat(troveName, xmlDocStream=None):
 
         metadata["source"] = "freshmeat"
         metadata["language"] = "C"
+        # Free the DOM - CNY-2674
+        doc.unlink()
         return Metadata(metadata)
     except xml.parsers.expat.ExpatError:
         raise NoFreshmeatRecord
