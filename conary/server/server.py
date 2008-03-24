@@ -1,7 +1,7 @@
 #!/usr/bin/python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -461,10 +461,6 @@ class ServerConfig(netserver.ServerConfig):
             print >> sys.stderr, ("warning: closed config option is ignored "
                                   "by the standalone server")
 
-        if self.forceSSL:
-            print >> sys.stderr, ("warning: commitAction config option is "
-                                  "ignored by the standalone server")
-
 def usage():
     print "usage: %s" % sys.argv[0]
     print "       %s --add-user <username> [--admin] [--mirror]" % sys.argv[0]
@@ -496,8 +492,9 @@ def addUser(netRepos, userName, admin = False, mirror = False):
     write = userName != 'anonymous'
     netRepos.auth.addUser(userName, pw1)
     # user/group, trovePattern, label, write, capped, admin
-    netRepos.auth.addAcl(userName, None, None, write, False, admin)
+    netRepos.auth.addAcl(userName, None, None, write = write)
     netRepos.auth.setMirror(userName, mirror)
+    netRepos.auth.setAdmin(userName, admin)
 
 def getServer(argv = sys.argv, reqClass = HttpRequests):
     argDef = {}
@@ -547,11 +544,13 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
     reqClass.tmpDir = cfg.tmpDir
     reqClass.cfg = cfg
 
-    profile = 0
+    profile = False
     if profile:
-        import hotshot
-        prof = hotshot.Profile('server.prof')
-        prof.start()
+        import cProfile
+        profiler = cProfile.Profile()
+        profiler.enable()
+    else:
+        profiler = None
 
     if cfg.useSSL:
         protocol = 'https'
@@ -656,9 +655,9 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
         httpServer = SecureHTTPServer(("", cfg.port), reqClass, ctx)
     else:
         httpServer = HTTPServer(("", cfg.port), reqClass)
-    return httpServer, profile
+    return httpServer, profiler
 
-def serve(httpServer, profile=False):
+def serve(httpServer, profiler=None):
     fds = {}
     fds[httpServer.fileno()] = httpServer
 
@@ -676,16 +675,19 @@ def serve(httpServer, profile=False):
         except select.error:
             pass
         except:
-            if profile:
-                prof.stop()
+            if profiler:
+                print 'HERE'
+                profiler.disable()
+                profiler.dump_stats('conary.lsprof')
+                profiler.print_stats()
                 print "exception happened, exiting"
                 sys.exit(1)
             else:
                 raise
 
 def main():
-    server, profile = getServer()
-    serve(server)
+    server, profiler = getServer()
+    serve(server, profiler)
 
 if __name__ == '__main__':
     sys.excepthook = util.genExcepthook(debug=True)

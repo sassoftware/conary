@@ -2,7 +2,7 @@
 <html xmlns:py="http://purl.org/kid/ns#"
       xmlns="http://www.w3.org/1999/xhtml">
 <!--
- Copyright (c) 2005 rPath, Inc.
+ Copyright (c) 2005,2008 rPath, Inc.
 
  This program is distributed under the terms of the Common Public License,
  version 1.0. A copy of this license should have been distributed with this
@@ -15,7 +15,7 @@
  full details.
 -->
     <head py:match="item.tag == '{http://www.w3.org/1999/xhtml}head'">
-        <title>Conary Repository (${cfg.serverName})</title>
+        <title>Conary Repository</title>
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/common.css" />
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/repository.css" />
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/custom.css" />
@@ -50,19 +50,19 @@
                 </div>
                 <div id="topRight">
                     <div class="about">
-                        <span py:if="not hasWrite" py:strip="True"><a href="login">Login</a></span>
-                        <span py:if="hasWrite" py:strip="True">Welcome, <b>${currentUser}</b><span py:if="isAdmin">&nbsp;(administrator)</span>.</span>
+                        <span py:if="not loggedIn" py:strip="True"><a href="login">Login</a></span>
+                        <span py:if="loggedIn" py:strip="True">Welcome, <b>${currentUser}</b><span py:if="isAdmin">&nbsp;(administrator)</span>.&nbsp;&nbsp;<a href="logout">Logout</a></span>
                     </div>
-                    <p style="font-size: smaller;"><span style="font-weight:bold;" py:content="', '.join(cfg.serverName)" /><br />Conary Repository Server ${constants.version}</p>
+                    <p style="font-size: smaller;">Conary Repository Server ${constants.version}</p>
                 </div>
             </div>
             <ul class="menu">
                 <li py:attrs="{'class': (lastchunk in ('', 'main', 'browse', 'troveInfo', 'files')) and 'highlighted' or None}"><a href="browse">Repository Browser</a></li>
-                <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('metadata', 'getMetadata')) and 'highlighted' or None}"><a href="metadata">Metadata</a></li>
+<!--                <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('metadata', 'getMetadata')) and 'highlighted' or None}"><a href="metadata">Metadata</a></li> -->
                 <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('pgpAdminForm', 'pgpNewKeyForm')) and 'highlighted' or None}"><a href="pgpAdminForm">PGP Keys</a></li>
-                <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'addUserForm', 'addPermForm', 'editPermForm', 'manageGroupForm',)) and 'highlighted' or None}"><a href="userlist">Users and Groups</a></li>
-                <li py:if="not isAnonymous" py:attrs="{'class': (lastchunk in ('chPassForm', )) and 'highlighted' or None}"><a href="chPassForm">Change Password</a></li>
-                <li py:if="hasEntitlements" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementForm', 'addEntGroupForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
+                <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'addUserForm', 'addPermForm', 'editPermForm', 'manageRoleForm',)) and 'highlighted' or None}"><a href="userlist">Users and Roles</a></li>
+                <li py:if="loggedIn" py:attrs="{'class': (lastchunk in ('chPassForm', )) and 'highlighted' or None}"><a href="chPassForm">Change Password</a></li>
+                <li py:if="hasEntitlements or isAdmin" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementKeyForm', 'addEntClassForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
             </ul>
             <ul class="menu submenu">&nbsp;</ul>
             <div class="layout" py:replace="item[:]" />
@@ -74,7 +74,7 @@
                     </ul>
                 </div>
                 <div id="bottomText">
-                    <span id="copyright">Copyright &copy; 2005-2006 rPath. All Rights Reserved.</span>
+                    <span id="copyright">Copyright &copy; 2005-2007 rPath. All Rights Reserved.</span>
                     <span id="tagline">rPath. The Software Appliance Company.</span>
                 </div>
 

@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
- Copyright (c) 2005 rpath, Inc.
+ Copyright (c) 2005,2007 rPath, Inc.
 
  This program is distributed under the terms of the Common Public License,
  version 1.0. A copy of this license should have been distributed with this
@@ -19,26 +19,26 @@
     <head/>
     <body>
         <div id="inner">
-            <h2>Entitlements for <span py:content="entClass"/></h2>
+            <h2>Entitlement Keys for <span py:content="entClass"/></h2>
             <table class="entlist" id="entitlements">
                 <thead>
                     <tr>
-                        <td style="width: 25%;">Entitlement</td>
-                        <td style="width: 25%;">Delete</td>
+                        <td style="width: 25%;">Entitlement Key</td>
+                        <td style="width: 25%;">Action</td>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr py:for="i, entitlement in enumerate(sorted(entitlements))"
+                    <tr py:for="i, entKey in enumerate(sorted(entKeys))"
                         class="${i % 2 and 'even' or 'odd'}">
-                        <td py:content="entitlement"/>
+                        <td py:content="entKey"/>
                         <td>
-                            <a href="deleteEntitlement?entClass=${entClass};entitlement=${entitlement}">X</a>
+                            <a href="deleteEntitlementKey?entClass=${entClass};entKey=${entKey}">Delete Key</a>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <p>
-                <a href="addEntitlementForm?entClass=${entClass}">Add Entitlement</a>
+                <a href="addEntitlementKeyForm?entClass=${entClass}">Add Entitlement</a>
             </p>
         </div>
     </body>

@@ -13,9 +13,9 @@
 #
 import inspect
 
-from conary import files
+from conary import files, versions
 from conary.errors import ParseError
-from conary.build import action, source, policy
+from conary.build import action, lookaside, source, policy
 from conary.build.errors import RecipeFileError
 from conary.lib import log, util
 
@@ -33,6 +33,7 @@ RECIPE_TYPE_FILESET   = 2
 RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
+RECIPE_TYPE_FACTORY   = 6
 
 class _policyUpdater:
     def __init__(self, theobject):
@@ -57,6 +58,9 @@ def isInfoRecipe(recipeClass):
 
 def isRedirectRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_REDIRECT
+
+def isFactoryRecipe(recipeClass):
+    return recipeClass.getType() == RECIPE_TYPE_FACTORY
 
 def loadMacros(paths):
     '''
@@ -362,6 +366,10 @@ class Recipe(object):
                 # to enable a build, so we need to find the
                 # sha1 hash of it since that's how it's indexed
                 # in the file store
+                if isinstance(version, versions.NewVersion):
+                    # don't try and look up things on the NewVersion label!
+                    continue
+
                 fileObj = repos.getFileVersion(pathId, fileId, version)
                 if isinstance(fileObj, files.RegularFile):
                     # it only makes sense to fetch regular files, skip
@@ -474,10 +482,18 @@ class Recipe(object):
                             post.__class__.__name__)
                     logFile.flush()
                     post.doProcess(self)
+                    post.postPolicy()
                 finally:
                     if formattedLog:
                         logFile.popDescriptor(post.__class__.__name__)
         finally:
             if formattedLog:
                 logFile.popDescriptor(bucketName)
+
+    def _fetchFile(self, sourceName, refreshFilter = None, localOnly = False):
+        f = lookaside.findAll(self.cfg, self.laReposCache,
+            sourceName, self.name, self.srcdirs,
+            refreshFilter = refreshFilter, localOnly = localOnly,
+            allowNone = True)
+        return f
 

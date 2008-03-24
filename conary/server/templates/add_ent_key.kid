@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <?python
-# Copyright (c) 2005 rpath, Inc.
+# Copyright (c) 2005,2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,15 +18,15 @@
     <head/>
     <body>
         <div id="inner">
-            <h2>Add Entitlement</h2>
+            <h2>Add Entitlement Key</h2>
 
-            <form method="post" action="addEntitlement">
+            <form method="post" action="addEntitlementKey">
             <input type="hidden" value="${entClass}" name="entClass"/>
                 <table>
                     <tr><td>Entitlement Class:</td><td><span py:content="entClass"/></td></tr>
-                    <tr><td>Entitlement:</td><td><input size="64" name="entitlement"/></td></tr>
+                    <tr><td>Entitlement Key:</td><td><input size="64" name="entKey"/></td></tr>
                 </table>
-                <p><input type="submit" value="Add Entitlement"/></p>
+                <p><input type="submit" value="Add Entitlement Key"/></p>
             </form>
         </div>
     </body>
