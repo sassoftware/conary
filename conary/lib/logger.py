@@ -559,11 +559,12 @@ class Logger:
                 raise RuntimeError('Log Descriptor does not match expected '
                         'value: empty stack while expecting %s' %
                             (descriptor, ))
-            stackTop = descriptorStack.pop()
+            stackTop = descriptorStack[-1]
             if descriptor != stackTop:
                 raise RuntimeError('Log Descriptor does not match expected '
                     'value: stack contained %s but reference value was %s' %
                             (stackTop, descriptor))
+            descriptorStack.pop()
 
             self.command("popDescriptor %s" % descriptor)
             return stackTop
