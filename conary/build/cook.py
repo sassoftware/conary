@@ -1201,7 +1201,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         raise
 
     if logBuild:
-        logBuild and logFile.popDescriptor('build')
+        logFile.popDescriptor('build')
         logFile.popDescriptor('cook')
         logFile.close()
 
