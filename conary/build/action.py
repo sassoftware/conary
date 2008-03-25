@@ -24,6 +24,7 @@ import string
 import traceback
 
 from conary.lib import debugger, log, util
+from conary.local import database
 
 # build.py and policy.py need some common definitions
 
@@ -161,6 +162,11 @@ class RecipeAction(Action):
     _packageAction = True
     _groupAction = False
 
+    # using an action may suggest the addition of a build requirement
+    # (like r.Make requiring make)
+    _actionTroveBuildRequires = set([])
+    _actionPathBuildRequires = set([])
+
     def __init__(self, recipe, *args, **keywords):
         assert(self.__class__ is not RecipeAction)
 	self._getLineNum()
@@ -168,7 +174,21 @@ class RecipeAction(Action):
 	self.recipe = recipe
 	# change self.use to be a simple flag
 	self.use = checkUse(self.use)
-        
+
+    def _addActionPathBuildRequires(self, buildRequires):
+        # We do not want dynamically added requirements to modify the class
+        if id(self._actionPathBuildRequires) == \
+           id(self.__class__._actionPathBuildRequires):
+            self._actionPathBuildRequires = set(self._actionPathBuildRequires)
+        self._actionPathBuildRequires.update(buildRequires)
+
+    def _addActionTroveBuildRequires(self, buildRequires):
+        # We do not want dynamically added requirements to modify the class
+        if id(self._actionTroveBuildRequires) == \
+           id(self.__class__._actionTroveBuildRequires):
+            self._actionTroveBuildRequires = set(self._actionTroveBuildRequires)
+        self._actionTroveBuildRequires.update(buildRequires)
+
     # virtual method for actually executing the action
     def doAction(self):
 	if self.debug:
@@ -184,6 +204,46 @@ class RecipeAction(Action):
 		self.do()
 		sys.excepthook = oldexcepthook
 
+        self.doSuggestAutoBuildReqs()
+
+    def doSuggestAutoBuildReqs(self):
+        if not hasattr(self.recipe, "buildRequires"):
+            # Most likely group recipe
+            return
+        paths = []
+        for cmd in self._actionPathBuildRequires:
+            # Catch the case "python setup.py"
+            cmdarr = cmd.split(' ')
+            # Try to catch the command "ENVVAR=val make": skip all words that
+            # have an equal sign in them
+            c = cmd
+            for x in cmdarr:
+                if '=' not in x:
+                    c = x
+                    break
+            # If the above for loop didn't find anything remotely resembling a
+            # command, use the original one
+            c = c % self.recipe.macros
+            fullPath = util.checkPath(c)
+            if not fullPath:
+                log.warning('Unable to find path for command "%s", '
+                            'will not suggest a build requirement for it' % c)
+                continue
+            paths.append(fullPath)
+        if not hasattr(self.recipe, '_pathLookupCache'):
+            pathCache = self.recipe._pathLookupCache = _pathLookupCache()
+        else:
+            pathCache = self.recipe._pathLookupCache
+        suggestsMap = pathCache.getTrovesByPaths(self._getDb(), paths)
+        suggests = set()
+        for k, v in suggestsMap.items():
+            suggests.update(v)
+        # Add the trove requirements
+        suggests.update(self._actionTroveBuildRequires)
+        # Remove build requires that were already added
+        suggests = suggests - set(self.recipe.buildRequires)
+        if suggests:
+            self.recipe.reportMissingBuildRequires(sorted(suggests))
 
     def doPrep(self):
 	pass
@@ -232,7 +292,13 @@ class RecipeAction(Action):
 	
 	raise type, "%s:%s: %s: %s" % (self.file, self.linenum,
 					   type.__name__, msg)
-    
+
+    def _getDb(self):
+        if not hasattr(self.recipe, '_db') or self.recipe._db is None:
+            self.recipe._db = database.Database(self.recipe.cfg.root,
+                                                self.recipe.cfg.dbPath)
+        return self.recipe._db
+
 # XXX look at ShellCommand versus Action
 class ShellCommand(RecipeAction):
     """Base class for shell-based commands. ShellCommand is an abstract class
@@ -426,3 +492,21 @@ def _expandPaths(paths, macros, defaultDir=None, braceGlob=True, error=False):
         if notfound:
             raise RuntimeError, "No such file(s) '%s'" % "', '".join(notfound)
     return expPaths
+
+class _pathLookupCache(object):
+    """Simple cache object for path lookups (singleton-like)"""
+
+    __slots__ = ['_cache']
+
+    def __init__(self):
+        self._cache = {}
+
+    def getTrovesByPaths(self, db, paths):
+        ret = {}
+        for path in paths:
+            if path in self._cache:
+                ret[path] = self._cache[path]
+            else:
+                ret[path] = self._cache[path] = [ x.getName()
+                                          for x in db.iterTrovesByPath(path) ]
+        return ret

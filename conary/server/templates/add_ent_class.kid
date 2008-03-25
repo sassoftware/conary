@@ -3,7 +3,7 @@
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <?python
-# Copyright (c) 2005 rpath, Inc.
+# Copyright (c) 2005-2007 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -31,19 +31,19 @@
                         </td>
                     </tr>
                     <tr>
-                        <td>Access Groups:</td>
+                        <td>Roles:</td>
                         <td>
-                            <select name="userGroupList" multiple="true">
-                                <option py:for="group in groups" py:content="group" py:value="${group}" py:attrs="{'selected': (group in accessGroups) and 'selected' or None}"/>
+                            <select name="roles" multiple="true">
+                                <option py:for="role in allRoles" py:content="role" py:value="${role}" py:attrs="{'selected': (role in currentRoles) and 'selected' or None}"/>
                             </select>
                         </td>
                     </tr>
                     <tr>
-                        <td>Managing Group:</td>
+                        <td>Managing Role:</td>
                         <td>
                             <select name="entOwner">
-                                <option value="*none*" py:attrs="{'selected': (not ownerGroup) and 'selected' or None}">(none)</option>
-                                <option py:for="group in groups" py:content="group" py:value="${group}" py:attrs="{'selected': (group == ownerGroup) and 'selected' or None}"/>
+                                <option value="*none*" py:attrs="{'selected': (not ownerRole) and 'selected' or None}">(none)</option>
+                                <option py:for="role in allRoles" py:content="role" py:value="${role}" py:attrs="{'selected': (role == ownerRole) and 'selected' or None}"/>
                             </select>
                         </td>
                     </tr>
