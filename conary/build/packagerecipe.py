@@ -773,6 +773,15 @@ class AbstractPackageRecipe(Recipe):
     def regexp(self, expression):
         return action.Regexp(expression)
 
+    def _addTroveScript(self, troveNames, scriptContents, scriptType,
+                        fromClass = None):
+        scriptTypeMap = dict((y[2], x) for (x, y) in
+                             trove.TroveScripts.streamDict.items())
+        assert(scriptType in scriptTypeMap)
+        for troveName in troveNames:
+            self._scriptsMap.setdefault(troveName, {})[scriptType] = \
+                (scriptContents, fromClass)
+
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance,
@@ -801,6 +810,8 @@ class AbstractPackageRecipe(Recipe):
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
+        # Mapping from trove name to scripts
+        self._scriptsMap = {}
         self._subscribeLogPath = None
         self._subscribedPatterns = []
         self._logFile = None
@@ -895,6 +906,7 @@ class PackageRecipe(AbstractPackageRecipe):
                 r.MakeInstall()
     """
     internalAbstractBaseClass = 1
+    name = "package-recipe"
     # these initial buildRequires need to be cleared where they would
     # otherwise create a requirement loop.  Also, note that each instance
     # of :lib in here is only for runtime, not to link against.

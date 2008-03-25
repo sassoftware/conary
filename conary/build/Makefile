@@ -24,6 +24,7 @@ python_files = __init__.py	\
 	destdirpolicy.py	\
 	errors.py	        \
 	explain.py	        \
+	factory.py	        \
 	filter.py 		\
 	filesetrecipe.py	\
 	grouprecipe.py		\

@@ -119,6 +119,8 @@ class BuildAction(action.RecipeAction):
             if self.manifest:
                 self.manifest.create()
 
+        self.doSuggestAutoBuildReqs()
+
     def do(self, macros):
         """
         Do the build action
@@ -598,6 +600,7 @@ class CMake(Configure):
     Demonstrates calling C{r.CMake()} and specifying C{NO} value for
     C{USE_KDE3} variable.
     """
+    _actionPathBuildRequires = set(['cmake'])
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
     template = (
@@ -828,7 +831,11 @@ class Make(BuildCommand):
                 if i in keywords['preMake']:
                     log.error('preMake argument cannot contain "%s"', i)
 
+    def _addMakeToBuildRequires(self):
+        self._addActionPathBuildRequires([ self.keywords['makeName'] ])
+
     def do(self, macros):
+        self._addMakeToBuildRequires()
 	macros = macros.copy()
         if self.local:
             macros.update(self.recipe.buildmacros.itermacros())
@@ -882,6 +889,7 @@ class MakeParallelSubdir(Make):
     the top-level C{Makefile} does not work correctly with parallel C{make},
     but the lower-level Makefiles do work correctly with parallel C{make}.
     """
+    _actionPathBuildRequires = set(['make'])
     template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
@@ -889,6 +897,10 @@ class MakeParallelSubdir(Make):
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s '
                 ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
+
+    def _addMakeToBuildRequires(self):
+        # Done by the class attribute
+        pass
 
 class MakeInstall(Make):
     """
@@ -943,6 +955,7 @@ class MakeInstall(Make):
     Demonstrates using C{r.MakeInstall()}, and setting the environment variable
     C{LIBTOOL} to C{%(bindir)s/libtool}.
     """
+    _actionPathBuildRequires = set(['make'])
     template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
@@ -961,6 +974,10 @@ class MakeInstall(Make):
 	else:
 	    macros['rootVarArgs'] = ''
 	Make.do(self, macros)
+
+    def _addMakeToBuildRequires(self):
+        # Done by the class attribute
+        pass
 
 class MakePathsInstall(Make):
     """
@@ -990,6 +1007,8 @@ class MakePathsInstall(Make):
     Calls C{r.MakePathsinstall()} and additionally sets the C{mandir}
     make variable to C{%(destdir)s/%(mandir)s/man1}.
     """
+    _actionPathBuildRequires = set(['make'])
+
     template = (
 	'cd \'%%(actionDir)s\'; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
@@ -1012,7 +1031,6 @@ class MakePathsInstall(Make):
 	' infodir=%%(destdir)s/%%(infodir)s'
 	' %(installtarget)s %(args)s')
     keywords = {'installtarget': 'install'}
-
 
 class Ant(BuildCommand):
     """
@@ -1055,6 +1073,7 @@ class Ant(BuildCommand):
     to C{ant}.
 
     """
+    _actionPathBuildRequires = set(['%(antcmd)s'])
     keywords = {'subdir': '',
                 'dir': '',
                 'verbose': True,
@@ -1119,6 +1138,7 @@ class JavaCompile(BuildCommand):
     template = 'CLASSPATH="%%(classpath)s" %(javacmd)s %%(dir)s %(javaArgs)s'
 
     def do(self, macros):
+        self._addActionPathBuildRequires([ self.keywords['javacmd'] ])
         macros = macros.copy()
         assert(len(self.arglist) == 1)
         macros.dir = self.arglist[0] % macros
@@ -1170,6 +1190,7 @@ class CompilePython(BuildCommand):
     The above example demonstrates calling C{r.CompilePython()}, and specifying
     the absolute path defined by C{%(varmmdir)s}.
     """
+    _actionPathBuildRequires = set(['python'])
     template = (
 	"""python -c 'from compileall import *; compile_dir("""
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'; """
@@ -1285,11 +1306,11 @@ class PythonSetup(BuildCommand):
     }
 
     def do(self, macros):
-	if 'python-setuptools:python' not in self.recipe.buildRequires:
+        if 'python-setuptools:python' not in self.recipe.buildRequires:
             if not self.bootstrap:
                 self.recipe.reportErrors(
-                    "Must add 'python-setuptools:python' to buildRequires")
-                self.recipe.reportMissingBuildRequires('python-setuptools:python')
+                        "Must add 'python-setuptools:python' to buildRequires")
+
 	macros = macros.copy()
         if self.dir == '%(builddir)s':
             rundir = macros.builddir # do not expand!
@@ -1328,10 +1349,12 @@ class PythonSetup(BuildCommand):
         # now figure out which kind of setup.py this is
         if re.compile('(import setuptools|from setuptools import)').search(file('%s/%s' %(rundir, self.setupName)).read()):
             macros.pythonsetup = 'python %s ' % self.setupName
+            self._addActionPathBuildRequires(['python'])
         else:
             # hack to use setuptools instead of disttools
             macros.pythonsetup = (
                 '''python -c "import setuptools;execfile('%(setupName)s')"''')
+            self._addActionTroveBuildRequires(['python-setuptools:python'])
 
         # prepare to test for multilib problems
         if macros.lib != 'lib':
@@ -1414,6 +1437,7 @@ class Ldconfig(BuildCommand):
     Demonstrates calling C{r.Ldconfig()} to execute C{ldconfig} in the
     C{%(libdir)s/} subdirectory.
     """
+    _actionPathBuildRequires = set(['%(essentialsbindir)s/ldconfig'])
     template = '%%(essentialsbindir)s/ldconfig -n %%(destdir)s/%(args)s'
     def do(self, macros):
         BuildCommand.do(self, macros)
@@ -1479,7 +1503,7 @@ class _FileAction(BuildAction):
                 try:
                     self.recipe.WarnWriteable(
                         exceptions=re.escape(destPath).replace(
-                        '%', '%%'))
+                        '%', '%%'), allowUnusedFilters = True)
                 except AttributeError:
                     pass
             else:
@@ -1563,6 +1587,8 @@ class Desktopfile(BuildCommand, _FileAction):
     Demonstrates creation of the desktop file C{thunderbird.desktop} with
     C{r.Desktopfile()}.
     """
+    _actionPathBuildRequires = set(['desktop-file-validate',
+                                'desktop-file-install'])
     template = ('cd \'%%(builddir)s\'; '
 		'desktop-file-validate %(args)s ; '
 		'desktop-file-install --vendor %(vendor)s'
@@ -3430,6 +3456,7 @@ class XMLCatalogEntry(BuildCommand):
     C{http://docbook.sourceforge.net/release/xsl/1.65.1} to be replaced by
     C{file://%(datadir)s/sgml/docbook/xsl-stylesheets-1.65.1}.
     """
+    _actionPathBuildRequires = set(['xmlcatalog'])
 
     template = (
         '%%(createcmd)s'
@@ -3524,6 +3551,7 @@ class SGMLCatalogEntry(BuildCommand):
     Calls C{r.SGMLCatalogEntry()} adding the entry C{sgml-common.cat} to the
     catalog reference C{%(datatdir)s/xml/qaml/catalog}.
     """
+    _actionPathBuildRequires = set(['xmlcatalog'])
 
     template = (
         'xmlcatalog --sgml --add'
