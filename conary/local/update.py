@@ -2655,6 +2655,8 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
 
         (id, status) = os.waitpid(pid, 0)
         os.unlink(scriptName)
+        os.close(stdoutPipe[0])
+        os.close(stderrPipe[0])
 
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
             if not os.WIFEXITED(status):
