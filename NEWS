@@ -9,7 +9,7 @@ Changes in @NEW@:
       will now emit an error. (CNY-2221)
     * A new selective logging facility for policy to use to inspect
       build output has been added. (CNY-2622)
-    * The ability to pass multiple URLs to addArchive has been added.
+    * It is now possible to pass a list of multiple URLs to addArchive.
       Conary will try to download the source from each URL, in order,
       until it succeeds. (CNY-2505)
     * Recipe actions have now the ability to suggest build requirements.
@@ -30,9 +30,9 @@ Changes in @NEW@:
     * addArchive now supports .war and .jar archives (CNY-2684) 
 
   o Bug Fixes:
-    * Rollbacks could restore files from local rollbacks by overwriting
-      existing contents rather than replacing the file. In addition,
-      the operation was not journaled properly. (CNY-2596)
+    * Previously, rollbacks could restore files from local rollbacks
+      by overwriting existing contents rather than replacing the file.
+      In addition, the operation was not journaled properly.  (CNY-2596)
     * A bug in finding the sources required to build all the packages for
       a group that omitted replace() packages has been fixed.  This mainly
       affected rmake builds of group recipes. (CNY-2605)
@@ -52,11 +52,11 @@ Changes in @NEW@:
       the factory
     * Building directly from recipe files which use factories for superclasses
       now works (CNY-2656)
-    * conary rdiff works correctly for groups that include troves from
-      foreign repositories. (CNY-2544)
+    * The conary rdiff command works correctly for groups that include
+      troves from foreign repositories. (CNY-2544)
     * An issue related to the build logger not properly setting the
-      terminal has been fixed. (CNY-2647)
-    * Allow perl dependencies with periods in them to be parsed from
+      logging pseudo-tty in raw mode has been fixed. (CNY-2647)
+    * Conary can now parse perl dependencies with periods in them from
       the command line. (CNY-2667)
     * On failure, the proper URL is returned to the Conary client
       library. This fixes a regression introduced in the Conary 2
@@ -66,10 +66,11 @@ Changes in @NEW@:
       memory usage has been removed. (CNY-2674)
     * Tighten the rules for what characters are allowed in version strings
       (CNY-2657)
+    * Fixed a file descriptor leak when using in-memory-only databases.
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
-      and the journal now cleans up rollback state on failure (CNY-2592)
+      and the journal now cleans up rollback state on failure. (CNY-2592)
 
 Changes in 2.0.9:
   o Bug Fixes:

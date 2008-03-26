@@ -535,6 +535,7 @@ class FilesystemJob:
                         util.mkdirChain(dirName)
                         name = os.path.basename(target)
                         tmpfd, tmpname = tempfile.mkstemp(name, '.ct', dirName)
+                        os.close(tmpfd)
                         opJournal.backup(target)
                         os.rename(tmpname, target)
 
@@ -2541,10 +2542,13 @@ class TagCommand:
                                 tagHandlerOutput(tagName, line,
                                                  stderr = isError)
 
-                if inputPid is not None: os.waitpid(inputPid, 0)
+                if inputPid is not None:
+                    os.waitpid(inputPid, 0)
                 (id, status) = os.waitpid(pid, 0)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
                     self.callback.error("%s failed", command[0])
+                os.close(stdoutPipe[0])
+                os.close(stderrPipe[0])
 
 def silentlyReplace(newF, oldF):
     # Can the file already on the disk (oldF) be replaced with the new file
@@ -2671,6 +2675,8 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
 
         (id, status) = os.waitpid(pid, 0)
         os.unlink(scriptName)
+        os.close(stdoutPipe[0])
+        os.close(stderrPipe[0])
 
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
             if not os.WIFEXITED(status):

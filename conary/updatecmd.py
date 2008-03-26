@@ -533,6 +533,7 @@ def _updateTroves(cfg, applyList, **kwargs):
         suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
         callback.done()
+        client.close()
         raise
 
     if info:
@@ -603,7 +604,6 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
-
     try:
         restartDir = client.applyUpdateJob(updJob, **applyKwargs)
     finally:
@@ -626,6 +626,7 @@ def _updateTroves(cfg, applyList, **kwargs):
             params[params.index('migrate')] = 'update'
 
         params.extend(['--restart-info=%s' % restartDir])
+        client.close()
         raise errors.ReexecRequired(
                 'Critical update completed, rerunning command...', params,
                 restartDir)
