@@ -895,6 +895,8 @@ def loadEntitlementFromProgram(fullPath, serverName):
             errBuf = os.read(stdErrRead, 1024)
 
     pid, status = os.waitpid(childPid, 0)
+    os.close(readFd)
+    os.close(stdErrRead)
 
     errMsg = ''
     if os.WIFEXITED(status) and os.WEXITSTATUS(status):
