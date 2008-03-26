@@ -495,7 +495,7 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
-	if f.endswith(".zip") or f.endswith(".xpi"):
+	if f.endswith(".zip") or f.endswith(".xpi") or f.endswith(".jar") or f.endswith(".war"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
 

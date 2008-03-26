@@ -27,6 +27,7 @@ Changes in @NEW@:
       develop factory recipes. (CNY-2666)
     * Checking out multiple sources with a single command line once again
       creates the CONARY files properly (CNY-2645)
+    * addArchive now supports .war and .jar archives (CNY-2684) 
 
   o Bug Fixes:
     * Rollbacks could restore files from local rollbacks by overwriting
