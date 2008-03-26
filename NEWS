@@ -31,7 +31,7 @@ Changes in @NEW@:
       the command line. (CNY-2667)
     * A source of circular references which could cause unpredictable
       memory usage has been removed. (CNY-2674)
-    * Fixed a file descroptor leak when using in-memory-only databases.
+    * Fixed a file descriptor leak when using in-memory-only databases.
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
