@@ -535,6 +535,7 @@ class FilesystemJob:
                         util.mkdirChain(dirName)
                         name = os.path.basename(target)
                         tmpfd, tmpname = tempfile.mkstemp(name, '.ct', dirName)
+                        os.close(tmpfd)
                         opJournal.backup(target)
                         os.rename(tmpname, target)
 
