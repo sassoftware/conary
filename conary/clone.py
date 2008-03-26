@@ -109,6 +109,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   cloneSources = False, allFlavors = False, client=None, 
                   targetFile = None, exactFlavors = None):
     targetMap = {}
+    searchPath = []
     for fromLoc, toLoc in targetList:
         context = cfg.buildLabel
         fromLoc = _convertLabelOrBranch(fromLoc, context)
@@ -117,6 +118,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                 context = fromLoc.label()
             else:
                 context = fromLoc
+            searchPath.append(context)
         toLoc = _convertLabelOrBranch(toLoc, context)
         targetMap[fromLoc] = toLoc
 
@@ -134,7 +136,9 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
 
 
     client = ConaryClient(cfg)
-    searchSource = client.getSearchSource()
+    if not searchPath:
+        searchPath = cfg.buildLabel
+    searchSource = client.getSearchSource(installLabelPath=searchPath)
     results = searchSource.findTroves(troveSpecs,
                                       bestFlavor=not allFlavors,
                                       exactFlavors=exactFlavors)
@@ -190,8 +194,6 @@ def _finishClone(client, cfg, cs, callback, info=False, test=False,
         okay = cmdline.askYn('continue with clone? [y/N]', default=False)
         if not okay:
             return
-
-    signAbsoluteChangesetByConfig(cs, cfg)
 
     if targetFile:
         cs.writeToFile(targetFile)

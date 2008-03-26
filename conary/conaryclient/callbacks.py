@@ -175,14 +175,14 @@ class CloneCallback(ChangesetCallback, callbacks.CloneCallback):
         else:
             self._message('Rewriting trove information')
 
-    def rewritingFileVersions(self, current=0, total=0):
+    def buildingChangeset(self, current=0, total=0):
         if total:
             percent = (current * 1000 / total) / 10.0
             self.prefix = 'Step 5/5 (%s%%): ' % (percent)
-            self._message('Rewriting file versions')
+            self._message('Building changeset...')
         else:
             self.prefix = 'Step 5/5: '
-            self._message('Rewriting file versions ')
+            self._message('Building changeset...')
 
     def requestingFiles(self, number):
         self._message('Requesting file info for %s files...' % (number))
