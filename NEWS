@@ -15,19 +15,20 @@ Changes in @NEW@:
     * Recipe actions have now the ability to suggest build requirements.
       (CNY-935)
     * Running "cvc cook" in a directory with a CONARY file now builds the
-      sources specified by that checkout. This is particularly useful for
-      source troves which do not provide recipes thanks to a factory
+      sources specified by that checkout.  This is particularly useful for
+      source troves which do not provide recipes thanks to a factory.
       (CNY-2642)
-    * Conary looks for factories in the same places it looks for superclasses
-      now, including the current working directory for local cooks
-      (CNY-2641)
+    * Conary now looks for factories in the same places it looks for
+      superclasses, including the current working directory for local
+      cooks. (CNY-2641)
     * Suggesting build requirements produces a warning if the supplied
       command cannot be found in the search path. (CNY-2663)
     * Skip FactoryRecipeClass when loading recipes to make it easier to
       develop factory recipes. (CNY-2666)
     * Checking out multiple sources with a single command line once again
-      creates the CONARY files properly (CNY-2645)
-    * addArchive now supports .war and .jar archives (CNY-2684) 
+      creates the CONARY files properly. (CNY-2645)
+    * The addArchive source action now supports .war and .jar archives.
+      (CNY-2684) 
 
   o Bug Fixes:
     * Previously, rollbacks could restore files from local rollbacks
