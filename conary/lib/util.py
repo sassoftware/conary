@@ -1493,12 +1493,12 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
         def _repr_iterable(self, x, level, left, right, maxiter, trail=''):
             n = len(x)
             if level <= 0 and n:
-                s = '...'
+                s = '...len=%d...' % n
             else:
                 newlevel = level - 1
                 repr1 = self.repr1
                 pieces = [repr1(elem, newlevel) for elem in itertools.islice(x, maxiter)]
-                if n > maxiter:  pieces.append('...')
+                if n > maxiter:  pieces.append('...len=%d...' % n)
                 s = self._pretty_repr(pieces, n, level)
                 if n == 1 and trail:  right = trail + right
             return '%s%s%s' % (left, s, right)
@@ -1506,7 +1506,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
         def repr_dict(self, x, level):
             n = len(x)
             if n == 0: return '{}'
-            if level <= 0: return '{...}'
+            if level <= 0: return '{...len=%d...}' % n
             newlevel = level - 1
             repr1 = self.repr1
             pieces = []
@@ -1522,7 +1522,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
                 self.subsequentIndent = oldSubsequentIndent
 
                 pieces.append('%s: %s' % (keyrepr, valrepr))
-            if n > self.maxdict: pieces.append('...')
+            if n > self.maxdict: pieces.append('...len=%d...' % n)
             s = self._pretty_repr(pieces, n, level)
             return '{%s}' % (s,)
 
