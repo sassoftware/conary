@@ -1696,7 +1696,8 @@ conary erase '%s=%s[%s]'
 
         cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                 withFiles = False,
-                                                recurse = recurse)
+                                                recurse = recurse,
+                                                callback = self.updateCallback)
         self._replaceIncomplete(cs, csSource, 
                                 self.db, self.repos)
         if notFound:
@@ -1743,7 +1744,8 @@ conary erase '%s=%s[%s]'
                                    if x[0] is True ]
             cs, notFound = csSource.createChangeSet(reposChangeSetList,
                                                     withFiles = False,
-                                                    recurse = recurse)
+                                                    recurse = recurse,
+                                                    callback = self.updateCallback)
             self._replaceIncomplete(cs, csSource, self.db, self.repos)
             #NOTE: we allow any missing bits (recursive or not) to be skipped.
             # We may not install then anyways
