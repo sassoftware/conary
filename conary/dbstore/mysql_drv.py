@@ -457,7 +457,7 @@ class Database(BaseDatabase):
             else:
                 raise
         self.dbName = dbName
-        self.database = "/".join([self.database.rsplit("/", 1), dbName])
+        self.database = "/".join([self.database.rsplit("/", 1)[0], dbName])
         
         self._setCharSet(cu)
         # wipe out the preloaded schema we had (if any), but don't

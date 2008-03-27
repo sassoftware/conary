@@ -207,6 +207,9 @@ class RecipeAction(Action):
         self.doSuggestAutoBuildReqs()
 
     def doSuggestAutoBuildReqs(self):
+        if not hasattr(self.recipe, "buildRequires"):
+            # Most likely group recipe
+            return
         paths = []
         for cmd in self._actionPathBuildRequires:
             # Catch the case "python setup.py"

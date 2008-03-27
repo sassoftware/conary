@@ -201,6 +201,9 @@ class RecipeLoader:
         for (name, obj) in objDict.items():
             if not inspect.isclass(obj):
                 continue
+            if name == 'FactoryRecipeClass':
+                continue
+
             # if a recipe has been marked to be ignored (for example, if
             # it was loaded from another recipe by loadRecipe()
             # (don't use hasattr here, we want to check only the recipe

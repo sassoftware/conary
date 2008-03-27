@@ -343,21 +343,18 @@ class Revision(AbstractRevision):
 	    (t, value) = value.split(':', 1)
 	    self.thawTimestamp(t)
 
-	if value.find(":") != -1:
-	    raise ParseError("release strings may not contain colons")
-
-	if value.find(",") != -1:
-	    raise ParseError("release strings may not contain commas")
-
-	if value.find(" ") != -1:
-	    raise ParseError("release strings may not contain spaces")
-
-	if value.find("@") != -1:
-	    raise ParseError("release strings may not contain @ signs")
-
 	fields = value.split("-")
 	if len(fields) > 3:
 	    raise ParseError("too many '-' characters in release string")
+
+        for ch in fields[0]:
+            if not((ch >= 'A' and ch <= 'Z') or
+                   (ch >= 'a' and ch <= 'z') or
+                   (ch >= '0' and ch <= '9') or
+                   (ch in '()+,.;_~')):
+                raise ParseError("release strings may not contain character "
+                                 "'%s'" % str(ch))
+
 
         # if the string we're parsing didn't include all of
         # version-sourceCount-buildCount AND we have a template to

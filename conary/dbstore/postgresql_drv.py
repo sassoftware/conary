@@ -356,5 +356,5 @@ class Database(BaseDatabase):
 
     def use(self, dbName, **kwargs):
         self.close()
-        self.database = "/".join([self.database.rsplit("/", 1), dbName])
+        self.database = "/".join([self.database.rsplit("/", 1)[0], dbName])
         return self.connect(**kwargs)

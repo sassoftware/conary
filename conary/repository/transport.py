@@ -229,6 +229,7 @@ class URLOpener(urllib.FancyURLopener):
                 user_passwd, host = urllib.splituser(host)
                 host = urllib.unquote(host)
             realhost = host
+            urlstr = "%s://%s%s" % (protocol, host, selector)
             # We used to send an absolute URI here, instead of just the
             # selector.
             # Although this is not totally against standards, it's confusing
@@ -278,6 +279,7 @@ class URLOpener(urllib.FancyURLopener):
                         # Other proxies will not support proxying ssl over !ssl
                         # or vice versa.
                         ssl = (proxyUrlType == 'conarys')
+            urlstr = selector
 
         if not host: raise IOError, ('http error', 'no host given')
         if user_passwd:
@@ -316,7 +318,7 @@ class URLOpener(urllib.FancyURLopener):
             headers.append(('X-Conary-Proxy-Host', host))
         if auth:
             headers.append(('Authorization', 'Basic %s' % auth))
-        return h, url, selector, headers
+        return h, urlstr, selector, headers
 
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
@@ -360,10 +362,10 @@ class URLOpener(urllib.FancyURLopener):
                 fp.seek(0)
 
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
-            return InfoURL(fp, headers, selector, protocolVersion)
+            return InfoURL(fp, headers, urlstr, protocolVersion)
         else:
             self.handleProxyErrors(errcode)
-            return self.http_error(selector, fp, errcode, errmsg, headers, data)
+            return self.http_error(urlstr, fp, errcode, errmsg, headers, data)
 
     def handleProxyErrors(self, errcode):
         e = None

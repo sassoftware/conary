@@ -761,6 +761,7 @@ class UserGroupIdCache:
 	if getChrootIds:
 	    os.chroot(".")
 	    os.fchdir(curDir)
+            os.close(curDir)
 
 	self.nameCache[name] = theId
 	self.idCache[theId] = name
@@ -780,6 +781,7 @@ class UserGroupIdCache:
 	if root and root != '/':
 	    os.chroot(".")
 	    os.fchdir(curDir)
+            os.close(curDir)
 
 	self.nameCache[name] = theId
 	self.idCache[theId] = name

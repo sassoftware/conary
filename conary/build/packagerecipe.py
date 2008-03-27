@@ -773,6 +773,9 @@ class AbstractPackageRecipe(Recipe):
     def regexp(self, expression):
         return action.Regexp(expression)
 
+    def setupAbstractBaseClass(r):
+        r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
+
     def _addTroveScript(self, troveNames, scriptContents, scriptType,
                         fromClass = None):
         scriptTypeMap = dict((y[2], x) for (x, y) in
@@ -925,9 +928,6 @@ class PackageRecipe(AbstractPackageRecipe):
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
-
-    def setupAbstractBaseClass(r):
-        r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
 
 # need this because we have non-empty buildRequires in PackageRecipe
 _addRecipeToCopy(PackageRecipe)

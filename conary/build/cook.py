@@ -32,7 +32,7 @@ import traceback
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, grouprecipe, loadrecipe
+from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
@@ -472,6 +472,23 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
             log.error('Error setting build flags from flavor %s: %s' % (
                                             buildFlavor, msg))
             sys.exit(1)
+
+        if type == recipe.RECIPE_TYPE_FACTORY:
+
+            class FactoryRecipe(packagerecipe.AbstractPackageRecipe):
+
+                name = recipeClass.name
+                version = recipeClass.version
+                _sourcePath = recipeClass._sourcePath
+                abstractBaseClass = True
+                _originalFactoryClass = recipeClass
+                _trove = recipeClass._trove
+
+                def setup(r):
+                    pass
+
+            recipeClass = FactoryRecipe
+            type = recipeClass.getType()
 
         if type in (recipe.RECIPE_TYPE_INFO,
                       recipe.RECIPE_TYPE_PACKAGE):

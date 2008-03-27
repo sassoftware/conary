@@ -326,7 +326,8 @@ class addArchive(_Source):
 
     If the specified I{archivename} is a list of URLs, C{r.addArchive} will
     attempt to download the files, using the rules described above, from
-    each URL, until one of them succeeds. Note that the archive name has be
+    each URL, until one of them succeeds. Note that the archive base name (as
+    would be printed by the "basename" shell command), if non-empty, has to be
     identical for all URLs.
 
     KEYWORDS
@@ -494,7 +495,7 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
-	if f.endswith(".zip") or f.endswith(".xpi"):
+	if f.endswith(".zip") or f.endswith(".xpi") or f.endswith(".jar") or f.endswith(".war"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
 

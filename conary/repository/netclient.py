@@ -647,6 +647,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                       shortDesc, longDesc,
                                       urls, licenses, categories,
                                       source, language)
+        # Free the DOM - CNY-2674
+        doc.unlink()
 
     def getMetadata(self, troveList, label, language="C"):
         if type(troveList[0]) is str:
