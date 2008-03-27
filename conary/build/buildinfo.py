@@ -24,6 +24,11 @@ class BuildInfo(dict):
     def __init__(self, builddir):
 	self.__builddir = builddir
 	self.__infofile = builddir + "/conary-build-info"
+        self.__fd = None
+
+    def __del__(self):
+        if self.__fd:
+            self.stop()
 
     def read(self):
 	# don't catch this error
@@ -71,6 +76,7 @@ class BuildInfo(dict):
 	tmstr = time.asctime()
 	self.end = "%s (%s)" % (tm, tmstr)
 	self.__fd.close()
+        self.__fd = None
 
     def __setattr__(self, name, value):
         # Note that using buildinfo.foo = y

@@ -36,6 +36,11 @@ Changes in @NEW@:
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
       and the journal now cleans up rollback state on failure. (CNY-2592)
+    * Conary now displays more progress information during the
+      "Preparing changeset request..." phase.  Much of the time in
+      this phase is spent communicating with the repository.  Now
+      "Requesting changeset ..." and "Downloading" will be shown as
+      data is transferred.
 
 Changes in 1.2.20:
   o Bug Fixes:
