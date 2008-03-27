@@ -26,11 +26,17 @@ from conary.lib import util
 
 class Magic(object):
     __slots__ = ['path', 'basedir', 'contents', 'name']
+    # The file type is a generic string for a specific file type
+    _fileType = None
     def __init__(self, path, basedir):
 	self.path = path
 	self.basedir = basedir
 	self.contents = {}
 	self.name = self.__class__.__name__
+
+    @classmethod
+    def getFileType(cls):
+        return cls._fileType
 
 
 class ELF(Magic):
@@ -90,6 +96,7 @@ class changeset(Magic):
 
 
 class jar(Magic):
+    _fileType = "jar"
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
 	Magic.__init__(self, path, basedir)
         self.contents['files'] = filesMap = {}
@@ -116,6 +123,7 @@ class jar(Magic):
 
 class WAR(Magic):
     _xmlMetadataFile = "WEB-INF/web.xml"
+    _fileType = "war"
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
         Magic.__init__(self, path, basedir)
         if zipFileObj is None:
@@ -145,6 +153,7 @@ class WAR(Magic):
 
 class EAR(WAR):
     _xmlMetadataFile = "META-INF/application.xml"
+    _fileType = "war"
 
 class ZIP(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
@@ -184,6 +193,7 @@ class CIL(Magic):
 	Magic.__init__(self, path, basedir)
 
 class RPM(Magic):
+    _fileType = 'rpm'
     _tagMap = [
         ("name",    rpmhelper.NAME, str),
         ("version", rpmhelper.VERSION, str),
