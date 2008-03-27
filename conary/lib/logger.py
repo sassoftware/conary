@@ -254,7 +254,7 @@ class XmlLogWriter(LogWriter):
         self.stream = openPath(self.path)
         print >> self.stream, '<?xml version="1.0"?>'
         print >> self.stream, \
-                "<log xmlns:log='http://www.rpath.com/permanent/log-v1.html'>"
+                "<log xmlns='http://www.rpath.com/permanent/log-v1.xsd'>"
         self.log('begin log', 'DEBUG')
         self.stream.flush()
         self.logging = True
