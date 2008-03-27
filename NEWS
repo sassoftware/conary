@@ -32,6 +32,8 @@ Changes in @NEW@:
     * A source of circular references which could cause unpredictable
       memory usage has been removed. (CNY-2674)
     * Fixed a file descriptor leak when using in-memory-only databases.
+    * A bug that caused conary to traceback when formating strings in the
+      syslog logger has been fixed. (CNY-2689)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
