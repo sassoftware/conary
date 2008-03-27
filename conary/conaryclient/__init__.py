@@ -368,9 +368,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
             raise errors.RepositoryError("Repository not available")
         return self.repos.getConaryUrl(version, flavor)
 
-    def getRepos(self):
-        return self.repos
-
     def iterRollbacksList(self):
         """
         Iterate over rollback list.
