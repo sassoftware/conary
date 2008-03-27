@@ -47,19 +47,15 @@ class SysLog:
         if not self.f:
             self.open()
 
-        # Only attempt to do substitution if args is specified.
-        if args:
-            msg = str % args
-        else:
-            msg = str
-
+        msg = str % args
         self.f.write(time.strftime("[%Y %b %d %H:%M:%S] ") + self.indent)
         self.f.write(msg)
         self.f.write("\n")
         self.f.flush()
 
     def command(self):
-        self(("version %s: " % constants.version) + ' '.join(sys.argv[1:]))
+        self(("version %s: " + " ".join(sys.argv[1:])) % 
+                                                constants.version)
         self.indent = "  "
 
     def commandComplete(self):
