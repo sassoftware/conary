@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Build Changes:
+    * The SubscriptionLogWriter now handles line continuation. (CNY-2963)
+
   o Bug Fixes:
     * A bug that caused a traceback when r.MakeDevices() is called
       with a path that contains 'lib' has been fixed. (CNY-2692)
