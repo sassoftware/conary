@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,11 +17,17 @@ Contains functions to assist in dealing with rpm files.
 """
 
 import itertools, struct
+from conary.lib.sha1helper import *
 
 NAME            = 1000
 VERSION         = 1001
 RELEASE         = 1002
 EPOCH           = 1003
+SUMMARY         = 1004
+DESCRIPTION     = 1005
+LICENSE         = 1014
+SOURCE          = 1018
+ARCH            = 1022
 PREIN           = 1023
 POSTIN          = 1024
 PREUN           = 1025
@@ -43,6 +49,9 @@ BASENAMES       = 1117
 DIRNAMES        = 1118
 PAYLOADFORMAT     = 1124
 PAYLOADCOMPRESSOR = 1125
+
+SIG_SHA1        = 269
+SIG_SIZE        = 1000
 
 def seekToData(f):
     """
@@ -83,7 +92,10 @@ def seekToData(f):
 
     f.seek(size + entries * 16, 1)
 
-class RpmHeader:
+class RpmHeader(object):
+    __slots__ = ['entries', 'data', 'isSource']
+    _tagListValues = set([
+        DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME])
 
     def has_key(self, tag):
         return self.entries.has_key(tag)
@@ -107,6 +119,12 @@ class RpmHeader:
             else:
                 yield baseName
 
+    def get(self, item, default):
+        if item in self:
+            return self[item]
+
+        return default
+
     def __getitem__(self, tag):
         if tag == OLDFILENAMES and tag not in self.entries:
             # mimic OLDFILENAMES using DIRNAMES and BASENAMES
@@ -117,6 +135,10 @@ class RpmHeader:
                 paths.append(dirs[dirIndex] + baseName)
 
             return paths
+
+        if tag in self._tagListValues and tag not in self.entries:
+            # Lists that are not present are empty
+            return []
 
         (dataType, offset, count) = self.entries[tag]
 
@@ -138,8 +160,8 @@ class RpmHeader:
                 # RPM_INT32_TYPE
                 items.append(struct.unpack("!I", self.data[offset:offset+4])[0])
                 offset += 4
-            elif dataType == 6 or dataType == 8:
-                # RPM_STRING_TYPE or RPM_STRING_ARRAY_TYPE
+            elif dataType in (6, 8, 9):
+                # RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18NSTRING_TYPE
                 s = ""
                 while self.data[offset] != '\0':
                     s += self.data[offset]
@@ -155,7 +177,7 @@ class RpmHeader:
 
         return items
 
-    def __init__(self, f):
+    def __init__(self, f, sha1 = None, isSource = False):
         intro = f.read(16)
         (mag1, mag2, mag3, ver, reserved, entries, size) = \
             struct.unpack("!BBBBiii", intro)
@@ -165,8 +187,15 @@ class RpmHeader:
 
         entryTable = f.read(entries * 16)
 
+        self.isSource = isSource
         self.entries = {}
         self.data = f.read(size)
+
+        if sha1 is not None:
+            computedSha1 = sha1ToString(sha1String(intro + entryTable +
+                                                   self.data))
+            if computedSha1 != sha1:
+                raise IOError, "bad header sha1"
 
         for i in range(entries):
             (tag, dataType, offset, count) = struct.unpack("!iiii", 
@@ -185,5 +214,16 @@ def readHeader(f):
     if (leadMagic & 0xffffffffl) != 0xedabeedbl: 
 	raise IOError, "file is not an RPM"
 
-    sigs = RpmHeader(f)
-    return RpmHeader(f)
+    isSource = (struct.unpack('!H', lead[6:8])[0] == 1)
+
+    sigs = RpmHeader(f, isSource = isSource)
+    sha1 = sigs.get(SIG_SHA1, None)
+
+    if SIG_SIZE in sigs:
+        size = sigs[SIG_SIZE][0]
+        totalSize = os.fstat(f.fileno()).st_size
+        pos = f.tell()
+        if size != (totalSize - pos):
+            raise IOError, "file size does not match size specified by header"
+
+    return RpmHeader(f, sha1 = sha1, isSource = isSource)

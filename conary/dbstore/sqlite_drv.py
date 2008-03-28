@@ -376,8 +376,14 @@ class Database(BaseDatabase):
             raise
         return cu
 
+    # sqlite doesn't support SQL language to add a foreign key constraint
+    def addForeignKey(self, *args, **kw):
+        return True
+    # same goes true for drop constraint
+    def dropForeignKey(self, *args, **kw):
+        return True
+
     def use(self, dbName, **kwargs):
         self.close()
         self.database = dbName
         return self.connect(**kwargs)
-

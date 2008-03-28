@@ -133,6 +133,8 @@ class BranchShadowCommand(CvcCommand):
     docs = {'binary-only': 'Do not shadow/branch any source components listed',
             'source-only': ('For any binary components listed, shadow/branch'
                             ' their sources instead'),
+             'to-file'   : (VERBOSE_HELP, 'Write changeset to file instead of'
+                                          ' committing to the repository'),
             'info'       : 'Display info on shadow/branch'}
 
     def addParameters(self, argDef):
@@ -140,6 +142,7 @@ class BranchShadowCommand(CvcCommand):
         argDef["binary-only"] = NO_PARAM
         argDef["source-only"] = NO_PARAM
         argDef["info"] = '-i', NO_PARAM
+        argDef["to-file"] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -147,6 +150,7 @@ class BranchShadowCommand(CvcCommand):
         makeShadow =  (args[0] == "shadow")
         sourceOnly = argSet.pop('source-only', False)
         binaryOnly = argSet.pop('binary-only', False)
+        targetFile = argSet.pop("to-file", None)
         info = argSet.pop('info', False)
 
         if argSet: return self.usage()
@@ -157,7 +161,7 @@ class BranchShadowCommand(CvcCommand):
 
         branch.branch(repos, cfg, target, troveSpecs, makeShadow = makeShadow, 
                       sourceOnly = sourceOnly, binaryOnly = binaryOnly,
-                      info = info)
+                      info = info, targetFile = targetFile)
 _register(BranchShadowCommand)
 
 class CheckoutCommand(CvcCommand):
@@ -258,7 +262,7 @@ class PromoteCommand(CvcCommand):
                                    ' Clones only those components'
                                    ' that are installed by default.'),
              'to-file'    : (VERBOSE_HELP, 'Write changeset to file instead of'
-                                           ' to the repository'),
+                                           ' committing to the repository'),
              'all-flavors' : (VERBOSE_HELP, 'Promote all flavors of a'
                                             ' package/group at the same time'
                                             ' (now the default)'),
@@ -541,8 +545,27 @@ class CookCommand(CvcCommand):
                                  errorOnFlavorChange=not allowFlavorChange,
                                  shortenFlavors=cfg.shortenGroupFlavors)
 
+        # the remainder of the argument list are the things to build.
+        # e.g., foo /path/to/bar.recipe, etc.
+        items = args[1:]
+        if not items:
+            # if nothing was specified, try to build the package in the current
+            # directory
+            name = os.path.basename(os.getcwd())
+
+            if os.path.isfile('%s.recipe' % name):
+                items = [ '%s.recipe' % name ]
+            elif os.path.isfile('CONARY'):
+                conaryState = state.ConaryStateFromFile('CONARY', repos)
+                items = [ conaryState ]
+
+            if not items:
+                # if we still don't have anything to build, throw a usage
+                # message
+                return self.usage()
+
         try:
-            cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
+            cook.cookCommand(cfg, items, prep, macros, resume=resume, 
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
                          crossCompile=crossCompile, downloadOnly=downloadOnly,
@@ -832,22 +855,32 @@ class NewPkgCommand(CvcCommand):
     help = 'Set a directory for creating a new package'
     commandGroup = 'Setup Commands'
     docs = {'dir' : 'create new package in DIR',
-            'template' : 'set recipe template to use'}
+            'template' : 'set recipe template to use',
+            'factory' : 'recipe factory to load'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef['dir'] = ONE_PARAM
         argDef['template'] = ONE_PARAM
+        argDef['factory'] = OPT_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         dir = argSet.pop('dir', None)
         template = argSet.pop('template', None)
+        # check to see if the user specified --factory (without an
+        # argument).  This is a shortcut for "--factory=factory"
+        # so as not to quite so cumbersome
+        factory = argSet.pop('factory', None)
+        if factory is True:
+            factory = 'factory'
 
-        if len(args) != 2 or argSet: return self.usage()
+        if len(args) != 2 or argSet:
+            return self.usage()
 
-        checkin.newTrove(repos, cfg, args[1], dir = dir, template = template)
+        checkin.newTrove(repos, cfg, args[1], dir = dir, template = template,
+                         factory = factory)
 _register(NewPkgCommand)
 
 class MergeCommand(CvcCommand):
@@ -950,6 +983,18 @@ class UpdateCommand(CvcCommand):
         checkin.updateSrc(repos, versionList = args, **kwargs)
 _register(UpdateCommand)
 
+class FactoryCommand(CvcCommand):
+    commands = ['factory']
+    paramHelp = '[<newfactory>]'
+    help = 'Show or change the factory for the working directory'
+    commandGroup = 'Information Display'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or len(args) > 2: return self.usage()
+        args[0] = repos
+        checkin.factory(*args[1:])
+_register(FactoryCommand)
 
 class CvcMain(command.MainHandler):
     name = 'cvc'
@@ -1000,8 +1045,10 @@ class CvcMain(command.MainHandler):
             del argSet['profile']
 
         keyCache = openpgpkey.getKeyCache()
-        keyCacheCallback = openpgpkey.KeyCacheCallback(cfg.repositoryMap,
-                                                       cfg.pubRing[-1])
+        keyCache.setPublicPath(cfg.pubRing)
+        repos = conaryclient.ConaryClient(cfg).getRepos()
+        keyCacheCallback = openpgpkey.KeyCacheCallback(repos,
+                                                       cfg)
         keyCache.setCallback(keyCacheCallback)
 
         rv = options.MainHandler.runCommand(self, thisCommand,
