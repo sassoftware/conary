@@ -202,16 +202,16 @@ class AutoBuildPackage:
     def _getname(self, pkgname, compname):
         return ':'.join((pkgname, compname))
 
-    def findComponent(self, path):
+    def findComponent(self, path, mode=None):
         """
 	Return the BuildComponent that matches the path.
 	"""
         if path in self.componentMap:
             return self.componentMap[path]
 	for main in self.pkgFilters:
-	    if main.match(path):
+	    if main.match(path, mode=mode):
 		for comp in self.compFilters:
-		    if comp.match(path):
+		    if comp.match(path, mode=mode):
 			self.componentMap[path] = self.packageMap[main][comp]
                         return self.componentMap[path]
         return None
@@ -257,7 +257,7 @@ class AutoBuildPackage:
         Add a device to the correct BuildComponent instance by matching
         the file name against the package and component filters
         """
-        pkg = self.findComponent(path)
+        pkg = self.findComponent(path, mode=perms)
         f = pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 	self.pathMap[path] = f
 	self.componentMap[path] = pkg

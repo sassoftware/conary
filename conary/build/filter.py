@@ -108,20 +108,23 @@ class Filter:
 	    regex = regex + '$'
 	return regex
 
-    def match(self, path):
+    def match(self, path, mode=None):
 	"""
 	Compare a path to the constraints
 	@param path: The string that should match the regex
+        @param mode: optional parameter used when the path is not on
+        disk (e.g., if a device node is being created virtually)
 	"""
 	# search instead of match in order to not automatically
 	# front-anchor searches
 	match = self.re.search(path)
 	if match:
 	    if self.setmode or self.unsetmode:
-		if path[0] == '/':
-		    mode = os.lstat(self.rootdir + path)[stat.ST_MODE]
-		else:
-		    mode = os.lstat(os.path.join(self.rootdir,path))[stat.ST_MODE]
+                if not mode:
+                    if path[0] == '/':
+                        mode = os.lstat(self.rootdir + path)[stat.ST_MODE]
+                    else:
+                        mode = os.lstat(os.path.join(self.rootdir,path))[stat.ST_MODE]
 		if self.setmode is not None:
 		    # if some bit in setmode is not set in mode, no match
 		    if (self.setmode & mode) != self.setmode:

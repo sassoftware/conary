@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A bug that caused a traceback when r.MakeDevices() is called
+      with a path that contains 'lib' has been fixed. (CNY-2692)
+
 Changes in 1.2.21:
   o Build Changes:
     * An xml formatted log has been added to :debuginfo. This is in
