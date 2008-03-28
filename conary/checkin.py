@@ -2169,3 +2169,17 @@ def localAutoSourceChanges(oldTrove, (changeSet, ((isDifferent, newState),))):
     changeSet.newTrove(d)
 
     return (changeSet, ((isDifferent, newState),))
+
+def factory(newFactory = None):
+    conaryState = ConaryStateFromFile("CONARY")
+    state = conaryState.getSourceState()
+
+    if newFactory is None:
+        if state.getFactory():
+            print state.getFactory()
+        else:
+            print "(none)"
+    else:
+        state.setFactory(newFactory)
+        conaryState.write("CONARY")
+

@@ -168,6 +168,12 @@ information about using \fBaddSource\fP in a recipe.
 \fBcvc explain PackageRecipe\fP will display information about
 \fBPackageRecipe\fP and list available actions.
 .TP 4
+.B factory [\fI<factory>]\fR]
+When used without any arguments, displays the factory used by the current
+source directory, or \fB(none)\fR if no factory is used. When a single
+argument is passed, the factory for the current source component is changed
+to the passed argument.
+.TP 4
 .B help
 Displays cvc help file.  Can be added to individual commands as an 
 option.  For example, \fBcvc cook help\fP will display help information

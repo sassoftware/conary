@@ -983,6 +983,18 @@ class UpdateCommand(CvcCommand):
         checkin.updateSrc(repos, versionList = args, **kwargs)
 _register(UpdateCommand)
 
+class FactoryCommand(CvcCommand):
+    commands = ['factory']
+    paramHelp = '[<newfactory>]'
+    help = 'Show or change the factory for the working directory'
+    commandGroup = 'Information Display'
+    def runCommand(self, cfg, argSet, args, profile = False, 
+                   callback = None, repos = None):
+        args = args[1:]
+        if argSet or len(args) > 2: return self.usage()
+        args[0] = repos
+        checkin.factory(*args[1:])
+_register(FactoryCommand)
 
 class CvcMain(command.MainHandler):
     name = 'cvc'
