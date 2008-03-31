@@ -33,85 +33,6 @@ from conary.local import database
 from conary import versions
 
 
-def localImport(d, package, modules=()):
-    """
-    import a package into a non-global context.
-
-    @param d: the context to import the module
-    @type d: dict
-    @param package: the name of the module to import
-    @type package: str
-    @param modules: a sequence of modules to import from the package.
-    If a 2-tuple is in the sequence, rename the imported module to
-    the second value in the tuple.
-    @type modules: sequence of strings or tuples, or empty tuple
-
-    Examples of translated import statements::
-      from foo import bar as baz:
-          localImport(d, "foo", (("bar", "baz"))
-      from bar import fred, george:
-          localImport(d, "bar", ("fred", "george"))
-      import os
-          localImport(d, "os")
-    """
-    m = __import__(package, d, {}, modules)
-    if modules:
-        if isinstance(modules, str):
-            modules = (modules,)
-        for name in modules:
-            if type(name) is tuple:
-                mod = name[0]
-                name = name[1]
-            else:
-                mod = name
-            d[name] = getattr(m, mod)
-    else:
-        d[package] = m
-    # save a reference to the module inside this context, so it won't
-    # be garbage collected until the context is deleted.
-    l = d.setdefault('__localImportModules', [])
-    l.append(m)
-
-def setupRecipeDict(d, filename, directory=None, factory=False):
-    localImport(d, 'conary.build', ('build', 'action'))
-    localImport(d, 'conary.build.loadrecipe', 
-                                   ('loadSuperClass', 'loadInstalled',
-                                    # XXX when all recipes have been migrated
-                                    # we can get rid of loadRecipe
-                                    ('loadSuperClass', 'loadRecipe')))
-    localImport(d, 'conary.build.grouprecipe', 'GroupRecipe')
-    localImport(d, 'conary.build.filesetrecipe', 'FilesetRecipe')
-    localImport(d, 'conary.build.redirectrecipe', 'RedirectRecipe')
-    localImport(d, 'conary.build.derivedrecipe', 'DerivedPackageRecipe')
-    localImport(d, 'conary.build.packagerecipe', 
-                                  ('clearBuildReqs',
-                                   'clearBuildRequires',
-                                   'clearCrossReqs',
-                                   'clearCrossRequires',
-                                   'PackageRecipe', 
-                                   'BuildPackageRecipe',
-                                   'CPackageRecipe',
-                                   'AutoPackageRecipe'))
-    localImport(d, 'conary.build.inforecipe',  ('UserInfoRecipe',
-                                                'GroupInfoRecipe'))
-    localImport(d, 'conary.lib', ('util',))
-    for x in ('os', 're', 'sys', 'stat'):
-        localImport(d, x)
-    localImport(d, 'conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
-                                        'PackageFlags'))
-
-    if factory:
-        localImport(d, 'conary.build.factory', ('Factory', 'FactoryException' ))
-
-    d['filename'] = filename
-    if not directory:
-        directory = os.path.dirname(filename)
-    d['directory'] = directory
-    _loadDefaultPackages(d['cfg'], d['repos'], db = d.get('db'),
-                         flavor = d.get('flavor'),
-                         buildFlavor = d.get('buildFlavor'))
-    _copyReusedRecipes(d)
-
 global _defaultsLoaded
 _defaultsLoaded = False
 def _loadDefaultPackages(cfg, repos, db = None, flavor = None,
@@ -182,6 +103,10 @@ def _copyReusedRecipes(moduleDict):
 
 class RecipeLoader:
 
+    # This is the module dictionary which is used as the starting point
+    # for all recipe imports.
+    baseModuleDict = {}
+
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
                  buildFlavor=None, db=None, overrides = None,
@@ -195,6 +120,50 @@ class RecipeLoader:
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
+
+    @staticmethod
+    def _localImport(d, package, modules=()):
+        """
+        import a package into a non-global context.
+
+        @param d: the context to import the module
+        @type d: dict
+        @param package: the name of the module to import
+        @type package: str
+        @param modules: a sequence of modules to import from the package.
+        If a 2-tuple is in the sequence, rename the imported module to
+        the second value in the tuple.
+        @type modules: sequence of strings or tuples, or empty tuple
+
+        Examples of translated import statements::
+          from foo import bar as baz:
+              _localImport(d, "foo", (("bar", "baz"))
+          from bar import fred, george:
+              _localImport(d, "bar", ("fred", "george"))
+          import os
+              _localImport(d, "os")
+        """
+        m = __import__(package, d, {}, modules)
+        if modules:
+            if isinstance(modules, str):
+                modules = (modules,)
+            for name in modules:
+                if type(name) is tuple:
+                    mod = name[0]
+                    name = name[1]
+                else:
+                    mod = name
+                d[name] = getattr(m, mod)
+        else:
+            d[package] = m
+        # save a reference to the module inside this context, so it won't
+        # be garbage collected until the context is deleted.
+        l = d.setdefault('__localImportModules', [])
+        l.append(m)
+
+    @classmethod
+    def baseImport(theClass, package, modules=()):
+        theClass._localImport(theClass.baseModuleDict, package, modules)
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
@@ -289,18 +258,31 @@ class RecipeLoader:
         basename = os.path.basename(filename)
         self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
-        sys.modules[self.file] = self.module
         f = open(filename)
+
+        self.module.__dict__.update(self.baseModuleDict)
 
         # store cfg and repos, so that the recipe can load
         # recipes out of the repository
+
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
         self.module.__dict__['db'] = db
         self.module.__dict__['buildFlavor'] = buildFlavor
+        self.module.__dict__['filename'] = filename
+        
+        if not directory:
+            directory = os.path.dirname(filename)
+        self.module.__dict__['directory'] = directory
 
-        setupRecipeDict(self.module.__dict__, filename, directory,
-                        factory = factory)
+        _loadDefaultPackages(cfg, repos, db,
+                             flavor = self.module.__dict__.get('flavor'),
+                             buildFlavor = buildFlavor)
+        _copyReusedRecipes(self.module.__dict__)
+
+        if factory:
+            self._localImport(self.module.__dict__, 'conary.build.factory',
+                              ('Factory', 'FactoryException' ))
 
         self.module.__dict__['component'] = component
         self.module.__dict__['branch'] = branch
@@ -402,12 +384,6 @@ class RecipeLoader:
 
     def getRecipe(self):
         return self.recipe
-
-    def __del__(self):
-        try:
-            del sys.modules[self.file]
-        except:
-            pass
 
 class RecipeLoaderFromSourceTrove(RecipeLoader):
 
@@ -1045,3 +1021,30 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              branch = branch,
                                              buildFlavor = buildFlavor,
                                              parentDir = os.getcwd())
+
+RecipeLoader.baseImport('conary.build', ('build', 'action'))
+RecipeLoader.baseImport('conary.build.loadrecipe', 
+                               ('loadSuperClass', 'loadInstalled',
+                                # XXX when all recipes have been migrated
+                                # we can get rid of loadRecipe
+                                ('loadSuperClass', 'loadRecipe')))
+RecipeLoader.baseImport('conary.build.grouprecipe', 'GroupRecipe')
+RecipeLoader.baseImport('conary.build.filesetrecipe', 'FilesetRecipe')
+RecipeLoader.baseImport('conary.build.redirectrecipe', 'RedirectRecipe')
+RecipeLoader.baseImport('conary.build.derivedrecipe', 'DerivedPackageRecipe')
+RecipeLoader.baseImport('conary.build.packagerecipe', 
+                              ('clearBuildReqs',
+                               'clearBuildRequires',
+                               'clearCrossReqs',
+                               'clearCrossRequires',
+                               'PackageRecipe', 
+                               'BuildPackageRecipe',
+                               'CPackageRecipe',
+                               'AutoPackageRecipe'))
+RecipeLoader.baseImport('conary.build.inforecipe',  ('UserInfoRecipe',
+                                            'GroupInfoRecipe'))
+RecipeLoader.baseImport('conary.lib', ('util',))
+for x in ('os', 're', 'sys', 'stat'):
+    RecipeLoader.baseImport(x)
+RecipeLoader.baseImport('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                    'PackageFlags'))

@@ -2,6 +2,7 @@ Changes in @NEW@:
   o Build Changes:
     * Added 'factory' command to cvc for displaying and changing the factory
       of the currently checked out recipe (CNY-2690)
+    * Loaded recipe modules are no longer tracked in sys.modules
 
   o Bug Fixes:
     * A regression introduced by the build requirements suggestions for
