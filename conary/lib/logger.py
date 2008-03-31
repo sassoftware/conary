@@ -442,7 +442,7 @@ class SubscriptionLogWriter(LogWriter):
         # Allow consumers to ensure that the log is complete as of
         # output from all previous code
         if self.current:
-            self.newline()
+            self.newline(forceNewline=True)
         self.stream.write(timestamp)
         self.stream.write('\n')
         self.stream.flush()
@@ -459,8 +459,12 @@ class SubscriptionLogWriter(LogWriter):
         else:
             self.current = text
 
-    def newline(self):
+    def newline(self, forceNewline=False):
         if self.current:
+            if self.current[-1] == '\\':
+                self.current = self.current.rstrip('\\')
+                if not forceNewline:
+                    return
             if self.r and self.r.match(self.current):
                 self.stream.write(self.current)
                 self.stream.write('\n')
