@@ -289,7 +289,6 @@ class RecipeLoader:
         basename = os.path.basename(filename)
         self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
-        sys.modules[self.file] = self.module
         f = open(filename)
 
         # store cfg and repos, so that the recipe can load
@@ -402,12 +401,6 @@ class RecipeLoader:
 
     def getRecipe(self):
         return self.recipe
-
-    def __del__(self):
-        try:
-            del sys.modules[self.file]
-        except:
-            pass
 
 class RecipeLoaderFromSourceTrove(RecipeLoader):
 
