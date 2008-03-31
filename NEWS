@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A regression introduced by the build requirements suggestions for
+      recipes using r.MakePathsInstall has been fixed. (CNY-2697)
+
 Changes in 2.0.10:
   o Build Changes:
     * An xml formatted log has been added to :debuginfo. This is in

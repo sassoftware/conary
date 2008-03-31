@@ -1032,6 +1032,10 @@ class MakePathsInstall(Make):
 	' %(installtarget)s %(args)s')
     keywords = {'installtarget': 'install'}
 
+    def _addMakeToBuildRequires(self):
+        # Done by the class attribute
+        pass
+
 class Ant(BuildCommand):
     """
     NAME
