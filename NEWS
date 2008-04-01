@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.11:
   o Build Changes:
     * Added 'factory' command to cvc for displaying and changing the factory
       of the currently checked out recipe (CNY-2690)
