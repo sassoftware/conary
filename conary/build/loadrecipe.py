@@ -40,7 +40,8 @@ class RecipeLoader:
     _recipesToCopy = []
 
     # This is the module dictionary which is used as the starting point
-    # for all recipe imports.
+    # for all recipe imports. Derivatives of RecipeLoader should use this
+    # version, not the one stored in the derivative class.
     baseModuleDict = {}
 
     # we don't set these up right away because of import ordering issues
@@ -133,6 +134,7 @@ class RecipeLoader:
 
     @staticmethod
     def _addRecipeToCopy(recipeClass):
+        pass
         RecipeLoader._recipesToCopy.append(recipeClass)
 
     @staticmethod
@@ -159,8 +161,7 @@ class RecipeLoader:
             moduleDict[name] = recipeCopy
 
     @staticmethod
-    def _loadDefaultPackages(cfg, repos, db = None, flavor = None,
-                             buildFlavor = None):
+    def _loadDefaultPackages(cfg, repos, db = None, buildFlavor = None):
         if RecipeLoader._defaultsLoaded:
             # we don't need to load these twice
             return
@@ -185,13 +186,9 @@ class RecipeLoader:
                 recipe = loader.getRecipe()
                 recipe.internalAbstractBaseClass = True
                 defaultRecipes.update(loader.recipes)
+                RecipeLoader.baseModuleDict
         RecipeLoader._recipesToCopy = [defaultRecipes.get(x.__name__, x) \
                                     for x in RecipeLoader._recipesToCopy]
-        if flavor is not None:
-            if buildFlavor is None:
-                buildFlavor = cfg.buildFlavor = oldBuildFlavor
-            else:
-                buildFlavor = oldBuildFlavor
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
@@ -304,7 +301,6 @@ class RecipeLoader:
         self.module.__dict__['directory'] = directory
 
         self._loadDefaultPackages(cfg, repos, db,
-                                  flavor = self.module.__dict__.get('flavor'),
                                   buildFlavor = buildFlavor)
         self._copyReusedRecipes(self.module.__dict__)
 
