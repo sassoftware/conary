@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 1.2.22:
   o Build Changes:
     * The SubscriptionLogWriter now handles line continuation. (CNY-2963)
 
