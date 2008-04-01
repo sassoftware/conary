@@ -33,75 +33,11 @@ from conary.local import database
 from conary import versions
 
 
-global _defaultsLoaded
-_defaultsLoaded = False
-def _loadDefaultPackages(cfg, repos, db = None, flavor = None,
-                         buildFlavor = None):
-    global _defaultsLoaded
-    global _recipesToCopy
-
-    if _defaultsLoaded:
-        # we don't need to load these twice
-        return
-
-    _defaultsLoaded = True
-
-    if db is None:
-        db = database.Database(cfg.root, cfg.dbPath)
-
-    oldBuildFlavor = cfg.buildFlavor
-    defaultRecipes = {}
-    for defaultPackage in cfg.defaultBasePackages:
-        packagePath = os.path.join(cfg.baseClassDir,
-                defaultPackage + '.recipe')
-        if os.path.exists(packagePath):
-            loader, oldBuildFlavor = \
-                    _getLoaderForInstalledRecipe(defaultPackage,
-                            '', deps.parseFlavor(''),
-                            cfg, repos, db, buildFlavor)
-            if not loader:
-                continue
-            recipe = loader.getRecipe()
-            recipe.internalAbstractBaseClass = True
-            defaultRecipes.update(loader.recipes)
-    _recipesToCopy = [defaultRecipes.get(x.__name__, x) \
-            for x in _recipesToCopy]
-    if flavor is not None:
-        if buildFlavor is None:
-            buildFlavor = cfg.buildFlavor = oldBuildFlavor
-        else:
-            buildFlavor = oldBuildFlavor
-
-
-_recipesToCopy = []
-def _addRecipeToCopy(recipeClass):
-    global _recipesToCopy
-    _recipesToCopy.append(recipeClass)
-
-def _copyReusedRecipes(moduleDict):
-    # XXX HACK - get rid of this when we move the
-    # recipe classes to the repository.
-    # makes copies of some of the superclass recipes that are 
-    # created in this module.  (specifically, the ones with buildreqs)
-    global _recipesToCopy
-    for recipeClass in _recipesToCopy:
-        name = recipeClass.__name__
-        # when we create a new class object, it needs its superclasses.
-        # get the original superclass list and substitute in any 
-        # copies
-        mro = list(inspect.getmro(recipeClass)[1:])
-        newMro = []
-        for superClass in mro:
-            superName = superClass.__name__
-            newMro.append(moduleDict.get(superName, superClass))
-
-        recipeCopy = new.classobj(name, tuple(newMro),
-                                 recipeClass.__dict__.copy())
-        recipeCopy.buildRequires = recipeCopy.buildRequires[:]
-        recipeCopy.crossRequires = recipeCopy.crossRequires[:]
-        moduleDict[name] = recipeCopy
 
 class RecipeLoader:
+
+    _defaultsLoaded = False
+    _recipesToCopy = []
 
     # This is the module dictionary which is used as the starting point
     # for all recipe imports.
@@ -191,9 +127,71 @@ class RecipeLoader:
         l = d.setdefault('__localImportModules', [])
         l.append(m)
 
-    @classmethod
-    def baseImport(theClass, package, modules=()):
-        theClass._localImport(theClass.baseModuleDict, package, modules)
+    @staticmethod
+    def baseImport(package, modules=()):
+        RecipeLoader._localImport(RecipeLoader.baseModuleDict, package, modules)
+
+    @staticmethod
+    def _addRecipeToCopy(recipeClass):
+        RecipeLoader._recipesToCopy.append(recipeClass)
+
+    @staticmethod
+    def _copyReusedRecipes(moduleDict):
+        # XXX HACK - get rid of this when we move the
+        # recipe classes to the repository.
+        # makes copies of some of the superclass recipes that are 
+        # created in this module.  (specifically, the ones with buildreqs)
+        for recipeClass in RecipeLoader._recipesToCopy:
+            name = recipeClass.__name__
+            # when we create a new class object, it needs its superclasses.
+            # get the original superclass list and substitute in any 
+            # copies
+            mro = list(inspect.getmro(recipeClass)[1:])
+            newMro = []
+            for superClass in mro:
+                superName = superClass.__name__
+                newMro.append(moduleDict.get(superName, superClass))
+
+            recipeCopy = new.classobj(name, tuple(newMro),
+                                     recipeClass.__dict__.copy())
+            recipeCopy.buildRequires = recipeCopy.buildRequires[:]
+            recipeCopy.crossRequires = recipeCopy.crossRequires[:]
+            moduleDict[name] = recipeCopy
+
+    @staticmethod
+    def _loadDefaultPackages(cfg, repos, db = None, flavor = None,
+                             buildFlavor = None):
+        if RecipeLoader._defaultsLoaded:
+            # we don't need to load these twice
+            return
+
+        RecipeLoader._defaultsLoaded = True
+
+        if db is None:
+            db = database.Database(cfg.root, cfg.dbPath)
+
+        oldBuildFlavor = cfg.buildFlavor
+        defaultRecipes = {}
+        for defaultPackage in cfg.defaultBasePackages:
+            packagePath = os.path.join(cfg.baseClassDir,
+                    defaultPackage + '.recipe')
+            if os.path.exists(packagePath):
+                loader, oldBuildFlavor = \
+                        _getLoaderForInstalledRecipe(defaultPackage,
+                                '', deps.parseFlavor(''),
+                                cfg, repos, db, buildFlavor)
+                if not loader:
+                    continue
+                recipe = loader.getRecipe()
+                recipe.internalAbstractBaseClass = True
+                defaultRecipes.update(loader.recipes)
+        RecipeLoader._recipesToCopy = [defaultRecipes.get(x.__name__, x) \
+                                    for x in RecipeLoader._recipesToCopy]
+        if flavor is not None:
+            if buildFlavor is None:
+                buildFlavor = cfg.buildFlavor = oldBuildFlavor
+            else:
+                buildFlavor = oldBuildFlavor
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
@@ -305,10 +303,10 @@ class RecipeLoader:
             directory = os.path.dirname(filename)
         self.module.__dict__['directory'] = directory
 
-        _loadDefaultPackages(cfg, repos, db,
-                             flavor = self.module.__dict__.get('flavor'),
-                             buildFlavor = buildFlavor)
-        _copyReusedRecipes(self.module.__dict__)
+        self._loadDefaultPackages(cfg, repos, db,
+                                  flavor = self.module.__dict__.get('flavor'),
+                                  buildFlavor = buildFlavor)
+        self._copyReusedRecipes(self.module.__dict__)
 
         if factory:
             self._localImport(self.module.__dict__, 'conary.build.factory',
@@ -1052,3 +1050,4 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              buildFlavor = buildFlavor,
                                              parentDir = os.getcwd())
 
+_addRecipeToCopy = RecipeLoader._addRecipeToCopy
