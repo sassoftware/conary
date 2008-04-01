@@ -107,10 +107,40 @@ class RecipeLoader:
     # for all recipe imports.
     baseModuleDict = {}
 
+    # we don't set these up right away because of import ordering issues
+    baseModuleImports = [
+        ('conary.build', ('build', 'action')),
+        ('conary.build.loadrecipe', 
+                           ('loadSuperClass', 'loadInstalled',
+                            # XXX when all recipes have been migrated
+                            # we can get rid of loadRecipe
+                            ('loadSuperClass', 'loadRecipe'))),
+        ('conary.build.grouprecipe', 'GroupRecipe'),
+        ('conary.build.filesetrecipe', 'FilesetRecipe'),
+        ('conary.build.redirectrecipe', 'RedirectRecipe'),
+        ('conary.build.derivedrecipe', 'DerivedPackageRecipe'),
+        ('conary.build.packagerecipe', 
+                          ('clearBuildReqs', 'clearBuildRequires',
+                           'clearCrossReqs', 'clearCrossRequires',
+                           'PackageRecipe', 'BuildPackageRecipe',
+                           'CPackageRecipe', 'AutoPackageRecipe')),
+        ('conary.build.inforecipe',  ('UserInfoRecipe', 'GroupInfoRecipe')),
+        ('conary.lib', ('util',)),
+        ('os',),
+        ('re',),
+        ('sys',),
+        ('stat',),
+        ('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                            'PackageFlags')) ]
+
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
                  buildFlavor=None, db=None, overrides = None,
                  factory = False, objDict = {}):
+        if not self.baseModuleDict:
+            for args in self.baseModuleImports:
+                self._localImport(self.baseModuleDict, *args)
+
         try:
             self._load(filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
@@ -1022,29 +1052,3 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              buildFlavor = buildFlavor,
                                              parentDir = os.getcwd())
 
-RecipeLoader.baseImport('conary.build', ('build', 'action'))
-RecipeLoader.baseImport('conary.build.loadrecipe', 
-                               ('loadSuperClass', 'loadInstalled',
-                                # XXX when all recipes have been migrated
-                                # we can get rid of loadRecipe
-                                ('loadSuperClass', 'loadRecipe')))
-RecipeLoader.baseImport('conary.build.grouprecipe', 'GroupRecipe')
-RecipeLoader.baseImport('conary.build.filesetrecipe', 'FilesetRecipe')
-RecipeLoader.baseImport('conary.build.redirectrecipe', 'RedirectRecipe')
-RecipeLoader.baseImport('conary.build.derivedrecipe', 'DerivedPackageRecipe')
-RecipeLoader.baseImport('conary.build.packagerecipe', 
-                              ('clearBuildReqs',
-                               'clearBuildRequires',
-                               'clearCrossReqs',
-                               'clearCrossRequires',
-                               'PackageRecipe', 
-                               'BuildPackageRecipe',
-                               'CPackageRecipe',
-                               'AutoPackageRecipe'))
-RecipeLoader.baseImport('conary.build.inforecipe',  ('UserInfoRecipe',
-                                            'GroupInfoRecipe'))
-RecipeLoader.baseImport('conary.lib', ('util',))
-for x in ('os', 're', 'sys', 'stat'):
-    RecipeLoader.baseImport(x)
-RecipeLoader.baseImport('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
-                                    'PackageFlags'))
