@@ -12,12 +12,14 @@
 # full details.
 #
 
+import copy
 import imp
 import inspect
 import new
 import os
 import string
 import sys
+import types
 import tempfile
 import traceback
 
@@ -37,7 +39,6 @@ from conary import versions
 class RecipeLoader:
 
     _defaultsLoaded = False
-    _recipesToCopy = []
 
     # This is the module dictionary which is used as the starting point
     # for all recipe imports. Derivatives of RecipeLoader should use this
@@ -61,7 +62,8 @@ class RecipeLoader:
                            'clearCrossReqs', 'clearCrossRequires',
                            'PackageRecipe', 'BuildPackageRecipe',
                            'CPackageRecipe', 'AutoPackageRecipe')),
-        ('conary.build.inforecipe',  ('UserInfoRecipe', 'GroupInfoRecipe')),
+        ('conary.build.inforecipe',  ('UserInfoRecipe', 'GroupInfoRecipe',
+                                      'UserGroupInfoRecipe' )),
         ('conary.lib', ('util',)),
         ('os',),
         ('re',),
@@ -133,17 +135,16 @@ class RecipeLoader:
         RecipeLoader._localImport(RecipeLoader.baseModuleDict, package, modules)
 
     @staticmethod
-    def _addRecipeToCopy(recipeClass):
-        pass
-        RecipeLoader._recipesToCopy.append(recipeClass)
-
-    @staticmethod
     def _copyReusedRecipes(moduleDict):
         # XXX HACK - get rid of this when we move the
         # recipe classes to the repository.
         # makes copies of some of the superclass recipes that are 
         # created in this module.  (specifically, the ones with buildreqs)
-        for recipeClass in RecipeLoader._recipesToCopy:
+        for recipeClass in moduleDict.values():
+            if (type(recipeClass) != type or
+                    not issubclass(recipeClass, recipe.Recipe)):
+                continue
+
             name = recipeClass.__name__
             # when we create a new class object, it needs its superclasses.
             # get the original superclass list and substitute in any 
@@ -154,11 +155,16 @@ class RecipeLoader:
                 superName = superClass.__name__
                 newMro.append(moduleDict.get(superName, superClass))
 
-            recipeCopy = new.classobj(name, tuple(newMro),
-                                     recipeClass.__dict__.copy())
-            recipeCopy.buildRequires = recipeCopy.buildRequires[:]
-            recipeCopy.crossRequires = recipeCopy.crossRequires[:]
-            moduleDict[name] = recipeCopy
+            newDict = {}
+            for name, attr in recipeClass.__dict__.iteritems():
+                if type(attr) in [ types.ModuleType, types.MethodType,
+                                   types.UnboundMethodType,
+                                   types.FunctionType ]:
+                    newDict[name] = attr
+                else:
+                    newDict[name] = copy.deepcopy(attr)
+
+            moduleDict[name] = new.classobj(name, tuple(newMro), newDict)
 
     @staticmethod
     def _loadDefaultPackages(cfg, repos, db = None, buildFlavor = None):
@@ -185,10 +191,8 @@ class RecipeLoader:
                     continue
                 recipe = loader.getRecipe()
                 recipe.internalAbstractBaseClass = True
-                defaultRecipes.update(loader.recipes)
-                RecipeLoader.baseModuleDict
-        RecipeLoader._recipesToCopy = [defaultRecipes.get(x.__name__, x) \
-                                    for x in RecipeLoader._recipesToCopy]
+
+                RecipeLoader.baseModuleDict.update(loader.recipes)
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
@@ -1045,5 +1049,3 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              branch = branch,
                                              buildFlavor = buildFlavor,
                                              parentDir = os.getcwd())
-
-_addRecipeToCopy = RecipeLoader._addRecipeToCopy
