@@ -226,8 +226,14 @@ class LogWriter(object):
     def start(self):
         pass
 
+    @callable
+    def reportMissingBuildRequires(self, data):
+        self.freetext("warning: Suggested buildRequires additions: ['%s']"
+                      %"', '".join(data.split(' ')))
+        self.newline()
+
     def command(self, cmd, *args):
-        func = self.__class__.__dict__.get(cmd)
+        func = getattr(self.__class__, cmd, False)
         # silently ignore nonsensical calls because the logger loops over each
         # writer and passes the command separately to all of them
         if func and func.__dict__.get('_callable', False):
@@ -293,7 +299,7 @@ class XmlLogWriter(LogWriter):
         descriptorStack = self._getDescriptorStack()
         return '.'.join(descriptorStack)
 
-    def log(self, message, levelname = 'INFO'):
+    def log(self, message = None, levelname = 'INFO'):
         # escape xml delimiters and newline characters
         message = saxutils.escape(message)
         message = message.replace('\n', '\\n')
@@ -313,7 +319,6 @@ class XmlLogWriter(LogWriter):
         if descriptor:
             macros['descriptor'] = descriptor
         print >> self.stream, makeRecord(macros)
-        self.stream.flush()
 
     @callable
     def pushDescriptor(self, descriptor):
@@ -349,6 +354,12 @@ class XmlLogWriter(LogWriter):
     def delRecordData(self, key):
         recordData = self._getRecordData()
         recordData.pop(key, None)
+
+    @callable
+    def reportMissingBuildRequires(self, data):
+        self.pushDescriptor('missingBuildRequires')
+        self.log(data, levelname = 'WARNING')
+        self.popDescriptor('missingBuildRequires')
 
 class FileLogWriter(LogWriter):
     def __init__(self, path):
@@ -584,6 +595,9 @@ class Logger:
 
     def subscribe(self, pattern):
         self.command('subscribe %s' %pattern)
+
+    def reportMissingBuildRequires(self, reqList):
+        self.command('reportMissingBuildRequires %s' %' '.join(reqList))
 
     def synchronize(self):
         timestamp = '%10.8f' %time.time()

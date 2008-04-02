@@ -3873,9 +3873,9 @@ class reportMissingBuildRequires(policy.Policy):
                 self.errors.add(arg)
 
     def do(self):
-	if self.errors:
-            self.warn('Suggested buildRequires additions: %s',
-                      str(sorted(list(self.errors))))
+	if self.errors and self.recipe._logFile:
+            self.recipe._logFile.reportMissingBuildRequires(
+                sorted(list(self.errors)))
 
 
 class reportErrors(policy.Policy, policy.GroupPolicy):
