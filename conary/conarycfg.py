@@ -484,6 +484,7 @@ class ConaryContext(ConfigSection):
     archDirs              =  (CfgPathList, ('/etc/conary/arch',
                                             '/etc/conary/distro/arch',
                                             '~/.conary/arch'))
+    autoLoadRecipes       =  CfgList(CfgFlavor)
     autoResolve           =  (CfgBool, False)
     autoResolvePackages   =  (CfgBool, True)
     buildFlavor           =  CfgFlavor

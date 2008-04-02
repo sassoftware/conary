@@ -17,7 +17,6 @@ import inspect
 import itertools
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
-from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
 from conary import trove
 
@@ -929,11 +928,6 @@ class PackageRecipe(AbstractPackageRecipe):
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
 
-# need this because we have non-empty buildRequires in PackageRecipe
-_addRecipeToCopy(PackageRecipe)
-
-
-
 # FIXME the next three classes will probably migrate to the repository
 # somehow, but not until we have figured out how to do this without
 # requiring that every recipe have a loadSuperClass line in it.
@@ -985,8 +979,6 @@ class BuildPackageRecipe(PackageRecipe):
     ]
     Flags = use.LocalFlags
     internalAbstractBaseClass = 1
-_addRecipeToCopy(BuildPackageRecipe)
-
 
 class CPackageRecipe(BuildPackageRecipe):
     """
@@ -1040,7 +1032,6 @@ class CPackageRecipe(BuildPackageRecipe):
     ]
     Flags = use.LocalFlags
     internalAbstractBaseClass = 1
-_addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
@@ -1117,4 +1108,3 @@ class AutoPackageRecipe(CPackageRecipe):
         r.MakeInstall()
     def policy(r):
         pass
-_addRecipeToCopy(AutoPackageRecipe)
