@@ -167,7 +167,7 @@ class RecipeLoader:
             moduleDict[name] = new.classobj(name, tuple(newMro), newDict)
 
     @staticmethod
-    def _loadDefaultPackages(cfg, repos, db = None, buildFlavor = None):
+    def _loadDefaultPackages(d, cfg, repos, db = None, buildFlavor = None):
         if RecipeLoader._defaultsLoaded:
             # we don't need to load these twice
             return
@@ -192,7 +192,7 @@ class RecipeLoader:
                 recipe = loader.getRecipe()
                 recipe.internalAbstractBaseClass = True
 
-                RecipeLoader.baseModuleDict.update(loader.recipes)
+                d.update(loader.recipes)
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
@@ -304,7 +304,7 @@ class RecipeLoader:
             directory = os.path.dirname(filename)
         self.module.__dict__['directory'] = directory
 
-        self._loadDefaultPackages(cfg, repos, db,
+        self._loadDefaultPackages(self.baseModuleDict, cfg, repos, db,
                                   buildFlavor = buildFlavor)
         self._copyReusedRecipes(self.module.__dict__)
 
