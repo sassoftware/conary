@@ -538,6 +538,7 @@ class Transport(xmlrpclib.Transport):
             opener.addheader(k, v)
 
         tries = 0
+        resetResolv = False
         url = ''.join([protocol, '://', host, handler])
         while tries < 5:
             try:
@@ -551,6 +552,14 @@ class Transport(xmlrpclib.Transport):
                     self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
                 break
             except IOError, e:
+                # try resetting the resolver - /etc/resolv.conf
+                # might have changed since this process started.
+                util.res_init()
+                if not resetResolv:
+                    # first time through this loop, don't sleep or
+                    # print a warning - just try again immediately
+                    resetResolv = True
+                    continue
                 tries += 1
                 if tries >= 5 or host in self.failedHosts:
                     self.failedHosts.add(host)

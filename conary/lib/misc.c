@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <malloc.h>
 #include <netinet/in.h>
+#include <resolv.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
@@ -43,6 +44,7 @@ static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
 static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
 static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
+static PyObject * py_res_init(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -65,6 +67,7 @@ static PyMethodDef MiscMethods[] = {
     { "sendmsg", py_sendmsg, METH_VARARGS },
     { "recvmsg", py_recvmsg, METH_VARARGS },
     { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
+    { "res_init", py_res_init, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -762,6 +765,11 @@ static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
             vfd++;
 
     return PyInt_FromLong(vfd);
+}
+
+static PyObject * py_res_init(PyObject *self, PyObject *args) {
+    int rc = res_init();
+    return Py_BuildValue("i", rc);
 }
 
 PyMODINIT_FUNC

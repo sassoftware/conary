@@ -6,6 +6,10 @@ Changes in @NEW@:
     * The source components needed to build everything in a group can
       now be found when the group uses searchPaths. (CNY-2710)
 
+  o Client Changes:
+    * Conary will now re-read /etc/resolv.conf if an error occurs when
+      resolving a hostname. (CNY-2703)
+
 Changes in 2.0.11:
   o Build Changes:
     * Added 'factory' command to cvc for displaying and changing the factory

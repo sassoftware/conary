@@ -74,7 +74,7 @@ elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< $(libelf)
 
 miscmodule.so: $(miscmodule_objs)
-	$(CC) -shared -o $@ $<
+	$(CC) -shared -lresolv -o $@ $<
 
 $(cstreamsmodule_objs): cstreams.h
 
