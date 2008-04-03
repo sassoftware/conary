@@ -320,20 +320,32 @@ class AbstractPackageRecipe(Recipe):
         self.crossReqMap = crossReqMap
         self.ignoreDeps = not raiseError
 
+    def _getTransitiveDepClosure(self, targets=None):
+        def isTroveTarget(trove):
+            if not targets:
+                return True
+            if trove.getName() in targets:
+                return True
+            return False
+
+	db = database.Database(self.cfg.root, self.cfg.dbPath)
+        
+        reqList =  [ req for req in self.getBuildRequirementTroves(db)
+                     if isTroveTarget(req) ]
+        reqNames = set(req.getName() for req in reqList)
+        depSetList = [ req.getRequires() for req in reqList ]
+        d = db.getTransitiveProvidesClosure(depSetList)
+        for depSet in d:
+            reqNames.update(
+                set(troveTup[0] for troveTup in d[depSet]))
+
+        return reqNames
+
     def _getTransitiveBuildRequiresNames(self):
         if self.transitiveBuildRequiresNames is not None:
             return self.transitiveBuildRequiresNames
 
-	db = database.Database(self.cfg.root, self.cfg.dbPath)
-        self.transitiveBuildRequiresNames = set(
-            req.getName() for req in self.getBuildRequirementTroves(db))
-        depSetList = [ req.getRequires()
-                       for req in self.getBuildRequirementTroves(db) ]
-        d = db.getTransitiveProvidesClosure(depSetList)
-        for depSet in d:
-            self.transitiveBuildRequiresNames.update(
-                set(troveTup[0] for troveTup in d[depSet]))
-
+        self.transitiveBuildRequiresNames = self._getTransitiveDepClosure()
         return self.transitiveBuildRequiresNames
 
     def getBuildRequirementTroves(self, db):
@@ -553,14 +565,19 @@ class AbstractPackageRecipe(Recipe):
 
     def _includeSuperClassItemsForAttr(self, attr):
         """ Include build requirements from super classes by searching
-            up the class hierarchy for buildRequires.  You can only
-            override this currenly by calling
+            up the class hierarchy for buildRequires.  You can
+            override this currently only by calling
             <superclass>.buildRequires.remove()
         """
         buildReqs = set()
+        superBuildReqs = set()
         for base in inspect.getmro(self.__class__):
-            buildReqs.update(getattr(base, attr, []))
+            thisClassReqs = getattr(base, attr, [])
+            buildReqs.update(thisClassReqs)
+            if base != self.__class__:
+                superBuildReqs.update(thisClassReqs)
         setattr(self, attr, list(buildReqs))
+        self._recipeRequirements['%sSuper' %attr] = superBuildReqs
 
     def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
@@ -801,6 +818,13 @@ class AbstractPackageRecipe(Recipe):
         self._componentReqs = {}
         self._componentProvs = {}
         self._derivedFiles = {} # used only for derived packages
+        # Inspected only when it is important to know for reporting
+        # purposes what was specified in the recipe per se, and not
+        # in superclasses or in defaultBuildRequires
+        self._recipeRequirements = {
+            'buildRequires': list(self.buildRequires),
+            'crossRequires': list(self.crossRequires)
+        }
         self._includeSuperClassBuildReqs()
         self._includeSuperClassCrossReqs()
         self.byDefaultIncludeSet = frozenset()

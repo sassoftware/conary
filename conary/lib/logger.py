@@ -232,6 +232,18 @@ class LogWriter(object):
                       %"', '".join(data.split(' ')))
         self.newline()
 
+    @callable
+    def reportExcessBuildRequires(self, data):
+        self.freetext("info: Possible excessive buildRequires: ['%s']"
+                      %"', '".join(data.split(' ')))
+        self.newline()
+
+    @callable
+    def reportExcessSuperclassBuildRequires(self, data):
+        self.freetext("info: Possible excessive superclass buildRequires: ['%s']"
+                      %"', '".join(data.split(' ')))
+        self.newline()
+
     def command(self, cmd, *args):
         func = getattr(self.__class__, cmd, False)
         # silently ignore nonsensical calls because the logger loops over each
@@ -361,6 +373,18 @@ class XmlLogWriter(LogWriter):
         self.log(data, levelname = 'WARNING')
         self.popDescriptor('missingBuildRequires')
 
+    @callable
+    def reportExcessBuildRequires(self, data):
+        self.pushDescriptor('excessBuildRequires')
+        self.log(data, levelname = 'INFO')
+        self.popDescriptor('excessBuildRequires')
+
+    @callable
+    def reportExcessSuperclassBuildRequires(self, data):
+        self.pushDescriptor('excessSuperclassBuildRequires')
+        self.log(data, levelname = 'DEBUG')
+        self.popDescriptor('excessSuperclassBuildRequires')
+
 class FileLogWriter(LogWriter):
     def __init__(self, path):
         self.path = path
@@ -387,6 +411,7 @@ class FileLogWriter(LogWriter):
     def close(self):
         self.stream.close()
         self.logging = False
+
 
 class StreamLogWriter(LogWriter):
     def __init__(self, stream = None):
@@ -431,6 +456,12 @@ class StreamLogWriter(LogWriter):
     def popDescriptor(self, descriptor = None):
         if descriptor == 'environment':
             self.data.hideLog = False
+
+    @callable
+    def reportExcessSuperclassBuildRequires(self, data):
+        # This is really only for debugging Conary itself, and so is
+        # useful to store in logfiles but not to display
+        pass
 
 
 class SubscriptionLogWriter(LogWriter):
@@ -598,6 +629,12 @@ class Logger:
 
     def reportMissingBuildRequires(self, reqList):
         self.command('reportMissingBuildRequires %s' %' '.join(reqList))
+
+    def reportExcessBuildRequires(self, reqList):
+        self.command('reportExcessBuildRequires %s' %' '.join(reqList))
+
+    def reportExcessSuperclassBuildRequires(self, reqList):
+        self.command('reportExcessSuperclassBuildRequires %s' %' '.join(reqList))
 
     def synchronize(self):
         timestamp = '%10.8f' %time.time()

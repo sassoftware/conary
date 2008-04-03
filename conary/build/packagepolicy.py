@@ -3851,6 +3851,92 @@ class Flavor(policy.Policy):
         if isnset in self.allowableIsnSets:
             self.packageFlavor.union(flv)
 
+
+class reportExcessBuildRequires(policy.Policy):
+    """
+    This policy is used to report together all suggestions for
+    possible items to remove from the C{buildRequires} list.
+    Do not call it directly; it is for internal use only.
+    """
+    bucket = policy.ERROR_REPORTING
+    processUnmodified = True
+    filetree = policy.NO_FILES
+
+    def __init__(self, *args, **keywords):
+	self.found = set()
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+        for arg in args:
+            if type(arg) in (list, tuple, set):
+                self.found.update(arg)
+            else:
+                self.found.add(arg)
+
+    def do(self):
+        # If absolutely no buildRequires were found automatically,
+        # assume that the buildRequires list has been carefully crafted
+        # for some reason that the buildRequires enforcement policy
+        # doesn't yet support, and don't warn that all of the listed
+        # buildRequires might be excessive.
+	if self.found and self.recipe._logFile:
+            r = self.recipe
+            def getReqNames(key):
+                return set(x.split('=')[0] for x in r._recipeRequirements[key])
+            recipeReqs = getReqNames('buildRequires')
+            superReqs = getReqNames('buildRequiresSuper')
+            foundPackages = set(x.split(':')[0] for x in self.found)
+            superClosure = r._getTransitiveDepClosure(superReqs)
+            foundClosure = r._getTransitiveDepClosure(self.found)
+
+            def removeCore(candidates):
+                # conary, python, and setup are always required; gcc
+                # is often an implicit requirement, and sqlite:lib is
+                # listed explicitly make bootstrapping easier
+                return set(x for x in candidates if
+                           not x.startswith('conary')
+                           and not x.startswith('python:')
+                           and not x.startswith('gcc:')
+                           and not x in ('libgcc:devellib',
+                                         'setup:runtime',
+                                         'sqlite:lib'))
+
+            def removeSome(candidates):
+                # at this point, we don't have good enough detection
+                # of :runtime in particular to recommend getting rid
+                # of it
+                return set(x for x in removeCore(candidates) if
+                           not x.endswith(':runtime'))
+
+            def removeDupComponents(candidates):
+                # If any component is required, we don't really need
+                # to flag others as excessive in superclass excess
+                return set(x for x in candidates
+                           if x.split(':')[0] not in foundPackages)
+
+            # for superclass reqs
+            excessSuperReqs = superReqs - foundClosure
+            if excessSuperReqs:
+                # note that as this is for debugging only, we do not
+                # remove runtime requirements
+                self._reportExcessSuperclassBuildRequires(sorted(list(
+                    removeDupComponents(removeCore(excessSuperReqs)))))
+
+            excessReqs = recipeReqs - self.found
+            redundantReqs = recipeReqs.intersection(superClosure)
+            if excessReqs or redundantReqs:
+                self._reportExcessBuildRequires(sorted(list(
+                    removeSome(excessReqs.union(redundantReqs)))))
+
+    def _reportExcessBuildRequires(self, reqList):
+        self.recipe._logFile.reportExcessBuildRequires(
+            sorted(list(reqList)))
+
+    def _reportExcessSuperclassBuildRequires(self, reqList):
+        self.recipe._logFile.reportExcessSuperclassBuildRequires(
+            sorted(list(reqList)))
+
+
 class reportMissingBuildRequires(policy.Policy):
     """
     This policy is used to report together all suggestions for

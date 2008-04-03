@@ -1,5 +1,7 @@
 Changes in @NEW@:
   o Build Changes:
+    * Conary now warns about some possibly unused build requirements.
+      This requires conary-policy 1.0.16 or later. (CNY-2232)
     * Suggested additions to buildRequires lists are now separately
       encoded in the XML build log. (CNY-2621)
     * Loaded recipe modules are no longer tracked in sys.modules
