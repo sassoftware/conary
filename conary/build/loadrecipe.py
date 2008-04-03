@@ -167,7 +167,8 @@ class RecipeLoader:
             for name, attr in recipeClass.__dict__.iteritems():
                 if type(attr) in [ types.ModuleType, types.MethodType,
                                    types.UnboundMethodType,
-                                   types.FunctionType ]:
+                                   types.FunctionType,
+                                   staticmethod]:
                     newDict[name] = attr
                 else:
                     newDict[name] = copy.deepcopy(attr)
