@@ -140,12 +140,20 @@ class RecipeLoader:
         # recipe classes to the repository.
         # makes copies of some of the superclass recipes that are 
         # created in this module.  (specifically, the ones with buildreqs)
+        recipeClassDict = {}
         for recipeClass in moduleDict.values():
             if (type(recipeClass) != type or
                     not issubclass(recipeClass, recipe.Recipe)):
                 continue
-
-            name = recipeClass.__name__
+            numParents = len(inspect.getmro(recipeClass))
+            recipeClassDict[recipeClass.__name__] = (numParents, recipeClass)
+        # create copies of recipes by the number of parents they have
+        # a class always has more parents than its parent does,
+        # if you copy the superClasses first, the copies will.
+        recipeClasses = [ x[1]  for x in sorted(recipeClassDict.values(),
+                                                key=lambda x: x[0]) ]
+        for recipeClass in recipeClasses:
+            className = recipeClass.__name__
             # when we create a new class object, it needs its superclasses.
             # get the original superclass list and substitute in any 
             # copies
@@ -164,7 +172,8 @@ class RecipeLoader:
                 else:
                     newDict[name] = copy.deepcopy(attr)
 
-            moduleDict[name] = new.classobj(name, tuple(newMro), newDict)
+            moduleDict[className] = new.classobj(className,
+                                                 tuple(newMro), newDict)
 
     @staticmethod
     def _loadDefaultPackages(d, cfg, repos, db = None, buildFlavor = None):
