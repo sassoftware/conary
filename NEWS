@@ -11,6 +11,10 @@ Changes in @NEW@:
   o Client Changes:
     * Conary will now re-read /etc/resolv.conf if an error occurs when
       resolving a hostname. (CNY-2703)
+  o Bug Fixes:
+    * The internal function _ensureReadableRollbackStatus now collects the
+      necessary state it needs to succed within itself instead of relying on
+      that state having been previously collected. (CNY-2711)
 
 Changes in 2.0.11:
   o Build Changes:

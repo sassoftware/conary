@@ -1833,6 +1833,7 @@ class Database(SqlDbRepository):
                 raise
 
     def _ensureReadableRollbackStack(self):
+        self.readRollbackStatus()
         if (self.firstRollback, self.lastRollback) == (None, None):
             raise ConaryError("Unable to open rollback directory")
 
