@@ -23,7 +23,7 @@ from conary.build import filesetrecipe, grouprecipe, inforecipe
 
 DELETE_CHAR = chr(8)
 
-blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'setModes', 'User', 'Group', 'SupplementalGroup'),
+blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'reportExcessBuildRequires', 'setModes', 'User', 'Group', 'SupplementalGroup'),
         'GroupRecipe' : ('reportErrors',)}
 
 class DummyRepos:

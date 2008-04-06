@@ -16,8 +16,7 @@ TOPDIR=..
 
 bin_files = \
 	conary		\
-	cvc		\
-        cvcdesc
+	cvc
 
 extra_dist = Makefile conary-wrapper
 
