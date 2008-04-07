@@ -721,7 +721,7 @@ class TroveStore:
             cu.execute("set join_collapse_limit to default")
             cu.execute("set enable_seqscan to default")
 
-        troveFilesCursor = util.PeekIterator(iter(()))
+        troveFilesCursor = iter(())
         if withFileStreams or withFiles:
             troveFilesCursor = self.db.cursor()
             streamSel = "NULL"
@@ -737,7 +737,7 @@ class TroveStore:
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
             ORDER BY tmpInstanceId.idx
             """ % (streamSel,))
-            troveFilesCursor = util.PeekIterator(troveFilesCursor)
+        troveFilesCursor = util.PeekIterator(troveFilesCursor)
 
         troveRedirectsCursor = self.db.cursor()
         troveRedirectsCursor.execute("""
