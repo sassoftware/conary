@@ -168,7 +168,10 @@ class RecipeLoader:
                 if type(attr) in [ types.ModuleType, types.MethodType,
                                    types.UnboundMethodType,
                                    types.FunctionType,
-                                   staticmethod]:
+                                   staticmethod,
+                                   # don't copy in flags, as they
+                                   # need to have their data copied out
+                                   use.LocalFlagCollection]:
                     newDict[name] = attr
                 else:
                     newDict[name] = copy.deepcopy(attr)
