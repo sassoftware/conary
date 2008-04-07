@@ -11,14 +11,16 @@ Changes in @NEW@:
   o Client Changes:
     * Conary will now re-read /etc/resolv.conf if an error occurs when
       resolving a hostname. (CNY-2703)
-    * Migrate now only preserves local installs of groups and kernels.
-      Before, all manually installed components and troves that were
+    * Migrate now preserves local installs only of groups and kernels.
+      Before, all manually-installed components and troves that were
       referenced by the group being migrated would be updated instead
       of erased. (CNY-2569)
+
   o Bug Fixes:
     * The internal function _ensureReadableRollbackStatus now collects the
-      necessary state it needs to succed within itself instead of relying on
-      that state having been previously collected. (CNY-2711)
+      necessary state it needs to succed within itself instead of relying
+      on that state having been previously collected. (CNY-2711)
+
   o API changes:
     * The addUser() xmlrpc call does not auto-create a matching role 
       anymore (CNY-2604)
