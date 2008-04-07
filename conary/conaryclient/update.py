@@ -1934,6 +1934,49 @@ conary erase '%s=%s[%s]'
 
             return db.getTroves(oldTroves, withFiles=False)
 
+        def _updateByDefaultFalseGroups(potentialJobs, byDefaultFalseSet,
+                                        availByDefaultInfo, searchSource):
+            # Find included groups that are byDefault False in the old
+            # group structure (but are installed anyway) and keeps them
+            # installed, and treats them as if they also had been referenced
+            # on the migrate line (meaning all included packages are also
+            # installed)
+            groupJobs = [ x for x in potentialJobs if trove.troveIsGroup(x[0]) ]
+            if not groupJobs:
+                return
+            oldGroups = []
+            newGroups = []
+            for job in groupJobs:
+                newInfo = (job[0], job[2][0], job[2][1])
+                oldInfo = (job[0], job[1][0], job[1][1])
+                if not job[2][0] or not job[1][0]:
+                    continue
+                if availByDefaultInfo[newInfo]:
+                    continue
+                if (oldInfo in byDefaultFalse
+                    and  trove.troveIsGroup(job[0])):
+                    oldGroups.append(oldInfo)
+                    newGroups.append(newInfo)
+                    availByDefaultInfo[newInfo] = True
+            newGroups = searchSource.getTroves(newGroups, withFiles=False)
+            oldGroups = self.db.getTroves(oldGroups, withFiles=False)
+
+            for trv in newGroups:
+                for (troveNVF, byDefault, isWeak) in trv.iterTroveListInfo():
+                    # possibly turn more troves to availableByDefault
+                    # if they're byDefault True in this subgroup.
+                    availByDefaultInfo.update(dict.fromkeys((x[0] for x in trv.iterTroveListInfo() if x[1]), True))
+            byDefaultTrue = []
+            for trv in oldGroups:
+                troveList = list(trv.iterTroveListInfo())
+                troveTups = [x[0] for x in troveList]
+                hasTroves = self.db.hasTroves(troveTups)
+                troveList = (x[0] for x in itertools.izip(troveList, hasTroves) if x[1])
+                byDefaultTrue.extend(x[0] for x in troveList if x[1])
+            byDefaultFalse.difference_update(byDefaultTrue)
+
+
+
         toFind = []
         for item in itemList:
             (troveName, (oldVersionStr, oldFlavorStr),
@@ -1967,12 +2010,10 @@ conary erase '%s=%s[%s]'
                 else:
                     availByDefaultInfo.setdefault(troveNVF, False)
 
-        # find the installed versions of the top level troves we're
-        # trying to migrate to.  Troves within the _old_ versions 
-        # of those troves that installed by byDefault False 
-        # we will keep when migrating.
-        # E.g. if you install foo:debuginfo, when we migrate you,
-        # foo:debuginfo will be kept.
+        # We keep groups that you have installed manually (and anything
+        # included in those groups as well as kernels.   
+        # Anything else that is installed manually will be removed.  
+        # All the following code is to preserve groups and kernels.
         toBeMigrated = _getTrovesToBeMigrated(self.db, newTroves, troveNames)
 
         byDefaultFalse = []
@@ -2012,7 +2053,12 @@ conary erase '%s=%s[%s]'
         for troveNVF in eraseSet:
             existsTrv.addTrove(*troveNVF)
         potentialJobs = availableTrv.diff(existsTrv)[2]
-
+        potentialJobs += [(x[0], (x[1], x[2]), (x[1], x[2]), False) for x in toKeep]
+        if recurse:
+            _updateByDefaultFromIncludedGroups(potentialJobs,
+                                               byDefaultFalse,
+                                               availByDefaultInfo,
+                                               searchSource)
         finalJobs = []
         for job in potentialJobs:
             newInfo = (job[0], job[2][0], job[2][1])
@@ -2022,13 +2068,21 @@ conary erase '%s=%s[%s]'
                     # only install byDefault True
                     continue
             elif job[2][0]:
-                if oldInfo not in byDefaultFalse:
-                    # this is an update from a byDefault True trv 
-                    # to a byDefault False trv.
-                    if not availByDefaultInfo[newInfo]:
-                        finalJobs.append((job[0], job[1], (None, None), False))
-                        continue
-            finalJobs.append(job)
+                if availByDefaultInfo[newInfo]:
+                    pass
+                elif (oldInfo in byDefaultFalse and 
+                      (job[0].split(':')[0] == 'kernel'
+                        or trove.troveIsGroup(job[0]))):
+                    pass
+                else:
+                    # new version is byDefault False and old version
+                    # is not byDefault False and a group or and kernel
+                    # (the two special cases that are allowed to remain 
+                    # installed if they're byDefault False)
+                    finalJobs.append((job[0], job[1], (None, None), False))
+                    continue
+            if job[1] != job[2]:
+                finalJobs.append(job)
 
 
         for troveNVF in toKeep:
