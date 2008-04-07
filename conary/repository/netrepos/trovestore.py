@@ -696,7 +696,17 @@ class TroveStore:
                        start_transaction = False)
         self.db.analyze("tmpInstanceId")
         
+        # unfortunately most cost-based optimizers will get the
+        # following query wrong. Details in CNY-2695
+
+        if self.db.driver == 'postgresql':
+            # for PostgreSQL we have to force an execution plan that
+            # uses the join order as coded in the query
+            cu.execute("set join_collapse_limit to 2")
+            cu.execute("set enable_seqscan to off")
+
         troveTrovesCursor = self.db.cursor()
+        # the STRAIGHTJOIN hack will ask MySQL to execute the query as written
         troveTrovesCursor.execute("""
         SELECT %(STRAIGHTJOIN)s tmpInstanceId.idx, Items.item, Versions.version, Flavors.flavor,
                TroveTroves.flags, Nodes.timeStamps
@@ -750,6 +760,11 @@ class TroveStore:
         ORDER BY tmpInstanceId.idx
         """)
         troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
+
+        if self.db.driver == 'postgresql':
+            # revert changes we forced on the postgresql optimizer
+            cu.execute("set join_collapse_limit to default")
+            cu.execute("set enable_seqscan to default")
 
         neededIdx = 0
         versionObjCache = {}

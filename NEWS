@@ -42,6 +42,8 @@ Changes in 1.2.21:
     * A source of circular references which could cause unpredictable
       memory usage has been removed. (CNY-2674)
     * Fixed a file descriptor leak when using in-memory-only databases.
+    * Performance problems when retrieving an uncached changeset with
+      a Postgresql backend have a workaround (CNY-2695)
 
   o Client changes
     * More of the update logic is now protected by the filesystem journal,
