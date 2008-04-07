@@ -1934,8 +1934,8 @@ conary erase '%s=%s[%s]'
 
             return db.getTroves(oldTroves, withFiles=False)
 
-        def _updateByDefaultFalseGroups(potentialJobs, byDefaultFalseSet,
-                                        availByDefaultInfo, searchSource):
+        def _updateByDefaultFromIncludedGroups(potentialJobs, byDefaultFalseSet,
+                                            availByDefaultInfo, searchSource):
             # Find included groups that are byDefault False in the old
             # group structure (but are installed anyway) and keeps them
             # installed, and treats them as if they also had been referenced
