@@ -697,7 +697,7 @@ class TroveStore:
         self.db.analyze("tmpInstanceId")
         
         # unfortunately most cost-based optimizers will get the
-        # following query wrong. Details in CNY-2695
+        # following trove*Cursor queries wrong. Details in CNY-2695
 
         if self.db.driver == 'postgresql':
             # for PostgreSQL we have to force an execution plan that
@@ -708,8 +708,8 @@ class TroveStore:
         troveTrovesCursor = self.db.cursor()
         # the STRAIGHTJOIN hack will ask MySQL to execute the query as written
         troveTrovesCursor.execute("""
-        SELECT %(STRAIGHTJOIN)s tmpInstanceId.idx, Items.item, Versions.version, Flavors.flavor,
-               TroveTroves.flags, Nodes.timeStamps
+        SELECT %(STRAIGHTJOIN)s tmpInstanceId.idx, Items.item, Versions.version,
+            Flavors.flavor, TroveTroves.flags, Nodes.timeStamps
         FROM tmpInstanceId
         JOIN TroveTroves using(instanceId)
         JOIN Instances on TroveTroves.includedId = Instances.instanceId
@@ -723,31 +723,22 @@ class TroveStore:
         """ % self.db.keywords)
         troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
 
-        troveFilesCursor = self.db.cursor()
-	if withFileStreams:
+        troveFilesCursor = util.PeekIterator(iter(()))
+        if withFileStreams or withFiles:
+            troveFilesCursor = self.db.cursor()
+            streamSel = "NULL"
+            if withFileStreams:
+                streamSel = "FileStreams.stream"
             troveFilesCursor.execute("""
-            SELECT tmpInstanceId.idx, TroveFiles.pathId, TroveFiles.path,
-                   Versions.version, FileStreams.fileId, FileStreams.stream
+            SELECT %(STRAIGHTJOIN)s tmpInstanceId.idx, TroveFiles.pathId,
+                TroveFiles.path, Versions.version, FileStreams.fileId, %s
             FROM tmpInstanceId
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
             ORDER BY tmpInstanceId.idx
-            """)
+            """ % (streamSel,))
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
-        elif withFiles:
-            troveFilesCursor.execute("""
-            SELECT tmpInstanceId.idx, TroveFiles.pathId, TroveFiles.path,
-                   Versions.version, FileStreams.fileId, NULL
-            FROM tmpInstanceId
-            JOIN TroveFiles using(instanceId)
-            JOIN FileStreams using(streamId)
-            JOIN Versions ON TroveFiles.versionId = Versions.versionId
-            ORDER BY tmpInstanceId.idx
-            """)
-            troveFilesCursor = util.PeekIterator(troveFilesCursor)
-        else:
-            troveFilesCursor = util.PeekIterator(iter(()))
 
         troveRedirectsCursor = self.db.cursor()
         troveRedirectsCursor.execute("""
