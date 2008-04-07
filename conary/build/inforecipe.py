@@ -12,7 +12,6 @@
 # full details.
 #
 
-from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.packagerecipe import AbstractPackageRecipe, _recipeHelper
 from conary.build.recipe import RECIPE_TYPE_INFO
 
@@ -82,7 +81,6 @@ class UserGroupInfoRecipe(AbstractPackageRecipe):
         if name in self.__dict__:
             return self.__dict__[name]
         raise AttributeError, name
-_addRecipeToCopy(UserGroupInfoRecipe)
 
 class UserInfoRecipe(UserGroupInfoRecipe):
     type = 'user'
@@ -96,7 +94,6 @@ class UserInfoRecipe(UserGroupInfoRecipe):
             depSet.addDep(deps.GroupInfoDependencies,
                           deps.Dependency(self.groupname, []))
         f.provides.set(depSet)
-_addRecipeToCopy(UserInfoRecipe)
 
 class GroupInfoRecipe(UserGroupInfoRecipe):
     type = 'group'
@@ -107,4 +104,3 @@ class GroupInfoRecipe(UserGroupInfoRecipe):
         depSet.addDep(deps.GroupInfoDependencies,
                       deps.Dependency(self.infoname, []))
         f.provides.set(depSet)
-_addRecipeToCopy(GroupInfoRecipe)

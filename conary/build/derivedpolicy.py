@@ -248,4 +248,5 @@ setModes = packagepolicy.setModes
 LinkType = packagepolicy.LinkType
 LinkCount = packagepolicy.LinkCount
 reportMissingBuildRequires = packagepolicy.reportMissingBuildRequires
+reportExcessBuildRequires = packagepolicy.reportExcessBuildRequires
 reportErrors = packagepolicy.reportErrors
