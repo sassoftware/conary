@@ -36,7 +36,7 @@ from conary import versions
 
 
 
-class RecipeLoader:
+class RecipeLoaderFromString:
 
     _defaultsLoaded = False
 
@@ -72,16 +72,12 @@ class RecipeLoader:
         ('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
                                             'PackageFlags')) ]
 
-    def __init__(self, filename, cfg=None, repos=None, component=None,
-                 branch=None, ignoreInstalled=False, directory=None,
-                 buildFlavor=None, db=None, overrides = None,
+    def __init__(self, codeString, filename, cfg=None, repos=None,
+                 component=None, branch=None, ignoreInstalled=False,
+                 directory=None, buildFlavor=None, db=None, overrides = None,
                  factory = False, objDict = {}):
-        if not self.baseModuleDict:
-            for args in self.baseModuleImports:
-                self._localImport(self.baseModuleDict, *args)
-
         try:
-            self._load(filename, cfg, repos, component,
+            self._load(codeString, filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
                        buildFlavor=buildFlavor, db=db,
                        overrides=overrides, factory = factory,
@@ -89,6 +85,11 @@ class RecipeLoader:
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
+    @classmethod
+    def _initClass(theKlass):
+        for args in theKlass.baseModuleImports:
+            theKlass._localImport(theKlass.baseModuleDict, *args)
+
 
     @staticmethod
     def _localImport(d, package, modules=()):
@@ -132,7 +133,7 @@ class RecipeLoader:
 
     @staticmethod
     def baseImport(package, modules=()):
-        RecipeLoader._localImport(RecipeLoader.baseModuleDict, package, modules)
+        RecipeLoaderFromString._localImport(RecipeLoaderFromString.baseModuleDict, package, modules)
 
     @staticmethod
     def _copyReusedRecipes(moduleDict):
@@ -181,11 +182,11 @@ class RecipeLoader:
 
     @staticmethod
     def _loadDefaultPackages(d, cfg, repos, db = None, buildFlavor = None):
-        if RecipeLoader._defaultsLoaded:
+        if RecipeLoaderFromString._defaultsLoaded:
             # we don't need to load these twice
             return
 
-        RecipeLoader._defaultsLoaded = True
+        RecipeLoaderFromString._defaultsLoaded = True
 
         if db is None:
             db = database.Database(cfg.root, cfg.dbPath)
@@ -283,7 +284,7 @@ class RecipeLoader:
                                     'recipe name cannot start with "%s"' % prefix)
         recipeClass.validateClass()
 
-    def _load(self, filename, cfg=None, repos=None, component=None,
+    def _load(self, codeString, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
               buildFlavor=None, db=None, overrides=None, factory=False,
               objDict = None):
@@ -300,7 +301,6 @@ class RecipeLoader:
         basename = os.path.basename(filename)
         self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
-        f = open(filename)
 
         self.module.__dict__.update(self.baseModuleDict)
 
@@ -337,7 +337,7 @@ class RecipeLoader:
 
         # create the recipe class by executing the code in the recipe
         try:
-            code = compile(f.read(), filename, 'exec')
+            code = compile(codeString, filename, 'exec')
         except SyntaxError, err:
             msg = ('Error in recipe file "%s": %s\n' %(basename, err))
             if err.offset is not None:
@@ -425,6 +425,28 @@ class RecipeLoader:
 
     def getRecipe(self):
         return self.recipe
+
+class RecipeLoader(RecipeLoaderFromString):
+
+    def __init__(self, filename, cfg=None, repos=None, component=None,
+                 branch=None, ignoreInstalled=False, directory=None,
+                 buildFlavor=None, db=None, overrides = None,
+                 factory = False, objDict = {}):
+        try:
+            f = open(filename)
+            codeString = f.read()
+            f.close()
+        except Exception, err:
+            raise builderrors.LoadRecipeError(
+                                    'unable to load recipe file %s:\n%s'\
+                                   % (filename, err))
+
+        RecipeLoaderFromString.__init__(self, codeString, filename,
+                cfg = cfg, repos = repos, component = component,
+                branch = branch, ignoreInstalled = ignoreInstalled,
+                directory = directory, buildFlavor = buildFlavor,
+                db = db, overrides = overrides, factory = factory,
+                objDict = objDict)
 
 class RecipeLoaderFromSourceTrove(RecipeLoader):
 
@@ -1062,3 +1084,5 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              branch = branch,
                                              buildFlavor = buildFlavor,
                                              parentDir = os.getcwd())
+
+RecipeLoaderFromString._initClass()
