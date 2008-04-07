@@ -254,11 +254,14 @@ class File(streams.StreamSet):
         return ThawFile(self.freeze(), self.thePathId)
 
     def diff(self, other):
+        # this never returns None; empty file diffs == '\x01'
 	if other is None or self.lsTag != other.lsTag:
 	    return self.freeze()
 
 	rc = [ FILE_TYPE_DIFF, self.lsTag ]
-        rc.append(streams.StreamSet.diff(self, other))
+        streamDiff = streams.StreamSet.diff(self, other)
+        if streamDiff is not None:
+            rc.append(streamDiff)
 
 	return "".join(rc)
 

@@ -19,22 +19,30 @@ class Flavors:
     def __init__(self, db):
         self.db = db
 
+    def createFlavorMap(self, flavorId, flavor, cu = None):
+        if cu is None:
+            cu = self.db.cursor()
+        for depClass in flavor.getDepClasses().itervalues():
+            for dep in depClass.getDeps():
+                cu.execute("""INSERT INTO FlavorMap
+                (flavorId, base, depClass, sense, flag)
+                VALUES (?, ?, ?, ?, NULL)""",
+                           flavorId, dep.name,
+                           depClass.tag, deps.FLAG_SENSE_REQUIRED)
+                for (flag, sense) in dep.flags.iteritems():
+                    cu.execute("""INSERT INTO FlavorMap
+                    (flavorId, base, depClass, sense, flag)
+                    VALUES (?, ?, ?, ?, ?)""",
+                               flavorId, dep.name,
+                               depClass.tag, sense, flag)
+
     def createFlavor(self, flavor):
 	cu = self.db.cursor()
 	cu.execute("INSERT INTO Flavors (flavor) VALUES (?)",
                    flavor.freeze())
 	flavorId = cu.lastrowid
-
-	for depClass in flavor.getDepClasses().itervalues():
-	    for dep in depClass.getDeps():
-		cu.execute("INSERT INTO FlavorMap (flavorId, base, sense, flag) "
-                           "VALUES (?, ?, ?, NULL)",
-			   flavorId, dep.name, deps.FLAG_SENSE_REQUIRED)
-		for (flag, sense) in dep.flags.iteritems():
-		    cu.execute("INSERT INTO FlavorMap (flavorId, base, sense, flag) "
-                               "VALUES (?, ?, ?, ?)",
-			       flavorId, dep.name, sense, flag)
-
+        self.createFlavorMap(flavorId, flavor, cu)
+        
     def __getitem__(self, flavor):
 	val = self.get(flavor, None)
 

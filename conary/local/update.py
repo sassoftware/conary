@@ -718,20 +718,20 @@ class FilesystemJob:
             self.callback.runningPostTagHandlers()
 	    tagCommands.run(tagScript, self.root)
 
-    def runPostScripts(self, tagScript, isRollback):
-        for (baseCompatClass, troveCs, script) in self.postScripts:
-            if isRollback:
-                scriptId = "%s postrollback" % troveCs.getName()
-            elif troveCs.getOldVersion():
-                scriptId = "%s postupdate" % troveCs.getName()
-            else:
-                scriptId = "%s postinstall" % troveCs.getName()
+    def orderPostScripts(self, uJob):
+        self.postScripts = uJob.orderScriptListByBucket(self.postScripts,
+            [ 'posterase', 'postupdate', 'postinstall', 'postrollback' ])
 
-            runTroveScript(troveCs.getJob(), script, tagScript, '/',
+    def runPostScripts(self, tagScript):
+        for (job, baseCompatClass, newCompatClass, script, action) in \
+                    self.postScripts:
+            scriptId = "%s %s" % (job[0], action)
+
+            runTroveScript(job, script, tagScript, '/',
                            self.root, self.callback, isPre = False,
                            scriptId = scriptId,
                            oldCompatClass = baseCompatClass,
-                           newCompatClass = troveCs.getNewCompatibilityClass())
+                           newCompatClass = newCompatClass)
 
     def getErrorList(self):
 	return self.errors
@@ -927,22 +927,33 @@ class FilesystemJob:
         if removalList is None:
             removalList = []
 
+        scriptList = []
         # queue up postinstall scripts
         baseCompatClass = None
+        action = None
+        if troveCs.getOldVersion():
+            s = troveCs.getPostUpdateScript()
+            baseCompatClass = baseTrove.getCompatibilityClass()
+            action = "postupdate"
+        else:
+            s = troveCs.getPostInstallScript()
+            action = "postinstall"
+
+        if s:
+            scriptList.append((s, action))
+
         if self.rollbackPhase == ROLLBACK_PHASE_REPOS:
             if baseTrove:
                 s = baseTrove.troveInfo.scripts.postRollback.script()
                 baseCompatClass = baseTrove.getCompatibilityClass()
-            else:
-                s = None
-        elif troveCs.getOldVersion():
-            s = troveCs.getPostUpdateScript()
-            baseCompatClass = baseTrove.getCompatibilityClass()
-        else:
-            s = troveCs.getPostInstallScript()
+                if s:
+                    scriptList.append((s, "postrollback"))
 
-        if s:
-            self.postScripts.append((baseCompatClass, troveCs, s))
+        job = troveCs.getJob()
+        newCompatClass = troveCs.getNewCompatibilityClass()
+        for (s, action) in scriptList:
+            self.postScripts.append((job, baseCompatClass,
+                                     newCompatClass, s, action))
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -1638,6 +1649,15 @@ class FilesystemJob:
                     itertools.izip(oldTrove.iterFileList(), fileObjs):
                 if path not in pathsMoved:
                     self._remove(fileObj, root + path, "removing %s")
+            # We catch removals here
+            oldTroveCs = oldTrove.diff(None)[0]
+            # Queue up the posterase script
+            postEraseScript = oldTroveCs._getPostEraseScript()
+            if postEraseScript:
+                self.postScripts.append(((name, (oldVersion, oldFlavor),
+                                                (None, None), False),
+                                         oldTrove.getCompatibilityClass(),
+                                         None, postEraseScript, "posterase"))
 
         troveList = []
 
