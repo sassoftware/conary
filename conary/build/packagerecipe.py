@@ -17,7 +17,6 @@ import inspect
 import itertools
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
-from conary.build.loadrecipe import _addRecipeToCopy
 from conary.build.errors import RecipeFileError
 from conary import trove
 
@@ -321,20 +320,32 @@ class AbstractPackageRecipe(Recipe):
         self.crossReqMap = crossReqMap
         self.ignoreDeps = not raiseError
 
+    def _getTransitiveDepClosure(self, targets=None):
+        def isTroveTarget(trove):
+            if not targets:
+                return True
+            if trove.getName() in targets:
+                return True
+            return False
+
+	db = database.Database(self.cfg.root, self.cfg.dbPath)
+        
+        reqList =  [ req for req in self.getBuildRequirementTroves(db)
+                     if isTroveTarget(req) ]
+        reqNames = set(req.getName() for req in reqList)
+        depSetList = [ req.getRequires() for req in reqList ]
+        d = db.getTransitiveProvidesClosure(depSetList)
+        for depSet in d:
+            reqNames.update(
+                set(troveTup[0] for troveTup in d[depSet]))
+
+        return reqNames
+
     def _getTransitiveBuildRequiresNames(self):
         if self.transitiveBuildRequiresNames is not None:
             return self.transitiveBuildRequiresNames
 
-	db = database.Database(self.cfg.root, self.cfg.dbPath)
-        self.transitiveBuildRequiresNames = set(
-            req.getName() for req in self.getBuildRequirementTroves(db))
-        depSetList = [ req.getRequires()
-                       for req in self.getBuildRequirementTroves(db) ]
-        d = db.getTransitiveProvidesClosure(depSetList)
-        for depSet in d:
-            self.transitiveBuildRequiresNames.update(
-                set(troveTup[0] for troveTup in d[depSet]))
-
+        self.transitiveBuildRequiresNames = self._getTransitiveDepClosure()
         return self.transitiveBuildRequiresNames
 
     def getBuildRequirementTroves(self, db):
@@ -554,14 +565,19 @@ class AbstractPackageRecipe(Recipe):
 
     def _includeSuperClassItemsForAttr(self, attr):
         """ Include build requirements from super classes by searching
-            up the class hierarchy for buildRequires.  You can only
-            override this currenly by calling
+            up the class hierarchy for buildRequires.  You can
+            override this currently only by calling
             <superclass>.buildRequires.remove()
         """
         buildReqs = set()
+        superBuildReqs = set()
         for base in inspect.getmro(self.__class__):
-            buildReqs.update(getattr(base, attr, []))
+            thisClassReqs = getattr(base, attr, [])
+            buildReqs.update(thisClassReqs)
+            if base != self.__class__:
+                superBuildReqs.update(thisClassReqs)
         setattr(self, attr, list(buildReqs))
+        self._recipeRequirements['%sSuper' %attr] = superBuildReqs
 
     def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
@@ -773,6 +789,18 @@ class AbstractPackageRecipe(Recipe):
     def regexp(self, expression):
         return action.Regexp(expression)
 
+    def setupAbstractBaseClass(r):
+        r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
+
+    def _addTroveScript(self, troveNames, scriptContents, scriptType,
+                        fromClass = None):
+        scriptTypeMap = dict((y[2], x) for (x, y) in
+                             trove.TroveScripts.streamDict.items())
+        assert(scriptType in scriptTypeMap)
+        for troveName in troveNames:
+            self._scriptsMap.setdefault(troveName, {})[scriptType] = \
+                (scriptContents, fromClass)
+
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance,
@@ -790,6 +818,13 @@ class AbstractPackageRecipe(Recipe):
         self._componentReqs = {}
         self._componentProvs = {}
         self._derivedFiles = {} # used only for derived packages
+        # Inspected only when it is important to know for reporting
+        # purposes what was specified in the recipe per se, and not
+        # in superclasses or in defaultBuildRequires
+        self._recipeRequirements = {
+            'buildRequires': list(self.buildRequires),
+            'crossRequires': list(self.crossRequires)
+        }
         self._includeSuperClassBuildReqs()
         self._includeSuperClassCrossReqs()
         self.byDefaultIncludeSet = frozenset()
@@ -801,6 +836,8 @@ class AbstractPackageRecipe(Recipe):
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
         self.transitiveBuildRequiresNames = None
+        # Mapping from trove name to scripts
+        self._scriptsMap = {}
         self._subscribeLogPath = None
         self._subscribedPatterns = []
         self._logFile = None
@@ -895,6 +932,7 @@ class PackageRecipe(AbstractPackageRecipe):
                 r.MakeInstall()
     """
     internalAbstractBaseClass = 1
+    name = "package-recipe"
     # these initial buildRequires need to be cleared where they would
     # otherwise create a requirement loop.  Also, note that each instance
     # of :lib in here is only for runtime, not to link against.
@@ -913,14 +951,6 @@ class PackageRecipe(AbstractPackageRecipe):
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
-
-    def setupAbstractBaseClass(r):
-        r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
-
-# need this because we have non-empty buildRequires in PackageRecipe
-_addRecipeToCopy(PackageRecipe)
-
-
 
 # FIXME the next three classes will probably migrate to the repository
 # somehow, but not until we have figured out how to do this without
@@ -973,8 +1003,6 @@ class BuildPackageRecipe(PackageRecipe):
     ]
     Flags = use.LocalFlags
     internalAbstractBaseClass = 1
-_addRecipeToCopy(BuildPackageRecipe)
-
 
 class CPackageRecipe(BuildPackageRecipe):
     """
@@ -1028,7 +1056,6 @@ class CPackageRecipe(BuildPackageRecipe):
     ]
     Flags = use.LocalFlags
     internalAbstractBaseClass = 1
-_addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
@@ -1105,4 +1132,3 @@ class AutoPackageRecipe(CPackageRecipe):
         r.MakeInstall()
     def policy(r):
         pass
-_addRecipeToCopy(AutoPackageRecipe)

@@ -1,4 +1,4 @@
-.\" Copyright (c) 2004-2006 rPath, Inc.
+.\" Copyright (c) 2004-2008 rPath, Inc.
 .TH CVC 1 "13 November 2007" "rPath, Inc."
 .SH NAME
 cvc \- Conary source management
@@ -168,6 +168,12 @@ information about using \fBaddSource\fP in a recipe.
 \fBcvc explain PackageRecipe\fP will display information about
 \fBPackageRecipe\fP and list available actions.
 .TP 4
+.B factory [\fI<factory>\fP]
+When used without any arguments, displays the factory used by the current
+source directory, or \fB(none)\fR if no factory is used. If a factory is
+passed as an argument, the current source component is changed to use that
+factory.
+.TP 4
 .B help
 Displays cvc help file.  Can be added to individual commands as an 
 option.  For example, \fBcvc cook help\fP will display help information
@@ -309,6 +315,7 @@ specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
 Multiple source troves may be specified if the \-\-dir option is
 not used.
 Synonyms: \fBco\fP
+.TP 4
 .B clone newclone [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Clones a trove from one repository to another. This is similar to shadowing in
 that it creates a new trove with information from another.
@@ -503,8 +510,9 @@ All refer to the exact same OpenPGP Key
 .SH SETUP COMMANDS
 Commands used in the creation of new contexts and packages for software creation.
 .TP 4
-.B newpkg [\fI--template <recipeTemplate>\fP] \fI<name\fP[=\fIlabel\fP]>\fP
-Creates a new package.
+.B newpkg [\fI--template <recipeTemplate>\fP] [\fI--factory <factoryName>\fP] \fI<name\fP[=\fIlabel\fP]>\fP
+Sets up a directory on the local filesystem that can be used to create
+the initial recipe for a package.
 .TP 4
 .B context [name] [\-\-show-passwords]\fP
 When not passed a name, displays information about the current context.
@@ -556,5 +564,3 @@ can report undocumented features at http://issues.rpath.com/
 .\"
 .SH "SEE ALSO"
 conary(1)
-.br
-cvcdesc(1)

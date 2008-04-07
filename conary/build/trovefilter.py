@@ -39,6 +39,14 @@ class AbstractFilter(object):
         return OrFilter(self, filter)
     def __and__(self, filter):
         return AndFilter(self, filter)
+    def __hash__(self):
+        if 'filters' in self.__dict__:
+            res = None
+            for f in self.filters:
+                res = hash((res, hash(f)))
+            return res
+        else:
+            return object.__hash__(self)
     __mul__ = __and__
     __add__ = __or__
     __neg__ = __invert__
@@ -89,6 +97,17 @@ class TroveFilter(AbstractFilter):
         return self.name == filter.name and \
                 self.version == filter.version and \
                 self.flavor == filter.flavor
+
+    def __hash__(self):
+        return hash((self.name, self.version, self.flavor))
+
+    def __str__(self):
+        name = self.name or ''
+        ver = self.version or ''
+        if ver:
+            ver = '=' + ver
+        flv = self.flavor and '[%s]' % self.flavor or ''
+        return "<TroveFilter: '%s%s%s'>" % (name, ver, flv)
 
     def _validateRegexp(self, pattern, param):
         try:

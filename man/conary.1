@@ -124,6 +124,14 @@ journal file will remain on the system and Conary will not allow access
 to the system until the journal has been reverted using this command.
 
 .TP
+.B rmrollback \fI<identifier>\fP
+Removes specified rollbacks. Rollbacks must be removed from oldest to newest.
+The \fI<identifier>\fP can be either an r.<sequence> rollback name as displayed
+by \fBrblist\fR, or a number.  If an r.<sequence> rollback name is specified,
+old rollbacks up to and including the one specified are removed.  If the number
+N is specified, the N oldest rollbacks are removed.
+
+.TP
 .B rollback \fI<identifier>\fP
 Applies rollback \fI<identifier>\fP.  The \fI<identifier>\fP can be either
 an r.<sequence> rollback name as displayed by \fBrblist\fR, or a number.
@@ -1021,8 +1029,6 @@ undocumented features at http://bugs.rpath.com/
 .\"
 .SH "SEE ALSO"
 cvc(1)
-.br
-cvcdesc(1)
 .br
 http://www.rpath.com/
 .br
