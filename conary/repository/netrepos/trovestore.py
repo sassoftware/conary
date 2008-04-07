@@ -731,13 +731,13 @@ class TroveStore:
                 streamSel = "FileStreams.stream"
             troveFilesCursor.execute("""
             SELECT %(STRAIGHTJOIN)s tmpInstanceId.idx, TroveFiles.pathId,
-                TroveFiles.path, Versions.version, FileStreams.fileId, %s
+                TroveFiles.path, Versions.version, FileStreams.fileId, %%s
             FROM tmpInstanceId
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
             ORDER BY tmpInstanceId.idx
-            """ % (streamSel,))
+            """ % self.db.keywords % (streamSel,))
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
 
         troveRedirectsCursor = self.db.cursor()
