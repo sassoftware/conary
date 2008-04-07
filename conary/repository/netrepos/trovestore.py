@@ -690,11 +690,11 @@ class TroveStore:
         self.db.analyze("tmpInstanceId")
         
         # unfortunately most cost-based optimizers will get the
-        # following trove*Cursor queries wrong. Details in CNY-2695
+        # following troveTrovesCursor queries wrong. Details in CNY-2695
 
+        # for PostgreSQL we have to force an execution plan that
+        # uses the join order as coded in the query
         if self.db.driver == 'postgresql':
-            # for PostgreSQL we have to force an execution plan that
-            # uses the join order as coded in the query
             cu.execute("set join_collapse_limit to 2")
             cu.execute("set enable_seqscan to off")
 
@@ -716,6 +716,11 @@ class TroveStore:
         """ % self.db.keywords)
         troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
 
+        # revert changes we forced on the postgresql optimizer
+        if self.db.driver == 'postgresql':
+            cu.execute("set join_collapse_limit to default")
+            cu.execute("set enable_seqscan to default")
+
         troveFilesCursor = util.PeekIterator(iter(()))
         if withFileStreams or withFiles:
             troveFilesCursor = self.db.cursor()
@@ -723,9 +728,8 @@ class TroveStore:
             if withFileStreams:
                 streamSel = "FileStreams.stream"
             troveFilesCursor.execute("""
-            SELECT %(STRAIGHTJOIN)s tmpInstanceId.idx, FilePaths.pathId,
-                   FilePaths.path, Versions.version, FileStreams.fileId,
-                   %%s
+            SELECT tmpInstanceId.idx, FilePaths.pathId, FilePaths.path,
+                   Versions.version, FileStreams.fileId, %s
             FROM tmpInstanceId
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
@@ -733,7 +737,7 @@ class TroveStore:
             JOIN FilePaths ON
                 TroveFiles.filePathId = FilePaths.filePathId
             ORDER BY tmpInstanceId.idx
-            """ % self.db.keywords % (streamSel,))
+            """ % (streamSel,))
             troveFilesCursor = util.PeekIterator(troveFilesCursor)
 
         troveRedirectsCursor = self.db.cursor()
@@ -747,11 +751,6 @@ class TroveStore:
         ORDER BY tmpInstanceId.idx
         """)
         troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
-
-        if self.db.driver == 'postgresql':
-            # revert changes we forced on the postgresql optimizer
-            cu.execute("set join_collapse_limit to default")
-            cu.execute("set enable_seqscan to default")
 
         neededIdx = 0
         versionCache = VersionCache()
