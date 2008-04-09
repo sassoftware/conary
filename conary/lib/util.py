@@ -218,8 +218,8 @@ def genExcepthook(debug=True,
                                                  errmsg=value,
                                                  stackfile=stackfile))
 
-    if catchSIGUSR1:
-        signal.signal(signal.SIGUSR1, SIGUSR1Handler)
+    #if catchSIGUSR1:
+    #    signal.signal(signal.SIGUSR1, SIGUSR1Handler)
     return excepthook
 
 

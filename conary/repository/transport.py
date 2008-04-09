@@ -30,6 +30,9 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
+                  socket.gethostname()])
+
 from conary.lib import util
 
 class InfoURL(urllib.addinfourl):
@@ -108,12 +111,35 @@ class DecompressFileObj:
     def fileno(self):
         return self.fp.fileno()
 
+_ipCache = {}
+def getIPAddress(hostAndPort):
+    host, port = urllib.splitport(hostAndPort)
+    if host in LocalHosts:
+        _ipCache[host] = host
+        return hostAndPort
+    try:
+        ret = socket.gethostbyname(host)
+    except IOError, err:
+        util.res_init()
+        # error looking up the host.  If this fails,
+        # the we fall back to the cache
+        if host in _ipCache:
+            ret = _ipCache[host]
+        raise
+    else:
+        _ipCache[host] = ret
+    if port:
+        ret = "%s:%s" % (ret, port)
+    return ret
+
+def clearIPCache():
+    _ipCache.clear()
+
 class URLOpener(urllib.FancyURLopener):
     '''Replacement class for urllib.FancyURLopener'''
     contentType = 'application/x-www-form-urlencoded'
 
-    localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
-        socket.gethostname()])
+    localhosts = LocalHosts
 
     # For debugging purposes only
     _sendConaryProxyHostHeader = True
@@ -145,7 +171,7 @@ class URLOpener(urllib.FancyURLopener):
         host, port = urllib.splitport(hostport)
         if port is None:
             port = defaultPort
-        return (host, int(port))
+        return (getIPAddress(host), int(port))
 
     def proxy_ssl(self, proxy, endpoint, proxyAuth):
         host, port = self._splitport(proxy, 3128)
@@ -297,9 +323,9 @@ class URLOpener(urllib.FancyURLopener):
             if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost, proxyAuth)
             else:
-                h = httplib.HTTPSConnection(host)
+                h = httplib.HTTPSConnection(getIPAddress(host))
         else:
-            h = httplib.HTTPConnection(host)
+            h = httplib.HTTPConnection(getIPAddress(host))
             if host != realhost and not useConaryProxy and proxyAuth:
                 headers.append(("Proxy-Authorization",
                                 "Basic " + proxyAuth))
