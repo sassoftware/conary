@@ -3467,6 +3467,15 @@ conary erase '%s=%s[%s]'
         kwargs = dict(
             commitFlags=commitFlags, tagScript=tagScript,
             journal=journal, autoPinList=autoPinList)
+        hosts = []
+        if self.getRepos():
+            for jobList in allJobs:
+                for job in jobList:
+                    if job[1][0] and not job[1][0].isOnLocalHost():
+                        hosts.append(job[1][0].getHost())
+                    if job[2][0] and not job[2][0].isOnLocalHost():
+                        hosts.append(job[2][0].getHost())
+            self.getRepos()._cacheHostLookups(hosts)
 
         if len(allJobs) == 1 and not uJob.getChangesetsDownloaded():
             # this handles change sets which include change set files
@@ -3495,6 +3504,8 @@ conary erase '%s=%s[%s]'
                 self.updateCallback.setUpdateJob(job)
                 self._applyCs(newCs, uJob, removeHints = removeHints, **kwargs)
                 self.updateCallback.updateDone()
+            if self.getRepos():
+                self.getRepos()._clearHostCache()
             return
 
         import Queue
@@ -3546,6 +3557,8 @@ conary erase '%s=%s[%s]'
             # the download thread _should_ respond to the
             # stopDownloadEvent in ~5 seconds.
             downloadThread.join(20)
+            if self.getRepos():
+                self.getRepos()._clearhostCache()
 
             if downloadThread.isAlive():
                 self.updateCallback.warning('timeout waiting for '
