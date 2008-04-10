@@ -3558,7 +3558,7 @@ conary erase '%s=%s[%s]'
             # stopDownloadEvent in ~5 seconds.
             downloadThread.join(20)
             if self.getRepos():
-                self.getRepos()._clearhostCache()
+                self.getRepos()._clearHostCache()
 
             if downloadThread.isAlive():
                 self.updateCallback.warning('timeout waiting for '
