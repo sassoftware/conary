@@ -2462,6 +2462,13 @@ def _setCookTroveMetadata(trv, itemDictList):
         item = trove.MetadataItem()
         for tagId, tagType, tag in item.streamDict.values():
             tagValue = itemDict.get(tag, None)
-            if tagValue is not None:
-                getattr(item, tag).set(tagValue)
+            stream = getattr(item, tag)
+            if tagValue is None:
+                continue
+            if isinstance(stream, list):
+                assert isinstance(tagValue, (list, tuple))
+                for v in tagValue:
+                    stream.set(v)
+            else:
+                stream.set(tagValue)
         metadata.addItem(item)
