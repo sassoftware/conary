@@ -223,23 +223,6 @@ class RecipeLoaderFromString:
         if db is None:
             db = database.Database(cfg.root, cfg.dbPath)
 
-        oldBuildFlavor = cfg.buildFlavor
-        defaultRecipes = {}
-        for defaultPackage in cfg.defaultBasePackages:
-            packagePath = os.path.join(cfg.baseClassDir,
-                    defaultPackage + '.recipe')
-            if os.path.exists(packagePath):
-                loader, oldBuildFlavor = \
-                        _getLoaderForInstalledRecipe(defaultPackage,
-                                '', deps.parseFlavor(''),
-                                cfg, repos, db, buildFlavor)
-                if not loader:
-                    continue
-                recipe = loader.getRecipe()
-                recipe.internalAbstractBaseClass = True
-
-                d.update(loader.recipes)
-
         troveSpecs = [ cmdline.parseTroveSpec(x) for x in cfg.autoLoadRecipes ]
 
         groupTroves = RecipeLoaderFromString._getTrovesFromRepos(repos,
@@ -374,10 +357,10 @@ class RecipeLoaderFromString:
         self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
 
-        self.module.__dict__.update(self.baseModuleDict)
-
         # store cfg and repos, so that the recipe can load
         # recipes out of the repository
+
+        self.module.__dict__.update(self.baseModuleDict)
 
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
@@ -389,7 +372,7 @@ class RecipeLoaderFromString:
             directory = os.path.dirname(filename)
         self.module.__dict__['directory'] = directory
 
-        self._loadDefaultPackages(self.baseModuleDict, cfg, repos, db,
+        self._loadDefaultPackages(self.module.__dict__, cfg, repos, db,
                                   buildFlavor = buildFlavor)
         self._copyReusedRecipes(self.module.__dict__)
 
