@@ -600,7 +600,9 @@ class Logger:
                 # 100 seconds is too long to wait for a pty; something's wrong
                 syncFile.seek(0,2)
                 length = syncFile.tell()
-                raise ConaryError('Log file synchronization %s failure with length %d', stage, length)
+                raise ConaryError(
+                    'Log file synchronization %s failure with length %d' %(
+                    stage, length))
 
         i = 0
         while not _fileLongEnough():
