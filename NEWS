@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Build Changes:
+    * The SubscriptionLogWriter (CNY-2622) sometimes caused builds
+      to fail.  This issue has been resolved. (CNY-2717)
+
 Changes in 1.2.22:
   o Build Changes:
     * The SubscriptionLogWriter now handles line continuation. (CNY-2963)
