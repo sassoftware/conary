@@ -15,6 +15,7 @@
 import copy
 import imp
 import inspect
+import itertools
 import new
 import os
 import string
@@ -87,9 +88,10 @@ class RecipeLoaderFromString:
                                               % (filename, err))
     @classmethod
     def _initClass(theKlass):
+        theKlass.baseModuleDict = {}
+        theKlass._defaultsLoaded = False
         for args in theKlass.baseModuleImports:
             theKlass._localImport(theKlass.baseModuleDict, *args)
-
 
     @staticmethod
     def _localImport(d, package, modules=()):
@@ -181,6 +183,36 @@ class RecipeLoaderFromString:
                                                  tuple(newMro), newDict)
 
     @staticmethod
+    def _getTrovesFromRepos(repos, labelPath, troveSpecs):
+        """
+        Gets trove objects from a repository based on a list of trove specs.
+        If any aren't found, None is returned. If a connectivity error
+        occurs, None is returned for all troves.
+        """
+        nvfDict = repos.findTroves(labelPath, troveSpecs)
+
+        trovesNeeded = []
+        for i, spec in enumerate(troveSpecs):
+            nvf = nvfDict.get(spec, None)
+            if not nvf:
+                continue
+
+            if len(nvf) > 1:
+                raise builderrors.RecipeFileError('too many matches for '
+                                'autoLoadRecipe entry %s' % spec)
+
+            trovesNeeded.append((i, nvf[0]))
+
+        troves = repos.getTroves([ x[1] for x in trovesNeeded],
+                                 withFiles = False)
+
+        result = [ None ] * len(troveSpecs)
+        for ((i, nvf), trv) in itertools.izip(trovesNeeded, troves):
+            result[i] = trv
+
+        return result
+
+    @staticmethod
     def _loadDefaultPackages(d, cfg, repos, db = None, buildFlavor = None):
         if RecipeLoaderFromString._defaultsLoaded:
             # we don't need to load these twice
@@ -207,6 +239,46 @@ class RecipeLoaderFromString:
                 recipe.internalAbstractBaseClass = True
 
                 d.update(loader.recipes)
+
+        troveSpecs = [ cmdline.parseTroveSpec(x) for x in cfg.autoLoadRecipes ]
+
+        groupTroves = RecipeLoaderFromString._getTrovesFromRepos(repos,
+                                                cfg.installLabelPath,
+                                                troveSpecs)
+
+        # we look for recipes in reverse order to allow the troves at the
+        # front of the list to override those at the end
+        recipeTroves = {}
+
+        for trv in reversed(groupTroves):
+            for x in itertools.chain([ trv.getNameVersionFlavor() ],
+                                      trv.iterTroveList(weakRefs = True,
+                                                        strongRefs = True) ):
+                if x[0].endswith(':recipe'):
+                    recipeTroves[x[0]] = x
+
+        # We have a list of the troves to autoload recipes from now. Go get
+        # those troves so we can get the file information we need. The
+        # sort here is to keep this order repeatable
+        troveList = repos.getTroves(sorted(recipeTroves.values()),
+                                    withFiles = True)
+        filesNeeded = []
+        for trv in troveList:
+            filesNeeded += [ x for x in trv.iterFileList() if
+                                    x[1].endswith('.recipe') ]
+
+        recipes = repos.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
+
+        for (fileContents, fileInfo) in itertools.izip(recipes, filesNeeded):
+            loader = RecipeLoaderFromString(fileContents.get().read(),
+                                  fileInfo[1], cfg, repos = repos,
+                                  ignoreInstalled = True,
+                                  buildFlavor = buildFlavor, db = db)
+
+            recipe = loader.getRecipe()
+            recipe.internalAbstractBaseClass = True
+
+            d.update(loader.recipes)
 
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
