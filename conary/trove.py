@@ -647,6 +647,10 @@ class Metadata(streams.OrderedStreamCollection):
     def addItem(self, item):
         self.addStream(1, item)
 
+    def addItems(self, items):
+        for item in items:
+            self.addItem(item)
+
     def __iter__(self):
         for item in self.getStreams(1):
             yield item
@@ -1246,10 +1250,28 @@ class Trove(streams.StreamSet):
         return self.troveInfo.metadata.flatten()
 
     def copyMetadata(self, trv, skipSet=None):
-        items = trv.troveInfo.metadata.flatten(skipSet=skipSet)
+        """
+        Copy metadata from a different trove
+        @param trv: Trove object from which metadata items will be copied
+        @type trv: Trove
+        @param skipSet: Items that will not be copied
+        @type skipSet: iterable
+        """
+        return self.copyMetadataFromMetadata(trv.troveInfo.metadata,
+                                             skipSet=skipSet)
+
+    def copyMetadataFromMetadata(self, metadata, skipSet=None):
+        """
+        Copy metadata from a different metadata object
+        @param metadata: Metadata object from which metadata items will be
+        copied
+        @type metadata: Metadata
+        @param skipSet: Items that will not be copied
+        @type skipSet: iterable
+        """
+        items = metadata.flatten(skipSet=skipSet)
         self.troveInfo.metadata = Metadata()
-        for item in items:
-            self.troveInfo.metadata.addItem(item)
+        self.troveInfo.metadata.addItems(items)
 
     def getFactory(self):
         return self.troveInfo.factory()

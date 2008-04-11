@@ -124,6 +124,12 @@ class Recipe(object):
         self.unusedMethods = set()
         self.methodDepth = 0
         self._pathTranslations = []
+        # Metadata is a hash keyed on a trove name and with a list of
+        # per-trove-name MetadataItem like objects (well, dictionaries)
+        self._metadataItemsMap = {}
+        # Old metadata, keyed on trove name, with ((n, v, f), metadata, log)
+        # as value
+        self._oldMetadataMap = {}
 
         superClasses = self.__class__.__mro__
 
@@ -497,3 +503,14 @@ class Recipe(object):
             allowNone = True)
         return f
 
+    def _addMetadataItem(self, troveNames, metadataItemDict):
+        assert isinstance(metadataItemDict, dict)
+        for troveName in troveNames:
+            self._metadataItemsMap.setdefault(troveName,
+                                              []).append(metadataItemDict)
+
+    def _setOldMetadata(self, metadataMap):
+        self._oldMetadataMap = metadataMap
+
+    def _getOldMetadata(self):
+        return self._oldMetadataMap

@@ -1189,6 +1189,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             bldInfo.stop()
             use.track(False)
             recipeObj.doProcess('PACKAGE_CREATION', logFile = output)
+            _initializeOldMetadata(repos, recipeObj, logFile = output)
             recipeObj.doProcess('PACKAGE_MODIFICATION', logFile = output)
             recipeObj.doProcess('ENFORCEMENT', logFile = output)
             recipeObj.doProcess('ERROR_REPORTING', logFile = output)
@@ -1249,6 +1250,60 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         recipeObj.autopkg.pathMap[buildxmlpath].tags.set("xmlbuildlog")
     return bldList, recipeObj, builddir, destdir, policyTroves
 
+class _SimpleTrove(object):
+    __slots__ = [ 'name', 'version', 'flavor', '_childTrovesNVF' ]
+
+    def __init__(self, name, version, flavor, childTroves = None):
+        self.name = name
+        self.version = version
+        self.flavor = flavor
+        self._childTrovesNVF = childTroves
+
+    def getNameVersionFlavor(self):
+        return self.name, self.version, self.flavor
+
+    def getName(self):
+        return self.name
+
+    def getVersion(self):
+        return self.version
+
+    def getFlavor(self):
+        return self.flavor
+
+    def iterTroveList(self, strongRefs = True):
+        return sorted(self._childTrovesNVF or [])
+
+    def _addChildTrove(self, childTrove):
+        if self._childTrovesNVF is None:
+            self._childTrovesNVF = set()
+        self._childTrovesNVF.add(childTrove)
+
+def _initializeOldMetadata(repos, recipeObj, logFile):
+    # Build the list of (fake) collection troves
+    flavor = recipeObj.getPackages()[0].flavor.copy()
+    pkgTroves = dict((x, _SimpleTrove(x, None, flavor))
+                      for x in recipeObj.packages)
+    # Now add references to components
+    for trv in recipeObj.getPackages():
+        trvName = trv.name
+        if ':' in trvName:
+            parentTrvName, comp = trvName.split(':', 1)
+        else:
+            parentTrvName, comp = trvName, None
+        ptrv = pkgTroves.setdefault(parentTrvName,
+                                    _SimpleTrove(parentTrvName, None, flavor))
+        if comp:
+            ptrv._addChildTrove((trvName, None, flavor))
+
+    troveList = []
+    for pkgTroveNVF in sorted(pkgTroves):
+        pkgTrove = pkgTroves[pkgTroveNVF]
+        troveList.append(pkgTrove)
+        for n_, v_, f_ in sorted(pkgTrove.iterTroveList()):
+            troveList.append(_SimpleTrove(n_, v_, f_))
+    _getTroveMetadataFromRepo(repos, troveList, recipeObj)
+
 def _copyScripts(trv, scriptsMap):
     trvName = trv.getName()
     trvScripts = scriptsMap.get(trvName, None)
@@ -1292,22 +1347,24 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         for (path, (realPath, f)) in buildPkg.iteritems():
             fileIdsPathMap[path] = f.fileId()
         if main not in grpMap:
-            grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
-            grpMap[main].setSize(0)
-            grpMap[main].setSourceName(sourceName)
-            grpMap[main].setBuildTime(buildTime)
-            grpMap[main].setConaryVersion(constants.version)
+            trv = grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
+            trv.setSize(0)
+            trv.setSourceName(sourceName)
+            trv.setBuildTime(buildTime)
+            trv.setConaryVersion(constants.version)
             if policyTroves:
-                grpMap[main].setPolicyProviders(policyTroves)
-            grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
-            grpMap[main].setBuildRequirements(buildReqs)
-            grpMap[main].setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
+               trv.setPolicyProviders(policyTroves)
+            trv.setLoadedTroves(recipeObj.getLoadedTroves())
+            trv.setBuildRequirements(buildReqs)
+            trv.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
-	    grpMap[main].setProvides(provides)
-            grpMap[main].setIsCollection(True)
-            grpMap[main].setIsDerived(recipeObj._isDerived)
-            _copyScripts(grpMap[main], recipeObj._scriptsMap)
+	    trv.setProvides(provides)
+            trv.setIsCollection(True)
+            trv.setIsDerived(recipeObj._isDerived)
+            _copyScripts(trv, recipeObj._scriptsMap)
+            _setCookTroveMetadata(trv, recipeObj._metadataItemsMap.get(
+                                                            trv.name(), {}))
 
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')
@@ -1339,6 +1396,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
         # Add build flavor
         p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
         _copyScripts(p, recipeObj._scriptsMap)
+        _setCookTroveMetadata(p, recipeObj._metadataItemsMap.get(p.name(), {}))
 
         _signTrove(p, signatureKey)
 
@@ -1377,9 +1435,8 @@ def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
 
         packageList = relativePackageList
 
-    _copyForwardTroveMetadata(repos,
-                              [x[1] for x in packageList] + grpMap.values(), 
-                              recipeObj)
+    troveList = [x[1] for x in packageList] + grpMap.values()
+    _doCopyForwardMetadata(troveList, recipeObj)
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:
         changeSet.addPrimaryTrove(packageName, targetVersion, flavor)
@@ -2205,6 +2262,11 @@ def _copyForwardTroveMetadata(repos, troveList, recipeObj):
         the most recent cook with a different flavor.  If necessary,
         it will search for metadata for components separately from the package.
     """
+
+    _getTroveMetadataFromRepo(repos, troveList, recipeObj)
+    _doCopyForwardMetadata(troveList, recipeObj)
+
+def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
     if not repos:
         log.info('No repository available, not copying forward metadata.')
         return
@@ -2279,24 +2341,41 @@ def _copyForwardTroveMetadata(repos, troveList, recipeObj):
         for troveTup, matchTup in metadataMatches.items():
             allMatches.append((troveDict[troveTup], troveDict[matchTup], True))
 
-    for newTrove, oldTrove, logCopy in allMatches:
+    recipeObj._setOldMetadata(dict(
+        (x[0].getName(), (x[1].getNameVersionFlavor(),
+                          x[1].troveInfo.metadata, x[2]))
+        for x in allMatches))
+
+
+def _doCopyForwardMetadata(troveList, recipeObj):
+    newTroveMap = dict((x.getName(), x) for x in troveList)
+    oldMetadata = recipeObj._getOldMetadata()
+    for otn, ((otn, otv, otf), oldMetadata, logCopy) in oldMetadata.items():
         # any metadata that's already been added to this trove
         # will override any copied metadata
+        newTrove = newTroveMap.get(otn, None)
+        if newTrove is None:
+            # Hmm. This shouldn't really happen if we used the same list for
+            # generating the old metadata - but just in case
+            continue
         items = newTrove.getAllMetadataItems()
-        newTrove.copyMetadata(oldTrove,
+        newTrove.copyMetadataFromMetadata(oldMetadata,
                               skipSet=recipeObj.metadataSkipSet)
         if logCopy and newTrove.getAllMetadataItems():
             # if getAllMetadataItems is empty, we didn't copy anything
-            # forward, so dont log:
+            # forward, so don't log. This is because copyMetadataFromMetadata
+            # overwrites the old metadata
             log.info('Copied metadata forward for %s[%s] from version %s[%s]',
                      newTrove.getName(), newTrove.getFlavor(),
-                     oldTrove.getVersion(), oldTrove.getFlavor())
+                     otv, otf)
 
         # add back any metadata added during the cook, that takes precedence.
-        for item in items:
-            newTrove.troveInfo.metadata.addItem(item)
-    return dict((x[0].getNameVersionFlavor(), x[1].getNameVersionFlavor())
-                 for x in allMatches)
+        metadata = newTrove.troveInfo.metadata
+        metadata.addItems(items)
+
+        # Flatten (a side-effect of copying the metadata)
+        newTrove.copyMetadataFromMetadata(metadata)
+
 
 def _getMetadataMatches(repos, troveList, buildBranch):
     toFind = {}
@@ -2373,4 +2452,16 @@ def _getMetadataMatches(repos, troveList, buildBranch):
                                                           flavorToUse)
     return metadataMatches
 
-
+def _setCookTroveMetadata(trv, itemDictList):
+    # Copy the metadata back in the trove
+    # We don't bother with flattening it at this point, we'll take care of
+    # that later
+    langMap = []
+    metadata = trv.troveInfo.metadata
+    for itemDict in itemDictList:
+        item = trove.MetadataItem()
+        for tagId, tagType, tag in item.streamDict.values():
+            tagValue = itemDict.get(tag, None)
+            if tagValue is not None:
+                getattr(item, tag).set(tagValue)
+        metadata.addItem(item)
