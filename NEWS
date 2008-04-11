@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Loaded recipe modules are no longer tracked in sys.modules
     * The source components needed to build everything in a group can
       now be found when the group uses searchPaths. (CNY-2710)
+    * The SubscriptionLogWriter (CNY-2622) sometimes caused builds
+      to fail.  This issue has been resolved. (CNY-2717)
 
   o Client Changes:
     * Conary will now re-read /etc/resolv.conf if an error occurs when

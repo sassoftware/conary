@@ -639,20 +639,23 @@ class Logger:
     def synchronize(self):
         timestamp = '%10.8f' %time.time()
         self.command('synchronizeMark %s' %timestamp)
+        self.flush()
         syncFile = file(self.syncPath)
 
-        def _longEnough():
+        def _fileLongEnough():
             syncFile.seek(0, 2)
             return syncFile.tell() > 19
 
-        def _tooLong(i):
+        def _waitedTooLong(i, stage):
             if i > 10000:
                 # 100 seconds is too long to wait for a pty; something's wrong
-                raise ConaryError('Log file synchronization failure')
+                syncFile.seek(0,2)
+                length = syncFile.tell()
+                raise ConaryError('Log file synchronization %s failure with length %d', stage, length)
 
         i = 0
-        while not _longEnough():
-            _tooLong(i)
+        while not _fileLongEnough():
+            _waitedTooLong(i, 'init')
             i += 1
             time.sleep(0.01)
 
@@ -662,7 +665,7 @@ class Logger:
         i = 0
         _seekTimestamp()
         while syncFile.read(19) != timestamp:
-            _tooLong(i)
+            _waitedTooLong(i, 'search')
             i += 1
             time.sleep(0.01)
             _seekTimestamp()
