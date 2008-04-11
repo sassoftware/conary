@@ -13,6 +13,8 @@ Changes in @NEW@:
   o Client Changes:
     * Conary will now re-read /etc/resolv.conf if an error occurs when
       resolving a hostname. (CNY-2703)
+    * Conary now caches the result of ip lookups and uses the cached
+      results if an IP address lookup fails during an update. (CNY-2260)
     * Migrate now preserves local installs only of groups and kernels.
       Before, all manually-installed components and troves that were
       referenced by the group being migrated would be updated instead
