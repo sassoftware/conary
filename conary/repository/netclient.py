@@ -18,7 +18,7 @@ import httplib
 import itertools
 import os
 import socket
-import sys
+import sys, time
 import urllib
 import xml
 import xmlrpclib
@@ -31,6 +31,7 @@ from conary import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util
+from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
@@ -51,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36,51 + 1)
+CLIENT_VERSIONS = range(36, 61 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -69,7 +70,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __init__(self, send, name, host, pwCallback, anonymousCallback,
                  altHostCallback, protocolVersion, transport, serverName,
-                 entitlementDir):
+                 entitlementDir, callLog):
         xmlrpclib._Method.__init__(self, send, name)
         self.__name = name
         self.__host = host
@@ -80,6 +81,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         self.__serverName = serverName
         self.__entitlementDir = entitlementDir
         self._transport = transport
+        self.__callLog = callLog
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -109,37 +111,57 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                  retryOnEntitlementTimeout = True):
         newArgs = ( clientVersion, ) + argList
 
+        start = time.time()
+
         try:
-            usedAnonymous, isException, result = self.__send(self.__name,
-                                                             newArgs)
+            rc = self.__send(self.__name, newArgs)
         except xmlrpclib.ProtocolError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission(
                     repoName = self.__serverName, url = e.url)
             raise
+
+        if clientVersion < 60:
+            usedAnonymous, isException, result = rc
+        else:
+            usedAnonymous = False
+            isException, result = rc
+
+        if self.__callLog:
+            self.__callLog.log(self.__host, self._transport.getEntitlements(),
+                               self.__name, rc, newArgs,
+                               latency = time.time() - start)
+
         if usedAnonymous:
             self.__anonymousCallback()
 
-        if isException:
-            if retryOnEntitlementTimeout and result[0] == 'EntitlementTimeout':
-                entList = self._transport.getEntitlements()
-                exception = errors.EntitlementTimeout(result[1])
-
-                singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
-                                                      self.__serverName)
-                # remove entitlement(s) which timed out
-                newEntList = [ x for x in entList if x[1] not in
-                                    exception.getEntitlements() ]
-                newEntList.insert(0, singleEnt[1:])
-
-                # try again with the new entitlement
-                self._transport.setEntitlements(newEntList)
-                return self.__doCall(clientVersion, argList,
-                                     retryOnEntitlementTimeout = False)
-
-            self.handleError(result)
-        else:
+        if not isException:
             return result
+
+        try:
+            self.handleError(clientVersion, result)
+        except errors.EntitlementTimeout:
+            if not retryOnEntitlementTimeout:
+                raise
+
+            entList = self._transport.getEntitlements()
+            exception = errors.EntitlementTimeout(result[1])
+
+            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
+                                                  self.__serverName)
+            # remove entitlement(s) which timed out
+            newEntList = [ x for x in entList if x[1] not in
+                                exception.getEntitlements() ]
+            newEntList.insert(0, singleEnt[1:])
+
+            # try again with the new entitlement
+            self._transport.setEntitlements(newEntList)
+            return self.__doCall(clientVersion, argList,
+                                 retryOnEntitlementTimeout = False)
+        else:
+            # this can't happen as handleError should always result in
+            # an exception
+            assert(0)
 
     def doCall(self, clientVersion, *args):
         try:
@@ -177,62 +199,32 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             pt = 'Conary'
         err.url = "%s (via %s proxy %s)" % (err.url, pt, proxyHost)
 
-    def handleError(self, result):
-	exceptionName = result[0]
-	exceptionArgs = result[1:]
+    def handleError(self, clientVersion, result):
+        if clientVersion < 60:
+            exceptionName = result[0]
+            exceptionArgs = result[1:]
+            exceptionKwArgs = {}
+        else:
+            exceptionName = result[0]
+            exceptionArgs = result[1]
+            exceptionKwArgs = result[2]
 
-	if exceptionName == "TroveMissing":
-	    (name, version) = exceptionArgs
-	    if not name: name = None
-	    if not version:
-		version = None
-	    else:
-		version = shims.toVersion(version)
-	    raise errors.TroveMissing(name, version)
-        elif exceptionName == "MethodNotSupported":
-	    raise errors.MethodNotSupported(exceptionArgs[0])
-        elif exceptionName == "IntegrityError":
-	    raise errors.IntegrityError(exceptionArgs[0])
-        elif exceptionName == "TroveIntegrityError":
-            if len(exceptionArgs) > 1:
-                # old repositories give TIE w/ no
-                # trove information or with a string error message.
-                # exceptionArgs[0] is that message if exceptionArgs[1]
-                # is not set or is empty.
-                raise errors.TroveIntegrityError(error=exceptionArgs[0], 
-                                            *self.toTroveTup(exceptionArgs[1]))
-            else:
-                raise errors.TroveIntegrityError(error=exceptionArgs[0])
-        elif exceptionName == "TroveSchemaError":
-            # value 0 is the full message, for older clients that don't
-            # know about this exception
-            n, v, f = self.toTroveTup(exceptionArgs[1])
-            raise errors.TroveSchemaError(n, v, f,
-                                          exceptionArgs[2], exceptionArgs[3])
-        elif exceptionName == errors.TroveChecksumMissing.__name__:
-            raise errors.TroveChecksumMissing(*self.toTroveTup(exceptionArgs[1]))
-        elif exceptionName == errors.RepositoryMismatch.__name__:
-            raise errors.RepositoryMismatch(*exceptionArgs)
-        elif exceptionName == errors.EntitlementTimeout.__name__:
-            raise errors.EntitlementTimeout(*exceptionArgs)
-        elif exceptionName == 'FileContentsNotFound':
-            raise errors.FileContentsNotFound((self.toFileId(exceptionArgs[0]),
-                                               self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileStreamNotFound':
-            raise errors.FileStreamNotFound((self.toFileId(exceptionArgs[0]),
-                                             self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileHasNoContents':
-            raise errors.FileHasNoContents((self.toFileId(exceptionArgs[0]),
-                                            self.toVersion(exceptionArgs[1])))
-        elif exceptionName == 'FileStreamMissing':
-            raise errors.FileStreamMissing((self.toFileId(exceptionArgs[0])))
-        elif exceptionName == 'RepositoryLocked':
-            raise errors.RepositoryLocked
-        elif exceptionName == 'RepositoryError':
-            raise errors.RepositoryError(exceptionArgs[0])
-        elif exceptionName == "InvalidSourceNameError":
-            raise errors.InvalidSourceNameError(*exceptionArgs)
-	else:
+        if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
+            # old repositories give TIE w/ no trove information or with a
+            # string error message. exceptionArgs[0] is that message if
+            # exceptionArgs[1] is not set or is empty.
+            raise errors.TroveIntegrityError(error=exceptionArgs[0], 
+                                        *self.toTroveTup(exceptionArgs[1]))
+        elif not hasattr(errors, exceptionName):
+            raise errors.UnknownException(exceptionName, exceptionArgs)
+        else:
+            exceptionClass = getattr(errors, exceptionName)
+
+            if hasattr(exceptionClass, 'demarshall'):
+                args, kwArgs = exceptionClass.demarshall(self, exceptionArgs,
+                                                         exceptionKwArgs)
+                raise exceptionClass(*args, **kwArgs)
+
             for klass, marshall in errors.simpleExceptions:
                 if exceptionName == marshall:
                     raise klass(exceptionArgs[0])
@@ -302,7 +294,7 @@ class ServerProxy(util.ServerProxy):
                        self.__passwordCallback, self.__usedAnonymousCallback,
                        self.__altHostCallback, self.getProtocolVersion(),
                        self.__transport, self.__serverName,
-                       self.__entitlementDir)
+                       self.__entitlementDir, self.__callLog)
 
     def usedProxy(self):
         return self.__transport.usedProxy
@@ -317,7 +309,7 @@ class ServerProxy(util.ServerProxy):
         return self.__protocolVersion
 
     def __init__(self, url, serverName, transporter, pwCallback, usedMap,
-                 entitlementDir):
+                 entitlementDir, callLog):
         try:
             util.ServerProxy.__init__(self, url, transporter)
         except IOError, e:
@@ -330,6 +322,7 @@ class ServerProxy(util.ServerProxy):
         self.__usedMap = usedMap
         self.__protocolVersion = CLIENT_VERSIONS[-1]
         self.__entitlementDir = entitlementDir
+        self.__callLog = callLog
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
@@ -342,6 +335,11 @@ class ServerCache:
         self.entitlements = entitlements
         self.proxies = proxies
         self.entitlementDir = entitlementDir
+        self.callLog = None
+
+        if 'CONARY_CLIENT_LOG' in os.environ:
+            self.callLog = calllog.ClientCallLogger(
+                                os.environ['CONARY_CLIENT_LOG'])
 
     def __getPassword(self, host, user=None):
         if not self.pwPrompt:
@@ -474,7 +472,8 @@ class ServerCache:
         transporter.setEntitlements(entList)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
                              usedMap = usedMap,
-                             entitlementDir = self.entitlementDir)
+                             entitlementDir = self.entitlementDir,
+                             callLog = self.callLog)
 
         # Avoid poking at __transport
         server._transport = transporter
@@ -679,13 +678,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #Base64 encode salt
         self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
 
-    def addAccessGroup(self, label, groupName):
-        return self.c[label].addAccessGroup(groupName)
+    def addRole(self, label, role):
+        if self.c[label].getProtocolVersion() < 61:
+            return self.c[label].addAccessGroup(role)
+        return self.c[label].addRole(role)
 
     def addDigitalSignature(self, name, version, flavor, digsig):
         if self.c[version].getProtocolVersion() < 45:
-            raise InvalidServerVersion, "Cannot sign troves on Conary " \
-                    "repositories older than 1.1.20"
+            raise InvalidServerVersion("Cannot sign troves on Conary "
+                                       "repositories older than 1.1.20")
 
         encSig = base64.b64encode(digsig.freeze())
         self.c[version].addDigitalSignature(name, self.fromVersion(version),
@@ -736,20 +737,63 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def deleteUserById(self, label, userId):
         self.c[label].deleteUserById(userId)
 
-    def deleteAccessGroup(self, label, groupName):
-        self.c[label].deleteAccessGroup(groupName)
+    def deleteRole(self, label, role):
+        if self.c[label].getProtocolVersion() < 61:
+            self.c[label].deleteAccessGroup(role)
+            return
+        self.c[label].deleteRole(role)
 
-    def updateAccessGroupMembers(self, label, groupName, members):
-        self.c[label].updateAccessGroupMembers(groupName, members)
+    def updateRoleMembers(self, label, role, members):
+        if self.c[label].getProtocolVersion() < 61:
+            self.c[label].updateAccessGroupMembers(role, members)
+            return
+        self.c[label].updateRoleMembers(role, members)
 
-    def setUserGroupCanMirror(self, reposLabel, userGroup, canMirror):
-        self.c[reposLabel].setUserGroupCanMirror(userGroup, canMirror)
+    def setRoleCanMirror(self, reposLabel, role, canMirror):
+        if self.c[reposLabel].getProtocolVersion() < 61:
+            self.c[reposLabel].setUserGroupCanMirror(role, canMirror)
+            return
+        self.c[reposLabel].setRoleCanMirror(role, canMirror)
 
-    def listAcls(self, reposLabel, userGroup):
-        return self.c[reposLabel].listAcls(userGroup)
+    def setRoleIsAdmin(self, reposLabel, role, admin):
+        if self.c[reposLabel].getProtocolVersion() < 61:
+            self.c[reposLabel].setUserGroupIsAdmin(role, admin)
+            return
+        self.c[reposLabel].setRoleIsAdmin(role, admin)
 
-    def addAcl(self, reposLabel, userGroup, trovePattern, label, write = False,
-               capped = False, admin = False, remove = False):
+    def addTroveAccess(self, role, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].trailingLabel().getHost(), [])
+            l.append( (tup[0], self.fromVersion(tup[1]),
+                       self.fromFlavor(tup[2])) )
+
+        for serverName, troveList in byServer.iteritems():
+            self.c[serverName].addTroveAccess(role, troveList)
+
+    def deleteTroveAccess(self, role, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].trailingLabel().getHost(), [])
+            l.append( (tup[0], self.fromVersion(tup[1]),
+                       self.fromFlavor(tup[2])) )
+
+        for serverName, troveList in byServer.iteritems():
+            self.c[serverName].deleteTroveAccess(role, troveList)
+
+    def listTroveAccess(self, serverName, role):
+        return [ ( x[0], self.toVersion(x[1]), self.toFlavor(x[2]) ) for x in
+                            self.c[serverName].listTroveAccess(role) ]
+
+    def listAcls(self, reposLabel, role):
+        return self.c[reposLabel].listAcls(role)
+
+    def addAcl(self, reposLabel, role, trovePattern, label, write = False,
+               remove = False):
+        if self.c[reposLabel].getProtocolVersion() < 61:
+            raise errors.InvalidServerVersion(
+                    "addAcl only works on Conary 2.0 and later")
+
         if not label:
             label = "ALL"
         elif type(label) == str:
@@ -760,20 +804,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        if remove and self.c[reposLabel].getProtocolVersion() < 38:
-            raise InvalidServerVersion, "Setting canRemove for an acl " \
-                    "requires a repository running Conary 1.1 or later."
-        elif remove:
-            self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                      capped, admin, remove)
-        else:
-            self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
-                                      capped, admin)
+        self.c[reposLabel].addAcl(role, trovePattern, label,
+                                  write = write, remove = remove)
+
         return True
 
-    def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
-                trovePattern, label, write = False, capped = False,
-                admin = False, canRemove = False):
+    def editAcl(self, reposLabel, role, oldTrovePattern, oldLabel,
+                trovePattern, label, write = False, canRemove = False):
+        if self.c[reposLabel].getProtocolVersion() < 61:
+            raise errors.InvalidServerVersion(
+                    "editAcl only works on Conary 2.0 and later")
+
         if not label:
             label = "ALL"
         elif type(label) == str:
@@ -794,20 +835,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not oldTrovePattern:
             oldTrovePattern = "ALL"
 
-        if canRemove and self.c[reposLabel].getProtocolVersion() < 38:
-            raise InvalidServerVersion, "Setting canRemove for an acl " \
-                    "requires a repository running Conary 1.1 or later."
-        elif canRemove:
-            self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                       trovePattern, label, write, capped, admin,
-                                       canRemove)
-        else:
-            self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
-                                       trovePattern, label, write, capped, admin)
+        self.c[reposLabel].editAcl(role, oldTrovePattern, oldLabel,
+                                   trovePattern, label, write = write,
+                                   canRemove = canRemove)
 
         return True
 
-    def deleteAcl(self, reposLabel, userGroup, trovePattern, label):
+    def deleteAcl(self, reposLabel, role, trovePattern, label):
         if not label:
             label = "ALL"
         elif type(label) == str:
@@ -818,56 +852,88 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not trovePattern:
             trovePattern = "ALL"
 
-        self.c[reposLabel].deleteAcl(userGroup, trovePattern, label)
+        self.c[reposLabel].deleteAcl(role, trovePattern, label)
         return True
 
     def changePassword(self, label, user, newPassword):
         self.c[label].changePassword(user, newPassword)
 
-    def getUserGroups(self, label):
-        return self.c[label].getUserGroups()
+    def getRoles(self, label):
+        if self.c[label].getProtocolVersion() < 61:
+            return self.c[label].getUserGroups()
+        return self.c[label].getRoles()
 
-    def addEntitlements(self, serverName, entGroup, entitlements):
-        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
-        return self.c[serverName].addEntitlements(entGroup, entitlements)
+    def addEntitlementKeys(self, serverName, entClass, entKeys):
+        entKeys = [ self.fromEntitlement(x) for x in entKeys ]
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].addEntitlements(entClass, entKeys)
+        return self.c[serverName].addEntitlementKeys(entClass, entKeys)
 
-    def deleteEntitlements(self, serverName, entGroup, entitlements):
-        entitlements = [ self.fromEntitlement(x) for x in entitlements ]
-        return self.c[serverName].deleteEntitlements(entGroup, entitlements)
+    def deleteEntitlementKeys(self, serverName, entClass, entKeys):
+        entKeys = [ self.fromEntitlement(x) for x in entKeys ]
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].deleteEntitlements(entClass, entKeys)
+        return self.c[serverName].deleteEntitlementKeys(entClass, entKeys)
 
-    def addEntitlementGroup(self, serverName, entGroup, userGroup):
-        return self.c[serverName].addEntitlementGroup(entGroup, userGroup)
+    def addEntitlementClass(self, serverName, entClass, role):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].addEntitlementGroup(entClass, role)
+        return self.c[serverName].addEntitlementClass(entClass, role)
 
-    def deleteEntitlementGroup(self, serverName, entGroup):
-        return self.c[serverName].deleteEntitlementGroup(entGroup)
+    def deleteEntitlementClass(self, serverName, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].deleteEntitlementGroup(entClass)
+        else:
+            return self.c[serverName].deleteEntitlementClass(entClass)
 
-    def addEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
-        return self.c[serverName].addEntitlementOwnerAcl(userGroup, entGroup)
+    def addEntitlementClassOwner(self, serverName, role, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].addEntitlementOwnerAcl(role, entClass)
+        return self.c[serverName].addEntitlementClassOwner(role, entClass)
 
-    def deleteEntitlementOwnerAcl(self, serverName, userGroup, entGroup):
-        return self.c[serverName].deleteEntitlementOwnerAcl(userGroup, entGroup)
+    def deleteEntitlementClassOwner(self, serverName, role, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].deleteEntitlementOwnerAcl(role, entClass)
+        return self.c[serverName].deleteEntitlementClassOwner(role, entClass)
 
-    def listEntitlements(self, serverName, entGroup):
-        l = self.c[serverName].listEntitlements(entGroup)
+    def listEntitlementKeys(self, serverName, entClass):
+        if self.c[serverName].getProtocolVersion() < 61:
+            l = self.c[serverName].listEntitlements(entClass)
+        else:
+            l = self.c[serverName].listEntitlementKeys(entClass)
         return [ self.toEntitlement(x) for x in l ]
 
-    def listEntitlementGroups(self, serverName):
-        return self.c[serverName].listEntitlementGroups()
+    def listEntitlementClasses(self, serverName):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].listEntitlementGroups()
+        return self.c[serverName].listEntitlementClasses()
 
-    def getEntitlementClassAccessGroup(self, serverName, classList):
-        return self.c[serverName].getEntitlementClassAccessGroup(classList)
+    def getEntitlementClassesRoles(self, serverName, classList):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].getEntitlementClassAccessGroup(classList)
+        return self.c[serverName].getEntitlementClassesRoles(classList)
 
-    def setEntitlementClassAccessGroup(self, serverName, classInfo):
-        return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+    def setEntitlementClassesRoles(self, serverName, classInfo):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].setEntitlementClassAccessGroup(classInfo)
+        return self.c[serverName].setEntitlementClassesRoles(classInfo)
 
-    def listAccessGroups(self, serverName):
-        return self.c[serverName].listAccessGroups()
+    def listRoles(self, serverName):
+        if self.c[serverName].getProtocolVersion() < 61:
+            return self.c[serverName].listAccessGroups()
+        return self.c[serverName].listRoles()
 
-    def troveNames(self, label):
-	return self.c[label].troveNames(self.fromLabel(label))
+    def troveNames(self, label, troveTypes = TROVE_QUERY_PRESENT):
+        if self.c[label].getProtocolVersion() < 60:
+            return self.c[label].troveNames(self.fromLabel(label))
+        return self.c[label].troveNames(self.fromLabel(label),
+                                        troveTypes = troveTypes)
 
-    def troveNamesOnServer(self, server):
-        return self.c[server].troveNames("")
+    def troveNamesOnServer(self, server, troveTypes = TROVE_QUERY_PRESENT):
+        if self.c[server].getProtocolVersion() < 60:
+            return self.c[server].troveNames("")
+
+        return self.c[server].troveNames("", troveTypes = troveTypes)
 
     def getTroveLeavesByPath(self, pathList, label):
         l = self.c[label].getTrovesByPaths(pathList, self.fromLabel(label), 
@@ -1023,90 +1089,157 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for name, versionList in troveDict.iteritems():
             d[name] = {}.fromkeys(versionList, [ None ])
 
-	return self.getTroveVersionFlavors(d)
+        return self.getTroveVersionFlavors(d)
 
-    def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method, 
-                               branches = False, labels = False, 
+    def _getTroveInfoByVerInfoTuples(self, troveSpecs, bestFlavor, method,
+                               branches = False, labels = False,
                                versions = False, 
                                troveTypes = TROVE_QUERY_PRESENT,
                                getLeaves = False, splitByBranch = False):
         assert(branches + labels + versions == 1)
 
         d = {}
-        for name, verSet in troveSpecs.iteritems():
+        specsByName = {}
+        if not troveSpecs:
+            return [], []
+
+        finalResults = [ [] for x in troveSpecs ]
+        finalAltFlavors = [ [] for x in troveSpecs ]
+
+        if branches:
+            freezeFn = self.fromBranch
+            keyFn = lambda version: version.branch()
+        elif labels:
+            freezeFn = self.fromLabel
+            keyFn = lambda version: version.trailingLabel()
+        elif versions:
+            freezeFn = self.fromVersion
+            keyFn = lambda version: version
+
+
+        for idx, (name, ver, flavor) in enumerate(troveSpecs):
             if not name:
                 name = ""
-
-            for ver, flavors in verSet.iteritems():
-                host = ver.getHost()
-                if branches:
-                    verStr = self.fromBranch(ver)
-                elif versions:
-                    verStr = self.fromVersion(ver)
-                else:
-                    verStr = self.fromLabel(ver)
-
-                versionDict = d.setdefault(host, {})
-                flavorDict = versionDict.setdefault(name, {})
-
-                flavorDict[verStr] = ''
+            host = ver.getHost()
+            verStr = freezeFn(ver)
+            specsByName.setdefault(name, []).append((idx, ver, flavor))
+            versionDict = d.setdefault(host, {})
+            flavorDict = versionDict.setdefault(name, {})
+            # don't pass in a flavor, we'll do all flavor work on this
+            # side.
+            flavorDict[verStr] = ''
 
         result = {}
-	if not d:
-	    return result
-
         for host, requestD in d.iteritems():
             respD = self.c[host].__getattr__(method)(
                             *self._setTroveTypeArgs(host, requestD,
                                                     bestFlavor,
                                                     troveTypes = troveTypes))
             self._mergeTroveQuery(result, respD)
+
+
         if not result:
-            return result
+            return finalResults, []
+
+        filterOptions = self._getFilterOptions(getLeaves, bestFlavor,
+                                               troveTypes,
+                                               splitByBranch=splitByBranch)
+
         scoreCache = {}
-        filteredResult = {}
         for name, versionFlavorDict in result.iteritems():
-            if branches:
-                keyFn = lambda version: version.branch()
-            elif labels:
-                keyFn = lambda version: version.trailingLabel()
-            elif versions:
-                keyFn = lambda version: version
             resultsByKey = {}
+            # create a results dictionary that is based off of the key
+            # passed in.
             for version, flavorList in versionFlavorDict.iteritems():
                 key = keyFn(version)
                 if key not in resultsByKey:
                     resultsByKey[key] = {}
-                resultsByKey[key][version] = flavorList
-            if getLeaves:
-                latestFilter = trovesource._GET_TROVE_VERY_LATEST
-            else:
-                latestFilter = trovesource._GET_TROVE_ALL_VERSIONS
+                if version not in resultsByKey[key]:
+                    vDict = resultsByKey[key][version] = {}
+                else:
+                    vDict = resultsByKey[key][version]
+                for flavor in flavorList:
+                    if flavor not in vDict:
+                        vDict[flavor] = []
+                    vDict[flavor].append(name)
 
-            if bestFlavor:
-                flavorFilter = trovesource._GET_TROVE_BEST_FLAVOR
-            else:
-                flavorFilter = trovesource._GET_TROVE_ALL_FLAVORS
-            flavorCheck = trovesource._CHECK_TROVE_REG_FLAVOR
+            if name in specsByName:
+                queryList = specsByName[name]
+            elif '' in specsByName:
+                queryList =  specsByName['']
+            elif None in specsByName:
+                queryList = specsByName[None]
 
-            if name in troveSpecs:
-                queryDict = troveSpecs[name]
-            elif '' in troveSpecs:
-                queryDict =  troveSpecs['']
-            elif None in troveSpecs:
-                queryDict = troveSpecs[None]
-
-            for versionQuery, flavorQueryList in queryDict.iteritems():
+            # for each relevant query, results are available by versionSepc
+            # (the "key")
+            for idx, versionQuery, flavorQuery in queryList:
                 versionFlavorDict = resultsByKey.get(versionQuery, None)
                 if not versionFlavorDict:
                     continue
-                self._filterResultsByFlavor(name, filteredResult,
+                results, altFlavors = self._filterResultsByFlavor(
                                             versionFlavorDict,
-                                            flavorQueryList, flavorFilter,
-                                            flavorCheck, latestFilter,
-                                            scoreCache, 
-                                            splitByBranch=splitByBranch)
-        return filteredResult
+                                            flavorQuery, filterOptions,
+                                            scoreCache)
+                if altFlavors:
+                    finalAltFlavors[idx].extend(altFlavors)
+                for version, flavorList in results.iteritems():
+                    for flavor in flavorList:
+                        for name in versionFlavorDict[version][flavor]:
+                            finalResults[idx].append((name, version, flavor))
+        for idx, results in enumerate(finalResults):
+            if results:
+                finalAltFlavors[idx] = [] # any results means no alternates
+                                          # are needed
+            else:
+                finalAltFlavors[idx] = list(set(finalAltFlavors[idx]))
+        return finalResults, finalAltFlavors
+
+    def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method,
+                               branches = False, labels = False,
+                               versions = False,
+                               troveTypes = TROVE_QUERY_PRESENT,
+                               getLeaves = False, splitByBranch = False):
+        # if necessary, convert troveSpecs to tuples before
+        # processing.  In tuple form the results need the least
+        # massaging so we do all work in tuple form.
+        troveSpecList = []
+        if isinstance(troveSpecs, dict):
+            for name, versionDict in troveSpecs.iteritems():
+                for version, flavorList in versionDict.iteritems():
+                    if flavorList is None or flavorList is '':
+                        troveSpecList.append((name, version, flavorList))
+                    else:
+                        troveSpecList.extend((name, version, x) for x in
+                                             flavorList)
+        else:
+            troveSpecList = troveSpecs
+        results, altFlavors = self._getTroveInfoByVerInfoTuples(
+                                                 troveSpecList, bestFlavor,
+                                                 method,
+                                                 branches=branches,
+                                                 labels=labels,
+                                                 versions=versions,
+                                                 troveTypes=troveTypes,
+                                                 getLeaves=getLeaves,
+                                                 splitByBranch=splitByBranch)
+        if not isinstance(troveSpecs, dict):
+            return results, altFlavors
+        resultDict = {}
+        for troveList in results:
+            for (name, version, flavor) in troveList:
+                if name not in resultDict:
+                    vDict = resultDict[name] = {}
+                else:
+                    vDict = resultDict[name]
+                if version not in vDict:
+                    fList = vDict[version] = []
+                else:
+                    fList = vDict[version]
+                fList.append(flavor)
+        for name, versionDict in resultDict.iteritems():
+            for version in versionDict:
+                versionDict[version] = list(set(versionDict[version]))
+        return resultDict
 
     def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False,
                                troveTypes = TROVE_QUERY_PRESENT):
@@ -1278,6 +1411,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             jobSizes.append(totalSize)
 
         return jobSizes
+
+    def _clearHostCache(self):
+        transport.clearIPCache()
+
+    def _cacheHostLookups(self, hosts):
+        hosts = set(hosts)
+        for host in hosts:
+            url = self.c.map[host]
+            if url:
+                mappedHost = urllib.splithost(urllib.splittype(url)[1])[0]
+            else:
+                mappedHost = host
+            transport.getIPAddress(mappedHost)
 
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
@@ -1837,10 +1983,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                     fileJob.extend([ needItems ])
 
-            contentList = self.getFileContents(contentsNeeded, 
+            contentList = self.getFileContents(contentsNeeded,
                                                tmpFile = outFile,
                                                lookInLocal = True,
-                                               callback = callback)
+                                               callback = callback,
+                                               compressed = True)
 
             i = 0
             for item in fileJob:
@@ -1850,20 +1997,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 if len(item) == 1:
                     internalCs.addFileContents(pathId, fileId,
-                                   changeset.ChangedFileTypes.file, 
-                                   contents, 
-                                   fileObj.flags.isConfig())
+                                   changeset.ChangedFileTypes.file,
+                                   contents,
+                                   fileObj.flags.isConfig(),
+                                   compressed = True)
                 else:
+                    # Don't bother with diffs. Clients can reconstruct them for
+                    # installs and they're just a pain to assemble here anyway.
                     fileId = item[1][1]
                     newFileObj = item[1][2]
                     newContents = contentList[i]
                     i += 1
 
-                    (contType, cont) = changeset.fileContentsDiff(fileObj,
-                                            contents, newFileObj, newContents,
+                    (contType, cont) = changeset.fileContentsDiff(None,
+                                            None, newFileObj, newContents,
                                             mirrorMode = mirrorMode)
                     internalCs.addFileContents(pathId, fileId, contType,
-                                               cont, True)
+                                               cont, True,
+                                               compressed = True)
 
         if not cs and internalCs:
             cs = internalCs
@@ -2103,7 +2254,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromFileId(fileId)))
 
     def getFileContents(self, fileList, tmpFile = None, lookInLocal = False,
-                        callback = None):
+                        callback = None, compressed = False):
         contents = [ None ] * len(fileList)
 
         if self.localRep and lookInLocal:
@@ -2115,6 +2266,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # retrieve the contents from the database now so that
                     # the changeset can be shared between threads
                     c = self.localRep.getFileContents([item])[0].get().read()
+                    if compressed:
+                        f = util.BoundedStringIO()
+                        compressor = gzip.GzipFile(None, "w", fileobj = f)
+                        compressor.write(c)
+                        compressor.close()
+                        f.seek(0)
+                        c = f.read()
+
                     contents[i] = filecontents.FromString(c)
 
         byServer = {}
@@ -2185,9 +2344,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 totalSize -= size
                 start += size
 
-                gzfile = gzip.GzipFile(fileobj = nestedF)
-
-                contents[i] = filecontents.FromGzFile(gzfile)
+                if compressed:
+                    contents[i] = filecontents.FromFile(nestedF)
+                else:
+                    gzfile = gzip.GzipFile(fileobj = nestedF)
+                    contents[i] = filecontents.FromGzFile(gzfile)
 
             assert(totalSize == 0)
 
@@ -2404,7 +2565,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
                   getLeaves = True, bestFlavor = True,
-                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False):
+                  troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
+                  requireLatest = False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
         affinityDatabase, and defaultFlavor.
@@ -2467,7 +2629,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             acrossFlavors, affinityDatabase,
                                             getLeaves, bestFlavor,
                                             troveTypes=troveTypes,
-                                            exactFlavors=exactFlavors)
+                                            exactFlavors=exactFlavors,
+                                            requireLatest=requireLatest)
         return troveFinder.findTroves(troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 

@@ -626,7 +626,8 @@ class ClientUpdate:
                                                job[2][0] is not None)
         primaryLocalUpdates = set((job[0], job[2][0], job[2][1]) 
                                   for job in primaryLocalUpdates)
-
+        localErases = set((job[0], job[1][0], job[1][1]) 
+                           for job in localUpdates if job[2][0] is None)
         # Troves which were locally updated to version on the same branch
         # no longer need to be listed as referenced. The trove which replaced
         # it is always a better match for the new items (installed is better
@@ -867,10 +868,19 @@ followLocalChanges: %s
                         # that trove instead.  If not, we just install this 
                         # trove as a fresh update. 
                         log.lowlevel('replaced trove is not installed')
-                        if (not ((parentInstalled
-                                 and not parentReplacedWasPinned)
-                                 or followLocalChanges
-                                 or installMissingRefs)):
+                        if followLocalChanges:
+                            skipLocal = False
+                        elif installMissingRefs:
+                            skipLocal = False
+                        elif (parentInstalled and not parentReplacedWasPinned):
+                            skipLocal = False
+                        elif replacedInfo not in localErases and not parentReplacedWasPinned:
+                            skipLocal = False
+                        else:
+                            skipLocal = True
+
+
+                        if skipLocal:
                             # followLocalChanges states that, even though
                             # the given trove is not a primary, we still want
                             # replace a localUpdate if available instead of 
@@ -886,6 +896,7 @@ followLocalChanges: %s
                         freshInstallOkay = (isPrimary or
                                             (parentInstalled
                                              and not parentReplacedWasPinned)
+                                            or byDefault
                                             or installMissingRefs)
                         # we always want to install the trove even if there's
                         # no local update to match to if it's a primary, or
@@ -1764,40 +1775,9 @@ conary erase '%s=%s[%s]'
         if not newJob:
             raise NoNewTrovesError
 
-        removedTroves = list()
-        missingTroves = list()
-        rollbackFence = False
-        ts = uJob.getTroveSource()
-        for job in newJob:
-            if job[2][0] is None:
-                continue
-
-            cs = ts.getChangeSet(job)
-            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
-            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
-                ti = trove.TroveInfo(troveCs.troveInfoDiff.freeze())
-                if ti.flags.isMissing():
-                    missingTroves.append(job)
-                else:
-                    removedTroves.append(job)
-
-            if job[1][0] is not None:
-                oldCompatClass = self.db.getTroveCompatibilityClass(
-                        job[0], job[1][0], job[1][1])
-                # it's an update; check for preupdate scripts
-                preScript = troveCs.getPreUpdateScript()
-                if preScript:
-                    uJob.addJobPreScript(job, preScript, oldCompatClass,
-                                         troveCs.getNewCompatibilityClass())
-            else:
-                oldCompatClass = None
-
-            rollbackFence = rollbackFence or \
-                troveCs.isRollbackFence(update = (job[1][0] is not None),
-                                        oldCompatibilityClass = oldCompatClass)
-
-        uJob.setInvalidateRollbacksFlag(rollbackFence)
-
+        troveSource = uJob.getTroveSource()
+        missingTroves, removedTroves = self._processJobList(newJob, uJob,
+                                                troveSource.getChangeSet)
         if removedTroves or missingTroves:
             removed = [ (x[0], x[2][0], x[2][1]) for x in removedTroves ]
             removed.sort()
@@ -1808,6 +1788,61 @@ conary erase '%s=%s[%s]'
         uJob.setPrimaryJobs(jobSet)
 
         return newJob
+
+    def _addJobPreEraseScript(self, job, updJob):
+        # check for the old trove's erase scripts
+        oldTrv = self.db.getTrove(job[0], job[1][0], job[1][1])
+        oldTrvCs = oldTrv.diff(None)[0]
+        preScript = oldTrvCs._getPreEraseScript()
+        if preScript:
+            updJob.addJobPreScript(job, preScript,
+                                   oldTrv.getCompatibilityClass(), None,
+                                   action = "preerase")
+
+    def _processJobList(self, jobList, updJob, troveSourceCallback):
+        missingTroves = list()
+        removedTroves = list()
+        rollbackFence = False
+
+        for job in jobList:
+            if job[2][0] is None:
+                # Removal
+                self._addJobPreEraseScript(job, updJob)
+                continue
+
+            cs = troveSourceCallback(job)
+            troveCs = cs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            if troveCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                ti = trove.TroveInfo(troveCs.troveInfoDiff.freeze())
+                if ti.flags.isMissing():
+                    missingTroves.append(job)
+                else:
+                    removedTroves.append(job)
+
+            if job[1][0] is not None:
+                # it's an update
+                # check for preupdate scripts
+                oldCompatClass = self.db.getTroveCompatibilityClass(
+                        job[0], job[1][0], job[1][1])
+                preScript = troveCs.getPreUpdateScript()
+                if preScript:
+                    updJob.addJobPreScript(job, preScript, oldCompatClass,
+                                           troveCs.getNewCompatibilityClass(),
+                                           action = "preupdate")
+            else:
+                oldCompatClass = None
+                preScript = troveCs._getPreInstallScript()
+                if preScript:
+                    updJob.addJobPreScript(job, preScript, oldCompatClass,
+                                         troveCs.getNewCompatibilityClass(),
+                                         action = "preinstall")
+
+            rollbackFence = rollbackFence or \
+                troveCs.isRollbackFence(update = (job[1][0] is not None),
+                                        oldCompatibilityClass = oldCompatClass)
+        updJob.setInvalidateRollbacksFlag(rollbackFence)
+        return missingTroves, removedTroves
+
 
     def _fullMigrate(self, itemList, uJob, recurse=True):
         def _convertRedirects(searchSource, newTroves):
@@ -1899,6 +1934,49 @@ conary erase '%s=%s[%s]'
 
             return db.getTroves(oldTroves, withFiles=False)
 
+        def _updateByDefaultFromIncludedGroups(potentialJobs, byDefaultFalseSet,
+                                            availByDefaultInfo, searchSource):
+            # Find included groups that are byDefault False in the old
+            # group structure (but are installed anyway) and keeps them
+            # installed, and treats them as if they also had been referenced
+            # on the migrate line (meaning all included packages are also
+            # installed)
+            groupJobs = [ x for x in potentialJobs if trove.troveIsGroup(x[0]) ]
+            if not groupJobs:
+                return
+            oldGroups = []
+            newGroups = []
+            for job in groupJobs:
+                newInfo = (job[0], job[2][0], job[2][1])
+                oldInfo = (job[0], job[1][0], job[1][1])
+                if not job[2][0] or not job[1][0]:
+                    continue
+                if availByDefaultInfo[newInfo]:
+                    continue
+                if (oldInfo in byDefaultFalse
+                    and  trove.troveIsGroup(job[0])):
+                    oldGroups.append(oldInfo)
+                    newGroups.append(newInfo)
+                    availByDefaultInfo[newInfo] = True
+            newGroups = searchSource.getTroves(newGroups, withFiles=False)
+            oldGroups = self.db.getTroves(oldGroups, withFiles=False)
+
+            for trv in newGroups:
+                for (troveNVF, byDefault, isWeak) in trv.iterTroveListInfo():
+                    # possibly turn more troves to availableByDefault
+                    # if they're byDefault True in this subgroup.
+                    availByDefaultInfo.update(dict.fromkeys((x[0] for x in trv.iterTroveListInfo() if x[1]), True))
+            byDefaultTrue = []
+            for trv in oldGroups:
+                troveList = list(trv.iterTroveListInfo())
+                troveTups = [x[0] for x in troveList]
+                hasTroves = self.db.hasTroves(troveTups)
+                troveList = (x[0] for x in itertools.izip(troveList, hasTroves) if x[1])
+                byDefaultTrue.extend(x[0] for x in troveList if x[1])
+            byDefaultFalse.difference_update(byDefaultTrue)
+
+
+
         toFind = []
         for item in itemList:
             (troveName, (oldVersionStr, oldFlavorStr),
@@ -1932,12 +2010,10 @@ conary erase '%s=%s[%s]'
                 else:
                     availByDefaultInfo.setdefault(troveNVF, False)
 
-        # find the installed versions of the top level troves we're
-        # trying to migrate to.  Troves within the _old_ versions 
-        # of those troves that installed by byDefault False 
-        # we will keep when migrating.
-        # E.g. if you install foo:debuginfo, when we migrate you,
-        # foo:debuginfo will be kept.
+        # We keep groups that you have installed manually (and anything
+        # included in those groups as well as kernels.   
+        # Anything else that is installed manually will be removed.  
+        # All the following code is to preserve groups and kernels.
         toBeMigrated = _getTrovesToBeMigrated(self.db, newTroves, troveNames)
 
         byDefaultFalse = []
@@ -1977,7 +2053,12 @@ conary erase '%s=%s[%s]'
         for troveNVF in eraseSet:
             existsTrv.addTrove(*troveNVF)
         potentialJobs = availableTrv.diff(existsTrv)[2]
-
+        potentialJobs += [(x[0], (x[1], x[2]), (x[1], x[2]), False) for x in toKeep]
+        if recurse:
+            _updateByDefaultFromIncludedGroups(potentialJobs,
+                                               byDefaultFalse,
+                                               availByDefaultInfo,
+                                               searchSource)
         finalJobs = []
         for job in potentialJobs:
             newInfo = (job[0], job[2][0], job[2][1])
@@ -1987,13 +2068,21 @@ conary erase '%s=%s[%s]'
                     # only install byDefault True
                     continue
             elif job[2][0]:
-                if oldInfo not in byDefaultFalse:
-                    # this is an update from a byDefault True trv 
-                    # to a byDefault False trv.
-                    if not availByDefaultInfo[newInfo]:
-                        finalJobs.append((job[0], job[1], (None, None), False))
-                        continue
-            finalJobs.append(job)
+                if availByDefaultInfo[newInfo]:
+                    pass
+                elif (oldInfo in byDefaultFalse and 
+                      (job[0].split(':')[0] == 'kernel'
+                        or trove.troveIsGroup(job[0]))):
+                    pass
+                else:
+                    # new version is byDefault False and old version
+                    # is not byDefault False and a group or and kernel
+                    # (the two special cases that are allowed to remain 
+                    # installed if they're byDefault False)
+                    finalJobs.append((job[0], job[1], (None, None), False))
+                    continue
+            if job[1] != job[2]:
+                finalJobs.append(job)
 
 
         for troveNVF in toKeep:
@@ -2062,31 +2151,13 @@ conary erase '%s=%s[%s]'
         # XXX this is horrible; we probablt have everything we need already,
         # I just don't know how to find it
         infoCs = troveSource.createChangeSet(finalJobs, withFiles = False)
+
         assert(not infoCs[1])
         infoCs = infoCs[0]
-        for job in finalJobs:
-            if job[2][0] is None:
-                continue
 
-            troveCs = infoCs.getNewTroveVersion(job[0], job[2][0], job[2][1])
+        troveSourceCallback = lambda x: infoCs
 
-            if job[1][0] is not None:
-                # it's an update; check for preupdate scripts
-                oldCompatClass = self.db.getTroveCompatibilityClass(
-                        job[0], job[1][0], job[1][1])
-                preScript = troveCs.getPreUpdateScript()
-                if preScript:
-                    uJob.addJobPreScript(job, preScript, oldCompatClass,
-                                         troveCs.getNewCompatibilityClass())
-            else:
-                oldCompatClass = None
-
-            rollbackFence = rollbackFence or \
-                troveCs.isRollbackFence(update = (job[1][0] is not None),
-                                        oldCompatibilityClass = oldCompatClass)
-
-        uJob.setInvalidateRollbacksFlag(rollbackFence)
-
+        self._processJobList(finalJobs, uJob, troveSourceCallback)
         return finalJobs
 
     def getUpdateItemList(self):
@@ -2259,6 +2330,8 @@ conary erase '%s=%s[%s]'
 
             for job in exists.diff(refd)[2]:
                 if not job[2][0]:
+                    #oldInfo = troves[troveIdsByInfo[job[0], job[1][0], job[1][1]]]
+                    #allJobs.append(job)
                     continue
                 newInfo = troves[troveIdsByInfo[job[0], job[2][0], job[2][1]]]
                 if not job[1][0] and newInfo[HASPARENT]:
@@ -2302,14 +2375,19 @@ conary erase '%s=%s[%s]'
         installed where a child of b is, and assert that that update is
         from childa -> childb.
         """
-        localUpdates = [ x for x in localUpdates 
-                         if x[1][0] and not x[1][0].isOnLocalHost() ]
-        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates ]
-        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates ]
+        localUpdates = [ x for x in localUpdates
+                         if not (x[1][0] and x[1][0].isOnLocalHost()) ]
+        oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates]
+        newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates]
+
+        toGet = [ x for x in oldTroveTups if x[1]]
 
         oldTroveSource = trovesource.stack(searchSource, self.repos)
-        oldTroves = oldTroveSource.getTroves(oldTroveTups, withFiles=False)
-        newTroves = self.db.getTroves(newTroveTups, withFiles=False)
+        oldTroves = oldTroveSource.getTroves(toGet, withFiles=False)
+        troveDict = dict(zip(toGet, oldTroves))
+        toGet = [ x for x in newTroveTups if x[1]]
+        newTroves = self.db.getTroves(toGet, withFiles=False)
+        troveDict.update(zip(toGet, newTroves))
 
         if installedTroves is None:
             assert(missingTroves is None)
@@ -2336,38 +2414,69 @@ conary erase '%s=%s[%s]'
             installedTroves = installedTroves.copy()
             missingTroves = missingTroves.copy()
 
+        erases = set()
         allJobs = []
-        for oldTrove, newTrove in itertools.izip(oldTroves, newTroves):
+        for oldTroveTup, newTroveTup in itertools.izip(oldTroveTups, newTroveTups):
+            erases.discard(oldTroveTup)
             # find the relevant local updates by performing a 
             # diff between oldTrove and a trove based on newTrove
             # that contains only those parts of newTrove that are actually
             # installed.
+            if oldTroveTup[1]:
+                oldTrove = troveDict[oldTroveTup]
+            else:
+                oldTrove = None
+            if newTroveTup[1]:
+                newTrove = troveDict[newTroveTup]
+            else:
+                newTrove = None
 
             notExistsOldTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
             existsNewTrove = trove.Trove('@update', versions.NewVersion(), deps.Flavor())
 
             # only create local updates between old troves that
             # don't exist and new troves that do.
-            for tup, _, isStrong in oldTrove.iterTroveListInfo():
-                if (tup in missingTroves and tup not in oldTroveTups
-                    and not newTrove.hasTrove(*tup)):
-                    notExistsOldTrove.addTrove(*tup)
-            for tup, _, isStrong in newTrove.iterTroveListInfo():
-                if (tup in installedTroves and tup not in newTroveTups
-                    and not oldTrove.hasTrove(*tup)):
-                    existsNewTrove.addTrove( *tup)
+            if oldTrove:
+                for tup, byDefault, isStrong in oldTrove.iterTroveListInfo():
+                    if (tup in missingTroves and tup not in oldTroveTups
+                        and not newTrove.hasTrove(*tup)):
+                        notExistsOldTrove.addTrove(*tup)
+                for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
+                    if (tup in installedTroves and tup not in newTroveTups
+                        and not oldTrove.hasTrove(*tup)):
+                        existsNewTrove.addTrove( *tup)
+                    elif not byDefault and tup in installedTroves:
+                        existsNewTrove.addTrove(*tup)
+                    if byDefault and tup in missingTroves:
+                        notExistsOldTrove.addTrove(*tup)
+            else:
+                for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
+                    if byDefault:
+                        if tup in missingTroves:
+                            notExistsOldTrove.addTrove(*tup)
+                    else:
+                        if tup in installedTroves:
+                            existsNewTrove.addTrove(*tup)
 
             newUpdateJobs = existsNewTrove.diff(notExistsOldTrove)[2]
 
             for newJob in newUpdateJobs:
-                if not newJob[1][0] or not newJob[2][0]:
+                oldInfo = (newJob[0], newJob[1][0], newJob[1][1])
+                if not newJob[1][0]:
+                    continue
+                if not newJob[2][0]:
+                    erases.add(oldInfo)
+                else:
+                    erases.discard(oldInfo)
+                    allJobs.append(newJob)
+                if not oldTrove:
                     continue
 
                 # no trove should be part of more than one update.
-                installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
+                if newJob[2][0]:
+                    installedTroves.remove((newJob[0], newJob[2][0], newJob[2][1]))
                 missingTroves.remove((newJob[0], newJob[1][0], newJob[1][1]))
-                allJobs.append(newJob)
-        return allJobs
+        return allJobs + [(x[0], (x[1], x[2]), (None, None), False) for x in erases]
 
     def _replaceIncomplete(self, cs, localSource, db, repos):
         jobSet = [ (x.getName(), (x.getOldVersion(), x.getOldFlavor()),
@@ -2765,6 +2874,126 @@ conary erase '%s=%s[%s]'
                 os.remove(tmpfile)
             raise
 
+    def _combineJobs(self, uJob, splitJob, criticalJobs):
+        """
+        Coming the dependency-ordered list of individual jobs into large jobs
+        for update efficiency. The following rules apply:
+
+        1. Info packages/components must be in there own jobs because of
+        limitations with our user handling (bah). We actually allow them
+        to combine if multiple versions/flavors of a single info package
+        are installed, which doesn't seem quite right but hasn't hurt
+        anything.
+        2. We don't combine groups with other types of troves. Groups may
+        be combined with other groups.
+        3. self.cfg.updateThreshold is the maximum number of troves
+        which may be installed within a single job. The only reason this
+        will be exceeded is if a single dependency job is larger than this.
+        4. We generally break jobs on packages and groups, not on components.
+        The rule for updateThreshold overrides this.
+        5. Jobs are made as large as possible given the other constraints.
+        6. jobs split for critical updates to prevent including non-critical
+        updates in a critical job unnecessarily.
+        7. Try hard to keep packages and components in a single job.
+        """
+
+        combinedJobs = []
+        # First pass combines components with their packages. This means
+        # that non-critical components may get promoted to critical, but
+        # that's not a problem.
+        i = 0
+        while i < len(splitJob):
+            newJob = []
+            combinedJobs.append(newJob)
+            lastName = None
+
+            while i < len(splitJob):
+                thisJob = splitJob[i]
+                if thisJob in criticalJobs:
+                    # we aren't allowed to combine critical jobs
+                    if not newJob:
+                        newJob.extend(thisJob)
+                        i += 1
+
+                    break
+
+                names = set([ x[0].split(':')[0] for x in thisJob ])
+                firstName = list(names)[0]
+                if len(names) != 1:
+                    if lastName is None:
+                        newJob.extend(thisJob)
+                        i += 1
+                    break
+                elif lastName is not None and lastName != firstName:
+                    break
+
+                lastName = firstName
+                newJob.extend(thisJob)
+                i += 1
+
+        newJob = []
+        inGroup = None
+        updateMax = self.cfg.updateThreshold
+        finalCriticalJobs = []
+
+        for jobList in combinedJobs:
+            isCritical = jobList in criticalJobs
+
+            foundGroup = None
+            isInfo = None
+
+            for job in jobList:
+                (name, (oldVersion, oldFlavor),
+                       (newVersion, newFlavor), absolute) = job
+
+                if name.startswith('group-'):
+                    foundGroup = True
+
+                if name.startswith('info-'):
+                    assert(isInfo is True or isInfo is None)
+                    isInfo = True
+                else:
+                    assert(isInfo is False or isInfo is None)
+                    isInfo = False
+
+            if isCritical:
+                if newJob:
+                    uJob.addJob(newJob)
+                    newJob = []
+                    inGroup = None
+
+                finalCriticalJobs.append(len(uJob.getJobs()))
+                uJob.addJob(jobList)
+            elif isInfo:
+                if newJob:
+                    uJob.addJob(newJob)
+                    newJob = []
+
+                uJob.addJob(jobList)
+                isInfo = None
+            elif foundGroup != inGroup:
+                if newJob:
+                    uJob.addJob(newJob)
+                    newJob = []
+
+                newJob.extend(jobList)
+                inGroup = foundGroup
+            else:
+                if (self.cfg.updateThreshold and newJob and
+                         (len(newJob)  + len(jobList))
+                         > self.cfg.updateThreshold):
+                    uJob.addJob(newJob)
+                    newJob = []
+
+                newJob.extend(jobList)
+
+        if newJob:
+            # we don't care if the final job is critical - there
+            # will be no need for a restart in that case.
+            uJob.addJob(newJob)
+
+        uJob.setCriticalJobs(finalCriticalJobs)
+
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback=None,
@@ -2905,8 +3134,6 @@ conary erase '%s=%s[%s]'
 
         self._validateJob(jobSet)
 
-        updateThreshold = self.cfg.updateThreshold
-
         # When keep existing is provided none of the changesets should
         # be relative (since relative change sets, by definition, cause
         # something on the system to get replaced).
@@ -2976,79 +3203,8 @@ conary erase '%s=%s[%s]'
         else:
             criticalJobs = []
 
-        finalCriticalJobs = []
-
-        startNew = True
-        newJob = []
-        for jobList in splitJob:
-            if startNew:
-                newJob = []
-                startNew = False
-                count = 0
-                newJobIsInfo = False
-                inGroup = False
-
-            isCritical = jobList in criticalJobs
-
-
-            foundCollection = False
-            foundGroup = False
-
-            count += len(jobList)
-            isInfo = None                 # neither true nor false
-            infoName = None
-            for job in jobList:
-                (name, (oldVersion, oldFlavor),
-                       (newVersion, newFlavor), absolute) = job
-
-                if name.startswith('group-'):
-                    foundGroup = True
-                elif newVersion is not None and ':' not in name:
-                    foundCollection = True
-
-                if name.startswith('info-'):
-                    assert(isInfo is True or isInfo is None)
-                    isInfo = True
-                    if not infoName:
-                        infoName = name.split(':')[0]
-                else:
-                    assert(isInfo is False or isInfo is None)
-                    isInfo = False
-
-            if (((not isInfo or infoName != name) and newJobIsInfo is True)
-                or foundGroup != inGroup):
-                # We switched from installing info components to
-                # installing fresh components. This has to go into
-                # a separate job from the last one.
-                # FIXME: We also require currently that each info 
-                # job be for the same info trove - that is, can't
-                # have info-foo and info-bar in the same update job
-                # because info-foo might depend on info-bar being
-                # installed already.  This should be fixed.
-                if newJob:
-                    uJob.addJob(newJob)
-                count = len(jobList)
-                newJob = list(jobList)             # make a copy
-                newJobIsInfo = False
-                inGroup = foundGroup
-            else:
-                newJobIsInfo = isInfo
-                newJob += jobList
-
-            if (foundCollection or isCritical
-                or (updateThreshold and (count >= updateThreshold))): 
-                if isCritical:
-                    finalCriticalJobs.append(len(uJob.getJobs()))
-                uJob.addJob(newJob)
-                startNew = True
-
-        if not startNew:
-            # we don't care if the final job is critical - there 
-            # will be no need for a restart in that case.
-            #if isCritical:
-            #    finalCriticalJobs.append(len(uJob.getJobs()))
-            uJob.addJob(newJob)
-        uJob.setCriticalJobs(finalCriticalJobs)
+        self._combineJobs(uJob, splitJob, criticalJobs)
+        uJob.reorderPreScripts(criticalUpdateInfo)
 
         uJob.setTransactionCounter(self.db.getTransactionCounter())
 
@@ -3311,6 +3467,15 @@ conary erase '%s=%s[%s]'
         kwargs = dict(
             commitFlags=commitFlags, tagScript=tagScript,
             journal=journal, autoPinList=autoPinList)
+        hosts = []
+        if self.getRepos():
+            for jobList in allJobs:
+                for job in jobList:
+                    if job[1][0] and not job[1][0].isOnLocalHost():
+                        hosts.append(job[1][0].getHost())
+                    if job[2][0] and not job[2][0].isOnLocalHost():
+                        hosts.append(job[2][0].getHost())
+            self.getRepos()._cacheHostLookups(hosts)
 
         if len(allJobs) == 1 and not uJob.getChangesetsDownloaded():
             # this handles change sets which include change set files
@@ -3339,6 +3504,8 @@ conary erase '%s=%s[%s]'
                 self.updateCallback.setUpdateJob(job)
                 self._applyCs(newCs, uJob, removeHints = removeHints, **kwargs)
                 self.updateCallback.updateDone()
+            if self.getRepos():
+                self.getRepos()._clearHostCache()
             return
 
         import Queue
@@ -3390,6 +3557,8 @@ conary erase '%s=%s[%s]'
             # the download thread _should_ respond to the
             # stopDownloadEvent in ~5 seconds.
             downloadThread.join(20)
+            if self.getRepos():
+                self.getRepos()._clearHostCache()
 
             if downloadThread.isAlive():
                 self.updateCallback.warning('timeout waiting for '

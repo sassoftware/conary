@@ -12,22 +12,31 @@
 # full details.
 #
 
-import elf
 import os
 import re
 import stat
 import string
-import util
-import javadeps
+import xml.dom.minidom
 import zipfile
 
+from conary import rpmhelper
+from conary.lib import elf
+from conary.lib import javadeps
+from conary.lib import util
 
-class Magic:
+class Magic(object):
+    __slots__ = ['path', 'basedir', 'contents', 'name']
+    # The file type is a generic string for a specific file type
+    _fileType = None
     def __init__(self, path, basedir):
 	self.path = path
 	self.basedir = basedir
 	self.contents = {}
 	self.name = self.__class__.__name__
+
+    @classmethod
+    def getFileType(cls):
+        return cls._fileType
 
 
 class ELF(Magic):
@@ -87,19 +96,19 @@ class changeset(Magic):
 
 
 class jar(Magic):
-    def __init__(self, path, basedir='', buffer=''):
+    _fileType = "jar"
+    def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
 	Magic.__init__(self, path, basedir)
         self.contents['files'] = filesMap = {}
         self.contents['provides'] = set()
         self.contents['requires'] = set()
 
-        fullpath = basedir+path
+        if zipFileObj is None:
+            return
+
         try:
-            jar = zipfile.ZipFile(fullpath)
-            namelist = [ i.filename for i in jar.infolist()
-                         if not i.filename.endswith('/') and i.file_size > 0 ]
-            for name in namelist:
-                contents = jar.read(name)
+            for name in fileList:
+                contents = zipFileObj.read(name)
                 if not _javaMagic(contents):
                     continue
                 prov, req = javadeps.getDeps(contents)
@@ -112,9 +121,42 @@ class jar(Magic):
             # zipfile raises IOError on some malformed zip files
             pass
 
+class WAR(Magic):
+    _xmlMetadataFile = "WEB-INF/web.xml"
+    _fileType = "war"
+    def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
+        Magic.__init__(self, path, basedir)
+        if zipFileObj is None:
+            raise ValueError("Expected a Zip file object")
+        # Get the contents of the deployment descriptor
+        ddcontent = zipFileObj.read(self._xmlMetadataFile)
+        try:
+            dom = xml.dom.minidom.parseString(ddcontent)
+        except Exception, e:
+            # Error parsing the XML, move on
+            return
+        # Grab data from the DOM
+        val = dom.getElementsByTagName('display-name')
+        if val:
+            self.contents['displayName'] = self._getNodeData(val[0])
+        val = dom.getElementsByTagName('description')
+        if val:
+            self.contents['description'] = self._getNodeData(val[0])
+        dom.unlink()
+
+    @staticmethod
+    def _getNodeData(node):
+        node.normalize()
+        if not node.hasChildNodes():
+            return ''
+        return node.childNodes[0].data
+
+class EAR(WAR):
+    _xmlMetadataFile = "META-INF/application.xml"
+    _fileType = "war"
 
 class ZIP(Magic):
-    def __init__(self, path, basedir='', buffer=''):
+    def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
 	Magic.__init__(self, path, basedir)
 
 
@@ -150,7 +192,40 @@ class CIL(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 
-
+class RPM(Magic):
+    _fileType = 'rpm'
+    _tagMap = [
+        ("name",    rpmhelper.NAME, str),
+        ("version", rpmhelper.VERSION, str),
+        ("release", rpmhelper.RELEASE, str),
+        ("epoch",   rpmhelper.EPOCH, int),
+        ("arch",    rpmhelper.ARCH, str),
+        ("summary", rpmhelper.SUMMARY, str),
+        ("description", rpmhelper.DESCRIPTION, str),
+        ("license", rpmhelper.LICENSE, str),
+    ]
+    def __init__(self, path, basedir=''):
+	Magic.__init__(self, path, basedir)
+        try:
+            f = file(path)
+        except:
+            return None
+        # Convert list of objects to simple types
+        hdr = rpmhelper.readHeader(f)
+        for key, tagName, valType in self._tagMap:
+            val = hdr.get(tagName, None)
+            if isinstance(val, list):
+                if not val:
+                    val = None
+                else:
+                    val = val[0]
+            if val is not None:
+                if valType == int:
+                    val = int(val)
+                elif valType == str:
+                    val = str(val)
+            self.contents[key] = val
+        self.contents['isSource'] = hdr.isSource
 
 def _javaMagic(b):
     if len(b) > 4 and b[0:4] == "\xCA\xFE\xBA\xBE":
@@ -193,12 +268,27 @@ def magic(path, basedir=''):
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":
-        if path.endswith('.jar'):
-            return jar(path, basedir, b)
+        # Zip file. Peek inside the file to extract the file list
+        try:
+            zf = zipfile.ZipFile(n)
+            namelist = set(i.filename for i in zf.infolist()
+                         if not i.filename.endswith('/') and i.file_size > 0)
+        except (IOError, zipfile.BadZipfile):
+            # zipfile raises IOError on some malformed zip files
+            # We are producing a dummy jar or ZIP with no contents
+            if path.endswith('.jar'):
+                return jar(path, basedir)
+            return ZIP(path, basedir)
+        if 'META-INF/application.xml' in namelist:
+            return EAR(path, basedir, zipFileObj = zf, fileList = namelist)
+        elif 'WEB-INF/web.xml' in namelist:
+            return WAR(path, basedir, zipFileObj = zf, fileList = namelist)
+        elif 'META-INF/MANIFEST.MF' in namelist:
+            return jar(path, basedir, zipFileObj = zf, fileList = namelist)
         #elif path.endswith('.par'):
         #    perl archive
         else:
-            return ZIP(path, basedir, b)
+            return ZIP(path, basedir, zipFileObj = zf, fileList = namelist)
     elif _javaMagic(b):
         return java(path, basedir, b)
     elif len(b) > 4 and b[0:2] == "#!":
@@ -215,6 +305,8 @@ def magic(path, basedir=''):
         # will match all PE executables.  See ECMA-335, partition ii,
         # section 25
         return CIL(path, basedir, b)
+    elif (len(b) > 4 and b[:4] == "\xed\xab\xee\xdb"):
+        return RPM(path, basedir)
 
     return None
 

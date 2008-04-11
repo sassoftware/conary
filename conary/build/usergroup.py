@@ -16,7 +16,11 @@
 from conary.build import build, errors
 from conary.lib import util
 
-class User(build.BuildAction):
+class UserGroupBuildAction(build.BuildAction):
+    def doSuggestAutoBuildReqs(self):
+        pass
+
+class User(UserGroupBuildAction):
     """
     NAME
     ====
@@ -93,7 +97,7 @@ class User(build.BuildAction):
          self.supplemental, self.saltedPassword, self.provideGroup) = args
         if self.shell is None: self.shell = '/sbin/nologin'
         if self.provideGroup is None: self.provideGroup=True
-	build.BuildAction.__init__(self, recipe, [], **keywords)
+	UserGroupBuildAction.__init__(self, recipe, [], **keywords)
 
     def do(self, macros):
         if self.recipe.infofilename:
@@ -145,7 +149,7 @@ class User(build.BuildAction):
         f.close()
 
 
-class SupplementalGroup(build.BuildAction):
+class SupplementalGroup(UserGroupBuildAction):
     """
     NAME
     ====
@@ -190,7 +194,7 @@ class SupplementalGroup(build.BuildAction):
         if recipe.type != 'group':
             raise UserGroupError, 'SupplementalGroup() allowed only in GroupInfoRecipe'
 	(self.user, self.infoname, self.preferred_gid) = args
-	build.BuildAction.__init__(self, recipe, [], **keywords)
+	UserGroupBuildAction.__init__(self, recipe, [], **keywords)
 
     def do(self, macros):
         if self.recipe.infofilename:
@@ -213,7 +217,7 @@ class SupplementalGroup(build.BuildAction):
 
 
 
-class Group(build.BuildAction):
+class Group(UserGroupBuildAction):
     """
     NAME
     ====
@@ -253,7 +257,7 @@ class Group(build.BuildAction):
         if recipe.type != 'group':
             raise UserGroupError, 'Group() allowed only in GroupInfoRecipe'
 	(self.infoname, self.preferred_gid) = args
-	build.BuildAction.__init__(self, recipe, [], **keywords)
+	UserGroupBuildAction.__init__(self, recipe, [], **keywords)
 
     def do(self, macros):
         if self.recipe.infofilename:

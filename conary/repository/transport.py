@@ -30,6 +30,9 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
+                  socket.gethostname()])
+
 from conary.lib import util
 
 class InfoURL(urllib.addinfourl):
@@ -108,12 +111,35 @@ class DecompressFileObj:
     def fileno(self):
         return self.fp.fileno()
 
+_ipCache = {}
+def getIPAddress(hostAndPort):
+    host, port = urllib.splitport(hostAndPort)
+    if host in LocalHosts:
+        _ipCache[host] = host
+        return hostAndPort
+    try:
+        ret = socket.gethostbyname(host)
+    except IOError, err:
+        util.res_init()
+        # error looking up the host.  If this fails,
+        # the we fall back to the cache
+        if host in _ipCache:
+            ret = _ipCache[host]
+        raise
+    else:
+        _ipCache[host] = ret
+    if port:
+        ret = "%s:%s" % (ret, port)
+    return ret
+
+def clearIPCache():
+    _ipCache.clear()
+
 class URLOpener(urllib.FancyURLopener):
     '''Replacement class for urllib.FancyURLopener'''
     contentType = 'application/x-www-form-urlencoded'
 
-    localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
-        socket.gethostname()])
+    localhosts = LocalHosts
 
     # For debugging purposes only
     _sendConaryProxyHostHeader = True
@@ -145,7 +171,7 @@ class URLOpener(urllib.FancyURLopener):
         host, port = urllib.splitport(hostport)
         if port is None:
             port = defaultPort
-        return (host, int(port))
+        return (getIPAddress(host), int(port))
 
     def proxy_ssl(self, proxy, endpoint, proxyAuth):
         host, port = self._splitport(proxy, 3128)
@@ -229,9 +255,18 @@ class URLOpener(urllib.FancyURLopener):
                 user_passwd, host = urllib.splituser(host)
                 host = urllib.unquote(host)
             realhost = host
-            # SPX: use the full URL here, not just the selector or name
-            # based virtual hosts don't work
-            selector = '%s:%s' %(protocol, url)
+            urlstr = "%s://%s%s" % (protocol, host, selector)
+            # We used to send an absolute URI here, instead of just the
+            # selector.
+            # Although this is not totally against standards, it's confusing
+            # PGP servers as well as causing reports of connection
+            # reset by peer errors (CNY-2324)
+            # The original reason why we were sending the full URL was virtual
+            # hosts. Indeed, repositories iwere sometimes expecting an
+            # absolute URIthere (making it more strict than a regular HTTP
+            # server), # but that started to break when we added HTTP proxies
+            # into the mix, for which we have no control over what the
+            # selector is (and for the proxies we tested it's a relative URI)
         else:
             # Request should go through a proxy
             # Check to see if it's a conary proxy
@@ -256,6 +291,7 @@ class URLOpener(urllib.FancyURLopener):
                     selector = "%s://%s%s" % (urltype, realhost, rest)
                 if self.proxyBypass(host, realhost):
                     host = realhost
+                    selector = rest
                 else:
                     self.usedProxy = True
                     # To make it visible for users of this object 
@@ -269,6 +305,7 @@ class URLOpener(urllib.FancyURLopener):
                         # Other proxies will not support proxying ssl over !ssl
                         # or vice versa.
                         ssl = (proxyUrlType == 'conarys')
+            urlstr = selector
 
         if not host: raise IOError, ('http error', 'no host given')
         if user_passwd:
@@ -286,9 +323,9 @@ class URLOpener(urllib.FancyURLopener):
             if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost, proxyAuth)
             else:
-                h = httplib.HTTPSConnection(host)
+                h = httplib.HTTPSConnection(getIPAddress(host))
         else:
-            h = httplib.HTTPConnection(host)
+            h = httplib.HTTPConnection(getIPAddress(host))
             if host != realhost and not useConaryProxy and proxyAuth:
                 headers.append(("Proxy-Authorization",
                                 "Basic " + proxyAuth))
@@ -307,7 +344,7 @@ class URLOpener(urllib.FancyURLopener):
             headers.append(('X-Conary-Proxy-Host', host))
         if auth:
             headers.append(('Authorization', 'Basic %s' % auth))
-        return h, url, selector, headers
+        return h, urlstr, selector, headers
 
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
@@ -351,10 +388,10 @@ class URLOpener(urllib.FancyURLopener):
                 fp.seek(0)
 
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
-            return InfoURL(fp, headers, selector, protocolVersion)
+            return InfoURL(fp, headers, urlstr, protocolVersion)
         else:
             self.handleProxyErrors(errcode)
-            return self.http_error(selector, fp, errcode, errmsg, headers, data)
+            return self.http_error(urlstr, fp, errcode, errmsg, headers, data)
 
     def handleProxyErrors(self, errcode):
         e = None
@@ -527,6 +564,7 @@ class Transport(xmlrpclib.Transport):
             opener.addheader(k, v)
 
         tries = 0
+        resetResolv = False
         url = ''.join([protocol, '://', host, handler])
         while tries < 5:
             try:
@@ -540,6 +578,14 @@ class Transport(xmlrpclib.Transport):
                     self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
                 break
             except IOError, e:
+                # try resetting the resolver - /etc/resolv.conf
+                # might have changed since this process started.
+                util.res_init()
+                if not resetResolv:
+                    # first time through this loop, don't sleep or
+                    # print a warning - just try again immediately
+                    resetResolv = True
+                    continue
                 tries += 1
                 if tries >= 5 or host in self.failedHosts:
                     self.failedHosts.add(host)

@@ -15,7 +15,6 @@
 man_files = \
 	conary.1	\
 	cvc.1		\
-	cvcdesc.1
 
 extra_dist = Makefile
 
@@ -29,7 +28,6 @@ install-mkdirs:
 install: install-mkdirs
 	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
 	install -m 644 cvc.1 $(DESTDIR)$(mandir)/man1
-	install -m 644 cvcdesc.1 $(DESTDIR)$(mandir)/man1
 
 dist: default-dist
 
