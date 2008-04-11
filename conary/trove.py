@@ -673,17 +673,21 @@ class Metadata(streams.OrderedStreamCollection):
         keys = MetadataItem._keys
         for item in self.getStreams(1):
             language = item.language()
-            if language not in items:
-                items[language] = MetadataItem()
-            newItem = items[language]
+            newItem = items.setdefault(language, MetadataItem())
             for key in item.keys():
                 if key in skipSet:
                     continue
                 values = getattr(item, key)()
+                newItemStream = getattr(newItem, key)
+                if isinstance(newItemStream, list):
+                    # We have to clear the old list before adding new elements
+                    # to it, otherwise we end up with a union of the lists,
+                    # which is not what we want
+                    del newItemStream[:]
                 if not isinstance(values, (list, tuple)):
                     values = [values]
                 for value in values:
-                    getattr(newItem, key).set(value)
+                    newItemStream.set(value)
         return items.values()
 
     def verifyDigitalSignatures(self, label=None):
