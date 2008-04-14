@@ -103,6 +103,20 @@ def searchFile(file, searchdirs, error=None):
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
+def which (filename):
+    if not os.environ.has_key('PATH') or os.environ['PATH'] == '':
+        p = os.defpath
+    else:
+        p = os.environ['PATH']
+
+    pathlist = p.split (os.pathsep)
+
+    for path in pathlist:
+        f = os.path.join(path, filename)
+        if os.access(f, os.X_OK):
+            return f
+    return None
+
 def recurseDirectoryList(topdir, withDirs=False):
     """Recursively list all files in the directory"""
     items = [topdir]
