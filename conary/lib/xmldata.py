@@ -31,7 +31,8 @@ def prettyPrint(func):
             tree = etree.parse(StringIO.StringIO(res))
             res = etree.tostring(tree, pretty_print = True)
             res = '<?xml version="1.0"?>\n' + res
-        else:
+        elif os.access(os.path.join(os.path.sep, 'usr', 'bin', 'xmllint'),
+                os.X_OK):
             p = os.popen("echo '%s' | xmllint --format -" % unformattedXml)
             res = p.read()
         return res
