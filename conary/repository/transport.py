@@ -167,16 +167,19 @@ class URLOpener(urllib.FancyURLopener):
     def open_https(self, url, data=None):
         return self.open_http(url, data=data, ssl=True)
 
-    def _splitport(self, hostport, defaultPort):
+    def _splitport(self, hostport, defaultPort, getIP=True):
         host, port = urllib.splitport(hostport)
         if port is None:
             port = defaultPort
-        return (getIPAddress(host), int(port))
+        if getIP:
+            return (getIPAddress(host), int(port))
+        else:
+            return (host, int(port))
 
     def proxy_ssl(self, proxy, endpoint, proxyAuth):
         host, port = self._splitport(proxy, 3128)
         endpointHost, endpointPort = self._splitport(endpoint,
-            httplib.HTTPS_PORT)
+            httplib.HTTPS_PORT, getIP=False)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((host, port))
@@ -308,6 +311,11 @@ class URLOpener(urllib.FancyURLopener):
             urlstr = selector
 
         if not host: raise IOError, ('http error', 'no host given')
+        if not self.usedProxy:
+            ipOrHost = getIPAddress(host)
+        else:
+            ipOrHost = host
+
         if user_passwd:
             auth = base64.b64encode(user_passwd)
         else:
@@ -323,9 +331,9 @@ class URLOpener(urllib.FancyURLopener):
             if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost, proxyAuth)
             else:
-                h = httplib.HTTPSConnection(getIPAddress(host))
+                h = httplib.HTTPSConnection(ipOrHost)
         else:
-            h = httplib.HTTPConnection(getIPAddress(host))
+            h = httplib.HTTPConnection(ipOrHost)
             if host != realhost and not useConaryProxy and proxyAuth:
                 headers.append(("Proxy-Authorization",
                                 "Basic " + proxyAuth))
