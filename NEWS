@@ -19,6 +19,8 @@ Changes in @NEW@:
       Before, all manually-installed components and troves that were
       referenced by the group being migrated would be updated instead
       of erased. (CNY-2569)
+    * API for creating source troves without using conary's checkin
+      module now exists. (CNY-2498)
 
   o Bug Fixes:
     * The internal function _ensureReadableRollbackStatus now collects the
