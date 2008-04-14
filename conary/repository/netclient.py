@@ -1416,6 +1416,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         transport.clearIPCache()
 
     def _cacheHostLookups(self, hosts):
+        if self.proxies:
+            return
         hosts = set(hosts)
         for host in hosts:
             url = self.c.map[host]
