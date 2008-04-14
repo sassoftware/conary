@@ -41,8 +41,7 @@ def prettyPrint(func):
                 p = subprocess.Popen([xmllint, '--format', '-'],
                         stdin = subprocess.PIPE, stdout = subprocess.PIPE,
                         stderr = subprocess.PIPE)
-                p.stdin.write(res)
-                stdout, stderr = p.communicate()
+                stdout, stderr = p.communicate(input = res)
                 if p.returncode:
                     raise RuntimeError(stderr[2:])
                 res = stdout[:-1]
