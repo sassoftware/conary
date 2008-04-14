@@ -226,8 +226,26 @@ class LogWriter(object):
     def start(self):
         pass
 
+    @callable
+    def reportMissingBuildRequires(self, data):
+        self.freetext("warning: Suggested buildRequires additions: ['%s']"
+                      %"', '".join(data.split(' ')))
+        self.newline()
+
+    @callable
+    def reportExcessBuildRequires(self, data):
+        self.freetext("info: Possible excessive buildRequires: ['%s']"
+                      %"', '".join(data.split(' ')))
+        self.newline()
+
+    @callable
+    def reportExcessSuperclassBuildRequires(self, data):
+        self.freetext("info: Possible excessive superclass buildRequires: ['%s']"
+                      %"', '".join(data.split(' ')))
+        self.newline()
+
     def command(self, cmd, *args):
-        func = self.__class__.__dict__.get(cmd)
+        func = getattr(self.__class__, cmd, False)
         # silently ignore nonsensical calls because the logger loops over each
         # writer and passes the command separately to all of them
         if func and func.__dict__.get('_callable', False):
@@ -293,7 +311,7 @@ class XmlLogWriter(LogWriter):
         descriptorStack = self._getDescriptorStack()
         return '.'.join(descriptorStack)
 
-    def log(self, message, levelname = 'INFO'):
+    def log(self, message = None, levelname = 'INFO'):
         # escape xml delimiters and newline characters
         message = saxutils.escape(message)
         message = message.replace('\n', '\\n')
@@ -313,7 +331,6 @@ class XmlLogWriter(LogWriter):
         if descriptor:
             macros['descriptor'] = descriptor
         print >> self.stream, makeRecord(macros)
-        self.stream.flush()
 
     @callable
     def pushDescriptor(self, descriptor):
@@ -350,6 +367,24 @@ class XmlLogWriter(LogWriter):
         recordData = self._getRecordData()
         recordData.pop(key, None)
 
+    @callable
+    def reportMissingBuildRequires(self, data):
+        self.pushDescriptor('missingBuildRequires')
+        self.log(data, levelname = 'WARNING')
+        self.popDescriptor('missingBuildRequires')
+
+    @callable
+    def reportExcessBuildRequires(self, data):
+        self.pushDescriptor('excessBuildRequires')
+        self.log(data, levelname = 'INFO')
+        self.popDescriptor('excessBuildRequires')
+
+    @callable
+    def reportExcessSuperclassBuildRequires(self, data):
+        self.pushDescriptor('excessSuperclassBuildRequires')
+        self.log(data, levelname = 'DEBUG')
+        self.popDescriptor('excessSuperclassBuildRequires')
+
 class FileLogWriter(LogWriter):
     def __init__(self, path):
         self.path = path
@@ -376,6 +411,7 @@ class FileLogWriter(LogWriter):
     def close(self):
         self.stream.close()
         self.logging = False
+
 
 class StreamLogWriter(LogWriter):
     def __init__(self, stream = None):
@@ -421,6 +457,12 @@ class StreamLogWriter(LogWriter):
         if descriptor == 'environment':
             self.data.hideLog = False
 
+    @callable
+    def reportExcessSuperclassBuildRequires(self, data):
+        # This is really only for debugging Conary itself, and so is
+        # useful to store in logfiles but not to display
+        pass
+
 
 class SubscriptionLogWriter(LogWriter):
     def __init__(self, path):
@@ -442,7 +484,7 @@ class SubscriptionLogWriter(LogWriter):
         # Allow consumers to ensure that the log is complete as of
         # output from all previous code
         if self.current:
-            self.newline()
+            self.newline(forceNewline=True)
         self.stream.write(timestamp)
         self.stream.write('\n')
         self.stream.flush()
@@ -459,8 +501,12 @@ class SubscriptionLogWriter(LogWriter):
         else:
             self.current = text
 
-    def newline(self):
+    def newline(self, forceNewline=False):
         if self.current:
+            if self.current[-1] == '\\':
+                self.current = self.current.rstrip('\\')
+                if not forceNewline:
+                    return
             if self.r and self.r.match(self.current):
                 self.stream.write(self.current)
                 self.stream.write('\n')
@@ -581,23 +627,37 @@ class Logger:
     def subscribe(self, pattern):
         self.command('subscribe %s' %pattern)
 
+    def reportMissingBuildRequires(self, reqList):
+        self.command('reportMissingBuildRequires %s' %' '.join(reqList))
+
+    def reportExcessBuildRequires(self, reqList):
+        self.command('reportExcessBuildRequires %s' %' '.join(reqList))
+
+    def reportExcessSuperclassBuildRequires(self, reqList):
+        self.command('reportExcessSuperclassBuildRequires %s' %' '.join(reqList))
+
     def synchronize(self):
         timestamp = '%10.8f' %time.time()
         self.command('synchronizeMark %s' %timestamp)
+        self.flush()
         syncFile = file(self.syncPath)
 
-        def _longEnough():
+        def _fileLongEnough():
             syncFile.seek(0, 2)
             return syncFile.tell() > 19
 
-        def _tooLong(i):
+        def _waitedTooLong(i, stage):
             if i > 10000:
                 # 100 seconds is too long to wait for a pty; something's wrong
-                raise ConaryError('Log file synchronization failure')
+                syncFile.seek(0,2)
+                length = syncFile.tell()
+                raise ConaryError(
+                    'Log file synchronization %s failure with length %d' %(
+                    stage, length))
 
         i = 0
-        while not _longEnough():
-            _tooLong(i)
+        while not _fileLongEnough():
+            _waitedTooLong(i, 'init')
             i += 1
             time.sleep(0.01)
 
@@ -607,7 +667,7 @@ class Logger:
         i = 0
         _seekTimestamp()
         while syncFile.read(19) != timestamp:
-            _tooLong(i)
+            _waitedTooLong(i, 'search')
             i += 1
             time.sleep(0.01)
             _seekTimestamp()

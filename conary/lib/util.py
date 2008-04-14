@@ -218,8 +218,8 @@ def genExcepthook(debug=True,
                                                  errmsg=value,
                                                  stackfile=stackfile))
 
-    if catchSIGUSR1:
-        signal.signal(signal.SIGUSR1, SIGUSR1Handler)
+    #if catchSIGUSR1:
+    #    signal.signal(signal.SIGUSR1, SIGUSR1Handler)
     return excepthook
 
 
@@ -1097,6 +1097,7 @@ class LineReader:
 exists = misc.exists
 removeIfExists = misc.removeIfExists
 pread = misc.pread
+res_init = misc.res_init
 
 class _LazyFile(object):
     __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',

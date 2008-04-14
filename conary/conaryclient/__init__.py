@@ -31,6 +31,7 @@ from conary.conaryclient import cmdline
 from conary.conaryclient.clone import ClientClone
 from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
+from conary.conaryclient.newtrove import ClientNewTrove
 
 CloneError = clone.CloneError
 CloneIncomplete = clone.CloneIncomplete
@@ -58,7 +59,7 @@ class VersionSuppliedError(UpdateError):
         return "version should not be specified when a Conary change set " \
                "is being installed"
 
-class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
+class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     """
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.
@@ -375,9 +376,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate):
         if self.repos is None:
             raise errors.RepositoryError("Repository not available")
         return self.repos.getConaryUrl(version, flavor)
-
-    def getRepos(self):
-        return self.repos
 
     def iterRollbacksList(self):
         """

@@ -30,6 +30,9 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
+                  socket.gethostname()])
+
 from conary.lib import util
 
 class InfoURL(urllib.addinfourl):
@@ -108,12 +111,35 @@ class DecompressFileObj:
     def fileno(self):
         return self.fp.fileno()
 
+_ipCache = {}
+def getIPAddress(hostAndPort):
+    host, port = urllib.splitport(hostAndPort)
+    if host in LocalHosts:
+        _ipCache[host] = host
+        return hostAndPort
+    try:
+        ret = socket.gethostbyname(host)
+    except IOError, err:
+        util.res_init()
+        # error looking up the host.  If this fails,
+        # the we fall back to the cache
+        if host in _ipCache:
+            ret = _ipCache[host]
+        raise
+    else:
+        _ipCache[host] = ret
+    if port:
+        ret = "%s:%s" % (ret, port)
+    return ret
+
+def clearIPCache():
+    _ipCache.clear()
+
 class URLOpener(urllib.FancyURLopener):
     '''Replacement class for urllib.FancyURLopener'''
     contentType = 'application/x-www-form-urlencoded'
 
-    localhosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
-        socket.gethostname()])
+    localhosts = LocalHosts
 
     # For debugging purposes only
     _sendConaryProxyHostHeader = True
@@ -141,16 +167,19 @@ class URLOpener(urllib.FancyURLopener):
     def open_https(self, url, data=None):
         return self.open_http(url, data=data, ssl=True)
 
-    def _splitport(self, hostport, defaultPort):
+    def _splitport(self, hostport, defaultPort, getIP=True):
         host, port = urllib.splitport(hostport)
         if port is None:
             port = defaultPort
-        return (host, int(port))
+        if getIP:
+            return (getIPAddress(host), int(port))
+        else:
+            return (host, int(port))
 
     def proxy_ssl(self, proxy, endpoint, proxyAuth):
         host, port = self._splitport(proxy, 3128)
         endpointHost, endpointPort = self._splitport(endpoint,
-            httplib.HTTPS_PORT)
+            httplib.HTTPS_PORT, getIP=False)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((host, port))
@@ -282,6 +311,11 @@ class URLOpener(urllib.FancyURLopener):
             urlstr = selector
 
         if not host: raise IOError, ('http error', 'no host given')
+        if not self.usedProxy:
+            ipOrHost = getIPAddress(host)
+        else:
+            ipOrHost = host
+
         if user_passwd:
             auth = base64.b64encode(user_passwd)
         else:
@@ -297,9 +331,9 @@ class URLOpener(urllib.FancyURLopener):
             if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost, proxyAuth)
             else:
-                h = httplib.HTTPSConnection(host)
+                h = httplib.HTTPSConnection(ipOrHost)
         else:
-            h = httplib.HTTPConnection(host)
+            h = httplib.HTTPConnection(ipOrHost)
             if host != realhost and not useConaryProxy and proxyAuth:
                 headers.append(("Proxy-Authorization",
                                 "Basic " + proxyAuth))
@@ -538,6 +572,7 @@ class Transport(xmlrpclib.Transport):
             opener.addheader(k, v)
 
         tries = 0
+        resetResolv = False
         url = ''.join([protocol, '://', host, handler])
         while tries < 5:
             try:
@@ -551,6 +586,14 @@ class Transport(xmlrpclib.Transport):
                     self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
                 break
             except IOError, e:
+                # try resetting the resolver - /etc/resolv.conf
+                # might have changed since this process started.
+                util.res_init()
+                if not resetResolv:
+                    # first time through this loop, don't sleep or
+                    # print a warning - just try again immediately
+                    resetResolv = True
+                    continue
                 tries += 1
                 if tries >= 5 or host in self.failedHosts:
                     self.failedHosts.add(host)

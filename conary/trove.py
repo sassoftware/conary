@@ -45,6 +45,9 @@ def troveIsCollection(troveName):
 def troveIsPackage(troveName):
     return troveIsCollection(troveName) and not troveName.startswith('group-')
 
+def troveIsGroup(troveName):
+    return troveIsCollection(troveName) and troveName.startswith('group-')
+
 def troveIsComponent(troveName):
     return ":" in troveName
 

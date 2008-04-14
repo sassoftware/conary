@@ -311,7 +311,9 @@ class GroupRecipe(_BaseGroupRecipe):
         """
         return findSourcesForGroup(repos, self, callback)
 
-    def _getSearchSource(self, ref=None):
+    def _getSearchSource(self, ref=None, troveSource=None):
+        if troveSource is None:
+            troveSource = self.troveSource
         if ref is None:
             if isinstance(self.defaultSource, (list, tuple)):
                 return searchsource.createSearchSourceStack(self.searchSource,
@@ -321,7 +323,7 @@ class GroupRecipe(_BaseGroupRecipe):
                 return searchsource.createSearchSourceStack(None,
                                                 [self.getLabelPath()],
                                                 self.getSearchFlavor(),
-                                                troveSource=self.troveSource)
+                                                troveSource=troveSource)
         elif isinstance(ref, (tuple, list)):
             source = searchsource.createSearchSourceStack(searchSource,
                                                       item, searchFlavor)
@@ -3182,12 +3184,31 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
     """
     Method to find all the sources contained in the group.
     """
-    def _sourceSpec(troveSpec, source=None):
+    def _sourceSpec(troveSpec, source=None, troveTup=None):
         if source:
             source = source.split(':')[0] + ':source'
         else:
             source = troveSpec[0].split(':')[0] + ':source'
-        troveSpec = (source, troveSpec[1], None)
+        versionSpec = troveSpec[1]
+        revisionSpec = ''
+        if versionSpec:
+            if '/' in versionSpec:
+                revisionSpec = versionSpec.split('/')
+            elif '@' in versionSpec or ':' in versionSpec:
+                revisionSpec = ''
+            else:
+                revisionSpec = versionSpec
+            if revisionSpec.count('-') > 1:
+                versionSpec = versionSpec.rsplit('-', 1)[0]
+                revisionSpec = revisionSpec.rsplit('-', 1)[0]
+
+        if troveTup:
+            label = troveTup[1].trailingLabel()
+            if revisionSpec:
+                versionSpec = '%s/%s' % (label, revisionSpec)
+            else:
+                versionSpec = str(label)
+        troveSpec = (source, versionSpec, None)
         return troveSpec
 
     def _addFlavors(refSource, sourceSpec, flavor, flavorMap):
@@ -3208,6 +3229,7 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
         (troveSpec, refSource, requireLatest), allowNoMatch = item
         sourceSpec = _sourceSpec(troveSpec)
         toFind.setdefault(refSource, set()).add(sourceSpec)
+        toFind.setdefault(refSource, set()).add(troveSpec)
         _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)
 
     for group in groupList:
@@ -3215,30 +3237,73 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
              refSource, components, requireLatest) in group.iterAddSpecs():
             sourceSpec = _sourceSpec(troveSpec, source)
             toFind.setdefault(refSource, set()).add(sourceSpec)
+            toFind.setdefault(refSource, set()).add(troveSpec)
             _addFlavors(refSource, sourceSpec, troveSpec[2], flavorMap)
+            _addFlavors(refSource, troveSpec, troveSpec[2], flavorMap)
 
-        for (troveSpec, flags) in group.iterAddAllSpecs():
-            sourceSpec = _sourceSpec(troveSpec)
-            toFind.setdefault(flags.ref, set()).add(sourceSpec)
-            _addFlavors(flags.ref, sourceSpec, troveSpec[2], flavorMap)
+    for (troveSpec, flags) in group.iterAddAllSpecs():
+        sourceSpec = _sourceSpec(troveSpec)
+        toFind.setdefault(flags.ref, set()).add(sourceSpec)
+        toFind.setdefault(flags.ref, set()).add(troveSpec)
+        _addFlavors(flags.ref, sourceSpec, troveSpec[2], flavorMap)
+        _addFlavors(flags.ref, troveSpec, troveSpec[2], flavorMap)
 
-        for (troveSpec, ref, requireLatest), _ in group.iterReplaceSpecs():
-            sourceSpec = _sourceSpec(troveSpec)
-            toFind.setdefault(ref, set()).add(sourceSpec)
-            _addFlavors(ref, sourceSpec, troveSpec[2], flavorMap)
+    for (troveSpec, ref, requireLatest), _ in group.iterReplaceSpecs():
+        sourceSpec = _sourceSpec(troveSpec)
+        toFind.setdefault(ref, set()).add(sourceSpec)
+        toFind.setdefault(ref, set()).add(troveSpec)
+        _addFlavors(ref, sourceSpec, troveSpec[2], flavorMap)
+        _addFlavors(ref, troveSpec, troveSpec[2], flavorMap)
 
-    results = {}
 
     callback.findingTroves(len(list(chain(*toFind.itervalues()))))
+    results = _findTroves(repos, toFind, labelPath, searchFlavor, 
+                          defaultSource=recipeObj._getSearchSource())
+    toFind = {}
+    newFlavorMap = {}
+    finalResults = []
+    for troveSource, specMap in results.iteritems():
+        for troveSpec, tupList in specMap.iteritems():
+            if troveSpec[0].endswith(':source'):
+                flavors = flavorMap[troveSource][troveSpec]
+                for troveTup in tupList:
+                    finalResults.extend((troveTup[0], troveTup[1], x)
+                                         for x in flavors)
+            else:
+                sourceSpec = _sourceSpec(troveSpec)
+                if sourceSpec in specMap:
+                    continue
+
+                for troveTup in tupList:
+                    sourceSpec = _sourceSpec(troveSpec, troveTup=troveTup)
+                    toFind.setdefault(None, set()).add(sourceSpec)
+                    _addFlavors(None, sourceSpec, troveSpec[2], newFlavorMap)
+    if toFind:
+        flavorMap = newFlavorMap
+        results = _findTroves(repos, toFind, labelPath, searchFlavor, 
+                              defaultSource=repos)
+        for troveSource, specMap in results.iteritems():
+            for troveSpec, tupList in specMap.iteritems():
+                flavors = flavorMap[troveSource][troveSpec]
+                for troveTup in tupList:
+                    finalResults.extend((troveTup[0], troveTup[1], x)
+                                         for x in flavors)
+    return finalResults
+
+def _findTroves(repos, toFind, labelPath, searchFlavor, defaultSource):
+    results = {}
+    reposSource = searchsource.NetworkSearchSource(repos, labelPath,
+                                                          searchFlavor)
     for troveSource, troveSpecs in toFind.iteritems():
         if troveSource is None:
-            source = repos
-            myLabelPath = labelPath
-            mySearchFlavor = searchFlavor
+            if defaultSource is repos:
+                source = reposSource
+            else:
+                source = defaultSource
         elif isinstance(troveSource, tuple):
-            source = repos
-            myLabelPath = troveSource
-            mySearchFlavor = searchFlavor
+            source = searchsource.createSearchSourceStack(reposSource, 
+                                                          troveSource,
+                                                          searchFlavor)
         else:
             source = troveSource
             troveSource.findSources(repos,  labelPath, searchFlavor),
@@ -3249,19 +3314,9 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
             # created from another source, and if they didn't include a
             # "source" line to point us to the right place, then they 
             # should be including the original package anyway.
-            results[troveSource] = source.findTroves(myLabelPath,
-                                                     toFind[troveSource],
-                                                     mySearchFlavor,
+            results[troveSource] = source.findTroves(toFind[troveSource],
                                                      allowMissing=True)
         except errors.TroveNotFound, e:
             raise CookError, str(e)
+    return results
 
-
-    finalResults = []
-    for troveSource, specMap in results.iteritems():
-        for troveSpec, tupList in specMap.iteritems():
-            flavors = flavorMap[troveSource][troveSpec]
-            for troveTup in tupList:
-                finalResults.extend((troveTup[0], troveTup[1], x)
-                                     for x in flavors)
-    return finalResults

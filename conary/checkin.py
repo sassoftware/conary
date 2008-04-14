@@ -1391,7 +1391,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
     else:
         recipeClass = None.__class__
 
-    if issubclass(recipeClass, derivedrecipe.DerivedPackageRecipe):
+    if getattr(recipeClass, '_isDerived', False):
         # Merges between non-derived recipes and derived recipes don't
         # do a patch merge.
         loader = loadrecipe.recipeLoaderFromSourceComponent(troveName, cfg,

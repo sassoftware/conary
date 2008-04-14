@@ -1412,6 +1412,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return jobSizes
 
+    def _clearHostCache(self):
+        transport.clearIPCache()
+
+    def _cacheHostLookups(self, hosts):
+        if self.proxies:
+            return
+        hosts = set(hosts)
+        for host in hosts:
+            url = self.c.map[host]
+            if url:
+                mappedHost = urllib.splithost(urllib.splittype(url)[1])[0]
+            else:
+                mappedHost = host
+            transport.getIPAddress(mappedHost)
+
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
                         excludeAutoSource = False, recurse = True,

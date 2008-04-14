@@ -211,6 +211,7 @@ class RecipeAction(Action):
             # Most likely group recipe
             return
         paths = []
+        buildRequires = self.recipe._getTransitiveBuildRequiresNames()
         for cmd in self._actionPathBuildRequires:
             # Catch the case "python setup.py"
             cmdarr = cmd.split(' ')
@@ -240,8 +241,10 @@ class RecipeAction(Action):
             suggests.update(v)
         # Add the trove requirements
         suggests.update(self._actionTroveBuildRequires)
+        # Tell reportExcessBuildRequires that all these are necessary
+        self.recipe.reportExcessBuildRequires(suggests)
         # Remove build requires that were already added
-        suggests = suggests - set(self.recipe.buildRequires)
+        suggests = suggests - set(buildRequires)
         if suggests:
             self.recipe.reportMissingBuildRequires(sorted(suggests))
 

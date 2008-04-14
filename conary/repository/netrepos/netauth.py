@@ -40,7 +40,7 @@ class UserAuthorization:
         self.pwCache = {}
 
 
-    def addUserByMD5(self, cu, user, salt, password, ugid):
+    def addUserByMD5(self, cu, user, salt, password):
         for letter in user:
             if letter not in nameCharacterSet:
                 raise errors.InvalidName(user)
@@ -60,8 +60,6 @@ class UserAuthorization:
         if len(cu.fetchall()) > 1:
             raise errors.UserAlreadyExists, 'user: %s' % user
 
-        cu.execute("INSERT INTO UserGroupMembers (userGroupId, userId) "
-                   "VALUES (?, ?)", (ugid, uid))
         return uid
 
     def changePassword(self, cu, user, salt, password):
@@ -660,13 +658,16 @@ class NetworkAuthorization:
                    (int(bool(canMirror)), role))
         self.db.commit()
 
+    def _checkValidName(self, name):
+        for letter in name:
+            if letter not in nameCharacterSet:
+                raise errors.InvalidName(name)
+        
     def addUserByMD5(self, user, salt, password):
         self.log(3, user)
+        self._checkValidName(user)
         cu = self.db.transaction()
-
-        roleId = self._addRole(cu, user)
-        uid = self.userAuth.addUserByMD5(cu, user, salt, password, roleId)
-
+        uid = self.userAuth.addUserByMD5(cu, user, salt, password)
         self.db.commit()
 
     def deleteUserByName(self, user):
@@ -769,10 +770,10 @@ class NetworkAuthorization:
             self.db.rollback()
             raise errors.RoleAlreadyExists('role: %s' % role)
 
-    def _addRole(self, cu, role):
-        for letter in role:
-            if letter not in nameCharacterSet:
-                raise errors.InvalidName(role)
+    def addRole(self, role):
+        self.log(3, role)
+        self._checkValidName(role)
+        cu = self.db.transaction()
         try:
             cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", role)
             ugid = cu.lastrowid
@@ -780,11 +781,6 @@ class NetworkAuthorization:
             self.db.rollback()
             raise errors.RoleAlreadyExists, "role: %s" % role
         self._checkDuplicates(cu, role)
-        return ugid
-
-    def addRole(self, role):
-        cu = self.db.transaction()
-        ugid = self._addRole(cu, role)
         self.db.commit()
         return ugid
 
@@ -810,8 +806,8 @@ class NetworkAuthorization:
         #First drop all the current members
         cu.execute ("DELETE FROM UserGroupMembers WHERE userGroupId=?", roleId)
         #now add the new members
-        for userId in members:
-            self.addRoleMember(role, userId, False)
+        for userName in members:
+            self.addRoleMember(role, userName, commit=False)
         self.db.commit()
 
     def addRoleMember(self, role, userName, commit = True):

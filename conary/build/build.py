@@ -327,6 +327,7 @@ class Automake(BuildCommand):
     Demonstrates calling C{r.Automake()} and passing in the C{--add-missing}
     and C{--foreign} arguments to the C{automake} program.
     """
+    _actionTroveBuildRequires = set(('automake:runtime', 'autoconf:runtime'))
     # note: no use of %(args)s -- to which command would it apply?
     template = ('cd \'%%(actionDir)s\' && '
                 'aclocal %%(m4DirArgs)s %(aclocalArgs)s && '
@@ -345,15 +346,6 @@ class Automake(BuildCommand):
                }
 
     def do(self, macros):
-        if 'automake:runtime' not in self.recipe.buildRequires:
-            self.recipe.reportErrors(
-                "Must add 'automake:runtime' to buildRequires")
-            self.recipe.reportMissingBuildRequires('automake:runtime')
-        if 'autoconf:runtime' not in self.recipe.buildRequires:
-            self.recipe.reportErrors(
-                "Must add 'autoconf:runtime' to buildRequires")
-            self.recipe.reportMissingBuildRequires('autoconf:runtime')
-
 	macros = macros.copy()
         macros.actionDir = action._expandOnePath(self.dir, macros,
              macros.builddir, error=not self.skipMissingDir)
@@ -431,6 +423,9 @@ class Configure(BuildCommand):
     Demonstrates calling C{r.Configure()} and specifying the
     C{%(essentialsbindir)s} directory with an C{--sbindir=} argument.
     """
+    # Typical requirements
+    _actionPathBuildRequires = set(('diff', 'file', 'find', 'gawk',
+                                    'grep', 'sed', 'sh',))
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
     template = (
@@ -658,6 +653,7 @@ class CMake(Configure):
             objDir = self.objDir %macros
             macros.cdObjdir = 'cd %s;' %objDir
             macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
+            self._addActionPathBuildRequires(['mkdir'])
 
         try:
             util.execute(self.command %macros)
@@ -832,7 +828,7 @@ class Make(BuildCommand):
                     log.error('preMake argument cannot contain "%s"', i)
 
     def _addMakeToBuildRequires(self):
-        self._addActionPathBuildRequires([ self.keywords['makeName'] ])
+        self._addActionPathBuildRequires(['sh', self.keywords['makeName'] ])
 
     def do(self, macros):
         self._addMakeToBuildRequires()
@@ -889,7 +885,7 @@ class MakeParallelSubdir(Make):
     the top-level C{Makefile} does not work correctly with parallel C{make},
     but the lower-level Makefiles do work correctly with parallel C{make}.
     """
-    _actionPathBuildRequires = set(['make'])
+    _actionPathBuildRequires = set(['sh', 'make'])
     template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
@@ -955,7 +951,7 @@ class MakeInstall(Make):
     Demonstrates using C{r.MakeInstall()}, and setting the environment variable
     C{LIBTOOL} to C{%(bindir)s/libtool}.
     """
-    _actionPathBuildRequires = set(['make'])
+    _actionPathBuildRequires = set(['sh', 'make'])
     template = ('cd \'%%(actionDir)s\'; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
@@ -1007,7 +1003,7 @@ class MakePathsInstall(Make):
     Calls C{r.MakePathsinstall()} and additionally sets the C{mandir}
     make variable to C{%(destdir)s/%(mandir)s/man1}.
     """
-    _actionPathBuildRequires = set(['make'])
+    _actionPathBuildRequires = set(['sh', 'make'])
 
     template = (
 	'cd \'%%(actionDir)s\'; '
@@ -1031,6 +1027,10 @@ class MakePathsInstall(Make):
 	' infodir=%%(destdir)s/%%(infodir)s'
 	' %(installtarget)s %(args)s')
     keywords = {'installtarget': 'install'}
+
+    def _addMakeToBuildRequires(self):
+        # Done by the class attribute
+        pass
 
 class Ant(BuildCommand):
     """
@@ -1306,11 +1306,6 @@ class PythonSetup(BuildCommand):
     }
 
     def do(self, macros):
-        if 'python-setuptools:python' not in self.recipe.buildRequires:
-            if not self.bootstrap:
-                self.recipe.reportErrors(
-                        "Must add 'python-setuptools:python' to buildRequires")
-
 	macros = macros.copy()
         if self.dir == '%(builddir)s':
             rundir = macros.builddir # do not expand!
@@ -1588,7 +1583,7 @@ class Desktopfile(BuildCommand, _FileAction):
     C{r.Desktopfile()}.
     """
     _actionPathBuildRequires = set(['desktop-file-validate',
-                                'desktop-file-install'])
+                                    'desktop-file-install'])
     template = ('cd \'%%(builddir)s\'; '
 		'desktop-file-validate %(args)s ; '
 		'desktop-file-install --vendor %(vendor)s'
@@ -1602,12 +1597,7 @@ class Desktopfile(BuildCommand, _FileAction):
     def do(self, macros):
 	if not Use.desktop:
 	    return
-	if 'desktop-file-utils:runtime' not in self.recipe.buildRequires:
-	    # Unfortunately, we really cannot do this automagically
-            self.recipe.reportErrors(
-                "Must add 'desktop-file-utils:runtime' to buildRequires"
-                " for file(s) %s", ', '.join(self.arglist))
-            self.recipe.reportMissingBuildRequires('desktop-file-utils:runtime')
+
 	macros = self.recipe.macros.copy()
         if self.category:
 	    macros['category'] = '--add-category "%s"' %self.category

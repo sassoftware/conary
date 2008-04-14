@@ -359,7 +359,7 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         mirrorType, mirrorLen = _splitSpecialURL(specialPrefix, origname)
         for mirrorBaseURL in Mirror(cfg, mirrorType):
             trailingName = sourcename[mirrorLen:]
-            urls.append(('/'.join((mirrorBaseURL, trailingName)), origname))
+            urls.append(('/'.join((mirrorBaseURL, trailingName)), sourcename))
 
     names = urls
 

@@ -636,8 +636,6 @@ class HttpHandler(WebHandler):
     @boolFields(write = False, admin = False, remove = False)
     def addUser(self, auth, user, password, write, admin, remove):
         self.repServer.addUser(self.authToken, 0, user, password)
-        self.repServer.addAcl(self.authToken, 60, user, "", "", write = write,
-                              remove=remove)
         self._redirect("userlist")
 
     @checkAuth(admin = True)

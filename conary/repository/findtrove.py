@@ -262,7 +262,7 @@ class QueryOptions(object):
     def __init__(self, troveSource, labelPath, defaultFlavorPath, acrossLabels,
                  acrossFlavors, affinityDatabase, getLeaves=True,
                  bestFlavor=True, allowNoLabel=False, troveTypes=None,
-                 exactFlavors=False, requireLatest=False):
+                 exactFlavors=False, requireLatest=False, allowMissing=False):
         self.troveSource = troveSource
         if isinstance(labelPath, versions.Label):
             labelPath = [labelPath]
@@ -282,6 +282,7 @@ class QueryOptions(object):
         self.labelPath = labelPath
         self.getLeaves = getLeaves
         self.bestFlavor = bestFlavor
+        self.allowMissing = allowMissing
         self.searchAcrossFlavors = acrossFlavors
         self.allowNoLabel = allowNoLabel
         self.exactFlavors = exactFlavors
@@ -322,6 +323,7 @@ class TroveFinder(object):
             or returning a dict of results.
         """
         queryOptions = self.queryOptions
+        queryOptions.allowMissing = allowMissing
         if queryOptions.affinityDatabase:
             affinityTroveDict = queryOptions.affinityDatabase.findTroves(
                                       None,
@@ -470,7 +472,8 @@ class TroveFinder(object):
         if not versionStr:
             labelPath = self._getLabelPath(troveSpec, self.queryOptions,
                                            affinityTroves, versionStr)
-            if not labelPath and not self.queryOptions.allowNoLabel:
+            if (not labelPath and not self.queryOptions.allowNoLabel 
+                and not self.queryOptions.allowMissing):
                 message = ("No search label path given and no label specified"
                            " for trove %s - set the installLabelPath" % name)
                 raise errors.LabelPathNeeded(message)
@@ -567,9 +570,9 @@ class TroveFinder(object):
             # no labelPath parts in versionStr, use the old one.
             newLabelPath = labelPath
             remainder = versionStr
-            if not newLabelPath and not self.queryOptions.allowNoLabel:
+            if not newLabelPath and not self.queryOptions.allowNoLabel and not self.queryOptions.allowMissing:
                 raise errors.LabelPathNeeded("No search label path given and no label specified for trove %s=%s - set the installLabelPath" % (name, versionStr))
-        if not newLabelPath and not self.queryOptions.allowNoLabel:
+        if not newLabelPath and not self.queryOptions.allowNoLabel and not self.queryOptions.allowMissing:
             raise errors.LabelPathNeeded("No search label path given and partial label specified for trove %s=%s - set the installLabelPath" % (name, versionStr))
         if isinstance(labelPath, set):
             newLabelPath = set(newLabelPath)
