@@ -42,6 +42,7 @@ python_files=	    __init__.py		\
 		    stackutil.py	\
 		    tracelog.py		\
 		    util.py		\
+		    xmldata.py		\
 		    xmllog.py
 
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
