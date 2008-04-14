@@ -40,9 +40,11 @@ def _save():
     _install()
 
 def _install():
-    coverageLoc = os.environ.get('COVERAGE_PATH', None) + '/coverage.py'
+    coverageLoc = os.environ.get('COVERAGE_PATH', None)
     if not coverageLoc:
         raise RuntimeError, 'cannot find coverage.py!'
+    else:
+        coverageLoc = coverageLoc + '/coverage.py'
 
     coverageDir = os.environ.get('COVERAGE_DIR', None)
     if not coverageDir:
