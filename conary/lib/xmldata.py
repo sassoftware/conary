@@ -14,6 +14,7 @@
 
 import StringIO
 import os
+import subprocess
 from xml import sax
 
 from conary.lib import util
@@ -34,9 +35,17 @@ def prettyPrint(func):
             tree = etree.parse(StringIO.StringIO(res))
             res = etree.tostring(tree, pretty_print = True)
             res = '<?xml version="1.0"?>\n' + res
-        elif os.access(util.which('xmllint'), os.X_OK):
-            p = os.popen("echo '%s' | xmllint --format -" % res)
-            res = p.read()[:-1]
+        else:
+            xmllint = util.which('xmllint')
+            if xmllint and os.access(xmllint, os.X_OK):
+                p = subprocess.Popen([xmllint, '--format', '-'],
+                        stdin = subprocess.PIPE, stdout = subprocess.PIPE,
+                        stderr = subprocess.PIPE)
+                p.stdin.write(res)
+                stdout, stderr = p.communicate()
+                if p.returncode:
+                    raise RuntimeError(stderr[2:])
+                res = stdout[:-1]
         return res
     return wrapper
 
@@ -261,7 +270,7 @@ class DataBinder(object):
                     if not x[0].startswith('_'))
             res += '<%s' % name
             for key, val in sorted(attrs.iteritems()):
-                res += " %s='%s'" % (key, val)
+                res += ' %s="%s"' % (key, val)
             res += '>'
             ordering = hasattr(obj, '_childOrder') and obj._childOrder or []
             childOrder = self._getChildOrder(children.keys(), ordering)
