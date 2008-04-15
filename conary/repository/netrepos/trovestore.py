@@ -1109,8 +1109,15 @@ class TroveStore:
         if filePathIdsToRemove:
             cu.execute("DELETE FROM FilePaths WHERE filePathId IN (%s)"
                        % ",".join("%d"%x for x in filePathIdsToRemove))
-            # XXX: also clean up Dirnames and Basenames,
-            # but those cleanups are quite expensive
+            # XXX: these cleanups are more expensive than they're worth, probably
+            cu.execute(""" delete from Prefixes where not exists (
+                select 1 from FilePaths as fp where fp.dirnameId = Prefixes.dirnameId ) """)
+            cu.execute(""" delete from Dirnames where not exists (
+                select 1 from FilePaths as fp where fp.dirnameId = Dirnames.dirnameId )
+            and not exists (
+                select 1 from Prefixes as p where p.prefixId = Dirnames.dirnameId ) """)
+            cu.execute(""" delete from Basenames where not exists (
+                select 1 from FilePaths as fp where fp.basenameId = Basenames.basenameId ) """)
 
         # we need to double check filesToRemove against other streams which
         # may need the same sha1
