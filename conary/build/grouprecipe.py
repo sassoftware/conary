@@ -1401,6 +1401,9 @@ class GroupRecipe(_BaseGroupRecipe):
     def getLabelPath(self):
         return self.labelPath
 
+    def getSearchPath(self):
+        return self._getSearchSource().getSearchPath()
+
     def getResolveTroveSpecs(self):
         return self.resolveTroveSpecs
 
