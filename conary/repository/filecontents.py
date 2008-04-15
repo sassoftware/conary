@@ -39,10 +39,10 @@ class FileContents(object):
 
 class FromDataStore(FileContents):
 
-    __slots__ = ( "store", "theSize", "sha1" )
+    __slots__ = ( "store", "sha1" )
 
     def copy(self):
-        return self.__class__(self.store, self.sha1, self.theSize)
+        return self.__class__(self.store, self.sha1)
 
     def get(self):
 	return self.store.openFile(sha1helper.sha1ToString(self.sha1))
@@ -56,13 +56,13 @@ class FromDataStore(FileContents):
 
 class CompressedFromDataStore(FileContents):
 
-    __slots__ = ( "store", "theSize", "sha1" )
+    __slots__ = ( "store", "sha1" )
 
     def getSha1(self):
         return self.sha1
 
     def copy(self):
-        return self.__class__(self.store, self.sha1, self.theSize)
+        return self.__class__(self.store, self.sha1)
 
     def get(self):
 	return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
@@ -130,7 +130,7 @@ util.SendableFileSet._register(FromString)
 
 class FromFile(FileContents):
 
-    __slots__ = [ "f", "theSize" ]
+    __slots__ = [ "f" ]
 
     def copy(self):
         # XXX dup the file?

@@ -24,7 +24,7 @@ import types
 import tempfile
 import traceback
 
-from conary.repository import errors
+from conary.repository import errors, trovesource
 from conary.build import recipe, use
 from conary.build import errors as builderrors
 from conary.build.errors import RecipeFileError
@@ -223,6 +223,10 @@ class RecipeLoaderFromString:
         if db is None:
             db = database.Database(cfg.root, cfg.dbPath)
 
+        # This stack looks in the database before looking at a repository,
+        # avoiding repository calls where they aren't needed.
+        ts = trovesource.stack(db, repos)
+
         troveSpecs = [ cmdline.parseTroveSpec(x) for x in cfg.autoLoadRecipes ]
 
         groupTroves = RecipeLoaderFromString._getTrovesFromRepos(repos,
@@ -243,14 +247,15 @@ class RecipeLoaderFromString:
         # We have a list of the troves to autoload recipes from now. Go get
         # those troves so we can get the file information we need. The
         # sort here is to keep this order repeatable
-        troveList = repos.getTroves(sorted(recipeTroves.values()),
+        troveList = ts.getTroves(sorted(recipeTroves.values()),
                                     withFiles = True)
         filesNeeded = []
         for trv in troveList:
             filesNeeded += [ x for x in trv.iterFileList() if
                                     x[1].endswith('.recipe') ]
 
-        recipes = repos.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
+        #import epdb;epdb.st('f')
+        recipes = ts.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
 
         for (fileContents, fileInfo) in itertools.izip(recipes, filesNeeded):
             loader = RecipeLoaderFromString(fileContents.get().read(),

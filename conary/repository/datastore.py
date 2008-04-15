@@ -291,12 +291,13 @@ class DataStoreRepository:
                 # XXX this is broken code, we have no findFileVersion()
                 # method
                 fileObj = self.findFileVersion(fileId)
-            
-            if fileObj:
+
+            if fileObj and fileObj.flags.isConfig():
+                # Only config files are stored in this data store
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
             else:
-                cont = ""
+                cont = None
 
             contentList.append(cont)
 
