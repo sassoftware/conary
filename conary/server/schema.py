@@ -22,7 +22,7 @@ TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
 # This is the major number of the schema we need
-VERSION = sqllib.DBversion(16)
+VERSION = sqllib.DBversion(17)
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -583,19 +583,50 @@ def createTroves(db, createIndex = True):
     if createTrigger(db, "FileStreams"):
         commit = True
 
+    if idtable.createIdTable(db, "Dirnames", "dirnameId", "dirname"):
+        commit = True
+    if 'Prefixes' not in db.tables:
+        cu.execute("""
+        CREATE TABLE Prefixes(
+            dirnameId   INTEGER NOT NULL,
+            prefixId    INTEGER NOT NULL,
+            CONSTRAINT  Prefixes_dirnameId_fk
+                FOREIGN KEY (dirnameId) REFERENCES Dirnames(dirnameId)
+                ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT Prefixes_prefixId_fk
+                FOREIGN KEY (prefixId) REFERENCES Dirnames(dirnameId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tables["Prefixes"] = []
+        commit = True
+    if createIndex:
+        db.createIndex("Prefixes", "PrefixesDirnameIdPrefixId_uq", "dirnameId, prefixId", unique = True)
+        db.createIndex("Prefixes", "PrefixesPrefixId_fk", "prefixId")
+    if idtable.createIdTable(db, "Basenames", "basenameId", "basename"):
+        commit = True
+
     if "FilePaths" not in db.tables:
         cu.execute("""
         CREATE TABLE FilePaths(
             filePathId      %(PRIMARYKEY)s,
-            path            %(PATHTYPE)s,
-            pathId          %(BINARY16)s,
-            changed         NUMERIC(14,0) NOT NULL DEFAULT 0
+            dirnameId       INTEGER NOT NULL,
+            basenameId      INTEGER NOT NULL,
+            pathId          %(BINARY16)s NOT NULL,
+            changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
+            CONSTRAINT      FilePaths_dirnameId_fk
+                FOREIGN KEY (dirnameId) REFERENCES Dirnames(dirnameId)
+                ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT      FilePaths_basenameId_fk
+                FOREIGN KEY (basenameId) REFERENCES Basenames(basenameId)
+                ON DELETE RESTRICT ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["FilePaths"] = []
         commit = True
-    db.createIndex("FilePaths", "FilesPathIdx", "path")
-    if createTrigger(db, "FilePaths"):
-        commit = True
+    if createIndex:
+        db.createIndex("FilePaths", "FilesPathDirnameIdx", "dirnameId")
+        db.createIndex("FilePaths", "FilesPathBasenameIdx", "basenameId")
+        if createTrigger(db, "FilePaths"):
+            commit = True
 
     if "TroveFiles" not in db.tables:
         cu.execute("""
@@ -1027,7 +1058,8 @@ def setupTempTables(db):
             fileId      %(BINARY20)s,
             stream      %(MEDIUMBLOB)s,
             sha1        %(BINARY20)s,
-            path        %(PATHTYPE)s
+            dirname     %(PATHTYPE)s,
+            basename    %(PATHTYPE)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpNewFiles"] = True
         # since this is an index on a temp table, don't check the
@@ -1035,6 +1067,8 @@ def setupTempTables(db):
         db.createIndex("tmpNewFiles", "tmpNewFilesFileIdx", "fileId",
                        check = False)
         db.createIndex("tmpNewFiles", "tmpNewFilesVersionIdx", "versionId",
+                       check = False)
+        db.createIndex("tmpNewFiles", "tmpNewFilesDirnameIdx", "dirname",
                        check = False)
     if "tmpNewRedirects" not in db.tempTables:
         cu.execute("""
@@ -1044,12 +1078,6 @@ def setupTempTables(db):
             flavor      %(STRING)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpNewRedirects"] = True
-    if "tmpNeededFlavors" not in db.tempTables:
-        cu.execute("""
-        CREATE TEMPORARY TABLE tmpNeededFlavors(
-            flavor      %(STRING)s
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["tmpNeededFlavors"] = True
     if "tmpNVF" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpNVF(
@@ -1109,10 +1137,11 @@ def setupTempTables(db):
         cu.execute("""
         CREATE TEMPORARY TABLE tmpPath(
             row         INTEGER,
-            path        %(PATHTYPE)s
+            dirname     %(PATHTYPE)s,
+            basename    %(PATHTYPE)s
         )""" % db.keywords)
         db.tempTables["tmpPath"] = True
-        db.createIndex("tmpPath", "tmpPathIdx", "path", check=False)
+        db.createIndex("tmpPath", "tmpPathDirnameIdx", "dirname", check=False)
     # used primarily for dependency resolution
     if "tmpInstances" not in db.tempTables:
         cu.execute("""
@@ -1129,6 +1158,16 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpId"] = True
         db.createIndex("tmpId", "tmpIdIdx", "id", check=False)
+    # general purpose list of strings
+    if "tmpItems" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpItems(
+            itemId    INTEGER,
+            item      %(STRING)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpItems"] = True
+        db.createIndex("tmpItems", "tmpItemsItemIdIdx", "itemId", check=False)
+        db.createIndex("tmpItems", "tmpItemsItemIdx", "item", check=False)
     # for processing UserGroupInstancesCache entries
     if "tmpUGI" not in db.tempTables:
         cu.execute("""
@@ -1153,15 +1192,6 @@ def setupTempTables(db):
         # XXX: this index helps postgresql and hurts mysql.
         #db.createIndex("tmpTroves", "tmpTrovesIdx", "item",
         #               check = False)
-    # for processing getPackageBranchpathIds
-    if "tmpFilePrefixes" not in db.tempTables:
-        cu.execute("""
-        CREATE TEMPORARY TABLE tmpFilePrefixes(
-            prefix          %(STRING)s NOT NULL
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["tmpFilePrefixes"] = True
-        db.createIndex("tmpFilePrefixes", "tmpFilePrefixesPrefixIdx", "prefix",
-                       check = False)
     # for processing markRemoved
     if "tmpRemovals" not in db.tempTables:
         cu.execute("""
@@ -1202,6 +1232,17 @@ def setupTempTables(db):
         db.tempTables["tmpDepNum"] = True
         db.createIndex("tmpDepNum", "tmpDepNumIdx", "idx, depNum",
                        check = False, unique=True)
+    # for processing intermediary results for pathid lookups
+    if "tmpPathIdLookup" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpPathIdLookup(
+            versionId           INTEGER NOT NULL,
+            filePathId          INTEGER NOT NULL,
+            streamId            INTEGER NOT NULL,
+            finalTimestamp      NUMERIC(13,3) NOT NULL      
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpPathIdLookup"] = True
+        
     db.commit()
 
 def resetTable(cu, name):

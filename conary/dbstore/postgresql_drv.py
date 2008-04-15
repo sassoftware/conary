@@ -354,6 +354,15 @@ class Database(BaseDatabase):
         # now it's safe to do the bulkload
         return self.dbh.bulkload(tableName, rows, columnNames)
 
+    # resetting the auto increment values of primary keys
+    def setAutoIncrement(self, table, column, value):
+        cu = self.cursor()
+        seqName = "%s_%s_seq" % (table, column)
+        cu.execute("select setval(?, ?)", (seqName, value))
+        ret = cu.fetchall()
+        assert (ret[0][0] == value)
+        return True
+
     def use(self, dbName, **kwargs):
         self.close()
         self.database = "/".join([self.database.rsplit("/", 1)[0], dbName])

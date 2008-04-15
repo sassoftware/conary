@@ -10,6 +10,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+import os
 import sys
 
 from conary import files, trove, versions
@@ -495,6 +496,17 @@ def createCheckTroveCache(db):
     db.analyze("CheckTroveCache")
     return True
         
+# return a list of all prefixes for a given dirname, including self
+def _prefix(dirname):
+    d, b = os.path.split(dirname)
+    if d == '/':
+        return [dirname]
+    if d == '':
+        return []
+    ret = _prefix(d)
+    ret.append(dirname)
+    return ret
+                                
 class MigrateTo_16(SchemaMigration):
     Version = (16,1)
     # migrate to 16.0
@@ -627,6 +639,162 @@ class MigrateTo_16(SchemaMigration):
     def migrate1(self):
         self.db.loadSchema()
         schema.createLockTables(self.db)
+        return True
+
+
+class MigrateTo_17(SchemaMigration):
+    Version = (17,0)
+
+    # after the Dirnames table is created, we unwind each dirname and
+    # record pointers to all possible prefixes in the Prefixes table,
+    # which has two FKs back into Dirnames
+    def _createPrefixes(self):
+        logMe(2, "computing the dirname prefixes...")
+        cu = self.db.cursor()
+        cu.execute("""
+        create table tmpPrefixes (
+        dirnameId       INTEGER,
+        prefix          %(PATHTYPE)s
+        ) """ % self.db.keywords)
+        # seed the tmpPrefixes
+        cu.execute("insert into tmpPrefixes(prefix) "
+                   "select dirname from Dirnames")
+        while True:
+            cu.execute("select prefix from tmpPrefixes")
+            dirnames = [ x[0] for x in cu.fetchall() ]
+            if not dirnames:
+                break
+            cu.execute("delete from tmpPrefixes")
+            parents = set(os.path.dirname(x) for x in dirnames)
+            # load the new prefixes; filtering out '' and '/' makes
+            # sure the break above will happen at some point
+            self.db.bulkload("tmpPrefixes",
+                             ( [x] for x in parents if x not in ['', '/'] ),
+                             ["prefix"] )
+            # make sure each prefix shows up in the Dirnames table
+            cu.execute(""" insert into Dirnames(dirname)
+            select prefix from tmpPrefixes
+            where not exists ( select 1 from Dirnames
+                               where Dirnames.dirname = tmpPrefixes.prefix )""")
+        cu.execute("delete from tmpPrefixes")
+
+        # now produce a list of which prefixes belong to which dirname
+        logMe(2, "linking dirnames to prefixes")
+        cu.execute("select dirnameId, dirname from Dirnames")
+        prefixList = []
+        for dirnameId, dirname in cu.fetchall():
+            prefixes = _prefix(dirname)
+            prefixList += [ (dirnameId, x) for x in prefixes ]
+            if len(prefixList) > 100000:
+                self.db.bulkload("tmpPrefixes", prefixList, ["dirnameId", "prefix"])
+                prefixList = []
+        if prefixList:
+            self.db.bulkload("tmpPrefixes", prefixList, ["dirnameId", "prefix"])
+        self.db.analyze("tmpPrefixes")
+
+        # finally, create the Prefixes table
+        logMe(2, "creating the Prefixes table")
+        self.db.dropForeignKey("Prefixes", name = "Prefixes_dirnameId_fk")
+        self.db.dropForeignKey("Prefixes", name = "Prefixes_prefixId_fk")
+        cu.execute("""insert into Prefixes (dirnameId, prefixId)
+        select tp.dirnameId, d.dirnameId
+        from Dirnames as d join tmpPrefixes as tp on d.dirname = tp.prefix """)
+        self.db.addForeignKey("Prefixes", "dirnameId", "Dirnames", "dirnameId")
+        self.db.addForeignKey("Prefixes", "prefixId", "Dirnames", "dirnameId")
+        cu.execute("drop table tmpPrefixes")
+        return
+    
+    # given a FilePaths table that only has a path column, split that into
+    # a (dirnameid, basenameId) tuple and create/update the corresponding
+    # Dirnames and Basenames tables
+    def _createDirnames(self):
+        logMe(2, "splitting paths in dirnames and basenames")
+        cu = self.db.cursor()
+        cu.execute("""create table tmpDirnames (
+        filePathId %(PRIMARYKEY)s,
+        dirname %(PATHTYPE)s,
+        basename %(PATHTYPE)s
+        ) """ % self.db.keywords)
+        # save a copy of FilePaths before updating the table definition
+        cu.execute("""create table tmpFilePaths as
+        select filePathId, pathId, path
+        from FilePaths""")
+        self.db.createIndex("tmpFilePaths", "tmpFilePathsIdx", "filePathId",
+                            check=False, unique=True)
+        self.db.analyze("tmpFilePaths")
+
+        # drop the FK constraint from TroveFiles into FilePaths
+        self.db.loadSchema()
+        self.db.dropForeignKey("TroveFiles", name = "TroveFiles_filePathId_fk")
+        cu.execute("drop table FilePaths")
+        # create the Dirnames and the new FilePaths tables
+        self.db.loadSchema()
+        schema.createTroves(self.db, createIndex=False)
+        # this is to avoid processing too many entries at once...
+        sliceSize = 200000
+        counter = 0
+        while True:
+            cu.execute("""
+            select filePathId, path from tmpFilePaths as fp
+            where not exists (select 1 from tmpDirnames as d where d.filePathId = fp.filePathId)
+            limit ?""", sliceSize)
+            tmpl = [ (_fpid, os.path.split(_path)) for _fpid,_path in cu.fetchall() ]
+            if not tmpl:
+                break # no more entries found
+            self.db.bulkload("tmpDirnames", [ (x[0], x[1][0], x[1][1]) for x in tmpl ],
+                             ["filePathId", "dirname", "basename"])
+            counter += len(tmpl)
+
+        logMe(2, "extracting unique dirnames and basenames...")
+        self.db.analyze("tmpDirnames")
+        # the '' and '/' dirnames should already be in the Dirnames table
+        cu.execute("""
+        insert into Dirnames(dirname)
+        select distinct dirname from tmpDirnames
+        order by dirname """)
+        cu.execute("""
+        insert into Basenames(basename)
+        select distinct basename from tmpDirnames
+        order by basename """)
+        self.db.analyze("Dirnames")
+        self.db.analyze("Basenames")
+        self._createPrefixes()
+        
+    
+    # migrate to 17.0
+    def migrate(self):
+        # migrate FilesPath to a dirnames-based setup
+        logMe(1, "WARNING: this migration takes a LONG time. Do not interupt!")
+        self._createDirnames()
+        
+        # need to create a temp table first to avoid FK contention on Dirnames...
+        logMe(2, "generating the new FilePaths table...")
+        cu = self.db.cursor()
+        cu.execute("""
+        create table tmpFP as
+        select fp.filePathId as filePathId, d.dirnameId as dirnameId,
+               b.basenameId as basenameId, fp.pathId as pathId
+        from tmpFilePaths as fp
+        join tmpDirnames as td using(filePathId)
+        join Dirnames as d on td.dirname = d.dirname
+        join Basenames as b on td.basename =  b.basename """)
+        # and now we insert into filepaths
+        cu.execute("""
+        insert into FilePaths (filePathId, dirnameId, basenameId, pathId)
+        select filePathId, dirnameId, basenameId, pathId from tmpFP """)
+        cu.execute("drop table tmpFilePaths")
+        cu.execute("drop table tmpDirnames")
+        cu.execute("drop table tmpFP")
+        # fix the atoincrement primary key value on the new filepaths
+        cu.execute("select max(filePathId) from FilePaths")
+        maxId = cu.fetchone()[0]
+        self.db.setAutoIncrement("FilePaths", "filePathId", maxId)
+        self.db.analyze("FilePaths")
+        # re-enable the FK constraint and create indexes
+        logMe(3, "adding foreign key constraints and creating indexes...")
+        self.db.addForeignKey("TroveFiles", "filePathId", "FilePaths", "filePathId")
+        self.db.analyze("TroveFiles")
+        schema.createTroves(self.db)
         return True
 
 def _getMigration(major):

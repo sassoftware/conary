@@ -491,3 +491,11 @@ class Database(BaseDatabase):
         cu.execute("ALTER TABLE %s DROP FOREIGN KEY %s" % (table, name))
         return True
 
+    # resetting the auto increment values of primary keys
+    def setAutoIncrement(self, table, column, value):
+        cu = self.cursor()
+        # mysql doesn't start from the "next" value, so we do it for it
+        cu.execute("ALTER TABLE %s AUTO_INCREMENT = ?" % (table,), value+1)
+        return True
+    
+        

@@ -383,6 +383,13 @@ class Database(BaseDatabase):
     def dropForeignKey(self, *args, **kw):
         return True
 
+    # resetting the auto increment values of primary keys
+    def setAutoIncrement(self, table, column, value):
+        cu = self.cursor()
+        cu.execute("update sqlite_sequence set seq = ? where lower(name) = lower(?)",
+                   (value, table))
+        return True
+
     def use(self, dbName, **kwargs):
         self.close()
         self.database = dbName

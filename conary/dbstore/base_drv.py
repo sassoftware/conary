@@ -524,3 +524,8 @@ class BaseDatabase:
         cu = self.cursor()
         cu.execute("ALTER TABLE %s DROP CONSTRAINT %s" % (table, name))
         return True
+
+    # resetting the auto increment values of primary keys
+    def setAutoIncrement(self, table, column, value):
+        raise NotImplementedError("This function should be provided by the SQL drivers")
+    

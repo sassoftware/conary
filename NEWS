@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Server Changes
+    * The repository code and repository schema have been updated to
+      allow for faster processing and lookup of file pathIds (CNY-2468)
+
 Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.

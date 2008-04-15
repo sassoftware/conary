@@ -12,6 +12,7 @@
 # full details.
 #
 
+import os
 import itertools
 
 from conary import files, metadata, trove, versions, changelog
@@ -211,137 +212,20 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewRedirects')
 	return (cu, trv, hidden, [])
 
-    def addTroveDone(self, troveInfo, mirror=False):
-        (cu, trv, hidden, newFilesInsertList) = troveInfo
+    # tmpNewFiles can contain duplicate entries for the same fileId,
+    # (with stream being NULL or not), so the FileStreams update
+    # is happening in three steps:
+    # 1. Update existing fileIds
+    # 2. Insert new fileIds with non-NULL streams
+    # 3. Insert new fileIds that might have NULL streams.
+    def _addTroveNewFiles(self, cu, troveInstanceId):
+        # We split these steps into separate queries because most DB
+        # backends I have tried will get the optimization of a single
+        # query wrong --gafton
 
-        self.log(3, trv)
-
-        self.db.bulkload("tmpNewFiles", newFilesInsertList,
-                         [ "pathId", "versionId", "fileId", "stream",
-                         "path", "sha1" ])
-
-	troveVersion = trv.getVersion()
-	troveItemId = self.getItemId(trv.getName())
-        sourceName = trv.troveInfo.sourceName()
-
-        # Pull out the clonedFromId
-        clonedFrom = trv.troveInfo.clonedFrom()
-        clonedFromId = None
-        if clonedFrom:
-            clonedFromId = self.versionTable.get(clonedFrom, None)
-            if clonedFromId is None:
-                clonedFromId = self.versionTable.addId(clonedFrom)
-
-        isPackage = (not trv.getName().startswith('group') and
-                     not trv.getName().startswith('fileset') and
-                     ':' not in trv.getName())
-
-	troveVersionId = self.versionTable.get(troveVersion, None)
-	if troveVersionId is not None:
-	    nodeId = self.versionOps.nodes.getRow(
-                troveItemId, troveVersionId, None)
-
-	troveFlavor = trv.getFlavor()
-
-	# start off by creating the flavors we need; we could combine this
-	# to some extent with the file table creation below, but there are
-	# normally very few flavors per trove so this probably better
-	flavorsNeeded = {}
-	if troveFlavor is not None:
-	    flavorsNeeded[troveFlavor] = True
-
-	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
-                                                           weakRefs = True):
-	    if flavor is not None:
-		flavorsNeeded[flavor] = True
-
-        for (name, branch, flavor) in trv.iterRedirects():
-            if flavor is not None:
-                flavorsNeeded[flavor] = True
-
-	flavorIndex = {}
-        schema.resetTable(cu, 'tmpNeededFlavors')
-	for flavor in flavorsNeeded.iterkeys():
-	    flavorIndex[flavor.freeze()] = flavor
-	    cu.execute("INSERT INTO tmpNeededFlavors VALUES(?)", flavor.freeze(),
-                       start_transaction=False)
-	del flavorsNeeded
-        self.db.analyze("tmpNeededFlavors")
-
-	# it seems like there must be a better way to do this, but I can't
-	# figure it out. I *think* inserting into a view would help, but I
-	# can't with sqlite.
-	cu.execute("""
-        SELECT tmpNeededFlavors.flavor
-        FROM tmpNeededFlavors
-        LEFT JOIN Flavors ON tmpNeededFlavors.flavor = Flavors.Flavor
-        WHERE Flavors.flavorId is NULL""")
-        # make a list of the flavors we're going to create.  Add them
-        # after we have retrieved all of the rows from this select
-        l = []
-	for (flavorStr,) in cu:
-            l.append(flavorIndex[flavorStr])
-        for flavor in l:
-	    self.flavors.createFlavor(flavor)
-
-	flavors = {}
-	cu.execute("""
-        SELECT Flavors.flavor, Flavors.flavorId
-        FROM tmpNeededFlavors
-        JOIN Flavors ON tmpNeededFlavors.flavor = Flavors.flavor""")
-	for (flavorStr, flavorId) in cu:
-	    flavors[flavorIndex[flavorStr]] = flavorId
-
-	del flavorIndex
-
-	if troveFlavor is not None:
-	    troveFlavorId = flavors[troveFlavor]
-	else:
-	    troveFlavorId = 0
-
-	if troveVersionId is None or nodeId is None:
-	    (nodeId, troveVersionId) = self.versionOps.createVersion(
-                troveItemId, troveVersion, troveFlavorId, sourceName)
-	    if trv.getChangeLog() and trv.getChangeLog().getName():
-		self.changeLogs.add(nodeId, trv.getChangeLog())
-        elif sourceName: # make sure the sourceItemId matches for the trove we are comitting
-            sourceItemId = self.items.getOrAddId(sourceName)
-            self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId, mirrorMode=mirror)
-                                         
-	# the instance may already exist (it could be referenced by a package
-	# which has already been added)
-        if hidden:
-            presence = instances.INSTANCE_PRESENT_HIDDEN
-        else:
-            presence = instances.INSTANCE_PRESENT_NORMAL
-
-	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
-                         troveFlavorId, clonedFromId, trv.getType(),
-                         isPresent = presence)
-        assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
-                          "instanceId=?", troveInstanceId).next()[0] == 0)
-
-        troveBranchId = self.branchTable[troveVersion.branch()]
-        self.depTables.add(cu, trv, troveInstanceId)
-        self.ri.addInstanceId(troveInstanceId)
-        self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
-        
-        # Fold tmpNewFiles into FileStreams
-        #
-        # tmpNewFiles can contain duplicate entries for the same fileId,
-        # (with stream being NULL or not), so the FileStreams update
-        # is happening in three steps:
-        # 1. Update existing fileIds (while avoiding  a full table scan)
-        # 2. Insert new fileIds with non-NULL streams
-        # 3. Insert new fileIds that might have NULL streams.
-
-        # Note: writing the next two steps in a single query causes
-        # very slow full table scans on FileStreams. Don't get fancy.
-        self.db.analyze("tmpNewFiles")
-        # get the common entries we're gonna update. In the extreme
-        # case of binary shadowing this might require a bit of of
-        # memory for large troves, but it is preferable to constant
-        # full table scans in the much more common cases
+        # In the extreme case of binary shadowing this might require a
+        # bit of of memory for larger troves, but it is preferable to
+        # constant full table scans in the much more common cases
         cu.execute("""
         SELECT tmpNewFiles.fileId, tmpNewFiles.stream
         FROM tmpNewFiles
@@ -349,13 +233,9 @@ class TroveStore:
         WHERE FileStreams.stream IS NULL
         AND tmpNewFiles.stream IS NOT NULL
         """)
-        # Note: PostgreSQL and MySQL have support for non-SQL standard
-        # multi-table updates that we could use to do this in one step.
-        # This two step should work on everything though --gafton
         for (fileId, stream) in cu.fetchall():
-            cu.execute("UPDATE FileStreams SET stream = ? "
-                       "WHERE fileId = ?", (cu.binary(stream), cu.binary(fileId)))
-
+            cu.execute("UPDATE FileStreams SET stream = ? WHERE fileId = ?",
+                       (cu.binary(stream), cu.binary(fileId)))
         # select the new non-NULL streams out of tmpNewFiles and Insert
         # them in FileStreams
         cu.execute("""
@@ -365,9 +245,9 @@ class TroveStore:
         LEFT JOIN FileStreams AS FS USING(fileId)
         WHERE FS.fileId IS NULL
           AND NF.stream IS NOT NULL
-        """)
-        # now insert the other fileIds
-        # select the new non-NULL streams out of tmpNewFiles and Insert them in FileStreams
+          """)
+        # now insert the other fileIds. select the new non-NULL streams
+        # out of tmpNewFiles and insert them in FileStreams
         cu.execute("""
         INSERT INTO FileStreams (fileId, stream, sha1)
         SELECT DISTINCT NF.fileId, NF.stream, NF.sha1
@@ -375,58 +255,71 @@ class TroveStore:
         LEFT JOIN FileStreams AS FS USING(fileId)
         WHERE FS.fileId IS NULL
         """)
-
-        # create the paths
-        cu.execute("""
-        INSERT INTO FilePaths (pathId, path)
-        SELECT NF.pathId, NF.path
-        FROM tmpNewFiles AS NF
-        LEFT JOIN FilePaths AS TFP USING (pathId, path)
-        WHERE TFP.pathID IS NULL
-        """)
+        # need to keep a list of new dirnames we're inserting
+        cu.execute(""" select distinct tnf.dirname from tmpNewFiles as tnf
+        where not exists (
+            select 1 from Dirnames as d where d.dirname = tnf.dirname )""")
+        newDirnames = cu.fetchall()
+        schema.resetTable(cu, "tmpItems")
+        import epdb ; epdb.st()
+        self.db.bulkload("tmpItems", newDirnames, ["item"])
+        self.db.bulkload("Dirnames", newDirnames, ["dirname"])
+        prefixList = []
+        # all the new dirnames need to be processed for Prefixes links
+        def _getPrefixes(dirname):
+            d, b = os.path.split(dirname)
+            if d == '/':
+                return [dirname]
+            if d == '':
+                return []
+            ret = _getPrefixes(d)
+            ret.append(dirname)
+            return ret
+        cu.execute("select dirnameId, dirname from Dirnames "
+                   "join tmpItems on dirname = item ")
+        for dirnameId, dirname in cu.fetchall():
+            prefixList += [ (dirnameId, x) for x in _getPrefixes(dirname) ]
+        if prefixList:
+            schema.resetTable(cu, "tmpItems")
+            self.db.bulkload("tmpItems", prefixList, ["itemId", "item"])
+            # insert any new prefix strings into Dirnames
+            cu.execute(""" insert into Dirnames(dirname)
+            select distinct item from tmpItems where not exists (
+                select 1 from Dirnames as d where d.dirname = tmpItems.item ) """)
+            # now populate Prefixes
+            cu.execute(""" insert into Prefixes (dirnameId, prefixId)
+            select tmpItems.itemId, d.dirnameId from tmpItems
+            join Dirnames as d on tmpItems.item = d.dirname """)
+        # done with processing the Prefixes for new Dirnames
+        cu.execute(""" insert into Basenames(basename)
+        select distinct tnf.basename from tmpNewFiles as tnf
+        where not exists (
+            select 1 from Basenames as b where b.basename = tnf.basename ) """)
+        cu.execute(""" insert into FilePaths (pathId, dirnameId, basenameId)
+        select tnf.pathId, d.dirnameId, b.basenameId
+        from tmpNewFiles as tnf
+        join Dirnames as d on tnf.dirname = d.dirname
+        join Basenames as b on tnf.basename = b.basename
+        where not exists (
+            select 1 from FilePaths as fp
+            where fp.pathId = tnf.pathId
+              and fp.dirnameId = d.dirnameId
+              and fp.basenameId = b.basenameId ) """)
 
         # create the TroveFiles links for this trove's files.
-        cu.execute("""
-        INSERT INTO TroveFiles
-            (instanceId, streamId, versionId, filePathId)
-        SELECT %d, FS.streamId, NF.versionId, TFP.filePathId
-        FROM tmpNewFiles as NF
-        JOIN FileStreams as FS USING(fileId)
-        JOIN FilePaths as TFP ON
-            NF.path = TFP.path AND
-            NF.pathId = TFP.pathId
+        cu.execute(""" insert into TroveFiles (instanceId, streamId, versionId, filePathId)
+        select %d, fs.streamId, tnf.versionId, fp.filePathId
+        from tmpNewFiles as tnf
+        join Dirnames as d on tnf.dirname = d.dirname
+        join Basenames as b on tnf.basename = b.basename
+        join FilePaths as fp on
+            tnf.pathId = fp.pathId and
+            fp.dirnameId = d.dirnameId and
+            fp.basenameId = b.basenameId
+        join FileStreams as fs using(fileId)
         """ % (troveInstanceId,))
 
-        # iterate over both strong and weak troves, and set weakFlag to
-        # indicate which kind we're looking at when
-        schema.resetTable(cu, 'tmpTroves')
-        insertList = []
-        for ((name, version, flavor), weakFlag) in itertools.chain(
-                itertools.izip(trv.iterTroveList(strongRefs = True,
-                                                   weakRefs   = False),
-                               itertools.repeat(0)),
-                itertools.izip(trv.iterTroveList(strongRefs = False,
-                                                   weakRefs   = True),
-                               itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
-
-            flags = weakFlag
-            if trv.includeTroveByDefault(name, version, flavor):
-                flags |= schema.TROVE_TROVES_BYDEFAULT
-
-            # sanity check - version/flavor of components must match the
-            # version/flavor of the package
-            assert(not isPackage or version == trv.getVersion())
-            assert(not isPackage or flavor == trv.getFlavor())
-            insertList.append((name, str(version), version.freeze(),
-                               flavor.freeze(), flags))
-
-        self.db.bulkload("tmpTroves", insertList,
-                         [ "item", "version", "frozenVersion", "flavor",
-                           "flags" ])
-
-
-        self.db.analyze("tmpTroves")
-        
+    def _addTroveNewTroves(self, cu, troveInstanceId, troveType):
         # need to use self.items.addId to keep the CheckTroveCache in
         # sync for any new items we might add
         cu.execute("""
@@ -475,7 +368,7 @@ class TroveStore:
             # will get fixed when the trove is comitted.
             # We actually don't quite care about the exact instanceId value we get back...
             self.getInstanceId(itemId, versionId, flavorId,
-                               clonedFromId = None, troveType =  trv.getType(),
+                               clonedFromId = None, troveType =  troveType,
                                isPresent = instances.INSTANCE_PRESENT_MISSING)
 
         cu.execute("""
@@ -491,6 +384,154 @@ class TroveStore:
             Flavors.flavorId = Instances.flavorId
         """ %(troveInstanceId,))
 
+    def addTroveDone(self, troveInfo, mirror=False):
+        (cu, trv, hidden, newFilesInsertList) = troveInfo
+
+        self.log(3, trv)
+
+	troveVersion = trv.getVersion()
+	troveItemId = self.getItemId(trv.getName())
+        sourceName = trv.troveInfo.sourceName()
+
+        # Pull out the clonedFromId
+        clonedFrom = trv.troveInfo.clonedFrom()
+        clonedFromId = None
+        if clonedFrom:
+            clonedFromId = self.versionTable.get(clonedFrom, None)
+            if clonedFromId is None:
+                clonedFromId = self.versionTable.addId(clonedFrom)
+
+        isPackage = (not trv.getName().startswith('group') and
+                     not trv.getName().startswith('fileset') and
+                     ':' not in trv.getName())
+
+	troveVersionId = self.versionTable.get(troveVersion, None)
+	if troveVersionId is not None:
+	    nodeId = self.versionOps.nodes.getRow(
+                troveItemId, troveVersionId, None)
+
+	troveFlavor = trv.getFlavor()
+
+	# start off by creating the flavors we need; we could combine this
+	# to some extent with the file table creation below, but there are
+	# normally very few flavors per trove so this probably better
+	flavorsNeeded = {}
+	if troveFlavor is not None:
+	    flavorsNeeded[troveFlavor] = True
+
+	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
+                                                           weakRefs = True):
+	    if flavor is not None:
+		flavorsNeeded[flavor] = True
+
+        for (name, branch, flavor) in trv.iterRedirects():
+            if flavor is not None:
+                flavorsNeeded[flavor] = True
+
+	flavorIndex = {}
+        schema.resetTable(cu, "tmpItems")
+	for flavor in flavorsNeeded.iterkeys():
+	    flavorIndex[flavor.freeze()] = flavor
+	    cu.execute("INSERT INTO tmpItems(item) VALUES(?)", flavor.freeze(),
+                       start_transaction=False)
+	del flavorsNeeded
+        self.db.analyze("tmpItems")
+
+	# it seems like there must be a better way to do this, but I can't
+	# figure it out. I *think* inserting into a view would help, but I
+	# can't with sqlite.
+	cu.execute("""
+        select tmpItems.item as flavor
+        from tmpItems
+        where not exists ( select flavor from Flavors
+                           where Flavors.flavor = tmpItems.item ) """)
+        # make a list of the flavors we're going to create.  Add them
+        # after we have retrieved all of the rows from this select
+        l = []
+	for (flavorStr,) in cu:
+            l.append(flavorIndex[flavorStr])
+        for flavor in l:
+	    self.flavors.createFlavor(flavor)
+
+	flavors = {}
+	cu.execute("""
+        SELECT Flavors.flavor, Flavors.flavorId
+        FROM tmpItems
+        JOIN Flavors ON tmpItems.item = Flavors.flavor""")
+	for (flavorStr, flavorId) in cu:
+	    flavors[flavorIndex[flavorStr]] = flavorId
+
+	del flavorIndex
+
+	if troveFlavor is not None:
+	    troveFlavorId = flavors[troveFlavor]
+	else:
+	    troveFlavorId = 0
+
+	if troveVersionId is None or nodeId is None:
+	    (nodeId, troveVersionId) = self.versionOps.createVersion(
+                troveItemId, troveVersion, troveFlavorId, sourceName)
+	    if trv.getChangeLog() and trv.getChangeLog().getName():
+		self.changeLogs.add(nodeId, trv.getChangeLog())
+        elif sourceName: # make sure the sourceItemId matches for the trove we are comitting
+            sourceItemId = self.items.getOrAddId(sourceName)
+            self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId, mirrorMode=mirror)
+
+	# the instance may already exist (it could be referenced by a package
+	# which has already been added)
+        if hidden:
+            presence = instances.INSTANCE_PRESENT_HIDDEN
+        else:
+            presence = instances.INSTANCE_PRESENT_NORMAL
+
+	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
+                         troveFlavorId, clonedFromId, trv.getType(),
+                         isPresent = presence)
+        assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
+                          "instanceId=?", troveInstanceId).next()[0] == 0)
+
+        troveBranchId = self.branchTable[troveVersion.branch()]
+        self.depTables.add(cu, trv, troveInstanceId)
+        self.ri.addInstanceId(troveInstanceId)
+        self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
+
+        # Fold tmpNewFiles into FileStreams
+        if len(newFilesInsertList):
+            self.db.bulkload("tmpNewFiles", newFilesInsertList,
+                             [ "pathId", "versionId", "fileId", "stream",
+                               "dirname", "basename", "sha1" ])
+            self.db.analyze("tmpNewFiles")
+            self._addTroveNewFiles(cu, troveInstanceId)
+
+        # iterate over both strong and weak troves, and set weakFlag to
+        # indicate which kind we're looking at when
+        insertList = []
+        for ((name, version, flavor), weakFlag) in itertools.chain(
+                itertools.izip(trv.iterTroveList(strongRefs = True,
+                                                   weakRefs   = False),
+                               itertools.repeat(0)),
+                itertools.izip(trv.iterTroveList(strongRefs = False,
+                                                   weakRefs   = True),
+                               itertools.repeat(schema.TROVE_TROVES_WEAKREF))):
+
+            flags = weakFlag
+            if trv.includeTroveByDefault(name, version, flavor):
+                flags |= schema.TROVE_TROVES_BYDEFAULT
+
+            # sanity check - version/flavor of components must match the
+            # version/flavor of the package
+            assert(not isPackage or version == trv.getVersion())
+            assert(not isPackage or flavor == trv.getFlavor())
+            insertList.append((name, str(version), version.freeze(),
+                               flavor.freeze(), flags))
+        if len(insertList):
+            schema.resetTable(cu, 'tmpTroves')
+            self.db.bulkload("tmpTroves", insertList, [
+                "item", "version", "frozenVersion", "flavor", "flags" ])
+            self.db.analyze("tmpTroves")
+            self._addTroveNewTroves(cu, troveInstanceId, trv.getType())
+
+        # process troveInfo and metadata...
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
         # now add the redirects
@@ -728,15 +769,17 @@ class TroveStore:
             if withFileStreams:
                 streamSel = "FileStreams.stream"
             troveFilesCursor.execute("""
-            SELECT tmpInstanceId.idx, FilePaths.pathId, FilePaths.path,
+            SELECT tmpInstanceId.idx, FilePaths.pathId,
+                   Dirnames.dirname, Basenames.basename,
                    Versions.version, FileStreams.fileId, %s
             FROM tmpInstanceId
             JOIN TroveFiles using(instanceId)
             JOIN FileStreams using(streamId)
             JOIN FilePaths ON TroveFiles.filePathId = FilePaths.filePathId
+            JOIN Dirnames ON FilePaths.dirnameId = Dirnames.dirnameId
+            JOIN Basenames ON FilePaths.basenameId = Basenames.basenameId
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
-            ORDER BY tmpInstanceId.idx
-            """ % (streamSel,))
+            ORDER BY tmpInstanceId.idx """ % (streamSel,))
         troveFilesCursor = util.PeekIterator(troveFilesCursor)
 
         troveRedirectsCursor = self.db.cursor()
@@ -804,8 +847,9 @@ class TroveStore:
 	    fileContents = {}
             try:
                 while troveFilesCursor.peek()[0] == idx:
-                    idxA, pathId, path, versionId, fileId, stream = \
+                    idxA, pathId, dirname, basename, versionId, fileId, stream = \
                             troveFilesCursor.next()
+                    path = os.path.join(dirname, basename)
                     version = versions.VersionFromString(versionId)
                     trv.addFile(cu.frombinary(pathId), path, version, 
                                 cu.frombinary(fileId))
@@ -859,28 +903,28 @@ class TroveStore:
 
     def iterFilesInTrove(self, troveName, troveVersion, troveFlavor,
                          sortByPath = False, withFiles = False):
+        troveInstanceId = self.instances.getInstanceId(
+            troveName, troveVersion, troveFlavor)
+        sort = ""
 	if sortByPath:
-	    sort = " ORDER BY path"
-	else:
-	    sort =""
+	    sort = " order by d.dirname, b.basename"
+        # iterfiles
 	cu = self.db.cursor()
-
-	troveItemId = self.items[troveName]
-	troveVersionId = self.versionTable[troveVersion]
-	troveFlavorId = self.flavors[troveFlavor]
-	troveInstanceId = self.instances[(troveItemId, troveVersionId,
-					  troveFlavorId)]
-
-	cu.execute("""SELECT pathId, path, fileId, versionId, stream
-        FROM TroveFiles
-        JOIN FileStreams USING (streamId)
-        JOIN FilePaths AS TFP ON TroveFiles.filePathId = TFP.filePathId
-        WHERE instanceId = ?
-        %s""" %sort, troveInstanceId)
+	cu.execute("""
+        select fp.pathId, d.dirname, b.basename, fs.fileId,
+               tf.versionId, fs.stream
+        from TroveFiles as tf
+        join FileStreams as fs using (streamId)
+        join FilePaths as fp on tf.filePathId = fp.filePathId
+        join Dirnames as d on fp.dirnameId = d.dirnameId
+        join Basenames as b on fp.basenameId = b.basenameId
+        where tf.instanceId = ?
+        %s""" % sort, troveInstanceId)
 
 	versionCache = {}
-	for (pathId, path, fileId, versionId, stream) in cu:
+	for (pathId, dirname, basename, fileId, versionId, stream) in cu:
 	    version = versionCache.get(versionId, None)
+            path = os.path.join(dirname, basename)
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
@@ -899,7 +943,8 @@ class TroveStore:
                 fileStream = None):
 	cu = troveInfo[0]
         newFilesInsertList = troveInfo[3]
-
+        dirname, basename = os.path.split(path)
+        
 	versionId = self.getVersionId(fileVersion)
         # if we have seen this fileId before, ignore the new stream data
         if fileId in self.seenFileId:
@@ -918,23 +963,11 @@ class TroveStore:
             self.seenFileId.add(fileId)
             newFilesInsertList.append((cu.binary(pathId), versionId,
                                        cu.binary(fileId), cu.binary(fileStream),
-                                       path, cu.binary(sha1)))
-
-            #cu.execute("""INSERT INTO tmpNewFiles
-            #              (pathId, versionId, fileId, stream, path, sha1)
-            #              VALUES(?, ?, ?, ?, ?, ?)""",
-            #           (cu.binary(pathId), versionId, cu.binary(fileId), 
-            #            cu.binary(fileStream), path, cu.binary(sha1)),
-            #           start_transaction=False)
+                                       dirname, basename, cu.binary(sha1)))
 	else:
             newFilesInsertList.append((cu.binary(pathId), versionId,
                                        cu.binary(fileId), None,
-                                       path, None))
-            #cu.execute("""INSERT INTO tmpNewFiles
-            #              (pathId, versionId, fileId, stream, path, sha1)
-            #              VALUES(?, ?, ?, NULL, ?, NULL)""",
-	#	       (cu.binary(pathId), versionId, cu.binary(fileId), path),
-            #           start_transaction=False)
+                                       dirname, basename, None))
 
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()
@@ -1037,7 +1070,7 @@ class TroveStore:
         # Remove from TroveInfo
         cu.execute("DELETE FROM TroveInfo WHERE instanceId = ?", instanceId)
 
-        # Look for path/pathId combinarions we don't need anymore
+        # Look for path/pathId combinations we don't need anymore
         cu.execute("""
         select FilePaths.filePathId
         from TroveFiles as TF
@@ -1077,6 +1110,8 @@ class TroveStore:
         if filePathIdsToRemove:
             cu.execute("DELETE FROM FilePaths WHERE filePathId IN (%s)"
                        % ",".join("%d"%x for x in filePathIdsToRemove))
+            # XXX: also clean up Dirnames and Basenames,
+            # but those cleanups are quite expensive
 
         # we need to double check filesToRemove against other streams which
         # may need the same sha1

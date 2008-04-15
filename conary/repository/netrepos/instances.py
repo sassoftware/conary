@@ -94,3 +94,23 @@ class InstanceTable:
 	if not item:
 	    return defValue
 	return item[0]
+
+    def getInstanceId(self, troveName, troveVersion, troveFlavor):
+        """ return the instanceId for a n,v f string tuple """
+        cu = self.db.cursor()
+
+        # get the instanceId we're looking for
+        cu.execute("""
+        select instanceId from Instances
+        join Items on Instances.itemId = Items.itemId
+        join Versions on Instances.versionId = Versions.versionId
+        join Flavors on Instances.flavorId = Flavors.flavorId
+        where Items.item = ?
+          and Versions.version = ?
+          and Flavors.flavor = ? """, (troveName, troveVersion, troveFlavor))
+        try:
+            return cu.next()[0]
+        except StopIteration:
+            raise KeyError, (troveName, troveVersion, troveFlavor)
+        # not reached
+        assert(0)
