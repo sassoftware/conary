@@ -16,6 +16,9 @@ INSTANCE_PRESENT_MISSING = 0
 INSTANCE_PRESENT_NORMAL  = 1
 INSTANCE_PRESENT_HIDDEN  = 2
 
+from conary import versions
+from conary.deps import deps
+
 class InstanceTable:
     """
     Generic table for assigning id's to a 3-tuple of IDs.
@@ -96,9 +99,15 @@ class InstanceTable:
 	return item[0]
 
     def getInstanceId(self, troveName, troveVersion, troveFlavor):
-        """ return the instanceId for a n,v f string tuple """
+        """ return the instanceId for a n,v,f string tuple """
         cu = self.db.cursor()
 
+        vStr = troveVersion
+        if isinstance(troveVersion, versions.Version):
+            vStr = troveVersion.asString()
+        fStr = troveFlavor 
+        if isinstance(troveFlavor, deps.Flavor):
+            fStr = troveFlavor.freeze()
         # get the instanceId we're looking for
         cu.execute("""
         select instanceId from Instances
@@ -107,7 +116,7 @@ class InstanceTable:
         join Flavors on Instances.flavorId = Flavors.flavorId
         where Items.item = ?
           and Versions.version = ?
-          and Flavors.flavor = ? """, (troveName, troveVersion, troveFlavor))
+          and Flavors.flavor = ? """, (troveName, vStr, fStr))
         try:
             return cu.next()[0]
         except StopIteration:
