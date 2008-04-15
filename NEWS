@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
       This requires conary-policy 1.0.16 or later. (CNY-2232)
