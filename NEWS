@@ -1,31 +1,37 @@
-Changes in @NEW@:
+Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
       This requires conary-policy 1.0.16 or later. (CNY-2232)
     * Suggested additions to buildRequires lists are now separately
       encoded in the XML build log. (CNY-2621)
-    * Loaded recipe modules are no longer tracked in sys.modules
+    * Loaded recipe modules are no longer tracked in sys.modules (RPL-2409)
     * The source components needed to build everything in a group can
       now be found when the group uses searchPaths. (CNY-2710)
+    * The SubscriptionLogWriter (CNY-2622) sometimes caused builds
+      to fail.  This issue has been resolved. (CNY-2717)
 
   o Client Changes:
     * Conary will now re-read /etc/resolv.conf if an error occurs when
       resolving a hostname. (CNY-2703)
-    * Conary now caches the result of ip lookups and uses the cached
+    * Conary now caches the result of IP lookups and uses the cached
       results if an IP address lookup fails during an update. (CNY-2260)
     * Migrate now preserves local installs only of groups and kernels.
       Before, all manually-installed components and troves that were
       referenced by the group being migrated would be updated instead
       of erased. (CNY-2569)
+    * An API (the createSourceTrove() method of client objects) has
+      been added which creates source troves without using the
+      conary.checkin module. (CNY-2498)
 
   o Bug Fixes:
-    * The internal function _ensureReadableRollbackStatus now collects the
-      necessary state it needs to succed within itself instead of relying
-      on that state having been previously collected. (CNY-2711)
+    * The internal function _ensureReadableRollbackStatus now directly
+      ensures that it collects the necessary state it needs to succeed
+      instead of relying on that state having been previously collected.
+      (CNY-2711)
 
-  o API changes:
-    * The addUser() xmlrpc call does not auto-create a matching role 
-      anymore (CNY-2604)
+  o Repository Changes:
+    * The addUser() xmlrpc call no longer automatically creates a
+      matching role. (CNY-2604)
 
 Changes in 2.0.11:
   o Build Changes:
