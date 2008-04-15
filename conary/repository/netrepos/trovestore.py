@@ -261,7 +261,6 @@ class TroveStore:
             select 1 from Dirnames as d where d.dirname = tnf.dirname )""")
         newDirnames = cu.fetchall()
         schema.resetTable(cu, "tmpItems")
-        import epdb ; epdb.st()
         self.db.bulkload("tmpItems", newDirnames, ["item"])
         self.db.bulkload("Dirnames", newDirnames, ["dirname"])
         prefixList = []
@@ -316,7 +315,7 @@ class TroveStore:
             tnf.pathId = fp.pathId and
             fp.dirnameId = d.dirnameId and
             fp.basenameId = b.basenameId
-        join FileStreams as fs using(fileId)
+        join FileStreams as fs on tnf.fileId = fs.fileId
         """ % (troveInstanceId,))
 
     def _addTroveNewTroves(self, cu, troveInstanceId, troveType):
