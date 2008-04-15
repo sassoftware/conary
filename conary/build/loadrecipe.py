@@ -183,37 +183,36 @@ class RecipeLoaderFromString:
                                                  tuple(newMro), newDict)
 
     @staticmethod
-    def _getTrovesFromRepos(repos, labelPath, troveSpecs):
-        """
-        Gets trove objects from a repository based on a list of trove specs.
-        If any aren't found, None is returned. If a connectivity error
-        occurs, None is returned for all troves.
-        """
-        nvfDict = repos.findTroves(labelPath, troveSpecs)
-
-        trovesNeeded = []
-        for i, spec in enumerate(troveSpecs):
-            nvf = nvfDict.get(spec, None)
-            if not nvf:
-                continue
-
-            if len(nvf) > 1:
-                raise builderrors.RecipeFileError('too many matches for '
-                                'autoLoadRecipe entry %s' % spec)
-
-            trovesNeeded.append((i, nvf[0]))
-
-        troves = repos.getTroves([ x[1] for x in trovesNeeded],
-                                 withFiles = False)
-
-        result = [ None ] * len(troveSpecs)
-        for ((i, nvf), trv) in itertools.izip(trovesNeeded, troves):
-            result[i] = trv
-
-        return result
-
-    @staticmethod
     def _loadDefaultPackages(d, cfg, repos, db = None, buildFlavor = None):
+        def _loadTroves(repos, nvfDict, troveSpecStrs, troveSpecs):
+            """
+            Loads troves from the repository after they've been found
+            """
+            trovesNeeded = []
+            for i, (specStr, spec) in \
+                        enumerate(itertools.izip(troveSpecStrs, troveSpecs)):
+                nvf = nvfDict.get(spec, None)
+                if not nvf:
+                    raise builderrors.RecipeFileError('no match for '
+                                    'autoLoadRecipe entry %s' % specStr)
+
+                if len(nvf) > 1:
+                    raise builderrors.RecipeFileError('too many matches for '
+                                    'autoLoadRecipe entry %s' % specStr)
+
+                trovesNeeded.append((i, nvf[0]))
+
+            troves = repos.getTroves([ x[1] for x in trovesNeeded],
+                                     withFiles = False)
+
+            result = [ None ] * len(troveSpecs)
+            for ((i, nvf), trv) in itertools.izip(trovesNeeded, troves):
+                result[i] = trv
+
+            return result
+
+        # def _loadDefaultPackages begins here
+
         if RecipeLoaderFromString._defaultsLoaded:
             # we don't need to load these twice
             return
@@ -229,9 +228,17 @@ class RecipeLoaderFromString:
 
         troveSpecs = [ cmdline.parseTroveSpec(x) for x in cfg.autoLoadRecipes ]
 
-        groupTroves = RecipeLoaderFromString._getTrovesFromRepos(repos,
-                                                cfg.installLabelPath,
-                                                troveSpecs)
+        # Look on the repository first to match the trove specs
+        try:
+            nvfDict = repos.findTroves(cfg.installLabelPath, troveSpecs)
+        except IOError:
+            nvfDict = {}
+
+        neededTroveSpecs = [ x for x in troveSpecs if x not in nvfDict ]
+        nvfDict.update(db.findTroves(cfg.installLabelPath, neededTroveSpecs,
+                                     allowMissing = True))
+
+        groupTroves = _loadTroves(ts, nvfDict, cfg.autoLoadRecipes, troveSpecs)
 
         # we look for recipes in reverse order to allow the troves at the
         # front of the list to override those at the end
