@@ -2029,7 +2029,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         roleIds = self.auth.getAuthRoles(cu, authToken)
 
         prefixQuery = ""
-        if filePrefixes:
+        # if we're asked for all files with a '/' prefix, don't bother
+        # "optimizing" since no records will be filtered out
+        if filePrefixes and not ('/' in filePrefixes):
             # if we have file prefixes, we build a list of filePathIds
             # that match them
             schema.resetTable(cu, "tmpId")
