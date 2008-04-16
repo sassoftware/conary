@@ -14,6 +14,8 @@ Changes in 2.0.12:
       now be found when the group uses searchPaths. (CNY-2710)
     * The SubscriptionLogWriter (CNY-2622) sometimes caused builds
       to fail.  This issue has been resolved. (CNY-2717)
+    * Group builds now store the searchPath used with the built troves in
+      the repository. (CNY-2721)
 
   o Client Changes:
     * Conary will now re-read /etc/resolv.conf if an error occurs when
