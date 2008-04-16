@@ -497,6 +497,9 @@ def createCheckTroveCache(db):
     return True
         
 # return a list of all prefixes for a given dirname, including self
+# note: we deliberately do not insert '/' as a prefix for all directories, since
+#       not walking through the Prefixes is faster than looping through the entire
+#       Dirnames set (gafton)
 def _prefix(dirname):
     d, b = os.path.split(dirname)
     if d == '/':

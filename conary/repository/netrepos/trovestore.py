@@ -266,6 +266,9 @@ class TroveStore:
         prefixList = []
         # all the new dirnames need to be processed for Prefixes links
         def _getPrefixes(dirname):
+            # note: we deliberately do not insert '/' as a prefix for
+            # all directories, since not walking through the Prefixes
+            # is faster than looping through the entire Dirnames set
             d, b = os.path.split(dirname)
             if d == '/':
                 return [dirname]
