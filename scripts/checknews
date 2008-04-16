@@ -49,8 +49,8 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                 else:
                     started = True
                     # cut off "Changes in " and the trailing ":"
-                    line = line.strip()
-                    version = line[11:-1]
+                    line = line.strip()[11:]
+                    version = line.split(':')[0]
                 if version == '@NEW@':
                     print 'change @NEW@ first'
                     sys.exit(1)

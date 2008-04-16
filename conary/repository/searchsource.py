@@ -128,6 +128,9 @@ class SearchSource(AbstractSearchSource):
     def getFlavorPreferenceList(self):
         return self.source.getFlavorPreferenceList()
 
+    def getSearchPath(self):
+        return self.installLabelPath
+
 class NetworkSearchSource(SearchSource):
     """
         Search source using an installLabelPath.
@@ -236,6 +239,9 @@ class TroveSearchSource(SearchSource):
         SearchSource.__init__(self, newTroveSource, flavor, db)
         self.troveList = troveList
 
+    def getSearchPath(self):
+        return [ x.getNameVersionFlavor() for x in self.troveList ]
+
     def getResolveMethod(self):
         """
             Returns a dep resolution method that will resolve dependencies
@@ -262,6 +268,12 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
         AbstractSearchSource.__init__(self)
         self.resolveSearchMethod =  kw.pop('resolveSearchMethod',
                                            resolvemethod.RESOLVE_ALL)
+
+    def getSearchPath(self):
+        searchPath = []
+        for source in self.sources:
+            searchPath.extend(source.getSearchPath())
+        return searchPath
 
     def getFlavorPreferenceList(self):
         return self.sources[0].getFlavorPreferenceList()

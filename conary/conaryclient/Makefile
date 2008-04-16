@@ -20,7 +20,9 @@ python_files =	__init__.py	\
 		mirror.py	\
 		password.py	\
 		resolve.py	\
-                update.py
+		update.py	\
+		filetypes.py	\
+		newtrove.py
 
 extra_dist = Makefile
 

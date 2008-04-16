@@ -758,6 +758,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setConaryVersion(constants.version)
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
+            grpTrv.setSearchPath(recipeObj.getSearchPath())
             grpTrv.troveInfo.imageGroup.set(group.imageGroup)
             compatClass = group.compatibilityClass
             if compatClass is not None:

@@ -383,6 +383,8 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     def createUser(self, name, password, write = False, admin = False,
                    remove = False):
         self.auth.addUser(name, password)
+        self.auth.addRole(name)
+        self.auth.addRoleMember(name, name)
         self.auth.addAcl(name, None, None, write, False, admin, remove = remove)
 
     def createUsers(self):
@@ -490,11 +492,24 @@ def addUser(netRepos, userName, admin = False, mirror = False):
 
     # never give anonymous write access by default
     write = userName != 'anonymous'
+    # if it is mirror or admin, it needs to have its own role
+    roles = [ x.lower() for x in netRepos.auth.getRoleList() ]
+    if mirror or admin:
+        assert (userName.lower() not in roles), \
+               "Can not add a new user matching the name of an existing role"
+        roleName = userName
+    else: # otherwise it has to be ReadAll or WriteAll
+        roleName = "ReadAll"
+        if write:
+            roleName = "WriteAll"
+    if roleName.lower() not in roles:
+        netRepos.auth.addRole(roleName)
+        netRepos.auth.addAcl(roleName, None, None, write = write)
+        netRepos.auth.setMirror(roleName, mirror)
+        netRepos.auth.setAdmin(roleName, admin)
     netRepos.auth.addUser(userName, pw1)
-    # user/group, trovePattern, label, write, capped, admin
-    netRepos.auth.addAcl(userName, None, None, write = write)
-    netRepos.auth.setMirror(userName, mirror)
-    netRepos.auth.setAdmin(userName, admin)
+    # user/group, trovePattern, label, write
+    netRepos.auth.addRoleMember(roleName, userName)
 
 def getServer(argv = sys.argv, reqClass = HttpRequests):
     argDef = {}
