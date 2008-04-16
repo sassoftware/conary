@@ -1282,7 +1282,11 @@ class _SimpleTrove(object):
 
 def _initializeOldMetadata(repos, recipeObj, logFile):
     # Build the list of (fake) collection troves
-    flavor = recipeObj.getPackages()[0].flavor.copy()
+    pkgs = recipeObj.getPackages()
+    if not pkgs:
+        # Nothing to do
+        return
+    flavor = pkgs[0].flavor.copy()
     pkgTroves = dict((x, _SimpleTrove(x, None, flavor))
                       for x in recipeObj.packages)
     # Now add references to components
