@@ -489,8 +489,11 @@ class TroveStore:
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
                          troveFlavorId, clonedFromId, trv.getType(),
                          isPresent = presence)
-        assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
-                          "instanceId=?", troveInstanceId).next()[0] == 0)
+        # check that we don't have any TroveTroves entries yet
+        cu.execute("select includedId from TroveTroves "
+                   "where instanceId = ? limit 1", troveInstanceId)
+        assert(len(cu.fetchall()) == 0), "troveId=%d %s has TroveTroves entries" % (
+            troveInstanceId, trv.getNameVersionFlavor())
 
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depTables.add(cu, trv, troveInstanceId)
