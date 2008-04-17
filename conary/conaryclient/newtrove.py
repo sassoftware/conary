@@ -83,7 +83,7 @@ class ClientNewTrove:
                 raise RuntimeError('Cannot create multiple versions of %s with same version' % name)
 
             trovesSeen.add((name, versionSpec))
-            troveSpecs[name, version, None] = troveObj
+            troveSpecs[name, versionSpec, None] = troveObj
 
         results = repos.findTroves(None, troveSpecs, None, allowMissing=True)
         for troveSpec, troveObj in troveSpecs.iteritems():
