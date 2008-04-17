@@ -1,8 +1,3 @@
-Changes in @NEW@:
-  o Server Changes
-    * The repository code and repository schema have been updated to
-      allow for faster processing and lookup of file pathIds (CNY-2468)
-
 Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
@@ -39,6 +34,10 @@ Changes in 2.0.12:
   o Repository Changes:
     * The addUser() xmlrpc call no longer automatically creates a
       matching role. (CNY-2604)
+
+  o Server Changes
+    * The repository code and repository schema have been updated to
+      allow for faster processing and lookup of file pathIds (CNY-2468)
 
 Changes in 2.0.11:
   o Build Changes:
