@@ -22,8 +22,12 @@ import sqlerrors, sqllib
 
 class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys.copy()
-    keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTOINCREMENT'
-
+    keys.update({
+        'PRIMARYKEY': 'INTEGER PRIMARY KEY AUTOINCREMENT',
+        'PATHTYPE'  : 'TEXT',
+        'STRING'    : 'TEXT',
+        })
+    
 # implement the regexp function for sqlite
 def _regexp(pattern, item):
     regexp = re.compile(pattern)

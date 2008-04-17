@@ -65,7 +65,7 @@ def createDBTroveFiles(db):
         streamId            %(PRIMARYKEY)s,
         pathId              BINARY(16),
         versionId           INTEGER,
-        path                STRING,
+        path                %(STRING)s,
         fileId              BINARY(20),
         instanceId          INTEGER,
         isPresent           INTEGER,
@@ -93,10 +93,10 @@ def createInstances(db):
     cu.execute("""
     CREATE TABLE Instances(
         instanceId      %(PRIMARYKEY)s,
-        troveName       STRING,
+        troveName       %(STRING)s,
         versionId       INTEGER,
         flavorId        INTEGER,
-        timeStamps      STRING,
+        timeStamps      %(STRING)s,
         isPresent       INTEGER,
         pinned          BOOLEAN
     )""" % db.keywords)
@@ -191,8 +191,8 @@ def createDatabaseAttributes(db):
     cu.execute("""
     CREATE TABLE DatabaseAttributes(
         id      %(PRIMARYKEY)s,
-        name    STRING,
-        value   STRING
+        name    %(STRING)s,
+        value   %(STRING)s
     )
     """ % db.keywords)
     cu.execute("CREATE UNIQUE INDEX DatabaseAttributesNameIdx "
@@ -765,10 +765,10 @@ class MigrateTo_18(SchemaMigration):
         cu.execute("""
     CREATE TABLE NewInstances(
         instanceId      %(PRIMARYKEY)s,
-        troveName       STRING,
+        troveName       %(STRING)s,
         versionId       INTEGER,
         flavorId        INTEGER,
-        timeStamps      STRING,
+        timeStamps      %(STRING)s,
         isPresent       INTEGER,
         pinned          BOOLEAN
     )""" % self.db.keywords)
