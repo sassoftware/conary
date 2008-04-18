@@ -572,11 +572,21 @@ class MigrateTo_16(SchemaMigration):
         # need to rebuild the TroveFiles and FilesPath tables
         logMe(2, "creating the FilePaths table...")
         self.db.loadSchema()
-        schema.createTroves(self.db, createIndex = False)
+
+        # need to create an old-style FilePaths table for the
+        # migration from old schema to succeed
+        cu.execute("""
+        CREATE TABLE FilePaths(
+            filePathId      %(PRIMARYKEY)s,
+            path            %(PATHTYPE)s,
+            pathId          %(BINARY16)s NOT NULL
+        ) %(TABLEOPTS)s""" % self.db.keywords)
+        self.db.tables["FilePaths"] = []
         # create entries for the FilePaths table
         cu.execute("""
         insert into FilePaths (pathId, path)
         select distinct pathId, path from TroveFiles """)
+        self.db.createIndex("FilePaths", "tmpFilePaths_idx", "pathId,path")
         self.db.analyze("FilePaths")
         # prepare for the new format of TroveFiles
         logMe(2, "creating the new TroveFiles table...")
@@ -584,10 +594,9 @@ class MigrateTo_16(SchemaMigration):
         # old TroveFiles
         cu.execute("""
         create table newTroveFiles as 
-        select instanceId, streamId, versionId, filePathId
-        from TroveFiles join FilePaths using(path, pathId)
-        order by instanceId, streamId, versionId
-        """)
+            select instanceId, streamId, versionId, filePathId
+            from TroveFiles join FilePaths using(pathId,path)
+            order by instanceId, streamId, versionId """)
         cu.execute("alter table newTroveFiles add column "
                    "changed NUMERIC(14,0) NOT NULL DEFAULT 0 ")
         cu.execute("drop table TroveFiles")
@@ -601,8 +610,6 @@ class MigrateTo_16(SchemaMigration):
         logMe(3, "checking results and analyzing TroveFiles...")
         # create the indexes required
         self.db.loadSchema()
-        schema.createTroves(self.db)
-        #cu.execute("drop table newTroveFiles")
         self.db.analyze("TroveFiles")
         return True
 
@@ -656,8 +663,8 @@ class MigrateTo_17(SchemaMigration):
         cu = self.db.cursor()
         cu.execute("""
         create table tmpPrefixes (
-        dirnameId       INTEGER,
-        prefix          %(PATHTYPE)s
+            dirnameId       INTEGER,
+            prefix          %(PATHTYPE)s
         ) """ % self.db.keywords)
         # seed the tmpPrefixes
         cu.execute("insert into tmpPrefixes(prefix) "
@@ -713,15 +720,15 @@ class MigrateTo_17(SchemaMigration):
     def _createDirnames(self):
         logMe(2, "splitting paths in dirnames and basenames")
         cu = self.db.cursor()
-        cu.execute("""create table tmpDirnames (
-        filePathId %(PRIMARYKEY)s,
-        dirname %(PATHTYPE)s,
-        basename %(PATHTYPE)s
+        cu.execute("""
+        create table tmpDirnames (
+            filePathId %(PRIMARYKEY)s,
+            dirname %(PATHTYPE)s,
+            basename %(PATHTYPE)s
         ) """ % self.db.keywords)
         # save a copy of FilePaths before updating the table definition
         cu.execute("""create table tmpFilePaths as
-        select filePathId, pathId, path
-        from FilePaths""")
+        select filePathId, pathId, path from FilePaths""")
         self.db.createIndex("tmpFilePaths", "tmpFilePathsIdx", "filePathId",
                             check=False, unique=True)
         self.db.analyze("tmpFilePaths")
@@ -747,7 +754,8 @@ class MigrateTo_17(SchemaMigration):
             self.db.bulkload("tmpDirnames", [ (x[0], x[1][0], x[1][1]) for x in tmpl ],
                              ["filePathId", "dirname", "basename"])
             counter += len(tmpl)
-
+        self.db.createIndex("tmpDirnames", "tmpDirnames_dirname_idx", "dirname",
+                            check = False)
         logMe(2, "extracting unique dirnames and basenames...")
         self.db.analyze("tmpDirnames")
         # the '' and '/' dirnames should already be in the Dirnames table
