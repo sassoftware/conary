@@ -1,3 +1,8 @@
+Changed in @NEW@:
+  o Bug Fixes:
+    * Conary repository migration from repository databases created by
+      conary 1.2.x has been fixed (CNY-2731)
+
 Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
