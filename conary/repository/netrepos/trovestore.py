@@ -212,6 +212,71 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewRedirects')
 	return (cu, trv, hidden, [])
 
+    # walk the trove and insert any missing flavors we need into the Flavors table
+    def _addTroveNewFlavors(self, cu, trv):
+        # XXX: a lot of the work from this function can be cached so
+        #      that we don't repeat it for every identically flavored trove we commit
+        # XXX: seems to me that if we run this once for the top of stack
+        #      group/package we don't need to repeat it for its members
+	troveFlavor = trv.getFlavor()
+
+	# start off by creating the flavors we need; we could combine this
+	# to some extent with the file table creation below, but there are
+	# normally very few flavors per trove so this probably better
+	flavorsNeeded = {}
+	if troveFlavor is not None:
+	    flavorsNeeded[troveFlavor] = True
+
+	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
+                                                           weakRefs = True):
+	    if flavor is not None:
+		flavorsNeeded[flavor] = True
+
+        for (name, branch, flavor) in trv.iterRedirects():
+            if flavor is not None:
+                flavorsNeeded[flavor] = True
+
+	flavorIndex = {}
+        schema.resetTable(cu, "tmpItems")
+	for flavor in flavorsNeeded.iterkeys():
+	    flavorIndex[flavor.freeze()] = flavor
+	    cu.execute("INSERT INTO tmpItems(item) VALUES(?)", flavor.freeze(),
+                       start_transaction=False)
+	del flavorsNeeded
+        self.db.analyze("tmpItems")
+
+	# it seems like there must be a better way to do this, but I can't
+	# figure it out. I *think* inserting into a view would help, but I
+	# can't with sqlite.
+	cu.execute("""
+        select tmpItems.item as flavor
+        from tmpItems
+        where not exists ( select flavor from Flavors
+                           where Flavors.flavor = tmpItems.item ) """)
+        # make a list of the flavors we're going to create.  Add them
+        # after we have retrieved all of the rows from this select
+        l = []
+	for (flavorStr,) in cu:
+            l.append(flavorIndex[flavorStr])
+        for flavor in l:
+	    self.flavors.createFlavor(flavor)
+
+	flavors = {}
+	cu.execute("""
+        SELECT Flavors.flavor, Flavors.flavorId
+        FROM tmpItems
+        JOIN Flavors ON tmpItems.item = Flavors.flavor""")
+	for (flavorStr, flavorId) in cu:
+	    flavors[flavorIndex[flavorStr]] = flavorId
+
+	del flavorIndex
+
+	if troveFlavor is not None:
+	    troveFlavorId = flavors[troveFlavor]
+	else:
+	    troveFlavorId = 0
+        return troveFlavorId
+    
     # tmpNewFiles can contain duplicate entries for the same fileId,
     # (with stream being NULL or not), so the FileStreams update
     # is happening in three steps:
@@ -412,63 +477,8 @@ class TroveStore:
 	    nodeId = self.versionOps.nodes.getRow(
                 troveItemId, troveVersionId, None)
 
-	troveFlavor = trv.getFlavor()
-
-	# start off by creating the flavors we need; we could combine this
-	# to some extent with the file table creation below, but there are
-	# normally very few flavors per trove so this probably better
-	flavorsNeeded = {}
-	if troveFlavor is not None:
-	    flavorsNeeded[troveFlavor] = True
-
-	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
-                                                           weakRefs = True):
-	    if flavor is not None:
-		flavorsNeeded[flavor] = True
-
-        for (name, branch, flavor) in trv.iterRedirects():
-            if flavor is not None:
-                flavorsNeeded[flavor] = True
-
-	flavorIndex = {}
-        schema.resetTable(cu, "tmpItems")
-	for flavor in flavorsNeeded.iterkeys():
-	    flavorIndex[flavor.freeze()] = flavor
-	    cu.execute("INSERT INTO tmpItems(item) VALUES(?)", flavor.freeze(),
-                       start_transaction=False)
-	del flavorsNeeded
-        self.db.analyze("tmpItems")
-
-	# it seems like there must be a better way to do this, but I can't
-	# figure it out. I *think* inserting into a view would help, but I
-	# can't with sqlite.
-	cu.execute("""
-        select tmpItems.item as flavor
-        from tmpItems
-        where not exists ( select flavor from Flavors
-                           where Flavors.flavor = tmpItems.item ) """)
-        # make a list of the flavors we're going to create.  Add them
-        # after we have retrieved all of the rows from this select
-        l = []
-	for (flavorStr,) in cu:
-            l.append(flavorIndex[flavorStr])
-        for flavor in l:
-	    self.flavors.createFlavor(flavor)
-
-	flavors = {}
-	cu.execute("""
-        SELECT Flavors.flavor, Flavors.flavorId
-        FROM tmpItems
-        JOIN Flavors ON tmpItems.item = Flavors.flavor""")
-	for (flavorStr, flavorId) in cu:
-	    flavors[flavorIndex[flavorStr]] = flavorId
-
-	del flavorIndex
-
-	if troveFlavor is not None:
-	    troveFlavorId = flavors[troveFlavor]
-	else:
-	    troveFlavorId = 0
+        # this also adds all the missing flavors into the mix
+        troveFlavorId = self._addTroveNewFlavors(cu, trv)
 
 	if troveVersionId is None or nodeId is None:
 	    (nodeId, troveVersionId) = self.versionOps.createVersion(
@@ -489,8 +499,11 @@ class TroveStore:
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
                          troveFlavorId, clonedFromId, trv.getType(),
                          isPresent = presence)
-        assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
-                          "instanceId=?", troveInstanceId).next()[0] == 0)
+        # check that we don't have any TroveTroves entries yet
+        cu.execute("select includedId from TroveTroves "
+                   "where instanceId = ? limit 1", troveInstanceId)
+        assert(len(cu.fetchall()) == 0), "troveId=%d %s has TroveTroves entries" % (
+            troveInstanceId, trv.getNameVersionFlavor())
 
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depTables.add(cu, trv, troveInstanceId)
