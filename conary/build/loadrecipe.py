@@ -314,8 +314,14 @@ class RecipeLoaderFromString:
 
         return result
 
+    # this is overridden in the testsuite to let it validate by class name
+    # instead of the name attribute; it's a shame it works that way
     @staticmethod
-    def _validateRecipe(recipeClass, packageName, fileName):
+    def _validateName(recipeClass, nameToCheck):
+        return recipeClass.name == nameToCheck
+
+    @classmethod
+    def _validateRecipe(klass, recipeClass, packageName, fileName):
         if recipeClass.name[0] not in string.ascii_letters + string.digits:
             raise RecipeFileError(
                 'Error in recipe file "%s": package name must start '
@@ -325,7 +331,7 @@ class RecipeLoaderFromString:
             raise RecipeFileError(
                 "Version string %s has illegal '-' character" % recipeClass.version)
 
-        if recipeClass.name != packageName:
+        if not(klass._validateName(recipeClass, packageName)):
             raise RecipeFileError(
                         "Recipe object name '%s' does not match "
                         "file/component name '%s'"
@@ -492,6 +498,9 @@ class RecipeLoaderFromString:
 
     def getRecipe(self):
         return self.recipe
+
+    def getModuleDict(self):
+        return self.module.__dict__
 
 class RecipeLoader(RecipeLoaderFromString):
 
