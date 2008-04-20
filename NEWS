@@ -1,8 +1,3 @@
-Changed in @NEW@:
-  o Bug Fixes:
-    * Conary repository migration from repository databases created by
-      conary 1.2.x has been fixed (CNY-2731)
-
 Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
@@ -35,6 +30,10 @@ Changes in 2.0.12:
       ensures that it collects the necessary state it needs to succeed
       instead of relying on that state having been previously collected.
       (CNY-2711)
+    * Conary repository migration from repository databases created by
+      conary 1.2.x has been fixed. (CNY-2731)
+    * In rare cases, some output could corrupt logging data during
+      builds.  This has been fixed. (CNY-2734)
 
   o Repository Changes:
     * The addUser() xmlrpc call no longer automatically creates a
