@@ -34,8 +34,8 @@ Changes in 2.0.12:
       conary 1.2.x has been fixed. (CNY-2731)
     * In rare cases, some output could corrupt logging data during
       builds.  This has been fixed. (CNY-2734)
-    * MySQL performance when inserting troves wit large numbers of
-      files has been fixed (CNY-2737)
+    * MySQL performance when inserting troves with large numbers of
+      files has been fixed. (CNY-2737)
 
   o Repository Changes:
     * The addUser() xmlrpc call no longer automatically creates a
