@@ -1062,13 +1062,17 @@ def setupTempTables(db):
             basename    %(PATHTYPE)s
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpNewFiles"] = True
-        # since this is an index on a temp table, don't check the
-        # validity of the table
+        # it sucks that we have to create this many indexes for this table;
+        # that's what we get for a non-normalized reprezentation...
+        db.createIndex("tmpNewFiles", "tmpNewFilesPathIdIdx", "pathId",
+                       check = False)
         db.createIndex("tmpNewFiles", "tmpNewFilesFileIdx", "fileId",
                        check = False)
         db.createIndex("tmpNewFiles", "tmpNewFilesVersionIdx", "versionId",
                        check = False)
         db.createIndex("tmpNewFiles", "tmpNewFilesDirnameIdx", "dirname",
+                       check = False)
+        db.createIndex("tmpNewFiles", "tmpNewFilesBasenameIdx", "basename",
                        check = False)
     if "tmpNewRedirects" not in db.tempTables:
         cu.execute("""
