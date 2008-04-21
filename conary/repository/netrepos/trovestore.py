@@ -349,6 +349,7 @@ class TroveStore:
         if prefixList:
             schema.resetTable(cu, "tmpItems")
             self.db.bulkload("tmpItems", prefixList, ["itemId", "item"])
+            self.db.analyze("tmpItems")
             # insert any new prefix strings into Dirnames
             cu.execute(""" insert into Dirnames(dirname)
             select distinct item from tmpItems where not exists (
