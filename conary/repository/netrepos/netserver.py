@@ -2043,8 +2043,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             select fp.filePathId from tmpItems
             join Dirnames as pd on tmpItems.item = pd.dirname
             join Prefixes as p on pd.dirnameId = p.prefixId
-            join Dirnames as d on p.dirnameId = d.dirnameId
-            join FilePaths as fp on d.dirnameId = fp.dirnameId """)
+            join FilePaths as fp on p.dirnameId = fp.dirnameId """)
             self.db.analyze("tmpId")
             prefixQuery = """join tmpId on tf.filePathId = tmpId.id """
         schema.resetTable(cu, "tmpPathIdLookup")
