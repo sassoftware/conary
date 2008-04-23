@@ -2034,18 +2034,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if filePrefixes and not ('/' in filePrefixes):
             # if we have file prefixes, we build a list of filePathIds
             # that match them
-            schema.resetTable(cu, "tmpId")
             schema.resetTable(cu, "tmpItems")
             cu.executemany("insert into tmpItems (item) values (?)",
                            filePrefixes, start_transaction=False)
             self.db.analyze("tmpItems")
+            schema.resetTable(cu, "tmpId")
+            # save a list of valid dirnames that correspond to the prefixes being asked for
             cu.execute("""insert into tmpId (id)
-            select fp.filePathId from tmpItems
-            join Dirnames as pd on tmpItems.item = pd.dirname
-            join Prefixes as p on pd.dirnameId = p.prefixId
-            join FilePaths as fp on p.dirnameId = fp.dirnameId """)
+            select p.dirnameId from tmpItems
+            join Dirnames as d on tmpItems.item = d.dirname
+            join Prefixes as p on d.dirnameId = p.prefixId """)
             self.db.analyze("tmpId")
-            prefixQuery = """join tmpId on tf.filePathId = tmpId.id """
+            prefixQuery = """join tmpId on fp.dirnameId = tmpId.id """
         schema.resetTable(cu, "tmpPathIdLookup")
         query = """
         insert into tmpPathIdLookup (versionId, filePathId, streamId, finalTimestamp)
@@ -2056,12 +2056,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join Nodes on Instances.itemId = Nodes.itemId and Instances.versionId = Nodes.versionId
         join Items on Nodes.sourceItemId = Items.itemId
         join TroveFiles as tf on Instances.instanceId = tf.instanceId
-        %s
         where Items.item = ?
           and Nodes.branchId = ( select branchId from Branches where branch = ? )
-          and ugi.userGroupId in (%s)
-        """ % (prefixQuery, ",".join("%d" % x for x in roleIds))
+          and ugi.userGroupId in (%s) """ % (",".join("%d" % x for x in roleIds), )
         cu.execute(query, (sourceName, branch))
+        self.db.analyze("tmpPathIdLookup")
         # now decode the results to human-readable strings
         cu.execute("""
         select fp.pathId, d.dirname, b.basename, v.version, fs.fileId, tpil.finalTimestamp
@@ -2071,8 +2070,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         join FileStreams as fs on tpil.streamId = fs.streamId
         join Dirnames as d on fp.dirnameId = d.dirnameId
         join Basenames as b on fp.basenameId = b.basenameId
+        %s
         order by tpil.finalTimestamp desc
-        """)
+        """ % (prefixQuery,))
         ids = {}
         for (pathId, dirname, basename, version, fileId, timeStamp) in cu:
             encodedPath = self.fromPath( os.path.join(dirname, basename) )
