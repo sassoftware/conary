@@ -7,7 +7,7 @@ IMPORTANT -- READ CAREFULLY BEFORE USING THIS SOFTWARE:
 
 The Software governed by this license agreement is a collective work
 under the U.S. Copyright laws. The Software may be licensed under the
-Common Public License ("CPL") or a comercial software agreement from
+Common Public License ("CPL") or a commercial software agreement from
 rPath, Inc. If the Software, under a commercial software agreement
 from rPath, is conveyed to the End User, and End User would like to
 use or distribute the Software, then the End User must comply with
