@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * More optimizations for the pathId lookup query times for some
+      package builds. (CNY-2742)
+
 Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
@@ -30,10 +35,20 @@ Changes in 2.0.12:
       ensures that it collects the necessary state it needs to succeed
       instead of relying on that state having been previously collected.
       (CNY-2711)
+    * Conary repository migration from repository databases created by
+      conary 1.2.x has been fixed. (CNY-2731)
+    * In rare cases, some output could corrupt logging data during
+      builds.  This has been fixed. (CNY-2734)
+    * MySQL performance when inserting troves with large numbers of
+      files has been fixed. (CNY-2737)
 
   o Repository Changes:
     * The addUser() xmlrpc call no longer automatically creates a
       matching role. (CNY-2604)
+
+  o Server Changes
+    * The repository code and repository schema have been updated to
+      allow for faster processing and lookup of file pathIds (CNY-2468)
 
 Changes in 2.0.11:
   o Build Changes:

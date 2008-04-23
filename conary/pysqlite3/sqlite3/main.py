@@ -173,10 +173,12 @@ class Cursor:
         if len(parms) == 1:
             if isinstance(parms[0], tuple) or \
                    isinstance(parms[0], list) or \
-                   isinstance(parms[0], dict):
+                   isinstance(parms[0], dict) or \
+                   isinstance(parms[0], Row):
                 parms = parms[0]
         # now bind the arguments. lists/tuples are positionals
-        if isinstance(parms, tuple) or isinstance(parms, list):
+        if isinstance(parms, tuple) or isinstance(parms, list) \
+               or isinstance(params, Row):
             for i, parm in enumerate(parms):
                 self.stmt.bind(i + 1, parm)
         # hashes are named parameters
@@ -212,7 +214,8 @@ class Cursor:
         self.stmt = self.con.db.prepare(SQL)
         for parms in parm_sequence:
             self.stmt.reset()
-            if isinstance(parms,tuple) or isinstance(parms, list):
+            if isinstance(parms,tuple) or isinstance(parms, list) \
+                   or isinstance(parms, Row):
                 # bind as positional arguments
                 for i, parm in enumerate(parms):
                     self.stmt.bind(i+1, parm)

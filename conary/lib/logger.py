@@ -584,11 +584,14 @@ class Logger:
     def command(self, cmdStr):
         # Writing to stdout will make the output go through the tty,
         # which is exactly what we want
-        sys.stdout.write("\n%s %s\n" % (self.marker, cmdStr))
+        sys.stdout.flush()
+        sys.stderr.flush()
+        msg = "\n%s %s\n" % (self.marker, cmdStr)
+        os.write(sys.stdout.fileno(), msg)
 
     def write(self, *msgs):
         for msg in msgs:
-            sys.stdout.write(msg)
+            os.write(sys.stdout.fileno(), msg)
 
     def flush(self):
         sys.stdout.flush()

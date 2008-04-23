@@ -22,8 +22,12 @@ import sqlerrors, sqllib
 
 class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys.copy()
-    keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTOINCREMENT'
-
+    keys.update({
+        'PRIMARYKEY': 'INTEGER PRIMARY KEY AUTOINCREMENT',
+        'PATHTYPE'  : 'TEXT',
+        'STRING'    : 'TEXT',
+        })
+    
 # implement the regexp function for sqlite
 def _regexp(pattern, item):
     regexp = re.compile(pattern)
@@ -381,6 +385,13 @@ class Database(BaseDatabase):
         return True
     # same goes true for drop constraint
     def dropForeignKey(self, *args, **kw):
+        return True
+
+    # resetting the auto increment values of primary keys
+    def setAutoIncrement(self, table, column, value):
+        cu = self.cursor()
+        cu.execute("update sqlite_sequence set seq = ? where lower(name) = lower(?)",
+                   (value, table))
         return True
 
     def use(self, dbName, **kwargs):

@@ -12,15 +12,15 @@
 # full details.
 #
 
-import base64
-import itertools
-import fnmatch
 import os
 import re
 import sys
-import tempfile
 import time
 import types
+import base64
+import fnmatch
+import tempfile
+import itertools
 
 from conary import files, trove, versions, streams
 from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
@@ -2029,49 +2029,53 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         roleIds = self.auth.getAuthRoles(cu, authToken)
 
         prefixQuery = ""
-        if filePrefixes:
-            schema.resetTable(cu, 'tmpFilePrefixes')
-            cu.executemany("INSERT INTO tmpFilePrefixes (prefix) VALUES (?)",
-                           ( f + '%' for f in filePrefixes ),
-                           start_transaction=False)
-            self.db.analyze("tmpFilePrefixes")
-            prefixQuery = """JOIN tmpFilePrefixes ON
-            FilePaths.path LIKE tmpFilePrefixes.prefix """
-
+        # if we're asked for all files with a '/' prefix, don't bother
+        # "optimizing" since no records will be filtered out
+        if filePrefixes and not ('/' in filePrefixes):
+            # if we have file prefixes, we build a list of filePathIds
+            # that match them
+            schema.resetTable(cu, "tmpItems")
+            cu.executemany("insert into tmpItems (item) values (?)",
+                           filePrefixes, start_transaction=False)
+            self.db.analyze("tmpItems")
+            schema.resetTable(cu, "tmpId")
+            # save a list of valid dirnames that correspond to the prefixes being asked for
+            cu.execute("""insert into tmpId (id)
+            select p.dirnameId from tmpItems
+            join Dirnames as d on tmpItems.item = d.dirname
+            join Prefixes as p on d.dirnameId = p.prefixId """)
+            self.db.analyze("tmpId")
+            prefixQuery = """join tmpId on fp.dirnameId = tmpId.id """
+        schema.resetTable(cu, "tmpPathIdLookup")
         query = """
-        SELECT DISTINCT
-            FilePaths.pathId, FilePaths.path, Versions.version,
-            FileStreams.fileId, Nodes.finalTimestamp
-        FROM Instances
-        JOIN Nodes ON
-            Instances.itemid = Nodes.itemId AND
-            Instances.versionId = Nodes.versionId
-        JOIN Branches using (branchId)
-        JOIN Items ON
-            Nodes.sourceItemId = Items.itemId
-        JOIN UserGroupInstancesCache as ugi ON
-            Instances.instanceId = ugi.instanceId
-        JOIN TroveFiles ON
-            Instances.instanceId = TroveFiles.instanceId
-        JOIN Versions ON
-            TroveFiles.versionId = Versions.versionId
-        JOIN FileStreams ON
-            TroveFiles.streamId = FileStreams.streamId
-        JOIN FilePaths ON
-            TroveFiles.filePathId = FilePaths.filePathId
-        %s
-        WHERE
-            Items.item = ? AND
-            Branches.branch = ? AND
-            ugi.userGroupId in (%s)
-        ORDER BY
-            Nodes.finalTimestamp DESC
-        """ % (prefixQuery, ",".join("%d" % x for x in roleIds))
-
+        insert into tmpPathIdLookup (versionId, filePathId, streamId, finalTimestamp)
+        select distinct
+            tf.versionId, tf.filePathId, tf.streamId, Nodes.finalTimestamp
+        from UserGroupInstancesCache as ugi
+        join Instances using (instanceId)
+        join Nodes on Instances.itemId = Nodes.itemId and Instances.versionId = Nodes.versionId
+        join Items on Nodes.sourceItemId = Items.itemId
+        join TroveFiles as tf on Instances.instanceId = tf.instanceId
+        where Items.item = ?
+          and Nodes.branchId = ( select branchId from Branches where branch = ? )
+          and ugi.userGroupId in (%s) """ % (",".join("%d" % x for x in roleIds), )
         cu.execute(query, (sourceName, branch))
+        self.db.analyze("tmpPathIdLookup")
+        # now decode the results to human-readable strings
+        cu.execute("""
+        select fp.pathId, d.dirname, b.basename, v.version, fs.fileId, tpil.finalTimestamp
+        from tmpPathIdLookup as tpil
+        join Versions as v on tpil.versionId = v.versionId
+        join FilePaths as fp on tpil.filePathId = fp.filePathId
+        join FileStreams as fs on tpil.streamId = fs.streamId
+        join Dirnames as d on fp.dirnameId = d.dirnameId
+        join Basenames as b on fp.basenameId = b.basenameId
+        %s
+        order by tpil.finalTimestamp desc
+        """ % (prefixQuery,))
         ids = {}
-        for (pathId, path, version, fileId, timeStamp) in cu:
-            encodedPath = self.fromPath(path)
+        for (pathId, dirname, basename, version, fileId, timeStamp) in cu:
+            encodedPath = self.fromPath( os.path.join(dirname, basename) )
             currVal = ids.get(encodedPath, None)
             newVal = (cu.frombinary(pathId), version, cu.frombinary(fileId))
             if currVal is None:
@@ -2146,15 +2150,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         schema.resetTable(cu, 'tmpPath')
         for row, path in enumerate(pathList):
-            cu.execute("INSERT INTO tmpPath (row, path) VALUES (?, ?)",
-                       (row, path), start_transaction=False)
+            dirname, basename = os.path.split(path)
+            cu.execute("INSERT INTO tmpPath (row, dirname, basename) VALUES (?, ?, ?)",
+                       (row, dirname, basename), start_transaction=False)
         self.db.analyze("tmpPath")
 
         query = """
-        SELECT tmpPath.row, Items.item, Versions.version, Flavors.flavor,
+        SELECT userQ.row, Items.item, Versions.version, Flavors.flavor,
             Nodes.timeStamps
-        FROM tmpPath
-        JOIN FilePaths using(path)
+        FROM ( select tmpPath.row as row, filePathId as filePathId
+               from FilePaths
+               join Dirnames on FilePaths.dirnameId = Dirnames.dirnameId
+               join Basenames on FilePaths.basenameId = Basenames.basenameId
+               join tmpPath on
+                   tmpPath.dirname = Dirnames.dirname and
+                   tmpPath.basename = Basenames.basename ) as userQ
         JOIN TroveFiles using(filePathId)
         JOIN Instances using(instanceId)
         JOIN Nodes on

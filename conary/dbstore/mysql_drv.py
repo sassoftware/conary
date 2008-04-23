@@ -30,12 +30,14 @@ conversions[MYSQL_TYPE_NEWDECIMAL] = float
 
 class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys.copy()
-    keys['PRIMARYKEY'] = 'INTEGER PRIMARY KEY AUTO_INCREMENT'
-    keys['MEDIUMBLOB'] = 'MEDIUMBLOB'
-    keys['TABLEOPTS'] = 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin'
-    keys['STRAIGHTJOIN'] = 'STRAIGHT_JOIN'
-    keys['PATHTYPE'] = 'VARBINARY(767)'
-    keys['STRING'] = 'VARCHAR(767)'
+    keys.update({
+        'PRIMARYKEY'   : 'INTEGER PRIMARY KEY AUTO_INCREMENT',
+        'MEDIUMBLOB'   : 'MEDIUMBLOB',
+        'STRAIGHTJOIN' : 'STRAIGHT_JOIN',
+        'PATHTYPE'     : 'VARBINARY(767)',
+        'STRING'       : 'VARCHAR(767)',
+        'TABLEOPTS'    : 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin',
+        })
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
 
@@ -491,3 +493,11 @@ class Database(BaseDatabase):
         cu.execute("ALTER TABLE %s DROP FOREIGN KEY %s" % (table, name))
         return True
 
+    # resetting the auto increment values of primary keys
+    def setAutoIncrement(self, table, column, value):
+        cu = self.cursor()
+        # mysql doesn't start from the "next" value, so we do it for it
+        cu.execute("ALTER TABLE %s AUTO_INCREMENT = ?" % (table,), value+1)
+        return True
+    
+        
