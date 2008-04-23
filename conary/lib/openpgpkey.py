@@ -370,7 +370,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         print "\nsignature key is: %s"% keyId
 
         tries = 0
-        while tries < 3:
+        while tries < 5:
             # FIXME: make this a callback
             passPhrase = getpass.getpass("Passphrase: ")
             try:

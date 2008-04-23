@@ -5,6 +5,9 @@ Changes in @NEW@:
   o Client Changes:
     * PGP Keyring location is no longer determined using $HOME, which
       is unreliable; a getpwuid(3) lookup is used instead. (CNY-2722)
+    * The number of retries for providing a passphrase when signing
+      troves changed from 3 to 5. (CNY-2709)
+
 
 Changes in 2.0.12:
   o Build Changes:
