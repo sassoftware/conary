@@ -19,6 +19,7 @@ import sys
 import xml
 import re
 import traceback
+import pwd
 
 from conary.deps import deps, arch
 from conary.lib import util
@@ -469,8 +470,18 @@ def _getDefaultPublicKeyrings():
     publicKeyrings = []
     # If we are root, don't use the keyring in $HOME, since a process started
     # under sudo will have $HOME set to the old user's (CNY-2630)
-    if os.getuid() != 0 and 'HOME' in os.environ:
-        publicKeyrings.append('~/.gnupg/pubring.gpg')
+
+    # CNY-2722: look up the directory with getpwuid, instead of using $HOME
+
+    try:
+        ent = pwd.getpwuid(os.getuid())
+        pwDir = ent[5]
+        # If home dir doesn't exist, don't bother
+        if os.path.isdir(pwDir):
+            publicKeyrings.append(os.path.join(pwDir, '.gnupg', 'pubring.gpg'))
+    except KeyError:
+        pass
+
     publicKeyrings.append('/etc/conary/pubring.gpg')
     return publicKeyrings
 
