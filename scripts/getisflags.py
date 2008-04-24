@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.4
+#!/usr/bin/env python
 #
 # Copyright (C) 2006-2008 rPath, Inc.
 #

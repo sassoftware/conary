@@ -18,7 +18,7 @@
 Keeps jira up to date with repositories.  Needs to be driven with
 a script that contains local information; something like the following:
 
-#!/usr/bin/python2.4
+#!/usr/bin/python
 
 import os
 import re
