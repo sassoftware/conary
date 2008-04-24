@@ -1,3 +1,7 @@
+Changes in @NEW@:
+  o Code Changes:
+    * Some incompatibilities with python2.5 have been removed.
+
 Changes in 2.0.12:
   o Build Changes:
     * Conary now warns about some possibly unused build requirements.
