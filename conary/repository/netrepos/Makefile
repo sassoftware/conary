@@ -12,24 +12,7 @@
 # full details.
 #
 
-python_files = __init__.py	\
-		accessmap.py	\
-		cacheset.py	\
-		cltable.py	\
-		deptable.py	\
-		flavors.py	\
-		fsrepos.py	\
-		__init__.py	\
-		instances.py	\
-		items.py	\
-		keytable.py	\
-                netauth.py	\
-		netserver.py	\
-		proxy.py	\
-		reposlog.py	\
-		troveinfo.py	\
-		trovestore.py	\
-		versionops.py
+python_files = *.py
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)

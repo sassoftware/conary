@@ -12,18 +12,7 @@
 # full details.
 #
 
-python_files =	__init__.py	\
-		branch.py       \
-		callbacks.py	\
-		clone.py        \
-		cmdline.py      \
-		mirror.py	\
-		password.py	\
-		resolve.py	\
-		update.py	\
-		filetypes.py	\
-		newtrove.py
-
+python_files =	*.py
 extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)

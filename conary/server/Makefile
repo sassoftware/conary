@@ -14,13 +14,7 @@
 
 SUBDIRS=templates
 
-python_files = __init__.py    \
-	       apachehooks.py \
-	       apachemethods.py \
-	       server.py      \
-               http.py        \
-	       schema.py      \
-	       migrate.py
+python_files = *.py
 
 extra_dist = Makefile
 

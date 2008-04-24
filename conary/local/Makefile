@@ -12,18 +12,7 @@
 # full details.
 #
 
-python_files = database.py	\
-		deptable.py	\
-		errors.py	\
-		__init__.py	\
-		journal.py	\
-		localrep.py	\
-		sqldb.py	\
-		schema.py	\
-		troveinfo.py	\
-		update.py	\
-		versiontable.py
-
+python_files = *.py
 extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)

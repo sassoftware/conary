@@ -14,23 +14,7 @@
 
 SUBDIRS=netrepos
 
-python_files = __init__.py	\
-		calllog.py	\
-		changeset.py	\
-		datastore.py	\
-		errors.py	\
-		filecontainer.py\
-		filecontents.py	\
-                findtrove.py    \
-		netclient.py 	\
-		searchsource.py	\
-		shimclient.py	\
-		repository.py	\
-		resolvemethod.py\
-		transport.py	\
-		trovesource.py	\
-		xmlshims.py
-
+python_files = *.py
 extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)

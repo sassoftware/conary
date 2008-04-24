@@ -12,42 +12,7 @@
 # full details.
 #
 
-python_files = __init__.py	\
-	action.py		\
-	build.py		\
-	buildinfo.py		\
-	buildpackage.py		\
-	cook.py			\
-	derive.py		\
-	derivedpolicy.py	\
-	derivedrecipe.py	\
-	destdirpolicy.py	\
-	errors.py	        \
-	explain.py	        \
-	factory.py	        \
-	filter.py 		\
-	filesetrecipe.py	\
-	grouprecipe.py		\
-	grouppolicy.py		\
-	inforecipe.py		\
-	loadrecipe.py		\
-	lookaside.py		\
-	macros.py		\
-	manifest.py		\
-	mirror.py		\
-	nextversion.py		\
-	packagepolicy.py	\
-	packagerecipe.py	\
-	policy.py		\
-	recipe.py		\
-	redirectrecipe.py       \
-	signtrove.py		\
-	source.py		\
-	tags.py			\
-	trovefilter.py			\
-	use.py                  \
-        usergroup.py
-
+python_files = *.py
 extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)

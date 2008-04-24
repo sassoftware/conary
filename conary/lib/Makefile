@@ -12,39 +12,7 @@
 # full details.
 #
 
-python_files=	    __init__.py		\
-		    cfg.py		\
-		    cfgtypes.py		\
-		    logparse.py		\
-		    coveragehook.py	\
-		    debugger.py		\
-		    enum.py		\
-		    epdb.py     	\
-		    erlcompleter.py	\
-		    fixeddifflib.py	\
-		    fixedfnmatch.py	\
-		    fixedglob.py	\
-		    fixedthreading.py	\
-		    graph.py		\
-		    importer.py		\
-		    javadeps.py     	\
-		    logger.py		\
-		    logparse.py		\
-		    log.py		\
-		    magic.py		\
-		    openpgpfile.py	\
-		    openpgpkey.py	\
-		    options.py		\
-		    patch.py		\
-		    pydeps.py           \
-		    sha1helper.py	\
-		    sigprotect.py	\
-		    stackutil.py	\
-		    tracelog.py		\
-		    util.py		\
-		    xmldata.py		\
-		    xmllog.py
-
+python_files=	    *.py
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
