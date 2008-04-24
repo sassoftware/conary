@@ -32,7 +32,10 @@ from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
 
-from elementtree import ElementTree
+try:
+    from elementtree import ElementTree
+except ImportError:
+    ElementTree = None
 
 
 # Helper class
@@ -2622,6 +2625,8 @@ class Provides(_dependency):
                 deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
 
     def _addCILPolicyProvides(self, path, pkg, macros):
+        if ElementTree is None:
+            return
         try:
             keys = {'urn': '{urn:schemas-microsoft-com:asm.v1}'}
             fullpath = macros.destdir + path
@@ -3271,7 +3276,8 @@ class Requires(_addInfo, _dependency):
 
             # generate site-packages list for destdir
             # (look in python base directory first)
-            pythonDir = os.path.dirname(sys.modules['os'].__file__)
+            pythonDir = os.popen("""python -c 'import os,sys; print sys.modules["os"].__file__'""").read().strip()
+
             sys.path = [destdir + pythonDir]
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
