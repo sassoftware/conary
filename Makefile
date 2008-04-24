@@ -75,8 +75,8 @@ smoketest: archive
 	make > /dev/null; \
 	tmpdir=$$(mktemp -d); \
 	make install DESTDIR=$$tmpdir > /dev/null; \
-	PYTHONPATH=$$tmpdir/usr/lib/python2.4/site-packages $$tmpdir/usr/bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
-	PYTHONPATH=$$tmpdir/usr/lib/python2.4/site-packages $$tmpdir/usr/bin/cvc --version > /dev/null || echo "CVC DOES NOT WORK"; \
+	PYTHONPATH=$$tmpdir/usr/lib/python$(PYVER)/site-packages $$tmpdir/usr/bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
+	PYTHONPATH=$$tmpdir/usr/lib/python$(PYVER)/site-packages $$tmpdir/usr/bin/cvc --version > /dev/null || echo "CVC DOES NOT WORK"; \
 	cd -; \
 	rm -rf $(DISTDIR) $$tmpdir
 

@@ -13,7 +13,8 @@
 # full details.
 #
 
-PYTHON = $(shell [ -x /usr/bin/python2.4 ] && echo /usr/bin/python2.4 || echo /usr/lib/conary/python/bin/python2.4)
+PYVER=`python -c 'import sys; print sys.version[0:3]'`
+PYTHON = /usr/bin/python${PYVER}
 PYVERSION = $(shell $(PYTHON) -c 'import os, sys; print sys.version[:3]')
 PYINCLUDE = $(shell $(PYTHON) -c 'import os, sys; print os.sep.join((sys.prefix, "include", "python" + sys.version[:3]))')
 
