@@ -1227,7 +1227,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         logFile.popDescriptor('cook')
         logFile.close()
 
-    if logBuild and recipeObj._autoCreatedFileCount:
+    if logBuild and recipeObj._autoCreatedFileCount > 0:
         if os.path.exists(logPath):
             os.unlink(logPath)
         if os.path.exists(xmlLogPath):
