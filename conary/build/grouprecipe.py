@@ -2204,7 +2204,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     replaceSpecs = dict(recipeObj.iterReplaceSpecs())
     resolveSpecs = recipeObj.getResolveTroveSpecs()
     log.info('Getting initial set of troves for'
-             ' building all %s groups' % (len(recipeObj.iterGroupList())))
+            ' building all %s groups' % (len(list(recipeObj.iterGroupList()))))
     defaultSource = recipeObj._getSearchSource()
 
     troveMap = findTrovesForGroups(recipeObj.searchSource,

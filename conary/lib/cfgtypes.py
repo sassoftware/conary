@@ -484,6 +484,10 @@ class RegularExpressionList(list):
 
     def __repr__(self):
         return 'RegularExpressionList(%s)' % list.__repr__(self)
+
+    def __deepcopy__(self, memo):
+        return RegularExpressionList(self)
+
     def addExp(self, val):
         list.append(self, CfgRegExp().parseString(val))
     def match(self, s):

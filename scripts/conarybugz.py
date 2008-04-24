@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.4
+#!/usr/bin/env python
 # -*- mode: python -*-
 #
 # Copyright (C) 2005-2008 rPath, Inc.
@@ -18,7 +18,7 @@
 Keeps bugzilla up to date with repositories.  Needs to be driven with
 a script that contains local information; something like the following:
 
-#!/usr/bin/env python2.4
+#!/usr/bin/env python
 
 import os
 import re

@@ -577,32 +577,6 @@ class CookCommand(CvcCommand):
         log.setVerbosity(level)
 _register(CookCommand)
 
-class DescribeCommand(CvcCommand):
-    commands = ['describe']
-    paramHelp = '<xml file>'
-    help = 'Add metadata to a repository from an XML file'
-    commandGroup = 'Repository Access'
-    hidden = True
-    def runCommand(self, cfg, argSet, args, profile = False, 
-                   callback = None, repos = None):
-        args = args[1:]
-        level = log.getVerbosity()
-        if level > log.INFO:
-            log.setVerbosity(log.INFO)
-
-        xmlSource = args[1]
-        conaryState = state.ConaryStateFromFile("CONARY", repos).getSourceState()
-        troveName = conaryState.getName()
-        troveBranch = conaryState.getVersion().branch()
-
-        log.info("describing trove %s with %s", troveName, xmlSource)
-        xmlFile = open(xmlSource)
-        xml = xmlFile.read()
-
-        repos.updateMetadataFromXML(troveName, troveBranch, xml)
-        log.setVerbosity(level)
-_register(DescribeCommand)
-
 class DeriveCommand(CvcCommand):
     commands = ['derive']
     hidden = True

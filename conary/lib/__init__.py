@@ -15,3 +15,8 @@
 The lib module provides code utility functions which are not
 conary-specific.
 """
+# BW compatibility - old code will expect to see MainHandler in
+# options.py
+from conary.lib import options, mainhandler,command
+options.MainHandler = mainhandler.MainHandler
+options.AbstractCommand = command.AbstractCommand

@@ -1299,6 +1299,7 @@ class PythonSetup(BuildCommand):
         'purelib': None,
         'platlib': None,
         'purePython': True,
+        'pythonVersion': None,
         'allowNonPure': False,
         'dir': '%(builddir)s',
         'rootDir': '%(destdir)s',
@@ -1325,17 +1326,22 @@ class PythonSetup(BuildCommand):
             macros.arguments = self.arglist[0]
         else:
             macros.arguments = ''
+        if self.pythonVersion is None:
+            pythonVersion = sys.version[0:3]
+            macros.pyver = pythonVersion
+        else:
+            pythonVersion = self.pythonVersion
 
         # workout arguments and multilib status:
         if self.purelib is None:
-            self.purelib = ' --install-purelib=%(prefix)s/lib/python2.4/site-packages/'
+            self.purelib = ' --install-purelib=%(prefix)s/lib/python%(pyver)s/site-packages/'
         if self.platlib is None:
-            self.platlib = ' --install-platlib=%(libdir)s/python2.4/site-packages/'
+            self.platlib = ' --install-platlib=%(libdir)s/python%(pyver)s/site-packages/'
         if self.data is None:
             if self.purePython:
-                self.data = ' --install-data=%(prefix)s/lib/python2.4/site-packages/'
+                self.data = ' --install-data=%(prefix)s/lib/python%(pyver)s/site-packages/'
             else:
-                self.data = ' --install-data=%(libdir)s/python2.4/site-packages/'
+                self.data = ' --install-data=%(libdir)s/python%(pyver)s/site-packages/'
 
         macros.purelib = self.purelib
         macros.platlib = self.platlib
@@ -1343,21 +1349,22 @@ class PythonSetup(BuildCommand):
 
         # now figure out which kind of setup.py this is
         if re.compile('(import setuptools|from setuptools import)').search(file('%s/%s' %(rundir, self.setupName)).read()):
-            macros.pythonsetup = 'python %s ' % self.setupName
+            macros.pythonsetup = 'python%s %s ' % (pythonVersion,
+                                                   self.setupName)
             self._addActionPathBuildRequires(['python'])
         else:
             # hack to use setuptools instead of disttools
             macros.pythonsetup = (
-                '''python -c "import setuptools;execfile('%(setupName)s')"''')
+                '''python%(pyver)s -c "import setuptools;execfile('%(setupName)s')"''')
             self._addActionTroveBuildRequires(['python-setuptools:python'])
 
         # prepare to test for multilib problems
         if macros.lib != 'lib':
             puresetbefore = set()
-            for tup in os.walk('%(destdir)s%(prefix)s/lib/python2.4' %macros):
+            for tup in os.walk('%(destdir)s%(prefix)s/lib/python%(pyver)s' %macros):
                 puresetbefore.update(set('/'.join((tup[0], x)) for x in tup[2]))
             platsetbefore = set()
-            for tup in os.walk('%(destdir)s%(libdir)s/python2.4' %macros):
+            for tup in os.walk('%(destdir)s%(libdir)s/python%(pyver)s' %macros):
                 platsetbefore.update(set('/'.join((tup[0], x)) for x in tup[2]))
             if puresetbefore and platsetbefore and not self.allowNonPure:
                 errorMsg = 'Python and object files detected in different directories before PythonSetup() instance on line %d' % self.linenum
@@ -1369,10 +1376,10 @@ class PythonSetup(BuildCommand):
         # test for multilib problems
         if macros.lib != 'lib' and not self.allowNonPure:
             puresetafter = set()
-            for tup in os.walk('%(destdir)s%(prefix)s/lib/python2.4' %macros):
+            for tup in os.walk('%(destdir)s%(prefix)s/lib/python%(pyver)s' %macros):
                 puresetafter.update(set('/'.join((tup[0], x)) for x in tup[2]))
             platsetafter = set()
-            for tup in os.walk('%(destdir)s%(libdir)s/python2.4' %macros):
+            for tup in os.walk('%(destdir)s%(libdir)s/python%(pyver)s' %macros):
                 platsetafter.update(set('/'.join((tup[0], x)) for x in tup[2]))
             if puresetafter - puresetbefore and platsetafter - platsetbefore:
                 # we have added both kinds of files in this invocation
