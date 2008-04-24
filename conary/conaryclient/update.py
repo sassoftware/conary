@@ -1218,7 +1218,7 @@ followLocalChanges: %s
 
 	eraseSet = _findErasures(erasePrimaries, newJob, alreadyInstalled, 
                                  recurse, ineligible)
-        assert(not x for x in newJob if x[2][0] is None)
+        assert(not [x for x in newJob if x[2][0] is None])
         newJob.update(eraseSet)
         return newJob
 
