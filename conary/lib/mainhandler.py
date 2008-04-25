@@ -100,7 +100,7 @@ class MainHandler(object):
                                      command.help)
         return rc
 
-    def getConfigFile(self, argv, ignoreErrors=False):
+    def getConfigFile(self, argv):
         """
             Find the appropriate config file
         """
@@ -109,9 +109,9 @@ class MainHandler(object):
                                  ' main handler')
         if '--skip-default-config' in argv:
             argv.remove('--skip-default-config')
-            ccfg = self.configClass(readConfigFiles=False, ignoreErrors=False)
+            ccfg = self.configClass(readConfigFiles=False)
         else:
-            ccfg = self.configClass(readConfigFiles=True, ignoreErrors=False)
+            ccfg = self.configClass(readConfigFiles=True)
         return ccfg
 
     def getParser(self, command):
