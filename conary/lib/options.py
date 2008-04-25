@@ -197,10 +197,12 @@ def addOptions(parser, argDef, skip=None):
         parser.add_option(*flagNames, **attrs)
 
 
-def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
+def processArgs(argDef, cfgMap, cfg, usage, argv=None):
     """Mostly backwards-compatible (with earlier conary processArgs)
        function that uses optparse as its backend.
     """
+    if argv is None:
+        argv=sys.argv
     return _processArgs(argDef, cfgMap, cfg, usage, argv)[:2]
 
 def _getUsageStr(usage):
@@ -265,11 +267,13 @@ def _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
 
 
 
-def _processArgs(params, cfgMap, cfg, usage, argv=sys.argv, version=None,
+def _processArgs(params, cfgMap, cfg, usage, argv=None, version=None,
                  commonParams=None, useHelp=False, defaultGroup=None,
                  interspersedArgs=True, hobbleShortOpts=False,
                  addDebugOptions=True, addConfigOptions=True,
                  addVerboseOptions=True, description=None):
+    if argv is None:
+        argv=sys.argv
     argSet = {}
     # don't mangle the command line
     argv = argv[:]
@@ -360,7 +364,9 @@ def getOptionParser(params, usage, version=None, useHelp=False,
 
     return parser
 
-def getArgSet(params, parser, argv=sys.argv):
+def getArgSet(params, parser, argv=None):
+    if argv is None:
+        argv=sys.argv
     (options, otherArgs) = parser.parse_args(argv)
 
     argSet = {}
