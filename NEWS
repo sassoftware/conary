@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Build Changes:
+    * When cooked, factories can now package additional files in their
+     :recipe component. (CNY-2748)
   o Bug Fixes:
     * More optimizations for the pathId lookup query times for some
       package builds. (CNY-2742)

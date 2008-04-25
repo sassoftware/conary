@@ -487,6 +487,18 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                 def setup(r):
                     pass
 
+                def setupAbstractBaseClass(r):
+                    packagerecipe.AbstractPackageRecipe.setupAbstractBaseClass(r)
+                    ofc = r._originalFactoryClass
+                    # getAdditionalSourceFiles has to be a static or class
+                    # method
+                    if  hasattr(ofc, "getAdditionalSourceFiles"):
+                        additionalFiles = ofc.getAdditionalSourceFiles()
+                        for ent in additionalFiles:
+                            srcFile, destLoc = ent[:2]
+                            r.addSource(srcFile, dest = destLoc,
+                                        package = ':recipe')
+
             recipeClass = FactoryRecipe
             type = recipeClass.getType()
 
