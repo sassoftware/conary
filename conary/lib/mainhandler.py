@@ -30,7 +30,7 @@ class MainHandler(object):
             for command in class_.commandList:
                 self._registerCommand(command)
 
-    def _registerCommand(self, commandClass):
+    def registerCommand(self, commandClass):
         supportedCommands = self._supportedCommands
         inst = commandClass()
         inst.setMainHandler(self)
@@ -39,13 +39,17 @@ class MainHandler(object):
         else:
             for cmdName in commandClass.commands:
                 supportedCommands[cmdName] = inst
+    # this method is public; add private version for bw compat.
+    _registerCommand = registerCommand
 
-    def _unregisterCommand(self, commandClass):
+    def unregisterCommand(self, commandClass):
         if isinstance(commandClass.commands, str):
             del self._supportedCommands[commandClass.commands]
         else:
             for cmdName in commandClass.commands:
                 del self._supportedCommands[cmdName]
+    # this method is public; add private version for bw compat.
+    _unregisterCommand = unregisterCommand
 
     def _getPreCommandOptions(self, argv, cfg):
         """Allow the user to specify generic flags before they specify the
@@ -61,6 +65,7 @@ class MainHandler(object):
                                                     argv=argv[1:],
                                                     interspersedArgs=False,
                                                     **kwargs)
+        thisCommand.processConfigOptions(cfg, cfgMap, argSet)
         return argSet, [argv[0]] + otherArgs
 
     def usage(self, rc = 1, showAll = False):
