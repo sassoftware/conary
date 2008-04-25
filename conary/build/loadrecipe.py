@@ -258,13 +258,14 @@ class RecipeLoaderFromString:
                                     withFiles = True)
         filesNeeded = []
         for trv in troveList:
-            filesNeeded += [ x for x in trv.iterFileList() if
-                                    x[1].endswith('.recipe') ]
+            l = [ x for x in trv.iterFileList() if x[1].endswith('.recipe') ]
+            assert(len(l) == 1)
+            filesNeeded += l
 
-        #import epdb;epdb.st('f')
         recipes = ts.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
 
-        for (fileContents, fileInfo) in itertools.izip(recipes, filesNeeded):
+        for (fileContents, fileInfo, trv) in \
+                               itertools.izip(recipes, filesNeeded, troveList):
             loader = RecipeLoaderFromString(fileContents.get().read(),
                                   fileInfo[1], cfg, repos = repos,
                                   ignoreInstalled = True,
@@ -272,6 +273,7 @@ class RecipeLoaderFromString:
 
             recipe = loader.getRecipe()
             recipe.internalAbstractBaseClass = True
+            recipe._loadedFromSource = (trv.getNameVersionFlavor())
 
             d.update(loader.recipes)
 
@@ -472,11 +474,19 @@ class RecipeLoaderFromString:
         # the module from getting unloaded
         obj.__moduleObj__ = self.module
 
+        # Look through the base classes for this recipe to see if any
+        # of them were autoloaded, and if so include that information
+        # in the loaded troves information
+        for baseClass in inspect.getmro(self.recipe):
+            if (hasattr(baseClass, '_loadedFromSource') and
+                  baseClass._loadedFromSource not in self.module.loadedTroves):
+                self.module.loadedTroves.append(baseClass._loadedFromSource)
+
         # inherit any tracked flags that we found while loading parent
         # classes.  Also inherit the list of recipes classes needed to load
         # this recipe.
-        self.recipe.addLoadedTroves(self.module.__dict__['loadedTroves'])
-        self.recipe.addLoadedSpecs(self.module.__dict__['loadedSpecs'])
+        self.recipe.addLoadedTroves(self.module.loadedTroves)
+        self.recipe.addLoadedSpecs(self.module.loadedSpecs)
 
         if self.recipe._trackedFlags is not None:
             use.setUsed(self.recipe._trackedFlags)
