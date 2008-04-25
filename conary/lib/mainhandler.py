@@ -158,6 +158,10 @@ class MainHandler(object):
                     description=description)
 
     def getCommand(self, argv, cfg):
+        if len(argv) == 1:
+            # no command specified
+            return None
+
         commandName = argv[1]
         if commandName not in self._supportedCommands:
             rc = self.usage()
@@ -189,13 +193,10 @@ class MainHandler(object):
             self.usage()
             print >>sys.stderr, e
             sys.exit(e.val)
-
-        if len(argv) == 1:
-            # no command specified
-            return self.usage()
-
-        commandName = argv[1]
         thisCommand = self.getCommand(argv, cfg)
+        if thisCommand is None:
+            return self.usage()
+        commandName = argv[1]
         params, cfgMap = thisCommand.prepare()
         kwargs = self._getParserFlags(thisCommand)
 
