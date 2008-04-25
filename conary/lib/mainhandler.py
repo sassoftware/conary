@@ -159,11 +159,13 @@ class MainHandler(object):
             raise errors.ParseError("%s: unknown command: '%s'" % (self.name, commandName))
         return self._supportedCommands[commandName]
 
-    def main(self, argv=sys.argv, debuggerException=Exception,
+    def main(self, argv=None, debuggerException=Exception,
              cfg=None, **kw):
         """
             Process argv and execute commands as specified.
         """
+        if argv is None:
+            argv=sys.argv
         from conary import versions
         supportedCommands = self._supportedCommands
 
