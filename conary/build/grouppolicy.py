@@ -21,7 +21,3 @@ from conary.build import packagepolicy
 _DatabaseDepCache = packagepolicy._DatabaseDepCache
 class reportErrors(packagepolicy.reportErrors):
     groupError = True
-<<<<<<< local
-=======
-
->>>>>>> other

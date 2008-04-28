@@ -1,10 +1,7 @@
 Changes in @NEW@:
   o Build Changes:
-<<<<<<< local
-=======
     * When cooked, factories can now package additional files in their
      :recipe component. (CNY-2748)
->>>>>>> other
     * Moved VersionConflicts to pluggable policy and removed default
       exceptions. (CNY-2716)
   o Bug Fixes:
