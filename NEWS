@@ -4,14 +4,17 @@ Changes in @NEW@:
      :recipe component. (CNY-2748)
     * Moved VersionConflicts to pluggable policy and removed default
       exceptions. (CNY-2716)
+
   o Bug Fixes:
     * More optimizations for the pathId lookup query times for some
       package builds. (CNY-2742)
+
   o Client Changes:
     * PGP Keyring location is no longer determined using $HOME, which
       is unreliable; a getpwuid(3) lookup is used instead. (CNY-2722)
     * The number of retries for providing a passphrase when signing
       troves changed from 3 to 5. (CNY-2709)
+
   o Code Changes:
     * Some incompatibilities with python2.5 have been removed.
 
