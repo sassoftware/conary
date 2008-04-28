@@ -17,6 +17,12 @@ Changes in @NEW@:
   o Bug Fixes:
     * More optimizations for the pathId lookup query times for some
       package builds. (CNY-2742)
+    * A bug that caused an InsufficientPermission error when a user
+      only has repository access permissions added by trove calls
+      getNewTroveList() has been fixed. (CNY-2755)
+    * A bug that caused a request to add access to a trove for a role
+      to be ignored if the same trove was used previously to grant
+      access to a different role has been fixed. (CNY-2758)
 
 Changes in 2.0.12:
   o Build Changes:

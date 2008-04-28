@@ -134,12 +134,13 @@ class RoleTroves(RoleTable):
         select distinct tmpInstanceId.instanceId, ugt.ugtId, ugt.recursive
         from tmpInstanceId
         left join UserGroupTroves as ugt using(instanceId)
-        where ugt.userGroupId is NULL or ugt.userGroupId = ?
-        """, roleId)
+        """)
         # record the new permissions
         rtList = []
         for instanceId, rtId, recflag in cu.fetchall():
-            if rtId is None: # new instanceId, left join returned a NULL rt record
+            # new instanceId, left join returned a NULL rt record, or
+            # another role has access to this instanceId
+            if rtId != roleId:
                 cu.execute("insert into UserGroupTroves(userGroupId, instanceId, recursive) "
                            "values (?,?,?)", (roleId, instanceId, recursive))
                 rtId = cu.lastrowid

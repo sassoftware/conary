@@ -2849,8 +2849,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             lim = 1000 # for safety and efficiency
 
         # To avoid using a LIMIT value too low on the big query below,
-        # we need to find out how many distinct permissions will
-        # likely grant access to a trove for this user
+        # we need to find out how many roles might grant access to a
+        # trove for this user
+        cu.execute("""
+        SELECT COUNT(*) AS rolesWithMirrorAccess
+        FROM UserGroups
+        WHERE UserGroups.canMirror = 1
+          AND UserGroups.userGroupId in (%s)
+        """ % (",".join("%d" % x for x in roleIds),))
+        roleCount = cu.fetchall()[0][0]
+        if roleCount == 0:
+	    raise errors.InsufficientPermission
+        if roleCount is None:
+            roleCount = 1
+
+        # Next look at the permissions that could grant access
         cu.execute("""
         SELECT COUNT(*) AS perms
         FROM Permissions
@@ -2859,12 +2872,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND UserGroups.userGroupId in (%s)
         """ % (",".join("%d" % x for x in roleIds),))
         permCount = cu.fetchall()[0][0]
-        if permCount == 0:
-	    raise errors.InsufficientPermission
         if permCount is None:
             permCount = 1
 
-        # multiply LIMIT by permCount so that after duplicate
+        # take a guess at the total number of access paths for
+        # a trove - the number of roles that have the mirror
+        # flag set + the number of permissions contained by those
+        # roles
+        accessPathCount = roleCount + permCount
+        # multiply LIMIT by accessPathCount so that after duplicate
         # elimination we are sure to return at least 'lim' troves
         # back to the client
         query = """
@@ -2891,7 +2907,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         LIMIT %d
         """ % ( instances.INSTANCE_PRESENT_NORMAL,
                 ",".join("%d" % x for x in roleIds),
-                lim * permCount)
+                lim * accessPathCount)
         cu.execute(query, mark)
         self.log(4, "executing query", query, mark)
         ret = []
