@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Build Changes:
+    * Moved VersionConflicts to pluggable policy and removed default
+      exceptions. (CNY-2716)
   o Bug Fixes:
     * More optimizations for the pathId lookup query times for some
       package builds. (CNY-2742)
