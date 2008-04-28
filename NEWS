@@ -5,10 +5,6 @@ Changes in @NEW@:
     * Moved VersionConflicts to pluggable policy and removed default
       exceptions. (CNY-2716)
 
-  o Bug Fixes:
-    * More optimizations for the pathId lookup query times for some
-      package builds. (CNY-2742)
-
   o Client Changes:
     * PGP Keyring location is no longer determined using $HOME, which
       is unreliable; a getpwuid(3) lookup is used instead. (CNY-2722)
@@ -17,6 +13,10 @@ Changes in @NEW@:
 
   o Code Changes:
     * Some incompatibilities with python2.5 have been removed.
+
+  o Bug Fixes:
+    * More optimizations for the pathId lookup query times for some
+      package builds. (CNY-2742)
 
 Changes in 2.0.12:
   o Build Changes:
