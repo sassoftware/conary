@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.13:
   o Build Changes:
     * When cooked, factories can now package additional files in their
      :recipe component. (CNY-2748)
