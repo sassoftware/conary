@@ -32,13 +32,20 @@ def prettyPrint(func):
     def wrapper(*args, **kwargs):
         res = func(*args, **kwargs)
         if _lxmlPresent:
+            # XXX: It is fairly inefficient to serialize an
+            # ElementTree-like object to XML, then parse it back into an
+            # lxml.etree.ElementTree object, then serialize it again just to
+            # pretty-print it. Maybe we whould just have _toXml write an
+            # ElementTree object to begin with?
             tree = etree.parse(StringIO.StringIO(res))
-            res = etree.tostring(tree, pretty_print = True)
-            res = '<?xml version="1.0"?>\n' + res
+            res = etree.tostring(tree, pretty_print = True,
+                xml_declaration = True, encoding = 'UTF-8')
         else:
+            res = res.encode('UTF-8')
             xmllint = util.which('xmllint')
             if xmllint and os.access(xmllint, os.X_OK):
-                p = subprocess.Popen([xmllint, '--format', '-'],
+                p = subprocess.Popen([xmllint, '--format',
+                        '--encode', 'UTF-8', '-'],
                         stdin = subprocess.PIPE, stdout = subprocess.PIPE,
                         stderr = subprocess.PIPE)
                 stdout, stderr = p.communicate(input = res)
@@ -247,40 +254,45 @@ class DataBinder(object):
                 (x not in order, x in order and order.index(x), x))
 
     def _toXml(self, obj, suggestedName = None):
-        res = ''
+        """This function returns an Unicode string. This is important as it
+        makes sure we are properly encoding non-ASCII characters"""
+        stream = StringIO.StringIO()
+        self._toXML_r(obj, stream, suggestedName = suggestedName)
+        return stream.getvalue()
+
+    def _toXML_r(self, obj, stream, suggestedName = None):
         name = suggestedName or obj.__class__.__name__
         if isinstance(obj, simpletypes):
             if isinstance(obj, bool):
                 obj = obj and 'true' or 'false'
             if isinstance(obj, (int, float, long, str, unicode, bool)):
-                res += "<%s>%s</%s>" % (name, obj, name)
+                stream.write(u"<%s>%s</%s>" % (name, obj, name))
             elif isinstance(obj, (list, set, tuple)):
                 for child in obj:
-                    res += self._toXml(child, suggestedName)
+                    self._toXML_r(child, stream, suggestedName)
             elif isinstance(obj, dict):
-                res += '<%s>' % name
+                stream.write(u'<%s>' % name)
                 for childName, child in sorted(obj.iteritems()):
-                    res += self._toXml(child, suggestedName = childName)
-                res += '</%s>' % name
+                    self._toXML_r(child, stream, suggestedName = childName)
+                stream.write(u'</%s>' % name)
         else:
             attrs = dict(x for x in obj.__class__.__dict__.iteritems() \
                     if not x[0].startswith('_'))
             children = dict(x for x in obj.__dict__.iteritems() \
                     if not x[0].startswith('_'))
-            res += '<%s' % name
+            stream.write(u'<%s' % name)
             for key, val in sorted(attrs.iteritems()):
-                res += ' %s="%s"' % (key, val)
-            res += '>'
+                stream.write(u' %s="%s"' % (key, val))
+            stream.write(u'>')
             ordering = hasattr(obj, '_childOrder') and obj._childOrder or []
             childOrder = self._getChildOrder(children.keys(), ordering)
             for key in childOrder:
                 val = children[key]
-                res += self._toXml(val, key)
+                self._toXML_r(val, stream, key)
             if hasattr(obj, '_text'):
                 if obj._text.strip():
-                    res += obj._text
-            res += "</%s>" % name
-        return res
+                    stream.write(unicode(obj._text))
+            stream.write(u"</%s>" % name)
 
     @prettyPrint
     def toXml(self, obj, suggestedName = None):
