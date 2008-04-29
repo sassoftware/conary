@@ -4,6 +4,8 @@ Changes in @NEW@:
      :recipe component. (CNY-2748)
     * Moved VersionConflicts to pluggable policy and removed default
       exceptions. (CNY-2716)
+    * a Bug causing python-setuptools to appear to be an excessive build
+      requirement has been fixed. (CNY-2738)
 
   o Client Changes:
     * PGP Keyring location is no longer determined using $HOME, which

@@ -322,11 +322,9 @@ class AbstractPackageRecipe(Recipe):
 
     def _getTransitiveDepClosure(self, targets=None):
         def isTroveTarget(trove):
-            if not targets:
+            if targets is None:
                 return True
-            if trove.getName() in targets:
-                return True
-            return False
+            return trove.getName() in targets
 
 	db = database.Database(self.cfg.root, self.cfg.dbPath)
         
