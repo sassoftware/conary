@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A bug causing python-setuptools to appear to be an excessive build
+      requirement has been fixed. (CNY-2738)
+
 Changes in 2.0.13:
   o Build Changes:
     * When cooked, factories can now package additional files in their
