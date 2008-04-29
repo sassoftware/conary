@@ -112,6 +112,8 @@ class StringNode(BaseNode):
     If no text is set, this object will default to ''.
     """
     def _finalize(self):
+        if isinstance(self._text, unicode):
+            return self._text
         return str(self._text)
 
 class NullNode(BaseNode):
