@@ -26,6 +26,8 @@ Changes in @NEW@:
     * A bug that caused an InsufficientPermission error when a user
       requests a changeset to which the user has been granted access
       with addTroveAccess has been fixed. (CNY-2760)
+    * The XML writer in xmldata.py is now encoding using UTF-8.
+      (CNY-2756)
 
 Changes in 2.0.12:
   o Build Changes:
