@@ -23,6 +23,9 @@ Changes in @NEW@:
     * A bug that caused a request to add access to a trove for a role
       to be ignored if the same trove was used previously to grant
       access to a different role has been fixed. (CNY-2758)
+    * A bug that caused an InsufficientPermission error when a user
+      requests a changeset to which the user has been granted access
+      with addTroveAccess has been fixed. (CNY-2760)
 
 Changes in 2.0.12:
   o Build Changes:
