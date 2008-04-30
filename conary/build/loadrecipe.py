@@ -36,10 +36,179 @@ from conary.local import database
 from conary import versions
 
 
+class Importer:
+
+    baseModuleImports = [
+        ('conary.build', ('build', 'action')),
+        ('conary.build.loadrecipe', 
+                           ('loadSuperClass', 'loadInstalled',
+                            # XXX when all recipes have been migrated
+                            # we can get rid of loadRecipe
+                            ('loadSuperClass', 'loadRecipe'))),
+        ('conary.build.grouprecipe', 'GroupRecipe'),
+        ('conary.build.filesetrecipe', 'FilesetRecipe'),
+        ('conary.build.redirectrecipe', 'RedirectRecipe'),
+        ('conary.build.derivedrecipe', 'DerivedPackageRecipe'),
+        ('conary.build.packagerecipe', 
+                          ('clearBuildReqs', 'clearBuildRequires',
+                           'clearCrossReqs', 'clearCrossRequires',
+                           'PackageRecipe', 'BuildPackageRecipe',
+                           'CPackageRecipe', 'AutoPackageRecipe')),
+        ('conary.build.inforecipe',  ('UserInfoRecipe', 'GroupInfoRecipe',
+                                      'UserGroupInfoRecipe' )),
+        ('conary.lib', ('util',)),
+        ('os',),
+        ('re',),
+        ('sys',),
+        ('stat',),
+        ('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                            'PackageFlags')) ]
+    def __init__(self, objDict = {}, fileName = 'unknownfile.py',
+                 baseName = 'unknown', factory = False):
+        self.fileName = fileName
+        self.baseName = os.path.basename(self.fileName)
+        self.module = imp.new_module(self.fileName)
+
+        for args in self.baseModuleImports:
+            self._localImport(*args)
+
+        if factory:
+            self._localImport('conary.build.factory',
+                              ('Factory', 'FactoryException' ))
+
+        self._copyReusedRecipes()
+
+        self.module.__dict__.update(objDict.copy())
+
+    def _copyReusedRecipes(self):
+        # XXX HACK - get rid of this when we move the
+        # recipe classes to the repository.
+        # makes copies of some of the superclass recipes that are 
+        # created in this module.  (specifically, the ones with buildreqs)
+        recipeClassDict = {}
+        for recipeClass in self.module.__dict__.values():
+            if (type(recipeClass) != type or
+                    not issubclass(recipeClass, recipe.Recipe)):
+                continue
+            numParents = len(inspect.getmro(recipeClass))
+            recipeClassDict[recipeClass.__name__] = (numParents, recipeClass)
+        # create copies of recipes by the number of parents they have
+        # a class always has more parents than its parent does,
+        # if you copy the superClasses first, the copies will.
+        recipeClasses = [ x[1]  for x in sorted(recipeClassDict.values(),
+                                                key=lambda x: x[0]) ]
+        for recipeClass in recipeClasses:
+            className = recipeClass.__name__
+            # when we create a new class object, it needs its superclasses.
+            # get the original superclass list and substitute in any 
+            # copies
+            mro = list(inspect.getmro(recipeClass)[1:])
+            newMro = []
+            for superClass in mro:
+                superName = superClass.__name__
+                newMro.append(self.module.__dict__.get(superName, superClass))
+
+            newDict = {}
+            for name, attr in recipeClass.__dict__.iteritems():
+                if type(attr) in [ types.ModuleType, types.MethodType,
+                                   types.UnboundMethodType,
+                                   types.FunctionType,
+                                   staticmethod,
+                                   # don't copy in flags, as they
+                                   # need to have their data copied out
+                                   use.LocalFlagCollection]:
+                    newDict[name] = attr
+                else:
+                    newDict[name] = copy.deepcopy(attr)
+
+            self.module.__dict__[className] = \
+                            new.classobj(className, tuple(newMro), newDict)
+ 
+    def _localImport(self, package, modules=()):
+        """
+        import a package into a non-global context.
+
+        @param d: the context to import the module
+        @type d: dict
+        @param package: the name of the module to import
+        @type package: str
+        @param modules: a sequence of modules to import from the package.
+        If a 2-tuple is in the sequence, rename the imported module to
+        the second value in the tuple.
+        @type modules: sequence of strings or tuples, or empty tuple
+
+        Examples of translated import statements::
+          from foo import bar as baz:
+              _localImport(d, "foo", (("bar", "baz"))
+          from bar import fred, george:
+              _localImport(d, "bar", ("fred", "george"))
+          import os
+              _localImport(d, "os")
+        """
+        m = __import__(package, {}, {}, modules)
+        if modules:
+            if isinstance(modules, str):
+                modules = (modules,)
+            for name in modules:
+                if type(name) is tuple:
+                    mod = name[0]
+                    name = name[1]
+                else:
+                    mod = name
+                self.module.__dict__[name] = getattr(m, mod)
+        else:
+            self.module.__dict__[package] = m
+        # save a reference to the module into this context, so it won't
+        # be garbage collected until the context is deleted.
+        l = self.module.__dict__.setdefault('__localImportModules', [])
+        l.append(m)
+
+    def execString(self, codeString):
+        try:
+            code = compile(codeString, self.fileName, 'exec')
+        except SyntaxError, err:
+            msg = ('Error in recipe file "%s": %s\n' %(basename, err))
+            if err.offset is not None:
+                msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
+            else:
+                msg += err.text
+            raise builderrors.RecipeFileError(msg)
+
+        use.resetUsed()
+        try:
+            exec code in self.module.__dict__
+        except (errors.ConaryError, builderrors.CvcError), err:
+            # don't show the exception for conary and cvc errors -
+            # we assume their exception message already contains the 
+            # required information
+
+            tb = sys.exc_info()[2]
+            while tb and tb.tb_frame.f_code.co_filename != self.fileName:
+                tb = tb.tb_next
+            linenum = tb.tb_frame.f_lineno
+
+            msg = ('Error in recipe file "%s", line %s:\n %s' % 
+                                (self.baseName, linenum, err))
+
+
+            raise builderrors.RecipeFileError(msg)
+        except Exception, err:
+            tb = sys.exc_info()[2]
+            while tb and tb.tb_frame.f_code.co_filename != self.fileName:
+                tb = tb.tb_next
+
+            if not tb:
+                raise
+
+            err = ''.join(traceback.format_exception(err.__class__, err, tb))
+            del tb
+            msg = ('Error in recipe file "%s":\n %s' %(self.baseName, err))
+            raise builderrors.RecipeFileError(msg)
 
 class RecipeLoaderFromString:
 
-    _defaultsLoaded = False
+    # acts as a semaphore to prevent infinite recursion in _loadDefaultPackages
+    _loadingDefaults = False
 
     # This is the module dictionary which is used as the starting point
     # for all recipe imports. Derivatives of RecipeLoader should use this
@@ -86,101 +255,6 @@ class RecipeLoaderFromString:
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
-    @classmethod
-    def _initClass(theKlass):
-        theKlass.baseModuleDict = {}
-        theKlass._defaultsLoaded = False
-        for args in theKlass.baseModuleImports:
-            theKlass._localImport(theKlass.baseModuleDict, *args)
-
-    @staticmethod
-    def _localImport(d, package, modules=()):
-        """
-        import a package into a non-global context.
-
-        @param d: the context to import the module
-        @type d: dict
-        @param package: the name of the module to import
-        @type package: str
-        @param modules: a sequence of modules to import from the package.
-        If a 2-tuple is in the sequence, rename the imported module to
-        the second value in the tuple.
-        @type modules: sequence of strings or tuples, or empty tuple
-
-        Examples of translated import statements::
-          from foo import bar as baz:
-              _localImport(d, "foo", (("bar", "baz"))
-          from bar import fred, george:
-              _localImport(d, "bar", ("fred", "george"))
-          import os
-              _localImport(d, "os")
-        """
-        m = __import__(package, d, {}, modules)
-        if modules:
-            if isinstance(modules, str):
-                modules = (modules,)
-            for name in modules:
-                if type(name) is tuple:
-                    mod = name[0]
-                    name = name[1]
-                else:
-                    mod = name
-                d[name] = getattr(m, mod)
-        else:
-            d[package] = m
-        # save a reference to the module inside this context, so it won't
-        # be garbage collected until the context is deleted.
-        l = d.setdefault('__localImportModules', [])
-        l.append(m)
-
-    @staticmethod
-    def baseImport(package, modules=()):
-        RecipeLoaderFromString._localImport(RecipeLoaderFromString.baseModuleDict, package, modules)
-
-    @staticmethod
-    def _copyReusedRecipes(moduleDict):
-        # XXX HACK - get rid of this when we move the
-        # recipe classes to the repository.
-        # makes copies of some of the superclass recipes that are 
-        # created in this module.  (specifically, the ones with buildreqs)
-        recipeClassDict = {}
-        for recipeClass in moduleDict.values():
-            if (type(recipeClass) != type or
-                    not issubclass(recipeClass, recipe.Recipe)):
-                continue
-            numParents = len(inspect.getmro(recipeClass))
-            recipeClassDict[recipeClass.__name__] = (numParents, recipeClass)
-        # create copies of recipes by the number of parents they have
-        # a class always has more parents than its parent does,
-        # if you copy the superClasses first, the copies will.
-        recipeClasses = [ x[1]  for x in sorted(recipeClassDict.values(),
-                                                key=lambda x: x[0]) ]
-        for recipeClass in recipeClasses:
-            className = recipeClass.__name__
-            # when we create a new class object, it needs its superclasses.
-            # get the original superclass list and substitute in any 
-            # copies
-            mro = list(inspect.getmro(recipeClass)[1:])
-            newMro = []
-            for superClass in mro:
-                superName = superClass.__name__
-                newMro.append(moduleDict.get(superName, superClass))
-
-            newDict = {}
-            for name, attr in recipeClass.__dict__.iteritems():
-                if type(attr) in [ types.ModuleType, types.MethodType,
-                                   types.UnboundMethodType,
-                                   types.FunctionType,
-                                   staticmethod,
-                                   # don't copy in flags, as they
-                                   # need to have their data copied out
-                                   use.LocalFlagCollection]:
-                    newDict[name] = attr
-                else:
-                    newDict[name] = copy.deepcopy(attr)
-
-            moduleDict[className] = new.classobj(className,
-                                                 tuple(newMro), newDict)
 
     @staticmethod
     def _loadDefaultPackages(d, cfg, repos, db = None, buildFlavor = None):
@@ -213,11 +287,11 @@ class RecipeLoaderFromString:
 
         # def _loadDefaultPackages begins here
 
-        if RecipeLoaderFromString._defaultsLoaded:
-            # we don't need to load these twice
+        if RecipeLoaderFromString._loadingDefaults or not cfg.autoLoadRecipes:
+            # prevent infinite recursion
             return
 
-        RecipeLoaderFromString._defaultsLoaded = True
+        RecipeLoaderFromString._loadingDefaults = True
 
         if db is None:
             db = database.Database(cfg.root, cfg.dbPath)
@@ -277,6 +351,8 @@ class RecipeLoaderFromString:
 
             d.update(loader.recipes)
 
+        RecipeLoaderFromString._loadingDefaults = False
+
     def _findRecipeClass(self, pkgname, basename, objDict, factory = False):
         result = None
         for (name, obj) in objDict.items():
@@ -291,8 +367,9 @@ class RecipeLoaderFromString:
             # class itself, not any parent class
             if 'internalAbstractBaseClass' in obj.__dict__:
                 continue
+
             # make sure the class is derived from either Recipe or Factory
-            if ((    factory and not issubclass(obj, FactoryRecipe)) or
+            if ((    factory and not issubclass(obj, objDict['Factory'])) or
                 (not factory and not issubclass(obj, recipe.Recipe  ))):
                 continue
 
@@ -375,94 +452,49 @@ class RecipeLoaderFromString:
             pkgname = pkgname[:-len('.recipe')]
         basename = os.path.basename(filename)
         self.file = basename.replace('.', '-')
-        self.module = imp.new_module(self.file)
 
         # store cfg and repos, so that the recipe can load
         # recipes out of the repository
 
-        self.module.__dict__.update(self.baseModuleDict)
+        importer = Importer(objDict, fileName = filename, baseName = basename,
+                            factory = factory)
 
-        self.module.__dict__['cfg'] = cfg
-        self.module.__dict__['repos'] = repos
-        self.module.__dict__['db'] = db
-        self.module.__dict__['buildFlavor'] = buildFlavor
-        self.module.__dict__['filename'] = filename
-        
+        importer.module.__dict__['cfg'] = cfg
+        importer.module.__dict__['repos'] = repos
+        importer.module.__dict__['db'] = db
+        importer.module.__dict__['buildFlavor'] = buildFlavor
+        importer.module.__dict__['filename'] = filename
+
         if not directory:
             directory = os.path.dirname(filename)
-        self.module.__dict__['directory'] = directory
+        importer.module.__dict__['directory'] = directory
 
-        self._loadDefaultPackages(self.module.__dict__, cfg, repos, db,
+        self._loadDefaultPackages(importer.module.__dict__, cfg, repos, db,
                                   buildFlavor = buildFlavor)
-        self._copyReusedRecipes(self.module.__dict__)
 
-        if factory:
-            self._localImport(self.module.__dict__, 'conary.build.factory',
-                              ('Factory', 'FactoryException' ))
+        importer.module.__dict__['component'] = component
+        importer.module.__dict__['branch'] = branch
+        importer.module.__dict__['name'] = pkgname
+        importer.module.__dict__['ignoreInstalled'] = ignoreInstalled
+        importer.module.__dict__['loadedTroves'] = []
+        importer.module.__dict__['loadedSpecs'] = {}
+        importer.module.__dict__['overrides'] = overrides
 
-        self.module.__dict__['component'] = component
-        self.module.__dict__['branch'] = branch
-        self.module.__dict__['name'] = pkgname
-        self.module.__dict__['ignoreInstalled'] = ignoreInstalled
-        self.module.__dict__['loadedTroves'] = []
-        self.module.__dict__['loadedSpecs'] = {}
-        self.module.__dict__['overrides'] = overrides
-        if objDict:
-            self.module.__dict__.update(objDict)
-
-        # create the recipe class by executing the code in the recipe
-        try:
-            code = compile(codeString, filename, 'exec')
-        except SyntaxError, err:
-            msg = ('Error in recipe file "%s": %s\n' %(basename, err))
-            if err.offset is not None:
-                msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
-            else:
-                msg += err.text
-            raise builderrors.RecipeFileError(msg)
-
-        use.resetUsed()
-        try:
-            exec code in self.module.__dict__
-        except (errors.ConaryError, builderrors.CvcError), err:
-            # don't show the exception for conary and cvc errors -
-            # we assume their exception message already contains the 
-            # required information
-
-            tb = sys.exc_info()[2]
-            while tb and tb.tb_frame.f_code.co_filename != filename:
-                tb = tb.tb_next
-            linenum = tb.tb_frame.f_lineno
-
-            msg = ('Error in recipe file "%s", line %s:\n %s' % (basename, linenum, err))
-
-
-            raise builderrors.RecipeFileError(msg)
-        except Exception, err:
-            tb = sys.exc_info()[2]
-            while tb and tb.tb_frame.f_code.co_filename != filename:
-                tb = tb.tb_next
-
-            if not tb:
-                raise
-
-            err = ''.join(traceback.format_exception(err.__class__, err, tb))
-            del tb
-            msg = ('Error in recipe file "%s":\n %s' %(basename, err))
-            raise builderrors.RecipeFileError(msg)
-            
+        importer.execString(codeString)
 
         # all recipes that could be loaded by loadRecipe are loaded;
         # get rid of our references to cfg and repos
-        del self.module.__dict__['db']
-        del self.module.__dict__['cfg']
-        del self.module.__dict__['repos']
-        del self.module.__dict__['component']
-        del self.module.__dict__['branch']
-        del self.module.__dict__['name']
-        del self.module.__dict__['ignoreInstalled']
-        del self.module.__dict__['buildFlavor']
-        del self.module.__dict__['overrides']
+        del importer.module.__dict__['db']
+        del importer.module.__dict__['cfg']
+        del importer.module.__dict__['repos']
+        del importer.module.__dict__['component']
+        del importer.module.__dict__['branch']
+        del importer.module.__dict__['name']
+        del importer.module.__dict__['ignoreInstalled']
+        del importer.module.__dict__['buildFlavor']
+        del importer.module.__dict__['overrides']
+
+        self.module = importer.module
 
         (name, obj) = self._findRecipeClass(pkgname, basename,
                                             self.module.__dict__,
@@ -1170,5 +1202,3 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              branch = branch,
                                              buildFlavor = buildFlavor,
                                              parentDir = os.getcwd())
-
-RecipeLoaderFromString._initClass()
