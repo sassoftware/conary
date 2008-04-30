@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug causing python-setuptools to appear to be an excessive build
       requirement has been fixed. (CNY-2738)
+    * A regression triggered when rMake recursed through a group recipe
+      that added troves with a full version has been fixed. (CNY-2768)
 
 Changes in 2.0.13:
   o Build Changes:

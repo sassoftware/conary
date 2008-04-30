@@ -3196,7 +3196,7 @@ def findSourcesForGroup(repos, recipeObj, callback=None):
         revisionSpec = ''
         if versionSpec:
             if '/' in versionSpec:
-                revisionSpec = versionSpec.split('/')
+                revisionSpec = versionSpec.split('/')[-1]
             elif '@' in versionSpec or ':' in versionSpec:
                 revisionSpec = ''
             else:
