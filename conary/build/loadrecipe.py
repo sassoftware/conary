@@ -73,7 +73,8 @@ class Importer:
 
         self._copyReusedRecipes()
 
-        self.module.__dict__.update(objDict.copy())
+        if objDict:
+            self.module.__dict__.update(objDict.copy())
 
     def _copyReusedRecipes(self):
         # XXX HACK - get rid of this when we move the
