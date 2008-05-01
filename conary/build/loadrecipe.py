@@ -769,7 +769,6 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                                openSourceFileFn = openSourceFile)
         recipe = factory.getRecipeClass()
 
-        self.addLoadedTroves(factoryClass._loadedTroves)
         recipe.addLoadedSpecs(factoryClass._loadedSpecs)
 
         if factoryClass._trove:

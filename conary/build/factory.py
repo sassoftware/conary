@@ -23,7 +23,6 @@ class Factory:
 
     internalAbstractBaseClass = True
     _recipeType = RECIPE_TYPE_FACTORY
-    _loadedTroves = []
     _loadedSpecs = {}
     _trackedFlags = None
 
@@ -40,13 +39,6 @@ class Factory:
     def validateClass(class_):
         if class_.version == '':
             raise ParseError("empty release string")
-
-    @classmethod
-    def addLoadedTroves(class_, newTroves):
-        # NOTE: we have these method to ensure that the
-        # class variable we're using is assigned to _this_
-        # class and not some superclass.
-        class_._loadedTroves = class_._loadedTroves + newTroves
 
     @classmethod
     def addLoadedSpecs(class_, newSpecs):
