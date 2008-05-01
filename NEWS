@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.14:
   o Bug Fixes:
     * A bug causing python-setuptools to appear to be an excessive build
       requirement has been fixed. (CNY-2738)
