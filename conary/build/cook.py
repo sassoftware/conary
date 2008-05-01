@@ -485,6 +485,8 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
                     pass
 
             recipeClass = FactoryRecipe
+            # XXX Ouch. Gross.
+            loader.recipe = recipeClass
             type = recipeClass.getType()
 
         if type in (recipe.RECIPE_TYPE_INFO,
