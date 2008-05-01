@@ -23,7 +23,6 @@ class Factory:
 
     internalAbstractBaseClass = True
     _recipeType = RECIPE_TYPE_FACTORY
-    _loadedSpecs = {}
     _trackedFlags = None
 
     def __init__(self, packageName, sourceFiles = [], openSourceFileFn = None):
@@ -39,11 +38,6 @@ class Factory:
     def validateClass(class_):
         if class_.version == '':
             raise ParseError("empty release string")
-
-    @classmethod
-    def addLoadedSpecs(class_, newSpecs):
-        class_._loadedSpecs = dict(class_._loadedSpecs)
-        class_._loadedSpecs.update(newSpecs)
 
     def openSourceFile(self, path):
         return self._openSourceFileFn(path)

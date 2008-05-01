@@ -98,7 +98,6 @@ class Recipe(object):
     """Virtual base class for all Recipes"""
     _trove = None
     _trackedFlags = None
-    _loadedSpecs = {}
     _recipeType = RECIPE_TYPE_UNKNOWN
     _isDerived = False
     _sourceModule = None
@@ -175,15 +174,6 @@ class Recipe(object):
             return method(*args, **kw)
         finally:
             self._recordMethodCalls = False
-
-    @classmethod
-    def getLoadedSpecs(class_):
-        return dict(class_._loadedSpecs)
-
-    @classmethod
-    def addLoadedSpecs(class_, newSpecs):
-        class_._loadedSpecs = dict(class_._loadedSpecs)
-        class_._loadedSpecs.update(newSpecs)
 
     def __repr__(self):
         return "<%s Object>" % self.__class__

@@ -207,7 +207,6 @@ class Importer(object):
             # a recipe that has been loaded by loadRecipe, so we treat them
             # for these purposes as if they are abstract base classes
             recipe.internalAbstractBaseClass = 1
-            self.loadedTroves.extend(loader.getLoadedTroves())
 
             self.module.__dict__[name] = recipe
             if recipe._trove:
@@ -221,8 +220,10 @@ class Importer(object):
                 troveTuple = (recipe._trove.getName(), recipe._trove.getVersion(),
                               recipe._usedFlavor)
                 log.info('Loaded %s from %s=%s[%s]' % ((name,) + troveTuple))
+                self.loadedTroves.extend(loader.getLoadedTroves())
                 self.loadedTroves.append(troveTuple)
-                self.loadedSpecs[troveSpec] = (troveTuple, recipe)
+                self.loadedSpecs[troveSpec] = (troveTuple,
+                                               loader.getLoadedSpecs())
 
         # stash a reference to the module in the namespace
         # of the recipe that loaded it, or else it will be destroyed
@@ -324,6 +325,7 @@ class Importer(object):
 class RecipeLoaderFromString(object):
 
     loadedTroves = None
+    loadedSpecs = None
 
     def __init__(self, codeString, filename, cfg=None, repos=None,
                  component=None, branch=None, ignoreInstalled=False,
@@ -580,7 +582,7 @@ class RecipeLoaderFromString(object):
         # classes.  Also inherit the list of recipes classes needed to load
         # this recipe.
         self.addLoadedTroves(importer.loadedTroves)
-        self.recipe.addLoadedSpecs(importer.loadedSpecs)
+        self.addLoadedSpecs(importer.loadedSpecs)
 
         if self.recipe._trackedFlags is not None:
             use.setUsed(self.recipe._trackedFlags)
@@ -618,6 +620,15 @@ class RecipeLoaderFromString(object):
             self.loadedTroves = []
 
         self.loadedTroves = self.loadedTroves + newTroves
+
+    def getLoadedSpecs(self):
+        return self.loadedSpecs
+
+    def addLoadedSpecs(self, newSpecs):
+        # see the comment for addLoadedTroves
+        if self.loadedSpecs is None:
+            self.loadedSpecs = {}
+        self.loadedSpecs.update(newSpecs)
 
 class RecipeLoader(RecipeLoaderFromString):
 
@@ -769,16 +780,13 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                                openSourceFileFn = openSourceFile)
         recipe = factory.getRecipeClass()
 
-        recipe.addLoadedSpecs(factoryClass._loadedSpecs)
-
         if factoryClass._trove:
             # this doesn't happen if you load from the local directory
             self.addLoadedTroves(
                             [ factoryClass._trove.getNameVersionFlavor() ])
-            recipe.addLoadedSpecs(
-                            { factoryClass.name :
-                                (factoryClass._trove.getNameVersionFlavor(),
-                                 factoryClass) } )
+            self.addLoadedSpecs(
+                    { factoryClass.name :
+                        (factoryClass._trove.getNameVersionFlavor(), {} ) } )
 
         return recipe
 
@@ -1002,9 +1010,6 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
 
     if overrides and troveSpec in overrides:
         recipeToLoad, newOverrideDict = overrides[troveSpec]
-        if hasattr(newOverrideDict, '_loadedSpecs'):
-            # handle case where loadSpec is passed directly back in
-            newOverrideDict = newOverrideDict._loadedSpecs
     else:
         recipeToLoad = newOverrideDict = None
 
