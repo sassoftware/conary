@@ -569,10 +569,21 @@ class AbstractPackageRecipe(Recipe):
         """
         buildReqs = set()
         superBuildReqs = set()
+        immediateSuper = True
         for base in inspect.getmro(self.__class__):
             thisClassReqs = getattr(base, attr, [])
             buildReqs.update(thisClassReqs)
             if base != self.__class__:
+                if immediateSuper:
+                    if (set(self._recipeRequirements[attr]) ==
+                        set(getattr(base, attr, []))):
+                        # requirements in recipe were inherited,
+                        # not explicitly specified, so report
+                        # them as if recipe explicitly contained
+                        # an empty list
+                        self._recipeRequirements[attr] = []
+                    # We have now inspected the immediate superclass
+                    immediateSuper = False
                 superBuildReqs.update(thisClassReqs)
         setattr(self, attr, list(buildReqs))
         self._recipeRequirements['%sSuper' %attr] = superBuildReqs

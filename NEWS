@@ -4,6 +4,10 @@ Changes in @NEW@:
       requirement has been fixed. (CNY-2738)
     * A regression triggered when rMake recursed through a group recipe
       that added troves with a full version has been fixed. (CNY-2768)
+    * When reporting possibly excessive buildRequires, not mentioning
+      buildRequires at all in the recipe caused Conary to report the
+      immediate superclass's buildRequires as the recipe's buildRequires.
+      This bug has been resolved. (CNY-2769)
 
 Changes in 2.0.13:
   o Build Changes:
