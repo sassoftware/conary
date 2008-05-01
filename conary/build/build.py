@@ -1348,7 +1348,7 @@ class PythonSetup(BuildCommand):
         macros.data = self.data
 
         # now figure out which kind of setup.py this is
-        if re.compile('(import setuptools|from setuptools import)').search(file('%s/%s' %(rundir, self.setupName)).read()):
+        if re.compile('(import setuptools|from setuptools import|import ez_setup|from ez_setup import)').search(file('%s/%s' %(rundir, self.setupName)).read()):
             macros.pythonsetup = 'python%s %s ' % (pythonVersion,
                                                    self.setupName)
             self._addActionPathBuildRequires(['python'])
@@ -1356,7 +1356,8 @@ class PythonSetup(BuildCommand):
             # hack to use setuptools instead of disttools
             macros.pythonsetup = (
                 '''python%(pyver)s -c "import setuptools;execfile('%(setupName)s')"''')
-            self._addActionTroveBuildRequires(['python-setuptools:python'])
+        # python-setuptools:python is required either way
+        self._addActionTroveBuildRequires(['python-setuptools:python'])
 
         # prepare to test for multilib problems
         if macros.lib != 'lib':
