@@ -316,7 +316,7 @@ With the latest conary, you must now cook all versions of a group at the same ti
             keyFlavors.extend(fDict.values())
         return self.shortenFlavors(keyFlavors, builtGroups)
 
-def cookObject(repos, cfg, recipeClass, sourceVersion,
+def cookObject(repos, cfg, loaderList, sourceVersion,
                changeSetFile = None, prep=True, macros={},
                targetLabel = None, resume = None, alwaysBumpCount = False,
                allowUnknownFlags = False, allowMissingSource = False,
@@ -332,8 +332,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
+    @param loaderList: list of RecipeLoader objects containing recipes to build
+    @type loaderList: list of classes descended from recipe.Recipe
     @type sourceVersion: the full conary verison of the recipeClass we are 
     cooking.  This source trove version should exist.  If you know what you
     are doing, you can create troves with non-existant source versions 
@@ -379,23 +379,16 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     if not groupOptions:
         groupCookOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
-    if not isinstance(recipeClass, (list, tuple)):
-        recipeClasses = [recipeClass]
-    else:
-        recipeClasses = recipeClass
-        recipeClass = recipeClass[0]
-        # every recipe passed into build at once must have the same
-        # name and version.
-        assert(len(set((x.name, x.version) for x in recipeClasses)) == 1)
+    assert(len(set((x.getRecipe().name, x.getRecipe().version) 
+                for x in loaderList)) == 1)
 
     if not callback:
         callback = callbacks.CookCallback()
 
-    if not (hasattr(recipeClass, 'name') and hasattr(recipeClass, 'version')):
-        raise CookError('recipe class must have name and version defined')
-    if '-' in recipeClass.version:
+    if '-' in loaderList[0].getRecipe().version:
         raise builderrors.RecipeFileError(
-            "Version string %s has illegal '-' character" %recipeClass.version)
+            "Version string %s has illegal '-' character" %
+                loaderList[0].getRecipe().version)
 
     if not use.Arch.keys():
         log.error('No architectures have been defined in %s -- '
@@ -415,7 +408,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 	sys.exit(1)
 
     use.allowUnknownFlags(allowUnknownFlags)
-    fullName = recipeClass.name
+    fullName = loaderList[0].getRecipe().name
 
     srcName = fullName + ':source'
 
@@ -453,9 +446,11 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
         signatureKey = selectSignatureKey(cfg, sourceVersion.trailingLabel())
 
     db = database.Database(cfg.root, cfg.dbPath)
-    type = recipeClass.getType()
-    if recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
-        ret = cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion,
+    type = loaderList[0].getRecipe().getType()
+    if type == recipe.RECIPE_TYPE_GROUP:
+        ret = cookGroupObjects(repos, db, cfg,
+                               [ x.getRecipe() for x in loaderList ],
+                               sourceVersion,
                                macros = macros, targetLabel = targetLabel,
                                alwaysBumpCount = alwaysBumpCount,
                                requireCleanSources = requireCleanSources,
@@ -463,7 +458,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                groupOptions=groupOptions)
         needsSigning = True
     else:
-        assert(len(recipeClasses) == 1) 
+        assert(len(loaderList) == 1) 
+        recipeClass = loaderList[0].getRecipe()
+        loader = loaderList[0]
         buildFlavor = getattr(recipeClass, '_buildFlavor', cfg.buildFlavor)
         try:
             use.setBuildFlagsFromFlavor(recipeClass.name, buildFlavor,
@@ -492,7 +489,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
         if type in (recipe.RECIPE_TYPE_INFO,
                       recipe.RECIPE_TYPE_PACKAGE):
-            ret = cookPackageObject(repos, db, cfg, recipeClass, 
+            ret = cookPackageObject(repos, db, cfg, loader,
                                 sourceVersion, 
                                 prep = prep, macros = macros,
                                 targetLabel = targetLabel,
@@ -926,7 +923,7 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
                                                 fileset.getFlavor()) ]
     return (changeSet, built, None)
 
-def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True, 
+def cookPackageObject(repos, db, cfg, loader, sourceVersion, prep=True, 
                       macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False, 
                       ignoreDeps=False, logBuild=False, crossCompile = None,
@@ -970,7 +967,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
                             and targetLabel != versions.CookLabel()
                             and not prep and not downloadOnly)
 
-    result  = _cookPackageObjWrap(repos, cfg, recipeClass, 
+    result  = _cookPackageObjWrap(repos, cfg, loader, 
                                  sourceVersion, prep=prep,
                                  macros=macros, resume=resume,
                                  ignoreDeps=ignoreDeps, 
@@ -987,7 +984,7 @@ def cookPackageObject(repos, db, cfg, recipeClass, sourceVersion, prep=True,
     
     # 2. convert the package into a changeset ready for committal
     changeSet, built = _createPackageChangeSet(repos, db, cfg, bldList,
-                           recipeObj, sourceVersion,
+                           loader, recipeObj, sourceVersion,
                            targetLabel=targetLabel,
                            alwaysBumpCount=alwaysBumpCount,
                            policyTroves=policyTroves,
@@ -1024,7 +1021,7 @@ def _cookPackageObjWrap(*args, **kwargs):
             os.close(oldStdin)
     return ret
 
-def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
+def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True, 
 		       macros={}, resume = None, ignoreDeps=False, 
                        logBuild=False, crossCompile=None, 
                        enforceManagedPolicy=False,  requireCleanSources = False,
@@ -1032,6 +1029,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     """Builds the package for cookPackageObject.  Parameter meanings are 
        described there.
     """
+    recipeClass = loader.getRecipe()
     fullName = recipeClass.name
 
     lcache = lookaside.RepositoryCache(repos)
@@ -1260,13 +1258,15 @@ def _copyScripts(trv, scriptsMap):
             continue
         getattr(trv.troveInfo.scripts, scriptType).script.set(scriptContents)
 
-def _createPackageChangeSet(repos, db, cfg, bldList, recipeObj, sourceVersion,
+def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
+                            sourceVersion,
                             targetLabel=None, alwaysBumpCount=False,
                             policyTroves=None, signatureKey = None):
     """ Helper function for cookPackage object.  See there for most
         parameter definitions. BldList is the list of
         components created by cooking a package recipe.  RecipeObj is
-        the instantiation of the package recipe.
+        the instantiation of the package recipe, and loader is the
+        loader which loaded the class for that recipe.
     """
     # determine final version and flavor  - flavor is shared among
     # all components, so just grab the first one.
@@ -1844,7 +1844,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         flavorList = [flavor]
 
     use.allowUnknownFlags(allowUnknownFlags)
-    recipeClassDict = {}
+    loaderDict = {}
     for flavor in flavorList:
         use.clearLocalFlags()
         if flavor is not None:
@@ -1911,7 +1911,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
             recipeClass = loader.getRecipe()
 
-        recipeClassDict.setdefault(sourceVersion, []).append(recipeClass)
+        loaderDict.setdefault(sourceVersion, []).append(loader)
 
         if showBuildReqs:
             if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
@@ -1931,14 +1931,14 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     built = None
 
     built = []
-    if len(recipeClassDict) > 1 and changeSetFile:
+    if len(loaderDict) > 1 and changeSetFile:
         # this would involve reading the changeset from disk and merging 
         # or writing an interface for this very, very, unlikely case where the
         # version is based off of a use flavor.
         raise CookError("Cannot cook multiple versions of %s to change set" % name)
-    for sourceVersion, recipeClasses in recipeClassDict.items():
+    for sourceVersion, loaders in loaderDict.items():
         try:
-            troves = cookObject(repos, cfg, recipeClasses, 
+            troves = cookObject(repos, cfg, loaders,
                                 changeSetFile = changeSetFile,
                                 prep = prep, macros = macros,
                                 targetLabel = targetLabel,
