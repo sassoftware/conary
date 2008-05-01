@@ -203,26 +203,22 @@ class Importer:
 
 class RecipeLoaderFromString:
 
-    # acts as a semaphore to prevent infinite recursion in _loadDefaultPackages
-    _loadingDefaults = False
-
     def __init__(self, codeString, filename, cfg=None, repos=None,
                  component=None, branch=None, ignoreInstalled=False,
                  directory=None, buildFlavor=None, db=None, overrides = None,
-                 factory = False, objDict = {}):
+                 factory = False, objDict = {}, loadAutoRecipes = True):
         try:
             self._load(codeString, filename, cfg, repos, component,
                        branch, ignoreInstalled, directory, 
                        buildFlavor=buildFlavor, db=db,
                        overrides=overrides, factory = factory,
-                       objDict = objDict)
+                       objDict = objDict, loadAutoRecipes = loadAutoRecipes)
         except Exception, err:
             raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
                                               % (filename, err))
 
     @staticmethod
-    def _loadDefaultPackages(importer, cfg, repos, db = None,
-                             buildFlavor = None):
+    def _loadAutoRecipes(importer, cfg, repos, db = None, buildFlavor = None):
         def _loadTroves(repos, nvfDict, troveSpecStrs, troveSpecs):
             """
             Loads troves from the repository after they've been found
@@ -252,10 +248,10 @@ class RecipeLoaderFromString:
 
         # def _loadDefaultPackages begins here
 
-        d = importer.module.__dict__
-        if RecipeLoaderFromString._loadingDefaults or not cfg.autoLoadRecipes:
-            # prevent infinite recursion
+        if not cfg.autoLoadRecipes:
             return
+
+        d = importer.module.__dict__
 
         RecipeLoaderFromString._loadingDefaults = True
 
@@ -309,7 +305,8 @@ class RecipeLoaderFromString:
             loader = RecipeLoaderFromString(fileContents.get().read(),
                                   fileInfo[1], cfg, repos = repos,
                                   ignoreInstalled = True,
-                                  buildFlavor = buildFlavor, db = db)
+                                  buildFlavor = buildFlavor, db = db,
+                                  loadAutoRecipes = False)
 
             recipe = loader.getRecipe()
             recipe.internalAbstractBaseClass = True
@@ -405,7 +402,7 @@ class RecipeLoaderFromString:
     def _load(self, codeString, filename, cfg=None, repos=None, component=None,
               branch=None, ignoreInstalled=False, directory=None,
               buildFlavor=None, db=None, overrides=None, factory=False,
-              objDict = None):
+              objDict = None, loadAutoRecipes = True):
         self.recipes = {}
 
         if filename[0] != "/":
@@ -439,7 +436,8 @@ class RecipeLoaderFromString:
         # we can get rid of loadRecipe
         importer.module.loadRecipe = shim.loadSuperClass
 
-        self._loadDefaultPackages(importer, cfg, repos, db,
+        if loadAutoRecipes:
+            self._loadAutoRecipes(importer, cfg, repos, db,
                                   buildFlavor = buildFlavor)
 
 
