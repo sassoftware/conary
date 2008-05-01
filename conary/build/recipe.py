@@ -98,7 +98,6 @@ class Recipe(object):
     """Virtual base class for all Recipes"""
     _trove = None
     _trackedFlags = None
-    _loadedTroves = []
     _loadedSpecs = {}
     _recipeType = RECIPE_TYPE_UNKNOWN
     _isDerived = False
@@ -178,22 +177,8 @@ class Recipe(object):
             self._recordMethodCalls = False
 
     @classmethod
-    def getLoadedTroves(class_):
-        # return a copy to avoid editing-in-place which
-        # could result in modifying the Recipe _loadedTroves
-        # list.
-        return list(class_._loadedTroves)
-
-    @classmethod
     def getLoadedSpecs(class_):
         return dict(class_._loadedSpecs)
-
-    @classmethod
-    def addLoadedTroves(class_, newTroves):
-        # NOTE: we have these method to ensure that the
-        # class variable we're using is assigned to _this_
-        # class and not some superclass.
-        class_._loadedTroves = class_._loadedTroves + newTroves
 
     @classmethod
     def addLoadedSpecs(class_, newSpecs):

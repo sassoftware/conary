@@ -1299,7 +1299,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
             grpMap[main].setConaryVersion(constants.version)
             if policyTroves:
                 grpMap[main].setPolicyProviders(policyTroves)
-            grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
+            grpMap[main].setLoadedTroves(loader.getLoadedTroves())
             grpMap[main].setBuildRequirements(buildReqs)
             grpMap[main].setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 	    provides = deps.DependencySet()

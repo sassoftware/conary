@@ -35,7 +35,7 @@ from conary.lib import log, util
 from conary.local import database
 from conary import versions
 
-class SubloadData:
+class SubloadData(object):
 
     # Collector for all of the data loadSuperClass and loadInstalled
     # need; this keeps this gunk out of the Importer class directly
@@ -56,7 +56,7 @@ class SubloadData:
         else:
             self.overrides = overrides
 
-class Importer:
+class Importer(object):
 
     baseModuleImports = [
         ('conary.build', ('build', 'action')),
@@ -207,6 +207,7 @@ class Importer:
             # a recipe that has been loaded by loadRecipe, so we treat them
             # for these purposes as if they are abstract base classes
             recipe.internalAbstractBaseClass = 1
+            self.loadedTroves.extend(loader.getLoadedTroves())
 
             self.module.__dict__[name] = recipe
             if recipe._trove:
@@ -220,7 +221,6 @@ class Importer:
                 troveTuple = (recipe._trove.getName(), recipe._trove.getVersion(),
                               recipe._usedFlavor)
                 log.info('Loaded %s from %s=%s[%s]' % ((name,) + troveTuple))
-                self.loadedTroves.extend(recipe._loadedTroves)
                 self.loadedTroves.append(troveTuple)
                 self.loadedSpecs[troveSpec] = (troveTuple, recipe)
 
@@ -321,7 +321,9 @@ class Importer:
             msg = ('Error in recipe file "%s":\n %s' %(self.baseName, err))
             raise builderrors.RecipeFileError(msg)
 
-class RecipeLoaderFromString:
+class RecipeLoaderFromString(object):
+
+    loadedTroves = None
 
     def __init__(self, codeString, filename, cfg=None, repos=None,
                  component=None, branch=None, ignoreInstalled=False,
@@ -577,7 +579,7 @@ class RecipeLoaderFromString:
         # inherit any tracked flags that we found while loading parent
         # classes.  Also inherit the list of recipes classes needed to load
         # this recipe.
-        self.recipe.addLoadedTroves(importer.loadedTroves)
+        self.addLoadedTroves(importer.loadedTroves)
         self.recipe.addLoadedSpecs(importer.loadedSpecs)
 
         if self.recipe._trackedFlags is not None:
@@ -603,6 +605,19 @@ class RecipeLoaderFromString:
 
     def getModuleDict(self):
         return self.module.__dict__
+
+    def getLoadedTroves(self):
+        return list(self.loadedTroves)
+
+    def addLoadedTroves(self, newTroves):
+        # This is awful, but it switches loadedTroves from a class variable
+        # to a instance variable. We don't just set this up in __init__
+        # because we have descendents which call addLoadedTroves before
+        # initializing the parent class.
+        if self.loadedTroves is None:
+            self.loadedTroves = []
+
+        self.loadedTroves = self.loadedTroves + newTroves
 
 class RecipeLoader(RecipeLoaderFromString):
 
@@ -676,6 +691,7 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
             factoryCreatedRecipe._sourcePath = parentDir
 
             self.recipes.update(loader.recipes)
+            self.addLoadedTroves(loader.getLoadedTroves())
             self.recipes[factoryCreatedRecipe.name] = factoryCreatedRecipe
         else:
             factoryCreatedRecipe = None
@@ -753,14 +769,12 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
                                openSourceFileFn = openSourceFile)
         recipe = factory.getRecipeClass()
 
-        recipe.addLoadedTroves(factoryClass._loadedTroves)
+        self.addLoadedTroves(factoryClass._loadedTroves)
         recipe.addLoadedSpecs(factoryClass._loadedSpecs)
-
-        recipe.addLoadedTroves(factoryClass._loadedTroves)
 
         if factoryClass._trove:
             # this doesn't happen if you load from the local directory
-            recipe.addLoadedTroves(
+            self.addLoadedTroves(
                             [ factoryClass._trove.getNameVersionFlavor() ])
             recipe.addLoadedSpecs(
                             { factoryClass.name :
