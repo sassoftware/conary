@@ -10,6 +10,8 @@ Changes in @NEW@:
       buildRequires at all in the recipe caused Conary to report the
       immediate superclass's buildRequires as the recipe's buildRequires.
       This bug has been resolved. (CNY-2769)
+    * A bug that caused the --context flag to not be recognized when specified
+      before a command has been fixed. (CNY-2770)
 
 Changes in 2.0.13:
   o Build Changes:

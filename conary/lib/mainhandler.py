@@ -65,7 +65,6 @@ class MainHandler(object):
                                                     argv=argv[1:],
                                                     interspersedArgs=False,
                                                     **kwargs)
-        thisCommand.processConfigOptions(cfg, cfgMap, argSet)
         return argSet, [argv[0]] + otherArgs
 
     def usage(self, rc = 1, showAll = False):
