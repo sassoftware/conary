@@ -1,17 +1,17 @@
 Changes in @NEW@:
   o Bug Fixes:
-    * A bug causing python-setuptools to appear to be an excessive build
-      requirement has been fixed. (CNY-2738)
-    * A bug causing python-setuptools to be missing from buildRequires
-      has been fixed. (CNY-2772)
-    * A regression triggered when rMake recursed through a group recipe
-      that added troves with a full version has been fixed. (CNY-2768)
+    * A bug causing python-setuptools to incorrectly appear to be an
+      excessive build requirement has been fixed. (CNY-2738)
+    * A bug in which python-setuptools was sometimes incorrectly not
+      recognized as being needed in buildRequires has been fixed. (CNY-2772)
+    * A regression has been fixed that caused rMake to abort when recursing
+      through a group recipe that added troves with full versions. (CNY-2768)
     * When reporting possibly excessive buildRequires, not mentioning
       buildRequires at all in the recipe caused Conary to report the
       immediate superclass's buildRequires as the recipe's buildRequires.
       This bug has been resolved. (CNY-2769)
-    * A bug that caused the --context flag to not be recognized when specified
-      before a command has been fixed. (CNY-2770)
+    * A bug that caused the --context flag to not be recognized when
+      specified before a command has been fixed. (CNY-2770)
 
 Changes in 2.0.13:
   o Build Changes:
