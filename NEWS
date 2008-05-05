@@ -3,6 +3,13 @@ Changes in @NEW@:
     * An incompatibility of the db2db migration script with the latest
       repository schema has been corrected. (CNY-2774)
 
+  o Build Changes:
+    * Removed defaultBasePackages configuration option as well as the
+    * functionality
+      for loading recipes from the filesystem in that manner
+    * Reworked recipe loading to make the code more understandable
+    * Implemented autoLoadRecipes configuration option (CNY-2694)
+
 Changes in 2.0.14:
   o Bug Fixes:
     * A bug causing python-setuptools to incorrectly appear to be an
