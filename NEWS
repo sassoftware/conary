@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * An incompatibility of the db2db migration script with the latest
+      repository schema has been corrected. (CNY-2774)
+
 Changes in 2.0.14:
   o Bug Fixes:
     * A bug causing python-setuptools to incorrectly appear to be an
