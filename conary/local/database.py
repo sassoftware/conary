@@ -27,7 +27,7 @@ from conary.errors import DatabaseLockedError, DecodingError
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
-from conary.lib import log, sigprotect, util
+from conary.lib import log, sha1helper, sigprotect, util
 from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
 from conary.local.journal import JobJournal, NoopJobJournal
@@ -1267,6 +1267,34 @@ class Database(SqlDbRepository):
     def dependencyChecker(self, troveSource):
         return self.db.dependencyChecker(troveSource)
 
+    def getFileContents(self, l):
+        # look for config files in the datastore first, then look for other
+        # files in the filesystem
+        inDataStore = SqlDbRepository.getFileContents(self, l)
+        for i, contents in enumerate(inDataStore):
+            if contents is not None: continue
+
+            (fileId, fileVersion) = l[i]
+            try:
+                path, stream = self.db.troveFiles.getFileByFileId(fileId,
+                                                        justPresent = True)
+            except KeyError:
+                # can't find the file in the database at all
+                continue
+
+            fileObj = files.ThawFile(stream, None)
+            if not fileObj.hasContents:
+                continue
+
+            try:
+                sha = sha1helper.sha1FileBin(self.root + path)
+            except IOError:
+                continue
+
+            if fileObj.contents.sha1() == sha:
+                inDataStore[i] = filecontents.FromFilesystem(self.root + path)
+
+        return inDataStore
 
     def _doCommit(self, uJob, cs, commitFlags, opJournal, tagSet,
                   reposRollback, localRollback, rollbackPhase, fsJob,

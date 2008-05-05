@@ -579,11 +579,6 @@ class ConaryContext(ConfigSection):
                                             '~/.conary/use'))
     user                  =  CfgUserInfo
     baseClassDir          =  (CfgPath, '/usr/share/conary/baseclasses')
-    defaultBasePackages   = (CfgList(CfgString), ['package',
-                                             'buildpackage',
-                                             'cpackage',
-                                             'autopackage'])
-
 
     def _resetSigMap(self):
         self.signatureKeyMap = []
