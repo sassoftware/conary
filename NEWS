@@ -12,6 +12,8 @@ Changes in 2.0.14:
       This bug has been resolved. (CNY-2769)
     * A bug that caused the --context flag to not be recognized when
       specified before a command has been fixed. (CNY-2770)
+    * A bug that caused buildRequires calculation in TagSpec to be slow has
+      been fixed. (CNY-2773)
 
 Changes in 2.0.13:
   o Build Changes:

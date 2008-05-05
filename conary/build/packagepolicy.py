@@ -1,4 +1,5 @@
 #
+#self.buildReqsComputedForTags = set()
 # Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -837,6 +838,7 @@ class TagSpec(_addInfo):
     )
     def doProcess(self, recipe):
 	self.tagList = []
+        self.buildReqsComputedForTags = set()
         self.suggestBuildRequires = set()
 	# read the system and %(destdir)s tag databases
 	for directory in (recipe.macros.destdir+'/etc/conary/tags/',
@@ -862,8 +864,9 @@ class TagSpec(_addInfo):
         if tag not in tags:
             self.info('%s: %s', name, path)
             tags.set(tag)
-            db = self._getDb()
-            if tagFile: 
+            if tagFile and tag not in self.buildReqsComputedForTags:
+                self.buildReqsComputedForTags.add(tag)
+                db = self._getDb()
                 for trove in db.iterTrovesByPath(tagFile.tagFile):
                     troveName = trove.getName()
                     if troveName not in self.fullReqs:
