@@ -86,7 +86,7 @@ class _Source(_AnySource):
                 multiurlMap = recipe.multiurlMap
             else:
                 multiurlMap = recipe.multiurlMap = {}
-            multiurlMap[multiurlMapName] = sourcename
+            multiurlMap[multiurlMapName] = nsources
             # If archiveName is not set, it's an empty string, so the
             # source line is well-formed
             self.sourcename = "multiurl://%s/%s" % (multiurlMapName,

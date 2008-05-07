@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * An incompatibility of the db2db migration script with the latest
       repository schema has been corrected. (CNY-2774)
+    * An error in the handling of multiple URLs with addArchive has
+      been fixed. (CNY-2778)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the

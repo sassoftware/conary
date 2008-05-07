@@ -289,9 +289,8 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         mapName, restLen = _splitSpecialURL(specialPrefix, name)
         possibleNames = multiurlMap[mapName]
         rest = name[restLen:]
-        if rest:
-            # Append the name of the archive
-            possibleNames = [ "%s/%s" % (x, rest) for x in possibleNames ]
+        # Append the name of the archive
+        possibleNames = [ "%s/%s" % (x, rest) for x in possibleNames ]
     else:
         possibleNames = [ name ]
 
