@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2005-2007 rPath, Inc.
+# Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,7 +18,8 @@
 recreatedb attempts to reconstruct a database from a list of
 (name, version, flavor) tuples.  It's useful when a database
 has become damaged, but the list of installed troves is still
-retrievable.
+retrievable.  It can also use a file containing name=version[flavor]
+lines as stored in /var/lib/conarydb/manifest
 """
 
 import os
@@ -49,7 +50,7 @@ from conary import versions
 def usage():
     print 'usage: %s conarydb newroot' %sys.argv[0]
 
-def collectTroves(db):
+def collectTrovesFromDb(db):
     """
     Collect (name, version, flavor) tuples from a database.  The
     minimal SQL possible is used to increase the chance of success
@@ -70,6 +71,25 @@ def collectTroves(db):
                '       AND Instances.isPresent = 1')
     for name, versionStr, flavorStr in cu:
         flavor = deps.ThawFlavor(flavorStr)
+        version = versions.VersionFromString(versionStr)
+        if not version.isOnLocalHost():
+            yield (name, version, flavor)
+        else:
+            print >> sys.stderr, ('warning: %s is cooked locally, '
+                                  'cannot be restored' %name)
+
+def collectTrovesFromManifest(manifest):
+    """
+    Collect (name, version, flavor) tuples from a manifest.
+
+    @param manifest: an open file containing name=version[flavor] lines
+    @type manifest: file
+    @return: iterator that yields (name, version, flavor) tuples
+    @rtype: iterator
+    """
+    troveList = []
+    for troveSpec in (x.strip() for x in manifest):
+        name, versionStr, flavor = conaryclient.cmdline.parseTroveSpec(troveSpec)
         version = versions.VersionFromString(versionStr)
         if not version.isOnLocalHost():
             yield (name, version, flavor)
@@ -165,8 +185,12 @@ def main(argv):
     callback = updatecmd.UpdateCallback()
 
     # get a list of (name, version, flavor) from the old db
-    olddb = sqlite3.connect(sys.argv[1])
-    troves = list(collectTroves(olddb))
+    try:
+        olddb = sqlite3.connect(sys.argv[1])
+        troves = list(collectTrovesFromDb(olddb))
+    except sqlite3._sqlite.DatabaseError:
+        manifest = file(sys.argv[1])
+        troves = list(collectTrovesFromManifest(manifest))
 
     # double check that everything installed in the old db really exists
     # and build up a changeset request
