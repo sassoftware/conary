@@ -211,7 +211,7 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
                         for x in binaries ]
 
         cs = repos.createChangeSet(troveSpec, recurse = False)
-        self.addLoadedTroves([
+        self.setDerivedFrom([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
             in cs.iterNewTroveList() ])
 

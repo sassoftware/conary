@@ -292,7 +292,7 @@ class DataStoreRepository:
                 # method
                 fileObj = self.findFileVersion(fileId)
 
-            if fileObj and fileObj.flags.isConfig():
+            if fileObj and self._hasFileContents(fileObj.contents.sha1()):
                 # Only config files are stored in this data store
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())

@@ -1274,7 +1274,7 @@ class Database(SqlDbRepository):
         for i, contents in enumerate(inDataStore):
             if contents is not None: continue
 
-            (fileId, fileVersion) = l[i]
+            (fileId, fileVersion) = l[i][0:2]
             try:
                 path, stream = self.db.troveFiles.getFileByFileId(fileId,
                                                         justPresent = True)

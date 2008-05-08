@@ -777,7 +777,8 @@ _TROVEINFO_TAG_COPIED_FROM    = 21
 _TROVEINFO_TAG_IMAGE_GROUP    = 22
 _TROVEINFO_TAG_FACTORY        = 23
 _TROVEINFO_TAG_SEARCH_PATH    = 24
-_TROVEINFO_TAG_LAST           = 24
+_TROVEINFO_TAG_DERIVEDFROM    = 25
+_TROVEINFO_TAG_LAST           = 25
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -870,6 +871,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_IMAGE_GROUP   : (DYNAMIC, streams.ByteStream, 'imageGroup' ),
         _TROVEINFO_TAG_FACTORY       : (DYNAMIC, streams.StringStream, 'factory' ),
         _TROVEINFO_TAG_SEARCH_PATH   : (DYNAMIC, SearchPath,          'searchPath'),
+        _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -2598,6 +2600,14 @@ class Trove(streams.StreamSet):
     def getLoadedTroves(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor()) 
                  for x in self.troveInfo.loadedTroves.iterAll() ]
+
+    def setDerivedFrom(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.derivedFrom.add(name, ver, release)
+
+    def getDerivedFrom(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor())
+                 for x in self.troveInfo.derivedFrom.iterAll() ]
 
     def getPathHashes(self):
         return self.troveInfo.pathHashes
