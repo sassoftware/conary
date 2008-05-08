@@ -82,10 +82,7 @@ class _Source(_AnySource):
                 s.update(src)
             multiurlMapName = s.hexdigest()
 
-            if hasattr(recipe, 'multiurlMap'):
-                multiurlMap = recipe.multiurlMap
-            else:
-                multiurlMap = recipe.multiurlMap = {}
+            multiurlMap = recipe.multiurlMap
             multiurlMap[multiurlMapName] = nsources
             # If archiveName is not set, it's an empty string, so the
             # source line is well-formed
@@ -251,10 +248,7 @@ class _Source(_AnySource):
             sourceDir = self.sourceDir or '.'
             return action._expandOnePath(util.joinPaths(sourceDir, self.sourcename), self.recipe.macros, defaultDir = defaultDir, braceGlob = braceGlob)
 
-        if hasattr(self.recipe, 'multiurlMap'):
-            multiurlMap = self.recipe.multiurlMap
-        else:
-            multiurlMap = None
+        multiurlMap = self.recipe.multiurlMap
         source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             self.sourcename, self.recipe.name, self.recipe.srcdirs,
             httpHeaders=httpHeaders, guessName=self.guessname,
