@@ -1374,6 +1374,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
             if policyTroves:
                trv.setPolicyProviders(policyTroves)
             trv.setLoadedTroves(loader.getLoadedTroves())
+            trv.setDerivedFrom(recipeObj.getDerivedFrom())
             trv.setBuildRequirements(buildReqs)
             trv.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
 	    provides = deps.DependencySet()

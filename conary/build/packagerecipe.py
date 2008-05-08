@@ -148,6 +148,7 @@ class AbstractPackageRecipe(Recipe):
     crossRequires = []
     buildRequirementsOverride = None
     crossRequirementsOverride = None
+    _derivedFrom = []
 
     Flags = use.LocalFlags
     explicitMainDir = False
@@ -800,6 +801,12 @@ class AbstractPackageRecipe(Recipe):
 
     def setupAbstractBaseClass(r):
         r.addSource(r.name + '.recipe', dest = str(r.cfg.baseClassDir) + '/')
+
+    def setDerivedFrom(self, troveInfoList):
+        self._derivedFrom = troveInfoList
+
+    def getDerivedFrom(self):
+        return self._derivedFrom
 
     def _addTroveScript(self, troveNames, scriptContents, scriptType,
                         fromClass = None):
