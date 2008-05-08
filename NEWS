@@ -4,6 +4,9 @@ Changes in @NEW@:
       repository schema has been corrected. (CNY-2774)
     * An error in the handling of multiple URLs with addArchive has
       been fixed. (CNY-2778)
+    * sys.argv is not defined under mod_python; importing cvc.py should
+      no longer fail as a result of using sys.argv as a default argument
+      to main(). (CNY-2786)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the

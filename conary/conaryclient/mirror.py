@@ -176,7 +176,9 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
                                      fastSync = fastSync)
 
 
-def Main(argv=sys.argv[1:]):
+def Main(argv=None):
+    if argv is None:
+        argv = argv=sys.argv[1:]
     try:
         options = parseArgs(argv)
     except OptionError, e:

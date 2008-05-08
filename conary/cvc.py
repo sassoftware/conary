@@ -1051,7 +1051,9 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
                                   callback=callback,
                                   repos=repos)
 
-def main(argv=sys.argv):
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
     sys.stdout = util.FileIgnoreEpipe(sys.stdout)
     try:
         argv = list(argv)
