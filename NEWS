@@ -1,7 +1,7 @@
 Changes in @NEW@:
   o Code Changes:
-    * We've started using a publicAPi decorator to tag methods which
-      are part of the public coanry API (CNY-2367)
+    * We've started using a @publicAPi decorator to tag methods which
+      are part of the public conary API (CNY-2367)
 
   o Bug Fixes:
     * An incompatibility of the db2db migration script with the latest
