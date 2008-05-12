@@ -20,5 +20,5 @@ conary-specific.
 from conary.lib.command import AbstractCommand
 from conary.lib.mainhandler import MainHandler
 from conary.lib import options as _options
-_options.MainHandler = mainhandler.MainHandler
-_options.AbstractCommand = command.AbstractCommand
+_options.MainHandler = MainHandler
+_options.AbstractCommand = AbstractCommand
