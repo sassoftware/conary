@@ -63,6 +63,9 @@ class AbstractTroveSource:
     def getFileVersion(self, pathId, fileId, version):
         return self.getFileVersions([(pathId, fileId, version)])[0]
 
+    def getFileVersions(self, fileIds):
+        raise NotImplementedError
+
     def searchableByType(self):
         return self._searchableByType
 
@@ -1552,12 +1555,22 @@ class SourceStack(object):
 
         return cs, jobList
 
+    def getFileVersions(self, fileIds):
+        for source in self.sources:
+            try:
+                return source.getFileVersions(fileIds)
+            # FIXME: there should be a better error for this
+            except (KeyError, NotImplementedError), e:
+                continue
+        return None
+
+
     def getFileVersion(self, pathId, fileId, version):
         for source in self.sources:
             try:
                 return source.getFileVersion(pathId, fileId, version)
             # FIXME: there should be a better error for this
-            except KeyError:
+            except (KeyError, NotImplementedError), e:
                 continue
         return None
 
