@@ -128,9 +128,13 @@ class DependencyWorkTables:
         #VALUES(?, ?, ?, ?, ?, ?, ?)
         #""")
 
+        ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
+
         toInsert = []
         for (isProvides, (classId, depClass)) in allDeps:
             # getDeps() returns sorted deps
+            if depClass.tag in ignoreDepClasses:
+                continue
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     toInsert.append((troveNum, multiplier * len(depList),
@@ -410,13 +414,9 @@ class DependencyChecker:
                            wasIn = None):
             failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None)
                     for x in self.iterNodes() ]
-            ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
 
             for idx in idxList:
                 (troveIndex, classId, dep) = depInfoList[-idx]
-
-                if classId in ignoreDepClasses:
-                    continue
 
                 troveIndex = -(troveIndex + 1)
 
