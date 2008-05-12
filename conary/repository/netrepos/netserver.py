@@ -45,7 +45,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 61 + 1)
+SERVER_VERSIONS = range(36, 62 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1752,6 +1752,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                     depList = requiresList,
                                     troveList = troveList)
         return ret
+
+    @accessReadOnly
+    def commitCheck(self, authToken, clientVersion, troveVersionList):
+        # troveVersionList is a list of (name, version) tuples
+        # batchCheck does it own authToken checking and validation
+        return self.auth.batchCheck(
+            authToken, ((n, self.toVersion(v)) for n,v in troveVersionList),
+            write = True)
 
     def _checkCommitPermissions(self, authToken, verList, mirror, hidden):
         if (mirror or hidden) and \

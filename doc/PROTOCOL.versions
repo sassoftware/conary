@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Varsion 62:
+  - added xmlrpc api call commitCheck()
+
 Version 61:
   - The following methods have been renamed for consistency:
     addAccessGroup -> addRole
