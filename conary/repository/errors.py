@@ -282,6 +282,23 @@ class TroveSchemaError(RepositoryError):
         RepositoryError.__init__(self, self._error % (name, version, flavor, 
                                                  troveSchema, supportedSchema))
 
+class TroveAccessError(RepositoryError):
+    _error = ("Trove Access Error: repository denied access to trove %s = %s")
+    def marshall(self, marshaller):
+        return (str(self), self.name, marshaller.fromVersion(self.version) ), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        # value 0 is the full message, for older clients that don't
+        # know about this exception so the text for unknown description is
+        # at least helpful
+        return (tup[1], marshaller.toVersion(tup[2])), {}
+
+    def __init__(self, name, version):
+        self.name = name
+        self.version = version
+        RepositoryError.__init__(self, self._error % (name, version))
+    
 class PermissionAlreadyExists(RepositoryError):
     pass
 

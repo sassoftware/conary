@@ -18,6 +18,11 @@ Changes in @NEW@:
     * Reworked recipe loading to make the code more understandable
     * Implemented autoLoadRecipes configuration option (CNY-2694)
 
+  o Protocol Changes:
+    * The commitCheck() xmlrpc API call has been added that will check
+      commit permissions for a trovelist before having to send the 
+      changeset for commit (CNY-2683)
+
 Changes in 2.0.14:
   o Bug Fixes:
     * A bug causing python-setuptools to incorrectly appear to be an

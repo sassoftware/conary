@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 61 + 1)
+CLIENT_VERSIONS = range(36, 62 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2426,6 +2426,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
+    def commitCheck(self, troveList):
+        byServer = {}
+        for tup in troveList:
+            l = byServer.setdefault(tup[1].getHost(), [])
+            l.append((tup[0], tup[1]))
+        for host, l in byServer.iteritems():
+            server = self.c[host]
+            if server.getProtocolVersion() < 62:
+                raise InvalidServerVersion("Server %s does not have support "
+                                           "for a commitCheck() call" % (host,))
+            ret = self.c[host].commitCheck([(n, self.fromVersion(v)) for n,v in l])
+            for (n,v), r in itertools.izip(l, ret):
+                if not r:
+                    raise errors.TroveAccessError(n,v)
+        return True
+                
     def getTroveSigs(self, troveList):
         byServer = {}
         results = [ None ] * len(troveList)
