@@ -39,7 +39,7 @@ import weakref
 import xmlrpclib
 import zlib
 
-from conary.lib import fixedglob, graph, log
+from conary.lib import fixedglob, graph, log, api
 
 # Simple ease-of-use extensions to python libraries
 
@@ -329,6 +329,7 @@ def braceExpand(path):
 	    return pathlist
 	h = h + 1
 
+@api.publicApi
 def braceGlob(paths):
     """
     @raises ValueError: raised if paths has unbalanced braces
@@ -1215,6 +1216,7 @@ class LazyFileCache:
     # Assuming maxfd is 1024, this should be ok
     threshold = 900
 
+    @api.publicApi
     def __init__(self, threshold=None):
         if threshold:
             self.threshold = threshold
@@ -1222,6 +1224,7 @@ class LazyFileCache:
         self._fdCounter = 0
         self._fdMap = {}
     
+    @api.publicApi
     def open(self, path, mode="r"):
         """
         @raises IOError: raised if there's an I/O error opening the fd
@@ -1275,6 +1278,7 @@ class LazyFileCache:
     def _closeSlot(self, fd):
         del self._fdMap[fd._hash]
 
+    @api.publicApi
     def close(self):
         """
         @raises IOError: could be raised if tell() fails prior to close()

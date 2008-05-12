@@ -25,7 +25,7 @@ from conary import files
 from conary import streams
 from conary import versions
 from conary.deps import deps
-from conary.lib import misc, sha1helper
+from conary.lib import misc, sha1helper, api
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED, TRUST_TRUSTED
 from conary.lib import openpgpkey
 from conary.streams import ByteStream
@@ -1285,15 +1285,19 @@ class Trove(streams.StreamSet):
         new.troveInfo.thaw(self.troveInfo.freeze())
         return new
 
+    @api.publicApi
     def getName(self):
         return self.name()
     
+    @api.publicApi
     def getVersion(self):
         return self.version()
 
+    @api.publicApi
     def getNameVersionFlavor(self):
         return self.name(), self.version(), self.flavor()
 
+    @api.publicApi
     def getMetadata(self, language=None):
         return self.troveInfo.metadata.get(language)
 
@@ -1456,6 +1460,7 @@ class Trove(streams.StreamSet):
 	    # FIXME, we should have better text here
 	    raise TroveError
 
+    @api.publicApi
     def iterTroveList(self, strongRefs = False, weakRefs = False):
 	"""
 	Returns a generator for (name, version, flavor) ordered pairs, 
@@ -1705,6 +1710,7 @@ class Trove(streams.StreamSet):
     def __ne__(self, them):
 	return not self == them
 
+    @api.publicApi
     def diff(self, them, absolute = 0, getPathHashes = None):
 	"""
 	Generates a change set between them (considered the old
@@ -2503,7 +2509,8 @@ class Trove(streams.StreamSet):
 
     def setCompatibilityClass(self, theClass):
         self.troveInfo.compatibilityClass.set(theClass)
-
+ 
+    @api.publicApi
     def getCompatibilityClass(self):
         c = self.troveInfo.compatibilityClass()
         if c is None:
@@ -2867,6 +2874,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
     ChangeSet. 
     """
 
+    @api.publicApi
     def isAbsolute(self):
 	return self.tcsType() == _TCS_TYPE_ABSOLUTE
 
@@ -2882,6 +2890,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getOldFileList(self):
 	return self.oldFiles
 
+    @api.publicApi
     def getName(self):
         """
         Get the name of the trove.
@@ -2975,6 +2984,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
         return c
 
+    @api.publicApi
     def isRollbackFence(self, oldCompatibilityClass = None, update = False):
         """
         Determine whether an update from the given oldCompatibilityClass to the
@@ -3036,6 +3046,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         assert(0)
 	self.changeLog.thaw(cl.freeze())
 
+    @api.publicApi
     def getOldVersion(self):
         """
         Get the old version of the trove this changeset applies to.  For an
@@ -3045,9 +3056,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
         """
 	return self.oldVersion()
 
+    @api.publicApi
     def getOldNameVersionFlavor(self):
         return self.name(), self.oldVersion(), self.oldFlavor()
 
+    @api.publicApi
     def getNewVersion(self):
         """
         Get the new version of the trove that'd be installed after applying
@@ -3057,6 +3070,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         """
 	return self.newVersion()
 
+    @api.publicApi
     def getNewNameVersionFlavor(self):
         return self.name(), self.newVersion(), self.newFlavor()
 
@@ -3264,9 +3278,11 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getRequires(self):
         return self.requires()
 
+    @api.publicApi
     def getOldFlavor(self):
         return self.oldFlavor()
 
+    @api.publicApi
     def getNewFlavor(self):
         return self.newFlavor()
 

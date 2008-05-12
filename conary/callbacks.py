@@ -16,7 +16,7 @@ import traceback
 import types
 
 from conary import errors
-from conary.lib import log
+from conary.lib import log, api
 
 def passExceptions(f):
     f._passExceptions = True
@@ -449,6 +449,7 @@ class KeyCacheCallback(Callback):
     def getPublicKey(self, keyId, serverName, warn=False):
         return False
 
+    @api.publicApi
     def __init__(self, repos = None, cfg = None):
         Callback.__init__(self)
         self.repos = repos

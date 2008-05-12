@@ -21,7 +21,7 @@ import os
 from conary import display
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary.lib import util
+from conary.lib import util, api
 
 def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   whatProvidesList = [],
@@ -145,6 +145,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     display.displayTroves(dcfg, formatter, troveTups)
 
 
+@api.publicApi
 def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
                        exactFlavors=False):
     """ Finds the given trove and path specifiers, and returns matching

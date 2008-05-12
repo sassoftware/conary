@@ -23,7 +23,7 @@ import weakref
 
 #conary
 from conary.errors import ParseError, VersionStringError
-from conary.lib import log
+from conary.lib import log, api
 
 staticLabelTable = {}
 
@@ -163,6 +163,7 @@ class Revision(AbstractRevision):
     def __setstate__(self, val):
         (self.version, self.sourceCount, self.buildCount, self.timeStamp) = val
 
+    @api.publicApi
     def asString(self, versus = None, frozen = False):
 	"""
 	Returns a string representation of a Release.
@@ -427,6 +428,7 @@ class Label(AbstractLabel):
     def __setstate__(self, val):
         (self.host, self.namespace, self.branch) = val
 
+    @api.publicApi
     def asString(self, versus = None, frozen = False):
 	"""
 	Returns the string representation of a label.
@@ -442,6 +444,7 @@ class Label(AbstractLabel):
     def freeze(self):
 	return self.asString()
 
+    @api.publicApi
     def getHost(self):
         """
         @return: repository hostname portion of the label.
@@ -652,6 +655,7 @@ class VersionSequence(AbstractVersion):
         return (len(common) / (len(ourSet) + len(otherSet) - 
                                 (len(common) * 2.0)))
 
+    @api.publicApi
     def asString(self, defaultBranch = None, frozen = False):
 	"""
 	Returns a string representation of the version.
@@ -797,6 +801,7 @@ class VersionSequence(AbstractVersion):
         count = 0
         return len([x for x in self.versions if isinstance(x, Label)])
 
+    @api.publicApi
     def getHost(self):
         """
         @return: the host name from the youngest label in this
@@ -829,6 +834,7 @@ class NewVersion(AbstractVersion):
     def copy(self):
         return self.__class__()
 
+    @api.publicApi
     def asString(self, frozen = False):
 	return "@NEW@"
 
@@ -1039,6 +1045,7 @@ class Version(VersionSequence):
 
         self.versions[-1].resetTimeStamp()
 
+    @api.publicApi
     def trailingRevision(self):
         """
         Returns the Revision object at the end of the version.
@@ -1050,6 +1057,7 @@ class Version(VersionSequence):
         """
 	return self.versions[-1]
 
+    @api.publicApi
     def trailingLabel(self):
         """
         @return: the last label object in the version.
@@ -1372,6 +1380,7 @@ def ThawVersion(ver):
     v.cached = True
     return v
 
+@api.publicApi
 def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     if ver == "@NEW@":
 	return NewVersion()

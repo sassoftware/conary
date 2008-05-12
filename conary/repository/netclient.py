@@ -30,7 +30,7 @@ from conary import files
 from conary import metadata
 from conary import trove
 from conary import versions
-from conary.lib import util
+from conary.lib import util, api
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
@@ -1002,6 +1002,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             return args
 
+    @api.publicApi
     def getAllTroveLeaves(self, serverName, troveNameList,
                           troveTypes = TROVE_QUERY_PRESENT):
         req = {}
@@ -1034,6 +1035,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
+    @api.publicApi
     def getTroveVersionList(self, serverName, troveNameList,
                             troveTypes = TROVE_QUERY_PRESENT):
         req = {}
@@ -1317,6 +1319,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return d
 
+    @api.publicApi
     def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True,
                  callback = None):
 	rc = self.getTroves([(troveName, troveVersion, troveFlavor)],
@@ -1326,6 +1329,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return rc[0]
 
+    @api.publicApi
     def getTroves(self, troves, withFiles = True, callback = None):
         """
         @param troves: List of troves to be retrieved
@@ -2579,6 +2583,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 results[i] = trove.TroveInfo.streamDict[infoType][1](data)
         return results
 
+    @api.publicApi
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossLabels = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False, 
@@ -2651,6 +2656,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             requireLatest=requireLatest)
         return troveFinder.findTroves(troves, allowMissing)
 
+    @api.publicApi
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossLabels = False, 
                   acrossFlavors = False, affinityDatabase = None,

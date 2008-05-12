@@ -14,7 +14,7 @@
 
 import itertools
 import re
-from conary.lib import misc, util
+from conary.lib import misc, util, api
 from conary.errors import ParseError
 
 DEP_CLASS_ABI		= 0
@@ -1035,6 +1035,7 @@ def _Thaw(depSet, frz):
 def ThawDependencySet(frz):
     return _Thaw(DependencySet(), frz)
 
+@api.publicApi
 def ThawFlavor(frz):
     """
     @param frz: the frozen representation of a flavor

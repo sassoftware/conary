@@ -27,7 +27,7 @@ from conary.errors import DatabaseLockedError, DecodingError
 from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
-from conary.lib import log, sha1helper, sigprotect, util
+from conary.lib import log, sha1helper, sigprotect, util, api
 from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
 from conary.local.journal import JobJournal, NoopJobJournal
@@ -117,6 +117,7 @@ class Rollback:
         self.count -= 1
         open("%s/count" % self.dir, "w").write("%d\n" % self.count)
 
+    @api.publicApi
     def iterChangeSets(self):
         """
         Iterate through the list of rollback changesets
@@ -328,6 +329,7 @@ class UpdateJob:
     def setRollback(self, rollback):
         self.rollback = rollback
 
+    @api.publicApi
     def getTroveSource(self):
         """
         @return: the TroveSource for this UpdateJob
@@ -349,6 +351,7 @@ class UpdateJob:
     def addJob(self, job):
         self.jobs.append(job)
 
+    @api.publicApi
     def getJobs(self):
         """
         @return: a list of jobs
@@ -375,6 +378,7 @@ class UpdateJob:
     def setTransactionCounter(self, transactionCounter):
         self.transactionCounter = transactionCounter
 
+    @api.publicApi
     def getTransactionCounter(self):
         return self.transactionCounter
 
@@ -397,6 +401,7 @@ class UpdateJob:
     def setKeywordArguments(self, kwargs):
         self._kwargs = kwargs
 
+    @api.publicApi
     def freeze(self, frzdir, withChangesetReferences=True):
         """
         If withChangesetReferences is False, instances of ChangeSetFromFile
@@ -501,6 +506,7 @@ class UpdateJob:
             drep.get('commitChangesetFlags', None)))
         return drep
 
+    @api.publicApi
     def thaw(self, frzdir):
         """
         @raises DecodingError: raised if there's a error parsing the frozen
@@ -710,6 +716,7 @@ class UpdateJob:
     def setInvalidateRollbacksFlag(self, flag):
         self._invalidateRollbackStack = bool(flag)
 
+    @api.publicApi
     def updateInvalidatesRollbacks(self):
         """
         @return: Does applying this update invalidate the rollback stack?
@@ -879,6 +886,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         """
         return self.db.findTroveReferences(names)
 
+    @api.publicApi
     def getTrove(self, name, version, flavor, pristine = True,
                  withFiles = True, withDeps = True):
         """

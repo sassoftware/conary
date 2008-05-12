@@ -18,6 +18,7 @@ from conary import dbstore
 from conary import deps, errors, files, streams, trove, versions
 from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
+from conary.lib import api
 
 OldDatabaseSchema = schema.OldDatabaseSchema
 
@@ -536,6 +537,7 @@ class Database:
                         flavor %s)
         """ % flavorClause, pin, name, version.asString())
 
+    @api.publicApi
     def trovesArePinned(self, troveList):
         """
         Get a list of which troves in troveList are pinned

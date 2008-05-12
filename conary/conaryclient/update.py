@@ -23,7 +23,7 @@ from conary.callbacks import UpdateCallback
 from conary.conaryclient import cmdline, resolve
 from conary.deps import deps
 from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError, DecodingError
-from conary.lib import log, util
+from conary.lib import log, util, api
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
 from conary.repository.errors import TroveMissing, OpenError
@@ -52,6 +52,7 @@ class CriticalUpdateInfo(object):
     def setFinalTroveRegexps(self, regexpList):
         self.finalTroveRegexps = regexpList
 
+    @api.publicApi
     def setCriticalTroveRegexps(self, regexpList):
         """
         Define the list of regular expressions that determine which trove
@@ -73,6 +74,7 @@ class CriticalUpdateInfo(object):
         """ Returns true if this job should just apply critical updates """
         return self.criticalOnly
 
+    @api.publicApi
     def __init__(self, criticalOnly=False):
         self.criticalOnly = criticalOnly
         self.changeSetList = []
@@ -107,9 +109,11 @@ class ClientUpdate:
         self.setUpdateCallback(callback)
         self.lzCache = util.LazyFileCache()
 
+    @api.publicApi
     def getUpdateCallback(self):
         return self.updateCallback
 
+    @api.publicApi
     def setUpdateCallback(self, callback):
         """
         set the callback function for an update
@@ -2160,6 +2164,7 @@ conary erase '%s=%s[%s]'
         self._processJobList(finalJobs, uJob, troveSourceCallback)
         return finalJobs
 
+    @api.publicApi
     def getUpdateItemList(self):
         """
         Returns I{top-level items}: troves that need to be updated in order to
@@ -2522,6 +2527,7 @@ conary erase '%s=%s[%s]'
             return
         util.rmtree(restartInfo, ignore_errors=True)
 
+    @api.publicApi
     def newUpdateJob(self):
         """Create a new update job.
 
@@ -2533,6 +2539,7 @@ conary erase '%s=%s[%s]'
         updJob = database.UpdateJob(self.db, lazyCache = self.lzCache)
         return updJob
 
+    @api.publicApi
     def prepareUpdateJob(self, updJob, itemList, keepExisting = False,
                         recurse = True,
                         resolveDeps = True, test = False,
@@ -2715,6 +2722,7 @@ conary erase '%s=%s[%s]'
 
         return suggMap
 
+    @api.publicApi
     def applyUpdateJob(self, updJob, replaceFiles = None, tagScript = None,
                     test = False, justDatabase = False, journal = None,
                     localRollbacks = None, autoPinList = None,
@@ -2994,6 +3002,7 @@ conary erase '%s=%s[%s]'
 
         uJob.setCriticalJobs(finalCriticalJobs)
 
+    @api.publicApi
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
                         updateByDefault = True, callback=None,
@@ -3340,6 +3349,7 @@ conary erase '%s=%s[%s]'
 
         # returning terminates the thread
 
+    @api.publicApi
     def getDownloadSizes(self, uJob):
         """
         Return the download sizes for each jobset in the update job.
@@ -3361,6 +3371,7 @@ conary erase '%s=%s[%s]'
 
         return sizes
 
+    @api.publicApi
     def downloadUpdate(self, uJob, destDir):
         """
         Download the changesets required in order to apply an update job.

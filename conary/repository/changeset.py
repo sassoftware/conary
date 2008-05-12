@@ -25,7 +25,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary import files, streams, trove, versions
-from conary.lib import enum, log, misc, patch, sha1helper, util
+from conary.lib import enum, log, misc, patch, sha1helper, util, api
 from conary.repository import filecontainer, filecontents, errors
 
 # "refr" being the same length as "file" matters
@@ -233,6 +233,7 @@ class ChangeSet(streams.StreamSet):
         del self.primaryTroveList[:]
         self.primaryTroveList.extend(l)
 
+    @api.publicApi
     def getPrimaryTroveList(self):
 	return self.primaryTroveList
 
@@ -277,6 +278,7 @@ class ChangeSet(streams.StreamSet):
     def delOldTrove(self, name, version, flavor):
         self.oldTroves.remove((name, version, flavor))
 
+    @api.publicApi
     def iterNewTroveList(self):
         """
         @return: dictionary-valueiterator object
@@ -288,6 +290,7 @@ class ChangeSet(streams.StreamSet):
         warnings.warn("iterNewPackageList is deprecated", DeprecationWarning)
         return self.newTroves.itervalues()
 
+    @api.publicApi
     def getNewTroveVersion(self, name, version, flavor):
 	return self.newTroves[(name, version, flavor)]
 
@@ -1423,7 +1426,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 util.SendableFileSet._register(ReadOnlyChangeSet)
 
 class ChangeSetFromFile(ReadOnlyChangeSet):
-
+    @api.publicApi
     def __init__(self, fileName, skipValidate = 1):
         self.fileName = None
         try:

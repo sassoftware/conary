@@ -20,6 +20,7 @@ from conary import trove
 from conary.deps import arch
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
+from conary.lib import api
 
 TROVE_QUERY_ALL = 0                 # normal, removed, redirect
 TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)

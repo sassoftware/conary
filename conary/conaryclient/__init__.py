@@ -18,7 +18,7 @@ import pickle
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
 from conary.conaryclient import clone, resolve, update
-from conary.lib import log, util, openpgpkey
+from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import trovesource
@@ -64,6 +64,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.
     """
+    @api.publicApi
     def __init__(self, cfg = None, passwordPrompter = None,
                  resolverClass=resolve.DependencySolver, updateCallback=None):
         """
@@ -127,6 +128,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         repos.setFlavorPreferenceList(cfg.flavorPreferences)
         return repos
 
+    @api.publicApi
     def getRepos(self):
         """
         @return: a repository client object
@@ -137,6 +139,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     def setRepos(self, repos):
         self.repos = repos
 
+    @api.publicApi
     def getDatabase(self):
         return self.db
 
@@ -284,6 +287,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
 
         return (finalList, primaryList)
 
+    @api.publicApi
     def createChangeSet(self, csList, recurse = True, 
                         skipNotByDefault = True, 
                         excludeList = conarycfg.RegularExpressionList(),
@@ -352,6 +356,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
             raise UpdateError, \
                 "Write permission denied on conary database %s" % self.db.dbpath
 
+    @api.publicApi
     def pinTroves(self, troveList, pin = True):
         """
         Calls L{conary.local.database.Database.pintroves}
@@ -377,6 +382,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
             raise errors.RepositoryError("Repository not available")
         return self.repos.getConaryUrl(version, flavor)
 
+    @api.publicApi
     def iterRollbacksList(self):
         """
         Iterate over rollback list.
@@ -385,6 +391,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         """
         return self.db.getRollbackStack().iter()
 
+    @api.publicApi
     def getSearchSource(self, flavor=0, troveSource=None, installLabelPath=0):
         """
         @return: a searchSourceStack
@@ -417,6 +424,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         else:
             return searchSource
 
+    @api.publicApi
     def applyRollback(self, rollbackSpec, replaceFiles = None,
             callback = None, tagScript = None, justDatabase = None,
             transactionCounter = None):

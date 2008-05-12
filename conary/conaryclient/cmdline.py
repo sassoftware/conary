@@ -18,10 +18,11 @@ from conary import conarycfg
 from conary import errors
 from conary import state
 from conary.deps import deps
-from conary.lib import log, cfgtypes
+from conary.lib import log, cfgtypes, api
 from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
+@api.publicApi
 def parseTroveSpec(specStr, allowEmptyName = True):
     """
     Parse a TroveSpec string
@@ -116,6 +117,7 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
     return set(applyList)
 
 
+@api.publicApi
 def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
                     allowChangeSets=True):
     """
@@ -212,6 +214,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
 
     return finalList
 
+@api.publicApi
 def toTroveSpec(name, versionStr, flavor):
     """
     Construct a TroveSpec string from name + version + flavor

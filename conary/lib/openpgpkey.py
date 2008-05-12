@@ -21,7 +21,7 @@ from time import time
 
 from conary import callbacks, versions
 from conary.lib.util import log
-from conary.lib import graph, util
+from conary.lib import graph, util, api
 
 import openpgpfile
 from Crypto.PublicKey import DSA
@@ -203,6 +203,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     OpenPGPKeyCache based object that reads keys from public and private
     keyrings
     """
+    @api.publicApi
     def __init__(self, callback = None):
         if callback is None:
             callback = callbacks.KeyCacheCallback()
@@ -236,6 +237,7 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
     def setPrivatePath(self, path):
         self.privatePath = path
 
+    @api.publicApi
     def setCallback(self, callback):
         self.callback = callback
 
