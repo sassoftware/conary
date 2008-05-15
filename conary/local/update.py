@@ -2519,6 +2519,9 @@ class TagCommand:
                             count -= 1
                         else:
                             for line in lines:
+                                # lines should always end with newline
+                                if line[-1] != '\n':
+                                    line += '\n'
                                 tagHandlerOutput(tagName, line,
                                                  stderr = isError)
 
