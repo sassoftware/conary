@@ -1538,6 +1538,36 @@ def getMinimalCompatibleChanges(flavor, flavorToMatch, keepArch=False):
                 finalFlavor.addDep(depClass, insDep)
     return finalFlavor
 
+def getUseFlags(flavor):
+    deps = list(flavor.iterDepsByClass(UseDependency))
+    if not deps:
+        return {}
+    return deps[0].getFlags()[0]
+
+def getShortFlavorDescriptors(flavors):
+    from conary.deps import arch
+    differences = flavorDifferences(flavors, strict=False)
+    contextStr = {}
+    descriptors = {}
+    for flavor in flavors:
+        majorArch = arch.getMajorArch(
+                    flavor.iterDepsByClass(InstructionSetDependency))
+        if majorArch:
+            majorArch = majorArch.name
+            descriptors[flavor] = (majorArch,)
+        else:
+            descriptors[flavor] = ()
+    if len(set(descriptors.values())) != len(descriptors):
+        for flavor, shortenedFlavor in differences.iteritems():
+            useFlags = getUseFlags(shortenedFlavor)
+            positiveFlags = sorted(x[0] for x in useFlags
+                                    if x[1] in (FLAG_SENSE_PREFERRED,
+                                                FLAG_SENSE_REQUIRED))
+            descriptors[flavor] = descriptors[flavor] + tuple(positiveFlags)
+    if len(set(descriptors.values())) == len(set(descriptors)):
+        return dict((x[0], '-'.join(x[1])) for x in descriptors.iteritems())
+    raise NotImplementedError
+
 
 dependencyCache = util.ObjectCache()
 
