@@ -1,6 +1,7 @@
 import inspect
 import optparse
 
+from conary import errors
 from conary.lib import log
 
 class AbstractCommand(object):
@@ -129,10 +130,10 @@ class AbstractCommand(object):
         if expected:
             missing = expected[len(args):]
             if missing:
-                raise errors.BadParameters('%s missing %s command'
-                                           ' parameter(s): %s' % (
-                                            command, len(missing),
-                                            ', '.join(missing)))
+                raise errors.ParseError('%s missing %s command'
+                                        ' parameter(s): %s' % (
+                                        command, len(missing),
+                                        ', '.join(missing)))
         extra = len(args) - len(expected)
         if not allowExtra and not appendExtra:
             maxExtra = 0
@@ -142,7 +143,7 @@ class AbstractCommand(object):
                                        len(expected) + maxExtra - 1)
             else:
                  numParams = '%s' % (len(expected)-1)
-            raise errors.BadParameters('%s takes %s arguments, received %s' % (command, numParams, len(args)-1))
+            raise errors.ParseError('%s takes %s arguments, received %s' % (command, numParams, len(args)-1))
 
         if appendExtra:
             # final parameter is list 
