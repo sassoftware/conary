@@ -813,6 +813,10 @@ class DependencySet(object):
         for dep in deps:
             del c.members[dep.name]
 
+    def removeDepsByClass(self, depClass):
+        self.hash = None
+        self.members.pop(depClass.tag, None)
+
     def addEmptyDepClass(self, depClass):
         """ adds an empty dependency class, which for flavors has 
             different semantics when merging than not having a dependency 

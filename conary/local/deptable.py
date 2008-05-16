@@ -128,13 +128,9 @@ class DependencyWorkTables:
         #VALUES(?, ?, ?, ?, ?, ?, ?)
         #""")
 
-        ignoreDepClasses = set((deps.DEP_CLASS_ABI,))
-
         toInsert = []
         for (isProvides, (classId, depClass)) in allDeps:
             # getDeps() returns sorted deps
-            if depClass.tag in ignoreDepClasses:
-                continue
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     toInsert.append((troveNum, multiplier * len(depList),
@@ -905,6 +901,7 @@ class DependencyChecker:
         # indexing depList. depList is a list of (troveNum, depClass, dep)
         # tuples. Like for depNum, negative troveNum values mean the
         # dependency was part of a new trove.
+        ignoreDepClasses = set((deps.AbiDependency,))
         for job in jobSet:
             if job[2][0] is None:
                 nodeId = self._addJob(job)
@@ -920,6 +917,8 @@ class DependencyChecker:
                 # which this trove both provides and requires conary 1.0.11
                 # and later remove these from troves at build time
                 requires = requires - provides
+                for depClass in ignoreDepClasses:
+                    requires.removeDepsByClass(depClass)
 
                 self.workTables._populateTmpTable(depList = self.depList,
                                                   troveNum = -newNodeId,
