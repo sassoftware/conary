@@ -170,7 +170,7 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
                 flavorDict = pkgMap[package][version]
                 for flavor in sorted(flavorDict.keys()):
                     print wrap.fill('%s:%s [%s]' %(package,
-                        ' :'.join(flavorDict[flavor]),
+                        ' :'.join(sorted(flavorDict[flavor])),
                         ', '.join(flavor.split(','))))
                 print
 
