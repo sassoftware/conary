@@ -2,6 +2,7 @@ Changes in @NEW@:
   o Code Changes:
     * We've started using a @publicApi decorator to tag methods which
       are part of the public conary API. (CNY-2367)
+    * xmldata.py is no longer part of the Conary library. (CNY-2765)
 
   o Bug Fixes:
     * An incompatibility of the db2db migration script with the latest
