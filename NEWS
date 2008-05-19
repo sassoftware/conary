@@ -14,10 +14,10 @@ Changes in @NEW@:
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the
-    * functionality
-      for loading recipes from the filesystem in that manner
-    * Reworked recipe loading to make the code more understandable
-    * Implemented autoLoadRecipes configuration option (CNY-2694)
+      functionality for loading recipes from the filesystem based
+      on configuration.
+    * Reworked recipe loading to make the code more understandable.
+    * Implemented autoLoadRecipes configuration option. (CNY-2694)
 
   o Protocol Changes:
     * The commitCheck() xmlrpc API call has been added that will check
