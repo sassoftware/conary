@@ -1464,8 +1464,9 @@ class GroupRecipe(_BaseGroupRecipe):
         B{autoResolve} : (False) Whether to resolve
         dependencies for this group.
 
-        B{byDefault} : (Current group setting) Whether to add troves to this
-        group byDefault C{True}, or byDefault C{False} by default.
+        B{byDefault} : whether or not to add the newly created group
+        byDefault C{True}, or byDefault C{False}. This setting does not
+        affect the default byDefault setting of the newly created group.
 
         B{checkOnlyByDefaultDeps} :  (Current group setting) Whether to
         include byDefault C{False} troves in this group.
@@ -1503,7 +1504,7 @@ class GroupRecipe(_BaseGroupRecipe):
             byDefault = origGroup.byDefault
 
         self.createGroup(name, depCheck = depCheck, autoResolve = autoResolve,
-                byDefault = byDefault,
+                byDefault = True,
                 checkOnlyByDefaultDeps = checkOnlyByDefaultDeps,
                 checkPathConflicts = checkPathConflicts,
                 imageGroup = imageGroup)
