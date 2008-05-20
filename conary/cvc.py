@@ -210,7 +210,7 @@ class CloneCommand(CvcCommand):
                                   ' groups'),
              'test'            : ('Runs through all the steps of committing'
                                   ' but does not modify the repository')
-           }
+        }
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
@@ -268,7 +268,10 @@ class PromoteCommand(CvcCommand):
                                             ' (now the default)'),
              'exact-flavors' : (VERBOSE_HELP, 'Specified flavors must match'
                                               'the package/group flavors'
-                                              'exactly to promote')
+                                              'exactly to promote'),
+             'exclude-groups'  : (VERBOSE_HELP,
+                                    'Skip over any groups in the clone list,'
+                                    ' but clone their contents')
            }
 
     def addParameters(self, argDef):
@@ -284,6 +287,7 @@ class PromoteCommand(CvcCommand):
         argDef["default-only"] = NO_PARAM
         argDef["to-file"] = ONE_PARAM
         argDef["exact-flavors"] = NO_PARAM
+        argDef["exclude-groups"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
@@ -309,12 +313,14 @@ class PromoteCommand(CvcCommand):
         targetFile = argSet.pop("to-file", False)
         defaultOnly = argSet.pop("default-only", False)
         exactFlavors = argSet.pop("exact-flavors", False)
+        excludeGroups = argSet.pop("exclude-groups", False)
         clone.promoteTroves(cfg, troveSpecs, labelList,
                             skipBuildInfo=skipBuildInfo,
                             info = info, message = message, test = test,
                             cloneSources=cloneSources, allFlavors=allFlavors,
                             cloneOnlyByDefaultTroves=defaultOnly,
-                            targetFile=targetFile, exactFlavors=exactFlavors)
+                            targetFile=targetFile, exactFlavors=exactFlavors,
+                            excludeGroups=excludeGroups)
 _register(PromoteCommand)
 
 

@@ -24,6 +24,10 @@ Changes in @NEW@:
     * The commitCheck() xmlrpc API call has been added that will check
       commit permissions for a trovelist before having to send the 
       changeset for commit (CNY-2683)
+  o Client Changes:
+    * Added an option --exclude-groups to promote that allows the promotion
+      of all the packages within a group without the promotion of the group
+      itself. (CNY-2801)
 
 Changes in 2.0.14:
   o Bug Fixes:

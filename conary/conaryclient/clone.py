@@ -100,7 +100,7 @@ class ClientClone:
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
                              infoOnly=False, fullRecurse=False,
                              cloneSources=False, callback=None, 
-                             trackClone=True):
+                             trackClone=True, excludeGroups=False):
         targetMap = dict((x[1].branch(), targetBranch) for x in troveList)
         return self.createTargetedCloneChangeSet(targetMap,
                                                troveList,
@@ -110,14 +110,15 @@ class ClientClone:
                                                callback=callback,
                                                message=message,
                                                updateBuildInfo=updateBuildInfo,
-                                               infoOnly=infoOnly)
+                                               infoOnly=infoOnly,
+                                               excludeGroups=excludeGroups)
 
     def createTargetedCloneChangeSet(self, targetMap, troveList,
                                      updateBuildInfo=True, infoOnly=False,
                                      callback=None, message=DEFAULT_MESSAGE,
                                      trackClone=True, fullRecurse=True,
                                      cloneOnlyByDefaultTroves=False,
-                                     cloneSources=True):
+                                     cloneSources=True, excludeGroups=False):
         cloneOptions = CloneOptions(fullRecurse=fullRecurse,
                             cloneSources=cloneSources,
                             trackClone=trackClone,
@@ -126,7 +127,8 @@ class ClientClone:
                             cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
                             updateBuildInfo=updateBuildInfo,
                             infoOnly=infoOnly,
-                            bumpGroupVersions=True)
+                            bumpGroupVersions=True,
+                            excludeGroups=excludeGroups)
         chooser = CloneChooser(targetMap, troveList, cloneOptions)
         return self._createCloneChangeSet(chooser, cloneOptions)
     # bw compatibility
@@ -470,12 +472,25 @@ class ClientClone:
                 else:
                     sourceName = _getSourceName(trv)
                 if chooser.shouldClone(troveTup, sourceName):
-                    targetBranch = chooser.getTargetBranch(troveTup[1])
-                    cloneMap.addTrove(troveTup, targetBranch, sourceName)
-                    chooser.addSource(troveTup, sourceName)
-                    for childTup in trv.iterTroveList(strongRefs=True, weakRefs=True):
-                        chooser.addReferenceByCloned(childTup)
-                    cloneJob.add(troveTup)
+                    if not chooser.isExcluded(troveTup):
+                        targetBranch = chooser.getTargetBranch(troveTup[1])
+                        cloneMap.addTrove(troveTup, targetBranch, sourceName)
+                        chooser.addSource(troveTup, sourceName)
+                        cloneJob.add(troveTup)
+                        for childTup in trv.iterTroveList(strongRefs=True,
+                                                          weakRefs=True):
+                            chooser.addReferenceByCloned(childTup)
+                    else:
+                        # don't include this collection, instead
+                        # only include child troves that aren't
+                        # components of this collection.
+                        for childTup in trv.iterTroveList(strongRefs=True,
+                                                          weakRefs=True):
+                            if (childTup[0].split(':')[0],
+                                childTup[1], childTup[2]) == troveTup:
+                                chooser.addReferenceByUncloned(childTup)
+                            else:
+                                chooser.addReferenceByCloned(childTup)
                 else:
                     if (chooser.options.cloneOnlyByDefaultTroves
                         and chooser.isByDefault(troveTup)
@@ -1022,7 +1037,7 @@ class CloneOptions(object):
                  trackClone=True, callback=None,
                  message=DEFAULT_MESSAGE, cloneOnlyByDefaultTroves=False,
                  updateBuildInfo=True, infoOnly=False, bumpGroupVersions=False,
-                 enforceFullBuildInfoCloning=False):
+                 enforceFullBuildInfoCloning=False, excludeGroups=False):
         self.fullRecurse = fullRecurse
         self.cloneSources = cloneSources
         self.trackClone = trackClone
@@ -1035,6 +1050,7 @@ class CloneOptions(object):
         self.infoOnly = infoOnly
         self.bumpGroupVersions = bumpGroupVersions
         self.enforceFullBuildInfoCloning = enforceFullBuildInfoCloning
+        self.excludeGroups = excludeGroups
 
 class TroveCache(object):
     def __init__(self, repos, callback):
@@ -1122,8 +1138,10 @@ class CloneChooser(object):
     def isReferencedByCloned(self, troveTup):
         return troveTup in self.referencedByClonedMap
 
-    def isReferencedByUncloned(self, troveTup):
-        return troveTup in self.referencedByUnclonedMap
+    def isExcluded(self, troveTup):
+        return (self.options.excludeGroups
+                and troveTup[0].startswith('group-')
+                and not troveTup[0].endswith(':source'))
 
     def shouldPotentiallyClone(self, troveTup):
         """

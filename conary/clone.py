@@ -107,7 +107,8 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
                   cloneSources = False, allFlavors = False, client=None, 
-                  targetFile = None, exactFlavors = None):
+                  targetFile = None, exactFlavors = None,
+                  excludeGroups = False):
     targetMap = {}
     searchPath = []
     for fromLoc, toLoc in targetList:
@@ -172,7 +173,8 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                            updateBuildInfo=not skipBuildInfo,
                            infoOnly=info, callback=callback,
                            cloneOnlyByDefaultTroves=cloneOnlyByDefaultTroves,
-                           cloneSources=cloneSources)
+                           cloneSources=cloneSources,
+                           excludeGroups=excludeGroups)
     if not okay:
         return False
     return _finishClone(client, cfg, cs, callback, info=info,
