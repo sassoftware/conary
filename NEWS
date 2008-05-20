@@ -12,6 +12,8 @@ Changes in @NEW@:
     * sys.argv is not defined under mod_python; importing cvc.py should
       no longer fail as a result of using sys.argv as a default argument
       to main(). (CNY-2786)
+    * repository code handles correctly the removal of groups that
+      include troves from other repositories. (CNY-2802)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the
@@ -19,6 +21,9 @@ Changes in @NEW@:
       on configuration.
     * Reworked recipe loading to make the code more understandable.
     * Implemented autoLoadRecipes configuration option. (CNY-2694)
+    * Using the byDefault parameter to startGroup only determines the
+      byDefault setting when the new group is added to its parent group.
+      (CNY-2791)
 
   o Protocol Changes:
     * The commitCheck() xmlrpc API call has been added that will check

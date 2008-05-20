@@ -1404,7 +1404,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
                 recipePath = state.getRecipeFileName()
                 recipe = open(recipePath).read()
                 regexp = re.compile('''^[ \t]*version *=[ ]*['"](.*)['"] *$''',
-                                    re.MULTILINE)
+                                    re.MULTILINE) #' emacs cant grok above quotes
                 l = list(regexp.finditer(recipe))
                 if len(l) != 1:
                     log.warning("Couldn't find version assignment in %s. The "
