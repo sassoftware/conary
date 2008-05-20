@@ -19,6 +19,9 @@ Changes in @NEW@:
       on configuration.
     * Reworked recipe loading to make the code more understandable.
     * Implemented autoLoadRecipes configuration option. (CNY-2694)
+    * Using the byDefault parameter to startGroup only determines the
+      byDefault setting when the new group is added to its parent group.
+      (CNY-2791)
 
   o Protocol Changes:
     * The commitCheck() xmlrpc API call has been added that will check
