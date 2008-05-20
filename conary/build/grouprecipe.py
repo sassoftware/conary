@@ -233,6 +233,10 @@ class GroupRecipe(_BaseGroupRecipe):
 
         - L{Requires} : Defines a runtime requirement for group
 
+        - L{requireLatest} : Raise an error if add* commands resolve to older
+        trove than the latest on branch. This can occur when a flavor of
+        a trove exists that is not the latest version.
+
         - L{replace} : Replace troves
 
         - L{setByDefault} : Set troves to be added to group by default
@@ -389,7 +393,7 @@ class GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{components},] [I{groupName},] [I{searchPath}])}
+        C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{requireLatest},] [I{components},] [I{groupName},] [I{searchPath}])}
 
         DESCRIPTION
         ===========
@@ -425,6 +429,10 @@ class GroupRecipe(_BaseGroupRecipe):
         B{versionStr} : (None) A version specifier like that passed to
 
         B{repquery} which determines the trove returned.
+
+        B{requireLatest} : Raise an error if add resolves to an older
+        trove than the latest on branch. This can occur when a flavor of
+        a trove exists that is not the latest version.
 
         B{use}: (True) A Use flag, or boolean, or a tuple of Use flags, and/or
         boolean values which determine whether the trove(s) are added to the
@@ -764,8 +772,9 @@ class GroupRecipe(_BaseGroupRecipe):
         ========
 
         C{r.addAll(I{name}, [I{versionStr}], [I{flavor},] [I{ref},]
-        [I{recurse},] [I{groupName},] [I{use},] [I{searchPath},] [I{flatten},]
-        [I{copyScripts},] [I{copyCompatibilityClass}])}
+        [I{requireLatest},] [I{recurse},] [I{groupName},] [I{use},]
+        [I{searchPath},] [I{flatten},] [I{copyScripts},]
+        [I{copyCompatibilityClass}])}
 
         DESCRIPTION
         ===========
@@ -819,6 +828,10 @@ class GroupRecipe(_BaseGroupRecipe):
 
         B{ref}: (None) (deprecated) Trove reference to search in for this 
         trove. See C{r.addReference()} for more information.
+
+        B{requireLatest} : Raise an error if addAll resolves to an older
+        trove than the latest on branch. This can occur when a flavor of
+        a trove exists that is not the latest version.
 
         EXAMPLES
         ========
@@ -976,7 +989,7 @@ class GroupRecipe(_BaseGroupRecipe):
         ========
 
         C{r.addCopy(I{name}, [I{flavor},] [I{groupName},] [I{recurse},]
-        [I{ref},] [I{versionStr},] [I{copyScripts},]
+        [I{ref},] [I{requireLatest},] [I{versionStr},] [I{copyScripts},]
         [I{copyCompatibilityClass}])}
 
         DESCRIPTION
@@ -1021,6 +1034,10 @@ class GroupRecipe(_BaseGroupRecipe):
 
         B{ref}: (None) (Deprecated) Trove reference to search in for this 
         trove. See C{r.addReference()} for more information.
+
+        B{requireLatest} : Raise an error if addCopy resolves to an older
+        trove than the latest on branch. This can occur when a flavor of
+        a trove exists that is not the latest version.
 
         B{searchPath}: (None) searchPath to search in for this
         trove. See C{r.setSearchPath()} for more information.
