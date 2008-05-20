@@ -846,7 +846,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
 class ProxyRepositoryServer(ChangesetFilter):
 
-    SERVER_VERSIONS = range(42, 61 + 1)
+    SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
     forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl):
