@@ -12,6 +12,8 @@ Changes in @NEW@:
     * sys.argv is not defined under mod_python; importing cvc.py should
       no longer fail as a result of using sys.argv as a default argument
       to main(). (CNY-2786)
+    * repository code handles correctly the removal of groups that
+      include troves from other repositories. (CNY-2802)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the

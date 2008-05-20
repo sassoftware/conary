@@ -1179,7 +1179,7 @@ class TroveStore:
         FROM TroveRedirects WHERE TroveRedirects.instanceId = ?
         """, instanceId, start_transaction=False)
         self.db.analyze("tmpRemovals")
-
+        
         # remove access to troves we're about to remove
         self.ri.deleteInstanceIds("tmpRemovals")
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
@@ -1224,106 +1224,89 @@ class TroveStore:
 
         # Delete flavors which are no longer needed
         cu.execute("""
-        DELETE FROM Flavors
-        WHERE flavorId IN (
-            SELECT tmpRemovals.flavorId
-            FROM tmpRemovals
-            LEFT JOIN LatestCache ON tmpRemovals.flavorId = LatestCache.flavorId
-            LEFT JOIN TroveRedirects ON tmpRemovals.flavorId = TroveRedirects.flavorId
-            WHERE LatestCache.flavorId IS NULL
-              AND TroveRedirects.flavorId IS NULL
+        delete from Flavors
+        where flavorId in (
+            select r.flavorId
+            from tmpRemovals as r
+            where not exists (select flavorId from Instances as i where i.flavorId = r.flavorId)
+            and not exists (select flavorId from TroveRedirects as tr where tr.flavorId = r.flavorId)
         )""")
+
         cu.execute("""
-        DELETE FROM FlavorMap
-        WHERE flavorId IN (
-            SELECT tmpRemovals.flavorId
-            FROM tmpRemovals
-            LEFT JOIN Flavors USING (flavorId)
-            WHERE Flavors.flavorId IS NULL
+        delete from FlavorMap
+        where flavorId in (
+            select r.flavorId
+            from tmpRemovals as r
+            where not exists (select flavorId from Flavors as f where f.flavorId = r.flavorId)
         )""")
 
         # do we need the labelmap entry anymore?
-        cu.execute("SELECT COUNT(*) FROM Nodes WHERE itemId = ? AND "
-                   "branchId = ?", itemId, branchId)
-        count = cu.next()[0]
-
-        # XXX This stinks, but to fix it we need a proper index column
-        # on LabelMap.
-        cu.execute("""
-        SELECT itemId, branchId FROM tmpRemovals
-        LEFT JOIN Nodes USING (itemId, branchId)
-        WHERE Nodes.itemId IS NULL
-        """)
-        for rmItemId, rmBranchId in cu.fetchall():
-            cu.execute("DELETE FROM LabelMap WHERE itemId=? AND branchId=?",
-                       rmItemId, rmBranchId)
+        schema.resetTable(cu, 'tmpId')
+        cu.execute("""insert into tmpId(id)
+        select lm.labelmapId
+        from tmpRemovals as r
+        join LabelMap as lm using(itemId, branchId)
+        where not exists ( select nodeId from Nodes as n
+                           where n.itemId = lm.itemId
+                           and n.branchId = lm.branchId ) """, start_transaction=False)
+        self.db.analyze("tmpId")
+        cu.execute("delete from LabelMap where labelmapId in (select id from tmpId)")
 
         # do we need these branchIds anymore?
         cu.execute("""
-        DELETE FROM Branches
-        WHERE branchId IN (
-            SELECT tmpRemovals.branchId
-            FROM tmpRemovals
-            LEFT JOIN LabelMap ON tmpRemovals.branchId = LabelMap.branchId
-            LEFT JOIN TroveRedirects ON tmpRemovals.branchId = TroveRedirects.branchId
-            WHERE LabelMap.branchId IS NULL
-              AND TroveRedirects.branchId IS NULL
+        delete from Branches
+        where branchId in (
+            select r.branchId
+            from tmpRemovals as r
+            where not exists (select branchId from Nodes as n where n.branchId = r.branchId)
+              and not exists (select branchId from TroveRedirects as tr where tr.branchId = r.branchId)
         )""")
 
         # XXX It would be nice to narrow this down based on tmpRemovals, but
         # in reality the labels table never gets that big.
         schema.resetTable(cu, 'tmpId')
-        cu.execute("""
-        INSERT INTO tmpId(id)
-        SELECT Labels.labelId
-        FROM Labels
-        LEFT JOIN LabelMap ON LabelMap.labelId = Labels.labelId
-        WHERE LabelMap.labelId IS NULL
-          AND Labels.labelId != 0
-        """, start_transaction=False)
+        cu.execute("""insert into tmpId(id)
+        select l.labelId
+        from Labels as l
+        where not exists (select labelId from LabelMap as lm where lm.labelId = l.labelId)
+        and not exists (select labelId from Permissions as p where p.labelId = l.labelId)
+        and l.labelId != 0 """, start_transaction=False)
         self.db.analyze("tmpId")
-        
-        cu.execute("""
-        DELETE FROM Labels
-        WHERE labelId IN (SELECT id from tmpId)
-        """)
+        cu.execute("delete from Labels where labelId in (select id from tmpId)")
 
-        # do we need these branchIds anymore?
+        # clean up Versions
         cu.execute("""
-        DELETE FROM Versions
-        WHERE versionId IN (
-            SELECT tmpRemovals.versionId
-            FROM tmpRemovals
-            LEFT JOIN Instances ON tmpRemovals.versionId = Instances.versionId
-            LEFT JOIN TroveFiles ON tmpRemovals.versionId = TroveFiles.versionId
-            WHERE Instances.versionId IS NULL
-              AND TroveFiles.versionId IS NULL
+        delete from Versions
+        where versionId in (
+            select r.versionId
+            from tmpRemovals as r
+            where not exists (select versionId from Instances as i where i.versionId = r.versionId)
+            and not exists (select versionId from Nodes as n where n.versionId = r.versionId)
+            and not exists (select versionId from TroveFiles as tf where tf.versionId = r.versionId)
         )""")
 
+        # clean up Items
         cu.execute("""
-        DELETE FROM Items
-        WHERE itemId IN (
-            SELECT tmpRemovals.itemId
-            FROM tmpRemovals
-            LEFT JOIN Instances ON tmpRemovals.itemId = Instances.itemId
-            LEFT JOIN Nodes ON tmpRemovals.itemId = Nodes.itemId
-            LEFT JOIN TroveRedirects ON tmpRemovals.itemId = TroveRedirects.itemId
-            WHERE Instances.itemId IS NULL
-              AND Nodes.itemId IS NULL
-              AND TroveRedirects.itemId IS NULL
+        delete from Items
+        where itemId in (
+            select r.itemId
+            from tmpRemovals as r
+            where not exists (select itemId from Instances as i where i.itemId = r.itemId)
+            and not exists (select itemId from Nodes as n where n.itemId = r.itemId)
+            and not exists (select itemId from TroveRedirects as tr where tr.itemId = r.itemId)
+            and not exists (select itemId from Permissions as p where p.itemId = r.itemId)
         )""")
 
+        # clean up CheckTroveCache
         cu.execute("""
-        DELETE FROM CheckTroveCache
-        WHERE itemId IN (
-            SELECT tmpRemovals.itemId
-            FROM tmpRemovals
-            LEFT JOIN Instances ON tmpRemovals.itemId = Instances.itemId
-            LEFT JOIN Nodes ON tmpRemovals.itemId = Nodes.itemId
-            LEFT JOIN TroveRedirects ON tmpRemovals.itemId = TroveRedirects.itemId
-            WHERE Instances.itemId IS NULL
-              AND Nodes.itemId IS NULL
-              AND TroveRedirects.itemId IS NULL
+        delete from CheckTroveCache
+        where itemId in (
+            select r.itemId
+            from tmpRemovals as r
+            where not exists (select itemId from Instances as i where i.itemId = r.itemId)
+            and not exists (select itemId from Nodes as n where n.itemId = r.itemId)
+            and not exists (select itemId from TroveRedirects as tr where tr.itemId = r.itemId)
+            and not exists (select itemId from Permissions as p where p.itemId = r.itemId)
         )""")
 
         # XXX what about metadata?
