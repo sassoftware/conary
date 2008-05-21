@@ -103,11 +103,14 @@ def main(argv):
             else:
                 print '%s missing from filesystem' %path
         elif isinstance(f, files.SymbolicLink):
-            fullpath = os.path.join(cfg.root, path)
-            c = os.readlink(fullpath)
-            if c != f.target():
-                print 'symlink %s contains %s instead of %s' %(
-                    path, c, f.target())
+            if existsOnFilesystem == True:
+                fullpath = os.path.join(cfg.root, path)
+                c = os.readlink(fullpath)
+                if c != f.target():
+                    print 'symlink %s contains %s instead of %s' %(
+                        path, c, f.target())
+            else:
+                print 'symlink %s missing from filesystem' %path
         elif isinstance(f, (files.Directory, files.Socket, files.NamedPipe,
                             files.DeviceFile)):
             # no further checking than permissions for these types
