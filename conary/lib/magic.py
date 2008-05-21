@@ -74,6 +74,7 @@ class ar(ELF):
 
 
 class gzip(Magic):
+    _fileType = 'gzip'
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 	if buffer[3] == '\x08':
