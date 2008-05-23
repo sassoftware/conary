@@ -700,6 +700,8 @@ class MigrateTo_17(SchemaMigration):
                 prefixList = []
         if prefixList:
             self.db.bulkload("tmpPrefixes", prefixList, ["dirnameId", "prefix"])
+        self.db.createIndex("tmpPrefixes", "tmpPrefixesPrefixIdx", "prefix",
+                            check = False)
         self.db.analyze("tmpPrefixes")
 
         # finally, create the Prefixes table
