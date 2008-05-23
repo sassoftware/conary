@@ -14,6 +14,8 @@ Changes in @NEW@:
       to main(). (CNY-2786)
     * repository code handles correctly the removal of groups that
       include troves from other repositories. (CNY-2802)
+    * When using sqlite, some temporary tables used the invalid column
+      datatype of STRING instead of TEXT. This has been fixed. (CNY-2013)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the
