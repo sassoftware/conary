@@ -3,6 +3,11 @@ Changes in @NEW@:
     * The SubscriptionLogWriter (CNY-2622) sometimes caused builds
       to fail.  This issue has been resolved. (CNY-2717)
 
+  o Bug Fixes:
+    * When using sqlite, some temporary tables used the invalid column
+      datatype of STRING instead of TEXT. This has been fixed. (CNY-2013)
+
+
 Changes in 1.2.22:
   o Build Changes:
     * The SubscriptionLogWriter now handles line continuation. (CNY-2963)
