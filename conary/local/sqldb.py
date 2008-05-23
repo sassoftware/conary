@@ -554,10 +554,10 @@ class Database:
         cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE tlList(
-            name        STRING,
-            version     STRING,
-            flavor      STRING
-        )""", start_transaction = False)
+            name        %(STRING)s,
+            version     %(STRING)s,
+            flavor      %(STRING)s
+        )""" % self.db.keywords, start_transaction = False)
         def _iter(tl):
             for name, version, flavor in troveList:
                 yield (name, version.asString(), flavor.freeze())
@@ -717,13 +717,14 @@ order by
         assert(cu.execute("SELECT COUNT(*) FROM TroveTroves WHERE "
                           "instanceId=?", troveInstanceId).next()[0] == 0)
 
-        cu.execute("""CREATE TEMPORARY TABLE IncludedTroves(
-                                troveName STRING,
-                                versionId INT,
-                                flavorId INT,
-                                timeStamps STRING,
-                                flags INT)
-                   """)
+        cu.execute("""
+        CREATE TEMPORARY TABLE IncludedTroves(
+            troveName   %(STRING)s,
+            versionId   INTEGER,
+            flavorId    INTEGER,
+            timeStamps  %(STRING)s,
+            flags       INTEGER
+        ) """ % self.db.keywords)
         def _iter(trove):
             for (name, version, flavor), byDefault, isStrong \
                                                 in trove.iterTroveListInfo():
@@ -1138,12 +1139,13 @@ order by
         # filled in w/ None
         cu = self.db.cursor()
 
-        cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
-                                idx %(PRIMARYKEY)s,
-                                troveName STRING,
-                                version STRING,
-                                flavor STRING)
-                   """ % self.db.keywords, start_transaction = False)
+        cu.execute("""
+        CREATE TEMPORARY TABLE getTrovesTbl(
+            idx %(PRIMARYKEY)s,
+            troveName %(STRING)s,
+            version %(STRING)s,
+            flavor %(STRING)s
+        ) """ % self.db.keywords, start_transaction = False)
 
         def _iter(tl):
             for i, (name, version, flavor) in enumerate(tl):
@@ -1462,14 +1464,16 @@ order by
             return
 
         cu = self.db.cursor()
-        cu.execute("""CREATE TEMPORARY TABLE mlt(
-                            name STRING,
-                            pinnedVersion STRING,
-                            pinnedFlavor STRING,
-                            mappedVersion STRING,
-                            mappedTimestamps STRING,
-                            mappedFlavor STRING)""")
-
+        cu.execute("""
+        CREATE TEMPORARY TABLE mlt(
+            name             %(STRING)s,
+            pinnedVersion    %(STRING)s,
+            pinnedFlavor     %(STRING)s,
+            mappedVersion    %(STRING)s,
+            mappedTimestamps %(STRING)s,
+            mappedFlavor     %(STRING)s
+        ) """ % self.db.keywords)
+        
         def _iter(ml):
             for (name, pinnedInfo, mapInfo) in ml:
                 assert(sum(mapInfo[0].timeStamps()) > 0)
@@ -1525,11 +1529,13 @@ order by
 
     def getTroveContainers(self, l):
         cu = self.db.cursor()
-        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER PRIMARY KEY, "
-                                              "name STRING, "
-                                              "version STRING, "
-                                              "flavor STRING)",
-                                              start_transaction = False)
+        cu.execute("""
+        CREATE TEMPORARY TABLE ftc(
+            idx     INTEGER PRIMARY KEY,
+            name    %(STRING)s,
+            version %(STRING)s,
+            flavor  %(STRING)s
+        ) """ % self.db.keywords, start_transaction = False)
         result = []
         def _iter(infoList, resultList):
             for idx, info in enumerate(infoList):
@@ -1576,8 +1582,11 @@ order by
     def findTroveContainers(self, names):
         # XXX this fn could be factored out w/ getTroveContainers above
         cu = self.db.cursor()
-        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
-                                              start_transaction = False)
+        cu.execute("""
+        CREATE TEMPORARY TABLE ftc(
+            idx INTEGER,
+            name %(STRING)s
+        )""" % self.db.keywords, start_transaction = False)
         cu.executemany("INSERT INTO ftc VALUES(?, ?)", enumerate(names),
                        start_transaction = False)
 
@@ -1612,8 +1621,11 @@ order by
             merely must be referenced by an installed trove.
         """
         cu = self.db.cursor()
-        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
-                                              start_transaction = False)
+        cu.execute("""
+        CREATE TEMPORARY TABLE ftc(
+            idx INTEGER,
+            name %(STRING)s
+        )""" % self.db.keywords, start_transaction = False)
         cu.executemany("INSERT INTO ftc VALUES(?, ?)",
                        enumerate(names), start_transaction = False)
 
@@ -1797,12 +1809,13 @@ order by
         # returns a list parallel to troveList
         cu = self.db.cursor()
 
-        cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
-                                idx %(PRIMARYKEY)s,
-                                troveName STRING,
-                                versionId INT,
-                                flavorId INT)
-                   """ % self.db.keywords, start_transaction = False)
+        cu.execute("""
+        CREATE TEMPORARY TABLE getTrovesTbl(
+            idx       %(PRIMARYKEY)s,
+            troveName %(STRING)s,
+            versionId INTEGER,
+            flavorId  INTEGER
+        ) """ % self.db.keywords, start_transaction = False)
 
         r = []
         def _iter(tl, r):
@@ -1948,8 +1961,8 @@ order by
         # installed, and the other is all of the troves which are referenced
         # but not installed
         cu = self.db.cursor()
-
-        cu.execute("CREATE TEMPORARY TABLE gcts(troveName STRING)",
+        cu.execute("CREATE TEMPORARY TABLE "
+                   "gcts(troveName %(STRING)s)" % self.db.keywords,
                    start_transaction = False)
         cu.executemany("INSERT INTO gcts VALUES (?)", names,
                        start_transaction = False)
