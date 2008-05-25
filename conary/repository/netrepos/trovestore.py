@@ -325,9 +325,17 @@ class TroveStore:
         where not exists (
             select 1 from Dirnames as d where d.dirname = tnf.dirname )""")
         newDirnames = cu.fetchall()
+        self.db.bulkload("Dirnames", newDirnames, ["dirname"])
+        # now get the new dirnames for which we have not computed prefixes yet
+        cu.execute(""" select distinct tnf.dirname from tmpNewFiles as tnf
+        where not exists (
+            select 1 from Dirnames as d
+            join Prefixes as p using(dirnameId)
+            where d.dirname = tnf.dirname
+        ) """)
+        newDirnames = cu.fetchall()        
         schema.resetTable(cu, "tmpItems")
         self.db.bulkload("tmpItems", newDirnames, ["item"])
-        self.db.bulkload("Dirnames", newDirnames, ["dirname"])
         prefixList = []
         # all the new dirnames need to be processed for Prefixes links
         def _getPrefixes(dirname):
