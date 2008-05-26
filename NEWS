@@ -16,6 +16,8 @@ Changes in @NEW@:
       include troves from other repositories. (CNY-2802)
     * When using sqlite, some temporary tables used the invalid column
       datatype of STRING instead of TEXT. This has been fixed. (CNY-2013)
+    * Fixed bug that made the repository code return incomplete data
+      for the getPackageBranchPathIds call in certain situations. (CNY-2810)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the

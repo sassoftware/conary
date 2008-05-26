@@ -57,6 +57,46 @@ class LocalRepVersionTable(versiontable.VersionTable):
 	except StopIteration:
             raise KeyError, itemId
 
+
+# we need to call this from the schema migration as well, which is why
+# we extracted it from the TroveStore class
+def addPrefixesFromList(db, dirnameList):
+    prefixList = []
+    # all the new dirnames need to be processed for Prefixes links
+    def _getPrefixes(dirname):
+        # note: we deliberately do not insert '/' as a prefix for
+        # all directories, since not walking through the Prefixes
+        # is faster than looping through the entire Dirnames set
+        d, b = os.path.split(dirname)
+        if d == '/':
+            return [dirname]
+        if d == '':
+            return []
+        ret = _getPrefixes(d)
+        ret.append(dirname)
+        return ret
+    def _iterPrefixes(dl):
+        for dirnameId, dirname in dl:
+            for x in _getPrefixes(dirname):
+                yield (dirnameId, x)
+        raise StopIteration
+    if not dirnameList:
+        return 0
+    cu = db.cursor()
+    schema.resetTable(cu, "tmpItems")
+    db.bulkload("tmpItems", _iterPrefixes(dirnameList), ["itemId", "item"])
+    db.analyze("tmpItems")
+    # insert any new prefix strings into Dirnames
+    cu.execute("""insert into Dirnames(dirname)
+    select distinct t.item from tmpItems as t
+    left join Dirnames as d on t.item = d.dirname
+    where d.dirnameId is null """)
+    # now populate Prefixes
+    cu.execute(""" insert into Prefixes (dirnameId, prefixId)
+    select tmpItems.itemId, d.dirnameId from tmpItems
+    join Dirnames as d on tmpItems.item = d.dirname """)
+    return len(dirnameList)
+
 class TroveStore:
     def __init__(self, db, log = None):
 	self.db = db
@@ -334,38 +374,13 @@ class TroveStore:
             where d.dirname = tnf.dirname
         ) """)
         newDirnames = cu.fetchall()        
+
         schema.resetTable(cu, "tmpItems")
         self.db.bulkload("tmpItems", newDirnames, ["item"])
-        prefixList = []
-        # all the new dirnames need to be processed for Prefixes links
-        def _getPrefixes(dirname):
-            # note: we deliberately do not insert '/' as a prefix for
-            # all directories, since not walking through the Prefixes
-            # is faster than looping through the entire Dirnames set
-            d, b = os.path.split(dirname)
-            if d == '/':
-                return [dirname]
-            if d == '':
-                return []
-            ret = _getPrefixes(d)
-            ret.append(dirname)
-            return ret
         cu.execute("select dirnameId, dirname from Dirnames "
                    "join tmpItems on dirname = item ")
-        for dirnameId, dirname in cu.fetchall():
-            prefixList += [ (dirnameId, x) for x in _getPrefixes(dirname) ]
-        if prefixList:
-            schema.resetTable(cu, "tmpItems")
-            self.db.bulkload("tmpItems", prefixList, ["itemId", "item"])
-            self.db.analyze("tmpItems")
-            # insert any new prefix strings into Dirnames
-            cu.execute(""" insert into Dirnames(dirname)
-            select distinct item from tmpItems where not exists (
-                select 1 from Dirnames as d where d.dirname = tmpItems.item ) """)
-            # now populate Prefixes
-            cu.execute(""" insert into Prefixes (dirnameId, prefixId)
-            select tmpItems.itemId, d.dirnameId from tmpItems
-            join Dirnames as d on tmpItems.item = d.dirname """)
+        addPrefixesFromList(self.db, cu.fetchall())
+
         # done with processing the Prefixes for new Dirnames
         cu.execute(""" insert into Basenames(basename)
         select distinct tnf.basename from tmpNewFiles as tnf
