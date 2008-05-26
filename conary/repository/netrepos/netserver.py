@@ -2019,8 +2019,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName,
-                                branch, filePrefixes=None, fileIds=None):
-        # filePrefixes should be a list of prefixes to look for
+                                branch, dirnames=[], fileIds=None):
+        # dirnames should be a list of prefixes to look for
         # It tries to limit the number of results for things that generate
         # unique paths with each build (e.g. the kernel).
         # Added as part of protocol version 39
@@ -2046,29 +2046,40 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 yield fileIds[start : end]
         # fileIds need to be unique for performance reasons
         fileIds = set(splitFileIds(fileIds))
-        self.log(2, sourceName, branch, filePrefixes, fileIds)
+        self.log(2, sourceName, branch, dirnames, fileIds)
         cu = self.db.cursor()
 
         roleIds = self.auth.getAuthRoles(cu, authToken)
 
-        prefixQuery = ""
-        # if we're asked for all files with a '/' prefix, don't bother
-        # "optimizing" since no records will be filtered out
-        if filePrefixes and not ('/' in filePrefixes):
-            # if we have file prefixes, we build a list of filePathIds
-            # that match them
+        def _lookupIds(cu, itemList, selectQ):
             schema.resetTable(cu, "tmpItems")
             cu.executemany("insert into tmpItems (item) values (?)",
-                           filePrefixes, start_transaction=False)
+                           itemList, start_transaction=False)
             self.db.analyze("tmpItems")
             schema.resetTable(cu, "tmpId")
-            # save a list of valid dirnames that correspond to the prefixes being asked for
-            cu.execute("""insert into tmpId (id)
-            select p.dirnameId from tmpItems
-            join Dirnames as d on tmpItems.item = d.dirname
-            join Prefixes as p on d.dirnameId = p.prefixId """)
+            cu.execute("""insert into tmpId (id) %s """ % (selectQ,))
             self.db.analyze("tmpId")
-            prefixQuery = """join tmpId on fp.dirnameId = tmpId.id """
+            return """join tmpId on fp.dirnameId = tmpId.id """
+            
+        prefixQuery = ""
+        if dirnames:
+            if clientVersion < 62: # dirnames are in fact filePrefixes
+                # if we're asked for all files with a '/' prefix, don't bother
+                # "optimizing" since no records will be filtered out
+                if not ('/' in dirnames):
+                    prefixQuery = _lookupIds(cu, dirnames, """
+                    select p.dirnameId from tmpItems
+                    join Dirnames as d on tmpItems.item = d.dirname
+                    join Prefixes as p on d.dirnameId = p.prefixId
+                    union
+                    select d.dirnameId from tmpItems
+                    join Dirnames as d on tmpItems.item = d.dirname
+                    """)
+            else: # dirnames are just dirnames
+                prefixQuery = _lookupIds(cu, dirnames, """
+                select d.dirnameId from tmpItems
+                join Dirnames as d on tmpItems.item = d.dirname """)
+
         schema.resetTable(cu, "tmpPathIdLookup")
         query = """
         insert into tmpPathIdLookup (versionId, filePathId, streamId, finalTimestamp)

@@ -1557,13 +1557,13 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
     # this source component, following our branch ancestry
     while True:
         # Generate the file prefixes
-        filePrefixes = _computeCommonPrefixes(fileIdsPathMap.keys())
+        dirnames = set(os.path.dirname(x) for x in fileIdsPathMap.iterkeys())
         fileIds = sorted(set(fileIdsPathMap.values()))
         if not fileIds:
             break
         try:
             d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                                              filePrefixes, fileIds)
+                                              dirnames, fileIds)
         except errors.InsufficientPermission:
             # No permissions to search on this branch. Keep going
             d = {}
@@ -1579,20 +1579,6 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
             break
         searchBranch = searchBranch.parentBranch()
     return ident
-
-def _computeCommonPrefixes(filePaths):
-    # Eliminate prefixes of prefixes
-    ret = []
-    oldp = None
-    filePaths = sorted(filePaths)
-    for p in filePaths:
-        # Get the dirname
-        p = os.path.dirname(p)
-        if oldp and p.startswith(oldp):
-            continue
-        ret.append(p)
-        oldp = p
-    return ret
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):
     write = out.write

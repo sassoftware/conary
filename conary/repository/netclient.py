@@ -2360,8 +2360,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return contents
 
-    def getPackageBranchPathIds(self, sourceName, branch, filePrefixes=None,
-                                fileIds=None):
+    def getPackageBranchPathIds(self, sourceName, branch, dirnames = [], fileIds=None):
         """
         Searches all of the troves generated from sourceName on the
         given branch, and returns the latest pathId for each path
@@ -2371,14 +2370,35 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @type sourceName: str
         @param branch: branch to restrict the source to
         @type branch: versions.Branch
+        @param dirnames: list of directory names of the oathids being looked up
+        @type dirnames: list of strings
+        @param fileIds: list of preferred fileIds in case more than one matches in the repo query
+        @type fileIds: list of fileId values
         """
-        if filePrefixes is None or self.c[branch].getProtocolVersion() < 39:
+        def _commonPrefixes(dirlist):
+            # Eliminate prefixes of prefixes
+            ret = []
+            oldp = None
+            for p in sorted(dirlist):
+                if oldp and p.startswith(oldp):
+                    continue
+                ret.append(p)
+                oldp = p
+            return ret
+        serverProtocol = self.c[branch].getProtocolVersion()
+        if dirnames is None or serverProtocol < 39:
             args = [sourceName, self.fromVersion(branch)]
+        elif serverProtocol < 62:
+            # up until protocol version 62 we attemoted to limit the
+            # data passed on by only listing common prefixes
+            args = [sourceName, self.fromVersion(branch), _commonPrefixes(dirnames)]
         else:
-            args = [sourceName, self.fromVersion(branch), filePrefixes]
-        if fileIds is not None and self.c[branch].getProtocolVersion() >= 42:
-            # Make sure we send a (possibly empty) filePrefixes
-            assert(filePrefixes is not None)
+            # since protocol 62, we pass on the full list of dirnames since the repository
+            # has paths indexed by dirnames now, and prefix lookups are more expensive
+            args = [sourceName, self.fromVersion(branch), list(set(dirnames))]
+        if fileIds is not None and serverProtocol >= 42:
+            # Make sure we send a (possibly empty) dirnames
+            assert(dirnames is not None)
             args.append(base64.b64encode("".join(fileIds)))
         ids = self.c[branch].getPackageBranchPathIds(*args)
         return dict((self.toPath(x[0]), (self.toPathId(x[1][0]),

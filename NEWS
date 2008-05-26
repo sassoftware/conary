@@ -33,6 +33,9 @@ Changes in @NEW@:
     * The commitCheck() xmlrpc API call has been added that will check
       commit permissions for a trovelist before having to send the 
       changeset for commit (CNY-2683)
+    * The getPackageBranchPathIds xmlrpc API call accepts now a list of 
+      dirnames instead of prefixes for improved performance (CNY-2743)
+
   o Client Changes:
     * Added an option --exclude-groups to promote that allows the promotion
       of all the packages within a group without the promotion of the group
