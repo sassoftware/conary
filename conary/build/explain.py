@@ -23,7 +23,9 @@ from conary.build import filesetrecipe, grouprecipe, inforecipe
 
 DELETE_CHAR = chr(8)
 
-blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'reportExcessBuildRequires', 'setModes', 'User', 'Group', 'SupplementalGroup'),
+blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'reportExcessBuildRequires', 'setModes'),
+        'GroupInfoRecipe': ('User',),
+        'UserInfoRecipe': ('Group', 'SupplementalGroup'),
         'GroupRecipe' : ('reportErrors',)}
 
 class DummyRepos:
@@ -72,16 +74,12 @@ class DummyUserInfoRecipe(inforecipe.UserInfoRecipe):
         self.name = 'info-dummy'
         self.version = '1.0'
         inforecipe.UserInfoRecipe.__init__(self, cfg, None, None)
-        self._loadSourceActions(lambda x: True)
-        self.loadPolicy()
 
 class DummyGroupInfoRecipe(inforecipe.GroupInfoRecipe):
     def __init__(self, cfg):
         self.name = 'info-dummy'
         self.version = '1.0'
         inforecipe.GroupInfoRecipe.__init__(self, cfg, None, None)
-        self._loadSourceActions(lambda x: True)
-        self.loadPolicy()
 
 classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
           DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe]
@@ -192,8 +190,10 @@ def docClass(cfg, recipeType):
     display = {}
     if recipeType in ('PackageRecipe', 'GroupRecipe'):
         display['Build'] = sorted(x for x in r.externalMethods if x[0] != '_' and x not in blacklist.get(recipeType, []))
-    elif 'InfoRecipe' in recipeType:
-        display['Build'] = ['User', 'Group', 'SupplementalGroup']
+    elif 'GroupInfoRecipe' in recipeType:
+        display['Build'] = ['Group', 'SupplementalGroup']
+    elif 'UserInfoRecipe' in recipeType:
+        display['Build'] = ['User']
     display['Policy'] = sorted(x for x in r._policyMap if x[0] != '_' and x not in blacklist.get(recipeType, []))
     if recipeType == 'PackageRecipe':
         Actions = display['Build'][:]
