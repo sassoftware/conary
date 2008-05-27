@@ -39,7 +39,7 @@ import tempfile
 import textwrap
 
 #conary imports
-from conary.build import action
+from conary.build import action, errors
 from conary.lib import fixedglob, log, util
 from conary.build.use import Use
 from conary.build.manifest import Manifest, ExplicitManifest
@@ -3753,4 +3753,300 @@ class MakeFIFO(_FileAction):
         """
         _FileAction.__init__(self, recipe, *args, **keywords)
         self.path = args[0] 
+
+class _UserGroupBuildAction(BuildAction):
+    keywords = {}
+    def doSuggestAutoBuildReqs(self):
+        pass
+
+    def __init__(self, recipe, *args, **kwargs):
+        self.kwargs = {}
+        for key, val in self.keywords.iteritems():
+            self.kwargs[key] = kwargs.pop(key, val)
+        for kwarg in kwargs:
+            raise UserGroupError('%s is not a valid keyword argument' % kwarg)
+        BuildAction.__init__(self, recipe)
+
+class User(_UserGroupBuildAction):
+    """
+    NAME
+    ====
+
+    B{C{r.User()}} - Provides user account creation information
+
+    SYNOPSIS
+    ========
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}',  {supplemental=[I{group}, ...]}, {saltedPassword='I{saltedPassword}'}, reprovideGroup=True)}
+
+    DESCRIPTION
+    ===========
+    The C{r.User} class provides user account information to Conary for the
+    purpose of user account creation.
+
+    The easiest way to get a salted password is to use the
+    /usr/share/conary/md5pw program installed with Conary.
+    Alternatively, set that password for a user on your system
+    and then cut and paste the salted value from the /etc/shadow file.
+
+    NOTE: Pre-setting a salted password should be done with caution.  Anyone
+    who is able to access the repository where this info file will be stored
+    will have the salted password, and given enough time will be able to
+    recover the original password.  Trust the security of this password as
+    far as you trust the security of the repository it is stored in.
+
+    KEYWORDS
+    ========
+
+    The C{r.User} class accepts the following keyword arguments, with
+    default values shown in parentheses where applicable.
+
+    B{name} : (None) Specify a user name for the account to be created
+
+    B{preferred_uid} : The preferred user identification number for the
+    account
+
+    B{group} : (same as user name) Specify default group for the account
+
+    B{groupid} : (same as UID) Specify default group identification number
+    for the account
+
+    B{homedir} : (None) Specify the account home directory
+
+    B{comment} : (None) Add a comment to the account record
+
+    B{provideGroup} : (True) Provide the primary group for the user.  If
+    set to False, then the user's primary group will be required instead
+    of provided.
+
+    B{saltedPassword} : (None) Specify a salted password for the account
+
+    B{shell} : (C{'/sbin/nologin'}) Specify the user account shell
+
+    B{supplemental} : (None) Specify a list of additional group memberships
+    for the account.
+
+    EXAMPLES
+    ========
+
+    C{r.User('mysql', 27, comment='mysql', homedir='%(localstatedir)s/lib/mysql', shell='%(essentialbindir)s/bash')}
+
+    Uses C{r.User} to define a C{mysql} user with a specific UID value of
+    '27', a home directory value of C{/var/lib/mysql}, and the default shell
+    value of C{/bin/bash}.
+    """
+    keywords = {
+            'name': None,
+            'preferred_uid': None,
+            'group': None,
+            'groupid': None,
+            'homedir': None,
+            'comment': None,
+            'provideGroup': True,
+            'saltedPassword': None,
+            'shell': '/sbin/nologin',
+            'supplemental': None}
+    keywordOrder = ['name', 'preferred_uid', 'group', 'groupid', 'homedir',
+            'comment', 'provideGroup', 'saltedPassword', 'shell',
+            'supplemental']
+
+    def __init__(self, recipe, *args, **kwargs):
+        _UserGroupBuildAction.__init__(self, recipe, *args, **kwargs)
+
+        for idx, arg in enumerate(('name', 'preferred_uid', 'group', 'groupid',
+                'homedir', 'comment', 'provideGroup', 'saltedPassword',
+                'shell', 'supplemental')):
+            inargs = (idx < len(args))
+            if arg in kwargs and inargs:
+                raise UserGroupError("ambiguous defintion of '%s' positional arg: %s and keyword arg: %s" % (arg, args[idx], kwargs[arg]))
+            if inargs:
+                self.__dict__[arg] = args[idx]
+            else:
+                self.__dict__[arg] = kwargs.get(arg, self.keywords[arg])
+
+    def do(self, macros):
+        if self.name is None:
+            raise UserGroupError("Parameter 'name' is required")
+        if self.preferred_uid is None:
+            raise UserGroupError("Parameter 'preferred_uid' is required")
+        self.infoname = self.name % macros
+        if not hasattr(self.recipe, 'provideGroup'):
+            self.recipe._provideGroup = {}
+        self.recipe._provideGroup[self.infoname] = self.provideGroup
+
+        d = '%(destdir)s%(userinfodir)s/' % macros
+        util.mkdirChain(d)
+        self.infofilename = '%s/%s' % (macros.userinfodir, self.infoname)
+        self.realfilename = '%s%s' % (macros.destdir, self.infofilename)
+
+        if self.recipe.name.startswith('info-'):
+            if os.path.exists(self.realfilename):
+                raise UserGroupError, 'Only one instance of User per recipe'
+            if self.recipe.name[5:] != self.infoname:
+                raise UserGroupError, \
+                    'User name must be the same as package name'
+
+        f = file(self.realfilename, 'w')
+        f.write('PREFERRED_UID=%d\n' % self.preferred_uid)
+        if self.group:
+            self.group = self.group % macros
+            f.write('GROUP=%s\n' % self.group)
+        if self.groupid:
+            f.write('GROUPID=%d\n' % self.groupid)
+        if self.homedir:
+            self.homedir = self.homedir % macros
+            f.write('HOMEDIR=%s\n' % self.homedir)
+        if self.comment:
+            self.comment = self.comment % macros
+            f.write('COMMENT=%s\n' % self.comment)
+        if self.shell:
+            self.shell = self.shell % macros
+            f.write('SHELL=%s\n' % self.shell)
+        if self.supplemental:
+            self.supplemental = [ x % macros for x in self.supplemental ]
+            f.write('SUPPLEMENTAL=%s\n' % (','.join(self.supplemental)))
+        if self.saltedPassword:
+            if self.saltedPassword[0] != '$' or len(self.saltedPassword) != 34:
+                raise UserGroupError('"%s" is not a valid md5 salted password.'
+                                     ' Use md5pw (installed with conary) to '
+                                     ' create a valid password.'
+                                     % self.saltedPassword)
+            f.write('PASSWORD=%s\n' % self.saltedPassword)
+        f.close()
+
+class Group(_UserGroupBuildAction):
+    """
+    NAME
+    ====
+
+    B{C{r.Group()}} - Provides group creation information
+
+    SYNOPSIS
+    ========
+
+    C{r.Group('I{group}', I{preferred_gid})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.Group} class provides group information to Conary for
+    the purpose of group creation, and should be used only for groups
+    that exist independently, never for a main group created by C{r.User()}.
+
+    KEYWORDS
+    ========
+
+    The C{r.Group} class accepts the following keyword arguments, with
+    default values shown in parentheses where applicable.
+
+    B{group} : (None) Specify a group name
+
+    B{preferred_gid} : (None) Specify the group identification number
+
+    EXAMPLES
+    ========
+
+    C{r.Group('mem', 8)}
+
+    Uses C{r.Group} to created a group named C{mem} with a group
+    identification number value of '8'.
+    """
+    keywords = {
+            'name': None,
+            'preferred_gid': None}
+    keywordOrder = ['name', 'preferred_gid']
+
+    def __init__(self, recipe, *args, **kwargs):
+        self.user = None
+        _UserGroupBuildAction.__init__(self, recipe, *args, **kwargs)
+
+        for idx, arg in enumerate(self.keywordOrder):
+            inargs = (idx < len(args))
+            if arg in kwargs and inargs:
+                raise UserGroupError("ambiguous defintion of '%s' positional arg: %s and keyword arg: %s" % (arg, args[idx], kwargs[arg]))
+            if inargs:
+                self.__dict__[arg] = args[idx]
+            else:
+                self.__dict__[arg] = kwargs.get(arg, self.keywords[arg])
+
+    def do(self, macros):
+        if self.name is None:
+            raise UserGroupError("Parameter 'name' is required")
+        if self.preferred_gid is None:
+            raise UserGroupError("Parameter 'preferred_gid' is required")
+        self.infoname = self.name % macros
+        d = '%(destdir)s%(groupinfodir)s/' % macros
+        util.mkdirChain(d)
+        self.infofilename = '%s/%s' % (macros.groupinfodir, self.infoname)
+        self.realfilename = '%s%s' % (macros.destdir, self.infofilename)
+        if self.recipe.name.startswith('info-'):
+            if os.path.exists(self.realfilename):
+                raise UserGroupError, 'Only one instance of Group per recipe'
+            if self.recipe.name[5:] != self.infoname:
+                raise UserGroupError, \
+                    'Group name must be the same as package name'
+
+        f = file(self.realfilename, 'w')
+        f.write('PREFERRED_GID=%d\n' % self.preferred_gid)
+        if self.user:
+            f.write('USER=%s\n' % self.user % macros)
+        f.close()
+
+class SupplementalGroup(Group):
+    """
+    NAME
+    ====
+
+    B{C{r.SupplementalGroup()}} - Ensures a user is associated with
+    a supplemental group
+
+    SYNOPSIS
+    ========
+
+    C{r.SupplementalGroup('I{user}', 'I{group}', I{preferred_gid})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.SupplementalGroup} class ensures that a user is associated with a
+    supplemental group that is not associated with any user.
+
+    KEYWORDS
+    ========
+
+    The C{r.SupplementalGroup} class accepts the following keyword arguments,
+    with default values shown in parentheses where applicable.
+
+    B{user} : (None) Specify the user name to be associated with a
+    supplemental group
+
+    B{group} : (None) Specify the supplemental group name
+
+    B{preferred_gid} : (None) Specify the supplemental group identification
+    number
+
+    EXAMPLES
+    ========
+
+    C{r.SupplementalGroup('breandon', 'ateam', 560)}
+
+    Uses C{r.SupplementalGroup} to add the user C{breandon} to the
+    supplemental group C{ateam}, and specifies the preferred group
+    identification number value of '560'.
+    """
+    keywords = {
+            'name': None,
+            'preferred_gid': None,
+            'user': None}
+    keywordOrder = ['user', 'name', 'preferred_gid']
+
+
+class UserGroupError(errors.CookError):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __repr__(self):
+        return self.msg
+
+    def __str__(self):
+        return repr(self)
 
