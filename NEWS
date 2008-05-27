@@ -30,6 +30,8 @@ Changes in @NEW@:
     * Using the byDefault parameter to startGroup only determines the
       byDefault setting when the new group is added to its parent group.
       (CNY-2791)
+    * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
+      now available in package recipes. (CNY-2723)
 
   o Protocol Changes:
     * The commitCheck() xmlrpc API call has been added that will check
