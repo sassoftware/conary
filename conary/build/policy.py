@@ -485,6 +485,9 @@ class Policy(BasePolicy):
                 res = True
         return res
 
+class UserGroupBasePolicy(Policy):
+    def updateArgs(self, *args, **kwargs):
+        self.error("Do not directly invoke %s" % self.__class__.__name__)
 
 class GroupPolicy(BasePolicy):
     keywords = {
@@ -751,6 +754,7 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
     # Load conary internal policy
     import conary.build.destdirpolicy
     import conary.build.derivedpolicy
+    import conary.build.infopolicy
     import conary.build.packagepolicy
     import conary.build.grouppolicy
     for pt in internalPolicyModules:
