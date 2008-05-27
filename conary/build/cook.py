@@ -1111,6 +1111,9 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
         destdir = builddir + '/_ROOT_'
     util.mkdirChain(destdir)
 
+    if recipeObj._recipeType == recipe.RECIPE_TYPE_INFO:
+        logBuild = False
+
     if logBuild:
         # turn on logging of this trove.  Logs are packaged as part
         # of :debuginfo component
