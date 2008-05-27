@@ -217,6 +217,7 @@ class Config(policy.Policy):
         ('ComponentSpec', policy.REQUIRED_SUBSEQUENT),
     )
     invariantinclusions = [ '%(sysconfdir)s/', '%(taghandlerdir)s/']
+    invariantexceptions = [ '%(userinfodir)s/', '%(groupinfodir)s' ]
 
     def doFile(self, filename):
         m = self.recipe.magic[filename]
@@ -556,6 +557,17 @@ class PackageSpec(_filterSpec):
             # would have an effect only with exceptions listed, so no warning...
             self.inclusions = None
 
+        # userinfo and groupinfo are invariant filters, so they must come first
+        for infoType in ('user', 'group'):
+            infoDir = '%%(%sinfodir)s' % infoType % self.macros
+            realDir = util.joinPaths(self.destdir, infoDir)
+            if not os.path.isdir(realDir):
+                continue
+            for infoPkgName in os.listdir(realDir):
+                pkgPath = util.joinPaths(infoDir, infoPkgName)
+                self.pkgFilters.append( \
+                        filter.Filter(pkgPath, self.macros,
+                                      name = 'info-%s' % infoPkgName))
         # extras need to come before derived so that derived packages
         # can change the package to which a file is assigned
         for filteritem in itertools.chain(self.extraFilters,
@@ -569,6 +581,7 @@ class PackageSpec(_filterSpec):
                 self.pkgFilters.append(filter.Filter(*args, **kwargs))
             else:
                 self.pkgFilters.append(filteritem)
+
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	self.pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
@@ -639,6 +652,8 @@ class InitialContents(policy.Policy):
     keywords = policy.Policy.keywords.copy()
     keywords['inclusions'] = []
 
+    invariantexceptions = [ '%(userinfodir)s/', '%(groupinfodir)s' ]
+
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
         self.recipe.Config(exceptions=args, allowUnusedFilters = True)
@@ -706,6 +721,8 @@ class Transient(policy.Policy):
     invariantinclusions = [
 	r'..*\.py(c|o)$',
         r'..*\.elc$',
+        r'%(userinfodir)s/',
+        r'%(groupinfodir)s'
     ]
 
     def doFile(self, filename):
@@ -974,6 +991,7 @@ class MakeDevices(policy.Policy):
 	    assert((l > 5) and (l < 8))
 	    if l == 6:
 		args.append(0400)
+            args[0] = args[0] % self.recipe.macros
 	    self.devices.append(args)
 	policy.Policy.updateArgs(self, **keywords)
 
@@ -3858,6 +3876,195 @@ class Flavor(policy.Policy):
         flv.union(self.archFlavor)
         if isnset in self.allowableIsnSets:
             self.packageFlavor.union(flv)
+
+class _ProcessInfoPackage(policy.UserGroupBasePolicy):
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('ComponentSpec', policy.REQUIRED_PRIOR),
+        ('Provides', policy.CONDITIONAL_PRIOR),
+        ('Requires', policy.CONDITIONAL_PRIOR),
+        ('Config', policy.CONDITIONAL_PRIOR),
+        ('InitialContents', policy.CONDITIONAL_PRIOR)
+    )
+
+    def preProcess(self):
+        if self.exceptions:
+            self.error('%s does not honor exceptions' % self.__class__.__name__)
+            self.exceptions = None
+        if self.inclusions:
+            self.inclusions = None
+
+    def doFile(self, path):
+        expectedName = 'info-%s:%s' % (os.path.basename(path), self.component)
+        comp = self.recipe.autopkg.componentMap[path]
+        compName = comp.name
+        if not isinstance(comp.getFile(path), files.RegularFile):
+            self.error("Only regular files may appear in '%s'" % expectedName)
+            return
+        if len(comp) > 1:
+            badPaths = [x for x in comp if x != path]
+            self.error("The following files are not allowed in '%s': '%s'" % \
+                    (compName, "', '".join(badPaths)))
+        else:
+            fileObj = comp[path][1]
+            for tag in fileObj.tags():
+                self.error("TagSpec '%s' is not allowed for %s" % \
+                        (tag, expectedName))
+
+            fileObj.tags.set('%s-info' % self.component)
+            fileObj.flags.isTransient(True)
+            self.parseError = False
+            self.addProvides(path)
+            if not self.parseError:
+                self.addRequires(path)
+
+    def parseInfoFile(self, path):
+        infoname = "info-%s:%s" % (os.path.basename(path), self.component)
+        data = {}
+        try:
+            data = dict([x.strip().split('=', 1) \
+                    for x in open(path).readlines()])
+            extraKeys = set(data.keys()).difference(self.legalKeys)
+            if extraKeys:
+                for key in extraKeys:
+                    self.error("%s is not is not a valid value for %s" % \
+                            (key, infoname))
+                    self.parseError = True
+        except ValueError:
+            self.error("Unable to parse info file for '%s'" % infoname)
+            self.parseError = True
+        return data
+
+    def addProvides(self, path):
+        realpath, fileObj = self.recipe.autopkg.findComponent(path)[path]
+        data = self.parseInfoFile(realpath)
+        pkg = self.recipe.autopkg.componentMap[path]
+        infoname = os.path.basename(path)
+        if path in pkg.providesMap:
+            # only deps related to userinfo/troveinfo are allowed
+            self.error("Illegal provision for 'info-%s:%s': '%s'" % \
+                    (infoname, self.component, str(pkg.providesMap[path])))
+
+        pkg.providesMap[path] = deps.DependencySet()
+        depSet = self.getProvides(infoname, data)
+
+        fileObj.provides.set(depSet)
+        pkg.providesMap[path].union(depSet)
+        pkg.provides.union(depSet)
+
+    def addRequires(self, path):
+        realpath, fileObj = self.recipe.autopkg.findComponent(path)[path]
+        data = self.parseInfoFile(realpath)
+        pkg = self.recipe.autopkg.componentMap[path]
+        infoname = os.path.basename(path)
+        if path in pkg.requiresMap:
+            # only deps related to userinfo/troveinfo are allowed
+            self.error("Illegal requirement on 'info-%s:%s': '%s'" % \
+                    (infoname, self.component, str(pkg.requiresMap[path])))
+        pkg.requiresMap[path] = deps.DependencySet()
+        depSet = self.getRequires(infoname, data)
+
+        fileObj.requires.set(depSet)
+        pkg.requiresMap[path].union(depSet)
+        pkg.requires.union(depSet)
+
+class ProcessUserInfoPackage(_ProcessInfoPackage):
+    """
+    NAME
+    ====
+
+    B{C{r.ProcessUserInfoPackage()}} - Set dependencies and tags for User
+    info packages
+
+    SYNOPSIS
+    ========
+
+    C{r.ProcessUserInfoPackage()}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.ProcessUserInfoPackage} policy automatically sets up provides
+    and requries, as well as tags for user info files create by the
+    C{r.User} build action.
+
+    This policy is not intended to be invoked from recipes. Do not use it.
+    """
+    invariantsubtrees = ['%(userinfodir)s']
+    component = 'user'
+    legalKeys = ['PREFERRED_UID', 'GROUP', 'GROUPID', 'HOMEDIR', 'COMMENT',
+            'SHELL', 'SUPPLEMENTAL', 'PASSWORD']
+
+    def parseInfoFile(self, path):
+        data = _ProcessInfoPackage.parseInfoFile(self, path)
+        if data:
+            supplemental = data.get('SUPPLEMENTAL')
+            if supplemental is not None:
+                data['SUPPLEMENTAL'] = supplemental.split(',')
+        return data
+
+    def getProvides(self, infoname, data):
+        depSet = deps.DependencySet()
+        groupname = data.get('GROUP', infoname)
+        depSet.addDep(deps.UserInfoDependencies,
+                      deps.Dependency(infoname, []))
+        if self.recipe._provideGroup.get(infoname, True):
+            depSet.addDep(deps.GroupInfoDependencies,
+                    deps.Dependency(groupname, []))
+        return depSet
+
+    def getRequires(self, infoname, data):
+        groupname = data.get('GROUP', infoname)
+        supp = data.get('SUPPLEMENTAL', [])
+        depSet = deps.DependencySet()
+        for grpDep in supp:
+            depSet.addDep(deps.GroupInfoDependencies,
+                          deps.Dependency(grpDep, []))
+        if not self.recipe._provideGroup.get(infoname):
+            depSet.addDep(deps.GroupInfoDependencies,
+                    deps.Dependency(groupname, []))
+        return depSet
+
+class ProcessGroupInfoPackage(_ProcessInfoPackage):
+    """
+    NAME
+    ====
+
+    B{C{r.ProcessGroupInfoPackage()}} - Set dependencies and tags for Group
+    info packages
+
+    SYNOPSIS
+    ========
+
+    C{r.ProcessGroupInfoPackage()}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.ProcessGroupInfoPackage} policy automatically sets up provides
+    and requries, as well as tags for group info files create by the
+    C{r.Group}  and C{r.SupplementalGroup} build actions.
+
+    This policy is not intended to be invoked from recipes. Do not use it.
+    """
+    invariantsubtrees = ['%(groupinfodir)s']
+    component = 'group'
+    legalKeys = ['PREFERRED_GID', 'USER']
+
+    def getProvides(self, groupname, data):
+        depSet = deps.DependencySet()
+        depSet.addDep(deps.GroupInfoDependencies,
+                      deps.Dependency(groupname, []))
+        return depSet
+
+    def getRequires(self, groupname, data):
+        infoname = data.get('USER')
+        depSet = deps.DependencySet()
+        if infoname:
+            depSet.addDep(deps.UserInfoDependencies,
+                          deps.Dependency(infoname, []))
+        return depSet
 
 
 class reportExcessBuildRequires(policy.Policy):

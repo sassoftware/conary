@@ -858,6 +858,9 @@ class AbstractPackageRecipe(Recipe):
         self._subscribedPatterns = []
         self._logFile = None
 
+        self._provideGroup = {} # used by User build action to indicate if
+        # group should also be provided
+
         # allow for architecture not to be set -- this could happen
         # when storing the recipe e.g.
  	for key in cfg.macros:
