@@ -126,6 +126,10 @@ class SerialNumber(object):
         else:
             self.numList = self.numList[:count]
 
+        # Strip off trailing zero parts
+        while len(self.numList) > 1 and self.numList[-1] == 0:
+            self.numList.pop()
+
     def increment(self, listLen):
         self.numList += [ 0 ] * ((listLen + 1) - len(self.numList))
         self.numList[-1] += 1
@@ -275,15 +279,22 @@ class Revision(AbstractRevision):
         return 0
 
     def shadowChangedUpstreamVersion(self, shadowLength):
-        """ returns True if this revision is a) on a shadow 
-            and b) the parent branch's source count is 0, 
-            implying that the upstream version # has been changed
-        """
-        i = shadowLength - 1
+        '''
+        Returns C{True} if this revision is both on a shadow, and all
+        parent source counts are 0, indicating that the upstream
+        version has changed and that there is no "parent" version.
+        '''
+        if not shadowLength:
+            # Not a shadow, so it obviously can't be different from
+            # its nonexistent parent
+            return False
+
         shadowCounts = list(self.sourceCount.iterCounts())
-        if len(shadowCounts) >= shadowLength and shadowCounts[i] == 0:
-            # 0 means there's no corresponding parent
-            # source with this version number
+        if len(shadowCounts) >= shadowLength \
+          and shadowCounts[:shadowLength] == [0] * shadowLength:
+            # If all preceding counts are zero then there is no
+            # corresponding parent version with the same version
+            # number.
             return True
         return False
 
