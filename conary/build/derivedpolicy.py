@@ -250,3 +250,6 @@ LinkCount = packagepolicy.LinkCount
 reportMissingBuildRequires = packagepolicy.reportMissingBuildRequires
 reportExcessBuildRequires = packagepolicy.reportExcessBuildRequires
 reportErrors = packagepolicy.reportErrors
+
+ProcessGroupInfoPackage = packagepolicy.ProcessGroupInfoPackage
+ProcessUserInfoPackage = packagepolicy.ProcessUserInfoPackage
