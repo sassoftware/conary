@@ -20,6 +20,8 @@ Changes in @NEW@:
       for the getPackageBranchPathIds call in certain situations. (CNY-2810)
     * Derived packages created from an unmodified shadow now choose
       the correct binary from which to derive. (CNY-2776)
+    * A bug that caused conary to traceback when formating strings in the
+      syslog logger has been fixed. (CNY-2689)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the
