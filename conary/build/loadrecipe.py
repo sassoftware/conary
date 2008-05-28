@@ -391,7 +391,7 @@ class RecipeLoaderFromString(object):
         # Look on the repository first to match the trove specs
         try:
             nvfDict = repos.findTroves(cfg.installLabelPath, troveSpecs)
-        except IOError:
+        except (IOError, errors.ProxyError), err:
             nvfDict = {}
 
         neededTroveSpecs = [ x for x in troveSpecs if x not in nvfDict ]
