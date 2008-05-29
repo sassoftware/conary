@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.15:
   o Code Changes:
     * We've started using a @publicApi decorator to tag methods which
       are part of the public conary API. (CNY-2367)
