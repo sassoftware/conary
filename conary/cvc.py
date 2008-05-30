@@ -41,7 +41,8 @@ from conary.lib import openpgpkey
 from conary.lib import options
 from conary.lib import util
 
-sys.excepthook = util.genExcepthook()
+if __name__ == '__main__':
+    sys.excepthook = util.genExcepthook()
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
