@@ -1548,16 +1548,20 @@ def getUseFlags(flavor):
         return {}
     return deps[0].getFlags()[0]
 
-def getShortFlavorDescriptors(flavors):
+def getMajorArch(flavor):
     from conary.deps import arch
+    majorArch = arch.getMajorArch(
+                    flavor.iterDepsByClass(InstructionSetDependency))
+    if majorArch:
+        return majorArch.name
+
+def getShortFlavorDescriptors(flavors):
     differences = flavorDifferences(flavors, strict=False)
     contextStr = {}
     descriptors = {}
     for flavor in flavors:
-        majorArch = arch.getMajorArch(
-                    flavor.iterDepsByClass(InstructionSetDependency))
+        majorArch = getMajorArch(flavor)
         if majorArch:
-            majorArch = majorArch.name
             descriptors[flavor] = (majorArch,)
         else:
             descriptors[flavor] = ()
