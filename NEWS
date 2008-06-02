@@ -1,4 +1,6 @@
 Changes in @NEW@:
+  o Code Changes:
+    * magic has been extended to identify tar archives. (CNY-2825)
   o Bug Fixes:
     * Derived packages created from an unmodified shadow now choose
       the correct binary from which to derive. (CNY-2776)

@@ -18,6 +18,8 @@ import stat
 import string
 import xml.dom.minidom
 import zipfile
+import gzip as gzip_module
+import bz2
 
 from conary import rpmhelper
 from conary.lib import elf
@@ -31,7 +33,8 @@ class Magic(object):
     def __init__(self, path, basedir):
 	self.path = path
 	self.basedir = basedir
-	self.contents = {}
+        if not hasattr(self, 'contents'):
+            self.contents = {}
 	self.name = self.__class__.__name__
 
     @classmethod
@@ -72,6 +75,11 @@ class ar(ELF):
         # We do still want to be able to distinguish between them via magic,
         # thus the two classes.
 
+class TarArchive(Magic):
+    _fileType = 'tar'
+    def __init__(self, path, basedir = '', buffer = ''):
+        Magic.__init__(self, path, basedir)
+        self.contents['GNU'] = (buffer[257:265] == 'ustar  \0')
 
 class gzip(Magic):
     _fileType = 'gzip'
@@ -84,12 +92,23 @@ class gzip(Magic):
 	else:
 	    self.contents['compression'] = '1'
 
+class tgz(gzip, TarArchive):
+    _fileType = 'tgz'
+    def __init__(self, path, basedir = '', gzipBuffer = '', tarBuffer = ''):
+        gzip.__init__(self, path, basedir = basedir, buffer = gzipBuffer)
+        TarArchive.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
 class bzip(Magic):
+    _fileType = "bzip"
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 	self.contents['compression'] = buffer[3]
 
+class tar_bz2(bzip, TarArchive):
+    _fileType = 'tar.bz2'
+    def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
+        bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
+        TarArchive.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
 class changeset(Magic):
     def __init__(self, path, basedir='', buffer=''):
@@ -233,6 +252,8 @@ def _javaMagic(b):
         return True
     return False
 
+def _tarMagic(b):
+    return len(b) > 262 and b[257:262]
 
 def magic(path, basedir=''):
     """
@@ -263,9 +284,17 @@ def magic(path, basedir=''):
     elif len(b) > 7 and b[0:7] == "!<arch>":
 	return ar(path, basedir, b)
     elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
-	return gzip(path, basedir, b)
+        uncompressedBuffer = gzip_module.GzipFile(path).read(4096)
+        if _tarMagic(uncompressedBuffer):
+            return tgz(path, basedir, b, uncompressedBuffer)
+        else:
+            return gzip(path, basedir, b)
     elif len(b) > 3 and b[0:3] == "BZh":
-	return bzip(path, basedir, b)
+        uncompressedBuffer = bz2.BZ2File(path).read(4096)
+        if _tarMagic(uncompressedBuffer):
+            return tar_bz2(path, basedir, b, uncompressedBuffer)
+        else:
+            return bzip(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":
@@ -308,6 +337,8 @@ def magic(path, basedir=''):
         return CIL(path, basedir, b)
     elif (len(b) > 4 and b[:4] == "\xed\xab\xee\xdb"):
         return RPM(path, basedir)
+    elif _tarMagic(b):
+        return TarArchive(path, basedir, b)
 
     return None
 
