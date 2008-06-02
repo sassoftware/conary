@@ -1,4 +1,14 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * Derived packages created from an unmodified shadow now choose
+      the correct binary from which to derive. (CNY-2776)
+    * A bug that caused conary to traceback when formating strings in the
+      syslog logger has been fixed. (CNY-2689)
+  o Build Changes:
+    * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
+      now available in package recipes. (CNY-2723)
+
+Changes in 2.0.15:
   o Code Changes:
     * We've started using a @publicApi decorator to tag methods which
       are part of the public conary API. (CNY-2367)
@@ -18,10 +28,6 @@ Changes in @NEW@:
       datatype of STRING instead of TEXT. This has been fixed. (CNY-2013)
     * Fixed bug that made the repository code return incomplete data
       for the getPackageBranchPathIds call in certain situations. (CNY-2810)
-    * Derived packages created from an unmodified shadow now choose
-      the correct binary from which to derive. (CNY-2776)
-    * A bug that caused conary to traceback when formating strings in the
-      syslog logger has been fixed. (CNY-2689)
 
   o Build Changes:
     * Removed defaultBasePackages configuration option as well as the
@@ -32,8 +38,6 @@ Changes in @NEW@:
     * Using the byDefault parameter to startGroup only determines the
       byDefault setting when the new group is added to its parent group.
       (CNY-2791)
-    * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
-      now available in package recipes. (CNY-2723)
 
   o Protocol Changes:
     * The commitCheck() xmlrpc API call has been added that will check
