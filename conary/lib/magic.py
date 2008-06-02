@@ -29,17 +29,12 @@ from conary.lib import util
 class Magic(object):
     __slots__ = ['path', 'basedir', 'contents', 'name']
     # The file type is a generic string for a specific file type
-    _fileType = None
     def __init__(self, path, basedir):
 	self.path = path
 	self.basedir = basedir
         if not hasattr(self, 'contents'):
             self.contents = {}
 	self.name = self.__class__.__name__
-
-    @classmethod
-    def getFileType(cls):
-        return cls._fileType
 
 
 class ELF(Magic):
@@ -76,13 +71,11 @@ class ar(ELF):
         # thus the two classes.
 
 class tar(Magic):
-    _fileType = 'tar'
     def __init__(self, path, basedir = '', buffer = ''):
         Magic.__init__(self, path, basedir)
         self.contents['GNU'] = (buffer[257:265] == 'ustar  \0')
 
 class gzip(Magic):
-    _fileType = 'gzip'
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 	if buffer[3] == '\x08':
@@ -93,19 +86,16 @@ class gzip(Magic):
 	    self.contents['compression'] = '1'
 
 class tar_gz(gzip, tar):
-    _fileType = 'tar.gz'
     def __init__(self, path, basedir = '', gzipBuffer = '', tarBuffer = ''):
         gzip.__init__(self, path, basedir = basedir, buffer = gzipBuffer)
         tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
 class bzip(Magic):
-    _fileType = "bzip"
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 	self.contents['compression'] = buffer[3]
 
 class tar_bz2(bzip, tar):
-    _fileType = 'tar.bz2'
     def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
         bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
         tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
@@ -116,7 +106,6 @@ class changeset(Magic):
 
 
 class jar(Magic):
-    _fileType = "jar"
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
 	Magic.__init__(self, path, basedir)
         self.contents['files'] = filesMap = {}
@@ -143,7 +132,6 @@ class jar(Magic):
 
 class WAR(Magic):
     _xmlMetadataFile = "WEB-INF/web.xml"
-    _fileType = "war"
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
         Magic.__init__(self, path, basedir)
         if zipFileObj is None:
@@ -173,7 +161,6 @@ class WAR(Magic):
 
 class EAR(WAR):
     _xmlMetadataFile = "META-INF/application.xml"
-    _fileType = "war"
 
 class ZIP(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
@@ -213,7 +200,6 @@ class CIL(Magic):
 	Magic.__init__(self, path, basedir)
 
 class RPM(Magic):
-    _fileType = 'rpm'
     _tagMap = [
         ("name",    rpmhelper.NAME, str),
         ("version", rpmhelper.VERSION, str),
