@@ -75,7 +75,7 @@ class ar(ELF):
         # We do still want to be able to distinguish between them via magic,
         # thus the two classes.
 
-class TarArchive(Magic):
+class tar(Magic):
     _fileType = 'tar'
     def __init__(self, path, basedir = '', buffer = ''):
         Magic.__init__(self, path, basedir)
@@ -92,11 +92,11 @@ class gzip(Magic):
 	else:
 	    self.contents['compression'] = '1'
 
-class tgz(gzip, TarArchive):
-    _fileType = 'tgz'
+class tar_gz(gzip, tar):
+    _fileType = 'tar.gz'
     def __init__(self, path, basedir = '', gzipBuffer = '', tarBuffer = ''):
         gzip.__init__(self, path, basedir = basedir, buffer = gzipBuffer)
-        TarArchive.__init__(self, path, basedir = basedir, buffer = tarBuffer)
+        tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
 class bzip(Magic):
     _fileType = "bzip"
@@ -104,11 +104,11 @@ class bzip(Magic):
 	Magic.__init__(self, path, basedir)
 	self.contents['compression'] = buffer[3]
 
-class tar_bz2(bzip, TarArchive):
+class tar_bz2(bzip, tar):
     _fileType = 'tar.bz2'
     def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
         bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
-        TarArchive.__init__(self, path, basedir = basedir, buffer = tarBuffer)
+        tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
 class changeset(Magic):
     def __init__(self, path, basedir='', buffer=''):
@@ -286,7 +286,7 @@ def magic(path, basedir=''):
     elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
         uncompressedBuffer = gzip_module.GzipFile(path).read(4096)
         if _tarMagic(uncompressedBuffer):
-            return tgz(path, basedir, b, uncompressedBuffer)
+            return tar_gz(path, basedir, b, uncompressedBuffer)
         else:
             return gzip(path, basedir, b)
     elif len(b) > 3 and b[0:3] == "BZh":
@@ -338,7 +338,7 @@ def magic(path, basedir=''):
     elif (len(b) > 4 and b[:4] == "\xed\xab\xee\xdb"):
         return RPM(path, basedir)
     elif _tarMagic(b):
-        return TarArchive(path, basedir, b)
+        return tar(path, basedir, b)
 
     return None
 
