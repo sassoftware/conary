@@ -270,17 +270,24 @@ def magic(path, basedir=''):
     elif len(b) > 7 and b[0:7] == "!<arch>":
 	return ar(path, basedir, b)
     elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
-        uncompressedBuffer = gzip_module.GzipFile(path).read(4096)
-        if _tarMagic(uncompressedBuffer):
-            return tar_gz(path, basedir, b, uncompressedBuffer)
-        else:
-            return gzip(path, basedir, b)
+        #import epdb; epdb.st()
+        try:
+            uncompressedBuffer = gzip_module.GzipFile(n).read(4096)
+            if _tarMagic(uncompressedBuffer):
+                return tar_gz(path, basedir, b, uncompressedBuffer)
+        except IOError:
+            # gzip raises IOError instead of any module specific errors
+            pass
+        return gzip(path, basedir, b)
     elif len(b) > 3 and b[0:3] == "BZh":
-        uncompressedBuffer = bz2.BZ2File(path).read(4096)
-        if _tarMagic(uncompressedBuffer):
-            return tar_bz2(path, basedir, b, uncompressedBuffer)
-        else:
-            return bzip(path, basedir, b)
+        try:
+            uncompressedBuffer = bz2.BZ2File(n).read(4096)
+            if _tarMagic(uncompressedBuffer):
+                return tar_bz2(path, basedir, b, uncompressedBuffer)
+        except IOError:
+            # bz2 raises IOError instead of any module specific errors
+            pass
+        return bzip(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":
