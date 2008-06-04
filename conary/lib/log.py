@@ -219,11 +219,17 @@ if not globals().has_key("logger"):
     # level
     logging.setLoggerClass(ConaryLogger)
     logger = logging.getLogger(LOGGER_CONARY)
-    hdlr = ErrorCheckingHandler(sys.stderr)
-    formatter = logging.Formatter('%(message)s')
-    hdlr.setFormatter(formatter)
-    logger.addHandler(hdlr)
-    logger.setLevel(logging.WARNING)
+    # conary's module importer resets globals() so we need an extra check to
+    # ensure we don't alter the logLevel or handler settings.
+    # the setLoggerClass above is stored as a global in the logging module,
+    # so it's safe to be left where it is.
+    if not hasattr(logger, '_loaded'):
+        hdlr = ErrorCheckingHandler(sys.stderr)
+        formatter = logging.Formatter('%(message)s')
+        hdlr.setFormatter(formatter)
+        logger.addHandler(hdlr)
+        logger.setLevel(logging.WARNING)
+        logger._loaded = True
 
 if not globals().has_key('fmtLogger'):
     fmtLogger = logging.getLogger(LOGGER_CONARY_FORMATTED)

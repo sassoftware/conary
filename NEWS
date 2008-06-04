@@ -12,6 +12,8 @@ Changes in @NEW@:
     * Python packages now use %(libdir)s instead of %(prefix)s/lib for pure
       Python libraries.  This is an artifact left behind from fixing CNY-2110
       and CNP-121.
+    * A bug causing log output to be lost if conary's log module was
+      imported in a recipe has been fixed. (CNY-2813)
 
 Changes in 2.0.15:
   o Code Changes:
