@@ -1334,12 +1334,12 @@ class PythonSetup(BuildCommand):
 
         # workout arguments and multilib status:
         if self.purelib is None:
-            self.purelib = ' --install-purelib=%(prefix)s/lib/python%(pyver)s/site-packages/'
+            self.purelib = ' --install-purelib=%(libdir)s/python%(pyver)s/site-packages/'
         if self.platlib is None:
             self.platlib = ' --install-platlib=%(libdir)s/python%(pyver)s/site-packages/'
         if self.data is None:
             if self.purePython:
-                self.data = ' --install-data=%(prefix)s/lib/python%(pyver)s/site-packages/'
+                self.data = ' --install-data=%(libdir)s/python%(pyver)s/site-packages/'
             else:
                 self.data = ' --install-data=%(libdir)s/python%(pyver)s/site-packages/'
 

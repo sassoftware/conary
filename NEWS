@@ -9,6 +9,9 @@ Changes in @NEW@:
   o Build Changes:
     * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
       now available in package recipes. (CNY-2723)
+    * Python packages now use %(libdir)s instead of %(prefix)s/lib for pure
+      Python libraries.  This is an artifact left behind from fixing CNY-2110
+      and CNP-121.
 
 Changes in 2.0.15:
   o Code Changes:
