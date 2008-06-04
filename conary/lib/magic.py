@@ -270,7 +270,6 @@ def magic(path, basedir=''):
     elif len(b) > 7 and b[0:7] == "!<arch>":
 	return ar(path, basedir, b)
     elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
-        #import epdb; epdb.st()
         try:
             uncompressedBuffer = gzip_module.GzipFile(n).read(4096)
             if _tarMagic(uncompressedBuffer):
