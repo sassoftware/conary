@@ -1,11 +1,13 @@
 Changes in @NEW@:
   o Code Changes:
     * magic has been extended to identify tar archives. (CNY-2825)
+
   o Bug Fixes:
     * Derived packages created from an unmodified shadow now choose
       the correct binary from which to derive. (CNY-2776)
     * A bug that caused conary to traceback when formating strings in the
       syslog logger has been fixed. (CNY-2689)
+
   o Build Changes:
     * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
       now available in package recipes. (CNY-2723)
