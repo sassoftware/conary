@@ -228,11 +228,11 @@ class RollbackStack:
 
     def getList(self):
         self._ensureReadableRollbackStack()
-        list = []
+        lst = []
         for i in range(self.first, self.last + 1):
-            list.append("r.%d" % i)
+            lst.append("r.%d" % i)
 
-        return list
+        return lst
 
     # name looks like "r.%d"
     def remove(self, name):
@@ -1401,10 +1401,10 @@ class Database(SqlDbRepository):
         # because the directories could have backup files in them that the
         # journal will clear out.
         if not commitFlags.justDatabase:
-            list = directoryCandidates.keys()
-            list.sort()
+            lst = directoryCandidates.keys()
+            lst.sort()
             keep = {}
-            for path in list:
+            for path in lst:
                 if keep.has_key(path):
                     keep[os.path.dirname(path)] = True
                     continue
@@ -1413,7 +1413,7 @@ class Database(SqlDbRepository):
                 if relativePath[0] != '/': relativePath = '/' + relativePath
 
                 if self.db.pathIsOwned(relativePath):
-                    list = [ x for x in self.db.iterFindByPath(path)]
+                    lst = [ x for x in self.db.iterFindByPath(path)]
                     keep[os.path.dirname(path)] = True
                     continue
 
@@ -1581,13 +1581,13 @@ class Database(SqlDbRepository):
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
         dirSet = fsJob.getDirectoryCountSet()
-        list = dirSet.keys()
-	list.sort()
-	list.reverse()
+        lst = dirSet.keys()
+	lst.sort()
+	lst.reverse()
 	directoryCandidates = {}
-	while (list):
-	    path = list[0]
-	    del list[0]
+	while (lst):
+	    path = lst[0]
+	    del lst[0]
             try:
                 entries = len(os.listdir(path))
             except OSError, e:
@@ -1607,11 +1607,11 @@ class Database(SqlDbRepository):
                 dirSet[parent] += 1
 	    else:
                 dirSet[parent] = 1
-		list.append(parent)
+		lst.append(parent)
 		# insertion is linear, sort is n log n
 		# oh well.
-		list.sort()
-		list.reverse()
+		lst.sort()
+		lst.reverse()
 
 	# -------- database and system are updated below this line ---------
 
@@ -1832,11 +1832,11 @@ class Database(SqlDbRepository):
 
     def getRollbackList(self):
         self._ensureReadableRollbackStack()
-	list = []
+	lst = []
 	for i in range(self.firstRollback, self.lastRollback + 1):
-	    list.append("r.%d" % i)
+	    lst.append("r.%d" % i)
 
-	return list
+	return lst
 
     def iterRollbacksList(self):
         """Generator for rollback data.
