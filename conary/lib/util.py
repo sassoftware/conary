@@ -1547,13 +1547,31 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
 
 
     def formatOneFrame(tb, stream):
-        fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
-        stream.write('  File "%s", line %d, in %s\n' % 
-            (fileName, lineNo, funcName))
-        if text is not None:
-            # If the source file is not available, we may not be able to get 
-            # the line
-            stream.write('    %s\n' % text[idx].strip())
+        import linecache
+        _updatecache = linecache.updatecache
+        def updatecache(filename):
+            # linecache.updatecache brokenlt looks in the module
+            # search path for files that match the module name
+            # (problem if you have a file without source with the same
+            # name as a python standard library module. We'll just check
+            # to see if the file exists first and require exact path
+            # matches
+            if not os.access(filename, os.R_OK):
+                return []
+            return _updatecache(filename)
+        linecache.updatecache = updatecache
+        try:
+            fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
+            stream.write('  File "%s", line %d, in %s\n' % 
+                (fileName, lineNo, funcName))
+            stream.write('  File "%s", line %d, in %s\n' % 
+                (fileName, lineNo, funcName))
+            if text is not None:
+                # If the source file is not available, we may not be able to get 
+                # the line
+                stream.write('    %s\n' % text[idx].strip())
+        finally:
+            linecache.updatecache = _updatecache
 
     stream.write(str(excType))
     stream.write(": ")

@@ -7,6 +7,9 @@ Changes in @NEW@:
       the correct binary from which to derive. (CNY-2776)
     * A bug that caused conary to traceback when formating strings in the
       syslog logger has been fixed. (CNY-2689)
+    * A workaround for a bug in the standard python library that can
+      prevent the display of extended debugging information has been
+      added.
 
   o Build Changes:
     * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
