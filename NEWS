@@ -10,6 +10,9 @@ Changes in @NEW@:
     * A workaround for a bug in the standard python library that can
       prevent the display of extended debugging information has been
       added.
+    * Unmodified shadows will be recognized as already present when
+      promoting them to their parent branch.  Previously they would be 
+      re-promoted unnecessarily. (CNY-2837)
 
   o Build Changes:
     * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are

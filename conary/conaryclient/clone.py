@@ -607,15 +607,24 @@ class ClientClone:
                 if newVersion:
                     cloneMap.target(sourceTup, newVersion)
                     cloneJob.alreadyCloned(sourceTup)
-                elif chooser.shouldClone(sourceTup):
-                    newVersion = leafMap.createSourceVersion(sourceTup,
-                                                             targetBranch)
-                    cloneMap.target(sourceTup, newVersion)
-                    cloneJob.target(sourceTup, newVersion)
                 else:
                     newVersion = leafMap.hasAncestor(sourceTup, targetBranch,
                                                      self.repos)
-                    if newVersion:
+
+                    if chooser.shouldClone(sourceTup):
+                        if newVersion:
+                            leafVersion = leafMap.getLeafVersion(sourceTup[0],
+                                                                 targetBranch,
+                                                                 sourceTup[2])
+                            if newVersion == leafVersion:
+                                cloneMap.target(sourceTup, newVersion)
+                                cloneJob.alreadyCloned(sourceTup)
+                                continue
+                        newVersion = leafMap.createSourceVersion(sourceTup,
+                                                                 targetBranch)
+                        cloneMap.target(sourceTup, newVersion)
+                        cloneJob.target(sourceTup, newVersion)
+                    elif newVersion:
                         cloneMap.target(sourceTup, newVersion)
                         cloneJob.alreadyCloned(sourceTup)
                     else:
@@ -1380,6 +1389,11 @@ class LeafMap(object):
 
     def hasAncestor(self, troveTup, targetBranch, repos):
         newVersion = troveTup[1]
+        if newVersion.branch() == targetBranch:
+            # even if we're an unmodified shadow - if we're cloning to our
+            # own branch we want to use other tests to determine if
+            # the clone is necessary.
+            return False
         while (newVersion.isShadow() and not newVersion.isModifiedShadow()
                and newVersion.branch() != targetBranch):
             newVersion = newVersion.parentVersion()
