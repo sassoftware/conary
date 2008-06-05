@@ -12,7 +12,10 @@
 # full details.
 #
 
+import os
 import sys
+
+from conary import deps, versions
 
 from conary.lib import log, util
 from conary.local import database
@@ -256,3 +259,167 @@ def removeRollbacks(db, rollbackSpec):
         rollbackStack.remove(rb)
 
     return 0
+
+#{ Classes used for the serialization of postrollback scripts.
+class RollbackScriptsError(Exception):
+    "Generic class for rollback scripts exceptions"
+
+class _RollbackScripts(object):
+    _KEY_JOB = 'job'
+    _KEY_INDEX = 'index'
+    _KEY_OLD_COMPAT_CLASS = 'oldCompatibilityClass'
+    _KEY_NEW_COMPAT_CLASS = 'newCompatibilityClass'
+    _KEYS = set([_KEY_JOB, _KEY_INDEX, _KEY_OLD_COMPAT_CLASS,
+                 _KEY_NEW_COMPAT_CLASS])
+
+    _metaFileNameTemplate = 'post-scripts.meta'
+    _scriptFileNameTemplate = 'post-script.%d'
+
+    def __init__(self):
+        # Each item is a tuple (job, script, oldCompatClass, newCompatClass)
+        self._items = []
+
+    def add(self, job, script, oldCompatClass, newCompatClass, index=None):
+        if index is None:
+            index = len(self._items)
+        self._items.append((index, job, script, oldCompatClass, newCompatClass))
+        return self
+
+    def __iter__(self):
+        return iter(self._items)
+
+    def getCreatedFiles(self, dir):
+        "Returns the files that will be created on save"
+        ret = set()
+        ret.add(self._getMDFileName(dir))
+        for idx, job, script, oldCompatClass, newCompatClass in self:
+            fname = self._getScriptFileName(dir, idx)
+            ret.add(fname)
+        return ret
+
+    def save(self, dir):
+        # Save metadata
+        stream = self._openFile(self._getMDFileName(dir))
+        self.saveMeta(stream)
+        stream.close()
+        for idx, job, script, oldCompatClass, newCompatClass in self:
+            # Save individual scripts
+            fname = self._getScriptFileName(dir, idx)
+            self._openFile(fname).write(script)
+
+    def saveMeta(self, stream):
+        for idx, job, script, oldCompatClass, newCompatClass in self:
+            if idx > 0:
+                # Add the double-newline as a group separator
+                stream.write('\n')
+
+            lines = self._serializeMeta(idx, job, oldCompatClass,
+                                        newCompatClass)
+            for line in lines:
+                stream.write(line)
+                stream.write('\n')
+
+    @classmethod
+    def load(cls, dir):
+        ret = cls()
+        group = []
+
+        try:
+            stream = file(cls._getMDFileName(dir))
+        except IOError, e:
+            raise RollbackScriptsError("Open error: %s: %s: %s" % 
+                (e.errno, e.filename, e.strerror))
+
+        while 1:
+            line = stream.readline()
+            sline = line.strip()
+            if not sline:
+                # Empty line (either from a double-newline or from EOF)
+                if group:
+                    cls._finalize(dir, group, ret)
+                if line:
+                    # Double-newline
+                    continue
+                # EOF
+                break
+            group.append(sline)
+        return ret
+
+    @classmethod
+    def _finalize(cls, dir, group, rbs):
+        idx, g = cls._parseMeta(group)
+        del group[:]
+        if g is not None:
+            try:
+                scfile = file(cls._getScriptFileName(dir, idx))
+            except IOError, e:
+                # If a script is missing, oh well...
+                return
+        rbs.add(g[0], scfile.read(), g[1], g[2], index=idx)
+
+    @classmethod
+    def _serializeVF(cls, version, flavor):
+        if version is None:
+            return ''
+        if flavor is None or not str(flavor):
+            return str(version)
+        return "%s[%s]" % (version, flavor)
+
+    @classmethod
+    def _serializeJob(cls, job):
+        return "%s=%s--%s" % (job[0],
+                              cls._serializeVF(*job[1]),
+                              cls._serializeVF(*job[2]))
+
+    @classmethod
+    def _serializeMeta(cls, idx, job, oldCompatClass, newCompatClass):
+        lines = []
+        lines.append('%s: %d' % (cls._KEY_INDEX, idx))
+        lines.append('%s: %s' % (cls._KEY_JOB, cls._serializeJob(job)))
+        lines.append('%s: %s' % (cls._KEY_OLD_COMPAT_CLASS, oldCompatClass))
+        lines.append('%s: %s' % (cls._KEY_NEW_COMPAT_CLASS, newCompatClass))
+        return lines
+
+    @classmethod
+    def _parseMeta(cls, lines):
+        ret = {}
+        for line in lines:
+            arr = line.split(': ', 1)
+            if len(arr) != 2:
+                continue
+            if arr[0] not in cls._KEYS:
+                continue
+            ret[arr[0]] = arr[1]
+        if cls._KEYS.difference(ret.keys()):
+            # Missing key
+            return None
+        from conaryclient import cmdline
+        job = cmdline.parseChangeList([ret[cls._KEY_JOB]])[0]
+        try:
+            oldCompatClass = int(ret[cls._KEY_OLD_COMPAT_CLASS])
+            newCompatClass = int(ret[cls._KEY_NEW_COMPAT_CLASS])
+            idx = int(ret[cls._KEY_INDEX])
+        except ValueError:
+            return None
+        return idx, (job, oldCompatClass, newCompatClass)
+
+    @classmethod
+    def _openFile(cls, fileName):
+        flags = os.O_WRONLY | os.O_CREAT
+        try:
+            fd = os.open(fileName, flags, 0600)
+        except OSError, e:
+            raise RollbackScriptsError("Open error: %s: %s: %s" % 
+                (e.errno, e.filename, e.strerror))
+
+        return os.fdopen(fd, "w")
+
+    @classmethod
+    def _getMDFileName(cls, dir):
+        return os.path.join(dir, cls._metaFileNameTemplate)
+
+    @classmethod
+    def _getScriptFileName(cls, dir, idx):
+        return os.path.join(dir, cls._scriptFileNameTemplate % idx)
+
+#}

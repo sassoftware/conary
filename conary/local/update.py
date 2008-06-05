@@ -860,6 +860,13 @@ class FilesystemJob:
 
         return headFile
 
+    def addPostRollbackScript(self, job, script, oldCompatCls, newCompatCls):
+        self.postScripts.append((job, oldCompatCls, newCompatCls, script,
+            "postrollback"))
+
+    def clearPostScripts(self):
+        del self.postScripts[:]
+
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
                      removalHints, pathsMoved, flags):
 	"""
@@ -941,13 +948,6 @@ class FilesystemJob:
 
         if s:
             scriptList.append((s, action))
-
-        if self.rollbackPhase == ROLLBACK_PHASE_REPOS:
-            if baseTrove:
-                s = baseTrove.troveInfo.scripts.postRollback.script()
-                baseCompatClass = baseTrove.getCompatibilityClass()
-                if s:
-                    scriptList.append((s, "postrollback"))
 
         job = troveCs.getJob()
         newCompatClass = troveCs.getNewCompatibilityClass()

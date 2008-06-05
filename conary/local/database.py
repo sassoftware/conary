@@ -47,13 +47,28 @@ class Rollback:
     reposName = "%s/repos.%d"
     localName = "%s/local.%d"
 
-    def add(self, opJournal, repos, local):
+    def add(self, opJournal, repos, local, rollbackScripts):
         reposName = self.reposName % (self.dir, self.count)
         localName = self.localName % (self.dir, self.count)
         countName = "%s/count" % self.dir
 
         opJournal.create(reposName)
         opJournal.create(localName)
+
+        if rollbackScripts:
+            # XXX We need to import rollbacks here to avoid a circular
+            # import. We should refactor rollbacks.py to not import
+            # local/database.py
+            from conary import rollbacks
+            rbs = rollbacks._RollbackScripts()
+            for job, sData, oldCompat, newCompat in rollbackScripts:
+                rbs.add(job, sData, oldCompat, newCompat)
+
+            # Mark the files to be created in the journal
+            for fileName in rbs.getCreatedFiles(self.dir):
+                opJournal.create(fileName)
+
+            rbs.save(self.dir)
 
         repos.writeToFile(reposName, mode = 0600)
         local.writeToFile(localName, mode = 0600)
@@ -90,6 +105,22 @@ class Rollback:
         if not self.count:
             return (None, None)
         return self._getChangeSets(self.count - 1)
+
+    def getLastPostRollbackScripts(self):
+        if not self.count:
+            return []
+
+        from conary import rollbacks
+        try:
+            rbs = rollbacks._RollbackScripts.load(self.dir)
+        except rollbacks.RollbackScriptsError:
+            return
+
+        ret = []
+        for idx, job, script, oldCompCls, newCompCls in rbs:
+            # We only use the first conversion, since only one was added
+            ret.append((job, script, oldCompCls, newCompCls))
+        return ret
 
     def getLocalChangeset(self, i):
         local = changeset.ChangeSetFromFile(self.localName % (self.dir, i))
@@ -436,6 +467,7 @@ class UpdateJob:
         drep['jobsCsList'] = self.jobsCsList
         drep['invalidateRollbackStack'] = int(self._invalidateRollbackStack)
         drep['jobPreScripts'] = list(self._freezeJobPreScripts())
+        drep['jobPostRBScripts'] = list(self._freezeJobPostRollbackScripts())
         drep['changesetsDownloaded'] = int(self._changesetsDownloaded)
 
         jobfile = os.path.join(frzdir, "jobfile")
@@ -535,8 +567,11 @@ class UpdateJob:
                                         drep.get('invalidateRollbackStack'))
         self._jobPreScripts = list(self._thawJobPreScripts(
             list(drep.get('jobPreScripts', []))))
+        self._jobPostRBScripts = list(self._thawJobPostRollbackScripts(
+            list(drep.get('jobPostRBScripts', []))))
         self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
         self._fromChangesets = self._thawFromChangesets(drep.get('fromChangesets', []))
+
 
     def _freezeJobs(self, jobs):
         for jobList in jobs:
@@ -603,6 +638,15 @@ class UpdateJob:
             else:
                 action = item[4]
             yield (self._thawJob(item[0]), item[1], item[2], item[3], action)
+
+    def _freezeJobPostRollbackScripts(self):
+        for job, script, oldCompCls, newCompCls in self._jobPostRBScripts:
+            yield (self._freezeJob(job), script, oldCompCls, newCompCls)
+
+    def _thawJobPostRollbackScripts(self, frzrepr):
+        for item in frzrepr:
+            job, script, oldCompCls, newCompCls = item[:4]
+            yield (self._thawJob(job), script, oldCompCls, newCompCls)
 
     def _freezeChangesetFilesTroveSource(self, troveSource, frzdir,
                                         withChangesetReferences=True):
@@ -735,6 +779,12 @@ class UpdateJob:
             for i in self._jobPreScripts:
                 yield i
 
+    def addJobPostRollbackScript(self, job, script, oldCompatCls, newCompatCls):
+        self._jobPostRBScripts.append((job, script, oldCompatCls, newCompatCls))
+
+    def iterJobPostRollbackScripts(self):
+        return iter(self._jobPostRBScripts)
+
     def splitCriticalJobs(self):
         criticalJobs = self.getCriticalJobs()
         if not criticalJobs:
@@ -847,6 +897,8 @@ class UpdateJob:
         self._invalidateRollbackStack = False
         # List of pre scripts to run for a particular job. This is ordered.
         self._jobPreScripts = []
+        # Map of postrollback scripts (keyed on trove NVF)
+        self._jobPostRBScripts = []
         # Changesets have been downloaded
         self._changesetsDownloaded = False
         # This flag gets set if the update job was loaded from the restart
@@ -1313,10 +1365,16 @@ class Database(SqlDbRepository):
         # valid until a bit later, but that's why we jounral
         if (rollbackPhase is None) and not commitFlags.test:
             rollback = uJob.getRollback()
+            rollbackScripts = None
             if rollback is None:
                 rollback = self.rollbackStack.new(opJournal)
                 uJob.setRollback(rollback)
-            rollback.add(opJournal, reposRollback, localRollback)
+                # Only save the rollback scripts once, and only if the job was
+                # not restarted
+                if not uJob.getRestartedFlag():
+                    rollbackScripts = list(uJob.iterJobPostRollbackScripts())
+            rollback.add(opJournal, reposRollback, localRollback,
+                rollbackScripts)
             del rollback
 
         if not (commitFlags.justDatabase or commitFlags.test):
@@ -1765,7 +1823,9 @@ class Database(SqlDbRepository):
 
                 localCs.newTrove(newTrv.diff(trv)[0])
 
-            rb.add(NoopJobJournal(), reposCs, localCs)
+            # No rollback scripts to add, since we don't have a real trove
+            # we're committing
+            rb.add(NoopJobJournal(), reposCs, localCs, [])
 
         rb = self.rollbackStack.new()
         try:
@@ -1944,8 +2004,12 @@ class Database(SqlDbRepository):
             # rid of them (otherwise we're left with redirects!). primaries
             # don't really matter here anyway, so no reason to worry about
             # them
-            (reposCs, localCs) = rb.getLast() 
+            (reposCs, localCs) = rb.getLast()
             reposCs.setPrimaryTroveList([])
+
+            lastFsJob = None
+            # Get the post-rollback scripts
+            postRollbackScripts = rb.getLastPostRollbackScripts()
             while reposCs:
                 # redirects in rollbacks mean we need to go get the real
                 # changeset from a repository
@@ -2019,6 +2083,9 @@ class Database(SqlDbRepository):
                                      commitFlags = commitFlags)
 
                     if fsJob:
+                        # We will use the last valid fsJob to run the
+                        # post-rollback scripts
+                        lastFsJob = fsJob
                         # Because of the two phase update for rollbacks, we
                         # run postscripts by hand instead of commitChangeSet
                         # doing it automatically
@@ -2033,6 +2100,16 @@ class Database(SqlDbRepository):
 
                 updJob.close()
                 (reposCs, localCs) = rb.getLast()
+
+            # Run post-rollback scripts at the very end of the rollback, when
+            # all other operations have been performed
+            if lastFsJob:
+                if postRollbackScripts:
+                    lastFsJob.clearPostScripts()
+                    # Add the post-rollback scripts
+                    for scriptData in postRollbackScripts:
+                        lastFsJob.addPostRollbackScript(*scriptData)
+                    lastFsJob.runPostScripts(tagScript)
 
             self.rollbackStack.removeLast()
 

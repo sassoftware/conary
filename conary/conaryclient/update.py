@@ -1841,6 +1841,14 @@ conary erase '%s=%s[%s]'
                                          troveCs.getNewCompatibilityClass(),
                                          action = "preinstall")
 
+            postRollbackScript = troveCs.getPostRollbackScript()
+            if postRollbackScript:
+                # Add the post-rollback script that will be saved on the
+                # rollback stack
+                updJob.addJobPostRollbackScript(job, postRollbackScript,
+                    troveCs.getNewCompatibilityClass(), oldCompatClass)
+
+
             rollbackFence = rollbackFence or \
                 troveCs.isRollbackFence(update = (job[1][0] is not None),
                                         oldCompatibilityClass = oldCompatClass)

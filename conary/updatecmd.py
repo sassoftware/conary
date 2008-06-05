@@ -509,7 +509,10 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     # Initialize the critical update set
     applyCriticalOnly = kwargs.get('applyCriticalOnly', False)
-    kwargs['criticalUpdateInfo'] = CriticalUpdateInfo(applyCriticalOnly)
+    if kwargs.get('criticalUpdateInfo') is not None:
+        kwargs['criticalUpdateInfo'].criticalOnly = applyCriticalOnly
+    else:
+        kwargs['criticalUpdateInfo'] = CriticalUpdateInfo(applyCriticalOnly)
 
     info = applyKwargs.pop('info', False)
 

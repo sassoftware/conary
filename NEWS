@@ -15,6 +15,9 @@ Changes in @NEW@:
       re-promoted unnecessarily. (CNY-2837)
     * conary update --test no longer executes the tagscripts associated 
       with the update. (CNY-2800)
+    * Multi-stage rollbacks correctly execute the post-rollback script
+      after all affected troves have been rolled back, instead of between
+      stages. (CNY-2829)
 
   o Build Changes:
     * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are
