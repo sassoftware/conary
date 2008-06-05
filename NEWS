@@ -13,6 +13,8 @@ Changes in @NEW@:
     * Unmodified shadows will be recognized as already present when
       promoting them to their parent branch.  Previously they would be 
       re-promoted unnecessarily. (CNY-2837)
+    * conary update --test no longer executes the tagscripts associated 
+      with the update. (CNY-2800)
 
   o Build Changes:
     * Info recipe actions (r.User, r.Group, and r.SupplementalGroup) are

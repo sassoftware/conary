@@ -1319,13 +1319,12 @@ class Database(SqlDbRepository):
             rollback.add(opJournal, reposRollback, localRollback)
             del rollback
 
-        if not commitFlags.justDatabase:
+        if not (commitFlags.justDatabase or commitFlags.test):
             # run preremove scripts before updating the database, otherwise
             # the file lists which get sent to them are incorrect. skipping
             # this makes --test a little inaccurate, but life goes on
-            if not commitFlags.test:
-                callback.runningPreTagHandlers()
-                fsJob.preapply(tagSet, tagScript)
+            callback.runningPreTagHandlers()
+            fsJob.preapply(tagSet, tagScript)
 
         for (troveName, troveVersion, troveFlavor, fileDict) \
                                             in fsJob.iterUserRemovals():
@@ -1654,7 +1653,7 @@ class Database(SqlDbRepository):
 
         #del opJournal
 
-        if not commitFlags.justDatabase:
+        if not (commitFlags.justDatabase or commitFlags.test):
             fsJob.runPostTagScripts(tagSet, tagScript)
 
         if rollbackPhase is None and updateDatabase and invalidateRollbacks:
