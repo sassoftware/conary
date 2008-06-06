@@ -2051,13 +2051,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         roleIds = self.auth.getAuthRoles(cu, authToken)
 
-        def _lookupIds(cu, itemList, selectQ):
+        def _lookupIds(cu, itemList, selectQlist):
             schema.resetTable(cu, "tmpItems")
             cu.executemany("insert into tmpItems (item) values (?)",
                            itemList, start_transaction=False)
             self.db.analyze("tmpItems")
             schema.resetTable(cu, "tmpId")
-            cu.execute("""insert into tmpId (id) %s """ % (selectQ,))
+            if cu.driver == "mysql" and len(selectQlist) > 1:
+                # MySQL stupidity: a temporaray table can not be used twice in
+                # the same statement, so we have to perform the union manually
+                tmpId = []
+                for selectQ in selectQlist:
+                    cu.execute(selectQ)
+                    tmpId += [ x[0] for x in cu.fetchall() ]
+                cu.executemany("insert into tmpId(id) values (?)", set(tmpId))
+            else:
+                cu.execute("""insert into tmpId (id) %s """ % (
+                    " union ".join(selectQlist),))
             self.db.analyze("tmpId")
             return """join tmpId on fp.dirnameId = tmpId.id """
             
@@ -2067,18 +2077,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 # if we're asked for all files with a '/' prefix, don't bother
                 # "optimizing" since no records will be filtered out
                 if not ('/' in dirnames):
-                    prefixQuery = _lookupIds(cu, dirnames, """
-                    select p.dirnameId from tmpItems
-                    join Dirnames as d on tmpItems.item = d.dirname
-                    join Prefixes as p on d.dirnameId = p.prefixId
-                    union
-                    select d.dirnameId from tmpItems
-                    join Dirnames as d on tmpItems.item = d.dirname
-                    """)
+                    prefixQuery = _lookupIds(cu, dirnames, [
+                        """ select p.dirnameId from tmpItems
+                            join Dirnames as d on tmpItems.item = d.dirname
+                            join Prefixes as p on d.dirnameId = p.prefixId """,
+                        """ select d.dirnameId from tmpItems
+                            join Dirnames as d on tmpItems.item = d.dirname """ ])
             else: # dirnames are just dirnames
-                prefixQuery = _lookupIds(cu, dirnames, """
-                select d.dirnameId from tmpItems
-                join Dirnames as d on tmpItems.item = d.dirname """)
+                prefixQuery = _lookupIds(cu, dirnames, [
+                    """ select d.dirnameId from tmpItems
+                        join Dirnames as d on tmpItems.item = d.dirname """ ])
 
         schema.resetTable(cu, "tmpPathIdLookup")
         query = """
