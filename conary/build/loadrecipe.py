@@ -31,7 +31,7 @@ from conary.build.errors import RecipeFileError
 from conary.build.factory import Factory as FactoryRecipe
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary.lib import log, util
+from conary.lib import graph, log, util
 from conary.local import database
 from conary import versions
 
@@ -105,6 +105,9 @@ class Importer(object):
         # XXX when all recipes have been migrated
         # we can get rid of loadRecipe
         self.module.loadRecipe = self.loadSuperClass
+
+    def updateModuleDict(self, d):
+        self.module.__dict__.update(d)
 
     def _copyReusedRecipes(self):
         # XXX HACK - get rid of this when we move the
@@ -375,8 +378,6 @@ class RecipeLoaderFromString(object):
         if not cfg.autoLoadRecipes:
             return
 
-        d = importer.module.__dict__
-
         RecipeLoaderFromString._loadingDefaults = True
 
         if db is None:
@@ -400,7 +401,7 @@ class RecipeLoaderFromString(object):
 
         groupTroves = _loadTroves(ts, nvfDict, cfg.autoLoadRecipes, troveSpecs)
 
-        # we look for recipes in reverse order to allow the troves at the
+        # We look for recipes in reverse order to allow the troves at the
         # front of the list to override those at the end
         recipeTroves = {}
 
@@ -413,11 +414,56 @@ class RecipeLoaderFromString(object):
 
         # We have a list of the troves to autoload recipes from now. Go get
         # those troves so we can get the file information we need. The
-        # sort here is to keep this order repeatable
-        troveList = ts.getTroves(sorted(recipeTroves.values()),
-                                    withFiles = True)
+        # sort here is to keep this order repeatable. Note that we need
+        # to get the package which contains the recipe as well because
+        # that's where the loadedTroves information is stored. We depend
+        # on the :recipe component coming after the package itself later
+        # on, which the sorting keeps true!
+        unorderedTroveList = ts.getTroves(
+                sorted(itertools.chain(
+                        *[ ( x, ( x[0].split(':')[0], x[1], x[2] )) for
+                               x in recipeTroves.values() ] ) ),
+                       withFiles = True)
+        # Last one by name wins. They're sorted by version (thanks to the
+        # above) so it's consistent at least.
+        trovesByName = dict( (x.getName(), x) for x in unorderedTroveList)
+
+        # Reorder troveList based on the loadedTroves for each one to
+        # get the final list of troves we should load as well as the load
+        # order for them.
+        g = graph.DirectedGraph()
+        for trv in unorderedTroveList:
+            # create the nodes
+            if trv.getName().endswith(':recipe'):
+                g.addNode(trv)
+
+        # Edges point from what's depended on to what depends on it since
+        # getTotalOrdering() returns children after parents.
+        while unorderedTroveList:
+            trv = unorderedTroveList.pop(0)
+            recipeTrv = unorderedTroveList.pop(0)
+
+            assert(( trv.getName() + ':recipe', trv.getVersion(),
+                            trv.getFlavor() ) ==
+                    recipeTrv.getNameVersionFlavor())
+
+            for (name, version, flavor) in trv.getLoadedTroves():
+                if name in trovesByName:
+                    g.addEdge(trovesByName[name + ':recipe'], recipeTrv)
+
+        try:
+            orderedTroveList = g.getTotalOrdering(
+                        lambda a, b: cmp(a[1].getNameVersionFlavor(),
+                                         b[1].getNameVersionFlavor()))
+        except graph.BackEdgeError, e:
+            raise builderrors.RecipeFileError(
+                "Cannot autoload recipes due to a loadedRecipes loop involving"
+                "%s=%s[%s] and %s=%s[%s]" %
+                        tuple(itertools.chain(e.src.getNameVersionFlavor(),
+                                        e.dst.getNameVersionFlavor())))
+
         filesNeeded = []
-        for trv in troveList:
+        for trv in orderedTroveList:
             l = [ x for x in trv.iterFileList() if x[1].endswith('.recipe') ]
             assert(len(l) == 1)
             filesNeeded += l
@@ -425,7 +471,8 @@ class RecipeLoaderFromString(object):
         recipes = ts.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
 
         for (fileContents, fileInfo, trv) in \
-                               itertools.izip(recipes, filesNeeded, troveList):
+                               itertools.izip(recipes, filesNeeded,
+                                              orderedTroveList):
             loader = RecipeLoaderFromString(fileContents.get().read(),
                                   fileInfo[1], cfg, repos = repos,
                                   ignoreInstalled = True,
@@ -436,7 +483,7 @@ class RecipeLoaderFromString(object):
             recipe.internalAbstractBaseClass = True
             recipe._loadedFromSource = (trv.getNameVersionFlavor())
 
-            d.update(loader.recipes)
+            importer.updateModuleDict(loader.recipes)
 
         RecipeLoaderFromString._loadingDefaults = False
 

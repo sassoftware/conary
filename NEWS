@@ -1,3 +1,10 @@
+Changes in @NEW@:
+
+  o Build Changes:
+    * Recipes loaded based on the autoLoadRecipe configuration directive
+      are now ordered based on the loadedTroves list in the packages
+      containing those recipes (CNY-2694)
+
 Changes in 2.0.16:
   o Code Changes:
     * magic has been extended to identify tar archives. (CNY-2825)
