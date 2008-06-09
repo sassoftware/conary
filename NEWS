@@ -28,6 +28,11 @@ Changes in 2.0.16:
     * A bug causing log output to be lost if conary's log module was
       imported in a recipe has been fixed. (CNY-2813)
 
+  o Server Changes:
+    * Testing the HTTPS environment variable to know whether a
+      connection is secure is now case-insensitive, because existing
+      implementations differ in case. (CNY-2838)
+
 Changes in 2.0.15:
   o Code Changes:
     * We've started using a @publicApi decorator to tag methods which
