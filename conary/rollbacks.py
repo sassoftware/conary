@@ -395,13 +395,22 @@ class _RollbackScripts(object):
             return None
         from conaryclient import cmdline
         job = cmdline.parseChangeList([ret[cls._KEY_JOB]])[0]
+        oldCompatClass = cls._toInt(ret[cls._KEY_OLD_COMPAT_CLASS])
+        newCompatClass = cls._toInt(ret[cls._KEY_NEW_COMPAT_CLASS])
         try:
-            oldCompatClass = int(ret[cls._KEY_OLD_COMPAT_CLASS])
-            newCompatClass = int(ret[cls._KEY_NEW_COMPAT_CLASS])
             idx = int(ret[cls._KEY_INDEX])
         except ValueError:
             return None
         return idx, (job, oldCompatClass, newCompatClass)
+
+    @classmethod
+    def _toInt(cls, value):
+        if value == 'None':
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
 
     @classmethod
     def _openFile(cls, fileName):

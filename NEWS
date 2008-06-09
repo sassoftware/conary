@@ -5,6 +5,11 @@ Changes in @NEW@:
       are now ordered based on the loadedTroves list in the packages
       containing those recipes (CNY-2694)
 
+  o Bug Fixes:
+    * Newly installed groups that contain a post-rollback script will
+      properly execute the script, passing a None value as the new
+      compatibility class. (CNY-2844)
+
 Changes in 2.0.16:
   o Code Changes:
     * magic has been extended to identify tar archives. (CNY-2825)
