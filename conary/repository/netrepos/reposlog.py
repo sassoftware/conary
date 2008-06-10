@@ -15,6 +15,7 @@
 import cPickle, mmap, os, struct, time
 
 from conary.repository import calllog
+from conary.lib import log
 
 class RepositoryCallLogEntry:
 
@@ -68,7 +69,11 @@ class RepositoryCallLogger(calllog.AbstractCallLogger):
                                 time.time(), remoteIp, (user, entitlements),
                                 methodName, args, kwArgs, exception,
                                 latency))
-        os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
+        try:
+            os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
+        except OSError, e:
+            log.warning("'%s' while logging call from (%s,%s) to %s\n",
+                        str(e), remoteIp, user, methodName)
 
     def __iter__(self):
         fd = os.open(self.path, os.O_RDONLY)

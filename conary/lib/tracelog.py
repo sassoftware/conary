@@ -143,7 +143,10 @@ class FileLog(NullLog):
 
     # this function is mainly here so we can subclass it (ie, tracing)
     def printLog(self, level, msg):
-        self.fd.write("%s %d %s\n" % (logTime(), self.pid, msg))
+        try:
+            self.fd.write("%s %d %s\n" % (logTime(), self.pid, msg))
+        except OSError, e:
+            pass
 
     # close on exit
     def __del__(self):
@@ -167,7 +170,10 @@ class TraceLog(FileLog):
         # reset the timers for the next call
         for i in range(timeIdx, self.level):
             self.times[i] = t
-        self.fd.write("%s\n" % (lineStr,))
+        try:
+            self.fd.write("%s\n" % (lineStr,))
+        except OSError, e:
+            pass
 
     def reset(self, level=None):
         FileLog.reset(self, level)
