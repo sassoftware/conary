@@ -583,6 +583,8 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
             (l, f) = cfg.traceLog
         initLog(filename = f, level = l, trace=1)
 
+    if cfg.tmpDir.endswith('/'):
+        cfg.tmpDir = cfg.tmpDir[:-1]
     if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
         print "tmpDir cannot include symbolic links"
         sys.exit(1)
