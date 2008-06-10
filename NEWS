@@ -9,6 +9,10 @@ Changes in @NEW@:
     * Newly installed groups that contain a post-rollback script will
       properly execute the script, passing a None value as the new
       compatibility class. (CNY-2844)
+    * A bug that caused a traceback during metadata lookup when
+      installing files to a new component has been corrected.
+      (CNY-2846)
+
 
 Changes in 2.0.16:
   o Code Changes:
