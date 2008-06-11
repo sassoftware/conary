@@ -1,18 +1,19 @@
 Changes in @NEW@:
-
   o Build Changes:
     * Recipes loaded based on the autoLoadRecipe configuration directive
       are now ordered based on the loadedTroves list in the packages
-      containing those recipes (CNY-2694)
+      containing those recipes. (CNY-2694)
+    * The information provided by the "cvc status" command is now
+      available through the checkin.generateStatus API call, and
+      it now handles new packages that have not yet been checked
+      in. (CNY-2843)
 
   o Bug Fixes:
     * A bug that caused a traceback when rolling back the installation
       of a group containing a post-rollback script has been corrected.
       (CNY-2844)
     * A bug that caused a traceback during metadata lookup when
-      installing files to a new component has been corrected.
-      (CNY-2846)
-
+      installing files to a new component has been corrected.  (CNY-2846)
 
 Changes in 2.0.16:
   o Code Changes:

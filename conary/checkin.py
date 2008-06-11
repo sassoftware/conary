@@ -2060,25 +2060,45 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     conaryState.setSourceState(state)
     conaryState.write('CONARY')
 
-def stat_(repos):
-    # List all files in the current directory
+
+def generateStatus(repos):
+    '''
+    Create summary of changes regarding all files in the current directory
+    as a list of C{(I{status}, I{filename})} tuples where C{I{status}} is
+    a single character describing the status of the file C{I{filename}}:
+    - C{?}: File not managed by Conary
+    - C{A}: File added since last commit (or since package created if no commit)
+    - C{M}: File modified since last commit
+    - C{R}: File removed since last commit
+    @rtype: list
+    '''
     filtered = [ 'CONARY' ]
+    # List of tuples (state, path)
+    # state can be ?, A, M, R
+    results = []
 
     dirfiles = util.recurseDirectoryList('.', withDirs=False)
-    dirfilesHash = {}
+    dirfilesSet = set()
     for f in dirfiles:
         # Remove ./ prefix
         f = os.path.normpath(f)
         if f in filtered:
             # Special file
             continue
-        dirfilesHash[f] = None
+        dirfilesSet.add(f)
 
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
-	log.error("no versions have been committed")
-	return
+        addedFilenames = set()
+        for _, fileName, _, _ in state.iterFileList():
+            dirfilesSet.discard(fileName)
+            addedFilenames.add(fileName)
+        results.extend([('?', x) for x in dirfilesSet])
+        results.extend([('A', x) for x in addedFilenames])
+        # Sort by file path
+        results.sort(lambda x, y: cmp(x[1], y[1]))
+	return results
 
     oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
@@ -2098,14 +2118,10 @@ def stat_(repos):
 troveCs.getNewFileList() ]
     fileList += [ (x[0], x[1], False, x[2], x[3]) for x in
                             troveCs.getChangedFileList() ]
-    # List of tuples (state, path)
-    # state can be ?, A, M, R
-    results = []
 
     for (pathId, path, isNew, fileId, newVersion) in fileList:
-        if path in dirfilesHash:
-            # autosource files aren't in this dict
-            del dirfilesHash[path]
+        # autosource files aren't in this set, so discard not remove
+        dirfilesSet.discard(path)
 
 	if isNew:
             results.append(('A', path))
@@ -2127,27 +2143,28 @@ troveCs.getNewFileList() ]
         trackedFiles[iterr[1]] = None
 
     # Eliminate the files that have not changed (the ones we track but are
-    # still present in dirfilesHash)
-    for k in dirfilesHash.keys():
+    # still present in dirfilesSet)
+    for k in set(dirfilesSet):
         if k in trackedFiles:
-            del dirfilesHash[k]
+            dirfilesSet.discard(k)
 
-    unknown = dirfilesHash.keys()
-
-    unknown = [ ('?', path) for path in unknown ]
+    unknown = [ ('?', path) for path in dirfilesSet ]
     results[0:0] = unknown
 
     # Sort by file path
     results.sort(lambda x, y: cmp(x[1], y[1]))
-	
-    return _showStat(results)
-
-def _showStat(results):
-    # print results
-    for fstat, path in results:
-        print "%s  %s" % (fstat, path)
 
     return results
+	
+def _showStat(results):
+    'print out status lists as returned by C{generateStatus}'
+    for fstat, path in results:
+        print "%s  %s" % (fstat, path)
+    return results
+
+def stat_(repos):
+    return _showStat(generateStatus(repos))
+
 
 def localAutoSourceChanges(oldTrove, (changeSet, ((isDifferent, newState),))):
     # look for autosource files which have changed from upstream; we don't
