@@ -560,9 +560,7 @@ class CookCommand(CvcCommand):
             # directory
             name = os.path.basename(os.getcwd())
 
-            if os.path.isfile('%s.recipe' % name):
-                items = [ '%s.recipe' % name ]
-            elif os.path.isfile('CONARY'):
+            if os.path.isfile('CONARY'):
                 conaryState = state.ConaryStateFromFile('CONARY', repos)
                 items = [ conaryState ]
 
