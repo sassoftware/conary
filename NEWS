@@ -1,14 +1,29 @@
 Changes in @NEW@:
-
   o Build Changes:
     * Recipes loaded based on the autoLoadRecipe configuration directive
       are now ordered based on the loadedTroves list in the packages
-      containing those recipes (CNY-2694)
+      containing those recipes. (CNY-2694)
+    * The information provided by the "cvc status" command is now
+      available through the checkin.generateStatus API call, and
+      it now handles new packages that have not yet been checked
+      in. (CNY-2843)
+    * The "cvc log" command now has a --newer option that prints
+      only log messages that are newer than the current checkout,
+      and has been modified to be consumable via a new
+      checkin.iterLog API call. (CNY-2840)
+    * Building factories which haven't been checked in should work now
+      (CNY-2757)
+    * Specifying checkDeps and resolveDeps no longer causes an extra
+      dependency check when building a group
 
   o Bug Fixes:
-    * Newly installed groups that contain a post-rollback script will
-      properly execute the script, passing a None value as the new
-      compatibility class. (CNY-2844)
+    * A bug that caused a traceback when rolling back the installation
+      of a group containing a post-rollback script has been corrected.
+      (CNY-2844)
+    * A bug that caused a traceback during metadata lookup when
+      installing files to a new component has been corrected.  (CNY-2846)
+    * A bug causing magic to identify almost every file as a tarfile
+      has been fixed. (CNP-135)
 
 Changes in 2.0.16:
   o Code Changes:

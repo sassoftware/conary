@@ -27,8 +27,9 @@ class Manifest:
 
         if ':' in package:
             (package, component) = package.split(':')
+        if package:
+            recipe.packages[package] = True
 
-        recipe.packages[package] = True
         i = 0
         while True:
             manifestName = '%s.%d' % (package, i)

@@ -560,9 +560,7 @@ class CookCommand(CvcCommand):
             # directory
             name = os.path.basename(os.getcwd())
 
-            if os.path.isfile('%s.recipe' % name):
-                items = [ '%s.recipe' % name ]
-            elif os.path.isfile('CONARY'):
+            if os.path.isfile('CONARY'):
                 conaryState = state.ConaryStateFromFile('CONARY', repos)
                 items = [ conaryState ]
 
@@ -652,15 +650,24 @@ _register(DiffCommand)
 class LogCommand(CvcCommand):
     commands = ['log']
     help = 'Show changelog entries for this source component'
+    docs = {'newer'       : 'Display only logs newer than current checkout' }
     hidden = True
+
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['newer'] = NO_PARAM
 
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
         args = args[1:]
+        newer = argSet.pop('newer', False)
         if argSet or len(args) > 2: return self.usage()
 
         args[0] = repos
-        checkin.showLog(*args)
+        branch = None
+        if len(args) == 2:
+            branch = args[1]
+        checkin.showLog(repos, branch=branch, newer=newer)
 _register(LogCommand)
 
 class RdiffCommand(CvcCommand):

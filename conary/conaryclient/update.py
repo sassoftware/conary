@@ -1842,9 +1842,10 @@ conary erase '%s=%s[%s]'
                                          action = "preinstall")
 
             postRollbackScript = troveCs.getPostRollbackScript()
-            if postRollbackScript:
+            if postRollbackScript and job[1][0] is not None:
                 # Add the post-rollback script that will be saved on the
                 # rollback stack
+                # CNY-2844: do not run rollbacks for installs
                 updJob.addJobPostRollbackScript(job, postRollbackScript,
                     troveCs.getNewCompatibilityClass(), oldCompatClass)
 

@@ -1811,7 +1811,26 @@ def renameFile(oldName, newName, repos=None):
     
     log.error("file %s is not under management" % oldName)
 
-def showLog(repos, branch = None):
+def showLog(repos, branch = None, newer = False):
+    for message in iterLog(repos, branch = branch, newer = newer):
+        print message
+
+def iterLog(repos, branch = None, newer = False):
+    '''
+    Iterator that yeilds log message lines relative to the
+    source checkout in the current directory.  If C{branch}
+    is specified, that branch of the package is used instead
+    as a source of log messages.
+    Alternatively, if C{newer} is set, then only log messages
+    newer than the current version in the source checkout
+    are yeilded.
+    The C{branch} and C{newer} keyword arguments may not both
+    be set, because cross-branch comparisons do not have a
+    concept of "newer".
+    '''
+    if branch and newer:
+        raise errors.CvcError(
+            'cannot specify --newer and a different branch together')
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
     if not branch:
 	branch = state.getBranch()
@@ -1831,23 +1850,35 @@ def showLog(repos, branch = None):
     verList = verList[troveName].keys()
     verList.sort()
     verList.reverse()
+    if newer:
+        newer= state.getVersion()
     l = []
     for version in verList:
+        if newer and not version.isAfter(newer):
+            break
 	l.append((troveName, version, deps.deps.Flavor()))
 
-    print "Name  :", troveName
-    print "Branch:", branch.asString()
-    print
+    yield 'Name  : ' + troveName
+    yield 'Branch: ' + branch.asString()
+    yield ''
 
     troves = repos.getTroves(l)
+    for logMessage in iterLogMessages(troves):
+        yield logMessage
 
+def iterLogMessages(troves):
     for trove in troves:
 	v = trove.getVersion()
 	cl = trove.getChangeLog()
-	showOneLog(v, cl)
+	for line in formatOneLog(v, cl):
+            yield line
 
 def showOneLog(version, changeLog=''):
+    print '\n'.join(formatOneLog(version, changeLog))
+
+def formatOneLog(version, changeLog=''):
     when = time.strftime("%c", time.localtime(version.timeStamps()[-1]))
+    logMessage = []
 
     if version == versions.NewVersion():
 	versionStr = "(working version)"
@@ -1855,14 +1886,14 @@ def showOneLog(version, changeLog=''):
 	versionStr = version.trailingRevision().asString()
 
     if changeLog.getName():
-	print "%s %s (%s) %s" % \
-	    (versionStr, changeLog.getName(), changeLog.getContact(), when)
+	logMessage.append("%s %s (%s) %s" %
+	    (versionStr, changeLog.getName(), changeLog.getContact(), when))
 	lines = changeLog.getMessage().split("\n")
 	for l in lines:
-	    print "    %s" % l
+	    logMessage.append("    %s" % l)
     else:
-	print "%s %s (no log message)\n" \
-	      %(versionStr, when)
+	logMessage.extend(['%s %s (no log message)' %(versionStr, when), ''])
+    return logMessage
 
 def setContext(cfg, contextName=None, ask=False, repos=None):
     def _ask(txt, *args):
@@ -2060,25 +2091,45 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     conaryState.setSourceState(state)
     conaryState.write('CONARY')
 
-def stat_(repos):
-    # List all files in the current directory
+
+def generateStatus(repos):
+    '''
+    Create summary of changes regarding all files in the current directory
+    as a list of C{(I{status}, I{filename})} tuples where C{I{status}} is
+    a single character describing the status of the file C{I{filename}}:
+    - C{?}: File not managed by Conary
+    - C{A}: File added since last commit (or since package created if no commit)
+    - C{M}: File modified since last commit
+    - C{R}: File removed since last commit
+    @rtype: list
+    '''
     filtered = [ 'CONARY' ]
+    # List of tuples (state, path)
+    # state can be ?, A, M, R
+    results = []
 
     dirfiles = util.recurseDirectoryList('.', withDirs=False)
-    dirfilesHash = {}
+    dirfilesSet = set()
     for f in dirfiles:
         # Remove ./ prefix
         f = os.path.normpath(f)
         if f in filtered:
             # Special file
             continue
-        dirfilesHash[f] = None
+        dirfilesSet.add(f)
 
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
-	log.error("no versions have been committed")
-	return
+        addedFilenames = set()
+        for _, fileName, _, _ in state.iterFileList():
+            dirfilesSet.discard(fileName)
+            addedFilenames.add(fileName)
+        results.extend([('?', x) for x in dirfilesSet])
+        results.extend([('A', x) for x in addedFilenames])
+        # Sort by file path
+        results.sort(lambda x, y: cmp(x[1], y[1]))
+	return results
 
     oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
@@ -2098,14 +2149,10 @@ def stat_(repos):
 troveCs.getNewFileList() ]
     fileList += [ (x[0], x[1], False, x[2], x[3]) for x in
                             troveCs.getChangedFileList() ]
-    # List of tuples (state, path)
-    # state can be ?, A, M, R
-    results = []
 
     for (pathId, path, isNew, fileId, newVersion) in fileList:
-        if path in dirfilesHash:
-            # autosource files aren't in this dict
-            del dirfilesHash[path]
+        # autosource files aren't in this set, so discard not remove
+        dirfilesSet.discard(path)
 
 	if isNew:
             results.append(('A', path))
@@ -2127,27 +2174,28 @@ troveCs.getNewFileList() ]
         trackedFiles[iterr[1]] = None
 
     # Eliminate the files that have not changed (the ones we track but are
-    # still present in dirfilesHash)
-    for k in dirfilesHash.keys():
+    # still present in dirfilesSet)
+    for k in set(dirfilesSet):
         if k in trackedFiles:
-            del dirfilesHash[k]
+            dirfilesSet.discard(k)
 
-    unknown = dirfilesHash.keys()
-
-    unknown = [ ('?', path) for path in unknown ]
+    unknown = [ ('?', path) for path in dirfilesSet ]
     results[0:0] = unknown
 
     # Sort by file path
     results.sort(lambda x, y: cmp(x[1], y[1]))
-	
-    return _showStat(results)
-
-def _showStat(results):
-    # print results
-    for fstat, path in results:
-        print "%s  %s" % (fstat, path)
 
     return results
+	
+def _showStat(results):
+    'print out status lists as returned by C{generateStatus}'
+    for fstat, path in results:
+        print "%s  %s" % (fstat, path)
+    return results
+
+def stat_(repos):
+    return _showStat(generateStatus(repos))
+
 
 def localAutoSourceChanges(oldTrove, (changeSet, ((isDifferent, newState),))):
     # look for autosource files which have changed from upstream; we don't

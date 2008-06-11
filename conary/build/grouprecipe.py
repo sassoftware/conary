@@ -2302,8 +2302,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
             resolveGroupDependencies(group, cache, cfg,
                                      repos, labelPath, flavor, callback,
                                      resolveSource)
-
-        if group.depCheck:
+        elif group.depCheck:
             callback.done()
             log.info('Checking for dependency closure...')
             failedDeps = checkGroupDependencies(group, cfg, cache, callback)

@@ -239,7 +239,7 @@ def _javaMagic(b):
     return False
 
 def _tarMagic(b):
-    return len(b) > 262 and b[257:262]
+    return len(b) > 262 and b[257:262] == 'ustar'
 
 def magic(path, basedir=''):
     """

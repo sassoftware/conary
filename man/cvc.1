@@ -179,9 +179,11 @@ Displays cvc help file.  Can be added to individual commands as an
 option.  For example, \fBcvc cook help\fP will display help information
 for the \fBcook\fP command.
 .TP 4
-.B log [\fI<branch>\fP]
-Prints the log messages for the branch specified by \fBbuildLabel\fP,
-or for \fI<branch>\fP if specified.
+.B log [\fI<branch>\fP|\-\-newer]
+Prints the log messages for the branch and trove currently checked out,
+printing only log messages newer than the current checkout if the
+\-\-newer argument is provided,
+or for the same trove name on \fI<branch>\fP if specified.
 .TP 4
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
