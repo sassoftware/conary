@@ -7,6 +7,10 @@ Changes in @NEW@:
       available through the checkin.generateStatus API call, and
       it now handles new packages that have not yet been checked
       in. (CNY-2843)
+    * The "cvc log" command now has a --newer option that prints
+      only log messages that are newer than the current checkout,
+      and has been modified to be consumable via a new
+      checkin.iterLog API call. (CNY-2840)
 
   o Bug Fixes:
     * A bug that caused a traceback when rolling back the installation

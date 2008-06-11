@@ -1811,7 +1811,26 @@ def renameFile(oldName, newName, repos=None):
     
     log.error("file %s is not under management" % oldName)
 
-def showLog(repos, branch = None):
+def showLog(repos, branch = None, newer = False):
+    for message in iterLog(repos, branch = branch, newer = newer):
+        print message
+
+def iterLog(repos, branch = None, newer = False):
+    '''
+    Iterator that yeilds log message lines relative to the
+    source checkout in the current directory.  If C{branch}
+    is specified, that branch of the package is used instead
+    as a source of log messages.
+    Alternatively, if C{newer} is set, then only log messages
+    newer than the current version in the source checkout
+    are yeilded.
+    The C{branch} and C{newer} keyword arguments may not both
+    be set, because cross-branch comparisons do not have a
+    concept of "newer".
+    '''
+    if branch and newer:
+        raise errors.CvcError(
+            'cannot specify --newer and a different branch together')
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
     if not branch:
 	branch = state.getBranch()
@@ -1831,23 +1850,35 @@ def showLog(repos, branch = None):
     verList = verList[troveName].keys()
     verList.sort()
     verList.reverse()
+    if newer:
+        newer= state.getVersion()
     l = []
     for version in verList:
+        if newer and not version.isAfter(newer):
+            break
 	l.append((troveName, version, deps.deps.Flavor()))
 
-    print "Name  :", troveName
-    print "Branch:", branch.asString()
-    print
+    yield 'Name  : ' + troveName
+    yield 'Branch: ' + branch.asString()
+    yield ''
 
     troves = repos.getTroves(l)
+    for logMessage in iterLogMessages(troves):
+        yield logMessage
 
+def iterLogMessages(troves):
     for trove in troves:
 	v = trove.getVersion()
 	cl = trove.getChangeLog()
-	showOneLog(v, cl)
+	for line in formatOneLog(v, cl):
+            yield line
 
 def showOneLog(version, changeLog=''):
+    print '\n'.join(formatOneLog(version, changeLog))
+
+def formatOneLog(version, changeLog=''):
     when = time.strftime("%c", time.localtime(version.timeStamps()[-1]))
+    logMessage = []
 
     if version == versions.NewVersion():
 	versionStr = "(working version)"
@@ -1855,14 +1886,14 @@ def showOneLog(version, changeLog=''):
 	versionStr = version.trailingRevision().asString()
 
     if changeLog.getName():
-	print "%s %s (%s) %s" % \
-	    (versionStr, changeLog.getName(), changeLog.getContact(), when)
+	logMessage.append("%s %s (%s) %s" %
+	    (versionStr, changeLog.getName(), changeLog.getContact(), when))
 	lines = changeLog.getMessage().split("\n")
 	for l in lines:
-	    print "    %s" % l
+	    logMessage.append("    %s" % l)
     else:
-	print "%s %s (no log message)\n" \
-	      %(versionStr, when)
+	logMessage.extend(['%s %s (no log message)' %(versionStr, when), ''])
+    return logMessage
 
 def setContext(cfg, contextName=None, ask=False, repos=None):
     def _ask(txt, *args):
