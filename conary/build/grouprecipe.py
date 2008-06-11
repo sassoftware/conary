@@ -2099,12 +2099,14 @@ class TroveCache(dict):
         self.callback.gettingTroveDefinitions(len(troveTupList))
         troves = self.repos.getTroves(troveTupList, withFiles=False,
                                       callback = self.callback)
-
+        # cache first, descend later
         for troveTup, trv in izip(troveTupList, troves):
             self[troveTup] = trv
-            self.getChildren(troveTup, trv)
+        for trv in troves:
+            self.getChildren(trv)
+        log.info("completed %d troves in %.3f sec", len(troveTupList), time.time()-t1)
 
-    def getChildren(self, troveTup, trv):
+    def getChildren(self, trv):
         """ Retrieve children,  and, if necessary, children's children)
             from repos.  Children's children should only be necessary
             if the group doesn't have weak references (i.e. is old).
