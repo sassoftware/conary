@@ -7,6 +7,8 @@ Changes in @NEW@:
       available through the checkin.generateStatus API call, and
       it now handles new packages that have not yet been checked
       in. (CNY-2843)
+    * Building factories which haven't been checked in should work now
+      (CNY-2757)
 
   o Bug Fixes:
     * A bug that caused a traceback when rolling back the installation
