@@ -2092,11 +2092,12 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     conaryState.write('CONARY')
 
 
-def generateStatus(repos):
+def generateStatus(repos, dirName='.'):
     '''
-    Create summary of changes regarding all files in the current directory
-    as a list of C{(I{status}, I{filename})} tuples where C{I{status}} is
-    a single character describing the status of the file C{I{filename}}:
+    Create summary of changes regarding all files in a directory
+    (the current directory by default) as a list of C{(I{status},
+    I{filename})} tuples where C{I{status}} is a single character
+    describing the status of the file C{I{filename}}:
     - C{?}: File not managed by Conary
     - C{A}: File added since last commit (or since package created if no commit)
     - C{M}: File modified since last commit
@@ -2108,17 +2109,19 @@ def generateStatus(repos):
     # state can be ?, A, M, R
     results = []
 
-    dirfiles = util.recurseDirectoryList('.', withDirs=False)
+    dirNameLen = len(dirName)
+    dirfiles = util.recurseDirectoryList(dirName, withDirs=False)
     dirfilesSet = set()
     for f in dirfiles:
-        # Remove ./ prefix
-        f = os.path.normpath(f)
+        # Remove dirName/ prefix
+        f = f[dirNameLen+1:]
         if f in filtered:
             # Special file
             continue
         dirfilesSet.add(f)
 
-    state = ConaryStateFromFile("CONARY", repos).getSourceState()
+    state = ConaryStateFromFile(os.sep.join((dirName, "CONARY")),
+                                repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
         addedFilenames = set()
