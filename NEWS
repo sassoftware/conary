@@ -18,6 +18,8 @@ Changes in @NEW@:
       (CNY-2844)
     * A bug that caused a traceback during metadata lookup when
       installing files to a new component has been corrected.  (CNY-2846)
+    * A bug causing magic to identify almost every file as a tarfile
+      has been fixed. (CNP-135)
 
 Changes in 2.0.16:
   o Code Changes:
