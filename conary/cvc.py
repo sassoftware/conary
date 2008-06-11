@@ -1031,6 +1031,12 @@ class CvcMain(command.MainHandler):
             prof.start()
             profile = True
             del argSet['profile']
+        if argSet.has_key('lsprof'):
+            import cProfile
+            prof = cProfile.Profile()
+            prof.enable()
+            profile = 'lsprof'
+            del argSet['lsprof']
 
         keyCache = openpgpkey.getKeyCache()
         keyCache.setPublicPath(cfg.pubRing)
@@ -1042,9 +1048,14 @@ class CvcMain(command.MainHandler):
         rv = options.MainHandler.runCommand(self, thisCommand,
                                             cfg, argSet, args,
                                             callback=callback,
-                                            repos=client.getRepos())
+                                            repos=client.getRepos(),
+                                            profile=profile)
 
-        if profile:
+        if profile == 'lsprof':
+            prof.disable()
+            prof.dump_stats('cvc.lsprof')
+            prof.print_stats()
+        elif profile:
             prof.stop()
         if log.errorOccurred():
             sys.exit(2)
