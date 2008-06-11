@@ -13,6 +13,8 @@ Changes in @NEW@:
       checkin.iterLog API call. (CNY-2840)
     * Building factories which haven't been checked in should work now
       (CNY-2757)
+    * Specifying checkDeps and resolveDeps no longer causes an extra
+      dependency check when building a group
 
   o Bug Fixes:
     * A bug that caused a traceback when rolling back the installation
