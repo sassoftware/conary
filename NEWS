@@ -11,6 +11,8 @@ Changes in @NEW@:
       only log messages that are newer than the current checkout,
       and has been modified to be consumable via a new
       checkin.iterLog API call. (CNY-2840)
+    * Building factories which haven't been checked in should work now
+      (CNY-2757)
 
   o Bug Fixes:
     * A bug that caused a traceback when rolling back the installation
