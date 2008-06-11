@@ -2087,7 +2087,12 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             # when we fork/exec
             fcntl.fcntl(outpipe, fcntl.FD_CLOEXEC)
 
-            if profile:
+            if profile == 'lsprof':
+                import cProfile
+                prof = cProfile.Profile()
+                prof.enable()
+                lsprof = True
+            elif profile:
                 import hotshot
                 prof = hotshot.Profile('conary-cook.prof')
                 prof.start()
@@ -2146,7 +2151,11 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 print 'Changeset written to:', csFile
                 # send the changeset file over the pipe
                 os.write(outpipe, csFile)
-            if profile:
+            if profile == 'lsprof':
+                prof.disable()
+                prof.dump_stats('conary-cook.lsprof')
+                prof.print_stats()
+            elif profile:
                 prof.stop()
             os._exit(0)
         else:
