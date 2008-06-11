@@ -1815,7 +1815,7 @@ def showLog(repos, branch = None, newer = False):
     for message in iterLog(repos, branch = branch, newer = newer):
         print message
 
-def iterLog(repos, branch = None, newer = False):
+def iterLog(repos, branch = None, newer = False, dirName = '.'):
     '''
     Iterator that yeilds log message lines relative to the
     source checkout in the current directory.  If C{branch}
@@ -1831,7 +1831,8 @@ def iterLog(repos, branch = None, newer = False):
     if branch and newer:
         raise errors.CvcError(
             'cannot specify --newer and a different branch together')
-    state = ConaryStateFromFile("CONARY", repos).getSourceState()
+    state = ConaryStateFromFile(os.sep.join((dirName, "CONARY")),
+                                repos).getSourceState()
     if not branch:
 	branch = state.getBranch()
     else:
