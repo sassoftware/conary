@@ -2104,7 +2104,6 @@ class TroveCache(dict):
             self[troveTup] = trv
         for trv in troves:
             self.getChildren(trv)
-        log.info("completed %d troves in %.3f sec", len(troveTupList), time.time()-t1)
 
     def getChildren(self, trv):
         """ Retrieve children,  and, if necessary, children's children)
