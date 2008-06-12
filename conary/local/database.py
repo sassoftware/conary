@@ -324,6 +324,58 @@ class RollbackStack:
 
         self._readStatus()
 
+class UpdateJobFeatures(util.Flags):
+    """
+    Features of an update job.
+    This class is used mostly when loading a saved update job from the restart
+    directory, since it helps determine support for a specific feature in the
+    version of Conary used for generating the serialized representation of the
+    update job.
+    """
+    __slots__ = [ "postRollbackScriptsOnRollbackStack" ]
+
+    def __init__(self):
+        util.Flags.__init__(self)
+        self.setAll(True)
+
+    def setAll(self, value = True):
+        """
+        Set all flags to the specified value (True by default)
+        @return: C{self}
+        """
+        for slot in self.__slots__:
+            setattr(self, slot, value)
+        return self
+
+    def saveToFile(self, filePath):
+        """
+        Save features to a file
+        """
+        f = file(filePath, "w")
+        for slot in self.__slots__:
+            if getattr(self, slot):
+                f.write(slot)
+                f.write("\n")
+        return self
+
+    def loadFromFile(self, filePath):
+        """
+        Load features from a file
+        """
+        # Clear the features first
+        self.setAll(False)
+        if not os.path.exists(filePath):
+            return self
+        if not os.access(filePath, os.R_OK):
+            return self
+        slots = set(self.__slots__)
+        f = file(filePath)
+        for line in f:
+            line = line.strip()
+            if line in slots:
+                setattr(self, line, True)
+        return self
+
 class UpdateJob:
     def __del__(self):
         try:
@@ -473,6 +525,10 @@ class UpdateJob:
         jobfile = os.path.join(frzdir, "jobfile")
 
         self._saveFrozenRepr(jobfile, drep)
+
+        # Save features too. We will not load them automatically unless we
+        # find a need for that.
+        self.saveFeatures(os.path.join(frzdir, "features"))
 
         return drep
 
@@ -869,6 +925,21 @@ class UpdateJob:
         self._jobPreScripts = self.orderScriptListByBucket(jobPreScripts,
                                 [ 'preinstall', 'preupdate', 'preerase' ])
 
+    def setPreviousVersion(self, version):
+        self._previousVersion = version
+
+    def getPreviousVersion(self):
+        return self._previousVersion
+
+    def saveFeatures(self, filePath):
+        self._features.saveToFile(filePath)
+
+    def loadFeatures(self, filePath):
+        self._features.loadFromFile(filePath)
+
+    def getFeatures(self):
+        return self._features
+
     def __init__(self, db, searchSource = None, lazyCache = None):
         # 20070714: lazyCache can be None for the users of the old API (when
         # an update job was instantiated directly, instead of using the
@@ -904,8 +975,14 @@ class UpdateJob:
         # This flag gets set if the update job was loaded from the restart
         # information
         self._restartedFlag = False
+        # Previous version of Conary, if the update job was loaded from the
+        # restart information
+        self._previousVersion = None
+        # Features of the previous Conary
+        self._features = UpdateJobFeatures()
 
         self._commitFlags = None
+
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
@@ -1370,8 +1447,10 @@ class Database(SqlDbRepository):
                 rollback = self.rollbackStack.new(opJournal)
                 uJob.setRollback(rollback)
                 # Only save the rollback scripts once, and only if the job was
-                # not restarted
-                if not uJob.getRestartedFlag():
+                # not restarted or the previous Conary didn't know how to save
+                # scripts on the rollback stack (CNY-2845)
+                prflag = uJob.getFeatures().postRollbackScriptsOnRollbackStack
+                if not uJob.getRestartedFlag() or not prflag:
                     rollbackScripts = list(uJob.iterJobPostRollbackScripts())
             rollback.add(opJournal, reposRollback, localRollback,
                 rollbackScripts)

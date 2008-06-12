@@ -24,6 +24,10 @@ Changes in @NEW@:
       installing files to a new component has been corrected.  (CNY-2846)
     * A bug causing magic to identify almost every file as a tarfile
       has been fixed. (CNP-135)
+    * When rolling back an update started with Conary version 2.0.15 or
+      older, that generated multiple rollback points (generally as a
+      result of the presence of critical updates as part of the job),
+      the rollback scripts are properly executed. (CNY-2845)
 
 Changes in 2.0.16:
   o Code Changes:

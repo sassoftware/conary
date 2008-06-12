@@ -3899,6 +3899,10 @@ def _storeJobInfo(remainingJobs, updJob):
     invocationInfoPath = os.path.join(restartDir, "job-invocation")
     updJob.saveInvocationInfo(invocationInfoPath)
 
+    # Save features
+    featuresFilePath = os.path.join(restartDir, "features")
+    updJob.saveFeatures(featuresFilePath)
+
     return restartDir
 
 def _loadRestartInfo(restartDir, updJob):
@@ -3948,5 +3952,23 @@ def _loadRestartInfo(restartDir, updJob):
             updJob.loadInvocationInfo(invInfoFile)
         except DecodingError:
             pass
+    # If there is a __version__ file, load the previous conary version
+    verFile = util.joinPaths(restartDir, '__version__')
+    if os.path.exists(verFile):
+        ver = []
+        try:
+            ver = [ x for x in file(verFile) if x.startswith('version ') ]
+        except IOError:
+            pass
+        else:
+            if ver:
+                ver = ver[0]
+                # We already know there is a space in the version string, so
+                # it's safe to assume split returned a 2-item list
+                updJob.setPreviousVersion(ver.strip().split(' ', 1)[1])
+    # Load features
+    featuresFilePath = os.path.join(restartDir, "features")
+    updJob.loadFeatures(featuresFilePath)
+
     return finalJobSet, changeSetList
 
