@@ -1846,8 +1846,9 @@ def iterLog(repos, branch = None, newer = False, dirName = '.'):
     verList = repos.getTroveVersionsByBranch(
                             { troveName : { branch : None } } )
     if not verList:
-        log.error('nothing has been committed')
+        yield 'nothing has been committed'
         return
+
     verList = verList[troveName].keys()
     verList.sort()
     verList.reverse()
