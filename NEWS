@@ -28,6 +28,10 @@ Changes in @NEW@:
       older, that generated multiple rollback points (generally as a
       result of the presence of critical updates as part of the job),
       the rollback scripts are properly executed. (CNY-2845)
+   
+  o Server Changes:
+    * The deleteUserByName() xmlrpc call now only deletes the role
+      with a matching name on very limited situations (CNY-2775)
 
 Changes in 2.0.16:
   o Code Changes:

@@ -675,14 +675,33 @@ class NetworkAuthorization:
 
         cu = self.db.cursor()
 
-        # delete the role created with the name of that user
-        try:
-            self.deleteRole(user, False)
-        except errors.RoleNotFound, e:
-            pass
-
+        # for historical reasons:
+        # - if the role of the same name exists
+        # - and the role is empty or the user is the sole member
+        # - and the role doesn't have any special permissions
+        # - and the role doesn't have any acls
+        # then we attempt to delete it as well
+        cu.execute("""
+        select count(*) from UserGroups where userGroup = ? and (admin or canMirror)
+        union
+        select count(*) from Users join UserGroupMembers using(userId)
+        join UserGroups using(userGroupId) where userGroup = ? and userName != ?
+        union
+        select count(*) from Permissions join UserGroups using(userGroupId) where userGroup = ?
+        union
+        select count(*) from UserGroupTroves join UserGroups using(userGroupId) where userGroup = ?
+        """, [user] * 5)
+        tryDelete = True
+        for count, in cu:
+            if count:
+                tryDelete = False
+                break
+        if tryDelete:
+            try:
+                self.deleteRole(user, False)
+            except errors.RoleNotFound, e:
+                pass
         self.userAuth.deleteUser(cu, user)
-
         self.db.commit()
 
     def changePassword(self, user, newPassword):
