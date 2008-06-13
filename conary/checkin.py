@@ -180,7 +180,7 @@ def checkout(repos, cfg, workDir, nameList, callback=None):
             trvList = repos.findTrove(cfg.buildLabel,
                                       (sourceName, versionStr, None))
         except errors.TroveNotFound, e:
-            if not cfg.buildLabel:
+            if not versionStr and not cfg.buildLabel:
                 raise errors.CvcError('buildLabel is not set.  Use '
                                       '--build-label or set buildLabel in '
                                       'your conaryrc to check out sources.')

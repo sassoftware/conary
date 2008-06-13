@@ -15,6 +15,9 @@ Changes in @NEW@:
       (CNY-2757)
     * Specifying checkDeps and resolveDeps no longer causes an extra
       dependency check when building a group
+    * Checking out a source trove without a buildLabel set, but with
+      a version specified, no longer gives a confusing warning about
+      the buildLabel being unset. (CNY-2783)
 
   o Bug Fixes:
     * A bug that caused a traceback when rolling back the installation
