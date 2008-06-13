@@ -2100,10 +2100,10 @@ def generateStatus(repos, dirName='.'):
     (the current directory by default) as a list of C{(I{status},
     I{filename})} tuples where C{I{status}} is a single character
     describing the status of the file C{I{filename}}:
-    - C{?}: File not managed by Conary
-    - C{A}: File added since last commit (or since package created if no commit)
-    - C{M}: File modified since last commit
-    - C{R}: File removed since last commit
+     - C{?}: File not managed by Conary
+     - C{A}: File added since last commit (or since package created if no commit)
+     - C{M}: File modified since last commit
+     - C{R}: File removed since last commit
     @rtype: list
     '''
     filtered = [ 'CONARY' ]
