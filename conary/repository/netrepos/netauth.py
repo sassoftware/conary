@@ -682,21 +682,22 @@ class NetworkAuthorization:
         # - and the role doesn't have any acls
         # then we attempt to delete it as well
         cu.execute("""
-        select count(*) from UserGroups where userGroup = ? and (admin or canMirror)
-        union
-        select count(*) from Users join UserGroupMembers using(userId)
-        join UserGroups using(userGroupId) where userGroup = ? and userName != ?
-        union
-        select count(*) from Permissions join UserGroups using(userGroupId) where userGroup = ?
-        union
-        select count(*) from UserGroupTroves join UserGroups using(userGroupId) where userGroup = ?
-        """, [user] * 5)
-        tryDelete = True
-        for count, in cu:
-            if count:
-                tryDelete = False
-                break
-        if tryDelete:
+        select sum(c) from (
+            select count(*) as c from UserGroups
+            where userGroup = :user and admin + canMirror > 0
+            union
+            select count(*) as c from Users
+            join UserGroupMembers using(userId)
+            join UserGroups using(userGroupId) where userGroup = :user and userName != :user
+            union
+            select count(*) as c from Permissions
+            join UserGroups using(userGroupId) where userGroup = :user
+            union
+            select count(*) as c from UserGroupTroves
+            join UserGroups using(userGroupId) where userGroup = :user
+        ) as counters """, {"user": user})
+        # a !0 sum means this role can't be deleted
+        if cu.fetchone()[0] == 0:
             try:
                 self.deleteRole(user, False)
             except errors.RoleNotFound, e:
