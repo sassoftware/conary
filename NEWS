@@ -85,6 +85,9 @@ Changes in 2.0.15:
     * sys.argv is not defined under mod_python; importing cvc.py should
       no longer fail as a result of using sys.argv as a default argument
       to main(). (CNY-2786)
+    * kernel:runtime is no longer included as a critical update when
+      updating conary, because we no longer use abi dependencies to order
+      updates.  (CNY-2787)
     * repository code handles correctly the removal of groups that
       include troves from other repositories. (CNY-2802)
     * When using sqlite, some temporary tables used the invalid column
