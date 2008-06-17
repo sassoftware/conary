@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.17:
   o Build Changes:
     * Recipes loaded based on the autoLoadRecipe configuration directive
       are now ordered based on the loadedTroves list in the packages
