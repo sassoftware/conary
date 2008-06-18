@@ -539,10 +539,12 @@ class NetworkAuthorization:
             (userGroupId, labelId, itemId, canWrite, canRemove)
             VALUES (?, ?, ?, ?, ?)""", (
                 roleId, labelId, itemId, write, remove))
+            permissionId = cu.lastrowid
         except sqlerrors.ColumnNotUnique:
             self.db.rollback()
-            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
-        self.ri.addPermissionId(cu.lastrowid, roleId)
+            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" %(
+                labelId, itemId)
+        self.ri.addPermissionId(permissionId, roleId)
         self.db.commit()
 
     def editAcl(self, role, oldTroveId, oldLabelId, troveId, labelId,
@@ -558,32 +560,29 @@ class NetworkAuthorization:
         write = int(bool(write))
         canRemove = int(bool(canRemove))
 
-        try:
-            cu.execute("""
-            UPDATE Permissions
-            SET labelId = ?, itemId = ?, canWrite = ?,
-                canRemove = ?
-            WHERE userGroupId=? AND labelId=? AND itemId=?""",
-                       labelId, troveId, write, canRemove,
-                       roleId, oldLabelId, oldTroveId)
-        except sqlerrors.ColumnNotUnique:
-            self.db.rollback()
-            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, troveId)
-
-        # find out what permission we have changed and update cached
-        # permission tables
+        # find out what permission we're changing
         cu.execute("""
         select permissionId from Permissions
         where userGroupId = ? and labelId = ? and itemId = ?""",
-                   (roleId, labelId, troveId))
-        permissionId = cu.fetchone()
-        if permissionId :
-            permissionId = permissionId[0]
-            if (oldLabelId != labelId or oldTroveId != troveId):
-                # a permission has changed the itemId or the labelId...
-                self.ri.updatePermissionId(permissionId, roleId)
-            else: # just set the new canWrite flag
-                self.ri.updateCanWrite(permissionId, roleId)
+                   (roleId, oldLabelId, oldTroveId))
+        ret = cu.fetchall()
+        if not ret: # noop, nothing clear to do
+            return
+        permissionId = ret[0][0]
+        try:
+            cu.execute("""
+            UPDATE Permissions
+            SET labelId = ?, itemId = ?, canWrite = ?, canRemove = ?
+            WHERE permissionId = ?""", (labelId, troveId, write, canRemove, permissionId))
+        except sqlerrors.ColumnNotUnique:
+            self.db.rollback()
+            raise errors.PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" %(
+                labelId, troveId)
+        if oldLabelId != labelId or oldTroveId != troveId:
+            # a permission has changed the itemId or the labelId...
+            self.ri.updatePermissionId(permissionId, roleId)
+        else: # just set the new canWrite flag
+            self.ri.updateCanWrite(permissionId, roleId)
         self.db.commit()
 
     def deleteAcl(self, role, label, item):
