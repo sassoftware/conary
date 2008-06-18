@@ -2,6 +2,10 @@ Changes in @NEW@:
   o Protocol Changes:
     * The addRoleMember() and getRoleMembers() calls are now exposed
       via XMLRPC. (CNY-2862)
+  o Bug Fixes:
+    * A rare error that occurred when an updating containing several groups
+      that contained different versions of the same package has been 
+      fixed. (CNY-2860)
 
 Changes in 2.0.17:
   o Build Changes:
